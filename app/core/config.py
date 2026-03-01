@@ -1,0 +1,19 @@
+﻿from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file='.env', env_file_encoding='utf-8', extra='ignore')
+
+    app_env: str = 'dev'
+    app_secret: str = 'change-me'
+    database_url: str = 'postgresql+psycopg2://postgres:postgres@localhost:5432/aipingtubackend'
+
+    object_bucket: str = 'aipingtuphotos'
+    object_base_url: str = 'https://object.example.com'
+    max_upload_bytes: int = 20 * 1024 * 1024
+
+    rate_limit_per_minute: int = 20
+    default_daily_quota: int = 20
+
+
+settings = Settings()
