@@ -2,13 +2,15 @@
 
 import time
 from datetime import date, datetime, timezone
+from urllib.parse import quote
 
 from sqlalchemy.orm import Session
 
 from app.api.deps import new_public_id
-from app.db.models import Review, ReviewMode, ReviewStatus, ReviewTask, TaskStatus, UsageLedger
+from app.core.config import settings
+from app.db.models import Photo, Review, ReviewMode, ReviewStatus, ReviewTask, TaskStatus, UsageLedger
 from app.db.session import SessionLocal
-from app.services.ai import run_mock_review
+from app.services.ai import AIReviewError, run_ai_review
 
 
 class ReviewWorker:
@@ -85,7 +87,34 @@ class ReviewWorker:
         db.add(task)
         db.commit()
 
-        result = run_mock_review(task.mode.value if isinstance(task.mode, ReviewMode) else str(task.mode))
+        photo = db.query(Photo).filter(Photo.id == task.photo_id).first()
+        if photo is None:
+            task.status = TaskStatus.FAILED
+            task.progress = 100
+            task.finished_at = datetime.now(timezone.utc)
+            task.error_code = 'PHOTO_NOT_FOUND'
+            task.error_message = 'Photo record not found for task'
+            db.add(task)
+            db.commit()
+            return
+
+        image_url = f'{settings.object_base_url.rstrip("/")}/{quote(photo.object_key)}'
+        try:
+            ai_response = run_ai_review(
+                task.mode.value if isinstance(task.mode, ReviewMode) else str(task.mode),
+                image_url=image_url,
+            )
+        except AIReviewError as exc:
+            task.status = TaskStatus.FAILED
+            task.progress = 100
+            task.finished_at = datetime.now(timezone.utc)
+            task.error_code = 'AI_CALL_FAILED'
+            task.error_message = str(exc)[:500]
+            db.add(task)
+            db.commit()
+            return
+
+        result = ai_response.result
 
         review = Review(
             public_id=new_public_id('rev'),
@@ -96,11 +125,11 @@ class ReviewWorker:
             status=ReviewStatus.SUCCEEDED,
             schema_version=result.schema_version,
             result_json=result.model_dump(),
-            input_tokens=200,
-            output_tokens=300,
-            cost_usd=0.0025 if task.mode == ReviewMode.flash else 0.01,
-            latency_ms=800,
-            model_name='mock-vision-v1',
+            input_tokens=ai_response.input_tokens,
+            output_tokens=ai_response.output_tokens,
+            cost_usd=ai_response.cost_usd,
+            latency_ms=ai_response.latency_ms,
+            model_name=ai_response.model_name,
         )
         db.add(review)
         db.flush()
@@ -113,7 +142,7 @@ class ReviewWorker:
             amount=1,
             unit='count',
             bill_date=date.today(),
-            metadata={'mode': task.mode.value if isinstance(task.mode, ReviewMode) else str(task.mode)},
+            metadata_json={'mode': task.mode.value if isinstance(task.mode, ReviewMode) else str(task.mode)},
         )
         db.add(ledger)
 

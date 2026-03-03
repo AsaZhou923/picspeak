@@ -15,5 +15,10 @@ class Settings(BaseSettings):
     rate_limit_per_minute: int = 20
     default_daily_quota: int = 20
 
+    siliconflow_base_url: str = 'https://api.siliconflow.cn/v1'
+    siliconflow_api_key: str = ''
+    ai_model_name: str = 'Qwen/Qwen3-VL-8B-Instruct'
+    ai_timeout_seconds: int = 60
+
 
 settings = Settings()

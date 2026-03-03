@@ -178,7 +178,7 @@ class UsageLedger(Base):
     amount: Mapped[float] = mapped_column(Numeric(18, 6), nullable=False)
     unit: Mapped[str] = mapped_column(Text, nullable=False)
     bill_date: Mapped[date] = mapped_column(Date, nullable=False)
-    metadata: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    metadata_json: Mapped[dict] = mapped_column('metadata', JSONB, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 

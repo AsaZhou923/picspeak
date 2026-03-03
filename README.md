@@ -74,7 +74,7 @@ uvicorn app.main:app --reload --port 8000
 - 当前鉴权为开发态简化方案：
   - `Authorization: Bearer dev-<user_public_id>`
   - 首次请求会自动创建测试用户
-- AI 点评当前为 Mock 逻辑，可替换为 GPT-4o / Gemini 实际调用。
+- AI 点评已接入 SiliconFlow，默认模型为 `Qwen/Qwen3-VL-8B-Instruct`（需配置 `SILICONFLOW_API_KEY`）。
 - 异步任务当前为进程内 worker，生产建议迁移到独立队列（如 Redis + Celery/RQ）。
 
 ## 数据与设计文档

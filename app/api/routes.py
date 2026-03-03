@@ -38,7 +38,7 @@ from app.schemas import (
     TaskStatusResponse,
     UsageResponse,
 )
-from app.services.ai import run_mock_review
+from app.services.ai import AIReviewError, run_ai_review
 from app.services.guard import (
     enforce_rate_limit,
     enforce_user_quota,
@@ -53,12 +53,15 @@ ALLOWED_CONTENT_TYPES = {'image/jpeg', 'image/png', 'image/webp'}
 
 
 def _build_photo_url(bucket: str, object_key: str) -> str:
-    return f's3://{bucket}/{object_key}'
+    _ = bucket
+    base = settings.object_base_url.rstrip('/')
+    return f'{base}/{quote(object_key)}'
 
 
 def _build_put_url(bucket: str, object_key: str) -> str:
+    _ = bucket
     base = settings.object_base_url.rstrip('/')
-    return f'{base}/{bucket}/{quote(object_key)}'
+    return f'{base}/{quote(object_key)}'
 
 
 @router.post('/uploads/presign', response_model=PresignResponse)
@@ -221,7 +224,13 @@ def create_review(
             db.commit()
         return response
 
-    result = run_mock_review(payload.mode)
+    image_url = _build_put_url(photo.bucket, photo.object_key)
+    try:
+        ai_response = run_ai_review(payload.mode, image_url=image_url)
+    except AIReviewError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f'AI review failed: {exc}') from exc
+
+    result = ai_response.result
     review = Review(
         public_id=new_public_id('rev'),
         task_id=None,
@@ -231,11 +240,11 @@ def create_review(
         status=ReviewStatus.SUCCEEDED,
         schema_version=result.schema_version,
         result_json=result.model_dump(),
-        input_tokens=200,
-        output_tokens=300,
-        cost_usd=0.0025 if payload.mode == 'flash' else 0.01,
-        latency_ms=900,
-        model_name='mock-vision-v1',
+        input_tokens=ai_response.input_tokens,
+        output_tokens=ai_response.output_tokens,
+        cost_usd=ai_response.cost_usd,
+        latency_ms=ai_response.latency_ms,
+        model_name=ai_response.model_name,
     )
     db.add(review)
     increment_quota(db, user)
