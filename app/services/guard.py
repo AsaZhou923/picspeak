@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import hashlib
 from datetime import datetime, timedelta, timezone
@@ -28,16 +28,21 @@ def increment_quota(db: Session, user: User) -> None:
     db.add(user)
 
 
-def enforce_rate_limit(db: Session, user: User, endpoint: str) -> dict:
-    now = utc_now()
-    window_start = minute_window_start(now)
-    window_seconds = 60
-
+def _enforce_scope_rate_limit(
+    db: Session,
+    *,
+    scope: str,
+    scope_key: str,
+    endpoint: str,
+    per_minute_limit: int,
+    window_start: datetime,
+    window_seconds: int,
+) -> dict:
     counter = (
         db.query(RateLimitCounter)
         .filter(
-            RateLimitCounter.scope == 'user',
-            RateLimitCounter.scope_key == user.public_id,
+            RateLimitCounter.scope == scope,
+            RateLimitCounter.scope_key == scope_key,
             RateLimitCounter.endpoint == endpoint,
             RateLimitCounter.window_start == window_start,
             RateLimitCounter.window_seconds == window_seconds,
@@ -47,8 +52,8 @@ def enforce_rate_limit(db: Session, user: User, endpoint: str) -> dict:
 
     if counter is None:
         counter = RateLimitCounter(
-            scope='user',
-            scope_key=user.public_id,
+            scope=scope,
+            scope_key=scope_key,
             endpoint=endpoint,
             window_start=window_start,
             window_seconds=window_seconds,
@@ -56,16 +61,49 @@ def enforce_rate_limit(db: Session, user: User, endpoint: str) -> dict:
         )
         db.add(counter)
 
-    if counter.hit_count >= settings.rate_limit_per_minute:
-        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail='Rate limit exceeded')
+    if counter.hit_count >= per_minute_limit:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=f'Rate limit exceeded ({scope})')
 
     counter.hit_count += 1
     db.add(counter)
 
     return {
-        'limit_per_min': settings.rate_limit_per_minute,
-        'remaining': settings.rate_limit_per_minute - counter.hit_count,
+        'limit_per_min': per_minute_limit,
+        'remaining': per_minute_limit - counter.hit_count,
         'reset_at': (window_start + timedelta(seconds=window_seconds)).isoformat(),
+    }
+
+
+def enforce_rate_limit(db: Session, user: User, endpoint: str, client_ip: str | None = None) -> dict:
+    now = utc_now()
+    window_start = minute_window_start(now)
+    window_seconds = 60
+
+    user_rate = _enforce_scope_rate_limit(
+        db,
+        scope='user',
+        scope_key=user.public_id,
+        endpoint=endpoint,
+        per_minute_limit=settings.rate_limit_per_minute,
+        window_start=window_start,
+        window_seconds=window_seconds,
+    )
+
+    ip_rate = None
+    if client_ip:
+        ip_rate = _enforce_scope_rate_limit(
+            db,
+            scope='ip',
+            scope_key=client_ip,
+            endpoint=endpoint,
+            per_minute_limit=settings.ip_rate_limit_per_minute,
+            window_start=window_start,
+            window_seconds=window_seconds,
+        )
+
+    return {
+        'user': user_rate,
+        'ip': ip_rate,
     }
 
 

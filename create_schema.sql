@@ -212,4 +212,27 @@ CREATE TRIGGER trg_rate_limit_updated_at
 BEFORE UPDATE ON rate_limit_counters
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
+
+-- 10) api_request_logs
+CREATE TABLE IF NOT EXISTS api_request_logs (
+    id                  BIGSERIAL PRIMARY KEY,
+    request_id          TEXT NOT NULL UNIQUE,
+    method              TEXT NOT NULL,
+    path                TEXT NOT NULL,
+    query_string        TEXT,
+    endpoint            TEXT,
+    client_ip           TEXT,
+    user_public_id      TEXT,
+    user_agent          TEXT,
+    request_body        TEXT,
+    status_code         INTEGER NOT NULL,
+    duration_ms         INTEGER NOT NULL CHECK (duration_ms >= 0),
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_api_request_logs_created ON api_request_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_api_request_logs_user_created ON api_request_logs(user_public_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_api_request_logs_ip_created ON api_request_logs(client_ip, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_api_request_logs_path_created ON api_request_logs(path, created_at DESC);
+
 COMMIT;

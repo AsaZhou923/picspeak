@@ -1,4 +1,5 @@
-﻿from pydantic_settings import BaseSettings, SettingsConfigDict
+﻿from pydantic import model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -12,13 +13,26 @@ class Settings(BaseSettings):
     object_base_url: str = 'https://object.example.com'
     max_upload_bytes: int = 20 * 1024 * 1024
 
-    rate_limit_per_minute: int = 20
+    rate_limit_per_minute: int = 10
+    ip_rate_limit_per_minute: int = 30
     default_daily_quota: int = 20
+
+    oauth_jwt_secret: str = 'change-me-jwt-secret'
+    oauth_jwt_issuer: str = ''
+    oauth_jwt_audience: str = ''
+    trust_x_forwarded_for: bool = False
 
     siliconflow_base_url: str = 'https://api.siliconflow.cn/v1'
     siliconflow_api_key: str = ''
     ai_model_name: str = 'Qwen/Qwen3-VL-8B-Instruct'
     ai_timeout_seconds: int = 60
+
+    @model_validator(mode='after')
+    def validate_oauth_secret(self) -> 'Settings':
+        insecure_defaults = {'', 'change-me-jwt-secret'}
+        if self.app_env.strip().lower() != 'dev' and self.oauth_jwt_secret.strip() in insecure_defaults:
+            raise ValueError('OAUTH_JWT_SECRET must be set to a non-default secret outside dev mode')
+        return self
 
 
 settings = Settings()
