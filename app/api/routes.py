@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 from datetime import datetime, timedelta, timezone
@@ -64,13 +64,26 @@ def _build_put_url(bucket: str, object_key: str) -> str:
     return f'{base}/{quote(object_key)}'
 
 
+def _client_ip(request: Request) -> str | None:
+    forwarded_for = request.headers.get('x-forwarded-for')
+    if forwarded_for:
+        candidate = forwarded_for.split(',', 1)[0].strip()
+        if candidate:
+            return candidate
+    if request.client:
+        return request.client.host
+    return None
+
+
 @router.post('/uploads/presign', response_model=PresignResponse)
 def create_upload_presign(
     payload: PresignRequest,
+    request: Request,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    _ = db
+    enforce_rate_limit(db, user, '/uploads/presign', client_ip=_client_ip(request))
+
     if payload.content_type not in ALLOWED_CONTENT_TYPES:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Unsupported content_type')
     if payload.size_bytes > settings.max_upload_bytes:
@@ -90,6 +103,7 @@ def create_upload_presign(
         'sha256': payload.sha256,
     }
     upload_id = sign_payload(token_payload, ttl_seconds=600)
+    db.commit()
 
     return PresignResponse(
         upload_id=upload_id,
@@ -103,9 +117,12 @@ def create_upload_presign(
 @router.post('/photos', response_model=PhotoCreateResponse)
 def confirm_photo_upload(
     payload: PhotoCreateRequest,
+    request: Request,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
+    enforce_rate_limit(db, user, '/photos', client_ip=_client_ip(request))
+
     token = verify_payload(payload.upload_id)
     if token.get('uid') != user.public_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Upload owner mismatch')
@@ -164,7 +181,7 @@ def create_review(
     if user.status != UserStatus.active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='User is not active')
 
-    enforce_rate_limit(db, user, '/reviews')
+    enforce_rate_limit(db, user, '/reviews', client_ip=_client_ip(request))
     enforce_user_quota(user)
 
     photo = _find_photo_owned(db, payload.photo_id, user.id)
@@ -267,7 +284,14 @@ def create_review(
 
 
 @router.get('/tasks/{task_id}', response_model=TaskStatusResponse)
-def get_task_status(task_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def get_task_status(
+    task_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    enforce_rate_limit(db, user, '/tasks/{task_id}', client_ip=_client_ip(request))
+
     task = db.query(ReviewTask).filter(ReviewTask.public_id == task_id, ReviewTask.owner_user_id == user.id).first()
     if task is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Task not found')
@@ -277,6 +301,7 @@ def get_task_status(task_id: str, db: Session = Depends(get_db), user: User = De
     if task.error_code or task.error_message:
         error = {'code': task.error_code, 'message': task.error_message}
 
+    db.commit()
     return TaskStatusResponse(
         task_id=task.public_id,
         status=task.status.value,
@@ -287,12 +312,20 @@ def get_task_status(task_id: str, db: Session = Depends(get_db), user: User = De
 
 
 @router.get('/reviews/{review_id}', response_model=ReviewGetResponse)
-def get_review(review_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def get_review(
+    review_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    enforce_rate_limit(db, user, '/reviews/{review_id}', client_ip=_client_ip(request))
+
     review = db.query(Review).filter(Review.public_id == review_id, Review.owner_user_id == user.id).first()
     if review is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Review not found')
 
     photo = db.query(Photo).filter(Photo.id == review.photo_id).first()
+    db.commit()
     return ReviewGetResponse(
         review_id=review.public_id,
         photo_id=photo.public_id if photo else 'unknown',
@@ -306,11 +339,14 @@ def get_review(review_id: str, db: Session = Depends(get_db), user: User = Depen
 @router.get('/photos/{photo_id}/reviews', response_model=PhotoReviewsResponse)
 def list_photo_reviews(
     photo_id: str,
+    request: Request,
     limit: int = Query(default=20, ge=1, le=100),
     cursor: str | None = Query(default=None),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
+    enforce_rate_limit(db, user, '/photos/{photo_id}/reviews', client_ip=_client_ip(request))
+
     photo = _find_photo_owned(db, photo_id, user.id)
 
     query = db.query(Review).filter(Review.photo_id == photo.id, Review.owner_user_id == user.id).order_by(Review.created_at.desc())
@@ -329,12 +365,13 @@ def list_photo_reviews(
     items = [ReviewListItem(review_id=row.public_id, mode=row.mode.value, status=row.status.value) for row in rows]
     next_cursor = rows[-1].created_at.isoformat() if has_next and rows else None
 
+    db.commit()
     return PhotoReviewsResponse(items=items, next_cursor=next_cursor)
 
 
 @router.get('/me/usage', response_model=UsageResponse)
-def get_usage(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    rate = enforce_rate_limit(db, user, '/me/usage')
+def get_usage(request: Request, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    rate = enforce_rate_limit(db, user, '/me/usage', client_ip=_client_ip(request))
     db.commit()
     return UsageResponse(
         plan=user.plan.value,

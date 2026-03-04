@@ -216,3 +216,27 @@ class IdempotencyKey(Base):
     response_json: Mapped[dict | None] = mapped_column(JSONB)
     expire_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class ApiRequestLog(Base):
+    __tablename__ = 'api_request_logs'
+    __table_args__ = (
+        Index('idx_api_request_logs_created', 'created_at'),
+        Index('idx_api_request_logs_user_created', 'user_public_id', 'created_at'),
+        Index('idx_api_request_logs_ip_created', 'client_ip', 'created_at'),
+        Index('idx_api_request_logs_path_created', 'path', 'created_at'),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    request_id: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
+    method: Mapped[str] = mapped_column(Text, nullable=False)
+    path: Mapped[str] = mapped_column(Text, nullable=False)
+    query_string: Mapped[str | None] = mapped_column(Text)
+    endpoint: Mapped[str | None] = mapped_column(Text)
+    client_ip: Mapped[str | None] = mapped_column(Text)
+    user_public_id: Mapped[str | None] = mapped_column(Text)
+    user_agent: Mapped[str | None] = mapped_column(Text)
+    request_body: Mapped[str | None] = mapped_column(Text)
+    status_code: Mapped[int] = mapped_column(Integer, nullable=False)
+    duration_ms: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
