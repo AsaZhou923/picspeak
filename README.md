@@ -56,6 +56,13 @@ pip install -r requirements.txt
 2. 配置环境变量
 
 复制 `.env.example` 为 `.env` 并按本地环境调整。
+其中上传到对象存储需要至少配置：
+- `OBJECT_BUCKET`
+- `OBJECT_BASE_URL`（用于回显/读取图片 URL）
+- `OBJECT_S3_ENDPOINT`（R2 S3 兼容端点，如 `https://<accountid>.r2.cloudflarestorage.com`）
+- `OBJECT_ACCESS_KEY_ID`
+- `OBJECT_SECRET_ACCESS_KEY`
+- `OBJECT_REGION`（R2 可用 `auto`）
 
 3. 初始化数据库
 
@@ -75,6 +82,7 @@ uvicorn app.main:app --reload --port 8000
   - `Authorization: Bearer <access_token>`
   - 访问令牌需包含 `sub` 声明并使用 `HS256` 签名
   - 可通过环境变量配置 `OAUTH_JWT_SECRET` / `OAUTH_JWT_ISSUER` / `OAUTH_JWT_AUDIENCE`（非 `dev` 环境必须设置 `OAUTH_JWT_SECRET` 且不能使用默认值）
+- 上传签名接口 `/api/v1/uploads/presign` 会返回 S3 兼容 `PUT` 预签名 URL（默认 10 分钟过期），前端应使用返回的 `put_url + headers` 直接上传对象存储。
 - AI 点评已接入 SiliconFlow，默认模型为 `Qwen/Qwen3-VL-8B-Instruct`（需配置 `SILICONFLOW_API_KEY`）。
 - 异步任务当前为进程内 worker，生产建议迁移到独立队列（如 Redis + Celery/RQ）。
 - 默认限流：用户维度 `10 次/分钟`，IP 维度 `30 次/分钟`（可通过环境变量覆盖）。

@@ -11,6 +11,10 @@ class Settings(BaseSettings):
 
     object_bucket: str = 'aipingtuphotos'
     object_base_url: str = 'https://object.example.com'
+    object_s3_endpoint: str = ''
+    object_access_key_id: str = ''
+    object_secret_access_key: str = ''
+    object_region: str = 'auto'
     max_upload_bytes: int = 20 * 1024 * 1024
 
     rate_limit_per_minute: int = 10

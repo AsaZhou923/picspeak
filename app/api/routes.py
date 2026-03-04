@@ -48,6 +48,7 @@ from app.services.guard import (
     increment_quota,
     save_idempotency_record,
 )
+from app.services.object_storage import get_object_storage_client
 
 router = APIRouter(prefix='/api/v1', tags=['v1'])
 ALLOWED_CONTENT_TYPES = {'image/jpeg', 'image/png', 'image/webp'}
@@ -57,13 +58,6 @@ def _build_photo_url(bucket: str, object_key: str) -> str:
     _ = bucket
     base = settings.object_base_url.rstrip('/')
     return f'{base}/{quote(object_key)}'
-
-
-def _build_put_url(bucket: str, object_key: str) -> str:
-    _ = bucket
-    base = settings.object_base_url.rstrip('/')
-    return f'{base}/{quote(object_key)}'
-
 
 
 @router.post('/uploads/presign', response_model=PresignResponse)
@@ -94,12 +88,31 @@ def create_upload_presign(
         'sha256': payload.sha256,
     }
     upload_id = sign_payload(token_payload, ttl_seconds=600)
+
+    try:
+        s3_client = get_object_storage_client()
+        put_url = s3_client.generate_presigned_url(
+            ClientMethod='put_object',
+            Params={
+                'Bucket': settings.object_bucket,
+                'Key': object_key,
+                'ContentType': payload.content_type,
+            },
+            ExpiresIn=600,
+            HttpMethod='PUT',
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f'Failed to generate upload presign URL: {exc}',
+        ) from exc
+
     db.commit()
 
     return PresignResponse(
         upload_id=upload_id,
         object_key=object_key,
-        put_url=_build_put_url(settings.object_bucket, object_key),
+        put_url=put_url,
         headers={'Content-Type': payload.content_type},
         expires_at=now + timedelta(minutes=10),
     )
@@ -232,7 +245,7 @@ def create_review(
             db.commit()
         return response
 
-    image_url = _build_put_url(photo.bucket, photo.object_key)
+    image_url = _build_photo_url(photo.bucket, photo.object_key)
     try:
         ai_response = run_ai_review(payload.mode, image_url=image_url)
     except AIReviewError as exc:
