@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, new_public_id
 from app.core.config import settings
+from app.core.network import client_ip_from_request
 from app.core.security import sign_payload, verify_payload
 from app.db.models import (
     Photo,
@@ -64,16 +65,6 @@ def _build_put_url(bucket: str, object_key: str) -> str:
     return f'{base}/{quote(object_key)}'
 
 
-def _client_ip(request: Request) -> str | None:
-    forwarded_for = request.headers.get('x-forwarded-for')
-    if forwarded_for:
-        candidate = forwarded_for.split(',', 1)[0].strip()
-        if candidate:
-            return candidate
-    if request.client:
-        return request.client.host
-    return None
-
 
 @router.post('/uploads/presign', response_model=PresignResponse)
 def create_upload_presign(
@@ -82,7 +73,7 @@ def create_upload_presign(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    enforce_rate_limit(db, user, '/uploads/presign', client_ip=_client_ip(request))
+    enforce_rate_limit(db, user, '/uploads/presign', client_ip=client_ip_from_request(request))
 
     if payload.content_type not in ALLOWED_CONTENT_TYPES:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Unsupported content_type')
@@ -121,7 +112,7 @@ def confirm_photo_upload(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    enforce_rate_limit(db, user, '/photos', client_ip=_client_ip(request))
+    enforce_rate_limit(db, user, '/photos', client_ip=client_ip_from_request(request))
 
     token = verify_payload(payload.upload_id)
     if token.get('uid') != user.public_id:
@@ -181,7 +172,7 @@ def create_review(
     if user.status != UserStatus.active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='User is not active')
 
-    enforce_rate_limit(db, user, '/reviews', client_ip=_client_ip(request))
+    enforce_rate_limit(db, user, '/reviews', client_ip=client_ip_from_request(request))
     enforce_user_quota(user)
 
     photo = _find_photo_owned(db, payload.photo_id, user.id)
@@ -290,7 +281,7 @@ def get_task_status(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    enforce_rate_limit(db, user, '/tasks/{task_id}', client_ip=_client_ip(request))
+    enforce_rate_limit(db, user, '/tasks/{task_id}', client_ip=client_ip_from_request(request))
 
     task = db.query(ReviewTask).filter(ReviewTask.public_id == task_id, ReviewTask.owner_user_id == user.id).first()
     if task is None:
@@ -318,7 +309,7 @@ def get_review(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    enforce_rate_limit(db, user, '/reviews/{review_id}', client_ip=_client_ip(request))
+    enforce_rate_limit(db, user, '/reviews/{review_id}', client_ip=client_ip_from_request(request))
 
     review = db.query(Review).filter(Review.public_id == review_id, Review.owner_user_id == user.id).first()
     if review is None:
@@ -345,7 +336,7 @@ def list_photo_reviews(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    enforce_rate_limit(db, user, '/photos/{photo_id}/reviews', client_ip=_client_ip(request))
+    enforce_rate_limit(db, user, '/photos/{photo_id}/reviews', client_ip=client_ip_from_request(request))
 
     photo = _find_photo_owned(db, photo_id, user.id)
 
@@ -371,7 +362,7 @@ def list_photo_reviews(
 
 @router.get('/me/usage', response_model=UsageResponse)
 def get_usage(request: Request, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    rate = enforce_rate_limit(db, user, '/me/usage', client_ip=_client_ip(request))
+    rate = enforce_rate_limit(db, user, '/me/usage', client_ip=client_ip_from_request(request))
     db.commit()
     return UsageResponse(
         plan=user.plan.value,

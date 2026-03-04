@@ -74,10 +74,11 @@ uvicorn app.main:app --reload --port 8000
 - 当前鉴权为 JWT Bearer Token：
   - `Authorization: Bearer <access_token>`
   - 访问令牌需包含 `sub` 声明并使用 `HS256` 签名
-  - 可通过环境变量配置 `OAUTH_JWT_SECRET` / `OAUTH_JWT_ISSUER` / `OAUTH_JWT_AUDIENCE`
+  - 可通过环境变量配置 `OAUTH_JWT_SECRET` / `OAUTH_JWT_ISSUER` / `OAUTH_JWT_AUDIENCE`（非 `dev` 环境必须设置 `OAUTH_JWT_SECRET` 且不能使用默认值）
 - AI 点评已接入 SiliconFlow，默认模型为 `Qwen/Qwen3-VL-8B-Instruct`（需配置 `SILICONFLOW_API_KEY`）。
 - 异步任务当前为进程内 worker，生产建议迁移到独立队列（如 Redis + Celery/RQ）。
 - 默认限流：用户维度 `10 次/分钟`，IP 维度 `30 次/分钟`（可通过环境变量覆盖）。
+- 默认使用 `request.client.host` 识别客户端 IP；仅在显式开启 `TRUST_X_FORWARDED_FOR=true` 时才会信任 `X-Forwarded-For`。
 - 服务会记录 API 请求审计日志到 `api_request_logs`（IP、路径、状态码、耗时、请求体截断等）。
 
 ## 数据与设计文档

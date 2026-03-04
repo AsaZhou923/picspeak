@@ -4,6 +4,7 @@ import time
 from fastapi import FastAPI, Request
 
 from app.api.routes import router
+from app.core.network import client_ip_from_request
 from app.db.session import SessionLocal
 from app.services.audit import log_api_request
 from app.services.worker import worker
@@ -41,10 +42,7 @@ async def request_audit_middleware(request: Request, call_next):
         query_string = request.url.query or None
         user_public_id = getattr(request.state, 'current_user_public_id', None)
 
-        forwarded_for = request.headers.get('x-forwarded-for')
-        client_ip = forwarded_for.split(',', 1)[0].strip() if forwarded_for else None
-        if not client_ip and request.client:
-            client_ip = request.client.host
+        client_ip = client_ip_from_request(request)
 
         db = SessionLocal()
         try:
