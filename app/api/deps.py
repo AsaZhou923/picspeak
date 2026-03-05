@@ -12,6 +12,7 @@ from app.db.models import User, UserPlan, UserStatus
 from app.db.session import get_db
 
 GUEST_TOKEN_COOKIE = 'ps_guest_token'
+GUEST_TOKEN_TTL_SECONDS = 30 * 24 * 3600
 
 
 class CurrentActor:
@@ -88,7 +89,10 @@ def create_guest_user(db: Session) -> User:
 
 
 def issue_guest_token(user: User) -> str:
-    return create_access_token({'sub': user.public_id, 'plan': user.plan.value, 'role': 'guest'})
+    return create_access_token(
+        {'sub': user.public_id, 'plan': user.plan.value, 'role': 'guest'},
+        ttl_seconds=GUEST_TOKEN_TTL_SECONDS,
+    )
 
 
 def bind_guest_token(response: Response, token: str) -> None:
@@ -98,7 +102,7 @@ def bind_guest_token(response: Response, token: str) -> None:
         httponly=True,
         secure=False,
         samesite='lax',
-        max_age=30 * 24 * 3600,
+        max_age=GUEST_TOKEN_TTL_SECONDS,
         path='/',
     )
     response.headers['X-Guest-Access-Token'] = token
