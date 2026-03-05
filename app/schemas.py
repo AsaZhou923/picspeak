@@ -102,3 +102,18 @@ class UsageResponse(BaseModel):
     plan: str
     quota: dict[str, int]
     rate_limit: dict[str, Any]
+
+
+class AuthGoogleLoginRequest(BaseModel):
+    id_token: str
+
+
+class AuthTokenResponse(BaseModel):
+    access_token: str
+    token_type: str = 'bearer'
+    user_id: str
+    plan: str
+
+
+class AuthGuestResponse(AuthTokenResponse):
+    pass

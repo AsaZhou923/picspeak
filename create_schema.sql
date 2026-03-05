@@ -9,7 +9,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_plan') THEN
-        CREATE TYPE user_plan AS ENUM ('free', 'pro', 'enterprise');
+        CREATE TYPE user_plan AS ENUM ('guest', 'free', 'pro');
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_status') THEN
         CREATE TYPE user_status AS ENUM ('active', 'suspended', 'deleted');
@@ -44,9 +44,10 @@ CREATE TABLE IF NOT EXISTS users (
     email               TEXT NOT NULL UNIQUE,
     username            TEXT NOT NULL UNIQUE,
     password_hash       TEXT,
-    plan                user_plan NOT NULL DEFAULT 'free',
-    daily_quota_total   INTEGER NOT NULL DEFAULT 20 CHECK (daily_quota_total >= 0),
+    plan                user_plan NOT NULL DEFAULT 'guest',
+    daily_quota_total   INTEGER NOT NULL DEFAULT 6 CHECK (daily_quota_total >= 0),
     daily_quota_used    INTEGER NOT NULL DEFAULT 0 CHECK (daily_quota_used >= 0),
+    daily_quota_date    DATE NOT NULL DEFAULT CURRENT_DATE,
     status              user_status NOT NULL DEFAULT 'active',
     last_login_at       TIMESTAMPTZ,
     created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),

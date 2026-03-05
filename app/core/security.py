@@ -49,6 +49,29 @@ def verify_payload(token: str) -> dict[str, Any]:
     return payload
 
 
+
+
+def create_access_token(payload: dict[str, Any], ttl_seconds: int = 24 * 3600) -> str:
+    now = int(time.time())
+    body = payload.copy()
+    body.setdefault('iat', now)
+    body.setdefault('nbf', now)
+    body.setdefault('exp', now + ttl_seconds)
+
+    header = {'alg': 'HS256', 'typ': 'JWT'}
+    issuer = settings.oauth_jwt_issuer.strip()
+    if issuer:
+        body.setdefault('iss', issuer)
+    audience = settings.oauth_jwt_audience.strip()
+    if audience:
+        body.setdefault('aud', audience)
+
+    header_b64 = _b64url_encode(json.dumps(header, separators=(',', ':')).encode('utf-8'))
+    payload_b64 = _b64url_encode(json.dumps(body, separators=(',', ':'), ensure_ascii=False).encode('utf-8'))
+    signed_part = f'{header_b64}.{payload_b64}'.encode('utf-8')
+    signature = hmac.new(settings.oauth_jwt_secret.encode('utf-8'), signed_part, hashlib.sha256).digest()
+    return f'{header_b64}.{payload_b64}.{_b64url_encode(signature)}'
+
 def validate_access_token(token: str) -> dict[str, Any]:
     try:
         header_b64, payload_b64, signature_b64 = token.split('.')
