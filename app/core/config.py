@@ -19,12 +19,17 @@ class Settings(BaseSettings):
 
     rate_limit_per_minute: int = 10
     ip_rate_limit_per_minute: int = 30
-    default_daily_quota: int = 20
+    guest_ip_rate_limit_per_minute: int = 8
+    guest_burst_limit_per_10s: int = 3
+    default_daily_quota: int = 6
 
     oauth_jwt_secret: str = 'change-me-jwt-secret'
     oauth_jwt_issuer: str = ''
     oauth_jwt_audience: str = ''
     trust_x_forwarded_for: bool = False
+    google_oauth_client_id: str = ""
+    google_oauth_client_secret: str = ""
+    google_oauth_redirect_uri: str = ""
 
     siliconflow_base_url: str = 'https://api.siliconflow.cn/v1'
     siliconflow_api_key: str = ''

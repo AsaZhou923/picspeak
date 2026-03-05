@@ -5,14 +5,24 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from urllib import error as urllib_error
+from urllib import parse, request as urllib_request
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, new_public_id
+from app.api.deps import (
+    CurrentActor,
+    bind_guest_token,
+    create_guest_user,
+    get_current_actor,
+    issue_guest_token,
+    new_public_id,
+    quota_for_plan,
+)
 from app.core.config import settings
 from app.core.network import client_ip_from_request
-from app.core.security import sign_payload, verify_payload
+from app.core.security import create_access_token, sign_payload, verify_payload
 from app.db.models import (
     Photo,
     PhotoStatus,
@@ -22,6 +32,7 @@ from app.db.models import (
     ReviewTask,
     TaskStatus,
     User,
+    UserPlan,
     UserStatus,
 )
 from app.db.session import get_db
@@ -38,6 +49,9 @@ from app.schemas import (
     ReviewListItem,
     TaskStatusResponse,
     UsageResponse,
+    AuthGuestResponse,
+    AuthGoogleLoginRequest,
+    AuthTokenResponse,
 )
 from app.services.ai import AIReviewError, run_ai_review
 from app.services.guard import (
@@ -60,14 +74,124 @@ def _build_photo_url(bucket: str, object_key: str) -> str:
     return f'{base}/{quote(object_key)}'
 
 
+
+
+def _google_token_info(id_token: str) -> dict:
+    query = parse.urlencode({'id_token': id_token})
+    url = f'https://oauth2.googleapis.com/tokeninfo?{query}'
+    with urllib_request.urlopen(url, timeout=8) as resp:
+        return json.loads(resp.read().decode('utf-8'))
+
+
+def _google_exchange_code(code: str) -> dict:
+    if not settings.google_oauth_client_id.strip() or not settings.google_oauth_client_secret.strip() or not settings.google_oauth_redirect_uri.strip():
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='Google OAuth callback is not configured')
+
+    data = parse.urlencode(
+        {
+            'code': code,
+            'client_id': settings.google_oauth_client_id,
+            'client_secret': settings.google_oauth_client_secret,
+            'redirect_uri': settings.google_oauth_redirect_uri,
+            'grant_type': 'authorization_code',
+        }
+    ).encode('utf-8')
+    req = urllib_request.Request('https://oauth2.googleapis.com/token', data=data, method='POST')
+    req.add_header('Content-Type', 'application/x-www-form-urlencoded')
+    with urllib_request.urlopen(req, timeout=10) as resp:
+        return json.loads(resp.read().decode('utf-8'))
+
+
+def _login_from_google_claims(claims: dict, db: Session) -> AuthTokenResponse:
+    if claims.get('email_verified') not in ('true', True):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Google account email is not verified')
+
+    expected_client_id = settings.google_oauth_client_id.strip()
+    if expected_client_id and claims.get('aud') != expected_client_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Invalid Google token audience')
+
+    google_sub = claims.get('sub')
+    if not isinstance(google_sub, str) or not google_sub.strip():
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Invalid Google token: missing sub')
+    google_sub = google_sub.strip()
+
+    email = claims.get('email') or f'{google_sub}@google.local'
+    name = claims.get('name') or claims.get('given_name') or f'google_{google_sub}'
+
+    user = db.query(User).filter(User.public_id == google_sub).first()
+    if user is None:
+        user = User(
+            public_id=google_sub,
+            email=email,
+            username=name,
+            password_hash=None,
+            plan=UserPlan.free,
+            daily_quota_total=quota_for_plan(UserPlan.free),
+            daily_quota_used=0,
+            status=UserStatus.active,
+            last_login_at=datetime.now(timezone.utc),
+        )
+        db.add(user)
+    else:
+        user.email = email
+        user.username = name
+        user.last_login_at = datetime.now(timezone.utc)
+        if user.plan == UserPlan.guest:
+            user.plan = UserPlan.free
+        user.daily_quota_total = quota_for_plan(user.plan)
+        db.add(user)
+
+    db.commit()
+    db.refresh(user)
+    token = create_access_token({'sub': user.public_id, 'email': user.email, 'plan': user.plan.value, 'provider': 'google'})
+    return AuthTokenResponse(access_token=token, token_type='bearer', user_id=user.public_id, plan=user.plan.value)
+
+
+@router.post('/auth/guest', response_model=AuthGuestResponse)
+def auth_guest(response: Response, db: Session = Depends(get_db)):
+    user = create_guest_user(db)
+    token = issue_guest_token(user)
+    bind_guest_token(response, token)
+    return AuthGuestResponse(access_token=token, token_type='bearer', user_id=user.public_id, plan=user.plan.value)
+
+
+@router.post('/auth/google/login', response_model=AuthTokenResponse)
+def auth_google_login(payload: AuthGoogleLoginRequest, db: Session = Depends(get_db)):
+    try:
+        claims = _google_token_info(payload.id_token)
+    except urllib_error.URLError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f'Google token verification failed: {exc}') from exc
+
+    return _login_from_google_claims(claims, db)
+
+
+@router.get('/auth/google/callback', response_model=AuthTokenResponse)
+def auth_google_callback(code: str = Query(..., min_length=1), db: Session = Depends(get_db)):
+    try:
+        token_resp = _google_exchange_code(code)
+    except urllib_error.URLError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f'Google code exchange failed: {exc}') from exc
+
+    id_token = token_resp.get('id_token')
+    if not isinstance(id_token, str) or not id_token.strip():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Google token response missing id_token')
+
+    try:
+        claims = _google_token_info(id_token)
+    except urllib_error.URLError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f'Google token verification failed: {exc}') from exc
+
+    return _login_from_google_claims(claims, db)
+
+
 @router.post('/uploads/presign', response_model=PresignResponse)
 def create_upload_presign(
     payload: PresignRequest,
     request: Request,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    actor: CurrentActor = Depends(get_current_actor),
 ):
-    enforce_rate_limit(db, user, '/uploads/presign', client_ip=client_ip_from_request(request))
+    enforce_rate_limit(db, actor, '/uploads/presign', client_ip=client_ip_from_request(request))
 
     if payload.content_type not in ALLOWED_CONTENT_TYPES:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Unsupported content_type')
@@ -76,11 +200,11 @@ def create_upload_presign(
 
     now = datetime.now(timezone.utc)
     ext = Path(payload.filename).suffix or '.jpg'
-    object_key = f'user_{user.public_id}/{now:%Y/%m}/{new_public_id("obj")}{ext}'
+    object_key = f'user_{actor.user.public_id}/{now:%Y/%m}/{new_public_id("obj")}{ext}'
 
     token_payload = {
         'upload_id': new_public_id('upl'),
-        'uid': user.public_id,
+        'uid': actor.user.public_id,
         'bucket': settings.object_bucket,
         'object_key': object_key,
         'content_type': payload.content_type,
@@ -123,12 +247,12 @@ def confirm_photo_upload(
     payload: PhotoCreateRequest,
     request: Request,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    actor: CurrentActor = Depends(get_current_actor),
 ):
-    enforce_rate_limit(db, user, '/photos', client_ip=client_ip_from_request(request))
+    enforce_rate_limit(db, actor, '/photos', client_ip=client_ip_from_request(request))
 
     token = verify_payload(payload.upload_id)
-    if token.get('uid') != user.public_id:
+    if token.get('uid') != actor.user.public_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Upload owner mismatch')
 
     client_width = payload.client_meta.get('width')
@@ -140,7 +264,7 @@ def confirm_photo_upload(
 
     photo = Photo(
         public_id=new_public_id('pho'),
-        owner_user_id=user.id,
+        owner_user_id=actor.user.id,
         upload_id=token['upload_id'],
         bucket=token['bucket'],
         object_key=token['object_key'],
@@ -180,15 +304,15 @@ def create_review(
     payload: ReviewCreateRequest,
     request: Request,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    actor: CurrentActor = Depends(get_current_actor),
 ):
-    if user.status != UserStatus.active:
+    if actor.user.status != UserStatus.active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='User is not active')
 
-    enforce_rate_limit(db, user, '/reviews', client_ip=client_ip_from_request(request))
-    enforce_user_quota(user)
+    enforce_rate_limit(db, actor, '/reviews', client_ip=client_ip_from_request(request))
+    enforce_user_quota(db, actor.user)
 
-    photo = _find_photo_owned(db, payload.photo_id, user.id)
+    photo = _find_photo_owned(db, payload.photo_id, actor.user.id)
     if photo.status != PhotoStatus.READY:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Photo is not ready for review')
 
@@ -196,7 +320,7 @@ def create_review(
     payload_dump = json.dumps(payload.model_dump(by_alias=True), ensure_ascii=False, sort_keys=True)
 
     if idempotency_key:
-        record = get_idempotency_record(db, user.id, '/reviews', idempotency_key)
+        record = get_idempotency_record(db, actor.user.id, '/reviews', idempotency_key)
         if record is not None and record.response_json is not None:
             return record.response_json
 
@@ -206,7 +330,7 @@ def create_review(
         task = ReviewTask(
             public_id=new_public_id('tsk'),
             photo_id=photo.id,
-            owner_user_id=user.id,
+            owner_user_id=actor.user.id,
             mode=mode_enum,
             status=TaskStatus.PENDING,
             idempotency_key=idempotency_key,
@@ -217,14 +341,14 @@ def create_review(
             expire_at=datetime.now(timezone.utc) + timedelta(minutes=30),
         )
         db.add(task)
-        increment_quota(db, user)
+        increment_quota(db, actor.user)
         try:
             db.commit()
         except IntegrityError as exc:
             db.rollback()
             existing = (
                 db.query(ReviewTask)
-                .filter(ReviewTask.owner_user_id == user.id, ReviewTask.idempotency_key == idempotency_key)
+                .filter(ReviewTask.owner_user_id == actor.user.id, ReviewTask.idempotency_key == idempotency_key)
                 .first()
             )
             if existing:
@@ -235,7 +359,7 @@ def create_review(
         if idempotency_key:
             save_idempotency_record(
                 db,
-                user_id=user.id,
+                user_id=actor.user.id,
                 endpoint='/reviews',
                 key=idempotency_key,
                 request_hash=hash_request(payload_dump),
@@ -256,7 +380,7 @@ def create_review(
         public_id=new_public_id('rev'),
         task_id=None,
         photo_id=photo.id,
-        owner_user_id=user.id,
+        owner_user_id=actor.user.id,
         mode=mode_enum,
         status=ReviewStatus.SUCCEEDED,
         schema_version=result.schema_version,
@@ -268,7 +392,7 @@ def create_review(
         model_name=ai_response.model_name,
     )
     db.add(review)
-    increment_quota(db, user)
+    increment_quota(db, actor.user)
     db.commit()
     db.refresh(review)
 
@@ -276,7 +400,7 @@ def create_review(
     if idempotency_key:
         save_idempotency_record(
             db,
-            user_id=user.id,
+            user_id=actor.user.id,
             endpoint='/reviews',
             key=idempotency_key,
             request_hash=hash_request(payload_dump),
@@ -292,11 +416,11 @@ def get_task_status(
     task_id: str,
     request: Request,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    actor: CurrentActor = Depends(get_current_actor),
 ):
-    enforce_rate_limit(db, user, '/tasks/{task_id}', client_ip=client_ip_from_request(request))
+    enforce_rate_limit(db, actor, '/tasks/{task_id}', client_ip=client_ip_from_request(request))
 
-    task = db.query(ReviewTask).filter(ReviewTask.public_id == task_id, ReviewTask.owner_user_id == user.id).first()
+    task = db.query(ReviewTask).filter(ReviewTask.public_id == task_id, ReviewTask.owner_user_id == actor.user.id).first()
     if task is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Task not found')
 
@@ -320,11 +444,11 @@ def get_review(
     review_id: str,
     request: Request,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    actor: CurrentActor = Depends(get_current_actor),
 ):
-    enforce_rate_limit(db, user, '/reviews/{review_id}', client_ip=client_ip_from_request(request))
+    enforce_rate_limit(db, actor, '/reviews/{review_id}', client_ip=client_ip_from_request(request))
 
-    review = db.query(Review).filter(Review.public_id == review_id, Review.owner_user_id == user.id).first()
+    review = db.query(Review).filter(Review.public_id == review_id, Review.owner_user_id == actor.user.id).first()
     if review is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Review not found')
 
@@ -347,13 +471,13 @@ def list_photo_reviews(
     limit: int = Query(default=20, ge=1, le=100),
     cursor: str | None = Query(default=None),
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    actor: CurrentActor = Depends(get_current_actor),
 ):
-    enforce_rate_limit(db, user, '/photos/{photo_id}/reviews', client_ip=client_ip_from_request(request))
+    enforce_rate_limit(db, actor, '/photos/{photo_id}/reviews', client_ip=client_ip_from_request(request))
 
-    photo = _find_photo_owned(db, photo_id, user.id)
+    photo = _find_photo_owned(db, photo_id, actor.user.id)
 
-    query = db.query(Review).filter(Review.photo_id == photo.id, Review.owner_user_id == user.id).order_by(Review.created_at.desc())
+    query = db.query(Review).filter(Review.photo_id == photo.id, Review.owner_user_id == actor.user.id).order_by(Review.created_at.desc())
 
     if cursor:
         try:
@@ -374,15 +498,15 @@ def list_photo_reviews(
 
 
 @router.get('/me/usage', response_model=UsageResponse)
-def get_usage(request: Request, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    rate = enforce_rate_limit(db, user, '/me/usage', client_ip=client_ip_from_request(request))
+def get_usage(request: Request, db: Session = Depends(get_db), actor: CurrentActor = Depends(get_current_actor)):
+    rate = enforce_rate_limit(db, actor, '/me/usage', client_ip=client_ip_from_request(request))
     db.commit()
     return UsageResponse(
-        plan=user.plan.value,
+        plan=actor.plan.value,
         quota={
-            'daily_total': user.daily_quota_total,
-            'used': user.daily_quota_used,
-            'remaining': max(user.daily_quota_total - user.daily_quota_used, 0),
+            'daily_total': actor.user.daily_quota_total,
+            'used': actor.user.daily_quota_used,
+            'remaining': max(actor.user.daily_quota_total - actor.user.daily_quota_used, 0),
         },
         rate_limit=rate,
     )

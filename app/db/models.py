@@ -24,9 +24,9 @@ from app.db.session import Base
 
 
 class UserPlan(str, enum.Enum):
+    guest = 'guest'
     free = 'free'
     pro = 'pro'
-    enterprise = 'enterprise'
 
 
 class UserStatus(str, enum.Enum):
@@ -68,8 +68,9 @@ class User(Base):
     username: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
     password_hash: Mapped[str | None] = mapped_column(Text)
     plan: Mapped[UserPlan] = mapped_column(Enum(UserPlan, name='user_plan', create_type=False), nullable=False, default=UserPlan.free)
-    daily_quota_total: Mapped[int] = mapped_column(Integer, nullable=False, default=20)
+    daily_quota_total: Mapped[int] = mapped_column(Integer, nullable=False, default=6)
     daily_quota_used: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    daily_quota_date: Mapped[date] = mapped_column(Date, nullable=False, server_default=func.current_date())
     status: Mapped[UserStatus] = mapped_column(Enum(UserStatus, name='user_status', create_type=False), nullable=False, default=UserStatus.active)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())

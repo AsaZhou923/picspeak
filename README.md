@@ -81,11 +81,18 @@ uvicorn app.main:app --reload --port 8000
 - 当前鉴权为 JWT Bearer Token：
   - `Authorization: Bearer <access_token>`
   - 访问令牌需包含 `sub` 声明并使用 `HS256` 签名
+  - 支持 `POST /api/v1/auth/google/login`（Google ID Token 登录换取 access_token）
+  - 支持 `GET /api/v1/auth/google/callback`（Google code 回调换取 access_token）
+  - 支持 `POST /api/v1/auth/guest`（游客 access_token）
+  - 未携带 Authorization 时会自动签发游客身份（Cookie: `ps_guest_token`），游客可直接开始评图
   - 可通过环境变量配置 `OAUTH_JWT_SECRET` / `OAUTH_JWT_ISSUER` / `OAUTH_JWT_AUDIENCE`（非 `dev` 环境必须设置 `OAUTH_JWT_SECRET` 且不能使用默认值）
+  - 可通过 `GOOGLE_OAUTH_CLIENT_ID` 校验 Google ID Token 的 `aud`
 - 上传签名接口 `/api/v1/uploads/presign` 会返回 S3 兼容 `PUT` 预签名 URL（默认 10 分钟过期），前端应使用返回的 `put_url + headers` 直接上传对象存储。
 - AI 点评已接入 SiliconFlow，默认模型为 `Qwen/Qwen3-VL-8B-Instruct`（需配置 `SILICONFLOW_API_KEY`）。
 - 异步任务当前为进程内 worker，生产建议迁移到独立队列（如 Redis + Celery/RQ）。
-- 默认限流：用户维度 `10 次/分钟`，IP 维度 `30 次/分钟`（可通过环境变量覆盖）。
+- 默认限流基线：用户维度 `10 次/分钟`，IP 维度 `30 次/分钟`（可通过环境变量覆盖）。
+- 按用户等级动态限流：游客（guest）= 基线 1/2，普通用户（free）= 基线，Pro（pro）= 基线 2 倍。
+- 每日评图额度（按 UTC 自然日重置）：普通用户基线 `6 次/天`，游客 `3 次/天`，Pro `12 次/天`。
 - 默认使用 `request.client.host` 识别客户端 IP；仅在显式开启 `TRUST_X_FORWARDED_FOR=true` 时才会信任 `X-Forwarded-For`。
 - 服务会记录 API 请求审计日志到 `api_request_logs`（IP、路径、状态码、耗时、请求体截断等）。
 
@@ -93,5 +100,7 @@ uvicorn app.main:app --reload --port 8000
 
 - 系统架构：`系统架构.md`
 - 接口设计：`后端接口文档_v1.md`
+- Google 登录接入：`Google登录接入指南.md`
+- 全流程测试：`全流程测试文档.md`
 - 数据库定义：`业务数据数据库定义.md`
 - 建表 SQL：`create_schema.sql`
