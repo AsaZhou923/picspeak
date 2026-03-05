@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from datetime import datetime, timezone
 from uuid import uuid4
@@ -48,8 +48,8 @@ def _extract_bearer_token(authorization: str | None) -> str:
 def _touch_user_login(user: User, db: Session) -> None:
     user.last_login_at = datetime.now(timezone.utc)
     db.add(user)
-    db.commit()
-    db.refresh(user)
+    # Defer transaction commit to the endpoint flow to avoid commit during dependency resolution.
+    db.flush()
 
 
 def _fetch_user_by_token(token: str, db: Session) -> User:

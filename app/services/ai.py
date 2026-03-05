@@ -29,11 +29,16 @@ def _prompt_for_mode(mode: str) -> str:
     depth = '详细且专业' if mode == 'pro' else '简洁且直接'
     return (
         f'请你作为摄影点评师，对输入照片进行{depth}的点评。'
+        '评分基准：以该照片所属题材的顶级大师作品作为 10 分参考标准（如风光、人像、街拍、纪实等各自题材内对标），'
+        '打分要偏严格、克制，只有接近大师水准才可给高分。'
         '必须只输出一个 JSON 对象，不要输出 markdown。'
         'JSON 字段必须严格为：'
         '{"schema_version":"1.0","scores":{"composition":0-10,"lighting":0-10,"color":0-10,"story":0-10,"technical":0-10},'
         '"advantage":"...","critique":"...","suggestions":"..."}。'
         'scores 内所有值必须是整数。'
+        'advantage 与 critique 请分别输出 1-3 条要点，使用“1. ...\\n2. ...”这种编号格式写在字符串里；'
+        '每条要点需具体、可落地，避免空泛夸赞。'
+        'suggestions 给出 2-4 条可执行改进建议，优先包含拍摄时机、机位、光线、构图、后期中的具体动作。'
     )
 
 
@@ -81,7 +86,7 @@ def run_ai_review(mode: str, image_url: str) -> AIReviewResponse:
         'temperature': 0.2,
         'response_format': {'type': 'json_object'},
         'messages': [
-            {'role': 'system', 'content': '你是一个严格返回 JSON 的摄影点评助手。'},
+            {'role': 'system', 'content': '你是一个严格返回 JSON 的摄影点评助手，审美标准高、评分偏严格。'},
             {
                 'role': 'user',
                 'content': [
