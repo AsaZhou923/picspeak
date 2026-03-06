@@ -304,6 +304,26 @@ def confirm_photo_upload(
         status=photo.status.value,
     )
 
+def _review_result_payload(result_json: dict | None, final_score: float | None) -> dict:
+    payload = dict(result_json or {})
+    if payload.get('final_score') is not None:
+        return payload
+
+    if final_score is not None:
+        payload['final_score'] = float(final_score)
+        return payload
+
+    scores = payload.get('scores')
+    if isinstance(scores, dict) and scores:
+        numeric_scores: list[float] = []
+        for value in scores.values():
+            try:
+                numeric_scores.append(float(value))
+            except (TypeError, ValueError):
+                return payload
+        payload['final_score'] = round(sum(numeric_scores) / len(numeric_scores), 1)
+    return payload
+
 
 def _find_photo_owned(db: Session, photo_public_id: str, owner_user_id: int) -> Photo:
     photo = db.query(Photo).filter(Photo.public_id == photo_public_id, Photo.owner_user_id == owner_user_id).first()
@@ -335,7 +355,11 @@ def create_review(
     if idempotency_key:
         record = get_idempotency_record(db, actor.user.id, '/reviews', idempotency_key)
         if record is not None and record.response_json is not None:
-            return record.response_json
+            response_json = dict(record.response_json)
+            result_payload = response_json.get('result')
+            if isinstance(result_payload, dict):
+                response_json['result'] = _review_result_payload(result_payload, None)
+            return response_json
 
     mode_enum = ReviewMode(payload.mode)
 
@@ -473,7 +497,7 @@ def get_review(
         photo_id=photo.public_id if photo else 'unknown',
         mode=review.mode.value,
         status=review.status.value,
-        result=review.result_json,
+        result=_review_result_payload(review.result_json, review.final_score),
         created_at=review.created_at,
     )
 

@@ -58,7 +58,25 @@ def _extract_content(message_content: object) -> str:
 
 
 def _normalize_result(parsed: dict) -> ContentAuditResult:
-    safe = bool(parsed.get('safe', True))
+    raw_safe = parsed.get('safe', True)
+    if isinstance(raw_safe, bool):
+        safe = raw_safe
+    elif isinstance(raw_safe, str):
+        lowered = raw_safe.strip().lower()
+        if lowered in {'true', '1', 'yes'}:
+            safe = True
+        elif lowered in {'false', '0', 'no'}:
+            safe = False
+        else:
+            raise ContentAuditError('Invalid safe flag in moderation response')
+    elif isinstance(raw_safe, (int, float)):
+        if raw_safe in (0, 1):
+            safe = bool(raw_safe)
+        else:
+            raise ContentAuditError('Invalid safe flag in moderation response')
+    else:
+        raise ContentAuditError('Invalid safe flag in moderation response')
+
     raw_score = parsed.get('nsfw_score', 0)
     try:
         score = float(raw_score)
