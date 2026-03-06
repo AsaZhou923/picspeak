@@ -54,6 +54,7 @@ from app.schemas import (
     AuthTokenResponse,
 )
 from app.services.ai import AIReviewError, run_ai_review
+from app.services.content_audit import ContentAuditError, run_content_audit
 from app.services.guard import (
     enforce_rate_limit,
     enforce_user_quota,
@@ -262,6 +263,15 @@ def confirm_photo_upload(
     if client_height is not None and int(client_height) <= 0:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Invalid height')
 
+    image_url = _build_photo_url(token['bucket'], token['object_key'])
+    try:
+        audit_result = run_content_audit(image_url=image_url)
+    except ContentAuditError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f'Image content audit failed: {exc}') from exc
+
+    photo_status = PhotoStatus.READY if audit_result.safe else PhotoStatus.REJECTED
+    rejected_reason = None if audit_result.safe else (audit_result.reason or 'Image content is not allowed')
+
     photo = Photo(
         public_id=new_public_id('pho'),
         owner_user_id=actor.user.id,
@@ -273,9 +283,12 @@ def confirm_photo_upload(
         checksum_sha256=token.get('sha256'),
         width=client_width,
         height=client_height,
-        status=PhotoStatus.READY,
+        status=photo_status,
         exif_data=payload.exif_data,
         client_meta=payload.client_meta,
+        nsfw_label=audit_result.label,
+        nsfw_score=audit_result.nsfw_score,
+        rejected_reason=rejected_reason,
     )
     db.add(photo)
     try:
@@ -287,9 +300,29 @@ def confirm_photo_upload(
 
     return PhotoCreateResponse(
         photo_id=photo.public_id,
-        photo_url=_build_photo_url(photo.bucket, photo.object_key),
+        photo_url=image_url,
         status=photo.status.value,
     )
+
+def _review_result_payload(result_json: dict | None, final_score: float | None) -> dict:
+    payload = dict(result_json or {})
+    if payload.get('final_score') is not None:
+        return payload
+
+    if final_score is not None:
+        payload['final_score'] = float(final_score)
+        return payload
+
+    scores = payload.get('scores')
+    if isinstance(scores, dict) and scores:
+        numeric_scores: list[float] = []
+        for value in scores.values():
+            try:
+                numeric_scores.append(float(value))
+            except (TypeError, ValueError):
+                return payload
+        payload['final_score'] = round(sum(numeric_scores) / len(numeric_scores), 1)
+    return payload
 
 
 def _find_photo_owned(db: Session, photo_public_id: str, owner_user_id: int) -> Photo:
@@ -322,7 +355,11 @@ def create_review(
     if idempotency_key:
         record = get_idempotency_record(db, actor.user.id, '/reviews', idempotency_key)
         if record is not None and record.response_json is not None:
-            return record.response_json
+            response_json = dict(record.response_json)
+            result_payload = response_json.get('result')
+            if isinstance(result_payload, dict):
+                response_json['result'] = _review_result_payload(result_payload, None)
+            return response_json
 
     mode_enum = ReviewMode(payload.mode)
 
@@ -371,7 +408,7 @@ def create_review(
 
     image_url = _build_photo_url(photo.bucket, photo.object_key)
     try:
-        ai_response = run_ai_review(payload.mode, image_url=image_url)
+        ai_response = run_ai_review(payload.mode, image_url=image_url, locale=payload.locale)
     except AIReviewError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f'AI review failed: {exc}') from exc
 
@@ -385,6 +422,7 @@ def create_review(
         status=ReviewStatus.SUCCEEDED,
         schema_version=result.schema_version,
         result_json=result.model_dump(),
+        final_score=result.final_score,
         input_tokens=ai_response.input_tokens,
         output_tokens=ai_response.output_tokens,
         cost_usd=ai_response.cost_usd,
@@ -459,7 +497,7 @@ def get_review(
         photo_id=photo.public_id if photo else 'unknown',
         mode=review.mode.value,
         status=review.status.value,
-        result=review.result_json,
+        result=_review_result_payload(review.result_json, review.final_score),
         created_at=review.created_at,
     )
 

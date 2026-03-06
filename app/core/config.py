@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     ai_model_name: str = 'Qwen/Qwen3-VL-8B-Instruct'
     ai_timeout_seconds: int = 60
 
+    image_audit_enabled: bool = True
+    image_audit_reject_threshold: float = 0.78
+
     @model_validator(mode='after')
     def validate_oauth_secret(self) -> 'Settings':
         insecure_defaults = {'', 'change-me-jwt-secret'}
