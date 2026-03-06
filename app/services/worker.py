@@ -99,10 +99,14 @@ class ReviewWorker:
             return
 
         image_url = f'{settings.object_base_url.rstrip("/")}/{quote(photo.object_key)}'
+        payload_locale = (task.request_payload or {}).get('locale', 'zh')
+        if payload_locale not in {'zh', 'en', 'ja'}:
+            payload_locale = 'zh'
         try:
             ai_response = run_ai_review(
                 task.mode.value if isinstance(task.mode, ReviewMode) else str(task.mode),
                 image_url=image_url,
+                locale=payload_locale,
             )
         except AIReviewError as exc:
             task.status = TaskStatus.FAILED
@@ -125,6 +129,7 @@ class ReviewWorker:
             status=ReviewStatus.SUCCEEDED,
             schema_version=result.schema_version,
             result_json=result.model_dump(),
+            final_score=result.final_score,
             input_tokens=ai_response.input_tokens,
             output_tokens=ai_response.output_tokens,
             cost_usd=ai_response.cost_usd,

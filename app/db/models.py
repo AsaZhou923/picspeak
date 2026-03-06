@@ -155,6 +155,7 @@ class Review(Base):
     status: Mapped[ReviewStatus] = mapped_column(Enum(ReviewStatus, name='review_status', create_type=False), nullable=False)
     schema_version: Mapped[str] = mapped_column(Text, nullable=False, default='1.0')
     result_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    final_score: Mapped[float] = mapped_column(Numeric(4, 2), nullable=False)
     input_tokens: Mapped[int | None] = mapped_column(Integer)
     output_tokens: Mapped[int | None] = mapped_column(Integer)
     cost_usd: Mapped[float | None] = mapped_column(Numeric(12, 6))

@@ -48,11 +48,13 @@ class ReviewCreateRequest(BaseModel):
     mode: str = Field(pattern='^(flash|pro)$')
     async_mode: bool = Field(default=True, alias='async')
     idempotency_key: str | None = None
+    locale: str = Field(default='zh', pattern='^(zh|en|ja)$')
 
 
 class ReviewResult(BaseModel):
     schema_version: str = '1.0'
     scores: dict[str, int]
+    final_score: float
     advantage: str
     critique: str
     suggestions: str

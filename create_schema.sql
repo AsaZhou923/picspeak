@@ -137,6 +137,7 @@ CREATE TABLE IF NOT EXISTS reviews (
     status              review_status NOT NULL,
     schema_version      TEXT NOT NULL DEFAULT '1.0',
     result_json         JSONB NOT NULL DEFAULT '{}'::jsonb,
+    final_score         NUMERIC(4,2) NOT NULL,
     input_tokens        INTEGER,
     output_tokens       INTEGER,
     cost_usd            NUMERIC(12,6),
