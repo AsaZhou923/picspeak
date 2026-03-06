@@ -1,0 +1,194 @@
+import {
+  ApiException,
+  AuthToken,
+  PhotoCreateResponse,
+  PhotoReviewsResponse,
+  PresignRequest,
+  PresignResponse,
+  ReviewCreateRequest,
+  ReviewCreateResponse,
+  ReviewGetResponse,
+  TaskStatusResponse,
+  UsageResponse,
+} from './types';
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
+
+async function request<T>(
+  path: string,
+  options: RequestInit & { token?: string } = {}
+): Promise<T> {
+  const { token, headers = {}, ...rest } = options;
+
+  const allHeaders: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(headers as Record<string, string>),
+  };
+
+  if (token) {
+    allHeaders['Authorization'] = `Bearer ${token}`;
+  }
+
+  const res = await fetch(`${API_BASE}/api/v1${path}`, {
+    ...rest,
+    headers: allHeaders,
+  });
+
+  if (!res.ok) {
+    let code = 'UNKNOWN_ERROR';
+    let message = `HTTP ${res.status}`;
+    let requestId: string | undefined;
+    try {
+      const body = await res.json();
+      if (body?.error) {
+        code = body.error.code ?? code;
+        message = body.error.message ?? message;
+        requestId = body.error.request_id;
+      } else {
+        message = typeof body === 'string' ? body : (body?.detail ?? message);
+      }
+    } catch {
+      // ignore JSON parse errors
+    }
+    throw new ApiException(res.status, code, message, requestId);
+  }
+
+  if (res.status === 204) return undefined as T;
+  return res.json();
+}
+
+// ─── Auth ────────────────────────────────────────────────────────────────────
+
+export async function authGuest(): Promise<AuthToken> {
+  return request<AuthToken>('/auth/guest', { method: 'POST' });
+}
+
+export async function authGoogleCallback(code: string): Promise<AuthToken> {
+  return request<AuthToken>(`/auth/google/callback?code=${encodeURIComponent(code)}`);
+}
+
+export async function authGoogleLogin(idToken: string): Promise<AuthToken> {
+  return request<AuthToken>('/auth/google/login', {
+    method: 'POST',
+    body: JSON.stringify({ id_token: idToken }),
+  });
+}
+
+// ─── Usage ───────────────────────────────────────────────────────────────────
+
+export async function getUsage(token: string): Promise<UsageResponse> {
+  return request<UsageResponse>('/me/usage', { token });
+}
+
+// ─── Upload ──────────────────────────────────────────────────────────────────
+
+export async function createPresign(
+  payload: PresignRequest,
+  token: string
+): Promise<PresignResponse> {
+  return request<PresignResponse>('/uploads/presign', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    token,
+  });
+}
+
+export async function putObjectStorage(
+  putUrl: string,
+  file: File,
+  headers: Record<string, string>,
+  onProgress?: (pct: number) => void
+): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', putUrl, true);
+    Object.entries(headers).forEach(([k, v]) => xhr.setRequestHeader(k, v));
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && onProgress) {
+        onProgress(Math.round((e.loaded / e.total) * 100));
+      }
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) resolve();
+      else {
+        const message =
+          xhr.status === 0
+            ? 'Upload blocked before object storage responded. Check object storage CORS for PUT/OPTIONS.'
+            : `Upload failed: ${xhr.status}`;
+        reject(new ApiException(xhr.status, 'UPLOAD_FAILED', message));
+      }
+    };
+    xhr.onerror = () =>
+      reject(
+        new ApiException(
+          0,
+          'NETWORK_ERROR',
+          'Network error during upload. Check object storage CORS for PUT/OPTIONS from the frontend origin.'
+        )
+      );
+    xhr.send(file);
+  });
+}
+
+export async function confirmPhoto(
+  uploadId: string,
+  exifData: Record<string, unknown>,
+  clientMeta: Record<string, unknown>,
+  token: string
+): Promise<PhotoCreateResponse> {
+  return request<PhotoCreateResponse>('/photos', {
+    method: 'POST',
+    body: JSON.stringify({ upload_id: uploadId, exif_data: exifData, client_meta: clientMeta }),
+    token,
+  });
+}
+
+// ─── Review ──────────────────────────────────────────────────────────────────
+
+export async function createReview(
+  payload: ReviewCreateRequest,
+  token: string
+): Promise<ReviewCreateResponse> {
+  return request<ReviewCreateResponse>('/reviews', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    token,
+  });
+}
+
+export async function getTask(taskId: string, token: string): Promise<TaskStatusResponse> {
+  return request<TaskStatusResponse>(`/tasks/${taskId}`, { token });
+}
+
+export async function getReview(reviewId: string, token: string): Promise<ReviewGetResponse> {
+  return request<ReviewGetResponse>(`/reviews/${reviewId}`, { token });
+}
+
+export async function getPhotoReviews(
+  photoId: string,
+  token: string,
+  cursor?: string
+): Promise<PhotoReviewsResponse> {
+  const q = cursor ? `?cursor=${encodeURIComponent(cursor)}` : '';
+  return request<PhotoReviewsResponse>(`/photos/${photoId}/reviews${q}`, { token });
+}
+
+// ─── Google OAuth URL builder ─────────────────────────────────────────────────
+
+export function buildGoogleOAuthUrl(): string {
+  const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? '';
+  const redirectUri =
+    process.env.NEXT_PUBLIC_GOOGLE_OAUTH_REDIRECT_URI ??
+    `${typeof window !== 'undefined' ? window.location.origin : ''}/auth/callback/google`;
+
+  const params = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    response_type: 'code',
+    scope: 'openid email profile',
+    access_type: 'offline',
+    prompt: 'select_account',
+  });
+
+  return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+}

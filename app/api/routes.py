@@ -21,7 +21,6 @@ from app.api.deps import (
     quota_for_plan,
 )
 from app.core.config import settings
-from app.core.network import client_ip_from_request
 from app.core.security import create_access_token, sign_payload, verify_payload
 from app.db.models import (
     Photo,
@@ -56,7 +55,6 @@ from app.schemas import (
 from app.services.ai import AIReviewError, run_ai_review
 from app.services.content_audit import ContentAuditError, run_content_audit
 from app.services.guard import (
-    enforce_rate_limit,
     enforce_user_quota,
     get_idempotency_record,
     hash_request,
@@ -192,8 +190,6 @@ def create_upload_presign(
     db: Session = Depends(get_db),
     actor: CurrentActor = Depends(get_current_actor),
 ):
-    enforce_rate_limit(db, actor, '/uploads/presign', client_ip=client_ip_from_request(request))
-
     if payload.content_type not in ALLOWED_CONTENT_TYPES:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Unsupported content_type')
     if payload.size_bytes > settings.max_upload_bytes:
@@ -250,8 +246,6 @@ def confirm_photo_upload(
     db: Session = Depends(get_db),
     actor: CurrentActor = Depends(get_current_actor),
 ):
-    enforce_rate_limit(db, actor, '/photos', client_ip=client_ip_from_request(request))
-
     token = verify_payload(payload.upload_id)
     if token.get('uid') != actor.user.public_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Upload owner mismatch')
@@ -342,7 +336,6 @@ def create_review(
     if actor.user.status != UserStatus.active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='User is not active')
 
-    enforce_rate_limit(db, actor, '/reviews', client_ip=client_ip_from_request(request))
     enforce_user_quota(db, actor.user)
 
     photo = _find_photo_owned(db, payload.photo_id, actor.user.id)
@@ -456,8 +449,6 @@ def get_task_status(
     db: Session = Depends(get_db),
     actor: CurrentActor = Depends(get_current_actor),
 ):
-    enforce_rate_limit(db, actor, '/tasks/{task_id}', client_ip=client_ip_from_request(request))
-
     task = db.query(ReviewTask).filter(ReviewTask.public_id == task_id, ReviewTask.owner_user_id == actor.user.id).first()
     if task is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Task not found')
@@ -484,8 +475,6 @@ def get_review(
     db: Session = Depends(get_db),
     actor: CurrentActor = Depends(get_current_actor),
 ):
-    enforce_rate_limit(db, actor, '/reviews/{review_id}', client_ip=client_ip_from_request(request))
-
     review = db.query(Review).filter(Review.public_id == review_id, Review.owner_user_id == actor.user.id).first()
     if review is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Review not found')
@@ -511,8 +500,6 @@ def list_photo_reviews(
     db: Session = Depends(get_db),
     actor: CurrentActor = Depends(get_current_actor),
 ):
-    enforce_rate_limit(db, actor, '/photos/{photo_id}/reviews', client_ip=client_ip_from_request(request))
-
     photo = _find_photo_owned(db, photo_id, actor.user.id)
 
     query = db.query(Review).filter(Review.photo_id == photo.id, Review.owner_user_id == actor.user.id).order_by(Review.created_at.desc())
@@ -537,7 +524,6 @@ def list_photo_reviews(
 
 @router.get('/me/usage', response_model=UsageResponse)
 def get_usage(request: Request, db: Session = Depends(get_db), actor: CurrentActor = Depends(get_current_actor)):
-    rate = enforce_rate_limit(db, actor, '/me/usage', client_ip=client_ip_from_request(request))
     db.commit()
     return UsageResponse(
         plan=actor.plan.value,
@@ -546,5 +532,5 @@ def get_usage(request: Request, db: Session = Depends(get_db), actor: CurrentAct
             'used': actor.user.daily_quota_used,
             'remaining': max(actor.user.daily_quota_total - actor.user.daily_quota_used, 0),
         },
-        rate_limit=rate,
+        rate_limit={},
     )
