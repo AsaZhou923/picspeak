@@ -161,6 +161,14 @@ export async function getTask(taskId: string, token: string): Promise<TaskStatus
   return request<TaskStatusResponse>(`/tasks/${taskId}`, { token });
 }
 
+export function buildTaskWebSocketUrl(taskId: string, token: string): string {
+  const apiBase = API_BASE.replace(/\/$/, '');
+  const url = new URL(`${apiBase}/api/v1/ws/tasks/${encodeURIComponent(taskId)}`);
+  url.searchParams.set('access_token', token);
+  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+  return url.toString();
+}
+
 export async function getReview(reviewId: string, token: string): Promise<ReviewGetResponse> {
   return request<ReviewGetResponse>(`/reviews/${reviewId}`, { token });
 }

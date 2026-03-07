@@ -45,6 +45,11 @@ class Settings(BaseSettings):
     ai_timeout_seconds: int = 60
     review_worker_concurrency: int = 2
     review_worker_idle_sleep_ms: int = 200
+    run_embedded_worker: bool = True
+    review_worker_name: str = 'embedded-worker'
+    review_retry_base_delay_seconds: int = 10
+    review_retry_max_delay_seconds: int = 300
+    ws_task_poll_interval_ms: int = 1000
 
     image_audit_enabled: bool = False
     image_audit_reject_threshold: float = 0.78

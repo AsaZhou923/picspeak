@@ -19,6 +19,10 @@ PicSpeak 是一个面向真实交付场景的 AI 摄影点评项目，包含：
 - 支持幂等键、防重复提交
 - 支持每日额度控制、基础限流、API 审计日志
 - 支持可选图片审核开关
+- 支持 WebSocket 任务状态推送
+- 支持统一错误码响应模型和请求追踪 ID
+- 支持独立 worker 进程部署
+- 支持任务重试、死信队列和任务事件编排日志
 
 ## 2. 技术栈
 
@@ -69,7 +73,8 @@ migration_*.sql                  # 增量 SQL
 4. 客户端调用 `/api/v1/photos` 确认上传并生成照片记录
 5. 客户端调用 `/api/v1/reviews` 发起 AI 点评
 6. 异步模式下轮询 `/api/v1/tasks/{task_id}` 获取任务进度
-7. 完成后通过 `/api/v1/reviews/{review_id}` 或历史接口读取结果
+7. 客户端可通过 `/api/v1/ws/tasks/{task_id}` 订阅任务状态推送
+8. 完成后通过 `/api/v1/reviews/{review_id}` 或历史接口读取结果
 
 ## 5. 已实现接口
 
@@ -80,6 +85,7 @@ migration_*.sql                  # 增量 SQL
 - `POST /api/v1/photos`
 - `POST /api/v1/reviews`
 - `GET /api/v1/tasks/{task_id}`
+- `GET /api/v1/ws/tasks/{task_id}`（WebSocket）
 - `GET /api/v1/reviews/{review_id}`
 - `GET /api/v1/me/reviews`
 - `GET /api/v1/photos/{photo_id}/reviews`
@@ -133,6 +139,11 @@ migration_*.sql                  # 增量 SQL
 - `BACKEND_CORS_ORIGINS`：允许跨域的前端来源，JSON 数组字符串
 - `IMAGE_AUDIT_ENABLED`：是否开启图片审核
 - `AI_MODEL_NAME` / `FLASH_MODEL_NAME` / `PRO_MODEL_NAME`：点评模型配置
+- `RUN_EMBEDDED_WORKER`：是否由 API 进程内启动 worker
+- `REVIEW_WORKER_NAME`：worker 实例名
+- `REVIEW_RETRY_BASE_DELAY_SECONDS`：重试基础退避时间
+- `REVIEW_RETRY_MAX_DELAY_SECONDS`：重试最大退避时间
+- `WS_TASK_POLL_INTERVAL_MS`：WebSocket 推送时服务端轮询数据库间隔
 
 ### 用户等级与额度规则
 
@@ -195,6 +206,7 @@ npm run dev
 - 使用 `uvicorn` 多进程或 `gunicorn + uvicorn workers` 部署
 - 通过 Nginx / 网关暴露 HTTPS
 - PostgreSQL 与对象存储使用独立生产实例
+- 生产环境建议关闭 `RUN_EMBEDDED_WORKER`，并单独启动 worker 进程
 - 生产环境务必替换默认 `APP_SECRET` 与 `OAUTH_JWT_SECRET`
 - `BACKEND_CORS_ORIGINS` 仅保留正式站点域名
 - 如果服务部署在反向代理后，只有在可信代理环境下才开启 `TRUST_X_FORWARDED_FOR=true`
@@ -203,6 +215,12 @@ npm run dev
 
 ```bash
 uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+独立 worker：
+
+```bash
+python -m app.worker_main
 ```
 
 ### 前端
@@ -241,22 +259,18 @@ npm run start
 
 以下能力在 README 中明确标注，便于上线时评估风险：
 
-- 异步点评 Worker 目前是进程内线程实现，不是独立队列系统
-- `/api/v1/me/usage` 当前只返回配额信息，`rate_limit` 结构为空对象
-- 当前错误返回主要使用 FastAPI 默认 `detail` 结构，未统一为全站标准错误模型
-- 未实现 WebSocket 实时任务推送，当前任务状态通过轮询获取
+- 数据库任务队列已支持重试和死信，但当前仍基于 PostgreSQL，不是 Redis / MQ 中间件
+- `/api/v1/me/usage` 当前只返回配额信息，`rate_limit` 结构仍为空对象
 - 游客身份通过 Cookie `ps_guest_token` 维持，会受前后端域名和 Cookie 策略影响
 
 如果要进入正式生产，优先建议补齐：
 
-- 独立任务队列
-- 标准化错误码体系
 - 完整监控告警
 - 自动化部署与回滚
 - 更细粒度的权限与风控
 
 ## 13. 相关文档
 
-- [后端接口文档_v1.md](/e:/Project%20Code/PicSpeak/后端接口文档_v1.md)
-- [系统架构.md](/e:/Project%20Code/PicSpeak/系统架构.md)
-- [Google登录接入指南.md](/e:/Project%20Code/PicSpeak/Google登录接入指南.md)
+- [后端接口文档_v1.md](/PicSpeak/后端接口文档_v1.md)
+- [系统架构.md](/PicSpeak/系统架构.md)
+- [Google登录接入指南.md](/PicSpeak/Google登录接入指南.md)

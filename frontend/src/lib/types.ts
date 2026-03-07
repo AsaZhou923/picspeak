@@ -54,7 +54,7 @@ export interface PhotoCreateResponse {
 
 export type ReviewMode = 'flash' | 'pro';
 export type ReviewStatus = 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'EXPIRED';
-export type TaskStatus = 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'EXPIRED';
+export type TaskStatus = 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'EXPIRED' | 'DEAD_LETTER';
 
 export interface ReviewScores {
   composition: number;
@@ -146,7 +146,18 @@ export interface ApiError {
     code: string;
     message: string;
     request_id?: string;
+    extra?: Record<string, unknown>;
   };
+}
+
+export interface TaskStreamMessage {
+  type: 'task.update';
+  task: TaskStatusResponse;
+  event: {
+    event_type: string;
+    message: string | null;
+    created_at: string;
+  } | null;
 }
 
 export class ApiException extends Error {

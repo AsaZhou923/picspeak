@@ -5,9 +5,8 @@ import json
 import time
 from typing import Any
 
-from fastapi import HTTPException, status
-
 from app.core.config import settings
+from app.core.errors import api_error
 
 
 class JWTValidationError(ValueError):
@@ -36,16 +35,16 @@ def verify_payload(token: str) -> dict[str, Any]:
     try:
         payload_encoded, signature_encoded = token.split('.', 1)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Invalid token format') from exc
+        raise api_error(400, 'TOKEN_FORMAT_INVALID', 'Invalid token format') from exc
 
     expected = hmac.new(settings.app_secret.encode('utf-8'), payload_encoded.encode('utf-8'), hashlib.sha256).digest()
     received = _b64url_decode(signature_encoded)
     if not hmac.compare_digest(expected, received):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Invalid token signature')
+        raise api_error(400, 'TOKEN_SIGNATURE_INVALID', 'Invalid token signature')
 
     payload = json.loads(_b64url_decode(payload_encoded).decode('utf-8'))
     if int(payload.get('exp', 0)) < int(time.time()):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Token expired')
+        raise api_error(400, 'TOKEN_EXPIRED', 'Token expired')
     return payload
 
 

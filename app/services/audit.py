@@ -29,6 +29,7 @@ def _safe_text_from_body(body: bytes) -> str | None:
 def log_api_request(
     db: Session,
     *,
+    request_id: str,
     method: str,
     path: str,
     query_string: str | None,
@@ -41,7 +42,7 @@ def log_api_request(
     duration_ms: int,
 ) -> None:
     record = ApiRequestLog(
-        request_id=f'req_{uuid4().hex[:16]}',
+        request_id=request_id or f'req_{uuid4().hex[:16]}',
         method=method,
         path=path,
         query_string=query_string,

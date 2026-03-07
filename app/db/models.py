@@ -52,6 +52,7 @@ class TaskStatus(str, enum.Enum):
     SUCCEEDED = 'SUCCEEDED'
     FAILED = 'FAILED'
     EXPIRED = 'EXPIRED'
+    DEAD_LETTER = 'DEAD_LETTER'
 
 
 class ReviewStatus(str, enum.Enum):
@@ -130,6 +131,10 @@ class ReviewTask(Base):
     progress: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     error_code: Mapped[str | None] = mapped_column(Text)
     error_message: Mapped[str | None] = mapped_column(Text)
+    next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    claimed_by: Mapped[str | None] = mapped_column(Text)
+    last_heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    dead_lettered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     expire_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -163,6 +168,27 @@ class Review(Base):
     model_name: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class ReviewTaskEvent(Base):
+    __tablename__ = 'review_task_events'
+    __table_args__ = (
+        Index('idx_review_task_events_task_created', 'task_id', 'created_at'),
+        Index('idx_review_task_events_public_created', 'task_public_id', 'created_at'),
+        Index('idx_review_task_events_type_created', 'event_type', 'created_at'),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    task_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('review_tasks.id'), nullable=False)
+    task_public_id: Mapped[str] = mapped_column(Text, nullable=False)
+    event_type: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False)
+    progress: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    error_code: Mapped[str | None] = mapped_column(Text)
+    message: Mapped[str | None] = mapped_column(Text)
+    payload_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
 class UsageLedger(Base):

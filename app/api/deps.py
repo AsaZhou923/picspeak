@@ -7,6 +7,7 @@ from fastapi import Cookie, Depends, Header, HTTPException, Request, Response, s
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.errors import api_error
 from app.core.security import JWTValidationError, create_access_token, validate_access_token
 from app.db.models import User, UserPlan, UserStatus
 from app.db.session import get_db
@@ -36,12 +37,12 @@ def quota_for_plan(plan: UserPlan) -> int:
 
 def _extract_bearer_token(authorization: str | None) -> str:
     if not authorization:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Missing Authorization header')
+        raise api_error(status.HTTP_401_UNAUTHORIZED, 'AUTH_MISSING', 'Missing Authorization header')
     if not authorization.lower().startswith('bearer '):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Invalid Authorization scheme')
+        raise api_error(status.HTTP_401_UNAUTHORIZED, 'AUTH_SCHEME_INVALID', 'Invalid Authorization scheme')
     token = authorization[7:].strip()
     if not token:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Missing bearer token')
+        raise api_error(status.HTTP_401_UNAUTHORIZED, 'AUTH_TOKEN_MISSING', 'Missing bearer token')
     return token
 
 
@@ -56,17 +57,21 @@ def _fetch_user_by_token(token: str, db: Session) -> User:
     try:
         claims = validate_access_token(token)
     except JWTValidationError as exc:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f'Invalid access token: {exc}') from exc
+        raise api_error(status.HTTP_401_UNAUTHORIZED, 'AUTH_TOKEN_INVALID', f'Invalid access token: {exc}') from exc
 
     subject = claims.get('sub')
     if not isinstance(subject, str) or not subject.strip():
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Invalid access token: missing sub claim')
+        raise api_error(status.HTTP_401_UNAUTHORIZED, 'AUTH_SUB_MISSING', 'Invalid access token: missing sub claim')
     subject = subject.strip()
 
     user = db.query(User).filter(User.public_id == subject).first()
     if user is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Invalid access token: user not found')
+        raise api_error(status.HTTP_401_UNAUTHORIZED, 'AUTH_USER_NOT_FOUND', 'Invalid access token: user not found')
     return user
+
+
+def get_user_from_token(token: str, db: Session) -> User:
+    return _fetch_user_by_token(token, db)
 
 
 def create_guest_user(db: Session) -> User:

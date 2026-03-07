@@ -3,11 +3,11 @@ from __future__ import annotations
 import hashlib
 from datetime import datetime, timedelta, timezone
 
-from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import CurrentActor, quota_for_plan
 from app.core.config import settings
+from app.core.errors import api_error
 from app.db.models import IdempotencyKey, RateLimitCounter, User, UserPlan
 
 
@@ -33,7 +33,7 @@ def enforce_user_quota(db: Session, user: User) -> None:
     db.add(user)
 
     if user.daily_quota_used >= user.daily_quota_total:
-        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail='Daily quota exceeded')
+        raise api_error(429, 'QUOTA_EXCEEDED', 'Daily quota exceeded')
 
 
 def increment_quota(db: Session, user: User) -> None:
@@ -83,7 +83,7 @@ def _enforce_scope_rate_limit(
         db.add(counter)
 
     if counter.hit_count >= per_minute_limit:
-        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=f'Rate limit exceeded ({scope})')
+        raise api_error(429, 'RATE_LIMIT_EXCEEDED', f'Rate limit exceeded ({scope})')
 
     counter.hit_count += 1
     db.add(counter)

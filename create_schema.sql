@@ -1,240 +1,344 @@
-﻿-- create_schema.sql
--- PostgreSQL 14+
-
-BEGIN;
-
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
-
--- 1) Enum types
-DO $$
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_plan') THEN
-        CREATE TYPE user_plan AS ENUM ('guest', 'free', 'pro');
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_status') THEN
-        CREATE TYPE user_status AS ENUM ('active', 'suspended', 'deleted');
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'photo_status') THEN
-        CREATE TYPE photo_status AS ENUM ('UPLOADING', 'READY', 'REJECTED');
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'review_mode') THEN
-        CREATE TYPE review_mode AS ENUM ('flash', 'pro');
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'task_status') THEN
-        CREATE TYPE task_status AS ENUM ('PENDING', 'RUNNING', 'SUCCEEDED', 'FAILED', 'EXPIRED');
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'review_status') THEN
-        CREATE TYPE review_status AS ENUM ('SUCCEEDED', 'FAILED');
-    END IF;
-END $$;
-
--- 2) Common trigger for updated_at
-CREATE OR REPLACE FUNCTION set_updated_at()
-RETURNS trigger AS $$
-BEGIN
-    NEW.updated_at = now();
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
--- 3) users
-CREATE TABLE IF NOT EXISTS users (
-    id                  BIGSERIAL PRIMARY KEY,
-    public_id           TEXT NOT NULL UNIQUE,
-    email               TEXT NOT NULL UNIQUE,
-    username            TEXT NOT NULL UNIQUE,
-    password_hash       TEXT,
-    plan                user_plan NOT NULL DEFAULT 'guest',
-    daily_quota_total   INTEGER NOT NULL DEFAULT 6 CHECK (daily_quota_total >= 0),
-    daily_quota_used    INTEGER NOT NULL DEFAULT 0 CHECK (daily_quota_used >= 0),
-    daily_quota_date    DATE NOT NULL DEFAULT CURRENT_DATE,
-    status              user_status NOT NULL DEFAULT 'active',
-    last_login_at       TIMESTAMPTZ,
-    created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+create table users
+(
+    id                bigserial
+        primary key,
+    public_id         text                                                   not null
+        unique,
+    email             text                                                   not null
+        unique,
+    username          text                                                   not null
+        unique,
+    password_hash     text,
+    plan              user_plan                default 'free'::user_plan     not null,
+    daily_quota_total integer                  default 6                     not null
+        constraint users_daily_quota_total_check
+            check (daily_quota_total >= 0),
+    daily_quota_used  integer                  default 0                     not null
+        constraint users_daily_quota_used_check
+            check (daily_quota_used >= 0),
+    status            user_status              default 'active'::user_status not null,
+    last_login_at     timestamp with time zone,
+    created_at        timestamp with time zone default now()                 not null,
+    updated_at        timestamp with time zone default now()                 not null,
+    daily_quota_date  date                     default CURRENT_DATE          not null
 );
 
-CREATE INDEX IF NOT EXISTS idx_users_status_plan ON users(status, plan);
+alter table users
+    owner to pic;
 
-DROP TRIGGER IF EXISTS trg_users_updated_at ON users;
-CREATE TRIGGER trg_users_updated_at
-BEFORE UPDATE ON users
-FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+create index idx_users_status_plan
+    on users (status, plan);
 
--- 4) photos
-CREATE TABLE IF NOT EXISTS photos (
-    id                  BIGSERIAL PRIMARY KEY,
-    public_id           TEXT NOT NULL UNIQUE,
-    owner_user_id       BIGINT NOT NULL REFERENCES users(id),
-    upload_id           TEXT NOT NULL,
-    bucket              TEXT NOT NULL,
-    object_key          TEXT NOT NULL,
-    content_type        TEXT NOT NULL,
-    size_bytes          BIGINT NOT NULL CHECK (size_bytes > 0),
-    checksum_sha256     TEXT,
-    width               INTEGER CHECK (width > 0),
-    height              INTEGER CHECK (height > 0),
-    status              photo_status NOT NULL DEFAULT 'UPLOADING',
-    exif_data           JSONB NOT NULL DEFAULT '{}'::jsonb,
-    client_meta         JSONB NOT NULL DEFAULT '{}'::jsonb,
-    nsfw_label          TEXT,
-    nsfw_score          NUMERIC(5,4),
-    rejected_reason     TEXT,
-    created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
-    CONSTRAINT uq_photos_bucket_object UNIQUE (bucket, object_key),
-    CONSTRAINT chk_photos_nsfw_score CHECK (nsfw_score IS NULL OR (nsfw_score >= 0 AND nsfw_score <= 1))
+create trigger trg_users_updated_at
+    before update
+    on users
+    for each row
+execute procedure set_updated_at();
+
+create table photos
+(
+    id              bigserial
+        primary key,
+    public_id       text                                                       not null
+        unique,
+    owner_user_id   bigint                                                     not null
+        references users,
+    upload_id       text                                                       not null,
+    bucket          text                                                       not null,
+    object_key      text                                                       not null,
+    content_type    text                                                       not null,
+    size_bytes      bigint                                                     not null
+        constraint photos_size_bytes_check
+            check (size_bytes > 0),
+    checksum_sha256 text,
+    width           integer
+        constraint photos_width_check
+            check (width > 0),
+    height          integer
+        constraint photos_height_check
+            check (height > 0),
+    status          photo_status             default 'UPLOADING'::photo_status not null,
+    exif_data       jsonb                    default '{}'::jsonb               not null,
+    client_meta     jsonb                    default '{}'::jsonb               not null,
+    nsfw_label      text,
+    nsfw_score      numeric(5, 4)
+        constraint chk_photos_nsfw_score
+            check ((nsfw_score IS NULL) OR ((nsfw_score >= (0)::numeric) AND (nsfw_score <= (1)::numeric))),
+    rejected_reason text,
+    created_at      timestamp with time zone default now()                     not null,
+    updated_at      timestamp with time zone default now()                     not null,
+    constraint uq_photos_bucket_object
+        unique (bucket, object_key)
 );
 
-CREATE INDEX IF NOT EXISTS idx_photos_owner_created ON photos(owner_user_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_photos_status ON photos(status);
+alter table photos
+    owner to pic;
 
-DROP TRIGGER IF EXISTS trg_photos_updated_at ON photos;
-CREATE TRIGGER trg_photos_updated_at
-BEFORE UPDATE ON photos
-FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+create index idx_photos_owner_created
+    on photos (owner_user_id asc, created_at desc);
 
--- 5) review_tasks
-CREATE TABLE IF NOT EXISTS review_tasks (
-    id                  BIGSERIAL PRIMARY KEY,
-    public_id           TEXT NOT NULL UNIQUE,
-    photo_id            BIGINT NOT NULL REFERENCES photos(id),
-    owner_user_id       BIGINT NOT NULL REFERENCES users(id),
-    mode                review_mode NOT NULL,
-    status              task_status NOT NULL DEFAULT 'PENDING',
-    idempotency_key     TEXT,
-    request_payload     JSONB NOT NULL DEFAULT '{}'::jsonb,
-    attempt_count       INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
-    max_attempts        INTEGER NOT NULL DEFAULT 3 CHECK (max_attempts > 0),
-    progress            INTEGER NOT NULL DEFAULT 0 CHECK (progress >= 0 AND progress <= 100),
-    error_code          TEXT,
-    error_message       TEXT,
-    started_at          TIMESTAMPTZ,
-    finished_at         TIMESTAMPTZ,
-    expire_at           TIMESTAMPTZ,
-    created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
-    CONSTRAINT uq_review_tasks_user_idempotency UNIQUE (owner_user_id, idempotency_key)
+create index idx_photos_status
+    on photos (status);
+
+create trigger trg_photos_updated_at
+    before update
+    on photos
+    for each row
+execute procedure set_updated_at();
+
+create table review_tasks
+(
+    id                bigserial
+        primary key,
+    public_id         text                                                    not null
+        unique,
+    photo_id          bigint                                                  not null
+        references photos,
+    owner_user_id     bigint                                                  not null
+        references users,
+    mode              review_mode                                             not null,
+    status            task_status              default 'PENDING'::task_status not null,
+    idempotency_key   text,
+    request_payload   jsonb                    default '{}'::jsonb            not null,
+    attempt_count     integer                  default 0                      not null
+        constraint review_tasks_attempt_count_check
+            check (attempt_count >= 0),
+    max_attempts      integer                  default 3                      not null
+        constraint review_tasks_max_attempts_check
+            check (max_attempts > 0),
+    progress          integer                  default 0                      not null
+        constraint review_tasks_progress_check
+            check ((progress >= 0) AND (progress <= 100)),
+    error_code        text,
+    error_message     text,
+    started_at        timestamp with time zone,
+    finished_at       timestamp with time zone,
+    expire_at         timestamp with time zone,
+    created_at        timestamp with time zone default now()                  not null,
+    updated_at        timestamp with time zone default now()                  not null,
+    next_attempt_at   timestamp with time zone,
+    claimed_by        text,
+    last_heartbeat_at timestamp with time zone,
+    dead_lettered_at  timestamp with time zone,
+    constraint uq_review_tasks_user_idempotency
+        unique (owner_user_id, idempotency_key)
 );
 
-CREATE INDEX IF NOT EXISTS idx_review_tasks_status_created ON review_tasks(status, created_at);
-CREATE INDEX IF NOT EXISTS idx_review_tasks_photo_created ON review_tasks(photo_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_review_tasks_owner_created ON review_tasks(owner_user_id, created_at DESC);
+alter table review_tasks
+    owner to pic;
 
-DROP TRIGGER IF EXISTS trg_review_tasks_updated_at ON review_tasks;
-CREATE TRIGGER trg_review_tasks_updated_at
-BEFORE UPDATE ON review_tasks
-FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+create index idx_review_tasks_status_created
+    on review_tasks (status, created_at);
 
--- 6) reviews
-CREATE TABLE IF NOT EXISTS reviews (
-    id                  BIGSERIAL PRIMARY KEY,
-    public_id           TEXT NOT NULL UNIQUE,
-    task_id             BIGINT UNIQUE REFERENCES review_tasks(id),
-    photo_id            BIGINT NOT NULL REFERENCES photos(id),
-    owner_user_id       BIGINT NOT NULL REFERENCES users(id),
-    mode                review_mode NOT NULL,
-    status              review_status NOT NULL,
-    schema_version      TEXT NOT NULL DEFAULT '1.0',
-    result_json         JSONB NOT NULL DEFAULT '{}'::jsonb,
-    final_score         NUMERIC(4,2) NOT NULL,
-    input_tokens        INTEGER,
-    output_tokens       INTEGER,
-    cost_usd            NUMERIC(12,6),
-    latency_ms          INTEGER,
-    model_name          TEXT,
-    created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
-    CONSTRAINT chk_reviews_tokens_non_negative CHECK (
-        (input_tokens IS NULL OR input_tokens >= 0)
-        AND (output_tokens IS NULL OR output_tokens >= 0)
-        AND (latency_ms IS NULL OR latency_ms >= 0)
-    )
+create index idx_review_tasks_photo_created
+    on review_tasks (photo_id asc, created_at desc);
+
+create index idx_review_tasks_owner_created
+    on review_tasks (owner_user_id asc, created_at desc);
+
+create index idx_review_tasks_next_attempt
+    on review_tasks (status, next_attempt_at);
+
+create trigger trg_review_tasks_updated_at
+    before update
+    on review_tasks
+    for each row
+execute procedure set_updated_at();
+
+create table reviews
+(
+    id             bigserial
+        primary key,
+    public_id      text                                         not null
+        unique,
+    task_id        bigint
+        unique
+        references review_tasks,
+    photo_id       bigint                                       not null
+        references photos,
+    owner_user_id  bigint                                       not null
+        references users,
+    mode           review_mode                                  not null,
+    status         review_status                                not null,
+    schema_version text                     default '1.0'::text not null,
+    result_json    jsonb                    default '{}'::jsonb not null,
+    input_tokens   integer,
+    output_tokens  integer,
+    cost_usd       numeric(12, 6),
+    latency_ms     integer,
+    model_name     text,
+    created_at     timestamp with time zone default now()       not null,
+    updated_at     timestamp with time zone default now()       not null,
+    final_score    numeric(4, 2)                                not null,
+    constraint chk_reviews_tokens_non_negative
+        check (((input_tokens IS NULL) OR (input_tokens >= 0)) AND ((output_tokens IS NULL) OR (output_tokens >= 0)) AND
+               ((latency_ms IS NULL) OR (latency_ms >= 0)))
 );
 
-CREATE INDEX IF NOT EXISTS idx_reviews_photo_created ON reviews(photo_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_reviews_owner_created ON reviews(owner_user_id, created_at DESC);
+alter table reviews
+    owner to pic;
 
-DROP TRIGGER IF EXISTS trg_reviews_updated_at ON reviews;
-CREATE TRIGGER trg_reviews_updated_at
-BEFORE UPDATE ON reviews
-FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+create index idx_reviews_photo_created
+    on reviews (photo_id asc, created_at desc);
 
--- 7) idempotency_keys
-CREATE TABLE IF NOT EXISTS idempotency_keys (
-    id                  BIGSERIAL PRIMARY KEY,
-    user_id             BIGINT NOT NULL REFERENCES users(id),
-    endpoint            TEXT NOT NULL,
-    idempotency_key     TEXT NOT NULL,
-    request_hash        TEXT NOT NULL,
-    http_status         INTEGER,
-    response_json       JSONB,
-    expire_at           TIMESTAMPTZ NOT NULL,
-    created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
-    CONSTRAINT uq_idempotency_user_endpoint_key UNIQUE (user_id, endpoint, idempotency_key)
+create index idx_reviews_owner_created
+    on reviews (owner_user_id asc, created_at desc);
+
+create trigger trg_reviews_updated_at
+    before update
+    on reviews
+    for each row
+execute procedure set_updated_at();
+
+create table idempotency_keys
+(
+    id              bigserial
+        primary key,
+    user_id         bigint                                 not null
+        references users,
+    endpoint        text                                   not null,
+    idempotency_key text                                   not null,
+    request_hash    text                                   not null,
+    http_status     integer,
+    response_json   jsonb,
+    expire_at       timestamp with time zone               not null,
+    created_at      timestamp with time zone default now() not null,
+    constraint uq_idempotency_user_endpoint_key
+        unique (user_id, endpoint, idempotency_key)
 );
 
-CREATE INDEX IF NOT EXISTS idx_idempotency_expire_at ON idempotency_keys(expire_at);
+alter table idempotency_keys
+    owner to pic;
 
--- 8) usage_ledger
-CREATE TABLE IF NOT EXISTS usage_ledger (
-    id                  BIGSERIAL PRIMARY KEY,
-    user_id             BIGINT NOT NULL REFERENCES users(id),
-    review_id           BIGINT REFERENCES reviews(id),
-    task_id             BIGINT REFERENCES review_tasks(id),
-    usage_type          TEXT NOT NULL,
-    amount              NUMERIC(18,6) NOT NULL,
-    unit                TEXT NOT NULL,
-    bill_date           DATE NOT NULL,
-    metadata            JSONB NOT NULL DEFAULT '{}'::jsonb,
-    created_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+create index idx_idempotency_expire_at
+    on idempotency_keys (expire_at);
+
+create table usage_ledger
+(
+    id         bigserial
+        primary key,
+    user_id    bigint                                       not null
+        references users,
+    review_id  bigint
+        references reviews,
+    task_id    bigint
+        references review_tasks,
+    usage_type text                                         not null,
+    amount     numeric(18, 6)                               not null,
+    unit       text                                         not null,
+    bill_date  date                                         not null,
+    metadata   jsonb                    default '{}'::jsonb not null,
+    created_at timestamp with time zone default now()       not null
 );
 
-CREATE INDEX IF NOT EXISTS idx_usage_ledger_user_bill_date ON usage_ledger(user_id, bill_date DESC);
-CREATE INDEX IF NOT EXISTS idx_usage_ledger_type_bill_date ON usage_ledger(usage_type, bill_date DESC);
+alter table usage_ledger
+    owner to pic;
 
--- 9) rate_limit_counters
-CREATE TABLE IF NOT EXISTS rate_limit_counters (
-    id                  BIGSERIAL PRIMARY KEY,
-    scope               TEXT NOT NULL,
-    scope_key           TEXT NOT NULL,
-    endpoint            TEXT,
-    window_start        TIMESTAMPTZ NOT NULL,
-    window_seconds      INTEGER NOT NULL CHECK (window_seconds > 0),
-    hit_count           INTEGER NOT NULL DEFAULT 0 CHECK (hit_count >= 0),
-    created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
-    CONSTRAINT uq_rate_limit_window UNIQUE (scope, scope_key, endpoint, window_start, window_seconds)
+create index idx_usage_ledger_user_bill_date
+    on usage_ledger (user_id asc, bill_date desc);
+
+create index idx_usage_ledger_type_bill_date
+    on usage_ledger (usage_type asc, bill_date desc);
+
+create table rate_limit_counters
+(
+    id             bigserial
+        primary key,
+    scope          text                                   not null,
+    scope_key      text                                   not null,
+    endpoint       text,
+    window_start   timestamp with time zone               not null,
+    window_seconds integer                                not null
+        constraint rate_limit_counters_window_seconds_check
+            check (window_seconds > 0),
+    hit_count      integer                  default 0     not null
+        constraint rate_limit_counters_hit_count_check
+            check (hit_count >= 0),
+    created_at     timestamp with time zone default now() not null,
+    updated_at     timestamp with time zone default now() not null,
+    constraint uq_rate_limit_window
+        unique (scope, scope_key, endpoint, window_start, window_seconds)
 );
 
-CREATE INDEX IF NOT EXISTS idx_rate_limit_scope_window ON rate_limit_counters(scope, scope_key, window_start DESC);
+alter table rate_limit_counters
+    owner to pic;
 
-DROP TRIGGER IF EXISTS trg_rate_limit_updated_at ON rate_limit_counters;
-CREATE TRIGGER trg_rate_limit_updated_at
-BEFORE UPDATE ON rate_limit_counters
-FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+create index idx_rate_limit_scope_window
+    on rate_limit_counters (scope asc, scope_key asc, window_start desc);
 
+create trigger trg_rate_limit_updated_at
+    before update
+    on rate_limit_counters
+    for each row
+execute procedure set_updated_at();
 
--- 10) api_request_logs
-CREATE TABLE IF NOT EXISTS api_request_logs (
-    id                  BIGSERIAL PRIMARY KEY,
-    request_id          TEXT NOT NULL UNIQUE,
-    method              TEXT NOT NULL,
-    path                TEXT NOT NULL,
-    query_string        TEXT,
-    endpoint            TEXT,
-    client_ip           TEXT,
-    user_public_id      TEXT,
-    user_agent          TEXT,
-    request_body        TEXT,
-    status_code         INTEGER NOT NULL,
-    duration_ms         INTEGER NOT NULL CHECK (duration_ms >= 0),
-    created_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+create table api_request_logs
+(
+    id             bigserial
+        primary key,
+    request_id     text                                   not null
+        unique,
+    method         text                                   not null,
+    path           text                                   not null,
+    query_string   text,
+    endpoint       text,
+    client_ip      text,
+    user_public_id text,
+    user_agent     text,
+    request_body   text,
+    status_code    integer                                not null,
+    duration_ms    integer                                not null
+        constraint api_request_logs_duration_ms_check
+            check (duration_ms >= 0),
+    created_at     timestamp with time zone default now() not null
 );
 
-CREATE INDEX IF NOT EXISTS idx_api_request_logs_created ON api_request_logs(created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_api_request_logs_user_created ON api_request_logs(user_public_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_api_request_logs_ip_created ON api_request_logs(client_ip, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_api_request_logs_path_created ON api_request_logs(path, created_at DESC);
+alter table api_request_logs
+    owner to pic;
 
-COMMIT;
+create index idx_api_request_logs_created
+    on api_request_logs (created_at desc);
+
+create index idx_api_request_logs_user_created
+    on api_request_logs (user_public_id asc, created_at desc);
+
+create index idx_api_request_logs_ip_created
+    on api_request_logs (client_ip asc, created_at desc);
+
+create index idx_api_request_logs_path_created
+    on api_request_logs (path asc, created_at desc);
+
+create table review_task_events
+(
+    id             bigserial
+        primary key,
+    task_id        bigint                                       not null
+        references review_tasks,
+    task_public_id text                                         not null,
+    event_type     text                                         not null,
+    status         text                                         not null,
+    progress       integer                  default 0           not null
+        constraint review_task_events_progress_check
+            check ((progress >= 0) AND (progress <= 100)),
+    attempt_count  integer                  default 0           not null
+        constraint review_task_events_attempt_count_check
+            check (attempt_count >= 0),
+    error_code     text,
+    message        text,
+    payload_json   jsonb                    default '{}'::jsonb not null,
+    created_at     timestamp with time zone default now()       not null
+);
+
+alter table review_task_events
+    owner to pic;
+
+create index idx_review_task_events_task_created
+    on review_task_events (task_id asc, created_at desc);
+
+create index idx_review_task_events_public_created
+    on review_task_events (task_public_id asc, created_at desc);
+
+create index idx_review_task_events_type_created
+    on review_task_events (event_type asc, created_at desc);
+
+
