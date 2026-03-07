@@ -259,6 +259,4 @@ npm run start
 
 - [后端接口文档_v1.md](/e:/Project%20Code/PicSpeak/后端接口文档_v1.md)
 - [系统架构.md](/e:/Project%20Code/PicSpeak/系统架构.md)
-- [业务数据数据库定义.md](/e:/Project%20Code/PicSpeak/业务数据数据库定义.md)
-- [全流程测试文档.md](/e:/Project%20Code/PicSpeak/全流程测试文档.md)
 - [Google登录接入指南.md](/e:/Project%20Code/PicSpeak/Google登录接入指南.md)
