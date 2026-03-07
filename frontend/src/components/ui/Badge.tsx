@@ -1,4 +1,7 @@
+'use client';
+
 import React from 'react';
+import { useI18n } from '@/lib/i18n';
 
 interface BadgeProps {
   variant?: 'gold' | 'sage' | 'rust' | 'neutral' | 'outline';
@@ -30,15 +33,16 @@ export default function Badge({ variant = 'neutral', size = 'sm', children }: Ba
 }
 
 export function StatusBadge({ status }: { status: string }) {
+  const { t } = useI18n();
   const config: Record<string, { label: string; variant: BadgeProps['variant'] }> = {
-    PENDING: { label: '等待中', variant: 'neutral' },
-    RUNNING: { label: '处理中', variant: 'gold' },
-    SUCCEEDED: { label: '已完成', variant: 'sage' },
-    FAILED: { label: '已失败', variant: 'rust' },
-    EXPIRED: { label: '已过期', variant: 'rust' },
-    READY: { label: '就绪', variant: 'sage' },
-    REJECTED: { label: '已拒绝', variant: 'rust' },
-    UPLOADING: { label: '上传中', variant: 'gold' },
+    PENDING: { label: t('status_pending'), variant: 'neutral' },
+    RUNNING: { label: t('status_running'), variant: 'gold' },
+    SUCCEEDED: { label: t('status_succeeded'), variant: 'sage' },
+    FAILED: { label: t('status_failed'), variant: 'rust' },
+    EXPIRED: { label: t('status_expired'), variant: 'rust' },
+    READY: { label: t('status_ready'), variant: 'sage' },
+    REJECTED: { label: t('status_rejected'), variant: 'rust' },
+    UPLOADING: { label: t('status_uploading'), variant: 'gold' },
   };
   const c = config[status] ?? { label: status, variant: 'neutral' as const };
   return <Badge variant={c.variant}>{c.label}</Badge>;

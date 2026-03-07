@@ -1,5 +1,8 @@
 # PicSpeak
 
+[![Next.js](https://img.shields.io/badge/Next.js-14-black)](https://nextjs.org/)
+[![Python](https://img.shields.io/badge/Python-3.11-blue)](https://www.python.org/)
+
 PicSpeak 是一个面向真实交付场景的 AI 摄影点评项目，包含：
 
 - 后端服务：FastAPI + PostgreSQL + S3 兼容对象存储

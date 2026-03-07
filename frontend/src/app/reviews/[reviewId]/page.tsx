@@ -11,16 +11,10 @@ import { ReviewGetResponse, ApiException } from '@/lib/types';
 import ScoreRing, { FinalScoreRing } from '@/components/ui/ScoreRing';
 import { ModeBadge, StatusBadge } from '@/components/ui/Badge';
 import { SkeletonBlock } from '@/components/ui/LoadingSpinner';
+import { useI18n } from '@/lib/i18n';
 
-// ─── Score dimensions config ───────────────────────────────────────────────────
-
-const SCORE_DIMS: Array<{ key: string; label: string }> = [
-  { key: 'composition', label: '构图' },
-  { key: 'lighting', label: '光线' },
-  { key: 'color', label: '色彩' },
-  { key: 'story', label: '故事' },
-  { key: 'technical', label: '技术' },
-];
+// ─── Score dimensions config ─────────────────────────────────────────────────
+// (Defined in component to use i18n — see ReviewPage)
 
 // ─── Parse body text into individual point strings ────────────────────────────
 
@@ -73,9 +67,19 @@ export default function ReviewPage() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { t } = useI18n();
+
+  const SCORE_DIMS = [
+    { key: 'composition', label: t('score_composition') },
+    { key: 'lighting', label: t('score_lighting') },
+    { key: 'color', label: t('score_color') },
+    { key: 'story', label: t('score_story') },
+    { key: 'technical', label: t('score_technical') },
+  ];
+
   const reviewId = params.reviewId as string;
   const backHref = searchParams.get('back') ?? '/workspace';
-  const backLabel = backHref === '/account/reviews' ? '评图历史' : '返回工作台';
+  const backLabel = backHref === '/account/reviews' ? t('review_back_history') : t('review_back_workspace');
   const { ensureToken } = useAuth();
 
   const [review, setReview] = useState<ReviewGetResponse | null>(null);
@@ -107,7 +111,7 @@ export default function ReviewPage() {
         if (err instanceof ApiException) {
           setError(err.message);
         } else {
-          setError('获取点评结果失败，请重试');
+          setError(t('review_err_fetch'));
         }
       });
   }, [reviewId, ensureToken]);
@@ -142,7 +146,7 @@ export default function ReviewPage() {
             onClick={() => router.back()}
             className="flex items-center gap-1 text-xs text-ink-subtle hover:text-ink-muted mx-auto"
           >
-            <ArrowLeft size={11} /> 返回
+            <ArrowLeft size={11} /> {t('back_btn')}
           </button>
         </div>
       </div>
@@ -185,7 +189,7 @@ export default function ReviewPage() {
               </div>
             ) : (
               <div className="rounded-lg bg-raised border border-border-subtle flex items-center justify-center h-64 text-ink-subtle text-sm">
-                暂无图片
+                {t('review_no_image')}
               </div>
             )}
 
@@ -217,14 +221,14 @@ export default function ReviewPage() {
                 className="flex items-center gap-2 px-4 py-2 bg-gold text-void text-sm font-medium rounded hover:bg-gold-light transition-colors"
               >
                 <RotateCcw size={13} />
-                再次点评
+                {t('review_btn_again')}
               </button>
               <Link
                 href={`/photos/${review.photo_id}/reviews`}
                 className="flex items-center gap-2 px-4 py-2 border border-border text-ink-muted text-sm rounded hover:border-gold/40 hover:text-gold transition-colors"
               >
                 <History size={13} />
-                该照片历史
+                {t('review_btn_photo_history')}
               </Link>
             </div>
           </div>
@@ -234,8 +238,8 @@ export default function ReviewPage() {
             {/* Title + badges */}
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-xs text-gold/70 font-mono mb-2 tracking-widest uppercase">— 点评结果</p>
-                <h1 className="font-display text-3xl sm:text-4xl">结果分析</h1>
+                <p className="text-xs text-gold/70 font-mono mb-2 tracking-widest uppercase">— {t('review_page_label')}</p>
+                <h1 className="font-display text-3xl sm:text-4xl">{t('review_page_headline')}</h1>
               </div>
               <div className="flex items-center gap-2 pt-1">
                 <ModeBadge mode={review.mode} />
@@ -250,7 +254,7 @@ export default function ReviewPage() {
                 borderColor="border-sage"
                 bgColor="bg-sage/5"
                 icon={<ThumbsUp size={13} />}
-                title="优点"
+                title={t('review_advantage')}
                 body={r.advantage}
               />
               <div className="border-t border-border-subtle" />
@@ -259,7 +263,7 @@ export default function ReviewPage() {
                 borderColor="border-rust"
                 bgColor="bg-rust/5"
                 icon={<AlertTriangle size={13} />}
-                title="问题"
+                title={t('review_critique')}
                 body={r.critique}
               />
               <div className="border-t border-border-subtle" />
@@ -268,7 +272,7 @@ export default function ReviewPage() {
                 borderColor="border-gold"
                 bgColor="bg-gold/5"
                 icon={<Lightbulb size={13} />}
-                title="改进建议"
+                title={t('review_suggestions')}
                 body={r.suggestions}
               />
             </div>

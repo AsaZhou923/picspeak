@@ -1,20 +1,24 @@
+'use client';
+
 import Link from 'next/link';
-import { Aperture } from 'lucide-react';
+import Image from 'next/image';
 import { Twitter } from 'lucide-react';
+import { useI18n } from '@/lib/i18n';
 
 export default function Footer() {
+  const { t } = useI18n();
   return (
     <footer className="border-t border-border-subtle py-10 mt-auto">
       <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-ink-subtle">
         <div className="flex items-center gap-2">
-          <Aperture size={12} className="text-gold/60" />
+          <Image src="/logo.png" alt="PicSpeak" width={14} height={14} className="rounded object-contain opacity-60" />
           <span className="font-display text-sm text-ink-muted tracking-wider">PicSpeak</span>
         </div>
 
         <div className="flex items-center gap-5">
-          <Link href="/" className="hover:text-ink transition-colors">首页</Link>
-          <Link href="/workspace" className="hover:text-ink transition-colors">评图</Link>
-          <Link href="/account/usage" className="hover:text-ink transition-colors">额度</Link>
+          <Link href="/" className="hover:text-ink transition-colors">{t('footer_home')}</Link>
+          <Link href="/workspace" className="hover:text-ink transition-colors">{t('footer_workspace')}</Link>
+          <Link href="/account/usage" className="hover:text-ink transition-colors">{t('footer_usage')}</Link>
         </div>
 
         <div className="flex items-center gap-4">

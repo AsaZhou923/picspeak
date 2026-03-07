@@ -24,6 +24,7 @@ import {
 import ImageUploader from '@/components/upload/ImageUploader';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Badge from '@/components/ui/Badge';
+import { useI18n } from '@/lib/i18n';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -58,6 +59,7 @@ function extractClientMeta(
 export default function WorkspacePage() {
   const router = useRouter();
   const { userInfo, ensureToken, isLoading: authLoading } = useAuth();
+  const { t, locale } = useI18n();
 
   const [usage, setUsage] = useState<UsageResponse | null>(null);
   const [usageError, setUsageError] = useState(false);
@@ -161,27 +163,27 @@ export default function WorkspacePage() {
           fetchUsage();
         } else if (photoData.status === 'REJECTED') {
           setStage('rejected');
-          setErrMessage('该图片未通过内容审核，无法评图');
+          setErrMessage(t('status_rejected'));
         } else {
           setStage('error');
-          setErrMessage(`照片状态异常：${photoData.status}`);
+          setErrMessage(t('status_photo_error') + photoData.status);
         }
       } catch (err) {
         setStage('error');
         if (err instanceof ApiException) {
           if (err.status === 429) {
-            setErrMessage('当前操作过于频繁，请稍后再试');
+            setErrMessage(t('err_rate_limit'));
           } else if (err.status === 402 || err.code === 'QUOTA_EXCEEDED') {
-            setErrMessage('今日评图额度已用完，请明日再来或升级套餐');
+            setErrMessage(t('err_quota'));
           } else {
             setErrMessage(err.message);
           }
         } else {
-          setErrMessage('上传失败，请检查网络后重试');
+          setErrMessage(t('err_upload'));
         }
       }
     },
-    [ensureToken, fetchUsage]
+    [ensureToken, fetchUsage, t]
   );
 
   // ── Submit review ──────────────────────────────────────────────────────────
@@ -205,6 +207,7 @@ export default function WorkspacePage() {
           mode: reviewMode,
           async: true,
           idempotency_key: idempotencyKey,
+          locale,
         },
         token
       );
@@ -220,17 +223,17 @@ export default function WorkspacePage() {
       setStage('ready');
       if (err instanceof ApiException) {
         if (err.status === 429) {
-          setErrMessage('请求过于频繁，请稍后重试');
+          setErrMessage(t('err_rate_limit'));
         } else if (err.code === 'QUOTA_EXCEEDED') {
-          setErrMessage('今日评图额度已用完');
+          setErrMessage(t('err_quota'));
         } else {
           setErrMessage(err.message);
         }
       } else {
-        setErrMessage('发起点评失败，请重试');
+        setErrMessage(t('err_upload'));
       }
     }
-  }, [photo, reviewMode, ensureToken, router]);
+  }, [photo, reviewMode, locale, ensureToken, router, t]);
 
   const handleReset = () => {
     setSelectedFile(null);
@@ -266,12 +269,9 @@ export default function WorkspacePage() {
               <AlertCircle size={22} className="text-rust" />
             </div>
             <div>
-              <h2 className="font-display text-2xl mb-2">今日额度已用尽</h2>
+              <h2 className="font-display text-2xl mb-2">{t('quota_modal_title')}</h2>
               <p className="text-sm text-ink-muted leading-relaxed">
-                你的今日评图次数已全部用完，将在次日 UTC 00:00 自动重置。
-                {usage?.plan === 'guest' && (
-                  <span>登录 Google 账号可解锁更多每日额度。</span>
-                )}
+                {t('quota_modal_body')}
               </p>
             </div>
             <div className="flex flex-col gap-2 pt-1">
@@ -280,17 +280,17 @@ export default function WorkspacePage() {
                   href={buildGoogleOAuthUrl()}
                   className="flex items-center justify-center gap-2 px-5 py-2.5 bg-gold text-void text-sm font-medium rounded hover:bg-gold-light transition-colors"
                 >
-                  登录以获取更多额度
+                  {t('quota_modal_upgrade')}
                   <ArrowRight size={13} />
                 </a>
               ) : (
-                <p className="text-xs text-ink-muted text-center">升级套餐可获得更高每日额度</p>
+                <p className="text-xs text-ink-muted text-center">{t('quota_modal_upgrade')}</p>
               )}
               <button
                 onClick={() => setShowQuotaModal(false)}
                 className="text-sm text-ink-muted hover:text-ink transition-colors py-1"
               >
-                关闭
+                {t('quota_modal_close')}
               </button>
             </div>
           </div>
@@ -300,9 +300,9 @@ export default function WorkspacePage() {
         {/* Header */}
         <div className="mb-10 animate-fade-in">
           <p className="text-xs text-gold/70 font-mono mb-3 tracking-widest uppercase">
-            — 评图工作台
+            — {t('workspace_label')}
           </p>
-          <h1 className="font-display text-4xl sm:text-5xl mb-4">上传照片</h1>
+          <h1 className="font-display text-4xl sm:text-5xl mb-4">{t('workspace_headline')}</h1>
 
           {/* Usage bar */}
           {usage && (
@@ -314,20 +314,20 @@ export default function WorkspacePage() {
               </span>
               <div className="flex items-center gap-1.5 text-xs text-ink-muted">
                 <Info size={11} />
-                今日剩余
+                {t('usage_remaining')}
                 <span className="text-ink font-medium">
                   {usage.quota.remaining} / {usage.quota.daily_total}
                 </span>
-                次
+                {t('usage_times')}
               </div>
               {usage.quota.remaining === 0 && (
-                <Badge variant="rust">额度已用尽</Badge>
+                <Badge variant="rust">{t('usage_quota_exhausted')}</Badge>
               )}
             </div>
           )}
 
           {usageError && (
-            <p className="text-xs text-ink-subtle mt-2">无法获取额度信息</p>
+            <p className="text-xs text-ink-subtle mt-2">{t('usage_error')}</p>
           )}
         </div>
 
@@ -354,7 +354,7 @@ export default function WorkspacePage() {
                 {stage === 'uploading' && (
                   <div className="absolute inset-0 bg-void/70 flex flex-col items-center justify-center gap-3">
                     <LoadingSpinner size={32} />
-                    <p className="text-sm text-ink-muted">上传中 {uploadProgress}%</p>
+                    <p className="text-sm text-ink-muted">{t('stage_uploading')} {uploadProgress}%</p>
                     <div className="w-40 h-0.5 bg-border rounded-full overflow-hidden">
                       <div
                         className="h-full bg-gold rounded-full transition-all duration-300"
@@ -366,13 +366,13 @@ export default function WorkspacePage() {
 
                 {stage === 'confirming' && (
                   <div className="absolute inset-0 bg-void/70 flex flex-col items-center justify-center gap-3">
-                    <LoadingSpinner size={32} label="确认照片中…" />
+                    <LoadingSpinner size={32} label={t('stage_confirming')} />
                   </div>
                 )}
 
                 {stage === 'reviewing' && (
                   <div className="absolute inset-0 bg-void/70 flex flex-col items-center justify-center gap-3">
-                    <LoadingSpinner size={32} label="提交点评请求…" />
+                    <LoadingSpinner size={32} label={t('stage_reviewing')} />
                   </div>
                 )}
               </div>
@@ -389,7 +389,7 @@ export default function WorkspacePage() {
               {stage === 'ready' && photo && (
                 <div className="flex items-center gap-2 text-sage text-sm">
                   <CheckCircle size={14} />
-                  <span>照片上传成功，可以开始评图</span>
+                  <span>{t('status_ready')}</span>
                 </div>
               )}
 
@@ -404,7 +404,7 @@ export default function WorkspacePage() {
               {stage === 'ready' && photo && (
                 <>
                   <div>
-                    <p className="text-xs text-ink-muted mb-3">选择点评模式</p>
+                    <p className="text-xs text-ink-muted mb-3">{t('select_mode')}</p>
                     <div className="grid grid-cols-2 gap-3">
                       {(
                         [
@@ -412,13 +412,13 @@ export default function WorkspacePage() {
                             id: 'flash' as const,
                             icon: Zap,
                             title: 'Flash',
-                            desc: '极速点评，秒级响应',
+                            desc: t('mode_flash_desc'),
                           },
                           {
                             id: 'pro' as const,
                             icon: Star,
                             title: 'Pro',
-                            desc: '深度分析，专业建议',
+                            desc: t('mode_pro_desc'),
                           },
                         ] as const
                       ).map((m) => {
@@ -452,7 +452,7 @@ export default function WorkspacePage() {
                               {m.title}
                             </p>
                             <p className="text-xs text-ink-muted mt-0.5">
-                              {disabled ? 'Guest unavailable' : m.desc}
+                              {disabled ? t('mode_pro_guest') : m.desc}
                             </p>
                           </div>
                         </button>
@@ -466,13 +466,13 @@ export default function WorkspacePage() {
                       onClick={handleReview}
                       className="flex-1 px-6 py-3 bg-gold text-void text-sm font-medium rounded hover:bg-gold-light transition-colors"
                     >
-                      开始 {reviewMode === 'pro' ? 'Pro' : 'Flash'} 点评
+                      {t('btn_start_review')} {reviewMode === 'pro' ? 'Pro' : 'Flash'} {t('btn_review_suffix')}
                     </button>
                     <button
                       onClick={handleReset}
                       className="px-4 py-3 border border-border text-ink-muted text-sm rounded hover:border-gold/40 transition-colors"
                     >
-                      换张照片
+                      {t('btn_change_photo')}
                     </button>
                   </div>
                 </>
@@ -484,7 +484,7 @@ export default function WorkspacePage() {
                   onClick={handleReset}
                   className="w-full px-6 py-3 border border-border text-ink-muted text-sm rounded hover:border-gold/40 transition-colors"
                 >
-                  重新上传
+                  {t('btn_reupload')}
                 </button>
               )}
             </div>

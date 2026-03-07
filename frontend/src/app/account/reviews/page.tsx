@@ -9,6 +9,7 @@ import { useAuth } from '@/lib/auth-context';
 import { ReviewHistoryItem, ApiException } from '@/lib/types';
 import { ModeBadge, StatusBadge } from '@/components/ui/Badge';
 import { SkeletonBlock } from '@/components/ui/LoadingSpinner';
+import { useI18n } from '@/lib/i18n';
 
 // ─── Score bar ────────────────────────────────────────────────────────────────
 
@@ -33,7 +34,9 @@ function ScoreBar({ score }: { score: number }) {
 
 function ReviewCard({ item }: { item: ReviewHistoryItem }) {
   const [imgError, setImgError] = useState(false);
-  const date = new Date(item.created_at).toLocaleString('zh-CN', {
+  const { locale, t } = useI18n();
+  const dateLocale = locale === 'zh' ? 'zh-CN' : locale === 'ja' ? 'ja-JP' : 'en-US';
+  const date = new Date(item.created_at).toLocaleString(dateLocale, {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -51,7 +54,7 @@ function ReviewCard({ item }: { item: ReviewHistoryItem }) {
         {item.photo_url && !imgError ? (
           <Image
             src={item.photo_url}
-            alt="照片缩略图"
+            alt={t('photo_thumbnail_alt')}
             width={64}
             height={64}
             className="w-full h-full object-cover"
@@ -100,6 +103,7 @@ function SkeletonList() {
 
 export default function ReviewHistoryPage() {
   const { ensureToken } = useAuth();
+  const { t } = useI18n();
 
   const [items, setItems] = useState<ReviewHistoryItem[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -122,7 +126,7 @@ export default function ReviewHistoryPage() {
         setHasMore(data.next_cursor !== null);
       } catch (err) {
         const msg =
-          err instanceof ApiException ? err.message : '获取评图历史失败';
+          err instanceof ApiException ? err.message : t('reviews_err_fetch');
         setError(msg);
       }
     },
@@ -147,9 +151,9 @@ export default function ReviewHistoryPage() {
         {/* Header */}
         <div className="mb-10">
           <p className="text-xs text-gold/70 font-mono mb-2 tracking-widest uppercase">
-            — 历史记录
+            — {t('account_reviews_label')}
           </p>
-          <h1 className="font-display text-4xl sm:text-5xl">评图历史</h1>
+          <h1 className="font-display text-4xl sm:text-5xl">{t('account_reviews_headline')}</h1>
         </div>
 
         {loading ? (
@@ -161,12 +165,12 @@ export default function ReviewHistoryPage() {
           </div>
         ) : items.length === 0 ? (
           <div className="text-center py-20 space-y-3">
-            <p className="text-ink-subtle text-sm">暂无评图记录</p>
+            <p className="text-ink-subtle text-sm">{t('reviews_empty')}</p>
             <Link
               href="/workspace"
               className="inline-flex items-center gap-1.5 text-xs text-gold border border-gold/30 rounded px-3 py-1.5 hover:bg-gold/10 transition-colors"
             >
-              去评图
+              {t('reviews_empty_cta')}
               <ChevronRight size={11} />
             </Link>
           </div>
@@ -188,7 +192,7 @@ export default function ReviewHistoryPage() {
                   {loadingMore && (
                     <RefreshCw size={13} className="animate-spin" />
                   )}
-                  {loadingMore ? '加载中…' : '加载更多'}
+                  {loadingMore ? t('reviews_loading_more') : t('reviews_load_more')}
                 </button>
               </div>
             )}

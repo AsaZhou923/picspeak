@@ -3,6 +3,7 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { Camera, X, AlertCircle, Loader, CheckCircle2 } from 'lucide-react';
 import { compressImage, formatBytes, compressionRatio, CompressionResult } from '@/lib/compress';
+import { useI18n } from '@/lib/i18n';
 
 interface ImageUploaderProps {
   onFileSelected: (file: File, preview: string) => void;
@@ -23,19 +24,21 @@ export default function ImageUploader({
   const [compressing, setCompressing] = useState(false);
   const [compressionInfo, setCompressionInfo] = useState<CompressionResult | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const { t } = useI18n();
+  const maxMB = Math.round(maxBytes / 1024 / 1024);
 
   const validate = useCallback(
     (file: File): string | null => {
       if (!ALLOWED_TYPES.includes(file.type)) {
-        return `不支持的格式（仅 JPG / PNG / WebP）`;
+        return t('uploader_invalid_type');
       }
       // Validate against original size before compression
       if (file.size > maxBytes) {
-        return `文件过大（最大 ${Math.round(maxBytes / 1024 / 1024)} MB）`;
+        return t('uploader_too_large').replace('{max}', String(maxMB));
       }
       return null;
     },
-    [maxBytes]
+    [maxBytes, maxMB, t]
   );
 
   const process = useCallback(
@@ -134,8 +137,8 @@ export default function ImageUploader({
                 <Loader size={22} className="text-gold animate-spin" style={{ animationDuration: '1.5s' }} />
               </div>
               <div>
-                <p className="text-sm text-ink-muted">正在压缩图片…</p>
-                <p className="text-xs text-ink-subtle mt-1">稍候片刻</p>
+                <p className="text-sm text-ink-muted">{t('uploader_compressing')}</p>
+                <p className="text-xs text-ink-subtle mt-1">{t('uploader_compressing_wait')}</p>
               </div>
             </>
           ) : (
@@ -145,10 +148,10 @@ export default function ImageUploader({
               </div>
               <div>
                 <p className="text-sm text-ink-muted">
-                  {dragOver ? '松开以上传' : '拖拽图片到此，或点击选择'}
+                  {dragOver ? t('uploader_drop_hint') : t('uploader_idle_hint')}
                 </p>
                 <p className="text-xs text-ink-subtle mt-1">
-                  JPG / PNG / WebP · 最大 {Math.round(maxBytes / 1024 / 1024)} MB · 自动压缩
+                  {t('uploader_format_hint').replace('{max}', String(maxMB))}
                 </p>
               </div>
             </>
@@ -162,12 +165,12 @@ export default function ImageUploader({
           <CheckCircle2 size={13} className="text-sage shrink-0" />
           {compressionInfo.compressed ? (
             <span className="text-ink-muted">
-              图片已压缩&nbsp;
+              {t('uploader_compressed')}&nbsp;
               <span className="text-ink">{formatBytes(compressionInfo.originalSize)}</span>
               &nbsp;→&nbsp;
               <span className="text-sage">{formatBytes(compressionInfo.compressedSize)}</span>
               &nbsp;
-              <span className="text-gold">（节省 {ratio}%）</span>
+              <span className="text-gold">（{t('uploader_saved').replace('{ratio}', String(ratio))}）</span>
               {compressionInfo.compressedWidth > 0 && (
                 <span className="text-ink-subtle ml-1">
                   · {compressionInfo.compressedWidth}×{compressionInfo.compressedHeight}
@@ -176,7 +179,7 @@ export default function ImageUploader({
             </span>
           ) : (
             <span className="text-ink-muted">
-              图片无需压缩&nbsp;
+              {t('uploader_no_compress')}&nbsp;
               <span className="text-ink">{formatBytes(compressionInfo.originalSize)}</span>
             </span>
           )}

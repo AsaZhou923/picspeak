@@ -81,7 +81,7 @@ export function useAuth(): AuthState {
 
 export function planLabel(plan: string): string {
   const labels: Record<string, string> = {
-    guest: '游客',
+    guest: 'Guest',
     free: 'Free',
     pro: 'Pro',
   };

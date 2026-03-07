@@ -5,19 +5,8 @@ import { useRouter, useParams } from 'next/navigation';
 import { AlertCircle, RotateCcw, ArrowLeft, ShieldCheck, Cpu, CheckCircle2, Clock } from 'lucide-react';
 import { buildTaskWebSocketUrl, getTask } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { useI18n } from '@/lib/i18n';
 import { ApiException, TaskStatusResponse, TaskStreamMessage } from '@/lib/types';
-
-const STEPS = [
-  { id: 'queue', label: '排队等待', detail: '任务已创建，等待 worker 领取。', icon: Clock, minProgress: 0, maxProgress: 19 },
-  { id: 'audit', label: '内容审核', detail: '正在执行图片安全审核。', icon: ShieldCheck, minProgress: 20, maxProgress: 69 },
-  { id: 'ai', label: 'AI 分析', detail: '模型正在分析构图、光线和技术表现。', icon: Cpu, minProgress: 70, maxProgress: 99 },
-  { id: 'done', label: '点评完成', detail: '即将跳转到结果页。', icon: CheckCircle2, minProgress: 100, maxProgress: 100 },
-];
-
-function getActiveStep(progress: number, status: string) {
-  if (status === 'SUCCEEDED') return STEPS.length - 1;
-  return Math.max(STEPS.findIndex((step) => progress >= step.minProgress && progress <= step.maxProgress), 0);
-}
 
 const POLL_INTERVAL = 2000;
 const MAX_POLLS = 60;
@@ -27,6 +16,19 @@ export default function TaskPage() {
   const params = useParams();
   const taskId = params.taskId as string;
   const { ensureToken } = useAuth();
+  const { t } = useI18n();
+
+  const STEPS = [
+    { id: 'queue', label: t('task_step_queue_label'), detail: t('task_step_queue_detail'), icon: Clock, minProgress: 0, maxProgress: 19 },
+    { id: 'audit', label: t('task_step_audit_label'), detail: t('task_step_audit_detail'), icon: ShieldCheck, minProgress: 20, maxProgress: 69 },
+    { id: 'ai', label: t('task_step_ai_label'), detail: t('task_step_ai_detail'), icon: Cpu, minProgress: 70, maxProgress: 99 },
+    { id: 'done', label: t('task_step_done_label'), detail: t('task_step_done_detail'), icon: CheckCircle2, minProgress: 100, maxProgress: 100 },
+  ];
+
+  const getActiveStep = (progress: number, status: string) => {
+    if (status === 'SUCCEEDED') return STEPS.length - 1;
+    return Math.max(STEPS.findIndex((step) => progress >= step.minProgress && progress <= step.maxProgress), 0);
+  };
 
   const [task, setTask] = useState<TaskStatusResponse | null>(null);
   const [error, setError] = useState('');
@@ -64,7 +66,7 @@ export default function TaskPage() {
       if (finalRef.current) return;
 
       if (pollCount.current >= MAX_POLLS) {
-        setError('等待时间过长，请稍后手动刷新或重新发起点评。');
+        setError(t('task_timeout_error'));
         return;
       }
 
@@ -73,7 +75,7 @@ export default function TaskPage() {
       if (err instanceof ApiException) {
         setError(err.message);
       } else {
-        setError('查询任务状态失败，请刷新页面重试。');
+        setError(t('task_fetch_error'));
       }
     }
   };
@@ -134,11 +136,11 @@ export default function TaskPage() {
 
   const stageInfo = task
     ? task.status === 'FAILED'
-      ? { label: '点评失败', detail: '任务处理过程中发生错误。' }
+      ? { label: t('task_failed_label'), detail: t('task_failed_detail') }
       : task.status === 'EXPIRED'
-      ? { label: '任务超时', detail: '任务等待时间过长，系统已终止。' }
+      ? { label: t('task_expired_label'), detail: t('task_expired_detail') }
       : task.status === 'DEAD_LETTER'
-      ? { label: '进入死信队列', detail: '任务已多次重试仍失败，请重新发起点评。' }
+      ? { label: t('task_dead_letter_label'), detail: t('task_dead_letter_detail') }
       : null
     : null;
   const isFinal = task?.status === 'FAILED' || task?.status === 'EXPIRED' || task?.status === 'DEAD_LETTER';
@@ -149,7 +151,7 @@ export default function TaskPage() {
   return (
     <div className="pt-14 min-h-screen flex items-center justify-center px-6">
       <div className="w-full max-w-md text-center space-y-10 animate-fade-in">
-        <p className="text-xs text-ink-muted font-mono">任务 {taskId}</p>
+        <p className="text-xs text-ink-muted font-mono">{t('task_id_label')} {taskId}</p>
 
         {isFinal ? (
           <div className="space-y-4">
@@ -201,8 +203,8 @@ export default function TaskPage() {
             </div>
 
             <div className="space-y-1">
-              <h1 className="font-display text-3xl">{isSuccess ? '点评完成' : activeStep.label}</h1>
-              <p className="text-sm text-ink-muted">{isSuccess ? '即将跳转到结果页。' : activeStep.detail}</p>
+              <h1 className="font-display text-3xl">{isSuccess ? t('task_step_done_label') : activeStep.label}</h1>
+              <p className="text-sm text-ink-muted">{isSuccess ? t('task_step_done_detail') : activeStep.detail}</p>
             </div>
 
             {task && !isSuccess && (
@@ -228,7 +230,7 @@ export default function TaskPage() {
         )}
         {task?.error && (
           <p className="text-sm text-rust bg-rust/5 border border-rust/20 rounded px-4 py-2">
-            {String((task.error as Record<string, unknown>).message ?? '未知错误')}
+            {String((task.error as Record<string, unknown>).message ?? t('err_unknown_title'))}
           </p>
         )}
 
@@ -239,14 +241,14 @@ export default function TaskPage() {
               className="flex items-center justify-center gap-2 px-6 py-2.5 bg-gold text-void text-sm font-medium rounded hover:bg-gold-light transition-colors"
             >
               <RotateCcw size={14} />
-              重新发起点评
+              {t('task_retry')}
             </button>
             <button
               onClick={() => router.back()}
               className="flex items-center justify-center gap-2 text-xs text-ink-muted hover:text-ink transition-colors"
             >
               <ArrowLeft size={11} />
-              返回
+              {t('task_back')}
             </button>
           </div>
         )}

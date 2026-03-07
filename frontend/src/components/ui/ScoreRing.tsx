@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { useI18n } from '@/lib/i18n';
 
 interface ScoreRingProps {
   score: number; // 0–10
@@ -87,12 +88,13 @@ export default function ScoreRing({
 // ─── Large final score display ────────────────────────────────────────────────
 
 export function FinalScoreRing({ score }: { score: number }) {
+  const { t } = useI18n();
   return (
     <ScoreRing
       score={score}
       size={120}
       strokeWidth={4}
-      label="综合评分"
+      label={t('score_overall')}
     />
   );
 }

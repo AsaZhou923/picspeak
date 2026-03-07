@@ -4,36 +4,47 @@ import Link from 'next/link';
 import { ArrowRight, Aperture, Zap, Star, BarChart2 } from 'lucide-react';
 import { buildGoogleOAuthUrl } from '@/lib/api';
 import ScoreRing from '@/components/ui/ScoreRing';
+import { useI18n } from '@/lib/i18n';
 
-// ─── Sample critique data for visual demo ────────────────────────────────────
-
-const DEMO_SCORES = [
-  { label: '构图', score: 8 },
-  { label: '光线', score: 7 },
-  { label: '色彩', score: 9 },
-  { label: '故事', score: 6 },
-  { label: '技术', score: 8 },
-];
-
-const FEATURES = [
-  {
-    icon: Zap,
-    title: 'Flash 极速点评',
-    body: '秒级响应，即时获得构图、光线、色彩等五维度精准评分',
-  },
-  {
-    icon: Star,
-    title: 'Pro 深度分析',
-    body: '深入剖析照片叙事力与创作意图，附带可落地改进建议',
-  },
-  {
-    icon: BarChart2,
-    title: '历史追踪',
-    body: '记录同一张照片的多次评图结果，量化你的进步轨迹',
-  },
+const DEMO_SCORES_KEYS = [
+  { labelKey: 'score_composition' as const, score: 8 },
+  { labelKey: 'score_lighting' as const, score: 7 },
+  { labelKey: 'score_color' as const, score: 9 },
+  { labelKey: 'score_story' as const, score: 6 },
+  { labelKey: 'score_technical' as const, score: 8 },
 ];
 
 export default function HomePage() {
+  const { t } = useI18n();
+
+  const FEATURES = [
+    { icon: Zap, title: t('feature_flash_title'), body: t('feature_flash_body') },
+    { icon: Star, title: t('feature_pro_title'), body: t('feature_pro_body') },
+    { icon: BarChart2, title: t('feature_history_title'), body: t('feature_history_body') },
+  ];
+
+  const TIERS = [
+    {
+      plan: t('plan_guest_name'),
+      daily: 3,
+      dailyLabel: t('plan_guest_quota'),
+      features: [t('plan_guest_feature'), t('plan_guest_label')],
+    },
+    {
+      plan: t('plan_free_name'),
+      daily: 6,
+      dailyLabel: t('plan_free_quota'),
+      features: [t('plan_free_feature'), 'Google'],
+    },
+    {
+      plan: t('plan_pro_name'),
+      daily: 30,
+      dailyLabel: t('plan_pro_quota'),
+      features: [t('plan_pro_feature')],
+      highlight: true,
+    },
+  ];
+
   return (
     <>
       {/* ── Hero ────────────────────────────────────────────────────────────── */}
@@ -50,19 +61,18 @@ export default function HomePage() {
         {/* Label */}
         <div className="relative flex items-center gap-2 mb-8 px-4 py-1.5 border border-gold/20 rounded-full text-xs text-gold/80">
           <Aperture size={11} />
-          <span>AI Photography Critique</span>
+          <span>{t('hero_label')}</span>
         </div>
 
         {/* Headline */}
         <h1 className="relative font-display text-5xl sm:text-6xl md:text-7xl text-center leading-[1.08] max-w-3xl text-balance">
-          让每一张照片
+          {t('hero_headline_1')}
           <br />
-          <span className="text-gold">开口说话</span>
+          <span className="text-gold">{t('hero_headline_2')}</span>
         </h1>
 
         <p className="relative mt-6 text-ink-muted text-base sm:text-lg text-center max-w-xl leading-relaxed">
-          上传你的摄影作品，AI 从构图、光线、色彩、故事与技术五个维度深度解析，
-          给出专业、可落地的改进建议。
+          {t('hero_desc')}
         </p>
 
         {/* CTA Buttons */}
@@ -71,7 +81,7 @@ export default function HomePage() {
             href="/workspace"
             className="flex items-center gap-2 px-7 py-3 bg-gold text-void text-sm font-medium rounded hover:bg-gold-light transition-colors"
           >
-            立即开始评图
+            {t('hero_cta_start')}
             <ArrowRight size={14} />
           </Link>
           <a
@@ -79,7 +89,7 @@ export default function HomePage() {
             className="flex items-center gap-2 px-7 py-3 border border-border text-ink-muted text-sm rounded hover:border-gold/40 hover:text-gold transition-colors"
           >
             <GoogleIcon />
-            Google 登录
+            {t('hero_cta_login')}
           </a>
         </div>
 
@@ -88,30 +98,30 @@ export default function HomePage() {
           <div className="border border-border-subtle rounded-lg bg-raised/60 backdrop-blur-sm p-6">
             <div className="flex items-start justify-between gap-4 mb-4">
               <div>
-                <p className="text-xs text-ink-subtle mb-1 font-mono">示例评图结果</p>
+                <p className="text-xs text-ink-subtle mb-1 font-mono">{t('demo_label')}</p>
                 <p className="font-display text-2xl text-gold">7.6</p>
-                <p className="text-xs text-ink-muted mt-0.5">综合评分</p>
+                <p className="text-xs text-ink-muted mt-0.5">{t('demo_final_score')}</p>
               </div>
               <div className="flex flex-wrap gap-3 justify-end">
-                {DEMO_SCORES.map((d) => (
+                {DEMO_SCORES_KEYS.map((d) => (
                   <ScoreRing
-                    key={d.label}
+                    key={d.labelKey}
                     score={d.score}
                     size={60}
                     strokeWidth={3}
-                    label={d.label}
+                    label={t(d.labelKey)}
                   />
                 ))}
               </div>
             </div>
             <div className="border-t border-border-subtle pt-4 space-y-2 text-sm text-ink-muted leading-relaxed">
               <p>
-                <span className="text-sage font-medium">优点</span> ·{' '}
-                构图遵循黄金分割，前景与远景形成自然层次，整体框架稳健。
+                <span className="text-sage font-medium">{t('demo_advantage')}</span> ·{' '}
+                {t('demo_advantage_body')}
               </p>
               <p>
-                <span className="text-gold font-medium">建议</span> ·{' '}
-                可适当降低高光区域曝光 0.5 EV，并通过后期微提阴影细节增强整体反差。
+                <span className="text-gold font-medium">{t('demo_suggestion')}</span> ·{' '}
+                {t('demo_suggestion_body')}
               </p>
             </div>
           </div>
@@ -121,9 +131,9 @@ export default function HomePage() {
       {/* ── Features ────────────────────────────────────────────────────────── */}
       <section className="px-6 py-24 border-t border-border-subtle">
         <div className="max-w-5xl mx-auto">
-          <p className="text-xs text-gold/70 font-mono mb-4 tracking-widest uppercase">— 核心能力</p>
+          <p className="text-xs text-gold/70 font-mono mb-4 tracking-widest uppercase">— {t('features_label')}</p>
           <h2 className="font-display text-3xl sm:text-4xl mb-16 max-w-md">
-            像专业摄影师一样思考
+            {t('features_headline')}
           </h2>
 
           <div className="grid md:grid-cols-3 gap-px bg-border-subtle">
@@ -143,31 +153,18 @@ export default function HomePage() {
       {/* ── Quota info ──────────────────────────────────────────────────────── */}
       <section className="px-6 py-24 border-t border-border-subtle">
         <div className="max-w-5xl mx-auto">
-          <p className="text-xs text-gold/70 font-mono mb-4 tracking-widest uppercase">— 使用额度</p>
-          <h2 className="font-display text-3xl sm:text-4xl mb-12">按需使用，开箱即评</h2>
+          <p className="text-xs text-gold/70 font-mono mb-4 tracking-widest uppercase">— {t('quota_label')}</p>
+          <h2 className="font-display text-3xl sm:text-4xl mb-12">{t('quota_headline')}</h2>
 
           <div className="grid sm:grid-cols-3 gap-px bg-border-subtle">
-            {[
-              { plan: '游客', daily: 3, features: ['Flash 极速点评', '无需注册'] },
-              {
-                plan: 'Free',
-                daily: 6,
-                features: ['Flash & Pro 模式', '历史记录保留', 'Google 账号'],
-              },
-              {
-                plan: 'Pro',
-                daily: 12,
-                features: ['全部 Free 权益', '优先队列', '更高评图频率'],
-                highlight: true,
-              },
-            ].map((tier) => (
+            {TIERS.map((tier) => (
               <div
                 key={tier.plan}
                 className={`bg-void p-8 relative ${tier.highlight ? 'bg-raised' : ''}`}
               >
                 {tier.highlight && (
                   <span className="absolute top-4 right-4 text-xs text-gold border border-gold/30 rounded px-2 py-0.5">
-                    最高权益
+                    ★
                   </span>
                 )}
                 <p
@@ -178,8 +175,7 @@ export default function HomePage() {
                   {tier.plan}
                 </p>
                 <p className="text-3xl font-display text-ink-muted mb-6">
-                  {tier.daily}
-                  <span className="text-base text-ink-subtle"> 次 / 天</span>
+                  {tier.dailyLabel}
                 </p>
                 <ul className="space-y-2">
                   {tier.features.map((f) => (
@@ -199,13 +195,13 @@ export default function HomePage() {
       <section className="px-6 py-24 border-t border-border-subtle">
         <div className="max-w-2xl mx-auto text-center space-y-8">
           <h2 className="font-display text-4xl sm:text-5xl">
-            你的下一张好照片<br />从一次点评开始
+            {t('hero_cta_start')}
           </h2>
           <Link
             href="/workspace"
             className="inline-flex items-center gap-2 px-8 py-3.5 bg-gold text-void text-sm font-medium rounded hover:bg-gold-light transition-colors"
           >
-            上传照片开始评图
+            {t('hero_cta_start')}
             <ArrowRight size={14} />
           </Link>
         </div>

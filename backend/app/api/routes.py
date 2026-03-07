@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import asyncio
+import logging
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import quote
@@ -76,6 +77,7 @@ from app.services.task_events import record_task_event
 
 router = APIRouter(prefix='/api/v1', tags=['v1'])
 ALLOWED_CONTENT_TYPES = {'image/jpeg', 'image/png', 'image/webp'}
+logger = logging.getLogger(__name__)
 
 
 def _build_photo_url(bucket: str, object_key: str) -> str:
@@ -431,6 +433,7 @@ def create_review(
             try:
                 enqueue_review_task(task.public_id)
             except TaskDispatchError as exc:
+                logger.exception('Failed to enqueue Cloud Task for review task %s', task.public_id)
                 db.rollback()
                 failed_task = db.query(ReviewTask).filter(ReviewTask.id == task.id).first()
                 if failed_task is not None:

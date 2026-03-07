@@ -3,6 +3,7 @@ import { Cormorant_Garamond, DM_Sans, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/lib/auth-context';
 import { ThemeProvider } from '@/lib/theme-context';
+import { I18nProvider } from '@/lib/i18n';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import BackgroundEffect from '@/components/ui/BackgroundEffect';
@@ -29,9 +30,45 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'PicSpeak — AI Photography Critique',
-  description: 'Upload your photographs and receive intelligent AI-powered critique and analysis.',
-  keywords: ['photography', 'AI critique', 'photo analysis', 'composition', 'lighting'],
+  title: {
+    default: 'PicSpeak — AI Photography Critique',
+    template: '%s | PicSpeak',
+  },
+  description:
+    'Upload your photographs and receive intelligent AI-powered critique and analysis. Get scored on composition, lighting, color, storytelling, and technical quality.',
+  keywords: [
+    'photography critique',
+    'AI photo analysis',
+    'photo scoring',
+    'composition feedback',
+    'lighting analysis',
+    'photography review',
+    'AI photography',
+    'photo feedback',
+  ],
+  authors: [{ name: 'PicSpeak' }],
+  creator: 'PicSpeak',
+  robots: { index: true, follow: true },
+  icons: {
+    icon: '/logo.png',
+    shortcut: '/logo.png',
+    apple: '/logo.png',
+  },
+  openGraph: {
+    type: 'website',
+    siteName: 'PicSpeak',
+    title: 'PicSpeak — AI Photography Critique',
+    description:
+      'Upload your photographs and receive intelligent AI-powered critique and analysis.',
+    images: [{ url: '/logo.png', width: 512, height: 512, alt: 'PicSpeak Logo' }],
+  },
+  twitter: {
+    card: 'summary',
+    title: 'PicSpeak — AI Photography Critique',
+    description:
+      'Upload your photographs and receive intelligent AI-powered critique and analysis.',
+    images: ['/logo.png'],
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -56,13 +93,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </div>
         {/* z-10: page content sits above the background layer */}
         <div className="relative z-10 min-h-screen flex flex-col">
-          <ThemeProvider>
-            <AuthProvider>
-              <Header />
-              <main className="flex-1">{children}</main>
-              <Footer />
-            </AuthProvider>
-          </ThemeProvider>
+          <I18nProvider>
+            <ThemeProvider>
+              <AuthProvider>
+                <Header />
+                <main className="flex-1">{children}</main>
+                <Footer />
+              </AuthProvider>
+            </ThemeProvider>
+          </I18nProvider>
         </div>
       </body>
     </html>
