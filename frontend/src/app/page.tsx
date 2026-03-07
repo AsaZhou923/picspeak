@@ -1,10 +1,12 @@
 'use client';
 
 import Link from 'next/link';
+import Script from 'next/script';
 import { ArrowRight, Aperture, Zap, Star, BarChart2 } from 'lucide-react';
 import { buildGoogleOAuthUrl } from '@/lib/api';
 import ScoreRing from '@/components/ui/ScoreRing';
 import { useI18n } from '@/lib/i18n';
+import { siteConfig } from '@/lib/site';
 
 const DEMO_SCORES_KEYS = [
   { labelKey: 'score_composition' as const, score: 8 },
@@ -16,6 +18,21 @@ const DEMO_SCORES_KEYS = [
 
 export default function HomePage() {
   const { t } = useI18n();
+  const softwareJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'SoftwareApplication',
+    name: siteConfig.name,
+    applicationCategory: 'PhotographyApplication',
+    operatingSystem: 'Web',
+    url: siteConfig.url,
+    description: siteConfig.description,
+    image: `${siteConfig.url}${siteConfig.ogImage}`,
+    offers: {
+      '@type': 'Offer',
+      price: '0',
+      priceCurrency: 'USD',
+    },
+  };
 
   const FEATURES = [
     { icon: Zap, title: t('feature_flash_title'), body: t('feature_flash_body') },
@@ -47,9 +64,12 @@ export default function HomePage() {
 
   return (
     <>
-      {/* ── Hero ────────────────────────────────────────────────────────────── */}
+      <Script
+        id="picspeak-structured-data"
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareJsonLd) }}
+      />
       <section className="relative min-h-screen flex flex-col items-center justify-center px-6 pt-24 pb-20 overflow-hidden">
-        {/* Decorative radial glow */}
         <div
           className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/4 w-[700px] h-[700px] rounded-full pointer-events-none"
           style={{
@@ -58,13 +78,11 @@ export default function HomePage() {
           }}
         />
 
-        {/* Label */}
         <div className="relative flex items-center gap-2 mb-8 px-4 py-1.5 border border-gold/20 rounded-full text-xs text-gold/80">
           <Aperture size={11} />
           <span>{t('hero_label')}</span>
         </div>
 
-        {/* Headline */}
         <h1 className="relative font-display text-5xl sm:text-6xl md:text-7xl text-center leading-[1.08] max-w-3xl text-balance">
           {t('hero_headline_1')}
           <br />
@@ -75,7 +93,6 @@ export default function HomePage() {
           {t('hero_desc')}
         </p>
 
-        {/* CTA Buttons */}
         <div className="relative mt-10 flex flex-col sm:flex-row gap-4 items-center">
           <Link
             href="/workspace"
@@ -93,7 +110,6 @@ export default function HomePage() {
           </a>
         </div>
 
-        {/* Demo score panel */}
         <div className="relative mt-20 w-full max-w-2xl animate-slide-up">
           <div className="border border-border-subtle rounded-lg bg-raised/60 backdrop-blur-sm p-6">
             <div className="flex items-start justify-between gap-4 mb-4">
@@ -116,22 +132,21 @@ export default function HomePage() {
             </div>
             <div className="border-t border-border-subtle pt-4 space-y-2 text-sm text-ink-muted leading-relaxed">
               <p>
-                <span className="text-sage font-medium">{t('demo_advantage')}</span> ·{' '}
-                {t('demo_advantage_body')}
+                <span className="text-sage font-medium">{t('demo_advantage')}</span> {t('demo_advantage_body')}
               </p>
               <p>
-                <span className="text-gold font-medium">{t('demo_suggestion')}</span> ·{' '}
-                {t('demo_suggestion_body')}
+                <span className="text-gold font-medium">{t('demo_suggestion')}</span> {t('demo_suggestion_body')}
               </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ── Features ────────────────────────────────────────────────────────── */}
       <section className="px-6 py-24 border-t border-border-subtle">
         <div className="max-w-5xl mx-auto">
-          <p className="text-xs text-gold/70 font-mono mb-4 tracking-widest uppercase">— {t('features_label')}</p>
+          <p className="text-xs text-gold/70 font-mono mb-4 tracking-widest uppercase">
+            {t('features_label')}
+          </p>
           <h2 className="font-display text-3xl sm:text-4xl mb-16 max-w-md">
             {t('features_headline')}
           </h2>
@@ -150,10 +165,11 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── Quota info ──────────────────────────────────────────────────────── */}
       <section className="px-6 py-24 border-t border-border-subtle">
         <div className="max-w-5xl mx-auto">
-          <p className="text-xs text-gold/70 font-mono mb-4 tracking-widest uppercase">— {t('quota_label')}</p>
+          <p className="text-xs text-gold/70 font-mono mb-4 tracking-widest uppercase">
+            {t('quota_label')}
+          </p>
           <h2 className="font-display text-3xl sm:text-4xl mb-12">{t('quota_headline')}</h2>
 
           <div className="grid sm:grid-cols-3 gap-px bg-border-subtle">
@@ -164,7 +180,7 @@ export default function HomePage() {
               >
                 {tier.highlight && (
                   <span className="absolute top-4 right-4 text-xs text-gold border border-gold/30 rounded px-2 py-0.5">
-                    ★
+                    Pro
                   </span>
                 )}
                 <p
@@ -191,12 +207,9 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── CTA ─────────────────────────────────────────────────────────────── */}
       <section className="px-6 py-24 border-t border-border-subtle">
         <div className="max-w-2xl mx-auto text-center space-y-8">
-          <h2 className="font-display text-4xl sm:text-5xl">
-            {t('hero_cta_start')}
-          </h2>
+          <h2 className="font-display text-4xl sm:text-5xl">{t('hero_cta_start')}</h2>
           <Link
             href="/workspace"
             className="inline-flex items-center gap-2 px-8 py-3.5 bg-gold text-void text-sm font-medium rounded hover:bg-gold-light transition-colors"

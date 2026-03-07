@@ -4,10 +4,11 @@ import './globals.css';
 import { AuthProvider } from '@/lib/auth-context';
 import { ThemeProvider } from '@/lib/theme-context';
 import { I18nProvider } from '@/lib/i18n';
-import { Analytics } from '@vercel/analytics/react';  
+import { Analytics } from '@vercel/analytics/react';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import BackgroundEffect from '@/components/ui/BackgroundEffect';
+import { siteConfig } from '@/lib/site';
 
 const cormorant = Cormorant_Garamond({
   subsets: ['latin'],
@@ -31,25 +32,35 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(siteConfig.url),
   title: {
-    default: 'PicSpeak — AI Photography Critique',
+    default: siteConfig.title,
     template: '%s | PicSpeak',
   },
-  description:
-    'Upload your photographs and receive intelligent AI-powered critique and analysis. Get scored on composition, lighting, color, storytelling, and technical quality.',
-  keywords: [
-    'photography critique',
-    'AI photo analysis',
-    'photo scoring',
-    'composition feedback',
-    'lighting analysis',
-    'photography review',
-    'AI photography',
-    'photo feedback',
-  ],
+  description: siteConfig.description,
+  applicationName: siteConfig.name,
+  keywords: [...siteConfig.keywords],
   authors: [{ name: 'PicSpeak' }],
   creator: 'PicSpeak',
-  robots: { index: true, follow: true },
+  publisher: 'PicSpeak',
+  category: 'photography',
+  alternates: {
+    canonical: '/',
+  },
+  verification: {
+    google: siteConfig.googleSiteVerification,
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+      'max-video-preview': -1,
+    },
+  },
   icons: {
     icon: '/logo.png',
     shortcut: '/logo.png',
@@ -57,18 +68,19 @@ export const metadata: Metadata = {
   },
   openGraph: {
     type: 'website',
-    siteName: 'PicSpeak',
-    title: 'PicSpeak — AI Photography Critique',
-    description:
-      'Upload your photographs and receive intelligent AI-powered critique and analysis.',
-    images: [{ url: '/logo.png', width: 512, height: 512, alt: 'PicSpeak Logo' }],
+    url: siteConfig.url,
+    siteName: siteConfig.name,
+    title: siteConfig.title,
+    description: siteConfig.description,
+    locale: 'en_US',
+    images: [{ url: siteConfig.ogImage, width: 512, height: 512, alt: 'PicSpeak Logo' }],
   },
   twitter: {
     card: 'summary',
-    title: 'PicSpeak — AI Photography Critique',
-    description:
-      'Upload your photographs and receive intelligent AI-powered critique and analysis.',
-    images: ['/logo.png'],
+    title: siteConfig.title,
+    description: siteConfig.description,
+    images: [siteConfig.ogImage],
+    creator: '@Zzw_Prime',
   },
 };
 
@@ -80,7 +92,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       suppressHydrationWarning
     >
       <head>
-        {/* Prevent flash of unstyled theme: apply class before first paint */}
+        <meta
+          name="google-site-verification"
+          content="uPzmX8kYSDzOWm7iBz-dty4It12mMcIVUOPPwWmLGnM"
+        />
         <script
           dangerouslySetInnerHTML={{
             __html: `(function(){try{var s=localStorage.getItem('picspeak-theme');var p=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';if((s||p)==='dark')document.documentElement.classList.add('dark');}catch(e){}})();`,
@@ -89,11 +104,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="text-ink min-h-screen">
         <Analytics />
-        {/* Fixed z-0: aurora + particles background layer */}
         <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
           <BackgroundEffect />
         </div>
-        {/* z-10: page content sits above the background layer */}
         <div className="relative z-10 min-h-screen flex flex-col">
           <I18nProvider>
             <ThemeProvider>
