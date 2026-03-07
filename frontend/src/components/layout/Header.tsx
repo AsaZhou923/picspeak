@@ -30,11 +30,11 @@ function LanguageSwitcher() {
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1 text-xs text-ink-muted hover:text-ink transition-colors px-2 py-1 rounded"
+        className="flex items-center gap-1 text-sm text-ink-muted hover:text-ink transition-colors px-2 py-1 rounded"
         aria-label="Switch language"
       >
         {LOCALE_LABELS[locale]}
-        <ChevronDown size={11} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown size={13} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
         <div className="absolute right-0 top-full mt-1.5 w-28 border border-border-subtle rounded-md bg-void shadow-lg z-50 overflow-hidden">
@@ -42,7 +42,7 @@ function LanguageSwitcher() {
             <button
               key={l}
               onClick={() => { setLocale(l); setOpen(false); }}
-              className={`w-full text-left px-3 py-2 text-xs transition-colors ${locale === l ? 'text-gold bg-gold/5' : 'text-ink-muted hover:text-ink hover:bg-raised'}`}
+              className={`w-full text-left px-3 py-2 text-sm transition-colors ${locale === l ? 'text-gold bg-gold/5' : 'text-ink-muted hover:text-ink hover:bg-raised'}`}
             >
               {LOCALE_LABELS[l]}
             </button>
@@ -114,7 +114,7 @@ export default function Header() {
 
           {userInfo ? (
             <div className="flex items-center gap-3">
-              <span className="hidden sm:flex items-center gap-1.5 text-xs">
+              <span className="hidden sm:flex items-center gap-1.5 text-sm">
                 <span className={`font-medium ${planColor(userInfo.plan)}`}>
                   {userInfo.plan === 'guest' ? t('plan_guest_label') : planLabel(userInfo.plan)}
                 </span>
@@ -123,14 +123,14 @@ export default function Header() {
               {userInfo.plan === 'guest' ? (
                 <a
                   href={buildGoogleOAuthUrl()}
-                  className="px-3 py-1.5 text-xs border border-gold/40 text-gold rounded hover:bg-gold/10 transition-colors"
+                  className="px-3 py-1.5 text-sm border border-gold/40 text-gold rounded hover:bg-gold/10 transition-colors"
                 >
                   {t('login_google')}
                 </a>
               ) : (
                 <button
                   onClick={logout}
-                  className="text-xs text-ink-subtle hover:text-ink transition-colors"
+                  className="text-sm text-ink-subtle hover:text-ink transition-colors"
                 >
                   {t('logout')}
                 </button>
@@ -139,7 +139,7 @@ export default function Header() {
           ) : (
             <a
               href={buildGoogleOAuthUrl()}
-              className="px-3 py-1.5 text-xs border border-gold/40 text-gold rounded hover:bg-gold/10 transition-colors"
+              className="px-3 py-1.5 text-sm border border-gold/40 text-gold rounded hover:bg-gold/10 transition-colors"
             >
               {t('login_google')}
             </a>

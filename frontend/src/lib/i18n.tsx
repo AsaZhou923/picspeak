@@ -62,7 +62,7 @@ const translations = {
     plan_free_quota: '6 次 / 天',
     plan_free_feature: 'Flash & Pro',
     plan_pro_name: 'Pro',
-    plan_pro_quota: '30 次 / 天',
+    plan_pro_quota: '12 次 / 天',
     plan_pro_feature: '优先处理',
 
     // Score dimension labels
@@ -278,7 +278,7 @@ const translations = {
     plan_free_quota: '6 / day',
     plan_free_feature: 'Flash & Pro',
     plan_pro_name: 'Pro',
-    plan_pro_quota: '30 / day',
+    plan_pro_quota: '12 / day',
     plan_pro_feature: 'Priority processing',
 
     // Score dimension labels
@@ -494,7 +494,7 @@ const translations = {
     plan_free_quota: '1日6回',
     plan_free_feature: 'Flash & Pro',
     plan_pro_name: 'Pro',
-    plan_pro_quota: '1日30回',
+    plan_pro_quota: '1日12回',
     plan_pro_feature: '優先処理',
 
     // Score dimension labels

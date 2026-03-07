@@ -40,6 +40,10 @@ const config: Config = {
         body: ['var(--font-body)', 'system-ui', 'sans-serif'],
         mono: ['var(--font-mono)', 'monospace'],
       },
+      fontSize: {
+        xs: ['0.8125rem', { lineHeight: '1.2rem' }],
+        sm: ['0.9375rem', { lineHeight: '1.4rem' }],
+      },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
         'gradient-conic':

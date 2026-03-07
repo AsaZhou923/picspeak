@@ -32,6 +32,7 @@ async function request<T>(
 
   const res = await fetch(`${API_BASE}/api/v1${path}`, {
     ...rest,
+    credentials: 'include',
     headers: allHeaders,
   });
 

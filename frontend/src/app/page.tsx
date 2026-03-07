@@ -55,7 +55,7 @@ export default function HomePage() {
     },
     {
       plan: t('plan_pro_name'),
-      daily: 30,
+      daily: 12,
       dailyLabel: t('plan_pro_quota'),
       features: [t('plan_pro_feature')],
       highlight: true,

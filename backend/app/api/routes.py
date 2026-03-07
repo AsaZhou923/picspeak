@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, WebSocket, WebSocketDisconnect, status
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, Request, Response, WebSocket, WebSocketDisconnect, status
 from fastapi.responses import RedirectResponse
 from urllib import error as urllib_error
 from urllib import parse, request as urllib_request
@@ -20,6 +20,7 @@ from app.api.deps import (
     create_guest_user,
     get_current_actor,
     get_user_from_token,
+    GUEST_TOKEN_COOKIE,
     issue_guest_token,
     new_public_id,
     quota_for_plan,
@@ -160,8 +161,23 @@ def _login_from_google_claims(claims: dict, db: Session) -> AuthTokenResponse:
 
 
 @router.post('/auth/guest', response_model=AuthGuestResponse)
-def auth_guest(response: Response, db: Session = Depends(get_db)):
-    user = create_guest_user(db)
+def auth_guest(
+    response: Response,
+    guest_cookie_token: str | None = Cookie(default=None, alias=GUEST_TOKEN_COOKIE),
+    db: Session = Depends(get_db),
+):
+    user = None
+    if guest_cookie_token:
+        try:
+            existing_user = get_user_from_token(guest_cookie_token, db)
+            if existing_user.plan == UserPlan.guest:
+                user = existing_user
+        except HTTPException:
+            user = None
+
+    if user is None:
+        user = create_guest_user(db)
+
     token = issue_guest_token(user)
     bind_guest_token(response, token)
     return AuthGuestResponse(access_token=token, token_type='bearer', user_id=user.public_id, plan=user.plan.value)
