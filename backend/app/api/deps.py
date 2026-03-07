@@ -101,11 +101,12 @@ def issue_guest_token(user: User) -> str:
 
 
 def bind_guest_token(response: Response, token: str) -> None:
+    is_dev = settings.app_env.strip().lower() == 'dev'
     response.set_cookie(
         key=GUEST_TOKEN_COOKIE,
         value=token,
         httponly=True,
-        secure=False,
+        secure=not is_dev,
         samesite='lax',
         max_age=GUEST_TOKEN_TTL_SECONDS,
         path='/',
