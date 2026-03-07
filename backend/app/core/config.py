@@ -58,6 +58,15 @@ class Settings(BaseSettings):
     review_retry_base_delay_seconds: int = 10
     review_retry_max_delay_seconds: int = 300
     ws_task_poll_interval_ms: int = 1000
+    cloud_tasks_enabled: bool = False
+    cloud_tasks_project_id: str = ''
+    cloud_tasks_location: str = ''
+    cloud_tasks_queue: str = ''
+    cloud_tasks_target_url: str = ''
+    cloud_tasks_secret: str = ''
+    cloud_tasks_service_account_email: str = ''
+    cloud_tasks_oidc_audience: str = ''
+    cloud_tasks_dispatch_deadline_seconds: int = 1800
 
     image_audit_enabled: bool = False
     image_audit_reject_threshold: float = 0.78
@@ -98,11 +107,29 @@ class Settings(BaseSettings):
             return ''
         return value.strip()
 
+    @field_validator('cloud_tasks_target_url', 'cloud_tasks_service_account_email', 'cloud_tasks_oidc_audience', mode='before')
+    @classmethod
+    def normalize_string_settings(cls, value: Any) -> str:
+        if not isinstance(value, str):
+            return ''
+        return value.strip().rstrip('/')
+
     @model_validator(mode='after')
     def validate_oauth_secret(self) -> 'Settings':
         insecure_defaults = {'', 'change-me-jwt-secret'}
         if self.app_env.strip().lower() != 'dev' and self.oauth_jwt_secret.strip() in insecure_defaults:
             raise ValueError('OAUTH_JWT_SECRET must be set to a non-default secret outside dev mode')
+        if self.cloud_tasks_enabled:
+            required_fields = {
+                'CLOUD_TASKS_PROJECT_ID': self.cloud_tasks_project_id,
+                'CLOUD_TASKS_LOCATION': self.cloud_tasks_location,
+                'CLOUD_TASKS_QUEUE': self.cloud_tasks_queue,
+                'CLOUD_TASKS_TARGET_URL': self.cloud_tasks_target_url,
+                'CLOUD_TASKS_SECRET': self.cloud_tasks_secret,
+            }
+            missing = [key for key, value in required_fields.items() if not str(value).strip()]
+            if missing:
+                raise ValueError(f'Cloud Tasks is enabled but missing required settings: {", ".join(missing)}')
         return self
 
 

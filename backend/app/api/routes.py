@@ -46,6 +46,7 @@ from app.schemas import (
     PhotoReviewsResponse,
     PresignRequest,
     PresignResponse,
+    InternalTaskExecuteRequest,
     ReviewCreateAsyncResponse,
     ReviewCreateRequest,
     ReviewCreateSyncResponse,
@@ -69,6 +70,8 @@ from app.services.guard import (
     save_idempotency_record,
 )
 from app.services.object_storage import get_object_storage_client
+from app.services.review_task_processor import process_review_task
+from app.services.task_dispatcher import TaskDispatchError, enqueue_review_task
 from app.services.task_events import record_task_event
 
 router = APIRouter(prefix='/api/v1', tags=['v1'])
@@ -424,6 +427,22 @@ def create_review(
             raise api_error(status.HTTP_409_CONFLICT, 'TASK_DUPLICATE', 'Duplicate task') from exc
 
         response = {'task_id': task.public_id, 'status': task.status.value, 'estimated_seconds': 12}
+        if settings.cloud_tasks_enabled:
+            try:
+                enqueue_review_task(task.public_id)
+            except TaskDispatchError as exc:
+                db.rollback()
+                failed_task = db.query(ReviewTask).filter(ReviewTask.id == task.id).first()
+                if failed_task is not None:
+                    failed_task.status = TaskStatus.FAILED
+                    failed_task.progress = 100
+                    failed_task.finished_at = datetime.now(timezone.utc)
+                    failed_task.error_code = 'TASK_DISPATCH_FAILED'
+                    failed_task.error_message = str(exc)[:500]
+                    db.add(failed_task)
+                    record_task_event(db, failed_task, event_type='TASK_DISPATCH_FAILED', message=failed_task.error_message)
+                    db.commit()
+                raise api_error(status.HTTP_503_SERVICE_UNAVAILABLE, 'TASK_DISPATCH_FAILED', 'Failed to enqueue async review task') from exc
         if idempotency_key:
             save_idempotency_record(
                 db,
@@ -508,6 +527,19 @@ def get_task_status(
     review = db.query(Review).filter(Review.task_id == task.id).first()
     db.commit()
     return TaskStatusResponse(**_serialize_task_status(task, review))
+
+
+@router.post('/internal/tasks/reviews/execute')
+def execute_review_task(payload: InternalTaskExecuteRequest, request: Request):
+    if not settings.cloud_tasks_enabled:
+        raise api_error(status.HTTP_404_NOT_FOUND, 'TASK_DISPATCH_DISABLED', 'Cloud Tasks execution is not enabled')
+    header_secret = request.headers.get('X-Task-Dispatch-Secret', '')
+    if header_secret != settings.cloud_tasks_secret:
+        raise api_error(status.HTTP_401_UNAUTHORIZED, 'TASK_DISPATCH_UNAUTHORIZED', 'Invalid task dispatch secret')
+    result = process_review_task(payload.task_id, worker_name='cloud-tasks')
+    if result.get('result') == 'delayed':
+        raise api_error(status.HTTP_503_SERVICE_UNAVAILABLE, 'TASK_RETRY_NOT_READY', 'Task is scheduled for a later retry')
+    return result
 
 
 @router.get('/reviews/{review_id}', response_model=ReviewGetResponse)

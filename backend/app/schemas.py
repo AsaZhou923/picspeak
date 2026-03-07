@@ -66,6 +66,10 @@ class ReviewCreateAsyncResponse(BaseModel):
     estimated_seconds: int
 
 
+class InternalTaskExecuteRequest(BaseModel):
+    task_id: str
+
+
 class ReviewCreateSyncResponse(BaseModel):
     review_id: str
     status: str
