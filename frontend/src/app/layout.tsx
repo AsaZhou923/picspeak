@@ -2,8 +2,10 @@ import type { Metadata } from 'next';
 import { Cormorant_Garamond, DM_Sans, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/lib/auth-context';
+import { ThemeProvider } from '@/lib/theme-context';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
+import BackgroundEffect from '@/components/ui/BackgroundEffect';
 
 const cormorant = Cormorant_Garamond({
   subsets: ['latin'],
@@ -37,13 +39,31 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html
       lang="zh"
       className={`${cormorant.variable} ${dmSans.variable} ${jetbrainsMono.variable}`}
+      suppressHydrationWarning
     >
-      <body className="bg-void text-ink min-h-screen flex flex-col">
-        <AuthProvider>
-          <Header />
-          <main className="flex-1">{children}</main>
-          <Footer />
-        </AuthProvider>
+      <head>
+        {/* Prevent flash of unstyled theme: apply class before first paint */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var s=localStorage.getItem('picspeak-theme');var p=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';if((s||p)==='dark')document.documentElement.classList.add('dark');}catch(e){}})();`,
+          }}
+        />
+      </head>
+      <body className="text-ink min-h-screen">
+        {/* Fixed z-0: aurora + particles background layer */}
+        <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
+          <BackgroundEffect />
+        </div>
+        {/* z-10: page content sits above the background layer */}
+        <div className="relative z-10 min-h-screen flex flex-col">
+          <ThemeProvider>
+            <AuthProvider>
+              <Header />
+              <main className="flex-1">{children}</main>
+              <Footer />
+            </AuthProvider>
+          </ThemeProvider>
+        </div>
       </body>
     </html>
   );

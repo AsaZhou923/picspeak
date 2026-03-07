@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     google_oauth_client_id: str = ''
     google_oauth_client_secret: str = ''
     google_oauth_redirect_uri: str = ''
+    # Frontend origin used for post-login redirect (e.g. http://localhost:3000)
+    frontend_origin: str = 'http://localhost:3000'
     backend_cors_origins: list[str] = Field(
         default_factory=lambda: ['http://localhost:3000', 'http://127.0.0.1:3000']
     )
@@ -38,9 +40,13 @@ class Settings(BaseSettings):
     siliconflow_base_url: str = 'https://api.siliconflow.cn/v1'
     siliconflow_api_key: str = ''
     ai_model_name: str = 'Qwen/Qwen3-VL-8B-Instruct'
+    flash_model_name: str = ''
+    pro_model_name: str = ''
     ai_timeout_seconds: int = 60
+    review_worker_concurrency: int = 2
+    review_worker_idle_sleep_ms: int = 200
 
-    image_audit_enabled: bool = True
+    image_audit_enabled: bool = False
     image_audit_reject_threshold: float = 0.78
 
     @model_validator(mode='after')

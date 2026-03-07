@@ -6,6 +6,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi.responses import RedirectResponse
 from urllib import error as urllib_error
 from urllib import parse, request as urllib_request
 from sqlalchemy.exc import IntegrityError
@@ -45,6 +46,8 @@ from app.schemas import (
     ReviewCreateRequest,
     ReviewCreateSyncResponse,
     ReviewGetResponse,
+    ReviewHistoryItem,
+    ReviewHistoryResponse,
     ReviewListItem,
     TaskStatusResponse,
     UsageResponse,
@@ -164,23 +167,39 @@ def auth_google_login(payload: AuthGoogleLoginRequest, db: Session = Depends(get
     return _login_from_google_claims(claims, db)
 
 
-@router.get('/auth/google/callback', response_model=AuthTokenResponse)
+@router.get('/auth/google/callback')
 def auth_google_callback(code: str = Query(..., min_length=1), db: Session = Depends(get_db)):
+    frontend_callback = f'{settings.frontend_origin.rstrip("/")}/auth/callback/google'
+
     try:
         token_resp = _google_exchange_code(code)
     except urllib_error.URLError as exc:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f'Google code exchange failed: {exc}') from exc
+        error_msg = parse.quote(f'Google code exchange failed: {exc}')
+        return RedirectResponse(f'{frontend_callback}?error={error_msg}', status_code=302)
 
     id_token = token_resp.get('id_token')
     if not isinstance(id_token, str) or not id_token.strip():
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Google token response missing id_token')
+        return RedirectResponse(f'{frontend_callback}?error=missing_id_token', status_code=302)
 
     try:
         claims = _google_token_info(id_token)
     except urllib_error.URLError as exc:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f'Google token verification failed: {exc}') from exc
+        error_msg = parse.quote(f'Token verification failed: {exc}')
+        return RedirectResponse(f'{frontend_callback}?error={error_msg}', status_code=302)
 
-    return _login_from_google_claims(claims, db)
+    try:
+        auth_data = _login_from_google_claims(claims, db)
+    except HTTPException as exc:
+        error_msg = parse.quote(str(exc.detail))
+        return RedirectResponse(f'{frontend_callback}?error={error_msg}', status_code=302)
+
+    params = parse.urlencode({
+        'access_token': auth_data.access_token,
+        'token_type': auth_data.token_type,
+        'user_id': auth_data.user_id,
+        'plan': auth_data.plan,
+    })
+    return RedirectResponse(f'{frontend_callback}?{params}', status_code=302)
 
 
 @router.post('/uploads/presign', response_model=PresignResponse)
@@ -258,13 +277,6 @@ def confirm_photo_upload(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Invalid height')
 
     image_url = _build_photo_url(token['bucket'], token['object_key'])
-    try:
-        audit_result = run_content_audit(image_url=image_url)
-    except ContentAuditError as exc:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f'Image content audit failed: {exc}') from exc
-
-    photo_status = PhotoStatus.READY if audit_result.safe else PhotoStatus.REJECTED
-    rejected_reason = None if audit_result.safe else (audit_result.reason or 'Image content is not allowed')
 
     photo = Photo(
         public_id=new_public_id('pho'),
@@ -277,12 +289,12 @@ def confirm_photo_upload(
         checksum_sha256=token.get('sha256'),
         width=client_width,
         height=client_height,
-        status=photo_status,
+        status=PhotoStatus.READY,
         exif_data=payload.exif_data,
         client_meta=payload.client_meta,
-        nsfw_label=audit_result.label,
-        nsfw_score=audit_result.nsfw_score,
-        rejected_reason=rejected_reason,
+        nsfw_label=None,
+        nsfw_score=None,
+        rejected_reason=None,
     )
     db.add(photo)
     try:
@@ -335,6 +347,8 @@ def create_review(
 ):
     if actor.user.status != UserStatus.active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='User is not active')
+    if actor.plan == UserPlan.guest and payload.mode == ReviewMode.pro.value:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Guest users cannot use pro review mode')
 
     enforce_user_quota(db, actor.user)
 
@@ -371,7 +385,6 @@ def create_review(
             expire_at=datetime.now(timezone.utc) + timedelta(minutes=30),
         )
         db.add(task)
-        increment_quota(db, actor.user)
         try:
             db.commit()
         except IntegrityError as exc:
@@ -400,6 +413,20 @@ def create_review(
         return response
 
     image_url = _build_photo_url(photo.bucket, photo.object_key)
+    if settings.image_audit_enabled and photo.nsfw_label is None:
+        try:
+            audit_result = run_content_audit(image_url=image_url)
+        except ContentAuditError as exc:
+            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f'Image content audit failed: {exc}') from exc
+        photo.nsfw_label = audit_result.label
+        photo.nsfw_score = audit_result.nsfw_score
+        photo.rejected_reason = None if audit_result.safe else (audit_result.reason or 'Image content is not allowed')
+        photo.status = PhotoStatus.READY if audit_result.safe else PhotoStatus.REJECTED
+        db.add(photo)
+        db.commit()
+        db.refresh(photo)
+        if photo.status != PhotoStatus.READY:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=photo.rejected_reason or 'Image content is not allowed')
     try:
         ai_response = run_ai_review(payload.mode, image_url=image_url, locale=payload.locale)
     except AIReviewError as exc:
@@ -484,11 +511,56 @@ def get_review(
     return ReviewGetResponse(
         review_id=review.public_id,
         photo_id=photo.public_id if photo else 'unknown',
+        photo_url=_build_photo_url(photo.bucket, photo.object_key) if photo else None,
         mode=review.mode.value,
         status=review.status.value,
         result=_review_result_payload(review.result_json, review.final_score),
         created_at=review.created_at,
     )
+
+
+@router.get('/me/reviews', response_model=ReviewHistoryResponse)
+def list_my_reviews(
+    request: Request,
+    limit: int = Query(default=20, ge=1, le=100),
+    cursor: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+    actor: CurrentActor = Depends(get_current_actor),
+):
+    query = (
+        db.query(Review, Photo)
+        .join(Photo, Photo.id == Review.photo_id)
+        .filter(Review.owner_user_id == actor.user.id)
+        .order_by(Review.created_at.desc(), Review.id.desc())
+    )
+
+    if cursor:
+        try:
+            cursor_dt = datetime.fromisoformat(cursor)
+        except ValueError as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Invalid cursor') from exc
+        query = query.filter(Review.created_at < cursor_dt)
+
+    rows = query.limit(limit + 1).all()
+    has_next = len(rows) > limit
+    rows = rows[:limit]
+
+    items = [
+        ReviewHistoryItem(
+            review_id=review.public_id,
+            photo_id=photo.public_id,
+            photo_url=_build_photo_url(photo.bucket, photo.object_key),
+            mode=review.mode.value,
+            status=review.status.value,
+            final_score=float(review.final_score),
+            created_at=review.created_at,
+        )
+        for review, photo in rows
+    ]
+    next_cursor = rows[-1][0].created_at.isoformat() if has_next and rows else None
+
+    db.commit()
+    return ReviewHistoryResponse(items=items, next_cursor=next_cursor)
 
 
 @router.get('/photos/{photo_id}/reviews', response_model=PhotoReviewsResponse)

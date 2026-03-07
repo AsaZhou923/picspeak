@@ -106,6 +106,7 @@ export interface TaskStatusResponse {
 export interface ReviewGetResponse {
   review_id: string;
   photo_id: string;
+  photo_url: string | null;
   mode: ReviewMode;
   status: ReviewStatus;
   result: ReviewResult;
@@ -120,6 +121,21 @@ export interface ReviewListItem {
 
 export interface PhotoReviewsResponse {
   items: ReviewListItem[];
+  next_cursor: string | null;
+}
+
+export interface ReviewHistoryItem {
+  review_id: string;
+  photo_id: string;
+  photo_url: string | null;
+  mode: ReviewMode;
+  status: ReviewStatus;
+  final_score: number;
+  created_at: string;
+}
+
+export interface ReviewHistoryResponse {
+  items: ReviewHistoryItem[];
   next_cursor: string | null;
 }
 

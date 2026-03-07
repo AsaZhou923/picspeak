@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Aperture } from 'lucide-react';
+import { Twitter } from 'lucide-react';
 
 export default function Footer() {
   return (
@@ -16,9 +17,20 @@ export default function Footer() {
           <Link href="/account/usage" className="hover:text-ink transition-colors">额度</Link>
         </div>
 
-        <p className="text-ink-subtle/60">
-          © {new Date().getFullYear()} PicSpeak. AI Photography Critique.
-        </p>
+        <div className="flex items-center gap-4">
+          <a
+            href="https://x.com/Zzw_Prime"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 hover:text-ink transition-colors"
+          >
+            <Twitter size={12} />
+            <span>@Zzw_Prime</span>
+          </a>
+          <p className="text-ink-subtle/60">
+            © {new Date().getFullYear()} PicSpeak. AI Photography Critique.
+          </p>
+        </div>
       </div>
     </footer>
   );

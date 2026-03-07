@@ -8,6 +8,7 @@ import {
   ReviewCreateRequest,
   ReviewCreateResponse,
   ReviewGetResponse,
+  ReviewHistoryResponse,
   TaskStatusResponse,
   UsageResponse,
 } from './types';
@@ -171,6 +172,16 @@ export async function getPhotoReviews(
 ): Promise<PhotoReviewsResponse> {
   const q = cursor ? `?cursor=${encodeURIComponent(cursor)}` : '';
   return request<PhotoReviewsResponse>(`/photos/${photoId}/reviews${q}`, { token });
+}
+
+export async function getMyReviews(
+  token: string,
+  cursor?: string,
+  limit = 20
+): Promise<ReviewHistoryResponse> {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (cursor) params.set('cursor', cursor);
+  return request<ReviewHistoryResponse>(`/me/reviews?${params.toString()}`, { token });
 }
 
 // ─── Google OAuth URL builder ─────────────────────────────────────────────────

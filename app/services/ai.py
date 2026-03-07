@@ -25,6 +25,34 @@ class AIReviewResponse:
     latency_ms: int | None = None
 
 
+def _is_incompatible_multimodal_model(model_name: str) -> bool:
+    normalized = (model_name or '').strip().lower()
+    # SiliconFlow's Qwen thinking vision variants can reject the OpenAI-style
+    # multimodal messages payload we send for photo review.
+    return 'qwen3-vl' in normalized and 'thinking' in normalized
+
+
+def model_name_for_mode(mode: str) -> str:
+    normalized = (mode or '').strip().lower()
+    selected_model = settings.ai_model_name
+
+    if normalized == 'pro' and settings.pro_model_name.strip():
+        selected_model = settings.pro_model_name.strip()
+    elif normalized == 'flash' and settings.flash_model_name.strip():
+        selected_model = settings.flash_model_name.strip()
+
+    if _is_incompatible_multimodal_model(selected_model):
+        fallback_candidates = [
+            settings.flash_model_name.strip(),
+            settings.ai_model_name.strip(),
+        ]
+        for fallback_model in fallback_candidates:
+            if fallback_model and not _is_incompatible_multimodal_model(fallback_model):
+                return fallback_model
+
+    return selected_model
+
+
 def _prompt_for_mode(mode: str, locale: str) -> str:
     lang = locale if locale in {'zh', 'en', 'ja'} else 'zh'
     depth_by_lang = {
@@ -46,9 +74,11 @@ def _prompt_for_mode(mode: str, locale: str) -> str:
             '{"schema_version":"1.0","scores":{"composition":0-10,"lighting":0-10,"color":0-10,"story":0-10,"technical":0-10},'
             '"advantage":"...","critique":"...","suggestions":"..."}. '
             'All values in scores must be integers from 0 to 10. '
-            'For advantage and critique, output 1-3 numbered points in a string using format "1. ...\n2. ..."; '
-            'each point must be specific and actionable. '
-            'Provide 2-4 actionable suggestions with concrete parameters/ranges when possible, '
+            'For advantage, critique, and suggestions, output 1-3 numbered points in a string using format "1. ...\n2. ...". '
+            'Do not force 3 points when the image evidence only supports 1 or 2 strong points. '
+            'Every point must be grounded in visible evidence from the photo, logically justified, and not speculative or generic. '
+            'If a point cannot be clearly supported by the image, do not include it. '
+            'Suggestions must follow the same rule and should be practical, with concrete parameters or ranges when appropriate, '
             'e.g. "Exposure +1~2, Shadows +1~2, Highlights -1, White Balance -300K". '
             'All text fields must be written in English.'
         )
@@ -64,9 +94,11 @@ def _prompt_for_mode(mode: str, locale: str) -> str:
             '{"schema_version":"1.0","scores":{"composition":0-10,"lighting":0-10,"color":0-10,"story":0-10,"technical":0-10},'
             '"advantage":"...","critique":"...","suggestions":"..."}。'
             'scores の値は 0-10 の整数のみ。'
-            'advantage と critique はそれぞれ 1〜3 点を文字列内で「1. ...\n2. ...」形式で記載し、'
-            '各項目は具体的で実行可能にしてください。'
-            'suggestions は 2〜4 点、可能な限り数値付きで具体的に（例：「露出 +1〜2、シャドウ +1〜2、ハイライト -1、色温度 -300K」）。'
+            'advantage・critique・suggestions はそれぞれ 1〜3 点を文字列内で「1. ...\n2. ...」形式で記載してください。'
+            '根拠が 1〜2 点しかない場合は無理に 3 点に増やさないでください。'
+            '各項目は写真から確認できる視覚的根拠に基づき、論理的で、こじつけや一般論にならないようにしてください。'
+            '画像から明確に裏付けられない内容は書かないでください。'
+            'suggestions も同様に根拠ベースで、可能な限り数値付きで具体的に（例：「露出 +1〜2、シャドウ +1〜2、ハイライト -1、色温度 -300K」）。'
             'すべてのテキスト項目は日本語で記述してください。'
         )
 
@@ -80,9 +112,10 @@ def _prompt_for_mode(mode: str, locale: str) -> str:
         '{"schema_version":"1.0","scores":{"composition":0-10,"lighting":0-10,"color":0-10,"story":0-10,"technical":0-10},'
         '"advantage":"...","critique":"...","suggestions":"..."}。'
         'scores 内所有值必须是 0-10 的整数。'
-        'advantage 与 critique 请分别输出 1-3 条要点，使用“1. ...\n2. ...”这种编号格式写在字符串里；'
-        '每条要点需具体、可落地，避免空泛夸赞。'
-        'suggestions 给出 2-4 条可执行改进建议，尽量量化，包含具体参数或区间，例如“曝光 +1~2、阴影 +1~2、高光 -1、色温 -300K”，'
+        'advantage、critique、suggestions 都请分别输出 1-3 条要点，使用“1. ...\n2. ...”这种编号格式写在字符串里。'
+        '如果画面里只有 1 条或 2 条真正站得住脚的观察，就只写 1-2 条，不要为了凑数硬写到 3 条。'
+        '每条要点都必须能被照片中的具体视觉信息支撑，论证要成立，不能牵强附会、不能写空泛套话、不能脱离画面瞎猜。'
+        'suggestions 也必须基于前面识别出的真实问题或潜力点，给出有依据、可执行的建议；尽量量化，包含具体参数或区间，例如“曝光 +1~2、阴影 +1~2、高光 -1、色温 -300K”，'
         '并可结合拍摄时机、机位、光线、构图、后期动作。'
         '所有文本字段请使用中文。'
     )
@@ -142,9 +175,10 @@ def run_ai_review(mode: str, image_url: str, locale: str = 'zh') -> AIReviewResp
     if not settings.siliconflow_api_key:
         raise AIReviewError('SILICONFLOW_API_KEY is not configured')
 
+    model_name = model_name_for_mode(mode)
     endpoint = settings.siliconflow_base_url.rstrip('/') + '/chat/completions'
     payload = {
-        'model': settings.ai_model_name,
+        'model': model_name,
         'temperature': 0.2,
         'response_format': {'type': 'json_object'},
         'messages': [
@@ -196,7 +230,7 @@ def run_ai_review(mode: str, image_url: str, locale: str = 'zh') -> AIReviewResp
     usage = body.get('usage') or {}
     return AIReviewResponse(
         result=result,
-        model_name=body.get('model', settings.ai_model_name),
+        model_name=body.get('model', model_name),
         input_tokens=usage.get('prompt_tokens'),
         output_tokens=usage.get('completion_tokens'),
         cost_usd=None,

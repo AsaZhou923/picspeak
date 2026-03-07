@@ -2,14 +2,16 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Camera, Aperture } from 'lucide-react';
+import { Camera, Aperture, Sun, Moon } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { planLabel, planColor } from '@/lib/auth-context';
 import { buildGoogleOAuthUrl } from '@/lib/api';
+import { useTheme } from '@/lib/theme-context';
 
 export default function Header() {
   const { userInfo, logout } = useAuth();
   const pathname = usePathname();
+  const { theme, toggleTheme } = useTheme();
 
   const isActive = (href: string) =>
     pathname === href ? 'text-gold' : 'text-ink-muted hover:text-ink';
@@ -34,14 +36,27 @@ export default function Header() {
             评图工作台
           </Link>
           {userInfo && (
-            <Link href="/account/usage" className={`transition-colors ${isActive('/account/usage')}`}>
-              我的额度
-            </Link>
+            <>
+              <Link href="/account/reviews" className={`transition-colors ${isActive('/account/reviews')}`}>
+                评图历史
+              </Link>
+              <Link href="/account/usage" className={`transition-colors ${isActive('/account/usage')}`}>
+                我的额度
+              </Link>
+            </>
           )}
         </nav>
 
-        {/* Right: identity pill */}
+        {/* Right: theme toggle + identity pill */}
         <div className="flex items-center gap-3">
+          {/* Theme toggle */}
+          <button
+            onClick={toggleTheme}
+            aria-label={theme === 'dark' ? '切换至亮色主题' : '切换至暗色主题'}
+            className="w-7 h-7 flex items-center justify-center rounded text-ink-muted hover:text-gold transition-colors"
+          >
+            {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+          </button>
           {userInfo ? (
             <div className="flex items-center gap-3">
               <span className="hidden sm:flex items-center gap-1.5 text-xs">

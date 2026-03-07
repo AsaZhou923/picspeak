@@ -78,14 +78,14 @@ export default function UsagePage() {
           <div className="space-y-4">
             {/* Identity card */}
             <div className="border border-border-subtle rounded-lg bg-raised p-6">
-              <p className="text-xs text-ink-subtle mb-3">当前身份</p>
+              <p className="text-xs text-ink-muted mb-3">当前身份</p>
               <div className="flex items-center justify-between">
                 <div>
                   <p className={`text-2xl font-display ${planColor(usage.plan)}`}>
                     {planLabel(usage.plan)}
                   </p>
                   {userInfo?.user_id && (
-                    <p className="text-xs text-ink-subtle font-mono mt-1 truncate max-w-[200px]">
+                    <p className="text-xs text-ink-muted font-mono mt-1 truncate max-w-[200px]">
                       {userInfo.user_id}
                     </p>
                   )}
@@ -104,7 +104,7 @@ export default function UsagePage() {
 
             {/* Quota card */}
             <div className="border border-border-subtle rounded-lg bg-raised p-6 space-y-4">
-              <p className="text-xs text-ink-subtle">今日评图额度</p>
+              <p className="text-xs text-ink-muted">今日评图额度</p>
               <div className="flex items-end gap-2">
                 <span className="font-display text-4xl text-ink">
                   {usage.quota.remaining}
@@ -119,27 +119,6 @@ export default function UsagePage() {
                   今日额度已用完，次日 UTC 0:00 自动重置
                 </p>
               )}
-            </div>
-
-            {/* Rate limit card */}
-            <div className="border border-border-subtle rounded-lg bg-raised p-6 space-y-3">
-              <p className="text-xs text-ink-subtle">分钟级限流</p>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-2xl font-display text-ink">
-                    {usage.rate_limit.remaining}
-                  </p>
-                  <p className="text-xs text-ink-muted mt-0.5">
-                    / {usage.rate_limit.limit_per_min} 次/分钟 剩余
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs text-ink-subtle">重置时间</p>
-                  <p className="text-xs text-ink-muted font-mono mt-0.5">
-                    {new Date(usage.rate_limit.reset_at).toLocaleTimeString('zh-CN')}
-                  </p>
-                </div>
-              </div>
             </div>
 
             {/* Plan comparison */}

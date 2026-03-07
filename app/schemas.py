@@ -83,6 +83,7 @@ class TaskStatusResponse(BaseModel):
 class ReviewGetResponse(BaseModel):
     review_id: str
     photo_id: str
+    photo_url: str | None = None
     mode: str
     status: str
     result: ReviewResult
@@ -97,6 +98,21 @@ class ReviewListItem(BaseModel):
 
 class PhotoReviewsResponse(BaseModel):
     items: list[ReviewListItem]
+    next_cursor: str | None = None
+
+
+class ReviewHistoryItem(BaseModel):
+    review_id: str
+    photo_id: str
+    photo_url: str | None = None
+    mode: str
+    status: str
+    final_score: float
+    created_at: datetime
+
+
+class ReviewHistoryResponse(BaseModel):
+    items: list[ReviewHistoryItem]
     next_cursor: str | None = None
 
 

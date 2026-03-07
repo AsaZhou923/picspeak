@@ -7,6 +7,38 @@
   --font-display: 'Cormorant Garamond', Georgia, serif;
   --font-body: 'DM Sans', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
+
+  /* ── Light theme (default) ── */
+  --color-void:         250 249 247;
+  --color-surface:      243 239 233;
+  --color-raised:       237 232 224;
+  --color-overlay:      229 224 214;
+  --color-ink:          26  24  21;
+  --color-ink-muted:    78  70  65;   /* darkened for contrast */
+  --color-ink-subtle:   104 96  90;   /* darkened for contrast */
+  --color-border-subtle:204 197 187;
+  --color-border:       180 172 164;
+
+  /* ── Accent colors — identical in both themes ── */
+  --color-gold:         200 162 104;
+  --color-gold-light:   224 186 136;
+  --color-gold-dim:     138 110 67;
+  --color-sage:         122 154 120;
+  --color-sage-light:   156 191 154;
+  --color-rust:         176 114 101;
+  --color-rust-light:   204 143 130;
+}
+
+.dark {
+  --color-void:         8   8   8;
+  --color-surface:      15  15  15;
+  --color-raised:       22  22  22;
+  --color-overlay:      30  30  30;
+  --color-ink:          240 236 229;
+  --color-ink-muted:    154 149 144;
+  --color-ink-subtle:   74  71  67;
+  --color-border-subtle:34  34  34;
+  --color-border:       46  46  46;
 }
 
 /* ─── Base Reset & Body ───────────────────────────────────────────────────── */
@@ -20,8 +52,12 @@ html,
 body {
   max-width: 100vw;
   overflow-x: hidden;
-  background-color: #080808;
-  color: #f0ece5;
+  color: rgb(var(--color-ink));
+}
+
+body {
+  background-color: rgb(var(--color-void));
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 body {
@@ -60,20 +96,20 @@ h3 {
   height: 4px;
 }
 ::-webkit-scrollbar-track {
-  background: #111111;
+  background: rgb(var(--color-surface));
 }
 ::-webkit-scrollbar-thumb {
-  background: #2e2e2e;
+  background: rgb(var(--color-border));
   border-radius: 2px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #c8a268;
+  background: rgb(var(--color-gold));
 }
 
 /* ─── Selection ───────────────────────────────────────────────────────────── */
 ::selection {
   background-color: rgba(200, 162, 104, 0.25);
-  color: #f0ece5;
+  color: rgb(var(--color-ink));
 }
 
 /* ─── Focus States ────────────────────────────────────────────────────────── */
@@ -110,13 +146,35 @@ h3 {
   .shimmer {
     background: linear-gradient(
       90deg,
-      #1a1a1a 25%,
-      #252525 50%,
-      #1a1a1a 75%
+      rgb(var(--color-raised))  25%,
+      rgb(var(--color-overlay)) 50%,
+      rgb(var(--color-raised))  75%
     );
     background-size: 200% auto;
     animation: shimmer 1.8s linear infinite;
   }
+}
+
+/* ─── Theme-aware utility overrides ──────────────────────────────────────── */
+/* Ensures Tailwind's compiled classes follow CSS variables in both themes.  */
+@layer utilities {
+  .bg-void    { background-color: rgb(var(--color-void)); }
+  .bg-surface { background-color: rgb(var(--color-surface)); }
+  .bg-raised  { background-color: rgb(var(--color-raised)); }
+  .bg-overlay { background-color: rgb(var(--color-overlay)); }
+
+  .bg-void\/90   { background-color: rgb(var(--color-void)   / 0.9); }
+  .bg-void\/70   { background-color: rgb(var(--color-void)   / 0.7); }
+  .bg-raised\/80 { background-color: rgb(var(--color-raised) / 0.8); }
+  .bg-raised\/60 { background-color: rgb(var(--color-raised) / 0.6); }
+  .bg-raised\/50 { background-color: rgb(var(--color-raised) / 0.5); }
+
+  .text-ink        { color: rgb(var(--color-ink)); }
+  .text-ink-muted  { color: rgb(var(--color-ink-muted)); }
+  .text-ink-subtle { color: rgb(var(--color-ink-subtle)); }
+
+  .border-border-subtle { border-color: rgb(var(--color-border-subtle)); }
+  .border-border        { border-color: rgb(var(--color-border)); }
 }
 
 /* ─── Animations ─────────────────────────────────────────────────────────── */
@@ -132,6 +190,77 @@ h3 {
 
 .ring-animate {
   animation: ring-fill 1s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* ─── Background Effects (aurora orbs + star particles) ───────────────────── */
+.bg-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(65px);
+  will-change: transform;
+}
+
+.bg-orb-gold {
+  width: 900px;
+  height: 900px;
+  top: -15%;
+  left: -8%;
+  background: radial-gradient(circle, rgba(200,162,104,0.32) 0%, rgba(200,162,104,0.10) 40%, transparent 65%);
+  animation: orb-drift-1 28s ease-in-out infinite;
+}
+
+.bg-orb-indigo {
+  width: 700px;
+  height: 700px;
+  top: 10%;
+  right: -12%;
+  background: radial-gradient(circle, rgba(100,70,220,0.24) 0%, rgba(80,55,160,0.08) 45%, transparent 65%);
+  animation: orb-drift-2 34s ease-in-out infinite;
+  animation-delay: -9s;
+}
+
+.bg-orb-teal {
+  width: 800px;
+  height: 800px;
+  bottom: -18%;
+  left: 20%;
+  background: radial-gradient(circle, rgba(36,140,180,0.20) 0%, rgba(36,108,152,0.06) 45%, transparent 65%);
+  animation: orb-drift-3 42s ease-in-out infinite;
+  animation-delay: -18s;
+}
+
+@keyframes orb-drift-1 {
+  0%, 100% { transform: translate(0px,  0px); }
+  33%       { transform: translate(70px, -55px); }
+  66%       { transform: translate(-45px, 65px); }
+}
+
+@keyframes orb-drift-2 {
+  0%, 100% { transform: translate(0px,  0px); }
+  33%       { transform: translate(-75px, 70px); }
+  66%       { transform: translate(65px, -45px); }
+}
+
+@keyframes orb-drift-3 {
+  0%, 100% { transform: translate(0px,  0px); }
+  40%       { transform: translate(55px, -60px); }
+  80%       { transform: translate(-55px, 50px); }
+}
+
+.bg-star {
+  position: absolute;
+  border-radius: 50%;
+  animation-name: star-pulse;
+  animation-duration: var(--duration, 4s);
+  animation-timing-function: ease-in-out;
+  animation-delay: var(--delay, 0s);
+  animation-iteration-count: infinite;
+  animation-fill-mode: both;
+}
+
+@keyframes star-pulse {
+  0%, 100% { opacity: var(--lo, 0.10); transform: scale(1); }
+  50%       { opacity: var(--hi, 0.55); transform: scale(2.5); }
 }
 
 /* ─── Upload Drop Zone ────────────────────────────────────────────────────── */

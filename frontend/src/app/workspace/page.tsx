@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { CheckCircle, AlertCircle, Info, Zap, Star } from 'lucide-react';
+import { CheckCircle, AlertCircle, Info, Zap, Star, X, ArrowRight } from 'lucide-react';
 import Image from 'next/image';
 import {
   createPresign,
@@ -10,6 +10,7 @@ import {
   confirmPhoto,
   createReview,
   getUsage,
+  buildGoogleOAuthUrl,
 } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { planLabel, planColor } from '@/lib/auth-context';
@@ -60,6 +61,7 @@ export default function WorkspacePage() {
 
   const [usage, setUsage] = useState<UsageResponse | null>(null);
   const [usageError, setUsageError] = useState(false);
+  const isGuest = (userInfo?.plan ?? usage?.plan) === 'guest';
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -70,6 +72,7 @@ export default function WorkspacePage() {
   const [errMessage, setErrMessage] = useState('');
 
   const [reviewMode, setReviewMode] = useState<'flash' | 'pro'>('flash');
+  const [showQuotaModal, setShowQuotaModal] = useState(false);
 
   // ── Fetch usage ────────────────────────────────────────────────────────────
 
@@ -86,6 +89,12 @@ export default function WorkspacePage() {
   useEffect(() => {
     if (!authLoading) fetchUsage();
   }, [authLoading, fetchUsage]);
+
+  useEffect(() => {
+    if (isGuest && reviewMode === 'pro') {
+      setReviewMode('flash');
+    }
+  }, [isGuest, reviewMode]);
 
   // ── File selected → upload flow ────────────────────────────────────────────
 
@@ -179,6 +188,11 @@ export default function WorkspacePage() {
 
   const handleReview = useCallback(async () => {
     if (!photo) return;
+    // Guard: check quota before making any API call
+    if (usage && usage.quota.remaining <= 0) {
+      setShowQuotaModal(true);
+      return;
+    }
     setStage('reviewing');
     setErrMessage('');
 
@@ -231,6 +245,57 @@ export default function WorkspacePage() {
 
   return (
     <div className="pt-14 min-h-screen">
+      {/* ── Quota exhausted modal ──────────────────────────────────────────── */}
+      {showQuotaModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center px-6"
+          style={{ background: 'rgba(8,8,8,0.80)', backdropFilter: 'blur(4px)' }}
+          onClick={() => setShowQuotaModal(false)}
+        >
+          <div
+            className="relative w-full max-w-sm bg-raised border border-border rounded-lg p-8 space-y-5 animate-slide-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowQuotaModal(false)}
+              className="absolute top-4 right-4 text-ink-muted hover:text-ink transition-colors"
+            >
+              <X size={16} />
+            </button>
+            <div className="w-12 h-12 rounded-full bg-rust/10 border border-rust/30 flex items-center justify-center">
+              <AlertCircle size={22} className="text-rust" />
+            </div>
+            <div>
+              <h2 className="font-display text-2xl mb-2">今日额度已用尽</h2>
+              <p className="text-sm text-ink-muted leading-relaxed">
+                你的今日评图次数已全部用完，将在次日 UTC 00:00 自动重置。
+                {usage?.plan === 'guest' && (
+                  <span>登录 Google 账号可解锁更多每日额度。</span>
+                )}
+              </p>
+            </div>
+            <div className="flex flex-col gap-2 pt-1">
+              {usage?.plan === 'guest' ? (
+                <a
+                  href={buildGoogleOAuthUrl()}
+                  className="flex items-center justify-center gap-2 px-5 py-2.5 bg-gold text-void text-sm font-medium rounded hover:bg-gold-light transition-colors"
+                >
+                  登录以获取更多额度
+                  <ArrowRight size={13} />
+                </a>
+              ) : (
+                <p className="text-xs text-ink-muted text-center">升级套餐可获得更高每日额度</p>
+              )}
+              <button
+                onClick={() => setShowQuotaModal(false)}
+                className="text-sm text-ink-muted hover:text-ink transition-colors py-1"
+              >
+                关闭
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="max-w-3xl mx-auto px-6 py-12">
         {/* Header */}
         <div className="mb-10 animate-fade-in">
@@ -356,14 +421,19 @@ export default function WorkspacePage() {
                             desc: '深度分析，专业建议',
                           },
                         ] as const
-                      ).map((m) => (
+                      ).map((m) => {
+                        const disabled = isGuest && m.id === 'pro';
+                        return (
                         <button
                           key={m.id}
-                          onClick={() => setReviewMode(m.id)}
+                          onClick={() => !disabled && setReviewMode(m.id)}
+                          disabled={disabled}
                           className={`
                             flex items-start gap-3 p-4 rounded-lg border text-left transition-all
                             ${
-                              reviewMode === m.id
+                              disabled
+                                ? 'opacity-45 cursor-not-allowed border-border'
+                                : reviewMode === m.id
                                 ? 'border-gold/60 bg-gold/5'
                                 : 'border-border hover:border-border-subtle'
                             }
@@ -381,10 +451,13 @@ export default function WorkspacePage() {
                             >
                               {m.title}
                             </p>
-                            <p className="text-xs text-ink-muted mt-0.5">{m.desc}</p>
+                            <p className="text-xs text-ink-muted mt-0.5">
+                              {disabled ? 'Guest unavailable' : m.desc}
+                            </p>
                           </div>
                         </button>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
 

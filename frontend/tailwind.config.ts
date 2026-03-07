@@ -1,35 +1,38 @@
 import type { Config } from 'tailwindcss';
 
 const config: Config = {
+  darkMode: 'class',
   content: ['./src/**/*.{js,ts,jsx,tsx,mdx}'],
   theme: {
     extend: {
       colors: {
-        void: '#080808',
-        surface: '#0f0f0f',
-        raised: '#161616',
-        overlay: '#1e1e1e',
+        // All semantic colors are driven by CSS variables so they
+        // respond instantly when the <html> class switches dark ↔ light.
+        void:    'rgb(var(--color-void)    / <alpha-value>)',
+        surface: 'rgb(var(--color-surface) / <alpha-value>)',
+        raised:  'rgb(var(--color-raised)  / <alpha-value>)',
+        overlay: 'rgb(var(--color-overlay) / <alpha-value>)',
         ink: {
-          DEFAULT: '#f0ece5',
-          muted: '#9a9590',
-          subtle: '#4a4743',
+          DEFAULT: 'rgb(var(--color-ink)        / <alpha-value>)',
+          muted:   'rgb(var(--color-ink-muted)   / <alpha-value>)',
+          subtle:  'rgb(var(--color-ink-subtle)  / <alpha-value>)',
         },
         border: {
-          subtle: '#222222',
-          DEFAULT: '#2e2e2e',
+          subtle:  'rgb(var(--color-border-subtle) / <alpha-value>)',
+          DEFAULT: 'rgb(var(--color-border)        / <alpha-value>)',
         },
         gold: {
-          DEFAULT: '#c8a268',
-          light: '#e0ba88',
-          dim: '#8a6e43',
+          DEFAULT: 'rgb(var(--color-gold)       / <alpha-value>)',
+          light:   'rgb(var(--color-gold-light)  / <alpha-value>)',
+          dim:     'rgb(var(--color-gold-dim)    / <alpha-value>)',
         },
         sage: {
-          DEFAULT: '#7a9a78',
-          light: '#9cbf9a',
+          DEFAULT: 'rgb(var(--color-sage)       / <alpha-value>)',
+          light:   'rgb(var(--color-sage-light)  / <alpha-value>)',
         },
         rust: {
-          DEFAULT: '#b07265',
-          light: '#cc8f82',
+          DEFAULT: 'rgb(var(--color-rust)       / <alpha-value>)',
+          light:   'rgb(var(--color-rust-light)  / <alpha-value>)',
         },
       },
       fontFamily: {

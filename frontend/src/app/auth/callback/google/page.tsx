@@ -3,9 +3,8 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { CheckCircle, XCircle, Loader } from 'lucide-react';
-import { authGoogleCallback } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
-import { ApiException } from '@/lib/types';
+import { AuthToken } from '@/lib/types';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
 type Status = 'processing' | 'success' | 'error';
@@ -32,35 +31,35 @@ function GoogleCallbackInner() {
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
-    const code = searchParams.get('code');
     const errorParam = searchParams.get('error');
 
     if (errorParam) {
       setStatus('error');
-      setErrorMsg(`Google 授权被拒绝：${errorParam}`);
+      setErrorMsg(decodeURIComponent(errorParam));
       return;
     }
 
-    if (!code) {
+    const accessToken = searchParams.get('access_token');
+    const tokenType = searchParams.get('token_type') ?? 'bearer';
+    const userId = searchParams.get('user_id');
+    const plan = searchParams.get('plan');
+
+    if (!accessToken || !userId || !plan) {
       setStatus('error');
       setErrorMsg('回调参数缺失，请重新登录');
       return;
     }
 
-    authGoogleCallback(code)
-      .then((data) => {
-        login(data);
-        setStatus('success');
-        setTimeout(() => router.push('/workspace'), 1200);
-      })
-      .catch((err) => {
-        setStatus('error');
-        if (err instanceof ApiException) {
-          setErrorMsg(err.message);
-        } else {
-          setErrorMsg('登录处理时发生异常，请稍后重试');
-        }
-      });
+    const authData: AuthToken = {
+      access_token: accessToken,
+      token_type: tokenType,
+      user_id: userId,
+      plan: plan as AuthToken['plan'],
+    };
+
+    login(authData);
+    setStatus('success');
+    setTimeout(() => router.push('/workspace'), 1200);
   }, [searchParams, login, router]);
 
   return (

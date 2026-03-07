@@ -73,7 +73,7 @@ export default function ScoreRing({
             className="font-display leading-none"
             style={{ fontSize: size * 0.3, color }}
           >
-            {score}
+            {Number.isInteger(score) ? score : score.toFixed(1)}
           </span>
         </div>
       </div>
@@ -89,7 +89,7 @@ export default function ScoreRing({
 export function FinalScoreRing({ score }: { score: number }) {
   return (
     <ScoreRing
-      score={Math.round(score)}
+      score={score}
       size={120}
       strokeWidth={4}
       label="综合评分"
