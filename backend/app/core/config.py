@@ -3,8 +3,12 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    # Support UTF-8 files with/without BOM so the first env key is parsed correctly.
-    model_config = SettingsConfigDict(env_file='.env', env_file_encoding='utf-8-sig', extra='ignore')
+    # Support running from repo root or backend/ while still finding the backend env file.
+    model_config = SettingsConfigDict(
+        env_file=('.env', '../.env', 'backend/.env'),
+        env_file_encoding='utf-8-sig',
+        extra='ignore',
+    )
 
     app_env: str = 'dev'
     app_secret: str = 'change-me'

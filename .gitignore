@@ -14,6 +14,10 @@ frontend/*.tsbuildinfo
 frontend/.env.local
 frontend/.env*.local
 
+# Backend
+backend/.env
+backend/.env.*.local
+
 # Logs
 *.log
 npm-debug.log*
