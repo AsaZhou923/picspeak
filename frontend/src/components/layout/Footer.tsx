@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { Twitter } from 'lucide-react';
+import { Github, Twitter } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 
 export default function Footer() {
@@ -35,6 +35,15 @@ export default function Footer() {
         </div>
 
         <div className="flex items-center gap-4">
+          <a
+            href="https://github.com/AsaZhou923/picspeak"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 hover:text-ink transition-colors"
+          >
+            <Github size={12} />
+            <span>GitHub</span>
+          </a>
           <a
             href="https://x.com/Zzw_Prime"
             target="_blank"
