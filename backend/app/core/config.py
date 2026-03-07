@@ -1,4 +1,7 @@
-from pydantic import Field, model_validator
+import json
+from typing import Any
+
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -40,6 +43,7 @@ class Settings(BaseSettings):
     backend_cors_origins: list[str] = Field(
         default_factory=lambda: ['http://localhost:3000', 'http://127.0.0.1:3000']
     )
+    backend_cors_origin_regex: str = ''
 
     siliconflow_base_url: str = 'https://api.siliconflow.cn/v1'
     siliconflow_api_key: str = ''
@@ -57,6 +61,42 @@ class Settings(BaseSettings):
 
     image_audit_enabled: bool = False
     image_audit_reject_threshold: float = 0.78
+
+    @field_validator('backend_cors_origins', mode='before')
+    @classmethod
+    def parse_backend_cors_origins(cls, value: Any) -> list[str]:
+        if value is None or value == '':
+            return []
+        if isinstance(value, list):
+            return [str(item).strip().rstrip('/') for item in value if str(item).strip()]
+        if isinstance(value, str):
+            raw = value.strip()
+            if not raw:
+                return []
+            if raw.startswith('['):
+                try:
+                    parsed = json.loads(raw)
+                except json.JSONDecodeError as exc:
+                    raise ValueError('BACKEND_CORS_ORIGINS must be valid JSON array or comma-separated string') from exc
+                if not isinstance(parsed, list):
+                    raise ValueError('BACKEND_CORS_ORIGINS JSON value must be an array')
+                return [str(item).strip().rstrip('/') for item in parsed if str(item).strip()]
+            return [item.strip().rstrip('/') for item in raw.split(',') if item.strip()]
+        raise ValueError('BACKEND_CORS_ORIGINS must be a list or string')
+
+    @field_validator('frontend_origin', mode='before')
+    @classmethod
+    def normalize_frontend_origin(cls, value: Any) -> str:
+        if not isinstance(value, str):
+            return 'http://localhost:3000'
+        return value.strip().rstrip('/')
+
+    @field_validator('backend_cors_origin_regex', mode='before')
+    @classmethod
+    def normalize_backend_cors_origin_regex(cls, value: Any) -> str:
+        if not isinstance(value, str):
+            return ''
+        return value.strip()
 
     @model_validator(mode='after')
     def validate_oauth_secret(self) -> 'Settings':

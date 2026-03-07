@@ -28,9 +28,11 @@ app = FastAPI(title='AiPingTu Backend', version='1.0.0', lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.backend_cors_origins,
+    allow_origin_regex=settings.backend_cors_origin_regex or None,
     allow_credentials=True,
     allow_methods=['*'],
     allow_headers=['*'],
+    expose_headers=['X-Request-Id', 'X-Guest-Access-Token'],
 )
 app.include_router(router)
 

@@ -13,7 +13,7 @@ import {
   UsageResponse,
 } from './types';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000').replace(/\/$/, '');
 
 async function request<T>(
   path: string,
@@ -198,7 +198,7 @@ export function buildGoogleOAuthUrl(): string {
   const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? '';
   const redirectUri =
     process.env.NEXT_PUBLIC_GOOGLE_OAUTH_REDIRECT_URI ??
-    `${typeof window !== 'undefined' ? window.location.origin : ''}/auth/callback/google`;
+    `${API_BASE}/api/v1/auth/google/callback`;
 
   const params = new URLSearchParams({
     client_id: clientId,
