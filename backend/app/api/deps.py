@@ -102,16 +102,13 @@ def issue_guest_token(user: User) -> str:
 
 
 def bind_guest_token(response: Response, token: str) -> None:
-    frontend_origin = settings.frontend_origin.strip()
-    frontend_scheme = urlparse(frontend_origin).scheme.lower() if frontend_origin else ''
-    secure_cookie = frontend_scheme == 'https'
-    same_site = 'none' if secure_cookie else 'lax'
+    is_dev = settings.app_env.strip().lower() == 'dev'
     response.set_cookie(
         key=GUEST_TOKEN_COOKIE,
         value=token,
         httponly=True,
-        secure=secure_cookie,
-        samesite=same_site,
+        secure=not is_dev,
+        samesite='lax',
         max_age=GUEST_TOKEN_TTL_SECONDS,
         path='/',
     )
