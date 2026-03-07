@@ -5,6 +5,7 @@ import { AuthProvider } from '@/lib/auth-context';
 import { ThemeProvider } from '@/lib/theme-context';
 import { I18nProvider } from '@/lib/i18n';
 import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/next';  
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import BackgroundEffect from '@/components/ui/BackgroundEffect';
@@ -104,6 +105,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="text-ink min-h-screen">
         <Analytics />
+        <SpeedInsights />
+        {/* Fixed z-0: aurora + particles background layer */}
         <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
           <BackgroundEffect />
         </div>
