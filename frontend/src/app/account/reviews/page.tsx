@@ -102,7 +102,7 @@ function SkeletonList() {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ReviewHistoryPage() {
-  const { ensureToken } = useAuth();
+  const { ensureToken, userInfo } = useAuth();
   const { t } = useI18n();
 
   const [items, setItems] = useState<ReviewHistoryItem[]>([]);
@@ -134,8 +134,13 @@ export default function ReviewHistoryPage() {
   );
 
   useEffect(() => {
+    setItems([]);
+    setCursor(null);
+    setHasMore(false);
+    setError('');
+    setLoading(true);
     fetchPage().finally(() => setLoading(false));
-  }, [fetchPage]);
+  }, [fetchPage, userInfo?.access_token]);
 
   const handleLoadMore = async () => {
     if (!cursor || loadingMore) return;

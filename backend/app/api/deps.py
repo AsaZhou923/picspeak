@@ -1,6 +1,7 @@
 ﻿from __future__ import annotations
 
 from datetime import datetime, timezone
+from urllib.parse import urlparse
 from uuid import uuid4
 
 from fastapi import Cookie, Depends, Header, HTTPException, Request, Response, status
@@ -101,12 +102,16 @@ def issue_guest_token(user: User) -> str:
 
 
 def bind_guest_token(response: Response, token: str) -> None:
+    frontend_origin = settings.frontend_origin.strip()
+    frontend_scheme = urlparse(frontend_origin).scheme.lower() if frontend_origin else ''
+    secure_cookie = frontend_scheme == 'https'
+    same_site = 'none' if secure_cookie else 'lax'
     response.set_cookie(
         key=GUEST_TOKEN_COOKIE,
         value=token,
         httponly=True,
-        secure=False,
-        samesite='lax',
+        secure=secure_cookie,
+        samesite=same_site,
         max_age=GUEST_TOKEN_TTL_SECONDS,
         path='/',
     )

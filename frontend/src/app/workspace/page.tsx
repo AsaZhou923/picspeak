@@ -80,6 +80,7 @@ export default function WorkspacePage() {
 
   const fetchUsage = useCallback(async () => {
     try {
+      setUsageError(false);
       const token = await ensureToken();
       const data = await getUsage(token);
       setUsage(data);
@@ -89,8 +90,10 @@ export default function WorkspacePage() {
   }, [ensureToken]);
 
   useEffect(() => {
-    if (!authLoading) fetchUsage();
-  }, [authLoading, fetchUsage]);
+    if (authLoading) return;
+    setUsage(null);
+    fetchUsage();
+  }, [authLoading, userInfo?.access_token, fetchUsage]);
 
   useEffect(() => {
     if (isGuest && reviewMode === 'pro') {

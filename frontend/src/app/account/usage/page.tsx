@@ -40,13 +40,20 @@ export default function UsagePage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
+    if (!userInfo) {
+      setUsage(null);
+      setError('');
+      setLoading(true);
+    }
     ensureToken()
       .then((token) => getUsage(token))
       .then((data) => {
         setUsage(data);
+        setError('');
         setLoading(false);
       })
       .catch((err) => {
+        setUsage(null);
         setLoading(false);
         if (err instanceof ApiException) {
           setError(err.message);
@@ -54,7 +61,7 @@ export default function UsagePage() {
           setError(t('usage_error'));
         }
       });
-  }, [ensureToken]);
+  }, [ensureToken, userInfo?.access_token, t]);
 
   return (
     <div className="pt-14 min-h-screen">
