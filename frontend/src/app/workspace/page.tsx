@@ -163,7 +163,7 @@ export default function WorkspacePage() {
           fetchUsage();
         } else if (photoData.status === 'REJECTED') {
           setStage('rejected');
-          setErrMessage(t('status_rejected'));
+          setErrMessage(t('photo_rejected_msg'));
         } else {
           setStage('error');
           setErrMessage(t('status_photo_error') + photoData.status);
@@ -262,6 +262,8 @@ export default function WorkspacePage() {
             <button
               onClick={() => setShowQuotaModal(false)}
               className="absolute top-4 right-4 text-ink-muted hover:text-ink transition-colors"
+              aria-label={t('quota_modal_close')}
+              title={t('quota_modal_close')}
             >
               <X size={16} />
             </button>
@@ -389,7 +391,7 @@ export default function WorkspacePage() {
               {stage === 'ready' && photo && (
                 <div className="flex items-center gap-2 text-sage text-sm">
                   <CheckCircle size={14} />
-                  <span>{t('status_ready')}</span>
+                  <span>{t('photo_ready_msg')}</span>
                 </div>
               )}
 

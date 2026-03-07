@@ -128,6 +128,7 @@ export default function ImageUploader({
           className="hidden"
           onChange={onInputChange}
           disabled={disabled || compressing}
+          aria-label="Upload image file"
         />
 
         <div className="flex flex-col items-center gap-3 px-8 py-10 text-center">
@@ -191,6 +192,8 @@ export default function ImageUploader({
           <AlertCircle size={14} className="shrink-0" />
           <span>{error}</span>
           <button
+            type="button"
+            title="Close"
             onClick={() => setError(null)}
             className="ml-auto text-rust/60 hover:text-rust"
           >
