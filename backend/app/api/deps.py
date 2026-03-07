@@ -1,6 +1,7 @@
 ﻿from __future__ import annotations
 
 from datetime import datetime, timezone
+from urllib.parse import urlparse
 from uuid import uuid4
 
 from fastapi import Cookie, Depends, Header, HTTPException, Request, Response, status

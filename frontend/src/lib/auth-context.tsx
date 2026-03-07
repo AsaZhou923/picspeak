@@ -11,6 +11,7 @@ import { authGuest } from './api';
 import { AuthToken } from './types';
 
 const TOKEN_KEY = 'ps_token';
+const shouldPersistToken = (tokenData: AuthToken) => tokenData.plan !== 'guest';
 
 interface AuthState {
   token: string | null;
@@ -33,8 +34,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (stored) {
       try {
         const parsed: AuthToken = JSON.parse(stored);
-        setToken(parsed.access_token);
-        setUserInfo(parsed);
+        if (shouldPersistToken(parsed)) {
+          setToken(parsed.access_token);
+          setUserInfo(parsed);
+        } else {
+          localStorage.removeItem(TOKEN_KEY);
+        }
       } catch {
         localStorage.removeItem(TOKEN_KEY);
       }
@@ -43,7 +48,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = useCallback((tokenData: AuthToken) => {
-    localStorage.setItem(TOKEN_KEY, JSON.stringify(tokenData));
+    if (shouldPersistToken(tokenData)) {
+      localStorage.setItem(TOKEN_KEY, JSON.stringify(tokenData));
+    } else {
+      localStorage.removeItem(TOKEN_KEY);
+    }
     setToken(tokenData.access_token);
     setUserInfo(tokenData);
   }, []);
