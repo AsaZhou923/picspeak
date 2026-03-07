@@ -93,10 +93,10 @@ def run_content_audit(image_url: str) -> ContentAuditResult:
     if not settings.image_audit_enabled:
         return ContentAuditResult(safe=True, nsfw_score=0.0, label='disabled', reason='audit disabled', latency_ms=0)
 
-    if not settings.siliconflow_api_key:
-        raise ContentAuditError('SILICONFLOW_API_KEY is not configured')
+    if not settings.ai_api_key:
+        raise ContentAuditError('AI_API_KEY is not configured')
 
-    endpoint = settings.siliconflow_base_url.rstrip('/') + '/chat/completions'
+    endpoint = settings.ai_api_base_url.rstrip('/') + '/chat/completions'
     prompt = (
         '你是图片内容审核器。请判断图片是否含有明显涉黄、性暗示、裸露、血腥暴力、仇恨或违法内容。'
         '必须只输出 JSON：{"safe":true/false,"nsfw_score":0-1,"label":"safe|sexual|violence|illegal|other","reason":"..."}。'
@@ -122,7 +122,7 @@ def run_content_audit(image_url: str) -> ContentAuditResult:
         endpoint,
         data=json.dumps(payload).encode('utf-8'),
         headers={
-            'Authorization': f'Bearer {settings.siliconflow_api_key}',
+            'Authorization': f'Bearer {settings.ai_api_key}',
             'Content-Type': 'application/json',
         },
         method='POST',
@@ -134,9 +134,9 @@ def run_content_audit(image_url: str) -> ContentAuditResult:
             body = json.loads(resp.read().decode('utf-8'))
     except HTTPError as exc:
         err_body = exc.read().decode('utf-8', errors='ignore') if hasattr(exc, 'read') else str(exc)
-        raise ContentAuditError(f'SiliconFlow HTTP {exc.code}: {err_body[:300]}') from exc
+        raise ContentAuditError(f'AI provider HTTP {exc.code}: {err_body[:300]}') from exc
     except URLError as exc:
-        raise ContentAuditError(f'SiliconFlow request failed: {exc.reason}') from exc
+        raise ContentAuditError(f'AI provider request failed: {exc.reason}') from exc
 
     latency_ms = int((time.perf_counter() - start) * 1000)
     try:

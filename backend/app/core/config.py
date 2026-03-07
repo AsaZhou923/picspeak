@@ -45,8 +45,8 @@ class Settings(BaseSettings):
     )
     backend_cors_origin_regex: str = ''
 
-    siliconflow_base_url: str = 'https://api.siliconflow.cn/v1'
-    siliconflow_api_key: str = ''
+    ai_api_base_url: str = 'https://dashscope.aliyuncs.com/compatible-mode/v1'
+    ai_api_key: str = ''
     ai_model_name: str = 'Qwen/Qwen3-VL-8B-Instruct'
     flash_model_name: str = ''
     pro_model_name: str = ''

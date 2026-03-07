@@ -9,7 +9,7 @@ import { useI18n } from '@/lib/i18n';
 import { ApiException, TaskStatusResponse, TaskStreamMessage } from '@/lib/types';
 
 const POLL_INTERVAL = 2000;
-const MAX_POLLS = 60;
+const HEARTBEAT_STALE_MS = 3 * 60 * 1000;
 
 export default function TaskPage() {
   const router = useRouter();
@@ -54,6 +54,26 @@ export default function TaskPage() {
     }
   };
 
+  const shouldContinueWaiting = (nextTask: TaskStatusResponse) => {
+    if (nextTask.status === 'PENDING' || nextTask.status === 'RUNNING') {
+      if (nextTask.last_heartbeat_at) {
+        const heartbeatAt = new Date(nextTask.last_heartbeat_at).getTime();
+        if (!Number.isNaN(heartbeatAt) && Date.now() - heartbeatAt <= HEARTBEAT_STALE_MS) {
+          return true;
+        }
+      }
+
+      if (nextTask.next_attempt_at) {
+        const retryAt = new Date(nextTask.next_attempt_at).getTime();
+        if (!Number.isNaN(retryAt) && retryAt > Date.now()) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  };
+
   const poll = async () => {
     if (wsConnectedRef.current || finalRef.current) return;
 
@@ -65,7 +85,7 @@ export default function TaskPage() {
 
       if (finalRef.current) return;
 
-      if (pollCount.current >= MAX_POLLS) {
+      if (pollCount.current >= 60 && !shouldContinueWaiting(data)) {
         setError(t('task_timeout_error'));
         return;
       }

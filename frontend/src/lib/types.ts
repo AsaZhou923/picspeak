@@ -100,6 +100,10 @@ export interface TaskStatusResponse {
   status: TaskStatus;
   progress: number;
   review_id: string | null;
+  attempt_count: number;
+  max_attempts: number;
+  next_attempt_at: string | null;
+  last_heartbeat_at: string | null;
   error: Record<string, unknown> | null;
 }
 

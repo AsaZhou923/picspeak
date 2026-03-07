@@ -25,6 +25,19 @@ class AIReviewResponse:
     latency_ms: int | None = None
 
 
+def _is_multimodal_model(model_name: str) -> bool:
+    normalized = (model_name or '').strip().lower()
+    if not normalized:
+        return False
+
+    multimodal_markers = (
+        '-vl',
+        'vl-',
+        '/vl',
+    )
+    return any(marker in normalized for marker in multimodal_markers)
+
+
 def _is_incompatible_multimodal_model(model_name: str) -> bool:
     normalized = (model_name or '').strip().lower()
     # SiliconFlow's Qwen thinking vision variants can reject the OpenAI-style
@@ -34,23 +47,34 @@ def _is_incompatible_multimodal_model(model_name: str) -> bool:
 
 def model_name_for_mode(mode: str) -> str:
     normalized = (mode or '').strip().lower()
-    selected_model = settings.ai_model_name
+    candidates: list[str] = []
 
     if normalized == 'pro' and settings.pro_model_name.strip():
-        selected_model = settings.pro_model_name.strip()
+        candidates.append(settings.pro_model_name.strip())
     elif normalized == 'flash' and settings.flash_model_name.strip():
-        selected_model = settings.flash_model_name.strip()
+        candidates.append(settings.flash_model_name.strip())
 
-    if _is_incompatible_multimodal_model(selected_model):
-        fallback_candidates = [
-            settings.flash_model_name.strip(),
-            settings.ai_model_name.strip(),
-        ]
-        for fallback_model in fallback_candidates:
-            if fallback_model and not _is_incompatible_multimodal_model(fallback_model):
-                return fallback_model
+    if settings.ai_model_name.strip():
+        candidates.append(settings.ai_model_name.strip())
+    if settings.flash_model_name.strip():
+        candidates.append(settings.flash_model_name.strip())
+    if settings.pro_model_name.strip():
+        candidates.append(settings.pro_model_name.strip())
 
-    return selected_model
+    seen: set[str] = set()
+    for candidate in candidates:
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        if not _is_multimodal_model(candidate):
+            continue
+        if _is_incompatible_multimodal_model(candidate):
+            continue
+        return candidate
+
+    raise AIReviewError(
+        'No multimodal AI model is configured. Set AI_MODEL_NAME, FLASH_MODEL_NAME, or PRO_MODEL_NAME to a vision-capable model.'
+    )
 
 
 def _prompt_for_mode(mode: str, locale: str) -> str:
@@ -172,11 +196,11 @@ def _extract_content(message_content: object) -> str:
 
 
 def run_ai_review(mode: str, image_url: str, locale: str = 'zh') -> AIReviewResponse:
-    if not settings.siliconflow_api_key:
-        raise AIReviewError('SILICONFLOW_API_KEY is not configured')
+    if not settings.ai_api_key:
+        raise AIReviewError('AI_API_KEY is not configured')
 
     model_name = model_name_for_mode(mode)
-    endpoint = settings.siliconflow_base_url.rstrip('/') + '/chat/completions'
+    endpoint = settings.ai_api_base_url.rstrip('/') + '/chat/completions'
     payload = {
         'model': model_name,
         'temperature': 0.2,
@@ -197,7 +221,7 @@ def run_ai_review(mode: str, image_url: str, locale: str = 'zh') -> AIReviewResp
         endpoint,
         data=json.dumps(payload).encode('utf-8'),
         headers={
-            'Authorization': f'Bearer {settings.siliconflow_api_key}',
+            'Authorization': f'Bearer {settings.ai_api_key}',
             'Content-Type': 'application/json',
         },
         method='POST',
@@ -209,9 +233,9 @@ def run_ai_review(mode: str, image_url: str, locale: str = 'zh') -> AIReviewResp
             body = json.loads(resp.read().decode('utf-8'))
     except HTTPError as exc:
         err_body = exc.read().decode('utf-8', errors='ignore') if hasattr(exc, 'read') else str(exc)
-        raise AIReviewError(f'SiliconFlow HTTP {exc.code}: {err_body[:300]}') from exc
+        raise AIReviewError(f'AI provider HTTP {exc.code}: {err_body[:300]}') from exc
     except URLError as exc:
-        raise AIReviewError(f'SiliconFlow request failed: {exc.reason}') from exc
+        raise AIReviewError(f'AI provider request failed: {exc.reason}') from exc
     latency_ms = int((time.perf_counter() - start) * 1000)
 
     try:
@@ -225,7 +249,7 @@ def run_ai_review(mode: str, image_url: str, locale: str = 'zh') -> AIReviewResp
         parsed['final_score'] = _compute_final_score(scores)
         result = ReviewResult.model_validate(parsed)
     except (KeyError, IndexError, TypeError, ValueError) as exc:
-        raise AIReviewError('Invalid SiliconFlow response structure') from exc
+        raise AIReviewError('Invalid AI provider response structure') from exc
 
     usage = body.get('usage') or {}
     return AIReviewResponse(

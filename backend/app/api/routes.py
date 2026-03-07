@@ -221,6 +221,10 @@ def _serialize_task_status(task: ReviewTask, review: Review | None = None) -> di
         'status': task.status.value,
         'progress': task.progress,
         'review_id': review.public_id if review else None,
+        'attempt_count': task.attempt_count,
+        'max_attempts': task.max_attempts,
+        'next_attempt_at': task.next_attempt_at,
+        'last_heartbeat_at': task.last_heartbeat_at,
         'error': error,
     }
 

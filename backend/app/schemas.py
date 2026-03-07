@@ -81,6 +81,10 @@ class TaskStatusResponse(BaseModel):
     status: str
     progress: int
     review_id: str | None = None
+    attempt_count: int = 0
+    max_attempts: int = 0
+    next_attempt_at: datetime | None = None
+    last_heartbeat_at: datetime | None = None
     error: dict[str, Any] | None = None
 
 

@@ -108,7 +108,7 @@ Google登录接入指南.md
 
 ### 第三方服务
 
-- SiliconFlow API Key
+- AI Provider API Key
 - Google OAuth Client（如启用 Google 登录）
 
 ## 7. 后端环境变量
@@ -123,7 +123,7 @@ Google登录接入指南.md
 - `OBJECT_S3_ENDPOINT`
 - `OBJECT_ACCESS_KEY_ID`
 - `OBJECT_SECRET_ACCESS_KEY`
-- `SILICONFLOW_API_KEY`
+- `AI_API_KEY`
 
 ### 常用配置
 
@@ -133,7 +133,7 @@ Google登录接入指南.md
 - `RATE_LIMIT_PER_MINUTE`
 - `GUEST_BURST_LIMIT_PER_10S`
 - `DEFAULT_DAILY_QUOTA`
-- `SILICONFLOW_BASE_URL`
+- `AI_API_BASE_URL`
 - `AI_MODEL_NAME`
 - `FLASH_MODEL_NAME`
 - `PRO_MODEL_NAME`
@@ -251,7 +251,7 @@ npm run start
 - 对象存储桶已创建，且 CORS 已正确放行
 - `OBJECT_BASE_URL` 可被前端直接访问
 - Google OAuth 回调地址三处一致
-- `SILICONFLOW_API_KEY` 已生效
+- `AI_API_KEY` 已生效
 - 前端 `NEXT_PUBLIC_API_URL` 已指向正式后端域名
 - 后端 `BACKEND_CORS_ORIGINS` 已配置正式前端域名
 - `/healthz` 可正常返回 `{"status":"ok"}`
