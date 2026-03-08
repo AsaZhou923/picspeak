@@ -108,7 +108,7 @@ export default function TaskPage() {
         const token = await ensureToken();
         if (cancelled) return;
 
-        const ws = new WebSocket(buildTaskWebSocketUrl(taskId, token));
+        const ws = new WebSocket(buildTaskWebSocketUrl(taskId), ['picspeak-auth', token]);
         wsRef.current = ws;
 
         ws.onopen = () => {

@@ -24,13 +24,17 @@ def ten_second_window_start(now: datetime) -> datetime:
     return now.replace(second=aligned, microsecond=0)
 
 
-def enforce_user_quota(db: Session, user: User) -> None:
+def refresh_user_quota(db: Session, user: User) -> None:
     today = utc_now().date()
     if user.daily_quota_date != today:
         user.daily_quota_date = today
         user.daily_quota_used = 0
     user.daily_quota_total = quota_for_plan(user.plan)
     db.add(user)
+
+
+def enforce_user_quota(db: Session, user: User) -> None:
+    refresh_user_quota(db, user)
 
     if user.daily_quota_used >= user.daily_quota_total:
         raise api_error(429, 'QUOTA_EXCEEDED', 'Daily quota exceeded')

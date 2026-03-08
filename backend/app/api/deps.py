@@ -68,6 +68,8 @@ def _fetch_user_by_token(token: str, db: Session) -> User:
     user = db.query(User).filter(User.public_id == subject).first()
     if user is None:
         raise api_error(status.HTTP_401_UNAUTHORIZED, 'AUTH_USER_NOT_FOUND', 'Invalid access token: user not found')
+    if user.status != UserStatus.active:
+        raise api_error(status.HTTP_403_FORBIDDEN, 'AUTH_USER_INACTIVE', 'User is not active')
     return user
 
 

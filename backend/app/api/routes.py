@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import asyncio
 import logging
+import secrets
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import quote
@@ -66,19 +67,22 @@ from app.services.ai import AIReviewError, run_ai_review
 from app.services.content_audit import ContentAuditError, run_content_audit
 from app.services.guard import (
     enforce_user_quota,
+    refresh_user_quota,
     get_idempotency_record,
     hash_request,
     increment_quota,
     save_idempotency_record,
 )
 from app.services.object_storage import get_object_storage_client
-from app.services.review_task_processor import process_review_task
+from app.services.review_task_processor import expire_review_tasks, process_review_task
 from app.services.task_dispatcher import TaskDispatchError, enqueue_review_task
 from app.services.task_events import record_task_event
 
 router = APIRouter(prefix='/api/v1', tags=['v1'])
 ALLOWED_CONTENT_TYPES = {'image/jpeg', 'image/png', 'image/webp'}
 logger = logging.getLogger(__name__)
+GOOGLE_OAUTH_STATE_COOKIE = 'ps_google_oauth_state'
+GOOGLE_OAUTH_STATE_TTL_SECONDS = 600
 
 
 def _build_photo_url(bucket: str, object_key: str) -> str:
@@ -113,6 +117,27 @@ def _google_exchange_code(code: str) -> dict:
     req.add_header('Content-Type', 'application/x-www-form-urlencoded')
     with urllib_request.urlopen(req, timeout=10) as resp:
         return json.loads(resp.read().decode('utf-8'))
+
+
+def _bind_google_oauth_state(response: Response, state: str) -> None:
+    is_dev = settings.app_env.strip().lower() == 'dev'
+    response.set_cookie(
+        key=GOOGLE_OAUTH_STATE_COOKIE,
+        value=state,
+        httponly=True,
+        secure=not is_dev,
+        samesite='lax',
+        max_age=GOOGLE_OAUTH_STATE_TTL_SECONDS,
+        path='/',
+    )
+
+
+def _clear_google_oauth_state(response: Response) -> None:
+    response.delete_cookie(
+        key=GOOGLE_OAUTH_STATE_COOKIE,
+        path='/',
+        samesite='lax',
+    )
 
 
 def _login_from_google_claims(claims: dict, db: Session) -> AuthTokenResponse:
@@ -160,6 +185,28 @@ def _login_from_google_claims(claims: dict, db: Session) -> AuthTokenResponse:
     return AuthTokenResponse(access_token=token, token_type='bearer', user_id=user.public_id, plan=user.plan.value)
 
 
+@router.get('/auth/google/start')
+def auth_google_start():
+    client_id = settings.google_oauth_client_id.strip()
+    redirect_uri = settings.google_oauth_redirect_uri.strip()
+    if not client_id or not redirect_uri:
+        raise api_error(status.HTTP_500_INTERNAL_SERVER_ERROR, 'GOOGLE_OAUTH_NOT_CONFIGURED', 'Google OAuth is not configured')
+
+    state = secrets.token_urlsafe(32)
+    params = parse.urlencode({
+        'client_id': client_id,
+        'redirect_uri': redirect_uri,
+        'response_type': 'code',
+        'scope': 'openid email profile',
+        'access_type': 'offline',
+        'prompt': 'select_account',
+        'state': state,
+    })
+    response = RedirectResponse(f'https://accounts.google.com/o/oauth2/v2/auth?{params}', status_code=302)
+    _bind_google_oauth_state(response, state)
+    return response
+
+
 @router.post('/auth/guest', response_model=AuthGuestResponse)
 def auth_guest(
     response: Response,
@@ -194,30 +241,47 @@ def auth_google_login(payload: AuthGoogleLoginRequest, db: Session = Depends(get
 
 
 @router.get('/auth/google/callback')
-def auth_google_callback(code: str = Query(..., min_length=1), db: Session = Depends(get_db)):
+def auth_google_callback(
+    code: str = Query(..., min_length=1),
+    state: str = Query(..., min_length=1),
+    oauth_state_cookie: str | None = Cookie(default=None, alias=GOOGLE_OAUTH_STATE_COOKIE),
+    db: Session = Depends(get_db),
+):
     frontend_callback = f'{settings.frontend_origin.rstrip("/")}/auth/callback/google'
+    if not oauth_state_cookie or not secrets.compare_digest(state, oauth_state_cookie):
+        response = RedirectResponse(f'{frontend_callback}?error=invalid_oauth_state', status_code=302)
+        _clear_google_oauth_state(response)
+        return response
 
     try:
         token_resp = _google_exchange_code(code)
     except urllib_error.URLError as exc:
         error_msg = parse.quote(f'Google code exchange failed: {exc}')
-        return RedirectResponse(f'{frontend_callback}?error={error_msg}', status_code=302)
+        response = RedirectResponse(f'{frontend_callback}?error={error_msg}', status_code=302)
+        _clear_google_oauth_state(response)
+        return response
 
     id_token = token_resp.get('id_token')
     if not isinstance(id_token, str) or not id_token.strip():
-        return RedirectResponse(f'{frontend_callback}?error=missing_id_token', status_code=302)
+        response = RedirectResponse(f'{frontend_callback}?error=missing_id_token', status_code=302)
+        _clear_google_oauth_state(response)
+        return response
 
     try:
         claims = _google_token_info(id_token)
     except urllib_error.URLError as exc:
         error_msg = parse.quote(f'Token verification failed: {exc}')
-        return RedirectResponse(f'{frontend_callback}?error={error_msg}', status_code=302)
+        response = RedirectResponse(f'{frontend_callback}?error={error_msg}', status_code=302)
+        _clear_google_oauth_state(response)
+        return response
 
     try:
         auth_data = _login_from_google_claims(claims, db)
     except HTTPException as exc:
         error_msg = parse.quote(_http_exception_message(exc))
-        return RedirectResponse(f'{frontend_callback}?error={error_msg}', status_code=302)
+        response = RedirectResponse(f'{frontend_callback}?error={error_msg}', status_code=302)
+        _clear_google_oauth_state(response)
+        return response
 
     params = parse.urlencode({
         'access_token': auth_data.access_token,
@@ -226,7 +290,9 @@ def auth_google_callback(code: str = Query(..., min_length=1), db: Session = Dep
         'plan': auth_data.plan,
     })
     # Use URL fragment to avoid leaking tokens through server logs and Referer headers.
-    return RedirectResponse(f'{frontend_callback}#{params}', status_code=302)
+    response = RedirectResponse(f'{frontend_callback}#{params}', status_code=302)
+    _clear_google_oauth_state(response)
+    return response
 
 
 def _serialize_task_status(task: ReviewTask, review: Review | None = None) -> dict:
@@ -393,8 +459,6 @@ def create_review(
     db: Session = Depends(get_db),
     actor: CurrentActor = Depends(get_current_actor),
 ):
-    if actor.user.status != UserStatus.active:
-        raise api_error(status.HTTP_403_FORBIDDEN, 'USER_INACTIVE', 'User is not active')
     if actor.plan == UserPlan.guest and payload.mode == ReviewMode.pro.value:
         raise api_error(status.HTTP_403_FORBIDDEN, 'PLAN_MODE_FORBIDDEN', 'Guest users cannot use pro review mode')
 
@@ -544,6 +608,7 @@ def get_task_status(
     db: Session = Depends(get_db),
     actor: CurrentActor = Depends(get_current_actor),
 ):
+    expire_review_tasks(db)
     task = db.query(ReviewTask).filter(ReviewTask.public_id == task_id, ReviewTask.owner_user_id == actor.user.id).first()
     if task is None:
         raise api_error(status.HTTP_404_NOT_FOUND, 'TASK_NOT_FOUND', 'Task not found')
@@ -667,6 +732,7 @@ def list_photo_reviews(
 
 @router.get('/me/usage', response_model=UsageResponse)
 def get_usage(request: Request, db: Session = Depends(get_db), actor: CurrentActor = Depends(get_current_actor)):
+    refresh_user_quota(db, actor.user)
     db.commit()
     return UsageResponse(
         plan=actor.plan.value,
@@ -681,7 +747,12 @@ def get_usage(request: Request, db: Session = Depends(get_db), actor: CurrentAct
 
 @router.websocket('/ws/tasks/{task_id}')
 async def stream_task_status(websocket: WebSocket, task_id: str):
-    token = websocket.query_params.get('access_token') or websocket.cookies.get('ps_guest_token')
+    token = websocket.cookies.get('ps_guest_token')
+    if not token:
+        protocol_header = websocket.headers.get('sec-websocket-protocol', '')
+        protocols = [item.strip() for item in protocol_header.split(',') if item.strip()]
+        if len(protocols) >= 2 and protocols[0] == 'picspeak-auth':
+            token = protocols[1]
     if not token:
         await websocket.close(code=4401, reason='Missing access token')
         return
@@ -694,10 +765,11 @@ async def stream_task_status(websocket: WebSocket, task_id: str):
             await websocket.close(code=4401, reason=_http_exception_message(exc))
             return
 
-        await websocket.accept()
+        await websocket.accept(subprotocol='picspeak-auth')
         last_payload: str | None = None
 
         while True:
+            expire_review_tasks(db)
             task = db.query(ReviewTask).filter(ReviewTask.public_id == task_id, ReviewTask.owner_user_id == user.id).first()
             if task is None:
                 await websocket.send_json({'error': {'code': 'TASK_NOT_FOUND', 'message': 'Task not found'}})

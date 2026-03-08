@@ -8,11 +8,10 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { authGuest } from './api';
+import { authGuest, registerUnauthorizedHandler } from './api';
 import { AuthToken } from './types';
 
 const TOKEN_KEY = 'ps_token';
-const TOKEN_COOKIE_MAX_AGE_SECONDS = 30 * 24 * 3600;
 
 interface AuthState {
   token: string | null;
@@ -25,7 +24,53 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState | null>(null);
 
-function readTokenFromCookie(): AuthToken | null {
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const [, payload] = token.split('.');
+    if (!payload) return null;
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
+    return JSON.parse(atob(padded)) as Record<string, unknown>;
+  } catch {
+    // ignore malformed jwt payloads
+  }
+  return null;
+}
+
+function isExpiredToken(token: string): boolean {
+  const payload = decodeJwtPayload(token);
+  const exp = payload?.exp;
+  return typeof exp === 'number' && exp <= Math.floor(Date.now() / 1000);
+}
+
+function readSessionAuthToken(): AuthToken | null {
+  try {
+    const stored = window.sessionStorage.getItem(TOKEN_KEY);
+    if (!stored) return null;
+    const parsed: AuthToken = JSON.parse(stored);
+    if (!parsed?.access_token || isExpiredToken(parsed.access_token)) {
+      window.sessionStorage.removeItem(TOKEN_KEY);
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function readLegacyAuthToken(): AuthToken | null {
+  for (const storage of [window.localStorage]) {
+    try {
+      const stored = storage.getItem(TOKEN_KEY);
+      if (!stored) continue;
+      const parsed: AuthToken = JSON.parse(stored);
+      if (parsed?.access_token && !isExpiredToken(parsed.access_token)) return parsed;
+      storage.removeItem(TOKEN_KEY);
+    } catch {
+      // Ignore malformed or restricted storage access.
+    }
+  }
+
   try {
     const pairs = document.cookie ? document.cookie.split(';') : [];
     for (const pair of pairs) {
@@ -34,57 +79,21 @@ function readTokenFromCookie(): AuthToken | null {
       const rawValue = rest.join('=');
       if (!rawValue) continue;
       const parsed: AuthToken = JSON.parse(decodeURIComponent(rawValue));
-      if (parsed?.access_token) return parsed;
+      if (parsed?.access_token && !isExpiredToken(parsed.access_token)) return parsed;
     }
   } catch {
     // ignore malformed cookie values
   }
+
   return null;
 }
 
-function persistTokenToCookie(tokenData: AuthToken): void {
-  try {
-    const encoded = encodeURIComponent(JSON.stringify(tokenData));
-    const secure = window.location.protocol === 'https:' ? '; Secure' : '';
-    document.cookie = `${TOKEN_KEY}=${encoded}; Max-Age=${TOKEN_COOKIE_MAX_AGE_SECONDS}; Path=/; SameSite=Lax${secure}`;
-  } catch {
-    // ignore
-  }
-}
-
-function clearTokenCookie(): void {
-  try {
-    document.cookie = `${TOKEN_KEY}=; Max-Age=0; Path=/; SameSite=Lax`;
-  } catch {
-    // ignore
-  }
-}
-
-function readStoredAuthToken(): AuthToken | null {
-  // localStorage may be restricted on some iOS/WebKit contexts; fallback to sessionStorage/cookie.
-  for (const storage of [window.localStorage, window.sessionStorage]) {
-    try {
-      const stored = storage.getItem(TOKEN_KEY);
-      if (!stored) continue;
-      const parsed: AuthToken = JSON.parse(stored);
-      if (parsed?.access_token) return parsed;
-      storage.removeItem(TOKEN_KEY);
-    } catch {
-      // Ignore malformed storage or restricted storage access.
-    }
-  }
-  return readTokenFromCookie();
-}
-
 function persistAuthToken(tokenData: AuthToken): void {
-  for (const storage of [window.localStorage, window.sessionStorage]) {
-    try {
-      storage.setItem(TOKEN_KEY, JSON.stringify(tokenData));
-    } catch {
-      // Best-effort persistence only.
-    }
+  try {
+    window.sessionStorage.setItem(TOKEN_KEY, JSON.stringify(tokenData));
+  } catch {
+    // Best-effort persistence only.
   }
-  persistTokenToCookie(tokenData);
 }
 
 function clearStoredAuthToken(): void {
@@ -95,7 +104,11 @@ function clearStoredAuthToken(): void {
       // ignore
     }
   }
-  clearTokenCookie();
+  try {
+    document.cookie = `${TOKEN_KEY}=; Max-Age=0; Path=/; SameSite=Lax`;
+  } catch {
+    // ignore legacy cookie cleanup
+  }
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -105,7 +118,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const pendingGuestTokenRef = useRef<Promise<string> | null>(null);
 
   useEffect(() => {
-    const parsed = readStoredAuthToken();
+    let parsed = readSessionAuthToken();
+    if (!parsed) {
+      parsed = readLegacyAuthToken();
+      if (parsed) {
+        persistAuthToken(parsed);
+      }
+    }
     if (parsed) {
       setToken(parsed.access_token);
       setUserInfo(parsed);
@@ -126,9 +145,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const ensureToken = useCallback(async (): Promise<string> => {
-    if (token) return token;
+    if (token && !isExpiredToken(token)) return token;
+    if (token && isExpiredToken(token)) {
+      clearStoredAuthToken();
+      setToken(null);
+      setUserInfo(null);
+    }
 
-    const parsed = readStoredAuthToken();
+    const parsed = readSessionAuthToken();
     if (parsed) {
       // Keep in-memory state consistent when caller asks token before provider hydrate settles.
       setToken(parsed.access_token);
@@ -150,6 +174,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return pendingGuestTokenRef.current;
   }, [login, token]);
+
+  useEffect(() => {
+    registerUnauthorizedHandler(async (failedToken) => {
+      const current = token ?? readSessionAuthToken()?.access_token ?? null;
+      if (!current || current !== failedToken) {
+        return readSessionAuthToken()?.access_token ?? null;
+      }
+      clearStoredAuthToken();
+      setToken(null);
+      setUserInfo(null);
+      return ensureToken();
+    });
+    return () => registerUnauthorizedHandler(null);
+  }, [ensureToken, token]);
 
   return (
     <AuthContext.Provider value={{ token, userInfo, isLoading, login, logout, ensureToken }}>

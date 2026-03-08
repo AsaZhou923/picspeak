@@ -57,6 +57,7 @@ class Settings(BaseSettings):
     review_worker_name: str = 'embedded-worker'
     review_retry_base_delay_seconds: int = 10
     review_retry_max_delay_seconds: int = 300
+    review_task_stale_timeout_seconds: int = 180
     ws_task_poll_interval_ms: int = 1000
     cloud_tasks_enabled: bool = False
     cloud_tasks_project_id: str = ''

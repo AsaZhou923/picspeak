@@ -1,10 +1,11 @@
-// ─── Image Compression Utility ───────────────────────────────────────────────
+// Image Compression Utility
 //
 // Compresses an image client-side using Canvas before upload.
 // Strategy:
-//   1. If the image is within acceptable dimensions and size, skip compression.
-//   2. Otherwise resize to max edge length and re-encode as JPEG at the given quality.
-//   3. Returns the compressed File plus a stats object for UI feedback.
+//   1. If the image is already small enough, skip compression.
+//   2. Otherwise resize to a bounded max edge length.
+//   3. Iteratively lower quality and, if needed, dimensions until near the target size.
+//   4. Returns the compressed File plus a stats object for UI feedback.
 
 export interface CompressionResult {
   file: File;
@@ -14,24 +15,50 @@ export interface CompressionResult {
   originalHeight: number;
   compressedWidth: number;
   compressedHeight: number;
-  /** true if compression was actually applied (file was modified) */
   compressed: boolean;
 }
 
 interface CompressOptions {
-  /** Maximum edge length (px) – default 2400 */
   maxEdge?: number;
-  /** JPEG quality 0–1 – default 0.85 */
   quality?: number;
-  /** Skip compression if file is already below this size (bytes) – default 1.5 MB */
   skipIfUnderBytes?: number;
+  targetBytes?: number;
+  minQuality?: number;
 }
 
 const DEFAULTS: Required<CompressOptions> = {
-  maxEdge: 2400,
-  quality: 0.85,
-  skipIfUnderBytes: 1.5 * 1024 * 1024,
+  maxEdge: 2048,
+  quality: 0.82,
+  skipIfUnderBytes: 0.95 * 1024 * 1024,
+  targetBytes: 1 * 1024 * 1024,
+  minQuality: 0.52,
 };
+
+async function canvasToBlob(
+  canvas: HTMLCanvasElement,
+  outputType: string,
+  quality: number
+): Promise<Blob> {
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (blob) resolve(blob);
+        else reject(new Error('Canvas toBlob returned null'));
+      },
+      outputType,
+      quality
+    );
+  });
+}
+
+function toCompressedFile(blob: Blob, file: File, outputType: string): File {
+  const baseName = file.name.replace(/\.[^.]+$/, '');
+  const ext = outputType === 'image/webp' ? 'webp' : 'jpg';
+  return new File([blob], `${baseName}.${ext}`, {
+    type: outputType,
+    lastModified: file.lastModified,
+  });
+}
 
 export async function compressImage(
   file: File,
@@ -39,12 +66,10 @@ export async function compressImage(
 ): Promise<CompressionResult> {
   const opts = { ...DEFAULTS, ...options };
 
-  // Decode image
   const bitmap = await createImageBitmap(file);
-  const { width: origW, height: origH } = bitmap;
+  const { width: originalWidth, height: originalHeight } = bitmap;
 
-  // Decide whether to compress
-  const needsResize = origW > opts.maxEdge || origH > opts.maxEdge;
+  const needsResize = originalWidth > opts.maxEdge || originalHeight > opts.maxEdge;
   const needsSizeReduction = file.size > opts.skipIfUnderBytes;
 
   if (!needsResize && !needsSizeReduction) {
@@ -53,83 +78,129 @@ export async function compressImage(
       file,
       originalSize: file.size,
       compressedSize: file.size,
-      originalWidth: origW,
-      originalHeight: origH,
-      compressedWidth: origW,
-      compressedHeight: origH,
+      originalWidth,
+      originalHeight,
+      compressedWidth: originalWidth,
+      compressedHeight: originalHeight,
       compressed: false,
     };
   }
 
-  // Calculate target dimensions
-  let targetW = origW;
-  let targetH = origH;
-
+  let targetWidth = originalWidth;
+  let targetHeight = originalHeight;
   if (needsResize) {
-    const scale = opts.maxEdge / Math.max(origW, origH);
-    targetW = Math.round(origW * scale);
-    targetH = Math.round(origH * scale);
+    const scale = opts.maxEdge / Math.max(originalWidth, originalHeight);
+    targetWidth = Math.round(originalWidth * scale);
+    targetHeight = Math.round(originalHeight * scale);
   }
 
-  // Draw to canvas
   const canvas = document.createElement('canvas');
-  canvas.width = targetW;
-  canvas.height = targetH;
   const ctx = canvas.getContext('2d');
   if (!ctx) {
     bitmap.close();
-    // Fallback: return original file unchanged
     return {
       file,
       originalSize: file.size,
       compressedSize: file.size,
-      originalWidth: origW,
-      originalHeight: origH,
-      compressedWidth: origW,
-      compressedHeight: origH,
+      originalWidth,
+      originalHeight,
+      compressedWidth: originalWidth,
+      compressedHeight: originalHeight,
       compressed: false,
     };
   }
 
-  ctx.drawImage(bitmap, 0, 0, targetW, targetH);
+  const outputType = file.type === 'image/webp' ? 'image/webp' : 'image/jpeg';
+  let bestBlob: Blob | null = null;
+  let bestBlobSize = Number.POSITIVE_INFINITY;
+  let bestWidth = targetWidth;
+  let bestHeight = targetHeight;
+  let cycleQuality = opts.quality;
+
+  while (true) {
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+    ctx.clearRect(0, 0, targetWidth, targetHeight);
+    ctx.drawImage(bitmap, 0, 0, targetWidth, targetHeight);
+
+    let quality = cycleQuality;
+    let smallestBlobForThisSize: Blob | null = null;
+
+    while (quality >= opts.minQuality) {
+      const blob = await canvasToBlob(canvas, outputType, quality);
+      if (!smallestBlobForThisSize || blob.size < smallestBlobForThisSize.size) {
+        smallestBlobForThisSize = blob;
+      }
+      if (blob.size <= opts.targetBytes) {
+        bestBlob = blob;
+        bestBlobSize = blob.size;
+        bestWidth = targetWidth;
+        bestHeight = targetHeight;
+        break;
+      }
+      quality = Number((quality - 0.08).toFixed(2));
+    }
+
+    if (bestBlob) break;
+
+    if (smallestBlobForThisSize) {
+      if (smallestBlobForThisSize.size < bestBlobSize) {
+        bestBlob = smallestBlobForThisSize;
+        bestBlobSize = smallestBlobForThisSize.size;
+        bestWidth = targetWidth;
+        bestHeight = targetHeight;
+      }
+    }
+
+    if (Math.max(targetWidth, targetHeight) <= 960) {
+      break;
+    }
+
+    targetWidth = Math.max(960, Math.round(targetWidth * 0.85));
+    targetHeight = Math.max(960, Math.round(targetHeight * 0.85));
+    cycleQuality = Math.min(opts.quality, 0.78);
+  }
+
   bitmap.close();
 
-  // Output as JPEG (better compression than PNG for photos)
-  // Keep WebP source as WebP when the browser supports it
-  const outputType = file.type === 'image/webp' ? 'image/webp' : 'image/jpeg';
-  const outputExt = outputType === 'image/webp' ? 'webp' : 'jpg';
+  if (!bestBlob) {
+    return {
+      file,
+      originalSize: file.size,
+      compressedSize: file.size,
+      originalWidth,
+      originalHeight,
+      compressedWidth: originalWidth,
+      compressedHeight: originalHeight,
+      compressed: false,
+    };
+  }
 
-  const blob = await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob(
-      (b) => {
-        if (b) resolve(b);
-        else reject(new Error('Canvas toBlob returned null'));
-      },
-      outputType,
-      opts.quality
-    );
-  });
-
-  // Build a new File with original name (extension normalised)
-  const baseName = file.name.replace(/\.[^.]+$/, '');
-  const compressedFile = new File([blob], `${baseName}.${outputExt}`, {
-    type: outputType,
-    lastModified: file.lastModified,
-  });
+  const compressedFile = toCompressedFile(bestBlob, file, outputType);
+  if (compressedFile.size >= file.size) {
+    return {
+      file,
+      originalSize: file.size,
+      compressedSize: file.size,
+      originalWidth,
+      originalHeight,
+      compressedWidth: originalWidth,
+      compressedHeight: originalHeight,
+      compressed: false,
+    };
+  }
 
   return {
     file: compressedFile,
     originalSize: file.size,
     compressedSize: compressedFile.size,
-    originalWidth: origW,
-    originalHeight: origH,
-    compressedWidth: targetW,
-    compressedHeight: targetH,
+    originalWidth,
+    originalHeight,
+    compressedWidth: bestWidth,
+    compressedHeight: bestHeight,
     compressed: true,
   };
 }
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;

@@ -14,12 +14,21 @@ import {
 } from './types';
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000').replace(/\/$/, '');
+const GOOGLE_OAUTH_START_PATH = '/api/v1/auth/google/start';
+
+type UnauthorizedHandler = (failedToken: string) => Promise<string | null>;
+
+let unauthorizedHandler: UnauthorizedHandler | null = null;
+
+export function registerUnauthorizedHandler(handler: UnauthorizedHandler | null): void {
+  unauthorizedHandler = handler;
+}
 
 async function request<T>(
   path: string,
-  options: RequestInit & { token?: string } = {}
+  options: RequestInit & { token?: string; _retried?: boolean } = {}
 ): Promise<T> {
-  const { token, headers = {}, ...rest } = options;
+  const { token, headers = {}, _retried = false, ...rest } = options;
 
   const allHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -35,6 +44,13 @@ async function request<T>(
     credentials: 'include',
     headers: allHeaders,
   });
+
+  if (res.status === 401 && token && !_retried && unauthorizedHandler) {
+    const recoveredToken = await unauthorizedHandler(token);
+    if (recoveredToken && recoveredToken !== token) {
+      return request<T>(path, { ...options, token: recoveredToken, _retried: true });
+    }
+  }
 
   if (!res.ok) {
     let code = 'UNKNOWN_ERROR';
@@ -162,10 +178,9 @@ export async function getTask(taskId: string, token: string): Promise<TaskStatus
   return request<TaskStatusResponse>(`/tasks/${taskId}`, { token });
 }
 
-export function buildTaskWebSocketUrl(taskId: string, token: string): string {
+export function buildTaskWebSocketUrl(taskId: string): string {
   const apiBase = API_BASE.replace(/\/$/, '');
   const url = new URL(`${apiBase}/api/v1/ws/tasks/${encodeURIComponent(taskId)}`);
-  url.searchParams.set('access_token', token);
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
   return url.toString();
 }
@@ -196,19 +211,5 @@ export async function getMyReviews(
 // ─── Google OAuth URL builder ─────────────────────────────────────────────────
 
 export function buildGoogleOAuthUrl(): string {
-  const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? '';
-  const redirectUri =
-    process.env.NEXT_PUBLIC_GOOGLE_OAUTH_REDIRECT_URI ??
-    `${API_BASE}/api/v1/auth/google/callback`;
-
-  const params = new URLSearchParams({
-    client_id: clientId,
-    redirect_uri: redirectUri,
-    response_type: 'code',
-    scope: 'openid email profile',
-    access_type: 'offline',
-    prompt: 'select_account',
-  });
-
-  return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+  return `${API_BASE}${GOOGLE_OAUTH_START_PATH}`;
 }

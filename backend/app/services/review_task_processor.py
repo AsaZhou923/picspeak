@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from urllib.parse import quote
 
 from sqlalchemy.orm import Session
@@ -18,7 +18,7 @@ from app.services.task_events import record_task_event
 
 def expire_review_tasks(db: Session) -> None:
     now = datetime.now(timezone.utc)
-    tasks = (
+    expired_tasks = (
         db.query(ReviewTask)
         .filter(
             ReviewTask.status.in_([TaskStatus.PENDING, TaskStatus.RUNNING]),
@@ -27,15 +27,46 @@ def expire_review_tasks(db: Session) -> None:
         )
         .all()
     )
-    for task in tasks:
+    for task in expired_tasks:
         task.status = TaskStatus.EXPIRED
         task.finished_at = now
         task.error_code = 'TASK_EXPIRED'
         task.error_message = 'Task expired before completion'
         db.add(task)
         record_task_event(db, task, event_type='TASK_EXPIRED', message=task.error_message)
-    if tasks:
+    if expired_tasks:
         db.commit()
+
+    stale_timeout = max(int(settings.review_task_stale_timeout_seconds), 30)
+    stale_cutoff = now - timedelta(seconds=stale_timeout)
+    stalled_tasks = (
+        db.query(ReviewTask)
+        .filter(
+            ReviewTask.status == TaskStatus.RUNNING,
+            ReviewTask.finished_at.is_(None),
+            ReviewTask.last_heartbeat_at.is_not(None),
+            ReviewTask.last_heartbeat_at < stale_cutoff,
+            (ReviewTask.expire_at.is_(None) | (ReviewTask.expire_at >= now)),
+        )
+        .all()
+    )
+    for task in stalled_tasks:
+        if task.attempt_count < task.max_attempts:
+            _schedule_retry(
+                db,
+                task,
+                error_code='TASK_STALLED',
+                error_message='Task heartbeat stalled; retry scheduled',
+            )
+        else:
+            _complete_task(
+                db,
+                task,
+                status=TaskStatus.DEAD_LETTER,
+                error_code='TASK_STALLED',
+                error_message='Task heartbeat stalled and max retries were exhausted',
+                dead_letter=True,
+            )
 
 
 def process_review_task(task_public_id: str, *, worker_name: str) -> dict[str, str]:
@@ -49,11 +80,14 @@ def process_review_task(task_public_id: str, *, worker_name: str) -> dict[str, s
             return {'result': 'noop', 'status': task.status.value}
         if task.status == TaskStatus.PENDING and task.next_attempt_at and task.next_attempt_at > datetime.now(timezone.utc):
             return {'result': 'delayed', 'status': task.status.value}
-        if not _claim_task(db, task.id, worker_name):
-            fresh_task = db.query(ReviewTask).filter(ReviewTask.id == task.id).first()
-            if fresh_task is None:
-                return {'result': 'missing'}
-            return {'result': 'noop', 'status': fresh_task.status.value}
+        if task.status == TaskStatus.PENDING:
+            if not _claim_task(db, task.id, worker_name):
+                fresh_task = db.query(ReviewTask).filter(ReviewTask.id == task.id).first()
+                if fresh_task is None:
+                    return {'result': 'missing'}
+                return {'result': 'noop', 'status': fresh_task.status.value}
+        elif task.status != TaskStatus.RUNNING:
+            return {'result': 'noop', 'status': task.status.value}
         task = db.query(ReviewTask).filter(ReviewTask.id == task.id).first()
         if task is None:
             return {'result': 'missing'}
@@ -90,7 +124,8 @@ def _claim_task(db: Session, task_id: int, worker_name: str) -> bool:
         .update(
             {
                 ReviewTask.status: TaskStatus.RUNNING,
-                ReviewTask.progress: 20,
+                # Keep claimed tasks in the queue stage until a concrete processing step starts.
+                ReviewTask.progress: 10,
                 ReviewTask.started_at: now,
                 ReviewTask.claimed_by: worker_name,
                 ReviewTask.last_heartbeat_at: now,
@@ -197,7 +232,7 @@ def _process_task(db: Session, task: ReviewTask) -> None:
     task.attempt_count += 1
     task.next_attempt_at = None
     task.last_heartbeat_at = datetime.now(timezone.utc)
-    task.progress = 20
+    task.progress = 10
     db.add(task)
     record_task_event(db, task, event_type='TASK_STARTED', message=f'Attempt {task.attempt_count} started')
     db.commit()
@@ -290,7 +325,7 @@ def _process_task(db: Session, task: ReviewTask) -> None:
         usage_type='review_request',
         amount=1,
         unit='count',
-        bill_date=date.today(),
+        bill_date=datetime.now(timezone.utc).date(),
         metadata_json={'mode': task.mode.value if isinstance(task.mode, ReviewMode) else str(task.mode)},
     )
     db.add(ledger)
