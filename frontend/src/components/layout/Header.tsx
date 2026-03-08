@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { Sun, Moon, ChevronDown } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { planLabel, planColor } from '@/lib/auth-context';
@@ -56,11 +56,18 @@ function LanguageSwitcher() {
 export default function Header() {
   const { userInfo, logout } = useAuth();
   const pathname = usePathname();
+  const router = useRouter();
   const { theme, toggleTheme } = useTheme();
   const { t } = useI18n();
 
   const isActive = (href: string) =>
     pathname === href ? 'text-gold' : 'text-ink-muted hover:text-ink';
+
+  const handleLogout = () => {
+    logout();
+    router.push('/workspace');
+    router.refresh();
+  };
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 border-b border-border-subtle bg-void/90 backdrop-blur-md">
@@ -129,7 +136,7 @@ export default function Header() {
                 </a>
               ) : (
                 <button
-                  onClick={logout}
+                  onClick={handleLogout}
                   className="text-sm text-ink-subtle hover:text-ink transition-colors"
                 >
                   {t('logout')}
