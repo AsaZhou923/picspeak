@@ -5,13 +5,14 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from 'react';
 import { authGuest } from './api';
 import { AuthToken } from './types';
 
 const TOKEN_KEY = 'ps_token';
-const shouldPersistToken = (tokenData: AuthToken) => tokenData.plan !== 'guest';
+const TOKEN_COOKIE_MAX_AGE_SECONDS = 30 * 24 * 3600;
 
 interface AuthState {
   token: string | null;
@@ -24,56 +25,131 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState | null>(null);
 
+function readTokenFromCookie(): AuthToken | null {
+  try {
+    const pairs = document.cookie ? document.cookie.split(';') : [];
+    for (const pair of pairs) {
+      const [rawKey, ...rest] = pair.trim().split('=');
+      if (rawKey !== TOKEN_KEY) continue;
+      const rawValue = rest.join('=');
+      if (!rawValue) continue;
+      const parsed: AuthToken = JSON.parse(decodeURIComponent(rawValue));
+      if (parsed?.access_token) return parsed;
+    }
+  } catch {
+    // ignore malformed cookie values
+  }
+  return null;
+}
+
+function persistTokenToCookie(tokenData: AuthToken): void {
+  try {
+    const encoded = encodeURIComponent(JSON.stringify(tokenData));
+    const secure = window.location.protocol === 'https:' ? '; Secure' : '';
+    document.cookie = `${TOKEN_KEY}=${encoded}; Max-Age=${TOKEN_COOKIE_MAX_AGE_SECONDS}; Path=/; SameSite=Lax${secure}`;
+  } catch {
+    // ignore
+  }
+}
+
+function clearTokenCookie(): void {
+  try {
+    document.cookie = `${TOKEN_KEY}=; Max-Age=0; Path=/; SameSite=Lax`;
+  } catch {
+    // ignore
+  }
+}
+
+function readStoredAuthToken(): AuthToken | null {
+  // localStorage may be restricted on some iOS/WebKit contexts; fallback to sessionStorage/cookie.
+  for (const storage of [window.localStorage, window.sessionStorage]) {
+    try {
+      const stored = storage.getItem(TOKEN_KEY);
+      if (!stored) continue;
+      const parsed: AuthToken = JSON.parse(stored);
+      if (parsed?.access_token) return parsed;
+      storage.removeItem(TOKEN_KEY);
+    } catch {
+      // Ignore malformed storage or restricted storage access.
+    }
+  }
+  return readTokenFromCookie();
+}
+
+function persistAuthToken(tokenData: AuthToken): void {
+  for (const storage of [window.localStorage, window.sessionStorage]) {
+    try {
+      storage.setItem(TOKEN_KEY, JSON.stringify(tokenData));
+    } catch {
+      // Best-effort persistence only.
+    }
+  }
+  persistTokenToCookie(tokenData);
+}
+
+function clearStoredAuthToken(): void {
+  for (const storage of [window.localStorage, window.sessionStorage]) {
+    try {
+      storage.removeItem(TOKEN_KEY);
+    } catch {
+      // ignore
+    }
+  }
+  clearTokenCookie();
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [userInfo, setUserInfo] = useState<AuthToken | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const pendingGuestTokenRef = useRef<Promise<string> | null>(null);
 
   useEffect(() => {
-    const stored = localStorage.getItem(TOKEN_KEY);
-    if (stored) {
-      try {
-        const parsed: AuthToken = JSON.parse(stored);
-        if (shouldPersistToken(parsed)) {
-          setToken(parsed.access_token);
-          setUserInfo(parsed);
-        } else {
-          localStorage.removeItem(TOKEN_KEY);
-        }
-      } catch {
-        localStorage.removeItem(TOKEN_KEY);
-      }
+    const parsed = readStoredAuthToken();
+    if (parsed) {
+      setToken(parsed.access_token);
+      setUserInfo(parsed);
     }
     setIsLoading(false);
   }, []);
 
   const login = useCallback((tokenData: AuthToken) => {
-    if (shouldPersistToken(tokenData)) {
-      localStorage.setItem(TOKEN_KEY, JSON.stringify(tokenData));
-    } else {
-      localStorage.removeItem(TOKEN_KEY);
-    }
+    persistAuthToken(tokenData);
     setToken(tokenData.access_token);
     setUserInfo(tokenData);
   }, []);
 
   const logout = useCallback(() => {
-    localStorage.removeItem(TOKEN_KEY);
+    clearStoredAuthToken();
     setToken(null);
     setUserInfo(null);
   }, []);
 
   const ensureToken = useCallback(async (): Promise<string> => {
-    const stored = localStorage.getItem(TOKEN_KEY);
-    if (stored) {
-      const parsed: AuthToken = JSON.parse(stored);
+    if (token) return token;
+
+    const parsed = readStoredAuthToken();
+    if (parsed) {
+      // Keep in-memory state consistent when caller asks token before provider hydrate settles.
+      setToken(parsed.access_token);
+      setUserInfo(parsed);
       return parsed.access_token;
     }
-    // Auto-create guest session
-    const data = await authGuest();
-    login(data);
-    return data.access_token;
-  }, [login]);
+
+    // Deduplicate concurrent guest-session creation to avoid generating multiple guest users.
+    if (!pendingGuestTokenRef.current) {
+      pendingGuestTokenRef.current = authGuest()
+        .then((data) => {
+          login(data);
+          return data.access_token;
+        })
+        .finally(() => {
+          pendingGuestTokenRef.current = null;
+        });
+    }
+
+    return pendingGuestTokenRef.current;
+  }, [login, token]);
 
   return (
     <AuthContext.Provider value={{ token, userInfo, isLoading, login, logout, ensureToken }}>
