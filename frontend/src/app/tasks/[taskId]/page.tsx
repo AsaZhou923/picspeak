@@ -8,8 +8,9 @@ import { useAuth } from '@/lib/auth-context';
 import { useI18n } from '@/lib/i18n';
 import { ApiException, TaskStatusResponse, TaskStreamMessage } from '@/lib/types';
 
-const POLL_INTERVAL = 2000;
+const POLL_INTERVAL = 1000;
 const HEARTBEAT_STALE_MS = 3 * 60 * 1000;
+const INITIAL_TASK_LOOKUP_GRACE_MS = 5000;
 
 export default function TaskPage() {
   const router = useRouter();
@@ -34,18 +35,48 @@ export default function TaskPage() {
   const [error, setError] = useState('');
   const [eventMessage, setEventMessage] = useState('');
   const pollCount = useRef(0);
+  const pageStartedAtRef = useRef(Date.now());
+  const transientErrorCountRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const wsConnectedRef = useRef(false);
   const finalRef = useRef(false);
+  const errorTerminalRef = useRef(false);
+  const taskRef = useRef<TaskStatusResponse | null>(null);
+  const redirectReviewIdRef = useRef<string | null>(null);
+
+  const setTransientError = (message: string) => {
+    transientErrorCountRef.current += 1;
+    const currentTask = taskRef.current;
+    const hasActiveTask = currentTask && (currentTask.status === 'PENDING' || currentTask.status === 'RUNNING');
+    if (!hasActiveTask || transientErrorCountRef.current >= 3) {
+      setError(message);
+    }
+  };
 
   const handleTaskUpdate = (nextTask: TaskStatusResponse, nextEventMessage?: string) => {
+    // Ignore stale updates once a terminal state has been reached (e.g. a concurrent HTTP
+    // poll returning an old RUNNING snapshot after the WebSocket already delivered SUCCEEDED).
+    if (finalRef.current) return;
+
+    taskRef.current = nextTask;
+    transientErrorCountRef.current = 0;
     setTask(nextTask);
+    setError('');
     if (nextEventMessage) setEventMessage(nextEventMessage);
 
-    if (nextTask.status === 'SUCCEEDED' && nextTask.review_id) {
-      finalRef.current = true;
-      setTimeout(() => router.push(`/reviews/${nextTask.review_id}`), 800);
+    if (nextTask.status === 'SUCCEEDED') {
+      if (nextTask.review_id) {
+        finalRef.current = true;
+        if (redirectReviewIdRef.current !== nextTask.review_id) {
+          redirectReviewIdRef.current = nextTask.review_id;
+          if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
+          redirectTimerRef.current = setTimeout(() => {
+            router.push(`/reviews/${nextTask.review_id}`);
+          }, 800);
+        }
+      }
       return;
     }
 
@@ -75,12 +106,13 @@ export default function TaskPage() {
   };
 
   const poll = async () => {
-    if (wsConnectedRef.current || finalRef.current) return;
+    if (finalRef.current || errorTerminalRef.current) return;
 
     try {
       const token = await ensureToken();
       const data = await getTask(taskId, token);
       pollCount.current += 1;
+      setError('');
       handleTaskUpdate(data);
 
       if (finalRef.current) return;
@@ -89,13 +121,25 @@ export default function TaskPage() {
         setError(t('task_timeout_error'));
         return;
       }
-
-      timerRef.current = setTimeout(poll, POLL_INTERVAL);
     } catch (err) {
       if (err instanceof ApiException) {
-        setError(err.message);
+        if (err.code === 'TASK_NOT_FOUND') {
+          const withinGraceWindow = Date.now() - pageStartedAtRef.current < INITIAL_TASK_LOOKUP_GRACE_MS;
+          const hasTaskSnapshot = taskRef.current !== null;
+          if (!withinGraceWindow || hasTaskSnapshot) {
+            errorTerminalRef.current = true;
+            if (wsRef.current) wsRef.current.close();
+            setError(err.message);
+            return;
+          }
+        }
+        setTransientError(err.message);
       } else {
-        setError(t('task_fetch_error'));
+        setTransientError(t('task_fetch_error'));
+      }
+    } finally {
+      if (!finalRef.current && !errorTerminalRef.current) {
+        timerRef.current = setTimeout(poll, POLL_INTERVAL);
       }
     }
   };
@@ -113,17 +157,28 @@ export default function TaskPage() {
 
         ws.onopen = () => {
           wsConnectedRef.current = true;
+          transientErrorCountRef.current = 0;
           setError('');
         };
 
         ws.onmessage = (event) => {
           const message = JSON.parse(event.data) as TaskStreamMessage | { error?: { message?: string } };
           if ('task' in message) {
+            setError('');
             handleTaskUpdate(message.task, message.event?.message ?? undefined);
             return;
           }
           if (message.error?.message) {
-            setError(message.error.message);
+            if (message.error.message === 'Task not found') {
+              const withinGraceWindow = Date.now() - pageStartedAtRef.current < INITIAL_TASK_LOOKUP_GRACE_MS;
+              const hasTaskSnapshot = taskRef.current !== null;
+              if (!withinGraceWindow || hasTaskSnapshot) {
+                errorTerminalRef.current = true;
+                setError(message.error.message);
+                return;
+              }
+            }
+            setTransientError(message.error.message);
           }
         };
 
@@ -134,7 +189,13 @@ export default function TaskPage() {
         ws.onclose = () => {
           const isFinal = finalRef.current;
           wsConnectedRef.current = false;
-          if (!cancelled && !isFinal) {
+          if (!cancelled && !isFinal && !errorTerminalRef.current) {
+            // Cancel any pending timer-based poll to avoid concurrent poll chains, then
+            // immediately kick off a fresh poll now that the WebSocket is gone.
+            if (timerRef.current) {
+              clearTimeout(timerRef.current);
+              timerRef.current = null;
+            }
             poll();
           }
         };
@@ -149,6 +210,7 @@ export default function TaskPage() {
     return () => {
       cancelled = true;
       if (timerRef.current) clearTimeout(timerRef.current);
+      if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
       if (wsRef.current) wsRef.current.close();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

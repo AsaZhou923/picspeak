@@ -37,6 +37,14 @@ type Stage =
   | 'reviewing'
   | 'error';
 
+type CachedPhotoEntry = {
+  photo: PhotoCreateResponse;
+  cached_at: number;
+};
+
+const PHOTO_UPLOAD_CACHE_KEY = 'ps_uploaded_photos_v1';
+const PHOTO_UPLOAD_CACHE_LIMIT = 20;
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function extractClientMeta(
@@ -52,6 +60,48 @@ function extractClientMeta(
     ...(extra?.height ? { height: extra.height } : {}),
     ...(extra?.original_size ? { original_size: extra.original_size } : {}),
   };
+}
+
+async function computeFileSha256(file: File): Promise<string> {
+  const buffer = await file.arrayBuffer();
+  const digest = await crypto.subtle.digest('SHA-256', buffer);
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+function readCachedPhotos(): Record<string, CachedPhotoEntry> {
+  try {
+    const raw = window.sessionStorage.getItem(PHOTO_UPLOAD_CACHE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, CachedPhotoEntry>;
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function getCachedPhoto(sha256: string): PhotoCreateResponse | null {
+  const cache = readCachedPhotos();
+  return cache[sha256]?.photo ?? null;
+}
+
+function cachePhoto(sha256: string, photo: PhotoCreateResponse): void {
+  try {
+    const cache = readCachedPhotos();
+    const nextEntries = Object.entries({
+      ...cache,
+      [sha256]: {
+        photo,
+        cached_at: Date.now(),
+      },
+    })
+      .sort(([, left], [, right]) => right.cached_at - left.cached_at)
+      .slice(0, PHOTO_UPLOAD_CACHE_LIMIT);
+    window.sessionStorage.setItem(PHOTO_UPLOAD_CACHE_KEY, JSON.stringify(Object.fromEntries(nextEntries)));
+  } catch {
+    // Best-effort cache only.
+  }
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -114,6 +164,7 @@ export default function WorkspacePage() {
       // Decode image dimensions from the preview dataUrl
       let imgWidth = 0;
       let imgHeight = 0;
+      let checksumSha256: string | null = null;
       try {
         const bmp = await createImageBitmap(file);
         imgWidth = bmp.width;
@@ -124,7 +175,31 @@ export default function WorkspacePage() {
       }
 
       try {
+        checksumSha256 = await computeFileSha256(file);
+      } catch {
+        checksumSha256 = null;
+      }
+
+      try {
         const token = await ensureToken();
+
+        if (checksumSha256) {
+          const cachedPhoto = getCachedPhoto(checksumSha256);
+          if (cachedPhoto) {
+            setPhoto(cachedPhoto);
+            if (cachedPhoto.status === 'READY') {
+              setStage('ready');
+              fetchUsage();
+            } else if (cachedPhoto.status === 'REJECTED') {
+              setStage('rejected');
+              setErrMessage(t('photo_rejected_msg'));
+            } else {
+              setStage('error');
+              setErrMessage(t('status_photo_error') + cachedPhoto.status);
+            }
+            return;
+          }
+        }
 
         // 1. Presign
         const presign = await createPresign(
@@ -132,6 +207,7 @@ export default function WorkspacePage() {
             filename: file.name,
             content_type: file.type,
             size_bytes: file.size,
+            ...(checksumSha256 ? { sha256: checksumSha256 } : {}),
           },
           token
         );
@@ -151,6 +227,9 @@ export default function WorkspacePage() {
         );
 
         setPhoto(photoData);
+        if (checksumSha256) {
+          cachePhoto(checksumSha256, photoData);
+        }
 
         if (photoData.status === 'READY') {
           setStage('ready');

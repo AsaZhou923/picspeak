@@ -12,6 +12,7 @@ import { authGuest, registerUnauthorizedHandler } from './api';
 import { AuthToken } from './types';
 
 const TOKEN_KEY = 'ps_token';
+const PHOTO_UPLOAD_CACHE_KEY = 'ps_uploaded_photos_v1';
 
 interface AuthState {
   token: string | null;
@@ -101,6 +102,7 @@ function clearStoredAuthToken(): void {
     try {
       storage.removeItem(TOKEN_KEY);
       storage.removeItem('ps_photo_urls');
+      storage.removeItem(PHOTO_UPLOAD_CACHE_KEY);
     } catch {
       // ignore
     }

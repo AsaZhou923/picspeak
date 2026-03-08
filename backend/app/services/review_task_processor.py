@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import logging
 from urllib.parse import quote
 
 from sqlalchemy.orm import Session
@@ -16,7 +17,11 @@ from app.services.guard import enforce_user_quota, increment_quota
 from app.services.task_events import record_task_event
 
 
+logger = logging.getLogger(__name__)
+
+
 def expire_review_tasks(db: Session) -> None:
+    _reconcile_completed_tasks(db)
     now = datetime.now(timezone.utc)
     expired_tasks = (
         db.query(ReviewTask)
@@ -69,6 +74,35 @@ def expire_review_tasks(db: Session) -> None:
             )
 
 
+def _reconcile_completed_tasks(db: Session) -> None:
+    now = datetime.now(timezone.utc)
+    completed_pairs = (
+        db.query(ReviewTask, Review)
+        .join(Review, Review.task_id == ReviewTask.id)
+        .filter(ReviewTask.status.in_([TaskStatus.PENDING, TaskStatus.RUNNING]))
+        .all()
+    )
+    if not completed_pairs:
+        return
+
+    for task, review in completed_pairs:
+        task.status = TaskStatus.SUCCEEDED
+        task.progress = 100
+        task.finished_at = task.finished_at or now
+        task.last_heartbeat_at = now
+        task.error_code = None
+        task.error_message = None
+        db.add(task)
+        record_task_event(
+            db,
+            task,
+            event_type='TASK_RECONCILED',
+            message='Task status reconciled from persisted review',
+            payload={'review_id': review.public_id},
+        )
+    db.commit()
+
+
 def process_review_task(task_public_id: str, *, worker_name: str) -> dict[str, str]:
     db = SessionLocal()
     try:
@@ -91,7 +125,24 @@ def process_review_task(task_public_id: str, *, worker_name: str) -> dict[str, s
         task = db.query(ReviewTask).filter(ReviewTask.id == task.id).first()
         if task is None:
             return {'result': 'missing'}
-        _process_task(db, task)
+        try:
+            _process_task(db, task)
+        except Exception as exc:
+            logger.exception('Unhandled review task error for task %s', task_public_id)
+            db.rollback()
+            fresh_task = db.query(ReviewTask).filter(ReviewTask.id == task.id).first()
+            if fresh_task is None:
+                return {'result': 'missing'}
+            if fresh_task.status == TaskStatus.RUNNING:
+                _handle_failure(
+                    db,
+                    fresh_task,
+                    error_code='TASK_PROCESSING_FAILED',
+                    error_message=f'Unexpected worker error: {exc}',
+                    retryable=True,
+                )
+                return {'result': 'failed', 'status': fresh_task.status.value}
+            return {'result': 'noop', 'status': fresh_task.status.value}
         return {'result': 'processed', 'status': task.status.value}
     finally:
         db.close()

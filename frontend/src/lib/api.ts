@@ -17,6 +17,7 @@ const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000').re
 const GOOGLE_OAUTH_START_PATH = '/api/v1/auth/google/start';
 
 type UnauthorizedHandler = (failedToken: string) => Promise<string | null>;
+type UnauthorizedRecoveryMode = 'disabled' | 'guest';
 
 let unauthorizedHandler: UnauthorizedHandler | null = null;
 
@@ -26,9 +27,15 @@ export function registerUnauthorizedHandler(handler: UnauthorizedHandler | null)
 
 async function request<T>(
   path: string,
-  options: RequestInit & { token?: string; _retried?: boolean } = {}
+  options: RequestInit & { token?: string; _retried?: boolean; unauthorizedRecovery?: UnauthorizedRecoveryMode } = {}
 ): Promise<T> {
-  const { token, headers = {}, _retried = false, ...rest } = options;
+  const {
+    token,
+    headers = {},
+    _retried = false,
+    unauthorizedRecovery = 'disabled',
+    ...rest
+  } = options;
 
   const allHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -45,7 +52,7 @@ async function request<T>(
     headers: allHeaders,
   });
 
-  if (res.status === 401 && token && !_retried && unauthorizedHandler) {
+  if (res.status === 401 && token && !_retried && unauthorizedRecovery === 'guest' && unauthorizedHandler) {
     const recoveredToken = await unauthorizedHandler(token);
     if (recoveredToken && recoveredToken !== token) {
       return request<T>(path, { ...options, token: recoveredToken, _retried: true });
@@ -95,7 +102,7 @@ export async function authGoogleLogin(idToken: string): Promise<AuthToken> {
 // ─── Usage ───────────────────────────────────────────────────────────────────
 
 export async function getUsage(token: string): Promise<UsageResponse> {
-  return request<UsageResponse>('/me/usage', { token });
+  return request<UsageResponse>('/me/usage', { token, unauthorizedRecovery: 'guest' });
 }
 
 // ─── Upload ──────────────────────────────────────────────────────────────────
@@ -108,6 +115,7 @@ export async function createPresign(
     method: 'POST',
     body: JSON.stringify(payload),
     token,
+    unauthorizedRecovery: 'guest',
   });
 }
 
@@ -158,6 +166,7 @@ export async function confirmPhoto(
     method: 'POST',
     body: JSON.stringify({ upload_id: uploadId, exif_data: exifData, client_meta: clientMeta }),
     token,
+    unauthorizedRecovery: 'guest',
   });
 }
 
@@ -175,7 +184,14 @@ export async function createReview(
 }
 
 export async function getTask(taskId: string, token: string): Promise<TaskStatusResponse> {
-  return request<TaskStatusResponse>(`/tasks/${taskId}`, { token });
+  return request<TaskStatusResponse>(`/tasks/${taskId}?_ts=${Date.now()}`, {
+    token,
+    cache: 'no-store',
+    headers: {
+      'Cache-Control': 'no-cache',
+      Pragma: 'no-cache',
+    },
+  });
 }
 
 export function buildTaskWebSocketUrl(taskId: string): string {

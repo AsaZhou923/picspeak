@@ -317,6 +317,22 @@ def _serialize_task_status(task: ReviewTask, review: Review | None = None) -> di
     }
 
 
+def _load_task_snapshot(db: Session, *, task_id: str, owner_user_id: int) -> tuple[ReviewTask | None, Review | None, ReviewTaskEvent | None]:
+    expire_review_tasks(db)
+    task = db.query(ReviewTask).filter(ReviewTask.public_id == task_id, ReviewTask.owner_user_id == owner_user_id).first()
+    if task is None:
+        return None, None, None
+
+    review = db.query(Review).filter(Review.task_id == task.id).first()
+    latest_event = (
+        db.query(ReviewTaskEvent)
+        .filter(ReviewTaskEvent.task_id == task.id)
+        .order_by(ReviewTaskEvent.created_at.desc(), ReviewTaskEvent.id.desc())
+        .first()
+    )
+    return task, review, latest_event
+
+
 def _http_exception_message(exc: HTTPException) -> str:
     detail = exc.detail
     if isinstance(detail, dict):
@@ -395,6 +411,26 @@ def confirm_photo_upload(
     if client_height is not None and int(client_height) <= 0:
         raise api_error(status.HTTP_400_BAD_REQUEST, 'PHOTO_HEIGHT_INVALID', 'Invalid height')
 
+    checksum_sha256 = token.get('sha256')
+    if checksum_sha256:
+        existing_photo = (
+            db.query(Photo)
+            .filter(
+                Photo.owner_user_id == actor.user.id,
+                Photo.checksum_sha256 == checksum_sha256,
+                Photo.status.in_([PhotoStatus.READY, PhotoStatus.REJECTED]),
+            )
+            .order_by(Photo.created_at.desc(), Photo.id.desc())
+            .first()
+        )
+        if existing_photo is not None:
+            db.commit()
+            return PhotoCreateResponse(
+                photo_id=existing_photo.public_id,
+                photo_url=_build_photo_proxy_url(request, existing_photo.public_id, actor.user.public_id),
+                status=existing_photo.status.value,
+            )
+
     photo = Photo(
         public_id=new_public_id('pho'),
         owner_user_id=actor.user.id,
@@ -403,7 +439,7 @@ def confirm_photo_upload(
         object_key=token['object_key'],
         content_type=token['content_type'],
         size_bytes=token['size_bytes'],
-        checksum_sha256=token.get('sha256'),
+        checksum_sha256=checksum_sha256,
         width=client_width,
         height=client_height,
         status=PhotoStatus.READY,
@@ -608,15 +644,15 @@ def create_review(
 def get_task_status(
     task_id: str,
     request: Request,
+    response: Response,
     db: Session = Depends(get_db),
     actor: CurrentActor = Depends(get_current_actor),
 ):
-    expire_review_tasks(db)
-    task = db.query(ReviewTask).filter(ReviewTask.public_id == task_id, ReviewTask.owner_user_id == actor.user.id).first()
+    task, review, _latest_event = _load_task_snapshot(db, task_id=task_id, owner_user_id=actor.user.id)
     if task is None:
         raise api_error(status.HTTP_404_NOT_FOUND, 'TASK_NOT_FOUND', 'Task not found')
-
-    review = db.query(Review).filter(Review.task_id == task.id).first()
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
     db.commit()
     return TaskStatusResponse(**_serialize_task_status(task, review))
 
@@ -819,20 +855,11 @@ async def stream_task_status(websocket: WebSocket, task_id: str):
         last_payload: str | None = None
 
         while True:
-            expire_review_tasks(db)
-            task = db.query(ReviewTask).filter(ReviewTask.public_id == task_id, ReviewTask.owner_user_id == user.id).first()
+            task, review, latest_event = _load_task_snapshot(db, task_id=task_id, owner_user_id=user.id)
             if task is None:
                 await websocket.send_json({'error': {'code': 'TASK_NOT_FOUND', 'message': 'Task not found'}})
                 await websocket.close(code=4404)
                 return
-
-            review = db.query(Review).filter(Review.task_id == task.id).first()
-            latest_event = (
-                db.query(ReviewTaskEvent)
-                .filter(ReviewTaskEvent.task_id == task.id)
-                .order_by(ReviewTaskEvent.created_at.desc(), ReviewTaskEvent.id.desc())
-                .first()
-            )
             payload = {
                 'type': 'task.update',
                 'task': _serialize_task_status(task, review),

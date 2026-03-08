@@ -225,8 +225,40 @@ const translations = {
     status_rejected: '已拒绝',
     status_uploading: '上传中',
 
+    // P0 review improvements
+    score_label_excellent: '优秀',
+    score_label_good: '良好',
+    score_label_above_avg: '中等偏上',
+    score_label_average: '中等',
+    score_label_weak: '待提升',
+    review_score_dims_basis: '构图 · 光线 · 色彩 · 故事 · 技术',
+    review_btn_upload_next: '上传下一张',
+    review_btn_history_all: '查看历史记录',
+    review_score_lowest: '最低分项',
+    review_ai_disclaimer: '评分为 AI 审美分析结果，仅供创作参考',
+
     // Score ring
     score_overall: '综合评分',
+
+    // P1 review improvements
+    score_dim_desc_composition: '评估画面框架、主体位置与视觉引导，包括三分法、黄金比例等构图手法。',
+    score_dim_desc_lighting: '评估光源质量、方向、对比度及曝光控制，包括高光与阴影的层次细节。',
+    score_dim_desc_color: '评估色调、饱和度、白平衡与整体色彩和谐感，以及色彩情绪的表达力。',
+    score_dim_desc_story: '评估照片传递的主题、情感、叙事力量及与观者的视觉共鸣。',
+    score_dim_desc_technical: '评估焦点清晰度、噪点控制、景深运用与整体后期处理的完成度。',
+    copy_btn: '复制',
+    copy_done: '已复制',
+    img_zoom_label: '点击查看大图',
+    img_zoom_close: '关闭',
+    guest_login_banner_title: '登录即可保存分析历史',
+    guest_login_banner_body: '保存全部历史记录 · 每日更多次数 · 解锁 Pro 深度分析',
+    guest_login_cta: 'Google 登录',
+    tag_pre: '前期',
+    tag_post: '后期',
+    tag_composition: '构图',
+    tag_timing: '拍摄时机',
+    tag_exposure: '曝光',
+    tag_focus: '对焦',
   },
 
   en: {
@@ -441,8 +473,40 @@ const translations = {
     status_rejected: 'Rejected',
     status_uploading: 'Uploading',
 
+    // P0 review improvements
+    score_label_excellent: 'Excellent',
+    score_label_good: 'Good',
+    score_label_above_avg: 'Above Average',
+    score_label_average: 'Average',
+    score_label_weak: 'Needs Improvement',
+    review_score_dims_basis: 'Composition · Lighting · Color · Story · Technical',
+    review_btn_upload_next: 'Upload Next',
+    review_btn_history_all: 'View History',
+    review_score_lowest: 'Lowest score',
+    review_ai_disclaimer: 'AI aesthetic analysis for creative reference only',
+
     // Score ring
     score_overall: 'Overall Score',
+
+    // P1 review improvements
+    score_dim_desc_composition: 'Evaluates framing, subject placement and visual flow, including rule of thirds, golden ratio and leading lines.',
+    score_dim_desc_lighting: 'Evaluates light quality, direction, contrast and exposure control, including highlight and shadow detail.',
+    score_dim_desc_color: 'Evaluates hue, saturation, white balance and overall color harmony, as well as emotional color expression.',
+    score_dim_desc_story: 'Evaluates the theme, emotion, narrative power and visual resonance the photo conveys to the viewer.',
+    score_dim_desc_technical: 'Evaluates focus sharpness, noise control, depth of field and overall post-processing quality.',
+    copy_btn: 'Copy',
+    copy_done: 'Copied',
+    img_zoom_label: 'Click to view full size',
+    img_zoom_close: 'Close',
+    guest_login_banner_title: 'Sign in to save your analysis history',
+    guest_login_banner_body: 'Save all past reviews · More daily credits · Unlock Pro deep analysis',
+    guest_login_cta: 'Sign in with Google',
+    tag_pre: 'Pre',
+    tag_post: 'Post',
+    tag_composition: 'Composition',
+    tag_timing: 'Timing',
+    tag_exposure: 'Exposure',
+    tag_focus: 'Focus',
   },
 
   ja: {
@@ -657,8 +721,40 @@ const translations = {
     status_rejected: '拒否',
     status_uploading: 'アップロード中',
 
+    // P0 review improvements
+    score_label_excellent: '優秀',
+    score_label_good: '良好',
+    score_label_above_avg: '平均以上',
+    score_label_average: '普通',
+    score_label_weak: '要改善',
+    review_score_dims_basis: '構図 · 光 · 色彩 · ストーリー · 技術',
+    review_btn_upload_next: '次の写真へ',
+    review_btn_history_all: '履歴を見る',
+    review_score_lowest: '最低スコア',
+    review_ai_disclaimer: 'AI審美分析は制作の参考としてのみお使いください',
+
     // Score ring
     score_overall: '総合スコア',
+
+    // P1 review improvements
+    score_dim_desc_composition: 'フレーミング・被写体の配置・視覚的誘導を評価。三分割法・黄金比・引き線などの構図手法を含む。',
+    score_dim_desc_lighting: '光の質・方向・コントラスト・露出コントロールを評価。ハイライトとシャドウの階調も含む。',
+    score_dim_desc_color: '色相・彩度・ホワイトバランスと全体の色彩調和、および色彩による感情表現を評価。',
+    score_dim_desc_story: '写真が伝えるテーマ・感情・物語力と、見る人との視覚的共鳴を評価。',
+    score_dim_desc_technical: 'フォーカスの精度・ノイズ制御・被写界深度の活用と全体の仕上げ品質を評価。',
+    copy_btn: 'コピー',
+    copy_done: 'コピー済',
+    img_zoom_label: 'クリックで拡大表示',
+    img_zoom_close: '閉じる',
+    guest_login_banner_title: 'サインインして分析履歴を保存',
+    guest_login_banner_body: '全履歴を保存 · 毎日より多くの回数 · Pro深度分析を解放',
+    guest_login_cta: 'Googleでサインイン',
+    tag_pre: '撮影',
+    tag_post: '現像',
+    tag_composition: '構図',
+    tag_timing: 'タイミング',
+    tag_exposure: '露出',
+    tag_focus: 'フォーカス',
   },
 } as const;
 

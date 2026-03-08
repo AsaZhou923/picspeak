@@ -59,6 +59,10 @@ class Settings(BaseSettings):
     review_retry_max_delay_seconds: int = 300
     review_task_stale_timeout_seconds: int = 180
     ws_task_poll_interval_ms: int = 1000
+    guest_user_cleanup_enabled: bool = True
+    guest_user_cleanup_interval_seconds: int = 3600
+    guest_user_stale_days: int = 7
+    guest_user_cleanup_batch_size: int = 200
     cloud_tasks_enabled: bool = False
     cloud_tasks_project_id: str = ''
     cloud_tasks_location: str = ''
