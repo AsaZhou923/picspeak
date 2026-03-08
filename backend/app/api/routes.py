@@ -188,7 +188,7 @@ def auth_google_login(payload: AuthGoogleLoginRequest, db: Session = Depends(get
     try:
         claims = _google_token_info(payload.id_token)
     except urllib_error.URLError as exc:
-        raise api_error(status.HTTP_502_BAD_GATEWAY, 'GOOGLE_TOKEN_VERIFY_FAILED', f'Google token verification failed: {exc}') from exc
+        raise api_error(status.HTTP_502_BAD_GATEWAY, 'GOOGLE_TOKEN_VERIFY_FAILED', 'Google token verification failed') from exc
 
     return _login_from_google_claims(claims, db)
 
@@ -225,7 +225,8 @@ def auth_google_callback(code: str = Query(..., min_length=1), db: Session = Dep
         'user_id': auth_data.user_id,
         'plan': auth_data.plan,
     })
-    return RedirectResponse(f'{frontend_callback}?{params}', status_code=302)
+    # Use URL fragment to avoid leaking tokens through server logs and Referer headers.
+    return RedirectResponse(f'{frontend_callback}#{params}', status_code=302)
 
 
 def _serialize_task_status(task: ReviewTask, review: Review | None = None) -> dict:

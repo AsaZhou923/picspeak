@@ -33,7 +33,17 @@ function GoogleCallbackInner() {
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
-    const errorParam = searchParams.get('error');
+    const hashParams = typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.hash.replace(/^#/, ''))
+      : null;
+
+    const readParam = (key: string): string | null => {
+      const fromQuery = searchParams.get(key);
+      if (fromQuery) return fromQuery;
+      return hashParams?.get(key) ?? null;
+    };
+
+    const errorParam = readParam('error');
 
     if (errorParam) {
       setStatus('error');
@@ -41,10 +51,10 @@ function GoogleCallbackInner() {
       return;
     }
 
-    const accessToken = searchParams.get('access_token');
-    const tokenType = searchParams.get('token_type') ?? 'bearer';
-    const userId = searchParams.get('user_id');
-    const plan = searchParams.get('plan');
+    const accessToken = readParam('access_token');
+    const tokenType = readParam('token_type') ?? 'bearer';
+    const userId = readParam('user_id');
+    const plan = readParam('plan');
 
     if (!accessToken || !userId || !plan) {
       setStatus('error');

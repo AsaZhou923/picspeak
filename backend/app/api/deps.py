@@ -101,12 +101,15 @@ def issue_guest_token(user: User) -> str:
 
 
 def bind_guest_token(response: Response, token: str) -> None:
+    is_dev = settings.app_env.strip().lower() == 'dev'
     response.set_cookie(
         key=GUEST_TOKEN_COOKIE,
         value=token,
         httponly=True,
-        secure=False,
-        samesite='lax',
+        secure=not is_dev,
+        # In production use SameSite=None so cross-site frontend -> backend API requests
+        # (common in separate-domain deployments and iOS WebKit browsers) can persist guest identity.
+        samesite='lax' if is_dev else 'none',
         max_age=GUEST_TOKEN_TTL_SECONDS,
         path='/',
     )
