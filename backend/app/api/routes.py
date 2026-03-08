@@ -9,7 +9,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, Request, Response, WebSocket, WebSocketDisconnect, status
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, StreamingResponse
 from urllib import error as urllib_error
 from urllib import parse, request as urllib_request
 from sqlalchemy.exc import IntegrityError
@@ -85,10 +85,15 @@ GOOGLE_OAUTH_STATE_COOKIE = 'ps_google_oauth_state'
 GOOGLE_OAUTH_STATE_TTL_SECONDS = 600
 
 
-def _build_photo_url(bucket: str, object_key: str) -> str:
+def _build_storage_photo_url(bucket: str, object_key: str) -> str:
     _ = bucket
     base = settings.object_base_url.rstrip('/')
     return f'{base}/{quote(object_key)}'
+
+
+def _build_photo_proxy_url(request: Request, photo_public_id: str, owner_public_id: str) -> str:
+    photo_token = sign_payload({'photo_id': photo_public_id, 'uid': owner_public_id}, ttl_seconds=600)
+    return str(request.url_for('get_photo_image', photo_id=photo_public_id)).rstrip('?') + f'?photo_token={quote(photo_token)}'
 
 
 
@@ -390,8 +395,6 @@ def confirm_photo_upload(
     if client_height is not None and int(client_height) <= 0:
         raise api_error(status.HTTP_400_BAD_REQUEST, 'PHOTO_HEIGHT_INVALID', 'Invalid height')
 
-    image_url = _build_photo_url(token['bucket'], token['object_key'])
-
     photo = Photo(
         public_id=new_public_id('pho'),
         owner_user_id=actor.user.id,
@@ -420,7 +423,7 @@ def confirm_photo_upload(
 
     return PhotoCreateResponse(
         photo_id=photo.public_id,
-        photo_url=image_url,
+        photo_url=_build_photo_proxy_url(request, photo.public_id, actor.user.public_id),
         status=photo.status.value,
     )
 
@@ -544,7 +547,7 @@ def create_review(
             db.commit()
         return response
 
-    image_url = _build_photo_url(photo.bucket, photo.object_key)
+    image_url = _build_storage_photo_url(photo.bucket, photo.object_key)
     if settings.image_audit_enabled and photo.nsfw_label is None:
         try:
             audit_result = run_content_audit(image_url=image_url)
@@ -647,7 +650,7 @@ def get_review(
     return ReviewGetResponse(
         review_id=review.public_id,
         photo_id=photo.public_id if photo else 'unknown',
-        photo_url=_build_photo_url(photo.bucket, photo.object_key) if photo else None,
+        photo_url=_build_photo_proxy_url(request, photo.public_id, actor.user.public_id) if photo else None,
         mode=review.mode.value,
         status=review.status.value,
         result=_review_result_payload(review.result_json, review.final_score),
@@ -685,7 +688,7 @@ def list_my_reviews(
         ReviewHistoryItem(
             review_id=review.public_id,
             photo_id=photo.public_id,
-            photo_url=_build_photo_url(photo.bucket, photo.object_key),
+            photo_url=_build_photo_proxy_url(request, photo.public_id, actor.user.public_id),
             mode=review.mode.value,
             status=review.status.value,
             final_score=float(review.final_score),
@@ -728,6 +731,53 @@ def list_photo_reviews(
 
     db.commit()
     return PhotoReviewsResponse(items=items, next_cursor=next_cursor)
+
+
+@router.get('/photos/{photo_id}/image', name='get_photo_image')
+def get_photo_image(
+    photo_id: str,
+    photo_token: str = Query(..., min_length=1),
+    db: Session = Depends(get_db),
+):
+    token_payload = verify_payload(photo_token)
+    if token_payload.get('photo_id') != photo_id:
+        raise api_error(status.HTTP_403_FORBIDDEN, 'PHOTO_TOKEN_INVALID', 'Invalid photo token')
+
+    owner_public_id = token_payload.get('uid')
+    if not isinstance(owner_public_id, str) or not owner_public_id.strip():
+        raise api_error(status.HTTP_403_FORBIDDEN, 'PHOTO_TOKEN_INVALID', 'Invalid photo token')
+
+    photo = (
+        db.query(Photo)
+        .join(User, User.id == Photo.owner_user_id)
+        .filter(Photo.public_id == photo_id, User.public_id == owner_public_id.strip())
+        .first()
+    )
+    if photo is None:
+        raise api_error(status.HTTP_404_NOT_FOUND, 'PHOTO_NOT_FOUND', 'Photo not found')
+
+    try:
+        storage = get_object_storage_client()
+        result = storage.get_object(Bucket=photo.bucket, Key=photo.object_key)
+    except Exception as exc:
+        raise api_error(status.HTTP_502_BAD_GATEWAY, 'PHOTO_FETCH_FAILED', f'Failed to fetch photo: {exc}') from exc
+
+    body = result['Body']
+
+    def iter_body():
+        try:
+            yield from body.iter_chunks(chunk_size=64 * 1024)
+        finally:
+            body.close()
+
+    return StreamingResponse(
+        iter_body(),
+        media_type=photo.content_type,
+        headers={
+            'Cache-Control': 'private, no-store',
+            'X-Content-Type-Options': 'nosniff',
+        },
+    )
 
 
 @router.get('/me/usage', response_model=UsageResponse)

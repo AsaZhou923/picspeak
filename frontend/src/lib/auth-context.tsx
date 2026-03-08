@@ -100,6 +100,7 @@ function clearStoredAuthToken(): void {
   for (const storage of [window.localStorage, window.sessionStorage]) {
     try {
       storage.removeItem(TOKEN_KEY);
+      storage.removeItem('ps_photo_urls');
     } catch {
       // ignore
     }
@@ -118,6 +119,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const pendingGuestTokenRef = useRef<Promise<string> | null>(null);
 
   useEffect(() => {
+    try {
+      window.localStorage.removeItem('ps_photo_urls');
+      window.sessionStorage.removeItem('ps_photo_urls');
+    } catch {
+      // ignore legacy cache cleanup
+    }
     let parsed = readSessionAuthToken();
     if (!parsed) {
       parsed = readLegacyAuthToken();

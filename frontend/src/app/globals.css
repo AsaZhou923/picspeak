@@ -296,3 +296,46 @@ h3 {
   border-bottom: 1px solid #c8a268;
   border-right: 1px solid #c8a268;
 }
+
+/* ─── Gold Button Shimmer ─────────────────────────────────────────────────── */
+.btn-gold {
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-gold::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -80%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
+  transform: skewX(-15deg);
+  transition: none;
+}
+
+.btn-gold:hover::after {
+  animation: btn-shine 0.55s ease forwards;
+}
+
+@keyframes btn-shine {
+  0%   { left: -80%; }
+  100% { left: 140%; }
+}
+
+/* ─── Stagger delay utilities ─────────────────────────────────────────────── */
+.delay-100 { animation-delay: 100ms; }
+.delay-150 { animation-delay: 150ms; }
+.delay-200 { animation-delay: 200ms; }
+.delay-300 { animation-delay: 300ms; }
+.delay-400 { animation-delay: 400ms; }
+.delay-500 { animation-delay: 500ms; }
+.anim-fill-both { animation-fill-mode: both; }
+
+/* Score ring stagger (used in demo card) */
+.score-stagger > *:nth-child(1) { animation-delay: 500ms; }
+.score-stagger > *:nth-child(2) { animation-delay: 580ms; }
+.score-stagger > *:nth-child(3) { animation-delay: 660ms; }
+.score-stagger > *:nth-child(4) { animation-delay: 740ms; }
+.score-stagger > *:nth-child(5) { animation-delay: 820ms; }

@@ -115,7 +115,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <ThemeProvider>
               <AuthProvider>
                 <Header />
-                <main className="flex-1">{children}</main>
+                <main className="flex-1 pt-12 md:pt-0">{children}</main>
                 <Footer />
               </AuthProvider>
             </ThemeProvider>

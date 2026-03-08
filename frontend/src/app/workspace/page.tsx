@@ -153,15 +153,6 @@ export default function WorkspacePage() {
         setPhoto(photoData);
 
         if (photoData.status === 'READY') {
-          // Persist photo_url so the review result page can display the photo
-          try {
-            const cache = JSON.parse(localStorage.getItem('ps_photo_urls') || '{}');
-            cache[photoData.photo_id] = photoData.photo_url;
-            // Keep only the last 20 entries to avoid unbounded growth
-            const keys = Object.keys(cache);
-            if (keys.length > 20) delete cache[keys[0]];
-            localStorage.setItem('ps_photo_urls', JSON.stringify(cache));
-          } catch { /* non-critical */ }
           setStage('ready');
           fetchUsage();
         } else if (photoData.status === 'REJECTED') {
@@ -337,7 +328,7 @@ export default function WorkspacePage() {
         </div>
 
         {/* Upload zone or preview */}
-        <div className="animate-slide-up">
+        <div className="animate-slide-up anim-fill-both delay-100">
           {!preview ? (
             <ImageUploader
               onFileSelected={handleFileSelected}
@@ -357,12 +348,12 @@ export default function WorkspacePage() {
 
                 {/* Progress overlay */}
                 {stage === 'uploading' && (
-                  <div className="absolute inset-0 bg-void/70 flex flex-col items-center justify-center gap-3">
+                  <div className="absolute inset-0 bg-void/75 backdrop-blur-[2px] flex flex-col items-center justify-center gap-3">
                     <LoadingSpinner size={32} />
                     <p className="text-sm text-ink-muted">{t('stage_uploading')} {uploadProgress}%</p>
                     <div className="w-40 h-0.5 bg-border rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-gold rounded-full transition-all duration-300"
+                        className="h-full bg-gold rounded-full transition-all duration-300 shadow-[0_0_8px_rgba(200,162,104,0.6)]"
                         style={{ width: `${uploadProgress}%` }}
                       />
                     </div>
@@ -392,14 +383,14 @@ export default function WorkspacePage() {
 
               {/* Status messages */}
               {stage === 'ready' && photo && (
-                <div className="flex items-center gap-2 text-sage text-sm">
+                <div className="flex items-center gap-2 text-sage text-sm animate-scale-in">
                   <CheckCircle size={14} />
                   <span>{t('photo_ready_msg')}</span>
                 </div>
               )}
 
               {(stage === 'rejected' || stage === 'error') && (
-                <div className="flex items-center gap-2 text-rust text-sm bg-rust/5 border border-rust/20 rounded px-3 py-2">
+                <div className="flex items-center gap-2 text-rust text-sm bg-rust/5 border border-rust/20 rounded px-3 py-2 animate-scale-in">
                   <AlertCircle size={14} className="shrink-0" />
                   <span>{errMessage}</span>
                 </div>
@@ -434,13 +425,13 @@ export default function WorkspacePage() {
                           onClick={() => !disabled && setReviewMode(m.id)}
                           disabled={disabled}
                           className={`
-                            flex items-start gap-3 p-4 rounded-lg border text-left transition-all
+                            flex items-start gap-3 p-4 rounded-lg border text-left transition-all duration-200
                             ${
                               disabled
-                                ? 'opacity-45 cursor-not-allowed border-border'
+                                ? 'opacity-40 cursor-not-allowed border-border'
                                 : reviewMode === m.id
-                                ? 'border-gold/60 bg-gold/5'
-                                : 'border-border hover:border-border-subtle'
+                                ? 'border-gold/60 bg-gold/5 shadow-[0_0_16px_rgba(200,162,104,0.12)]'
+                                : 'border-border hover:border-gold/30 hover:bg-raised/60 active:scale-[0.98]'
                             }
                           `}
                         >
@@ -469,13 +460,13 @@ export default function WorkspacePage() {
                   <div className="flex gap-3">
                     <button
                       onClick={handleReview}
-                      className="flex-1 px-6 py-3 bg-gold text-void text-sm font-medium rounded hover:bg-gold-light transition-colors"
+                      className="btn-gold flex-1 px-6 py-3 bg-gold text-void text-sm font-medium rounded hover:bg-gold-light active:scale-[0.98] transition-all duration-200 hover:shadow-[0_0_24px_rgba(200,162,104,0.35)]"
                     >
                       {t('btn_start_review')} {reviewMode === 'pro' ? 'Pro' : 'Flash'} {t('btn_review_suffix')}
                     </button>
                     <button
                       onClick={handleReset}
-                      className="px-4 py-3 border border-border text-ink-muted text-sm rounded hover:border-gold/40 transition-colors"
+                      className="px-4 py-3 border border-border text-ink-muted text-sm rounded hover:border-gold/40 hover:text-ink active:scale-[0.98] transition-all duration-200"
                     >
                       {t('btn_change_photo')}
                     </button>
@@ -487,7 +478,7 @@ export default function WorkspacePage() {
               {(stage === 'rejected' || stage === 'error') && (
                 <button
                   onClick={handleReset}
-                  className="w-full px-6 py-3 border border-border text-ink-muted text-sm rounded hover:border-gold/40 transition-colors"
+                  className="w-full px-6 py-3 border border-border text-ink-muted text-sm rounded hover:border-gold/40 hover:text-ink active:scale-[0.98] transition-all duration-200"
                 >
                   {t('btn_reupload')}
                 </button>

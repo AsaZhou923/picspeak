@@ -97,14 +97,6 @@ export default function ReviewPage() {
           setPhotoUrl(data.photo_url);
         }
         setLoading(false);
-        if (!data.photo_url) {
-          try {
-            const cache = JSON.parse(localStorage.getItem('ps_photo_urls') || '{}');
-            if (cache[data.photo_id]) setPhotoUrl(cache[data.photo_id]);
-          } catch {
-            // Ignore cache parsing errors.
-          }
-        }
       })
       .catch((err) => {
         setLoading(false);

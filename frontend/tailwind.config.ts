@@ -52,9 +52,11 @@ const config: Config = {
       animation: {
         'fade-in': 'fadeIn 0.4s ease-out',
         'slide-up': 'slideUp 0.5s ease-out',
+        'scale-in': 'scaleIn 0.28s cubic-bezier(0.34, 1.56, 0.64, 1)',
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
         'spin-slow': 'spin 3s linear infinite',
         'shimmer': 'shimmer 2s infinite',
+        'glow-pulse': 'glowPulse 2.5s ease-in-out infinite',
       },
       keyframes: {
         fadeIn: {
@@ -65,9 +67,17 @@ const config: Config = {
           '0%': { opacity: '0', transform: 'translateY(16px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
         },
+        scaleIn: {
+          '0%': { opacity: '0', transform: 'scale(0.92)' },
+          '100%': { opacity: '1', transform: 'scale(1)' },
+        },
         shimmer: {
           '0%': { backgroundPosition: '-200% center' },
           '100%': { backgroundPosition: '200% center' },
+        },
+        glowPulse: {
+          '0%, 100%': { boxShadow: '0 0 0 0 rgba(200,162,104,0)' },
+          '50%': { boxShadow: '0 0 18px 3px rgba(200,162,104,0.22)' },
         },
       },
     },

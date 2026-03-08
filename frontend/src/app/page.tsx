@@ -78,55 +78,59 @@ export default function HomePage() {
           }}
         />
 
-        <div className="relative flex items-center gap-2 mb-8 px-4 py-1.5 border border-gold/20 rounded-full text-xs text-gold/80">
-          <Aperture size={11} />
+        <div className="relative flex items-center gap-2 mb-8 px-4 py-1.5 border border-gold/20 rounded-full text-xs text-gold/80 animate-fade-in">
+          <Aperture size={11} className="animate-spin-slow opacity-70" />
           <span>{t('hero_label')}</span>
         </div>
 
-        <h1 className="relative font-display text-5xl sm:text-6xl md:text-7xl text-center leading-[1.08] max-w-3xl text-balance">
+        <h1 className="relative font-display text-5xl sm:text-6xl md:text-7xl text-center leading-[1.08] max-w-3xl text-balance animate-fade-in anim-fill-both delay-100">
           {t('hero_headline_1')}
           <br />
           <span className="text-gold">{t('hero_headline_2')}</span>
         </h1>
 
-        <p className="relative mt-6 text-ink-muted text-base sm:text-lg text-center max-w-xl leading-relaxed">
+        <p className="relative mt-6 text-ink-muted text-base sm:text-lg text-center max-w-xl leading-relaxed animate-fade-in anim-fill-both delay-200">
           {t('hero_desc')}
         </p>
 
-        <div className="relative mt-10 flex flex-col sm:flex-row gap-4 items-center">
+        <div className="relative mt-10 flex flex-col sm:flex-row gap-4 items-center animate-fade-in anim-fill-both delay-300">
           <Link
             href="/workspace"
-            className="flex items-center gap-2 px-7 py-3 bg-gold text-void text-sm font-medium rounded hover:bg-gold-light transition-colors"
+            className="btn-gold flex items-center gap-2 px-7 py-3 bg-gold text-void text-sm font-medium rounded hover:bg-gold-light active:scale-[0.98] transition-all duration-200 hover:shadow-[0_0_24px_rgba(200,162,104,0.4)]"
           >
             {t('hero_cta_start')}
             <ArrowRight size={14} />
           </Link>
           <a
             href={buildGoogleOAuthUrl()}
-            className="flex items-center gap-2 px-7 py-3 border border-border text-ink-muted text-sm rounded hover:border-gold/40 hover:text-gold transition-colors"
+            className="flex items-center gap-2 px-7 py-3 border border-border text-ink-muted text-sm rounded hover:border-gold/40 hover:text-gold active:scale-[0.98] transition-all duration-200"
           >
             <GoogleIcon />
             {t('hero_cta_login')}
           </a>
         </div>
 
-        <div className="relative mt-20 w-full max-w-2xl animate-slide-up">
-          <div className="border border-border-subtle rounded-lg bg-raised/60 backdrop-blur-sm p-6">
+        <div className="relative mt-20 w-full max-w-2xl animate-slide-up anim-fill-both delay-400">
+          <div className="border border-border-subtle rounded-lg bg-raised/60 backdrop-blur-sm p-6 hover:border-border transition-colors duration-300">
             <div className="flex items-start justify-between gap-4 mb-4">
               <div>
                 <p className="text-xs text-ink-subtle mb-1 font-mono">{t('demo_label')}</p>
                 <p className="font-display text-2xl text-gold">7.6</p>
                 <p className="text-xs text-ink-muted mt-0.5">{t('demo_final_score')}</p>
               </div>
-              <div className="flex flex-wrap gap-3 justify-end">
+              <div className="flex flex-wrap gap-3 justify-end score-stagger">
                 {DEMO_SCORES_KEYS.map((d) => (
-                  <ScoreRing
+                  <div
                     key={d.labelKey}
-                    score={d.score}
-                    size={60}
-                    strokeWidth={3}
-                    label={t(d.labelKey)}
-                  />
+                    className="animate-scale-in anim-fill-both"
+                  >
+                    <ScoreRing
+                      score={d.score}
+                      size={60}
+                      strokeWidth={3}
+                      label={t(d.labelKey)}
+                    />
+                  </div>
                 ))}
               </div>
             </div>
@@ -153,8 +157,8 @@ export default function HomePage() {
 
           <div className="grid md:grid-cols-3 gap-px bg-border-subtle">
             {FEATURES.map((f) => (
-              <div key={f.title} className="bg-void p-8 space-y-4">
-                <div className="w-10 h-10 border border-border rounded flex items-center justify-center">
+              <div key={f.title} className="bg-void p-8 space-y-4 transition-all duration-300 hover:bg-raised/50 group">
+                <div className="w-10 h-10 border border-border rounded flex items-center justify-center transition-all duration-300 group-hover:border-gold/40 group-hover:shadow-[0_0_12px_rgba(200,162,104,0.15)]">
                   <f.icon size={16} className="text-gold" />
                 </div>
                 <h3 className="font-display text-xl">{f.title}</h3>

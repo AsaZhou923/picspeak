@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
-import { Sun, Moon, ChevronDown } from 'lucide-react';
+import { Sun, Moon, ChevronDown, Camera, Clock, BarChart2 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { planLabel, planColor } from '@/lib/auth-context';
 import { buildGoogleOAuthUrl } from '@/lib/api';
@@ -71,7 +71,7 @@ export default function Header() {
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 border-b border-border-subtle bg-void/90 backdrop-blur-md">
-      <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
         {/* Logo */}
         <Link
           href="/"
@@ -85,7 +85,7 @@ export default function Header() {
             className="rounded object-contain"
             priority
           />
-          <span className="font-display text-lg tracking-wide">PicSpeak</span>
+          <span className="font-display text-lg tracking-wide hidden xs:inline sm:inline">PicSpeak</span>
         </Link>
 
         {/* Nav */}
@@ -106,7 +106,7 @@ export default function Header() {
         </nav>
 
         {/* Right: lang + theme + identity */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2">
           {/* Language switcher */}
           <LanguageSwitcher />
 
@@ -130,7 +130,7 @@ export default function Header() {
               {userInfo.plan === 'guest' ? (
                 <a
                   href={buildGoogleOAuthUrl()}
-                  className="px-3 py-1.5 text-sm border border-gold/40 text-gold rounded hover:bg-gold/10 transition-colors"
+                  className="px-2.5 sm:px-3 py-1.5 text-sm border border-gold/40 text-gold rounded hover:bg-gold/10 transition-colors whitespace-nowrap"
                 >
                   {t('login_google')}
                 </a>
@@ -146,13 +146,53 @@ export default function Header() {
           ) : (
             <a
               href={buildGoogleOAuthUrl()}
-              className="px-3 py-1.5 text-sm border border-gold/40 text-gold rounded hover:bg-gold/10 transition-colors"
+              className="px-2.5 sm:px-3 py-1.5 text-sm border border-gold/40 text-gold rounded hover:bg-gold/10 transition-colors whitespace-nowrap"
             >
               {t('login_google')}
             </a>
           )}
         </div>
       </div>
+
+      {userInfo && (
+        <div className="md:hidden border-t border-border-subtle/40 px-3 py-2">
+          <nav className="flex items-stretch bg-surface/70 rounded-xl p-1 gap-0.5">
+            <Link
+              href="/workspace"
+              className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-[10px] text-[10px] font-medium transition-all duration-200 ${
+                pathname === '/workspace'
+                  ? 'bg-void shadow-sm text-gold'
+                  : 'text-ink-subtle hover:text-ink-muted active:scale-95'
+              }`}
+            >
+              <Camera size={14} />
+              <span className="tracking-wide">{t('nav_workspace')}</span>
+            </Link>
+            <Link
+              href="/account/reviews"
+              className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-[10px] text-[10px] font-medium transition-all duration-200 ${
+                pathname === '/account/reviews'
+                  ? 'bg-void shadow-sm text-gold'
+                  : 'text-ink-subtle hover:text-ink-muted active:scale-95'
+              }`}
+            >
+              <Clock size={14} />
+              <span className="tracking-wide">{t('nav_history')}</span>
+            </Link>
+            <Link
+              href="/account/usage"
+              className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-[10px] text-[10px] font-medium transition-all duration-200 ${
+                pathname === '/account/usage'
+                  ? 'bg-void shadow-sm text-gold'
+                  : 'text-ink-subtle hover:text-ink-muted active:scale-95'
+              }`}
+            >
+              <BarChart2 size={14} />
+              <span className="tracking-wide">{t('nav_usage')}</span>
+            </Link>
+          </nav>
+        </div>
+      )}
     </header>
   );
 }
