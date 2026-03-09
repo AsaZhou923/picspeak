@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 import logging
 from urllib.parse import quote
 
+from sqlalchemy import case
 from sqlalchemy.orm import Session
 
 from app.api.deps import new_public_id
@@ -153,11 +154,16 @@ def claim_next_pending_review_task(db: Session, *, worker_name: str) -> ReviewTa
     now = datetime.now(timezone.utc)
     candidate = (
         db.query(ReviewTask)
+        .join(User, User.id == ReviewTask.owner_user_id)
         .filter(
             ReviewTask.status == TaskStatus.PENDING,
             (ReviewTask.next_attempt_at.is_(None) | (ReviewTask.next_attempt_at <= now)),
         )
-        .order_by(ReviewTask.next_attempt_at.asc().nullsfirst(), ReviewTask.created_at.asc())
+        .order_by(
+            case((User.plan == UserPlan.pro, 0), else_=1),
+            ReviewTask.next_attempt_at.asc().nullsfirst(),
+            ReviewTask.created_at.asc(),
+        )
         .first()
     )
     if candidate is None:
@@ -345,10 +351,10 @@ def _process_task(db: Session, task: ReviewTask) -> None:
             _handle_failure(
                 db,
                 task,
-                error_code=str(detail.get('code') or 'QUOTA_EXCEEDED'),
-                error_message=str(detail.get('message') or 'Daily quota exceeded'),
-                retryable=False,
-            )
+                    error_code=str(detail.get('code') or 'QUOTA_EXCEEDED'),
+                    error_message=str(detail.get('message') or 'Plan quota exceeded'),
+                    retryable=False,
+                )
             return
 
     review = Review(

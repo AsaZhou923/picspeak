@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import Script from 'next/script';
-import { ArrowRight, Aperture, Zap, Star, BarChart2 } from 'lucide-react';
+import { ArrowRight, Aperture, Zap, Star, BarChart2, Mail } from 'lucide-react';
 import { buildGoogleOAuthUrl } from '@/lib/api';
 import ScoreRing from '@/components/ui/ScoreRing';
 import { useI18n } from '@/lib/i18n';
@@ -48,21 +48,18 @@ export default function HomePage() {
   const TIERS = [
     {
       plan: t('plan_guest_name'),
-      daily: 3,
-      dailyLabel: t('plan_guest_quota'),
-      features: [t('plan_guest_feature'), t('plan_guest_label')],
+      quotaLabel: t('plan_guest_quota'),
+      features: [t('plan_guest_feature'), t('plan_guest_feature_2')],
     },
     {
       plan: t('plan_free_name'),
-      daily: 6,
-      dailyLabel: t('plan_free_quota'),
-      features: [t('plan_free_feature'), 'Google'],
+      quotaLabel: t('plan_free_quota'),
+      features: [t('plan_free_feature'), t('plan_free_feature_2'), t('plan_free_feature_3')],
     },
     {
       plan: t('plan_pro_name'),
-      daily: 12,
-      dailyLabel: t('plan_pro_quota'),
-      features: [t('plan_pro_feature')],
+      quotaLabel: t('plan_pro_quota'),
+      features: [t('plan_pro_feature'), t('plan_pro_feature_2'), t('plan_pro_feature_3')],
       highlight: true,
     },
   ];
@@ -201,40 +198,55 @@ export default function HomePage() {
           <p className="text-xs text-gold/70 font-mono mb-4 tracking-widest uppercase">
             {t('quota_label')}
           </p>
-          <h2 className="font-display text-3xl sm:text-4xl mb-12">{t('quota_headline')}</h2>
+          <h2 className="font-display text-3xl sm:text-4xl mb-4">{t('quota_headline')}</h2>
+          <p className="text-sm text-ink-muted max-w-2xl mb-12 leading-relaxed">
+            {t('quota_subhead')}
+          </p>
 
-          <div className="grid sm:grid-cols-3 gap-px bg-border-subtle">
+          <div className="grid sm:grid-cols-3 gap-4 items-start">
             {TIERS.map((tier) => (
               <div
                 key={tier.plan}
-                className={`bg-void p-8 relative ${tier.highlight ? 'bg-raised' : ''}`}
+                className={`relative rounded-lg border overflow-hidden transition-all duration-300 ${
+                  tier.highlight
+                    ? 'bg-raised border-gold/50 shadow-[0_0_48px_rgba(200,162,104,0.18)] ring-1 ring-gold/20 sm:scale-[1.05] sm:z-10'
+                    : 'bg-raised/20 border-border-subtle'
+                }`}
               >
                 {tier.highlight && (
-                  <span className="absolute top-4 right-4 text-xs text-gold border border-gold/30 rounded px-2 py-0.5">
-                    Pro
-                  </span>
+                  <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-gold to-transparent" />
                 )}
-                <p
-                  className={`font-display text-2xl mb-1 ${
-                    tier.highlight ? 'text-gold' : 'text-ink'
-                  }`}
-                >
-                  {tier.plan}
-                </p>
-                <p className="text-3xl font-display text-ink-muted mb-6">
-                  {tier.dailyLabel}
-                </p>
-                <ul className="space-y-2">
-                  {tier.features.map((f) => (
-                    <li key={f} className="text-sm text-ink-muted flex items-center gap-2">
-                      <span className="w-1 h-1 rounded-full bg-gold/60 shrink-0" />
-                      {f}
-                    </li>
-                  ))}
-                </ul>
+                <div className="p-8">
+                  {tier.highlight && (
+                    <span className="inline-block mb-3 text-xs text-void bg-gold rounded-full px-2.5 py-0.5 font-medium tracking-wide">
+                      Most Popular
+                    </span>
+                  )}
+                  <p
+                    className={`font-display text-2xl mb-1 ${
+                      tier.highlight ? 'text-gold' : 'text-ink'
+                    }`}
+                  >
+                    {tier.plan}
+                  </p>
+                  <p className={`text-3xl font-display mb-6 ${tier.highlight ? 'text-ink' : 'text-ink-muted'}`}>
+                    {tier.quotaLabel}
+                  </p>
+                  <ul className="space-y-2.5">
+                    {tier.features.map((f) => (
+                      <li key={f} className="text-sm text-ink-muted flex items-center gap-2">
+                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${tier.highlight ? 'bg-gold' : 'bg-gold/40'}`} />
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               </div>
             ))}
           </div>
+          <p className="text-xs text-ink-subtle mt-5">
+            {t('quota_payment_note')}
+          </p>
         </div>
       </section>
 
@@ -250,7 +262,50 @@ export default function HomePage() {
           </Link>
         </div>
       </section>
+
+      <section className="px-6 py-16 border-t border-border-subtle">
+        <div className="max-w-5xl mx-auto">
+          <p className="text-xs text-gold/70 font-mono mb-4 tracking-widest uppercase">Contact</p>
+          <h2 className="font-display text-2xl sm:text-3xl mb-8">Get in Touch</h2>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <a
+              href="https://x.com/Zzw_Prime"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 px-5 py-4 border border-border rounded-lg hover:border-gold/40 hover:bg-raised/50 transition-all duration-200 group w-full sm:w-64"
+            >
+              <span className="flex items-center justify-center w-8 h-8 rounded-full border border-border group-hover:border-gold/40 transition-colors shrink-0">
+                <XIcon />
+              </span>
+              <div>
+                <p className="text-sm font-medium text-ink group-hover:text-gold transition-colors">X (Twitter)</p>
+                <p className="text-xs text-ink-subtle mt-0.5">@Zzw_Prime</p>
+              </div>
+            </a>
+            <a
+              href="mailto:xavierzhou23@gmail.com"
+              className="flex items-center gap-3 px-5 py-4 border border-border rounded-lg hover:border-gold/40 hover:bg-raised/50 transition-all duration-200 group w-full sm:w-64"
+            >
+              <span className="flex items-center justify-center w-8 h-8 rounded-full border border-border group-hover:border-gold/40 transition-colors shrink-0">
+                <Mail size={14} className="text-ink-muted group-hover:text-gold transition-colors" />
+              </span>
+              <div>
+                <p className="text-sm font-medium text-ink group-hover:text-gold transition-colors">Email</p>
+                <p className="text-xs text-ink-subtle mt-0.5">xavierzhou23@gmail.com</p>
+              </div>
+            </a>
+          </div>
+        </div>
+      </section>
     </>
+  );
+}
+
+function XIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="text-ink-muted group-hover:text-gold transition-colors">
+      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.746l7.73-8.835L1.254 2.25H8.08l4.259 5.631 5.905-5.631Zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+    </svg>
   );
 }
 

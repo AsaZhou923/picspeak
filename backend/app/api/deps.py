@@ -12,7 +12,7 @@ from app.core.errors import api_error
 from app.core.security import JWTValidationError, create_access_token, validate_access_token
 from app.db.models import User, UserPlan, UserStatus
 from app.db.session import get_db
-from app.services.guard import enforce_guest_api_rate_limit, guest_rate_limit_scope_key
+from app.services.guard import daily_quota_for_plan, enforce_guest_api_rate_limit, guest_rate_limit_scope_key
 
 GUEST_TOKEN_COOKIE = 'ps_guest_token'
 GUEST_TOKEN_TTL_SECONDS = 30 * 24 * 3600
@@ -29,12 +29,7 @@ def new_public_id(prefix: str) -> str:
 
 
 def quota_for_plan(plan: UserPlan) -> int:
-    base = settings.default_daily_quota
-    if plan == UserPlan.guest:
-        return settings.guest_review_limit_per_day
-    if plan == UserPlan.pro:
-        return base * 2
-    return base
+    return daily_quota_for_plan(plan) or 0
 
 
 def _extract_bearer_token(authorization: str | None) -> str:

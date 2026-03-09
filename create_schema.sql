@@ -10,7 +10,7 @@ create table users
         unique,
     password_hash     text,
     plan              user_plan                default 'free'::user_plan     not null,
-    daily_quota_total integer                  default 6                     not null
+    daily_quota_total integer                  default 0                     not null
         constraint users_daily_quota_total_check
             check (daily_quota_total >= 0),
     daily_quota_used  integer                  default 0                     not null

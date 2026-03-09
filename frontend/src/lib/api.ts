@@ -1,6 +1,7 @@
 import {
   ApiException,
   AuthToken,
+  BillingCheckoutResponse,
   PhotoCreateResponse,
   PhotoReviewsResponse,
   PresignRequest,
@@ -103,6 +104,15 @@ export async function authGoogleLogin(idToken: string): Promise<AuthToken> {
 
 export async function getUsage(token: string): Promise<UsageResponse> {
   return request<UsageResponse>('/me/usage', { token, unauthorizedRecovery: 'guest' });
+}
+
+export async function createBillingCheckout(token: string, plan: 'pro'): Promise<BillingCheckoutResponse> {
+  return request<BillingCheckoutResponse>('/billing/checkout', {
+    method: 'POST',
+    body: JSON.stringify({ plan }),
+    token,
+    unauthorizedRecovery: 'guest',
+  });
 }
 
 // ─── Upload ──────────────────────────────────────────────────────────────────

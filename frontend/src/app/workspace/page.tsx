@@ -125,6 +125,10 @@ export default function WorkspacePage() {
 
   const [reviewMode, setReviewMode] = useState<'flash' | 'pro'>('flash');
   const [showQuotaModal, setShowQuotaModal] = useState(false);
+  const remainingQuota =
+    usage?.quota.daily_remaining ?? usage?.quota.monthly_remaining ?? null;
+  const totalQuota =
+    usage?.quota.daily_total ?? usage?.quota.monthly_total ?? null;
 
   // ── Fetch usage ────────────────────────────────────────────────────────────
 
@@ -264,7 +268,7 @@ export default function WorkspacePage() {
   const handleReview = useCallback(async () => {
     if (!photo) return;
     // Guard: check quota before making any API call
-    if (usage && usage.quota.remaining <= 0) {
+    if (usage && remainingQuota !== null && remainingQuota <= 0) {
       setShowQuotaModal(true);
       return;
     }
@@ -306,7 +310,7 @@ export default function WorkspacePage() {
         setErrMessage(t('err_upload'));
       }
     }
-  }, [photo, reviewMode, locale, ensureToken, router, t]);
+  }, [photo, reviewMode, locale, ensureToken, router, t, usage, remainingQuota]);
 
   const handleReset = () => {
     setSelectedFile(null);
@@ -391,11 +395,11 @@ export default function WorkspacePage() {
                 <Info size={11} />
                 {t('usage_remaining')}
                 <span className="text-ink font-medium">
-                  {usage.quota.remaining} / {usage.quota.daily_total}
+                  {remainingQuota ?? '∞'}{totalQuota !== null ? ` / ${totalQuota}` : ''}
                 </span>
                 {t('usage_times')}
               </div>
-              {usage.quota.remaining === 0 && (
+              {remainingQuota === 0 && (
                 <Badge variant="rust">{t('usage_quota_exhausted')}</Badge>
               )}
             </div>

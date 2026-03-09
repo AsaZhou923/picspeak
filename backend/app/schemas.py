@@ -124,10 +124,37 @@ class ReviewHistoryResponse(BaseModel):
     next_cursor: str | None = None
 
 
+class UsageQuota(BaseModel):
+    daily_total: int | None = None
+    daily_used: int | None = None
+    daily_remaining: int | None = None
+    monthly_total: int | None = None
+    monthly_used: int | None = None
+    monthly_remaining: int | None = None
+
+
+class UsageFeatures(BaseModel):
+    review_modes: list[str]
+    history_retention_days: int | None = None
+    priority_queue: bool
+
+
 class UsageResponse(BaseModel):
     plan: str
-    quota: dict[str, int]
+    quota: UsageQuota
+    features: UsageFeatures
     rate_limit: dict[str, Any]
+
+
+class BillingCheckoutRequest(BaseModel):
+    plan: str = Field(pattern='^(pro)$')
+
+
+class BillingCheckoutResponse(BaseModel):
+    status: str
+    plan: str
+    message: str
+    checkout_url: str | None = None
 
 
 class AuthGoogleLoginRequest(BaseModel):

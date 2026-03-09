@@ -12,15 +12,30 @@ export interface AuthToken {
 export interface UsageResponse {
   plan: 'guest' | 'free' | 'pro';
   quota: {
-    daily_total: number;
-    used: number;
-    remaining: number;
+    daily_total: number | null;
+    daily_used: number | null;
+    daily_remaining: number | null;
+    monthly_total: number | null;
+    monthly_used: number | null;
+    monthly_remaining: number | null;
+  };
+  features: {
+    review_modes: Array<'flash' | 'pro'>;
+    history_retention_days: number | null;
+    priority_queue: boolean;
   };
   rate_limit: {
     limit_per_min: number;
     remaining: number;
     reset_at: string;
   };
+}
+
+export interface BillingCheckoutResponse {
+  status: 'placeholder' | 'already_active';
+  plan: 'pro';
+  message: string;
+  checkout_url: string | null;
 }
 
 // ─── Upload ──────────────────────────────────────────────────────────────────

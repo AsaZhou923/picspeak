@@ -41,9 +41,12 @@ from app.db.models import (
     User,
     UserPlan,
     UserStatus,
+    UsageLedger,
 )
 from app.db.session import SessionLocal, get_db
 from app.schemas import (
+    BillingCheckoutRequest,
+    BillingCheckoutResponse,
     PhotoCreateRequest,
     PhotoCreateResponse,
     PhotoReviewsResponse,
@@ -66,14 +69,19 @@ from app.schemas import (
 from app.services.ai import AIReviewError, run_ai_review
 from app.services.content_audit import ContentAuditError, run_content_audit
 from app.services.guard import (
+    guest_usage_snapshot,
+    has_priority_queue,
+    history_retention_days_for_plan,
+    plan_review_modes,
+    review_history_cutoff,
     enforce_guest_review_limits,
     enforce_user_quota,
     guest_rate_limit_scope_key,
-    refresh_user_quota,
     get_idempotency_record,
     hash_request,
     increment_quota,
     save_idempotency_record,
+    user_usage_snapshot,
 )
 from app.services.object_storage import get_object_storage_client
 from app.services.review_task_processor import expire_review_tasks, process_review_task
@@ -493,6 +501,13 @@ def _find_photo_owned(db: Session, photo_public_id: str, owner_user_id: int) -> 
     return photo
 
 
+def _apply_review_history_visibility(query, plan: UserPlan):
+    cutoff = review_history_cutoff(plan)
+    if cutoff is not None:
+        query = query.filter(Review.created_at >= cutoff)
+    return query
+
+
 @router.post('/reviews', response_model=ReviewCreateAsyncResponse | ReviewCreateSyncResponse)
 def create_review(
     payload: ReviewCreateRequest,
@@ -657,6 +672,19 @@ def create_review(
         model_name=ai_response.model_name,
     )
     db.add(review)
+    db.flush()
+    db.add(
+        UsageLedger(
+            user_id=actor.user.id,
+            review_id=review.id,
+            task_id=None,
+            usage_type='review_request',
+            amount=1,
+            unit='count',
+            bill_date=datetime.now(timezone.utc).date(),
+            metadata_json={'mode': payload.mode},
+        )
+    )
     increment_quota(db, actor.user)
     db.commit()
     db.refresh(review)
@@ -719,6 +747,14 @@ def get_review(
     ).first()
     if review is None:
         raise api_error(status.HTTP_404_NOT_FOUND, 'REVIEW_NOT_FOUND', 'Review not found')
+    cutoff = review_history_cutoff(actor.plan)
+    if (
+        cutoff is not None
+        and review.owner_user_id == actor.user.id
+        and not review.is_public
+        and review.created_at < cutoff
+    ):
+        raise api_error(status.HTTP_404_NOT_FOUND, 'REVIEW_NOT_FOUND', 'Review not found')
 
     photo = db.query(Photo).filter(Photo.id == review.photo_id).first()
     db.commit()
@@ -751,6 +787,7 @@ def list_my_reviews(
         .filter(Review.owner_user_id == actor.user.id)
         .order_by(Review.created_at.desc(), Review.id.desc())
     )
+    query = _apply_review_history_visibility(query, actor.plan)
 
     if cursor:
         try:
@@ -795,7 +832,12 @@ def list_photo_reviews(
         db.commit()
         return PhotoReviewsResponse(items=[], next_cursor=None)
 
-    query = db.query(Review).filter(Review.photo_id == photo.id, Review.owner_user_id == actor.user.id).order_by(Review.created_at.desc())
+    query = (
+        db.query(Review)
+        .filter(Review.photo_id == photo.id, Review.owner_user_id == actor.user.id)
+        .order_by(Review.created_at.desc())
+    )
+    query = _apply_review_history_visibility(query, actor.plan)
 
     if cursor:
         try:
@@ -864,16 +906,43 @@ def get_photo_image(
 
 @router.get('/me/usage', response_model=UsageResponse)
 def get_usage(request: Request, db: Session = Depends(get_db), actor: CurrentActor = Depends(get_current_actor)):
-    refresh_user_quota(db, actor.user)
+    quota = (
+        guest_usage_snapshot(db, guest_rate_limit_scope_key(request))
+        if actor.plan == UserPlan.guest
+        else user_usage_snapshot(db, actor.user)
+    )
     db.commit()
     return UsageResponse(
         plan=actor.plan.value,
-        quota={
-            'daily_total': actor.user.daily_quota_total,
-            'used': actor.user.daily_quota_used,
-            'remaining': max(actor.user.daily_quota_total - actor.user.daily_quota_used, 0),
+        quota=quota,
+        features={
+            'review_modes': plan_review_modes(actor.plan),
+            'history_retention_days': history_retention_days_for_plan(actor.plan),
+            'priority_queue': has_priority_queue(actor.plan),
         },
         rate_limit={},
+    )
+
+
+@router.post('/billing/checkout', response_model=BillingCheckoutResponse)
+def create_billing_checkout(
+    payload: BillingCheckoutRequest,
+    db: Session = Depends(get_db),
+    actor: CurrentActor = Depends(get_current_actor),
+):
+    db.commit()
+    if actor.plan == UserPlan.pro:
+        return BillingCheckoutResponse(
+            status='already_active',
+            plan=payload.plan,
+            message='Your account is already on Pro.',
+            checkout_url=None,
+        )
+    return BillingCheckoutResponse(
+        status='placeholder',
+        plan=payload.plan,
+        message='Payment integration placeholder: checkout is not enabled yet.',
+        checkout_url=None,
     )
 
 
