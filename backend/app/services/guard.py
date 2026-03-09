@@ -4,10 +4,12 @@ import hashlib
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING
 
+from fastapi import Request
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.errors import api_error
+from app.core.network import client_ip_from_request, device_key_from_request
 from app.db.models import IdempotencyKey, RateLimitCounter, User, UserPlan
 
 if TYPE_CHECKING:
@@ -100,7 +102,13 @@ def _enforce_scope_rate_limit(
     }
 
 
-def enforce_guest_review_limits(db: Session, actor: 'CurrentActor') -> dict:
+def guest_rate_limit_scope_key(request: Request) -> str:
+    key_basis = device_key_from_request(request) or client_ip_from_request(request) or 'anonymous'
+    hashed_basis = hashlib.sha256(key_basis.encode('utf-8')).hexdigest()
+    return f'guest:{hashed_basis}'
+
+
+def enforce_guest_review_limits(db: Session, actor: 'CurrentActor', scope_key: str) -> dict:
     if actor.plan != UserPlan.guest:
         return {}
 
@@ -108,7 +116,7 @@ def enforce_guest_review_limits(db: Session, actor: 'CurrentActor') -> dict:
     minute_rate = _enforce_scope_rate_limit(
         db,
         scope='guest_review_minute',
-        scope_key=actor.user.public_id,
+        scope_key=scope_key,
         endpoint='review_create',
         per_minute_limit=settings.guest_review_rate_limit_per_minute,
         window_start=minute_window_start(now),
@@ -117,7 +125,7 @@ def enforce_guest_review_limits(db: Session, actor: 'CurrentActor') -> dict:
     day_rate = _enforce_scope_rate_limit(
         db,
         scope='guest_review_daily',
-        scope_key=actor.user.public_id,
+        scope_key=scope_key,
         endpoint='review_create',
         per_minute_limit=settings.guest_review_limit_per_day,
         window_start=day_window_start(now),
@@ -129,7 +137,7 @@ def enforce_guest_review_limits(db: Session, actor: 'CurrentActor') -> dict:
     }
 
 
-def enforce_guest_api_rate_limit(db: Session, actor: 'CurrentActor', endpoint: str) -> dict:
+def enforce_guest_api_rate_limit(db: Session, actor: 'CurrentActor', endpoint: str, scope_key: str) -> dict:
     if actor.plan != UserPlan.guest:
         return {}
 
@@ -137,7 +145,7 @@ def enforce_guest_api_rate_limit(db: Session, actor: 'CurrentActor', endpoint: s
     minute_rate = _enforce_scope_rate_limit(
         db,
         scope='guest_api_minute',
-        scope_key=actor.user.public_id,
+        scope_key=scope_key,
         endpoint=endpoint,
         per_minute_limit=settings.guest_api_rate_limit_per_minute,
         window_start=minute_window_start(now),

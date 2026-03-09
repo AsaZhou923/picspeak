@@ -12,7 +12,7 @@ from app.core.errors import api_error
 from app.core.security import JWTValidationError, create_access_token, validate_access_token
 from app.db.models import User, UserPlan, UserStatus
 from app.db.session import get_db
-from app.services.guard import enforce_guest_api_rate_limit
+from app.services.guard import enforce_guest_api_rate_limit, guest_rate_limit_scope_key
 
 GUEST_TOKEN_COOKIE = 'ps_guest_token'
 GUEST_TOKEN_TTL_SECONDS = 30 * 24 * 3600
@@ -126,6 +126,7 @@ def get_current_actor(
     guest_cookie_token: str | None = Cookie(default=None, alias=GUEST_TOKEN_COOKIE),
 ) -> CurrentActor:
     endpoint = request.url.path
+    scope_key = guest_rate_limit_scope_key(request)
     token: str | None = None
     if authorization:
         token = _extract_bearer_token(authorization)
@@ -136,7 +137,7 @@ def get_current_actor(
         user = _fetch_user_by_token(token, db)
         request.state.current_user_public_id = user.public_id
         actor = CurrentActor(user)
-        enforce_guest_api_rate_limit(db, actor, endpoint)
+        enforce_guest_api_rate_limit(db, actor, endpoint, scope_key)
         _touch_user_login(user, db)
         return actor
 
@@ -145,5 +146,5 @@ def get_current_actor(
     token = issue_guest_token(user)
     bind_guest_token(response, token)
     actor = CurrentActor(user)
-    enforce_guest_api_rate_limit(db, actor, endpoint)
+    enforce_guest_api_rate_limit(db, actor, endpoint, scope_key)
     return actor

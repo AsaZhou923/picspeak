@@ -68,6 +68,7 @@ from app.services.content_audit import ContentAuditError, run_content_audit
 from app.services.guard import (
     enforce_guest_review_limits,
     enforce_user_quota,
+    guest_rate_limit_scope_key,
     refresh_user_quota,
     get_idempotency_record,
     hash_request,
@@ -551,7 +552,7 @@ def create_review(
         return response_sync
 
     if actor.plan == UserPlan.guest:
-        enforce_guest_review_limits(db, actor)
+        enforce_guest_review_limits(db, actor, guest_rate_limit_scope_key(request))
     else:
         enforce_user_quota(db, actor.user)
 
