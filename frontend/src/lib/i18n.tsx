@@ -31,9 +31,9 @@ const translations = {
 
     // Home page
     hero_label: 'AI Photography Critique',
-    hero_headline_1: '让每一张照片',
-    hero_headline_2: '开口说话',
-    hero_desc: '上传你的摄影作品，AI 从构图、光线、色彩、故事与技术五个维度深度解析，给出专业、可落地的改进建议。',
+    hero_headline_1: '专业摄影点评',
+    hero_headline_2: '秒级反馈',
+    hero_desc: '上传照片，AI 从构图、光线、色彩、故事与技术五个维度给出详细点评，提供可落地的改进建议。',
     hero_cta_start: '立即开始评图',
     hero_cta_login: 'Google 登录',
 
@@ -41,8 +41,12 @@ const translations = {
     demo_final_score: '综合评分',
     demo_advantage: '优点',
     demo_suggestion: '建议',
-    demo_advantage_body: '构图遵循黄金分割，前景与远景形成自然层次，整体框架稳健。',
-    demo_suggestion_body: '可适当降低高光区域曝光 0.5 EV，并通过后期微提阴影细节增强整体反差。',
+    demo_advantage_body: '色彩层次极佳：金黄銀杏叶与淡粩蓝渐变天空形成高对比和谐色域；逾光/侧逃光下叶片轮廓光清晰可见，曝光控制精准。',
+    demo_suggestion_body: '退后5–8米并降低视角，将地面落叶纳入为前景引导线；选择日出后20分钟内与微风动态，同步提升立体感与叙事力。',
+    demo_view_example: '查看完整点评示例',
+    demo_review_advantage: '1. 色彩层次极佳：金黄银杏叶与淡粉蓝渐变天空形成高对比、低冲突的和谐色域，符合秋季黄金时刻的典型色温特征（约4500–5500K），饱和度控制得当，未溢出；2. 光线通透性优秀：逆光/侧逆光下叶片边缘产生自然轮廓光，叶脉细节清晰可见，说明曝光精准（高光保留完整，无过曝死白）；3. 构图具备节奏感：左侧稀疏枯枝与右侧浓密树冠形成疏密对比，垂直线条引导视线向上，具一定韵律。',
+    demo_review_critique: '1. 空间纵深弱化：前景与中景银杏树几乎同焦平面，缺乏明确前景元素或地面参照物，导致画面扁平，深度感不足；2. 右侧树冠过密且边缘杂乱，部分枝干穿插形成视觉干扰（如右上角黑枝切割金色区域），削弱主体统一性；3. 故事性缺失：仅呈现季节表象，无时间线索（如落叶动态、人物痕迹、光影移动证据）或环境语境（道路、建筑、地形），沦为典型"打卡式"秋景快照。',
+    demo_review_suggestions: '1. 机位调整：退后5–8米并降低视角至1.2m以下，纳入地面落叶或小径作为前景引导线，增强空间层次；2. 曝光微调：若为RAW拍摄，后期可压高光-15~20（保留叶缘细节），提阴影+10~15（显露出枝干纹理），色温微降200K以强化冷暖对比；3. 拍摄时机优化：选择日出后20分钟内（太阳高度角<10°），利用更斜射光线拉长树影、强化立体感，并等待微风使叶片轻微摆动，捕捉动态模糊提升生命力。',
 
     features_label: '核心能力',
     features_headline: '像专业摄影师一样思考',
@@ -137,7 +141,7 @@ const translations = {
     usage_remaining_label: '/ {total} 次剩余',
     usage_reset_hint: '今日额度已用完，次日 UTC 0:00 自动重置',
     usage_login_unlock_title: '登录解锁更多额度',
-    usage_login_unlock_body: '游客每日仅 3 次评图。Google 登录后升级为 Free 用户，享有每日 6 次评图 + 历史记录保留。',
+    usage_login_unlock_body: '游客每日最多 3 次、每月最多 12 次评图，且不保留历史。Google 登录后升级为 Free 用户，享有每日 6 次评图与历史记录保留。',
     usage_login_now: '立即登录',
     usage_goto_workspace: '前往评图工作台',
 
@@ -259,6 +263,8 @@ const translations = {
     tag_timing: '拍摄时机',
     tag_exposure: '曝光',
     tag_focus: '对焦',
+    review_photo_alt: '被评照片',
+    review_photo_zoom_alt: '被评照片（放大预览）',
   },
 
   en: {
@@ -279,9 +285,9 @@ const translations = {
 
     // Home page
     hero_label: 'AI Photography Critique',
-    hero_headline_1: 'Let every photo',
-    hero_headline_2: 'speak for itself',
-    hero_desc: 'Upload your photographs and receive AI-powered analysis across five dimensions: composition, lighting, color, storytelling, and technique.',
+    hero_headline_1: 'Professional Photography Critique',
+    hero_headline_2: 'in Seconds',
+    hero_desc: 'Upload your photo and get detailed AI critique on composition, lighting, color, storytelling and technique.',
     hero_cta_start: 'Start Critiquing',
     hero_cta_login: 'Sign in with Google',
 
@@ -289,10 +295,12 @@ const translations = {
     demo_final_score: 'Overall Score',
     demo_advantage: 'Strengths',
     demo_suggestion: 'Suggestions',
-    demo_advantage_body: 'The composition follows the golden ratio; the foreground and background create a natural layering effect.',
-    demo_suggestion_body: 'Consider reducing highlight exposure by 0.5 EV and lifting shadows slightly in post to enhance overall contrast.',
-
-    features_label: 'Core Features',
+    demo_advantage_body: 'Excellent color layering: golden ginkgo leaves against a soft-blue gradient sky create a harmonious high-contrast palette. Backlit leaf-edge glow is sharp, with accurate exposure preserving full highlight detail.',
+    demo_suggestion_body: 'Step back 5–8 m and lower the camera to include fallen leaves as a leading-line foreground. Shoot within 20 min of sunrise with a gentle breeze for added depth and narrative.',
+    demo_view_example: 'View full critique example',
+    demo_review_advantage: '1. Color: Golden ginkgo leaves against a soft blue-pink gradient sky form a high-contrast yet harmonious palette matching autumn golden-hour color temperature (~4500–5500 K); saturation is well-controlled with no clipping. 2. Lighting: Back/side-backlight produces clean rim lighting on leaf edges with visible vein detail, confirming precise exposure and fully retained highlights. 3. Composition rhythm: Sparse bare branches on the left balance the dense canopy on the right; vertical lines guide the eye upward with a natural cadence.',
+    demo_review_critique: '1. Flat depth: The foreground and mid-ground ginkgo trees share nearly the same focal plane; no leading-line foreground element or ground anchor makes the image feel flat and lacking depth. 2. Cluttered right canopy: Dense, tangled branches in the upper right — dark limbs cutting across the golden area — disrupt subject unity. 3. No narrative: The shot conveys only seasonal surface with no temporal cues (falling leaves, footprints, shifting light) or environmental context (path, architecture, terrain), making it a typical “check-in” snapshot.',
+    demo_review_suggestions: '1. Camera position: Step back 5–8 m and lower the camera to ~1.2 m; include fallen leaves or a small path as a foreground leading line to add spatial depth. 2. Exposure adjustment: If shooting RAW, pull highlights −15 to −20 (preserve leaf-edge detail) and lift shadows +10 to +15 (reveal branch texture); drop color temperature ~200 K to strengthen the warm-cool contrast. 3. Timing: Shoot within 20 min of sunrise (sun angle < 10°) to lengthen shadows and enhance depth; wait for a light breeze to add subtle motion blur and vitality.',
     features_headline: 'Think like a pro photographer',
     feature_flash_title: 'Flash Critique',
     feature_flash_body: 'Instant response with precise five-dimensional scoring for composition, lighting, color, and more.',
@@ -385,7 +393,7 @@ const translations = {
     usage_remaining_label: '/ {total} remaining',
     usage_reset_hint: 'Quota exhausted. Resets at UTC 00:00.',
     usage_login_unlock_title: 'Sign in to unlock more quota',
-    usage_login_unlock_body: 'Guests get 3 critiques/day. Sign in with Google to upgrade to Free and get 6 critiques/day + history.',
+    usage_login_unlock_body: 'Guests can use up to 3 critiques per day and 12 per month, with no saved history. Sign in with Google to upgrade to Free for 6 critiques per day and saved history.',
     usage_login_now: 'Sign in now',
     usage_goto_workspace: 'Go to Workspace',
 
@@ -507,6 +515,8 @@ const translations = {
     tag_timing: 'Timing',
     tag_exposure: 'Exposure',
     tag_focus: 'Focus',
+    review_photo_alt: 'Photo being reviewed',
+    review_photo_zoom_alt: 'Photo being reviewed (zoomed)',
   },
 
   ja: {
@@ -527,9 +537,9 @@ const translations = {
 
     // Home page
     hero_label: 'AI写真評価',
-    hero_headline_1: 'すべての写真が',
-    hero_headline_2: '語り始める',
-    hero_desc: '写真をアップロードすると、AIが構図・光・色彩・ストーリー・技術の5つの次元から深く分析し、具体的な改善提案をお届けします。',
+    hero_headline_1: 'プロの写真評価を',
+    hero_headline_2: '秒単位で取得',
+    hero_desc: '写真をアップロードすると、AIが構図・光・色彩・ストーリー・技術の5つの次元から詳細な評価と具体的な改善提案をお届けします。',
     hero_cta_start: '今すぐ評価する',
     hero_cta_login: 'Googleでサインイン',
 
@@ -537,10 +547,12 @@ const translations = {
     demo_final_score: '総合スコア',
     demo_advantage: '強み',
     demo_suggestion: '提案',
-    demo_advantage_body: '構図は黄金比に従い、前景と背景が自然な層を形成しています。フレーム全体が安定しています。',
-    demo_suggestion_body: 'ハイライト領域の露出を0.5 EV下げ、後処理でシャドウの細部を少し持ち上げてコントラストを強調してみてください。',
-
-    features_label: 'コア機能',
+    demo_advantage_body: '色彩の層次が優れています：金黄の銀杏の葉と淡い青からピンクのグラデーション空が高対比で調和的な色彩場を生み、逆光/斜めの逃光で葉の輪郭光が骮やかに講影。',
+    demo_suggestion_body: '5–8m後退して視点を下げ、落ち葉を誘導線の前景に組み込む。日出かも20分以内と微風のタイミングを合わせると立体感と物語性が大幅に向上。',
+    demo_view_example: '評価の全文を見る',
+    demo_review_advantage: '1. 色彩の階調が優れている：金黄色のイチョウの葉と淡いピンク〜ブルーのグラデーション空が高コントラストかつ調和的な色域を形成し、秋のゴールデンアワー特有の色温度（絈4500～5500K）に一致。彩度は適切でクリッピングなし。 2. 光線の透明感が高い：逆光・斜め逆光により葉のエッジに自然なリムライトが入り、葉脈のディテールが明竮。ハイライトは飛んでおらず露出が正確。 3. 構図にリズムがある：左の疏らな枕れ枝と右の密な樹冠が密度のコントラストを形成し、垂直な線が視線を上方へ誤導。',
+    demo_review_critique: '1. 奔行き不足：前景と中景のイチョウ並木がほぼ同じ焦点面に収まり、前景の誘導線要素や地面のアンカーがないため画面が平坦に見える。 2. 右側の樹冠が煩雑：密集した枝が絡み合い（右上の黒い枝が金色エリアを分断）、主体の統一感を損なっている。 3. 物語性の欠如：季節の表象のみを提示し、時間的な手がかり（落ち葉の動き・人の痕跡・光の変化）や環境的な文脈（道・建物・地形）がなく、典型的な「映えスポット」スナップになっている。',
+    demo_review_suggestions: '1. 撮影位置の調整：5～8m後退してカメラを約1.2mに下げ、地面の落ち葉や小道を前景の誘導線として取り込み、空間の奔行きを強化。 2. 露出の微調整：RAW撮影の場合、ハイライトを−15～−20（葉縁のディテールを保全）、シャドウを+10～+15（枝の質感を浮き出す）に補正し、色温度を約200K下げて寒暖のコントラストを強調。 3. 撮影タイミング：日の出後20分以内（太陽高度10°未満）に撮影して長い影と立体感を引き出し、微風で葉が軽く摇れる瞬間を捕えて動しの生命感を加える。',
     features_headline: 'プロカメラマンのように考える',
     feature_flash_title: 'Flash 即時評価',
     feature_flash_body: '秒単位の応答で、構図・光・色彩など5次元の精確なスコアをすぐに取得',
@@ -633,7 +645,7 @@ const translations = {
     usage_remaining_label: '/ {total} 回残り',
     usage_reset_hint: '本日のクォータを使い切りました。翌日 UTC 0:00 に自動リセット。',
     usage_login_unlock_title: 'サインインしてクォータを増やす',
-    usage_login_unlock_body: 'ゲストは1日3回まで評価できます。Googleでサインインしてフリープランへアップグレードし、1日6回の評価と履歴保存をお楽しみください。',
+    usage_login_unlock_body: 'ゲストは1日3回まで、かつ1か月12回まで評価できます。履歴は保存されません。Googleでサインインしてフリープランへアップグレードすると、1日6回の評価と履歴保存が利用できます。',
     usage_login_now: '今すぐサインイン',
     usage_goto_workspace: 'ワークスペースへ',
 
@@ -755,6 +767,8 @@ const translations = {
     tag_timing: 'タイミング',
     tag_exposure: '露出',
     tag_focus: 'フォーカス',
+    review_photo_alt: '評価対象の写真',
+    review_photo_zoom_alt: '評価対象の写真（拡大プレビュー）',
   },
 } as const;
 

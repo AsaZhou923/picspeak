@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import Script from 'next/script';
 import { ArrowRight, Aperture, Zap, Star, BarChart2 } from 'lucide-react';
@@ -9,12 +10,16 @@ import { useI18n } from '@/lib/i18n';
 import { siteConfig } from '@/lib/site';
 
 const DEMO_SCORES_KEYS = [
-  { labelKey: 'score_composition' as const, score: 8 },
-  { labelKey: 'score_lighting' as const, score: 7 },
+  { labelKey: 'score_composition' as const, score: 7 },
+  { labelKey: 'score_lighting' as const, score: 8 },
   { labelKey: 'score_color' as const, score: 9 },
-  { labelKey: 'score_story' as const, score: 6 },
+  { labelKey: 'score_story' as const, score: 5 },
   { labelKey: 'score_technical' as const, score: 8 },
 ];
+
+const DEMO_IMAGE_URL =
+  'https://pub-7ae066210514433e84a850bc95c5f1a2.r2.dev/user_108685848365180955307/2026/03/obj_2e7f89c3199643b5.jpg';
+const DEMO_REVIEW_ID = 'rev_35e0951d0df94a1e';
 
 export default function HomePage() {
   const { t } = useI18n();
@@ -111,36 +116,58 @@ export default function HomePage() {
         </div>
 
         <div className="relative mt-20 w-full max-w-2xl animate-slide-up anim-fill-both delay-400">
-          <div className="border border-border-subtle rounded-lg bg-raised/60 backdrop-blur-sm p-6 hover:border-border transition-colors duration-300">
-            <div className="flex items-start justify-between gap-4 mb-4">
-              <div>
-                <p className="text-xs text-ink-subtle mb-1 font-mono">{t('demo_label')}</p>
-                <p className="font-display text-2xl text-gold">7.6</p>
-                <p className="text-xs text-ink-muted mt-0.5">{t('demo_final_score')}</p>
+          <div className="border border-border-subtle rounded-lg bg-raised/60 backdrop-blur-sm overflow-hidden hover:border-border transition-colors duration-300">
+            <div className="flex items-stretch">
+              {/* Actual photo thumbnail */}
+              <div className="relative w-28 sm:w-36 shrink-0">
+                <Image
+                  src={DEMO_IMAGE_URL}
+                  alt="Sample critique — autumn ginkgo trees against blue sky"
+                  fill
+                  className="object-cover"
+                  sizes="144px"
+                />
               </div>
-              <div className="flex flex-wrap gap-3 justify-end score-stagger">
-                {DEMO_SCORES_KEYS.map((d) => (
-                  <div
-                    key={d.labelKey}
-                    className="animate-scale-in anim-fill-both"
-                  >
-                    <ScoreRing
-                      score={d.score}
-                      size={60}
-                      strokeWidth={3}
-                      label={t(d.labelKey)}
-                    />
-                  </div>
-                ))}
+              {/* Score header */}
+              <div className="flex-1 p-5 flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs text-ink-subtle mb-1 font-mono">{t('demo_label')}</p>
+                  <p className="font-display text-2xl text-gold">7.4</p>
+                  <p className="text-xs text-ink-muted mt-0.5">{t('demo_final_score')}</p>
+                </div>
+                <div className="flex flex-wrap gap-2 justify-end score-stagger">
+                  {DEMO_SCORES_KEYS.map((d) => (
+                    <div
+                      key={d.labelKey}
+                      className="animate-scale-in anim-fill-both"
+                    >
+                      <ScoreRing
+                        score={d.score}
+                        size={54}
+                        strokeWidth={3}
+                        label={t(d.labelKey)}
+                      />
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
-            <div className="border-t border-border-subtle pt-4 space-y-2 text-sm text-ink-muted leading-relaxed">
+            <div className="border-t border-border-subtle px-5 py-4 space-y-2 text-sm text-ink-muted leading-relaxed">
               <p>
                 <span className="text-sage font-medium">{t('demo_advantage')}</span> {t('demo_advantage_body')}
               </p>
               <p>
                 <span className="text-gold font-medium">{t('demo_suggestion')}</span> {t('demo_suggestion_body')}
               </p>
+              <div className="pt-1">
+                <Link
+                  href={`/reviews/${DEMO_REVIEW_ID}`}
+                  className="inline-flex items-center gap-1 text-xs text-gold/60 hover:text-gold transition-colors"
+                >
+                  {t('demo_view_example')}
+                  <ArrowRight size={11} />
+                </Link>
+              </div>
             </div>
           </div>
         </div>

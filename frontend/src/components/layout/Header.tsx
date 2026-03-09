@@ -95,9 +95,11 @@ export default function Header() {
           </Link>
           {userInfo && (
             <>
-              <Link href="/account/reviews" className={`transition-colors ${isActive('/account/reviews')}`}>
-                {t('nav_history')}
-              </Link>
+              {userInfo.plan !== 'guest' && (
+                <Link href="/account/reviews" className={`transition-colors ${isActive('/account/reviews')}`}>
+                  {t('nav_history')}
+                </Link>
+              )}
               <Link href="/account/usage" className={`transition-colors ${isActive('/account/usage')}`}>
                 {t('nav_usage')}
               </Link>
@@ -168,17 +170,19 @@ export default function Header() {
               <Camera size={14} />
               <span className="tracking-wide">{t('nav_workspace')}</span>
             </Link>
-            <Link
-              href="/account/reviews"
-              className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-[10px] text-[10px] font-medium transition-all duration-200 ${
-                pathname === '/account/reviews'
-                  ? 'bg-void shadow-sm text-gold'
-                  : 'text-ink-subtle hover:text-ink-muted active:scale-95'
-              }`}
-            >
-              <Clock size={14} />
-              <span className="tracking-wide">{t('nav_history')}</span>
-            </Link>
+            {userInfo.plan !== 'guest' && (
+              <Link
+                href="/account/reviews"
+                className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-[10px] text-[10px] font-medium transition-all duration-200 ${
+                  pathname === '/account/reviews'
+                    ? 'bg-void shadow-sm text-gold'
+                    : 'text-ink-subtle hover:text-ink-muted active:scale-95'
+                }`}
+              >
+                <Clock size={14} />
+                <span className="tracking-wide">{t('nav_history')}</span>
+              </Link>
+            )}
             <Link
               href="/account/usage"
               className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-[10px] text-[10px] font-medium transition-all duration-200 ${

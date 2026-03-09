@@ -28,6 +28,10 @@ def day_window_start(now: datetime) -> datetime:
     return now.replace(hour=0, minute=0, second=0, microsecond=0)
 
 
+def month_window_start(now: datetime) -> datetime:
+    return now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+
 def refresh_user_quota(db: Session, user: User) -> None:
     today = utc_now().date()
     if user.daily_quota_date != today:
@@ -51,6 +55,8 @@ def increment_quota(db: Session, user: User) -> None:
 
 def _quota_for_plan(plan: UserPlan) -> int:
     base = settings.default_daily_quota
+    if plan == UserPlan.guest:
+        return settings.guest_review_limit_per_day
     if plan == UserPlan.pro:
         return base * 2
     return base
@@ -131,9 +137,19 @@ def enforce_guest_review_limits(db: Session, actor: 'CurrentActor', scope_key: s
         window_start=day_window_start(now),
         window_seconds=24 * 3600,
     )
+    month_rate = _enforce_scope_rate_limit(
+        db,
+        scope='guest_review_monthly',
+        scope_key=scope_key,
+        endpoint='review_create',
+        per_minute_limit=settings.guest_review_limit_per_month,
+        window_start=month_window_start(now),
+        window_seconds=31 * 24 * 3600,
+    )
     return {
         'guest_review_minute': minute_rate,
         'guest_review_daily': day_rate,
+        'guest_review_monthly': month_rate,
     }
 
 

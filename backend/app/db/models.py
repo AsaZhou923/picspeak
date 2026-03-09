@@ -161,6 +161,7 @@ class Review(Base):
     schema_version: Mapped[str] = mapped_column(Text, nullable=False, default='1.0')
     result_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     final_score: Mapped[float] = mapped_column(Numeric(4, 2), nullable=False)
+    is_public: Mapped[bool] = mapped_column(nullable=False, default=False, server_default='false')
     input_tokens: Mapped[int | None] = mapped_column(Integer)
     output_tokens: Mapped[int | None] = mapped_column(Integer)
     cost_usd: Mapped[float | None] = mapped_column(Numeric(12, 6))

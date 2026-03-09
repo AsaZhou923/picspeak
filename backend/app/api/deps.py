@@ -30,6 +30,8 @@ def new_public_id(prefix: str) -> str:
 
 def quota_for_plan(plan: UserPlan) -> int:
     base = settings.default_daily_quota
+    if plan == UserPlan.guest:
+        return settings.guest_review_limit_per_day
     if plan == UserPlan.pro:
         return base * 2
     return base

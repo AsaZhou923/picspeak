@@ -521,35 +521,36 @@ def create_review(
                 response_json['result'] = _review_result_payload(result_payload, None)
             return response_json
 
-    existing_review = (
-        db.query(Review)
-        .filter(
-            Review.photo_id == photo.id,
-            Review.owner_user_id == actor.user.id,
-            Review.mode == mode_enum,
-            Review.status == ReviewStatus.SUCCEEDED,
-        )
-        .order_by(Review.created_at.desc(), Review.id.desc())
-        .first()
-    )
-    if existing_review is not None:
-        response_sync = {
-            'review_id': existing_review.public_id,
-            'status': existing_review.status.value,
-            'result': _review_result_payload(existing_review.result_json, existing_review.final_score),
-        }
-        if idempotency_key:
-            save_idempotency_record(
-                db,
-                user_id=actor.user.id,
-                endpoint='/reviews',
-                key=idempotency_key,
-                request_hash=hash_request(payload_dump),
-                http_status=200,
-                response_json=response_sync,
+    if actor.plan != UserPlan.guest:
+        existing_review = (
+            db.query(Review)
+            .filter(
+                Review.photo_id == photo.id,
+                Review.owner_user_id == actor.user.id,
+                Review.mode == mode_enum,
+                Review.status == ReviewStatus.SUCCEEDED,
             )
-            db.commit()
-        return response_sync
+            .order_by(Review.created_at.desc(), Review.id.desc())
+            .first()
+        )
+        if existing_review is not None:
+            response_sync = {
+                'review_id': existing_review.public_id,
+                'status': existing_review.status.value,
+                'result': _review_result_payload(existing_review.result_json, existing_review.final_score),
+            }
+            if idempotency_key:
+                save_idempotency_record(
+                    db,
+                    user_id=actor.user.id,
+                    endpoint='/reviews',
+                    key=idempotency_key,
+                    request_hash=hash_request(payload_dump),
+                    http_status=200,
+                    response_json=response_sync,
+                )
+                db.commit()
+            return response_sync
 
     if actor.plan == UserPlan.guest:
         enforce_guest_review_limits(db, actor, guest_rate_limit_scope_key(request))
@@ -712,7 +713,10 @@ def get_review(
     db: Session = Depends(get_db),
     actor: CurrentActor = Depends(get_current_actor),
 ):
-    review = db.query(Review).filter(Review.public_id == review_id, Review.owner_user_id == actor.user.id).first()
+    review = db.query(Review).filter(
+        Review.public_id == review_id,
+        (Review.owner_user_id == actor.user.id) | (Review.is_public == True),  # noqa: E712
+    ).first()
     if review is None:
         raise api_error(status.HTTP_404_NOT_FOUND, 'REVIEW_NOT_FOUND', 'Review not found')
 
@@ -737,6 +741,10 @@ def list_my_reviews(
     db: Session = Depends(get_db),
     actor: CurrentActor = Depends(get_current_actor),
 ):
+    if actor.plan == UserPlan.guest:
+        db.commit()
+        return ReviewHistoryResponse(items=[], next_cursor=None)
+
     query = (
         db.query(Review, Photo)
         .join(Photo, Photo.id == Review.photo_id)
@@ -783,6 +791,9 @@ def list_photo_reviews(
     actor: CurrentActor = Depends(get_current_actor),
 ):
     photo = _find_photo_owned(db, photo_id, actor.user.id)
+    if actor.plan == UserPlan.guest:
+        db.commit()
+        return PhotoReviewsResponse(items=[], next_cursor=None)
 
     query = db.query(Review).filter(Review.photo_id == photo.id, Review.owner_user_id == actor.user.id).order_by(Review.created_at.desc())
 

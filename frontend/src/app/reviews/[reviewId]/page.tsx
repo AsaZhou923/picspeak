@@ -320,7 +320,7 @@ export default function ReviewPage() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
 
   const SCORE_DIMS = [
     { key: 'composition', label: t('score_composition'), desc: t('score_dim_desc_composition') },
@@ -334,6 +334,8 @@ export default function ReviewPage() {
   const backHref = searchParams.get('back') ?? '/workspace';
   const backLabel = backHref === '/account/reviews' ? t('review_back_history') : t('review_back_workspace');
   const { ensureToken, userInfo } = useAuth();
+
+  const DEMO_REVIEW_ID = 'rev_35e0951d0df94a1e';
 
   const [review, setReview] = useState<ReviewGetResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -410,6 +412,10 @@ export default function ReviewPage() {
   if (!review) return null;
 
   const r = review.result;
+  const isDemoReview = reviewId === DEMO_REVIEW_ID;
+  const displayAdvantage   = isDemoReview && locale !== 'zh' ? t('demo_review_advantage')   : r.advantage;
+  const displayCritique    = isDemoReview && locale !== 'zh' ? t('demo_review_critique')    : r.critique;
+  const displaySuggestions = isDemoReview && locale !== 'zh' ? t('demo_review_suggestions') : r.suggestions;
   const weakestKey = getWeakestDimKey(r.scores);
   const weakestDim = SCORE_DIMS.find((d) => d.key === weakestKey) ?? SCORE_DIMS[0];
   const scoreLabelColor = getScoreLabelColor(r.final_score);
@@ -446,7 +452,7 @@ export default function ReviewPage() {
               >
                 <Image
                   src={photoUrl}
-                  alt="被评照片"
+                  alt={t('review_photo_alt')}
                   width={1200}
                   height={900}
                   className="w-full h-auto object-contain"
@@ -486,7 +492,7 @@ export default function ReviewPage() {
                   return (
                     <div key={d.key} className="group/dim relative">
                       <div className="flex items-center gap-2.5">
-                        <span className={`text-xs w-8 shrink-0 ${isWeakest ? 'text-rust' : 'text-ink-muted'}`}>
+                        <span className={`text-xs w-16 shrink-0 ${isWeakest ? 'text-rust' : 'text-ink-muted'}`}>
                           {d.label}
                         </span>
                         <div className="flex-1 h-1.5 bg-void/50 rounded-full overflow-hidden">
@@ -518,7 +524,7 @@ export default function ReviewPage() {
 
             {/* Meta */}
             <p className="text-xs text-ink-subtle font-mono px-1">
-              {new Date(review.created_at).toLocaleString('zh-CN')} · #{review.review_id.slice(0, 8)}
+              {new Date(review.created_at).toLocaleString(locale)} · #{review.review_id.slice(0, 8)}
             </p>
           </div>
 
@@ -537,7 +543,7 @@ export default function ReviewPage() {
                 <span>·</span>
                 <span className="text-sage">{t('status_succeeded')}</span>
                 <span>·</span>
-                <span>{new Date(review.created_at).toLocaleDateString('zh-CN')}</span>
+                <span>{new Date(review.created_at).toLocaleDateString(locale)}</span>
               </div>
             </div>
 
@@ -550,13 +556,15 @@ export default function ReviewPage() {
                 <Upload size={13} />
                 {t('review_btn_upload_next')}
               </button>
-              <Link
-                href="/account/reviews"
-                className="flex items-center gap-2 px-4 py-2 border border-border text-ink-muted text-sm rounded hover:border-gold/40 hover:text-gold transition-colors"
-              >
-                <History size={13} />
-                {t('review_btn_history_all')}
-              </Link>
+              {userInfo?.plan !== 'guest' && (
+                <Link
+                  href="/account/reviews"
+                  className="flex items-center gap-2 px-4 py-2 border border-border text-ink-muted text-sm rounded hover:border-gold/40 hover:text-gold transition-colors"
+                >
+                  <History size={13} />
+                  {t('review_btn_history_all')}
+                </Link>
+              )}
               <button
                 onClick={() => router.push('/workspace')}
                 className="flex items-center gap-2 px-3 py-2 text-ink-subtle text-xs rounded hover:text-ink-muted transition-colors"
@@ -576,7 +584,7 @@ export default function ReviewPage() {
                 bgColor="bg-sage/5"
                 icon={<ThumbsUp size={13} />}
                 title={t('review_advantage')}
-                body={r.advantage}
+                body={displayAdvantage}
               />
               <div className="border-t border-border-subtle" />
               <CritiqueSection
@@ -585,7 +593,7 @@ export default function ReviewPage() {
                 bgColor="bg-rust/5"
                 icon={<AlertTriangle size={13} />}
                 title={t('review_critique')}
-                body={r.critique}
+                body={displayCritique}
               />
               <div className="border-t border-border-subtle" />
               <CritiqueSection
@@ -594,7 +602,7 @@ export default function ReviewPage() {
                 bgColor="bg-gold/5"
                 icon={<Lightbulb size={13} />}
                 title={t('review_suggestions')}
-                body={r.suggestions}
+                body={displaySuggestions}
                 showTags
               />
             </div>
@@ -644,7 +652,7 @@ export default function ReviewPage() {
           >
             <Image
               src={photoUrl}
-              alt="被评照片（预览）"
+              alt={t('review_photo_zoom_alt')}
               width={2400}
               height={1800}
               className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl"
