@@ -66,7 +66,9 @@ from app.schemas import (
 from app.services.ai import AIReviewError, run_ai_review
 from app.services.content_audit import ContentAuditError, run_content_audit
 from app.services.guard import (
+    enforce_guest_review_limits,
     enforce_user_quota,
+    guest_rate_limit_scope_key,
     refresh_user_quota,
     get_idempotency_record,
     hash_request,
@@ -501,7 +503,7 @@ def create_review(
     if actor.plan == UserPlan.guest and payload.mode == ReviewMode.pro.value:
         raise api_error(status.HTTP_403_FORBIDDEN, 'PLAN_MODE_FORBIDDEN', 'Guest users cannot use pro review mode')
 
-    enforce_user_quota(db, actor.user)
+    mode_enum = ReviewMode(payload.mode)
 
     photo = _find_photo_owned(db, payload.photo_id, actor.user.id)
     if photo.status != PhotoStatus.READY:
@@ -519,7 +521,40 @@ def create_review(
                 response_json['result'] = _review_result_payload(result_payload, None)
             return response_json
 
-    mode_enum = ReviewMode(payload.mode)
+    existing_review = (
+        db.query(Review)
+        .filter(
+            Review.photo_id == photo.id,
+            Review.owner_user_id == actor.user.id,
+            Review.mode == mode_enum,
+            Review.status == ReviewStatus.SUCCEEDED,
+        )
+        .order_by(Review.created_at.desc(), Review.id.desc())
+        .first()
+    )
+    if existing_review is not None:
+        response_sync = {
+            'review_id': existing_review.public_id,
+            'status': existing_review.status.value,
+            'result': _review_result_payload(existing_review.result_json, existing_review.final_score),
+        }
+        if idempotency_key:
+            save_idempotency_record(
+                db,
+                user_id=actor.user.id,
+                endpoint='/reviews',
+                key=idempotency_key,
+                request_hash=hash_request(payload_dump),
+                http_status=200,
+                response_json=response_sync,
+            )
+            db.commit()
+        return response_sync
+
+    if actor.plan == UserPlan.guest:
+        enforce_guest_review_limits(db, actor, guest_rate_limit_scope_key(request))
+    else:
+        enforce_user_quota(db, actor.user)
 
     if payload.async_mode:
         task = ReviewTask(

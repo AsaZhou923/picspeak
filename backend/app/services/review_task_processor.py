@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import new_public_id
 from app.core.config import settings
 from app.core.errors import ApiHTTPException
-from app.db.models import Photo, PhotoStatus, Review, ReviewMode, ReviewStatus, ReviewTask, TaskStatus, UsageLedger, User
+from app.db.models import Photo, PhotoStatus, Review, ReviewMode, ReviewStatus, ReviewTask, TaskStatus, UsageLedger, User, UserPlan
 from app.db.session import SessionLocal
 from app.services.ai import AIReviewError, run_ai_review
 from app.services.content_audit import ContentAuditError, run_content_audit
@@ -335,20 +335,21 @@ def _process_task(db: Session, task: ReviewTask) -> None:
         _handle_failure(db, task, error_code='USER_NOT_FOUND', error_message='Task owner not found', retryable=False)
         return
 
-    try:
-        enforce_user_quota(db, owner)
-    except ApiHTTPException as exc:
-        db.rollback()
-        task = db.query(ReviewTask).filter(ReviewTask.id == task.id).first() or task
-        detail = exc.detail if isinstance(exc.detail, dict) else {'message': str(exc.detail)}
-        _handle_failure(
-            db,
-            task,
-            error_code=str(detail.get('code') or 'QUOTA_EXCEEDED'),
-            error_message=str(detail.get('message') or 'Daily quota exceeded'),
-            retryable=False,
-        )
-        return
+    if owner.plan != UserPlan.guest:
+        try:
+            enforce_user_quota(db, owner)
+        except ApiHTTPException as exc:
+            db.rollback()
+            task = db.query(ReviewTask).filter(ReviewTask.id == task.id).first() or task
+            detail = exc.detail if isinstance(exc.detail, dict) else {'message': str(exc.detail)}
+            _handle_failure(
+                db,
+                task,
+                error_code=str(detail.get('code') or 'QUOTA_EXCEEDED'),
+                error_message=str(detail.get('message') or 'Daily quota exceeded'),
+                retryable=False,
+            )
+            return
 
     review = Review(
         public_id=new_public_id('rev'),

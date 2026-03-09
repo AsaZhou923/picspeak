@@ -2,13 +2,18 @@ from __future__ import annotations
 
 import hashlib
 from datetime import datetime, timedelta, timezone
+from typing import TYPE_CHECKING
 
+from fastapi import Request
 from sqlalchemy.orm import Session
 
-from app.api.deps import CurrentActor, quota_for_plan
 from app.core.config import settings
 from app.core.errors import api_error
+from app.core.network import client_ip_from_request, device_key_from_request
 from app.db.models import IdempotencyKey, RateLimitCounter, User, UserPlan
+
+if TYPE_CHECKING:
+    from app.api.deps import CurrentActor
 
 
 def utc_now() -> datetime:
@@ -19,9 +24,8 @@ def minute_window_start(now: datetime) -> datetime:
     return now.replace(second=0, microsecond=0)
 
 
-def ten_second_window_start(now: datetime) -> datetime:
-    aligned = now.second - (now.second % 10)
-    return now.replace(second=aligned, microsecond=0)
+def day_window_start(now: datetime) -> datetime:
+    return now.replace(hour=0, minute=0, second=0, microsecond=0)
 
 
 def refresh_user_quota(db: Session, user: User) -> None:
@@ -29,7 +33,7 @@ def refresh_user_quota(db: Session, user: User) -> None:
     if user.daily_quota_date != today:
         user.daily_quota_date = today
         user.daily_quota_used = 0
-    user.daily_quota_total = quota_for_plan(user.plan)
+    user.daily_quota_total = _quota_for_plan(user.plan)
     db.add(user)
 
 
@@ -45,12 +49,11 @@ def increment_quota(db: Session, user: User) -> None:
     db.add(user)
 
 
-def _tier_rate_limit(plan: UserPlan, base_limit: int) -> int:
-    if plan == UserPlan.guest:
-        return max(base_limit // 2, 1)
+def _quota_for_plan(plan: UserPlan) -> int:
+    base = settings.default_daily_quota
     if plan == UserPlan.pro:
-        return base_limit * 2
-    return base_limit
+        return base * 2
+    return base
 
 
 def _enforce_scope_rate_limit(
@@ -99,65 +102,57 @@ def _enforce_scope_rate_limit(
     }
 
 
-def enforce_rate_limit(db: Session, actor: CurrentActor, endpoint: str, client_ip: str | None = None) -> dict:
+def guest_rate_limit_scope_key(request: Request) -> str:
+    key_basis = device_key_from_request(request) or client_ip_from_request(request) or 'anonymous'
+    hashed_basis = hashlib.sha256(key_basis.encode('utf-8')).hexdigest()
+    return f'guest:{hashed_basis}'
+
+
+def enforce_guest_review_limits(db: Session, actor: 'CurrentActor', scope_key: str) -> dict:
+    if actor.plan != UserPlan.guest:
+        return {}
+
     now = utc_now()
-    window_start = minute_window_start(now)
-    window_seconds = 60
-
-    user_limit = _tier_rate_limit(actor.plan, settings.rate_limit_per_minute)
-    ip_limit = _tier_rate_limit(actor.plan, settings.ip_rate_limit_per_minute)
-
-    user_rate = _enforce_scope_rate_limit(
+    minute_rate = _enforce_scope_rate_limit(
         db,
-        scope='user',
-        scope_key=actor.user.public_id,
-        endpoint=endpoint,
-        per_minute_limit=user_limit,
-        window_start=window_start,
-        window_seconds=window_seconds,
+        scope='guest_review_minute',
+        scope_key=scope_key,
+        endpoint='review_create',
+        per_minute_limit=settings.guest_review_rate_limit_per_minute,
+        window_start=minute_window_start(now),
+        window_seconds=60,
     )
-
-    ip_rate = None
-    if client_ip:
-        ip_rate = _enforce_scope_rate_limit(
-            db,
-            scope='ip',
-            scope_key=client_ip,
-            endpoint=endpoint,
-            per_minute_limit=ip_limit,
-            window_start=window_start,
-            window_seconds=window_seconds,
-        )
-
-    guest_ip_rate = None
-    guest_burst_rate = None
-    if actor.plan == UserPlan.guest and client_ip:
-        guest_ip_rate = _enforce_scope_rate_limit(
-            db,
-            scope='guest_ip',
-            scope_key=client_ip,
-            endpoint='guest_all',
-            per_minute_limit=settings.guest_ip_rate_limit_per_minute,
-            window_start=window_start,
-            window_seconds=window_seconds,
-        )
-
-        burst_window_start = ten_second_window_start(now)
-        guest_burst_rate = _enforce_scope_rate_limit(
-            db,
-            scope='guest_ip_burst',
-            scope_key=client_ip,
-            endpoint='guest_all',
-            per_minute_limit=settings.guest_burst_limit_per_10s,
-            window_start=burst_window_start,
-            window_seconds=10,
-        )
-
+    day_rate = _enforce_scope_rate_limit(
+        db,
+        scope='guest_review_daily',
+        scope_key=scope_key,
+        endpoint='review_create',
+        per_minute_limit=settings.guest_review_limit_per_day,
+        window_start=day_window_start(now),
+        window_seconds=24 * 3600,
+    )
     return {
-        'user': user_rate,
-        'ip': ip_rate,
-        'guest_ip': guest_ip_rate,
-        'guest_burst': guest_burst_rate,
+        'guest_review_minute': minute_rate,
+        'guest_review_daily': day_rate,
+    }
+
+
+def enforce_guest_api_rate_limit(db: Session, actor: 'CurrentActor', endpoint: str, scope_key: str) -> dict:
+    if actor.plan != UserPlan.guest:
+        return {}
+
+    now = utc_now()
+    minute_rate = _enforce_scope_rate_limit(
+        db,
+        scope='guest_api_minute',
+        scope_key=scope_key,
+        endpoint=endpoint,
+        per_minute_limit=settings.guest_api_rate_limit_per_minute,
+        window_start=minute_window_start(now),
+        window_seconds=60,
+    )
+    return {
+        'guest_api_minute': minute_rate,
     }
 
 
