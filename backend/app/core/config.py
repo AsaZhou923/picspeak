@@ -27,8 +27,9 @@ class Settings(BaseSettings):
 
     rate_limit_per_minute: int = 10
     ip_rate_limit_per_minute: int = 30
-    guest_ip_rate_limit_per_minute: int = 8
-    guest_burst_limit_per_10s: int = 8
+    guest_api_rate_limit_per_minute: int = 60
+    guest_review_rate_limit_per_minute: int = 4
+    guest_review_limit_per_day: int = 6
     default_daily_quota: int = 6
 
     oauth_jwt_secret: str = 'change-me-jwt-secret'

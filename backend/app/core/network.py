@@ -13,3 +13,14 @@ def client_ip_from_request(request: Request) -> str | None:
     if request.client:
         return request.client.host
     return None
+
+
+def device_key_from_request(request: Request) -> str | None:
+    device_id = request.headers.get('x-device-id', '').strip()
+    if device_id:
+        return f'device:{device_id[:128]}'
+
+    user_agent = request.headers.get('user-agent', '').strip()
+    if user_agent:
+        return f'ua:{user_agent[:256]}'
+    return None

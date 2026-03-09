@@ -12,6 +12,7 @@ from app.core.errors import api_error
 from app.core.security import JWTValidationError, create_access_token, validate_access_token
 from app.db.models import User, UserPlan, UserStatus
 from app.db.session import get_db
+from app.services.guard import enforce_guest_api_rate_limit
 
 GUEST_TOKEN_COOKIE = 'ps_guest_token'
 GUEST_TOKEN_TTL_SECONDS = 30 * 24 * 3600
@@ -29,8 +30,6 @@ def new_public_id(prefix: str) -> str:
 
 def quota_for_plan(plan: UserPlan) -> int:
     base = settings.default_daily_quota
-    if plan == UserPlan.guest:
-        return max(base // 2, 1)
     if plan == UserPlan.pro:
         return base * 2
     return base
@@ -126,6 +125,7 @@ def get_current_actor(
     authorization: str | None = Header(default=None),
     guest_cookie_token: str | None = Cookie(default=None, alias=GUEST_TOKEN_COOKIE),
 ) -> CurrentActor:
+    endpoint = request.url.path
     token: str | None = None
     if authorization:
         token = _extract_bearer_token(authorization)
@@ -135,11 +135,15 @@ def get_current_actor(
     if token:
         user = _fetch_user_by_token(token, db)
         request.state.current_user_public_id = user.public_id
+        actor = CurrentActor(user)
+        enforce_guest_api_rate_limit(db, actor, endpoint)
         _touch_user_login(user, db)
-        return CurrentActor(user)
+        return actor
 
     user = create_guest_user(db)
     request.state.current_user_public_id = user.public_id
     token = issue_guest_token(user)
     bind_guest_token(response, token)
-    return CurrentActor(user)
+    actor = CurrentActor(user)
+    enforce_guest_api_rate_limit(db, actor, endpoint)
+    return actor
