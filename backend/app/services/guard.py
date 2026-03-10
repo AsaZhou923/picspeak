@@ -33,6 +33,15 @@ def month_window_start(now: datetime) -> datetime:
     return now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
 
+def month_window_seconds(now: datetime) -> int:
+    start = month_window_start(now)
+    if start.month == 12:
+        next_start = start.replace(year=start.year + 1, month=1)
+    else:
+        next_start = start.replace(month=start.month + 1)
+    return int((next_start - start).total_seconds())
+
+
 def refresh_user_quota(db: Session, user: User) -> None:
     today = utc_now().date()
     if user.daily_quota_date != today:
@@ -70,6 +79,8 @@ def daily_quota_for_plan(plan: UserPlan) -> int | None:
 
 
 def monthly_quota_for_plan(plan: UserPlan) -> int | None:
+    if plan == UserPlan.guest:
+        return settings.guest_review_limit_per_month
     if plan == UserPlan.free:
         return settings.free_review_limit_per_month
     if plan == UserPlan.pro:
@@ -140,14 +151,23 @@ def guest_usage_snapshot(db: Session, scope_key: str, *, now: datetime | None = 
         window_start=day_window_start(current),
         window_seconds=24 * 3600,
     )
+    monthly_used = _counter_hit_count(
+        db,
+        scope='guest_review_monthly',
+        scope_key=scope_key,
+        endpoint='review_create',
+        window_start=month_window_start(current),
+        window_seconds=month_window_seconds(current),
+    )
     daily_total = settings.guest_review_limit_per_day
+    monthly_total = settings.guest_review_limit_per_month
     return {
         'daily_total': daily_total,
         'daily_used': daily_used,
         'daily_remaining': max(daily_total - daily_used, 0),
-        'monthly_total': None,
-        'monthly_used': None,
-        'monthly_remaining': None,
+        'monthly_total': monthly_total,
+        'monthly_used': monthly_used,
+        'monthly_remaining': max(monthly_total - monthly_used, 0),
     }
 
 
@@ -264,9 +284,19 @@ def enforce_guest_review_limits(db: Session, actor: 'CurrentActor', scope_key: s
         window_start=day_window_start(now),
         window_seconds=24 * 3600,
     )
+    month_rate = _enforce_scope_rate_limit(
+        db,
+        scope='guest_review_monthly',
+        scope_key=scope_key,
+        endpoint='review_create',
+        per_minute_limit=settings.guest_review_limit_per_month,
+        window_start=month_window_start(now),
+        window_seconds=month_window_seconds(now),
+    )
     return {
         'guest_review_minute': minute_rate,
         'guest_review_daily': day_rate,
+        'guest_review_monthly': month_rate,
     }
 
 
