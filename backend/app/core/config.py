@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     guest_api_rate_limit_per_minute: int = 60
     guest_review_rate_limit_per_minute: int = 4
     guest_review_limit_per_day: int = 5
+    guest_review_limit_per_month: int = 50
     free_review_limit_per_day: int = 10
     free_review_limit_per_month: int = 100
     pro_review_limit_per_month: int = 1000
