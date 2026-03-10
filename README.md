@@ -10,9 +10,8 @@
 
 ## 截图
 
-> 📸 将应用截图放入 `docs/screenshots/` 文件夹后，取消下方注释即可在 README 中展示。
 
-<!--
+
 | 主页 | 点评结果 |
 |------|---------|
 | ![主页](docs/screenshots/home.png) | ![点评结果](docs/screenshots/review.png) |
@@ -20,7 +19,7 @@
 | 历史记录 | 移动端 |
 |---------|-------|
 | ![历史记录](docs/screenshots/history.png) | ![移动端](docs/screenshots/mobile.png) |
--->
+
 
 ---
 
