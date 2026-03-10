@@ -90,6 +90,9 @@ export default function Header() {
 
         {/* Nav */}
         <nav className="hidden md:flex items-center gap-6 text-sm">
+          <Link href="/" className={`transition-colors ${isActive('/')}`}>
+            {t('nav_home')}
+          </Link>
           <Link href="/workspace" className={`transition-colors ${isActive('/workspace')}`}>
             {t('nav_workspace')}
           </Link>

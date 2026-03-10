@@ -37,6 +37,23 @@ function getWeakestDimKey(scores: ReviewScores): keyof ReviewScores {
   return dims.reduce((weakest, d) => (scores[d] < scores[weakest] ? d : weakest), dims[0]);
 }
 
+function generateScoreSummary(
+  scores: ReviewScores,
+  dims: { key: string; label: string }[],
+  locale: string,
+): string {
+  const sorted = [...dims].sort(
+    (a, b) =>
+      (scores as unknown as Record<string, number>)[b.key] -
+      (scores as unknown as Record<string, number>)[a.key],
+  );
+  const top = sorted[0];
+  const bottom = sorted[sorted.length - 1];
+  if (locale === 'zh') return `${top.label}为本次亮点，${bottom.label}有提升空间`;
+  if (locale === 'ja') return `${top.label}が際立っており、${bottom.label}を伸ばす余地があります`;
+  return `${top.label} is the highlight; ${bottom.label} has room to grow`;
+}
+
 // ─── Suggestion tag detection ─────────────────────────────────────────────────
 
 type TagKey = 'pre' | 'post' | 'composition' | 'timing' | 'exposure' | 'focus';
@@ -425,6 +442,7 @@ export default function ReviewPage() {
     : r.final_score >= 6.0 ? t('score_label_above_avg')
     : r.final_score >= 4.0 ? t('score_label_average')
     : t('score_label_weak');
+  const scoreSummary = generateScoreSummary(r.scores, SCORE_DIMS, locale);
 
   return (
     <div className="pt-14 min-h-screen">
@@ -433,59 +451,60 @@ export default function ReviewPage() {
         {/* Back */}
         <button
           onClick={() => router.push(backHref)}
-          className="flex items-center gap-1.5 text-xs text-ink-subtle hover:text-ink-muted transition-colors mb-8"
+          className="flex items-center gap-1.5 text-xs text-ink-subtle hover:text-ink-muted transition-colors mb-6"
         >
           <ArrowLeft size={12} />
           {backLabel}
         </button>
 
+        {/* ── Score hero strip ─────────────────────────────────────────────── */}
+        <div className="mb-6 rounded-xl border border-border-subtle bg-raised/50 px-6 py-5 flex items-center gap-5">
+          <FinalScoreRing score={r.final_score} />
+          <div className="min-w-0">
+            <div className={`font-display text-2xl leading-none ${scoreLabelColor}`}>{scoreLabel}</div>
+            <div className="text-xs text-ink-muted mt-1.5 leading-relaxed">{t('review_score_dims_basis')}</div>
+          </div>
+          <div className="ml-auto hidden sm:flex items-center gap-1.5 text-xs text-ink-subtle">
+            <TrendingDown size={11} className="text-rust shrink-0" />
+            <span>{t('review_score_lowest')}:</span>
+            <span className="text-rust/70 ml-0.5">{weakestDim.label}</span>
+          </div>
+        </div>
+
         {/* ── Two-column layout ───────────────────────────────────────────── */}
-        <div className="grid lg:grid-cols-[45%_1fr] gap-8 items-start">
+        <div className="grid lg:grid-cols-[360px_1fr] gap-8 items-start">
 
           {/* ── LEFT: Photo + Scores ──────────────────────────────────────── */}
-          <div className="lg:sticky lg:top-20 space-y-4">
-            {photoUrl && !photoError ? (
-              <div
-                className="photo-frame relative rounded-lg overflow-hidden bg-raised border border-border-subtle cursor-zoom-in group"
-                onClick={() => setZoomOpen(true)}
-                title={t('img_zoom_label')}
-              >
-                <Image
-                  src={photoUrl}
-                  alt={t('review_photo_alt')}
-                  width={1200}
-                  height={900}
-                  className="w-full h-auto object-contain"
-                  onError={() => setPhotoError(true)}
-                  unoptimized
-                />
-                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-void/30">
-                  <ZoomIn size={32} className="text-white drop-shadow-lg" />
-                </div>
-              </div>
-            ) : (
-              <div className="rounded-lg bg-raised border border-border-subtle flex items-center justify-center h-64 text-ink-subtle text-sm">
-                {t('review_no_image')}
-              </div>
-            )}
-
-            {/* Score panel */}
-            <div className="border border-border-subtle rounded-lg bg-raised px-5 py-4 space-y-4">
-              {/* Overall score + label */}
-              <div className="flex items-center gap-4">
-                <FinalScoreRing score={r.final_score} />
-                <div className="min-w-0">
-                  <div className={`font-display text-2xl leading-none ${scoreLabelColor}`}>
-                    {scoreLabel}
-                  </div>
-                  <div className="text-xs text-ink-subtle mt-2 leading-relaxed">
-                    {t('review_score_dims_basis')}
+          <div className="lg:sticky lg:top-20">
+            <div className="rounded-xl overflow-hidden border border-border-subtle bg-raised">
+              {/* Photo */}
+              {photoUrl && !photoError ? (
+                <div
+                  className="photo-frame relative cursor-zoom-in group"
+                  onClick={() => setZoomOpen(true)}
+                  title={t('img_zoom_label')}
+                >
+                  <Image
+                    src={photoUrl}
+                    alt={t('review_photo_alt')}
+                    width={1200}
+                    height={900}
+                    className="w-full h-auto object-contain max-h-[65vh]"
+                    onError={() => setPhotoError(true)}
+                    unoptimized
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-void/30">
+                    <ZoomIn size={32} className="text-white drop-shadow-lg" />
                   </div>
                 </div>
-              </div>
+              ) : (
+                <div className="flex items-center justify-center h-64 text-ink-subtle text-sm">
+                  {t('review_no_image')}
+                </div>
+              )}
 
-              {/* Dimension scores — horizontal bars */}
-              <div className="border-t border-border-subtle pt-4 space-y-2">
+              {/* Dimension scores */}
+              <div className="border-t border-border-subtle px-5 py-4 space-y-2">
                 {SCORE_DIMS.map((d) => {
                   const score = (r.scores as unknown as Record<string, number>)[d.key] ?? 0;
                   const isWeakest = d.key === weakestKey;
@@ -516,16 +535,15 @@ export default function ReviewPage() {
                     </div>
                   );
                 })}
-                <p className="text-[11px] text-ink-subtle/60 pt-0.5">
-                  {t('review_score_lowest')}: <span className="text-rust/70">{weakestDim.label}</span>
+              </div>
+
+              {/* Meta footer */}
+              <div className="border-t border-border-subtle px-5 py-2.5">
+                <p className="text-xs text-ink-subtle font-mono">
+                  {new Date(review.created_at).toLocaleString(locale)} · #{review.review_id.slice(0, 8)}
                 </p>
               </div>
             </div>
-
-            {/* Meta */}
-            <p className="text-xs text-ink-subtle font-mono px-1">
-              {new Date(review.created_at).toLocaleString(locale)} · #{review.review_id.slice(0, 8)}
-            </p>
           </div>
 
           {/* ── RIGHT: Results ───────────────────────────────────────────── */}
@@ -534,7 +552,8 @@ export default function ReviewPage() {
             {/* Header */}
             <div>
               <p className="text-xs text-gold/70 font-mono mb-2 tracking-widest uppercase">— {t('review_page_label')}</p>
-              <h1 className="font-display text-3xl sm:text-4xl mb-3">{t('review_page_headline')}</h1>
+              <h1 className="font-display text-3xl sm:text-4xl mb-2">{t('review_page_headline')}</h1>
+              <p className="text-sm text-ink-muted mb-3 leading-relaxed">{scoreSummary}</p>
               {/* Metadata row: mode · status · date */}
               <div className="flex items-center gap-2 text-xs text-ink-subtle">
                 <span className={review.mode === 'pro' ? 'text-gold font-medium' : 'text-ink-muted'}>

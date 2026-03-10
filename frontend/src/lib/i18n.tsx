@@ -15,6 +15,7 @@ export const LOCALE_LABELS: Record<Locale, string> = {
 const translations = {
   zh: {
     // Header
+    nav_home: '首页',
     nav_workspace: '评图工作台',
     nav_history: '评图历史',
     nav_usage: '我的额度',
@@ -293,6 +294,7 @@ const translations = {
 
   en: {
     // Header
+    nav_home: 'Home',
     nav_workspace: 'Workspace',
     nav_history: 'History',
     nav_usage: 'Quota',
@@ -569,6 +571,7 @@ const translations = {
 
   ja: {
     // Header
+    nav_home: 'ホーム',
     nav_workspace: '評価ワークスペース',
     nav_history: '評価履歴',
     nav_usage: 'クォータ',

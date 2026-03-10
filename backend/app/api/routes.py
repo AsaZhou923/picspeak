@@ -757,11 +757,16 @@ def get_review(
         raise api_error(status.HTTP_404_NOT_FOUND, 'REVIEW_NOT_FOUND', 'Review not found')
 
     photo = db.query(Photo).filter(Photo.id == review.photo_id).first()
+    if photo is not None:
+        photo_owner = db.query(User).filter(User.id == photo.owner_user_id).first()
+        photo_url = _build_photo_proxy_url(request, photo.public_id, photo_owner.public_id) if photo_owner else None
+    else:
+        photo_url = None
     db.commit()
     return ReviewGetResponse(
         review_id=review.public_id,
         photo_id=photo.public_id if photo else 'unknown',
-        photo_url=_build_photo_proxy_url(request, photo.public_id, actor.user.public_id) if photo else None,
+        photo_url=photo_url,
         mode=review.mode.value,
         status=review.status.value,
         result=_review_result_payload(review.result_json, review.final_score),
