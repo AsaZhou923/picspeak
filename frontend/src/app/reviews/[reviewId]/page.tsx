@@ -1,13 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowLeft, History, RotateCcw, AlertCircle, ThumbsUp, AlertTriangle, Lightbulb, Upload, TrendingDown, ZoomIn, X, Copy, Check, LogIn } from 'lucide-react';
-import { getReview, buildGoogleOAuthUrl } from '@/lib/api';
+import { ArrowLeft, History, RotateCcw, AlertCircle, ThumbsUp, AlertTriangle, Lightbulb, Upload, TrendingDown, ZoomIn, X, Copy, Check, LogIn, Sparkles } from 'lucide-react';
+import { getReview, getUsage, buildGoogleOAuthUrl } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
-import { ReviewGetResponse, ApiException, ReviewScores } from '@/lib/types';
+import { ReviewGetResponse, ApiException, ReviewScores, UsageResponse } from '@/lib/types';
 import { FinalScoreRing } from '@/components/ui/ScoreRing';
 import { SkeletonBlock } from '@/components/ui/LoadingSpinner';
 import { useI18n } from '@/lib/i18n';
@@ -258,6 +258,28 @@ function parsePointWithTitle(raw: string): { title: string; detail: string } {
   return { title: '', detail: text.trim() };
 }
 
+// ─── Score dimension → suggestion tag mapping ─────────────────────────────────
+// Each dimension maps to an ordered list of tag candidates to try.
+// The first tag whose corresponding card exists in the DOM is used.
+// Rationale for non-obvious mappings:
+//   lighting  → exposure first (camera exposure adjustment), then post (RAW correction)
+//   color     → post first (color grading / white balance), then exposure (WB in-camera)
+//   story     → timing first (golden hour / moment), then pre (framing for narrative)
+//   technical → focus first (sharpness / depth-of-field), then exposure (settings), then post (noise/sharpen)
+const DIM_TO_TAGS: Partial<Record<string, TagKey[]>> = {
+  composition: ['composition', 'pre'],
+  lighting:    ['exposure', 'post', 'pre'],
+  color:       ['post', 'exposure'],
+  story:       ['timing', 'pre'],
+  technical:   ['focus', 'exposure', 'post'],
+};
+
+// Max detail chars shown before truncation in Flash mode
+const FLASH_DETAIL_LIMIT = 120;
+
+// Duration (ms) of the card-highlight animation in tailwind.config.ts
+const CARD_HIGHLIGHT_DURATION_MS = 1800;
+
 // ─── Critique section with per-item cards ─────────────────────────────────────
 
 type SectionConfig = {
@@ -268,11 +290,15 @@ type SectionConfig = {
   title: string;
   body: string;
   showTags?: boolean;
+  isPro?: boolean;
+  highlightTop?: number;
+  highlightedId?: string | null;
 };
 
-function CritiqueSection({ accent, borderColor, bgColor, icon, title, body, showTags }: SectionConfig) {
+function CritiqueSection({ accent, borderColor, bgColor, icon, title, body, showTags, isPro = false, highlightTop = 0, highlightedId }: SectionConfig) {
   const { t } = useI18n();
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [expandedSet, setExpandedSet] = useState<Set<number>>(new Set());
   const points = parsePoints(body);
 
   function handleCopy(text: string, index: number) {
@@ -280,6 +306,15 @@ function CritiqueSection({ accent, borderColor, bgColor, icon, title, body, show
       setCopiedIndex(index);
       setTimeout(() => setCopiedIndex(null), 1800);
     }).catch(() => {});
+  }
+
+  function toggleExpand(index: number) {
+    setExpandedSet((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
   }
 
   return (
@@ -293,17 +328,40 @@ function CritiqueSection({ accent, borderColor, bgColor, icon, title, body, show
           const parsed = parsePointWithTitle(point);
           const tags = showTags ? detectSuggestionTags(parsed.title, parsed.detail) : [];
           const fullText = parsed.title ? `${parsed.title}: ${parsed.detail}` : parsed.detail;
+          const isPriority = highlightTop > 0 && i < highlightTop;
+          const isExpanded = expandedSet.has(i);
+          const detail = parsed.detail;
+          const needsTruncation = !isPro && detail.length > FLASH_DETAIL_LIMIT;
+          const displayDetail = needsTruncation && !isExpanded
+            ? `${detail.slice(0, FLASH_DETAIL_LIMIT)}…`
+            : detail;
+          // Stable scroll-target ID: use first tag so dimension click can find this card
+          const cardId = showTags && tags.length > 0 ? `suggestion-tag-${tags[0]}` : undefined;
           return (
             <div
               key={i}
-              className={`group ${bgColor} border-l-2 ${borderColor} rounded-r-md px-4 py-3`}
+              id={cardId}
+              className={`group ${bgColor} border-l-2 ${isPriority ? 'border-l-[3px]' : ''} ${borderColor} rounded-r-md px-4 py-3 ${cardId && cardId === highlightedId ? 'animate-card-highlight' : ''}`}
             >
+              {isPriority && (
+                <div className={`text-[10px] font-semibold ${accent} opacity-60 mb-1.5 tracking-widest uppercase`}>
+                  {t('suggestion_priority_badge')}
+                </div>
+              )}
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
                   {parsed.title && (
                     <p className={`text-xs font-semibold ${accent} mb-1.5 opacity-90`}>{parsed.title}</p>
                   )}
-                  <p className="text-sm text-ink leading-[1.75]">{parsed.detail}</p>
+                  <p className="text-sm text-ink leading-[1.75]">{displayDetail}</p>
+                  {needsTruncation && (
+                    <button
+                      onClick={() => toggleExpand(i)}
+                      className={`mt-1 text-xs ${accent} opacity-60 hover:opacity-100 transition-opacity`}
+                    >
+                      {isExpanded ? t('suggestion_show_less') : t('suggestion_show_more')}
+                    </button>
+                  )}
                   {tags.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 mt-2">
                       {tags.map((tag) => (
@@ -360,6 +418,10 @@ export default function ReviewPage() {
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [photoError, setPhotoError] = useState(false);
   const [zoomOpen, setZoomOpen] = useState(false);
+  const [activeDim, setActiveDim] = useState<string | null>(null);
+  const [highlightedCardId, setHighlightedCardId] = useState<string | null>(null);
+  const [usage, setUsage] = useState<UsageResponse | null>(null);
+  const rightColRef = useRef<HTMLDivElement>(null);
 
   // Close zoom on Escape key
   useEffect(() => {
@@ -388,6 +450,41 @@ export default function ReviewPage() {
         }
       });
   }, [reviewId, ensureToken]);
+
+  // Fetch usage info for quota-low conversion banner (silently ignore failures)
+  useEffect(() => {
+    ensureToken()
+      .then((token) => getUsage(token))
+      .then(setUsage)
+      .catch(() => {});
+  }, [ensureToken]);
+
+  // Click a score dimension → scroll to the best matching tagged suggestion.
+  // Tries each tag candidate for the dimension in priority order until a card is found.
+  // Uses a brief 150 ms delay so the row-highlight (activeDim) is visible before the
+  // page scrolls, making the interaction feel intentional rather than abrupt.
+  function handleDimClick(dimKey: string) {
+    const tags = DIM_TO_TAGS[dimKey];
+    if (!tags || tags.length === 0) return;
+
+    for (const tag of tags) {
+      const targetId = `suggestion-tag-${tag}`;
+      const el = document.getElementById(targetId);
+      if (el) {
+        // Highlight the dimension row immediately as tactile feedback
+        setActiveDim(dimKey);
+        // Short pause lets the highlight register before the viewport moves
+        setTimeout(() => {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          setHighlightedCardId(targetId);
+          // Clear the card glow once the animation finishes
+          setTimeout(() => setHighlightedCardId(null), CARD_HIGHLIGHT_DURATION_MS);
+        }, 150);
+        return;
+      }
+    }
+    // No matching suggestion card found in the DOM — don't activate anything
+  }
 
   if (loading) {
     return (
@@ -429,6 +526,7 @@ export default function ReviewPage() {
   if (!review) return null;
 
   const r = review.result;
+  const isPro = review.mode === 'pro';
   const isDemoReview = reviewId === DEMO_REVIEW_ID;
   const displayAdvantage   = isDemoReview && locale !== 'zh' ? t('demo_review_advantage')   : r.advantage;
   const displayCritique    = isDemoReview && locale !== 'zh' ? t('demo_review_critique')    : r.critique;
@@ -443,6 +541,26 @@ export default function ReviewPage() {
     : r.final_score >= 4.0 ? t('score_label_average')
     : t('score_label_weak');
   const scoreSummary = generateScoreSummary(r.scores, SCORE_DIMS, locale);
+
+  // Determine if quota is low for conversion banner
+  const quotaRemaining = (() => {
+    if (!usage) return null;
+    const { daily_remaining, monthly_remaining } = usage.quota;
+    if (daily_remaining !== null) return daily_remaining;
+    return monthly_remaining;
+  })();
+  const quotaTotal = (() => {
+    if (!usage) return null;
+    const { daily_total, monthly_total } = usage.quota;
+    if (daily_total !== null) return daily_total;
+    return monthly_total;
+  })();
+  const isLowQuota =
+    quotaRemaining !== null &&
+    quotaTotal !== null &&
+    quotaTotal > 0 &&
+    (quotaRemaining <= 2 || quotaRemaining / quotaTotal <= 0.2);
+  const plan = userInfo?.plan ?? 'guest';
 
   return (
     <div className="pt-14 min-h-screen">
@@ -508,10 +626,16 @@ export default function ReviewPage() {
                 {SCORE_DIMS.map((d) => {
                   const score = (r.scores as unknown as Record<string, number>)[d.key] ?? 0;
                   const isWeakest = d.key === weakestKey;
+                  const isActive = activeDim === d.key;
+                  const hasTarget = (DIM_TO_TAGS[d.key]?.length ?? 0) > 0;
                   return (
-                    <div key={d.key} className="group/dim relative">
+                    <div
+                      key={d.key}
+                      className={`group/dim relative rounded px-1 -mx-1 py-0.5 transition-colors ${hasTarget ? 'cursor-pointer' : ''} ${isActive ? 'bg-gold/10' : hasTarget ? 'hover:bg-void/30' : ''}`}
+                      onClick={() => handleDimClick(d.key)}
+                    >
                       <div className="flex items-center gap-2.5">
-                        <span className={`text-xs w-16 shrink-0 ${isWeakest ? 'text-rust' : 'text-ink-muted'}`}>
+                        <span className={`text-xs w-16 shrink-0 ${isWeakest ? 'text-rust' : isActive ? 'text-gold' : 'text-ink-muted'}`}>
                           {d.label}
                         </span>
                         <div className="flex-1 h-1.5 bg-void/50 rounded-full overflow-hidden">
@@ -524,10 +648,20 @@ export default function ReviewPage() {
                           {score.toFixed(1)}
                         </span>
                         {isWeakest && <TrendingDown size={10} className="text-rust shrink-0" />}
+                        {/* Hover arrow: appears only when the row has a candidate tag and is not already weakest-marked */}
+                        {hasTarget && (
+                          <span className="text-[10px] text-gold/0 group-hover/dim:text-gold/50 transition-colors shrink-0 select-none" aria-hidden>↓</span>
+                        )}
                       </div>
-                      {/* Dimension tooltip */}
-                      <div className="pointer-events-none absolute left-0 bottom-full mb-2 z-10 hidden group-hover/dim:block w-56 rounded-md bg-surface border border-border-subtle px-3 py-2 shadow-lg">
+                      {/* Dimension tooltip: shows description + click hint */}
+                      <div className="pointer-events-none absolute left-0 bottom-full mb-2 z-10 hidden group-hover/dim:block w-60 rounded-md bg-surface border border-border-subtle px-3 py-2 shadow-lg">
                         <p className="text-[11px] text-ink-muted leading-relaxed">{d.desc}</p>
+                        {hasTarget && (
+                          <p className="text-[10px] text-gold/70 mt-1.5 pt-1.5 border-t border-border-subtle flex items-center gap-1">
+                            <span aria-hidden>↓</span>
+                            {t('dim_click_hint')}
+                          </p>
+                        )}
                         <div className="absolute left-4 top-full w-2 h-2 overflow-hidden">
                           <div className="w-2 h-2 bg-surface border-r border-b border-border-subtle rotate-45 -translate-y-1" />
                         </div>
@@ -547,7 +681,7 @@ export default function ReviewPage() {
           </div>
 
           {/* ── RIGHT: Results ───────────────────────────────────────────── */}
-          <div className="space-y-6">
+          <div ref={rightColRef} className="space-y-6">
 
             {/* Header */}
             <div>
@@ -572,6 +706,13 @@ export default function ReviewPage() {
                 onClick={() => router.push('/workspace')}
                 className="flex items-center gap-2 px-4 py-2 bg-gold text-void text-sm font-medium rounded hover:bg-gold-light transition-colors"
               >
+                <RotateCcw size={13} />
+                {t('review_btn_again')}
+              </button>
+              <button
+                onClick={() => router.push('/workspace')}
+                className="flex items-center gap-2 px-4 py-2 border border-border text-ink-muted text-sm rounded hover:border-gold/40 hover:text-gold transition-colors"
+              >
                 <Upload size={13} />
                 {t('review_btn_upload_next')}
               </button>
@@ -584,13 +725,6 @@ export default function ReviewPage() {
                   {t('review_btn_history_all')}
                 </Link>
               )}
-              <button
-                onClick={() => router.push('/workspace')}
-                className="flex items-center gap-2 px-3 py-2 text-ink-subtle text-xs rounded hover:text-ink-muted transition-colors"
-              >
-                <RotateCcw size={11} />
-                {t('review_btn_again')}
-              </button>
             </div>
 
             <div className="border-t border-border-subtle" />
@@ -604,6 +738,7 @@ export default function ReviewPage() {
                 icon={<ThumbsUp size={13} />}
                 title={t('review_advantage')}
                 body={displayAdvantage}
+                isPro={isPro}
               />
               <div className="border-t border-border-subtle" />
               <CritiqueSection
@@ -613,6 +748,7 @@ export default function ReviewPage() {
                 icon={<AlertTriangle size={13} />}
                 title={t('review_critique')}
                 body={displayCritique}
+                isPro={isPro}
               />
               <div className="border-t border-border-subtle" />
               <CritiqueSection
@@ -623,6 +759,9 @@ export default function ReviewPage() {
                 title={t('review_suggestions')}
                 body={displaySuggestions}
                 showTags
+                isPro={isPro}
+                highlightTop={2}
+                highlightedId={highlightedCardId}
               />
             </div>
 
@@ -631,9 +770,42 @@ export default function ReviewPage() {
               {t('review_ai_disclaimer')}
             </p>
 
-            {/* Guest login conversion banner */}
-            {userInfo?.plan === 'guest' && (
-              <div className="mt-4 rounded-lg border border-gold/25 bg-gold/5 px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3">
+            {/* Quota-low conversion banner (shown when remaining quota is low) */}
+            {plan !== 'pro' && isLowQuota && (
+              <div className="mt-2 rounded-lg border border-gold/40 bg-gold/5 px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gold/90">
+                    {t('review_quota_low_remaining').replace('{n}', String(quotaRemaining ?? 0))}
+                  </p>
+                  {plan === 'guest' ? (
+                    <p className="text-xs text-ink-subtle mt-0.5">{t('guest_login_banner_body')}</p>
+                  ) : (
+                    <p className="text-xs text-ink-subtle mt-0.5">{t('review_free_upgrade_body')}</p>
+                  )}
+                </div>
+                {plan === 'guest' ? (
+                  <a
+                    href={buildGoogleOAuthUrl()}
+                    className="shrink-0 flex items-center gap-2 px-4 py-2 bg-gold text-void text-xs font-medium rounded hover:bg-gold-light transition-colors"
+                  >
+                    <LogIn size={12} />
+                    {t('guest_login_cta')}
+                  </a>
+                ) : (
+                  <Link
+                    href="/account/usage"
+                    className="shrink-0 flex items-center gap-2 px-4 py-2 bg-gold text-void text-xs font-medium rounded hover:bg-gold-light transition-colors"
+                  >
+                    <Sparkles size={12} />
+                    {t('review_free_upgrade_cta')}
+                  </Link>
+                )}
+              </div>
+            )}
+
+            {/* Guest login banner (shown when quota is not low, to encourage sign-in) */}
+            {plan === 'guest' && !isLowQuota && (
+              <div className="mt-2 rounded-lg border border-gold/25 bg-gold/5 px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gold/90">{t('guest_login_banner_title')}</p>
                   <p className="text-xs text-ink-subtle mt-0.5">{t('guest_login_banner_body')}</p>
@@ -645,6 +817,23 @@ export default function ReviewPage() {
                   <LogIn size={12} />
                   {t('guest_login_cta')}
                 </a>
+              </div>
+            )}
+
+            {/* Free → Pro lightweight upgrade entry */}
+            {plan === 'free' && !isLowQuota && (
+              <div className="mt-2 rounded-lg border border-border-subtle bg-raised/30 px-5 py-3 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-ink-muted">{t('review_free_upgrade_title')}</p>
+                  <p className="text-[11px] text-ink-subtle mt-0.5">{t('review_free_upgrade_body')}</p>
+                </div>
+                <Link
+                  href="/account/usage"
+                  className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 border border-gold/30 text-gold text-xs font-medium rounded hover:bg-gold/10 transition-colors"
+                >
+                  <Sparkles size={11} />
+                  {t('review_free_upgrade_cta')}
+                </Link>
               </div>
             )}
 

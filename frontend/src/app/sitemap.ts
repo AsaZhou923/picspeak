@@ -14,7 +14,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     {
       url: `${siteConfig.url}/workspace`,
       lastModified: now,
-      changeFrequency: 'weekly',
+      changeFrequency: 'daily',
       priority: 0.9,
     },
     {
@@ -27,14 +27,14 @@ export default function sitemap(): MetadataRoute.Sitemap {
     {
       url: `${siteConfig.url}/account/reviews`,
       lastModified: now,
-      changeFrequency: 'monthly',
-      priority: 0.5,
+      changeFrequency: 'weekly',
+      priority: 0.6,
     },
     {
       url: `${siteConfig.url}/account/usage`,
       lastModified: now,
       changeFrequency: 'monthly',
-      priority: 0.4,
+      priority: 0.5,
     },
   ];
 }
