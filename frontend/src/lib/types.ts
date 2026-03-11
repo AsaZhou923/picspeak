@@ -75,17 +75,23 @@ export interface ReviewScores {
   composition: number;
   lighting: number;
   color: number;
-  story: number;
+  impact: number;
   technical: number;
 }
 
 export interface ReviewResult {
   schema_version: string;
+  prompt_version: string;
+  model_name: string;
+  model_version: string;
   scores: ReviewScores;
   final_score: number;
   advantage: string;
   critique: string;
   suggestions: string;
+  visual_analysis: Record<string, unknown>;
+  exif_info: Record<string, unknown>;
+  share_info: Record<string, unknown>;
 }
 
 export interface ReviewCreateRequest {
@@ -130,6 +136,7 @@ export interface ReviewGetResponse {
   status: ReviewStatus;
   result: ReviewResult;
   created_at: string;
+  exif_data?: Record<string, unknown>;
 }
 
 export interface ReviewListItem {

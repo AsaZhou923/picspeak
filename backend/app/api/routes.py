@@ -60,6 +60,7 @@ from app.schemas import (
     ReviewHistoryItem,
     ReviewHistoryResponse,
     ReviewListItem,
+    REVIEW_SCHEMA_VERSION,
     TaskStatusResponse,
     UsageResponse,
     AuthGuestResponse,
@@ -473,25 +474,79 @@ def confirm_photo_upload(
         status=photo.status.value,
     )
 
-def _review_result_payload(result_json: dict | None, final_score: float | None) -> dict:
-    payload = dict(result_json or {})
-    if payload.get('final_score') is not None:
-        return payload
+def _default_review_scores() -> dict[str, int]:
+    return {
+        'composition': 0,
+        'lighting': 0,
+        'color': 0,
+        'impact': 0,
+        'technical': 0,
+    }
 
-    if final_score is not None:
-        payload['final_score'] = float(final_score)
-        return payload
 
-    scores = payload.get('scores')
-    if isinstance(scores, dict) and scores:
-        numeric_scores: list[float] = []
-        for value in scores.values():
-            try:
-                numeric_scores.append(float(value))
-            except (TypeError, ValueError):
-                return payload
-        payload['final_score'] = round(sum(numeric_scores) / len(numeric_scores), 1)
-    return payload
+def _coerce_review_scores(raw_scores: Any) -> dict[str, int]:
+    normalized = _default_review_scores()
+    if not isinstance(raw_scores, dict):
+        return normalized
+
+    for key in normalized:
+        value = raw_scores.get(key)
+        if value is None and key == 'impact':
+            value = raw_scores.get('story')
+        try:
+            score = int(value)
+        except (TypeError, ValueError):
+            continue
+        normalized[key] = max(0, min(score, 10))
+    return normalized
+
+
+def _build_review_extensions(raw_payload: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    visual_analysis = raw_payload.get('visual_analysis')
+    exif_info = raw_payload.get('exif_info')
+    share_info = raw_payload.get('share_info')
+    return (
+        visual_analysis if isinstance(visual_analysis, dict) else {},
+        exif_info if isinstance(exif_info, dict) else {},
+        share_info if isinstance(share_info, dict) else {},
+    )
+
+
+def _review_result_payload(
+    result_json: dict | None,
+    final_score: float | None,
+    *,
+    prompt_version: str | None = None,
+    model_name: str | None = None,
+    model_version: str | None = None,
+    exif_info: dict[str, Any] | None = None,
+) -> dict:
+    raw_payload = dict(result_json or {})
+    scores = _coerce_review_scores(raw_payload.get('scores'))
+    visual_analysis, stored_exif_info, share_info = _build_review_extensions(raw_payload)
+
+    resolved_final_score = final_score
+    if resolved_final_score is None:
+        payload_score = raw_payload.get('final_score')
+        try:
+            resolved_final_score = float(payload_score)
+        except (TypeError, ValueError):
+            resolved_final_score = round(sum(scores.values()) / len(scores), 1)
+
+    return {
+        'schema_version': str(raw_payload.get('schema_version') or REVIEW_SCHEMA_VERSION),
+        'prompt_version': str(raw_payload.get('prompt_version') or prompt_version or ''),
+        'model_name': str(raw_payload.get('model_name') or model_name or ''),
+        'model_version': str(raw_payload.get('model_version') or model_version or ''),
+        'scores': scores,
+        'final_score': float(resolved_final_score),
+        'advantage': str(raw_payload.get('advantage') or ''),
+        'critique': str(raw_payload.get('critique') or ''),
+        'suggestions': str(raw_payload.get('suggestions') or ''),
+        'visual_analysis': visual_analysis,
+        'exif_info': exif_info if isinstance(exif_info, dict) else stored_exif_info,
+        'share_info': share_info,
+    }
 
 
 def _find_photo_owned(db: Session, photo_public_id: str, owner_user_id: int) -> Photo:
@@ -552,7 +607,13 @@ def create_review(
             response_sync = {
                 'review_id': existing_review.public_id,
                 'status': existing_review.status.value,
-                'result': _review_result_payload(existing_review.result_json, existing_review.final_score),
+                'result': _review_result_payload(
+                    existing_review.result_json,
+                    existing_review.final_score,
+                    model_name=existing_review.model_name,
+                    model_version=existing_review.model_name,
+                    exif_info=photo.exif_data if photo.exif_data else None,
+                ),
             }
             if idempotency_key:
                 save_idempotency_record(
@@ -650,11 +711,18 @@ def create_review(
         if photo.status != PhotoStatus.READY:
             raise api_error(status.HTTP_400_BAD_REQUEST, 'IMAGE_REJECTED', photo.rejected_reason or 'Image content is not allowed')
     try:
-        ai_response = run_ai_review(payload.mode, image_url=image_url, locale=payload.locale)
+        ai_response = run_ai_review(payload.mode, image_url=image_url, locale=payload.locale, exif_data=photo.exif_data or None)
     except AIReviewError as exc:
         raise api_error(status.HTTP_502_BAD_GATEWAY, 'AI_REVIEW_FAILED', f'AI review failed: {exc}') from exc
 
-    result = ai_response.result
+    result_payload = _review_result_payload(
+        ai_response.result.model_dump(),
+        ai_response.result.final_score,
+        prompt_version=ai_response.prompt_version,
+        model_name=ai_response.model_name,
+        model_version=ai_response.model_version,
+        exif_info=photo.exif_data if photo.exif_data else None,
+    )
     review = Review(
         public_id=new_public_id('rev'),
         task_id=None,
@@ -662,9 +730,9 @@ def create_review(
         owner_user_id=actor.user.id,
         mode=mode_enum,
         status=ReviewStatus.SUCCEEDED,
-        schema_version=result.schema_version,
-        result_json=result.model_dump(),
-        final_score=result.final_score,
+        schema_version=result_payload['schema_version'],
+        result_json=result_payload,
+        final_score=result_payload['final_score'],
         input_tokens=ai_response.input_tokens,
         output_tokens=ai_response.output_tokens,
         cost_usd=ai_response.cost_usd,
@@ -689,7 +757,7 @@ def create_review(
     db.commit()
     db.refresh(review)
 
-    response_sync = {'review_id': review.public_id, 'status': review.status.value, 'result': result.model_dump()}
+    response_sync = {'review_id': review.public_id, 'status': review.status.value, 'result': result_payload}
     if idempotency_key:
         save_idempotency_record(
             db,
@@ -769,8 +837,15 @@ def get_review(
         photo_url=photo_url,
         mode=review.mode.value,
         status=review.status.value,
-        result=_review_result_payload(review.result_json, review.final_score),
+        result=_review_result_payload(
+            review.result_json,
+            review.final_score,
+            model_name=review.model_name,
+            model_version=review.model_name,
+            exif_info=photo.exif_data if photo and photo.exif_data else None,
+        ),
         created_at=review.created_at,
+        exif_data=photo.exif_data if photo and photo.exif_data else None,
     )
 
 

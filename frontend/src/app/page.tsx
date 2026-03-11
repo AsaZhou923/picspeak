@@ -13,7 +13,7 @@ const DEMO_SCORES_KEYS = [
   { labelKey: 'score_composition' as const, score: 7 },
   { labelKey: 'score_lighting' as const, score: 8 },
   { labelKey: 'score_color' as const, score: 9 },
-  { labelKey: 'score_story' as const, score: 5 },
+  { labelKey: 'score_impact' as const, score: 5 },
   { labelKey: 'score_technical' as const, score: 8 },
 ];
 

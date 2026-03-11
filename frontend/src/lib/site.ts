@@ -3,7 +3,7 @@ export const siteConfig = {
   url: 'https://picspeak.art',
   title: 'PicSpeak | AI Photography Critique and Photo Feedback',
   description:
-    'PicSpeak helps photographers upload images and get AI-powered critique on composition, lighting, color, storytelling, and technical quality.',
+    'PicSpeak helps photographers upload images and get AI-powered critique on composition, lighting, color, impact, and technical quality.',
   keywords: [
     'AI photography critique',
     'photo feedback',
@@ -18,3 +18,4 @@ export const siteConfig = {
   googleSiteVerification: 'uPzmX8kYSDzOWm7iBz-dty4It12mMcIVUOPPwWmLGnM',
   ogImage: '/logo.png',
 } as const;
+

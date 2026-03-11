@@ -25,6 +25,7 @@ import ImageUploader from '@/components/upload/ImageUploader';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Badge from '@/components/ui/Badge';
 import { useI18n } from '@/lib/i18n';
+import type { ExifData } from '@/lib/exif';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -117,6 +118,7 @@ export default function WorkspacePage() {
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [exifData, setExifData] = useState<ExifData>({});
   const [uploadProgress, setUploadProgress] = useState(0);
 
   const [stage, setStage] = useState<Stage>('idle');
@@ -158,9 +160,10 @@ export default function WorkspacePage() {
   // ── File selected → upload flow ────────────────────────────────────────────
 
   const handleFileSelected = useCallback(
-    async (file: File, dataUrl: string) => {
+    async (file: File, dataUrl: string, exif: ExifData = {}) => {
       setSelectedFile(file);
       setPreview(dataUrl);
+      setExifData(exif);
       setStage('uploading');
       setUploadProgress(0);
       setErrMessage('');
@@ -225,7 +228,7 @@ export default function WorkspacePage() {
         setStage('confirming');
         const photoData = await confirmPhoto(
           presign.upload_id,
-          {},
+          exif as Record<string, unknown>,
           extractClientMeta(file, { width: imgWidth, height: imgHeight }),
           token
         );

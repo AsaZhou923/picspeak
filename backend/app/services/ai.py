@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 import re
@@ -19,10 +19,15 @@ class AIReviewError(RuntimeError):
 class AIReviewResponse:
     result: ReviewResult
     model_name: str
+    model_version: str
+    prompt_version: str
     input_tokens: int | None = None
     output_tokens: int | None = None
     cost_usd: float | None = None
     latency_ms: int | None = None
+
+
+PROMPT_VERSION = 'photo-review-v1'
 
 
 def _is_multimodal_model(model_name: str) -> bool:
@@ -77,7 +82,53 @@ def model_name_for_mode(mode: str) -> str:
     )
 
 
-def _prompt_for_mode(mode: str, locale: str) -> str:
+def model_version_for_name(model_name: str) -> str:
+    return (model_name or '').strip()
+
+
+def _format_exif_context(exif_data: dict | None) -> str:
+    """Convert EXIF dict to a concise technical parameters string for the AI prompt."""
+    if not exif_data:
+        return ''
+    parts: list[str] = []
+    camera_parts: list[str] = []
+    if exif_data.get('Make'):
+        camera_parts.append(str(exif_data['Make']))
+    if exif_data.get('Model'):
+        camera_parts.append(str(exif_data['Model']))
+    if camera_parts:
+        parts.append('Camera: ' + ' '.join(camera_parts))
+    if exif_data.get('LensModel'):
+        parts.append(f'Lens: {exif_data["LensModel"]}')
+    if exif_data.get('FocalLength'):
+        fl = exif_data['FocalLength']
+        fl35 = exif_data.get('FocalLengthIn35mm')
+        if fl35:
+            parts.append(f'Focal Length: {fl}mm ({fl35}mm equiv.)')
+        else:
+            parts.append(f'Focal Length: {fl}mm')
+    if exif_data.get('FNumber'):
+        parts.append(f'Aperture: f/{exif_data["FNumber"]}')
+    if exif_data.get('ExposureTime'):
+        parts.append(f'Shutter: {exif_data["ExposureTime"]}')
+    if exif_data.get('ISO'):
+        parts.append(f'ISO: {exif_data["ISO"]}')
+    if exif_data.get('ExposureBias') is not None and exif_data['ExposureBias'] != 0:
+        bias = exif_data['ExposureBias']
+        sign = '+' if bias > 0 else ''
+        parts.append(f'Exposure Bias: {sign}{bias} EV')
+    if exif_data.get('Flash'):
+        parts.append(f'Flash: {exif_data["Flash"]}')
+    if exif_data.get('WhiteBalance'):
+        parts.append(f'White Balance: {exif_data["WhiteBalance"]}')
+    if exif_data.get('ExposureMode'):
+        parts.append(f'Exposure Mode: {exif_data["ExposureMode"]}')
+    if exif_data.get('MeteringMode'):
+        parts.append(f'Metering: {exif_data["MeteringMode"]}')
+    return ', '.join(parts)
+
+
+def _prompt_for_mode(mode: str, locale: str, exif_data: dict | None = None) -> str:
     lang = locale if locale in {'zh', 'en', 'ja'} else 'zh'
     depth_by_lang = {
         'zh': ('详细且专业', '简洁且直接'),
@@ -87,15 +138,21 @@ def _prompt_for_mode(mode: str, locale: str) -> str:
     deep, concise = depth_by_lang[lang]
     depth = deep if mode == 'pro' else concise
 
+    exif_context = _format_exif_context(exif_data)
+
     if lang == 'en':
+        exif_note = (
+            f' The following shooting parameters are provided for reference in the technical dimension assessment: {exif_context}.'
+            if exif_context else ''
+        )
         return (
-            f'You are a photography critic. Provide a {depth} review for the input photo. '
+            f'You are a photography critic. Provide a {depth} review for the input photo.{exif_note} '
             'Scoring baseline: 10 means top master-level work within the same genre (landscape, portrait, street, documentary, etc.). '
             'Scores must be strict and clearly differentiated; avoid giving 7-8 to ordinary photos. '
             'Most ordinary photos should be in the 3-6 range; only clearly strong photos should exceed 7. '
             'Output only one JSON object; do not output markdown. '
             'JSON schema must be exactly: '
-            '{"schema_version":"1.0","scores":{"composition":0-10,"lighting":0-10,"color":0-10,"story":0-10,"technical":0-10},'
+            '{"schema_version":"1.0","scores":{"composition":0-10,"lighting":0-10,"color":0-10,"impact":0-10,"technical":0-10},'
             '"advantage":"...","critique":"...","suggestions":"..."}. '
             'All values in scores must be integers from 0 to 10. '
             'For advantage, critique, and suggestions, output 1-3 numbered points in a string using format "1. ...\n2. ...". '
@@ -108,14 +165,18 @@ def _prompt_for_mode(mode: str, locale: str) -> str:
         )
 
     if lang == 'ja':
+        exif_note = (
+            f'なお、技術次元の評価参考として以下の撮影パラメータが提供されています：{exif_context}。'
+            if exif_context else ''
+        )
         return (
-            f'あなたは写真講評者です。入力写真に対して{depth}講評を行ってください。'
+            f'あなたは写真講評者です。入力写真に対して{depth}講評を行ってください。{exif_note}'
             '採点基準：同ジャンル（風景、ポートレート、ストリート、ドキュメンタリー等）のトップレベル作品を 10 点とします。'
             '採点は厳格で差が出るようにし、普通の写真に 7〜8 点を安易に付けないでください。'
             '一般的な写真は主に 3〜6 点、明確に優れた写真のみ 7 点以上にしてください。'
             '出力は JSON オブジェクト 1 つのみ。markdown は不要。'
             'JSON スキーマは厳密に：'
-            '{"schema_version":"1.0","scores":{"composition":0-10,"lighting":0-10,"color":0-10,"story":0-10,"technical":0-10},'
+            '{"schema_version":"1.0","scores":{"composition":0-10,"lighting":0-10,"color":0-10,"impact":0-10,"technical":0-10},'
             '"advantage":"...","critique":"...","suggestions":"..."}。'
             'scores の値は 0-10 の整数のみ。'
             'advantage・critique・suggestions はそれぞれ 1〜3 点を文字列内で「1. ...\n2. ...」形式で記載してください。'
@@ -126,20 +187,21 @@ def _prompt_for_mode(mode: str, locale: str) -> str:
             'すべてのテキスト項目は日本語で記述してください。'
         )
 
+    exif_note = f'以下拍摄参数供技术维度评估参考：{exif_context}。' if exif_context else ''
     return (
-        f'请你作为摄影点评师，对输入照片进行{depth}的点评。'
+        f'请你作为摄影点评师，对输入照片进行{depth}的点评。{exif_note}'
         '评分基准：以该照片所属题材的顶级大师作品作为 10 分参考标准（如风光、人像、街拍、纪实等各自题材内对标）。'
-        '打分必须严格且有明显差异性，严禁“随手一张都有 7~8 分”的宽松倾向；'
+        '打分必须严格且有明显差异性，严禁"随手一张都有 7~8 分"的宽松倾向；'
         '普通照片应更多落在 3-6 分区间，只有明显优秀才进入 7 分以上。'
         '必须只输出一个 JSON 对象，不要输出 markdown。'
         'JSON 字段必须严格为：'
-        '{"schema_version":"1.0","scores":{"composition":0-10,"lighting":0-10,"color":0-10,"story":0-10,"technical":0-10},'
+        '{"schema_version":"1.0","scores":{"composition":0-10,"lighting":0-10,"color":0-10,"impact":0-10,"technical":0-10},'
         '"advantage":"...","critique":"...","suggestions":"..."}。'
         'scores 内所有值必须是 0-10 的整数。'
-        'advantage、critique、suggestions 都请分别输出 1-3 条要点，使用“1. ...\n2. ...”这种编号格式写在字符串里。'
+        'advantage、critique、suggestions 都请分别输出 1-3 条要点，使用"1. ...\n2. ..."这种编号格式写在字符串里。'
         '如果画面里只有 1 条或 2 条真正站得住脚的观察，就只写 1-2 条，不要为了凑数硬写到 3 条。'
         '每条要点都必须能被照片中的具体视觉信息支撑，论证要成立，不能牵强附会、不能写空泛套话、不能脱离画面瞎猜。'
-        'suggestions 也必须基于前面识别出的真实问题或潜力点，给出有依据、可执行的建议；尽量量化，包含具体参数或区间，例如“曝光 +1~2、阴影 +1~2、高光 -1、色温 -300K”，'
+        'suggestions 也必须基于前面识别出的真实问题或潜力点，给出有依据、可执行的建议；尽量量化，包含具体参数或区间，例如"曝光 +1~2、阴影 +1~2、高光 -1、色温 -300K"，'
         '并可结合拍摄时机、机位、光线、构图、后期动作。'
         '所有文本字段请使用中文。'
     )
@@ -149,7 +211,10 @@ def _compute_final_score(scores: dict[str, int]) -> float:
     if not scores:
         raise AIReviewError('scores cannot be empty')
     values: list[int] = []
-    for key in ('composition', 'lighting', 'color', 'story', 'technical'):
+    if 'impact' not in scores and 'story' in scores:
+        scores = dict(scores)
+        scores['impact'] = scores['story']
+    for key in ('composition', 'lighting', 'color', 'impact', 'technical'):
         if key not in scores:
             raise AIReviewError(f'Missing score field: {key}')
         value = scores[key]
@@ -195,7 +260,7 @@ def _extract_content(message_content: object) -> str:
     raise AIReviewError('Unsupported message content format')
 
 
-def run_ai_review(mode: str, image_url: str, locale: str = 'zh') -> AIReviewResponse:
+def run_ai_review(mode: str, image_url: str, locale: str = 'zh', exif_data: dict | None = None) -> AIReviewResponse:
     if not settings.ai_api_key:
         raise AIReviewError('AI_API_KEY is not configured')
 
@@ -210,7 +275,7 @@ def run_ai_review(mode: str, image_url: str, locale: str = 'zh') -> AIReviewResp
             {
                 'role': 'user',
                 'content': [
-                    {'type': 'text', 'text': _prompt_for_mode(mode, locale)},
+                    {'type': 'text', 'text': _prompt_for_mode(mode, locale, exif_data)},
                     {'type': 'image_url', 'image_url': {'url': image_url}},
                 ],
             },
@@ -252,9 +317,12 @@ def run_ai_review(mode: str, image_url: str, locale: str = 'zh') -> AIReviewResp
         raise AIReviewError('Invalid AI provider response structure') from exc
 
     usage = body.get('usage') or {}
+    resolved_model_name = body.get('model', model_name)
     return AIReviewResponse(
         result=result,
-        model_name=body.get('model', model_name),
+        model_name=resolved_model_name,
+        model_version=model_version_for_name(resolved_model_name),
+        prompt_version=PROMPT_VERSION,
         input_tokens=usage.get('prompt_tokens'),
         output_tokens=usage.get('completion_tokens'),
         cost_usd=None,

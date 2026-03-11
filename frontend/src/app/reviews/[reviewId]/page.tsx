@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowLeft, History, RotateCcw, AlertCircle, ThumbsUp, AlertTriangle, Lightbulb, Upload, TrendingDown, ZoomIn, X, Copy, Check, LogIn, Sparkles } from 'lucide-react';
+import { ArrowLeft, History, RotateCcw, AlertCircle, ThumbsUp, ThumbsDown, AlertTriangle, Lightbulb, Upload, TrendingDown, ZoomIn, X, Copy, Check, LogIn, Sparkles, Share2, Download } from 'lucide-react';
 import { getReview, getUsage, buildGoogleOAuthUrl } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { ReviewGetResponse, ApiException, ReviewScores, UsageResponse } from '@/lib/types';
@@ -33,7 +33,7 @@ function getScoreLabelColor(score: number): string {
 }
 
 function getWeakestDimKey(scores: ReviewScores): keyof ReviewScores {
-  const dims: (keyof ReviewScores)[] = ['composition', 'lighting', 'color', 'story', 'technical'];
+  const dims: (keyof ReviewScores)[] = ['composition', 'lighting', 'color', 'impact', 'technical'];
   return dims.reduce((weakest, d) => (scores[d] < scores[weakest] ? d : weakest), dims[0]);
 }
 
@@ -264,13 +264,13 @@ function parsePointWithTitle(raw: string): { title: string; detail: string } {
 // Rationale for non-obvious mappings:
 //   lighting  → exposure first (camera exposure adjustment), then post (RAW correction)
 //   color     → post first (color grading / white balance), then exposure (WB in-camera)
-//   story     → timing first (golden hour / moment), then pre (framing for narrative)
+//   impact    → timing first (golden hour / moment), then pre (framing for impact)
 //   technical → focus first (sharpness / depth-of-field), then exposure (settings), then post (noise/sharpen)
 const DIM_TO_TAGS: Partial<Record<string, TagKey[]>> = {
   composition: ['composition', 'pre'],
   lighting:    ['exposure', 'post', 'pre'],
   color:       ['post', 'exposure'],
-  story:       ['timing', 'pre'],
+  impact:      ['timing', 'pre'],
   technical:   ['focus', 'exposure', 'post'],
 };
 
@@ -290,15 +290,17 @@ type SectionConfig = {
   title: string;
   body: string;
   showTags?: boolean;
+  showFeedback?: boolean;
   isPro?: boolean;
   highlightTop?: number;
   highlightedId?: string | null;
 };
 
-function CritiqueSection({ accent, borderColor, bgColor, icon, title, body, showTags, isPro = false, highlightTop = 0, highlightedId }: SectionConfig) {
+function CritiqueSection({ accent, borderColor, bgColor, icon, title, body, showTags, showFeedback, isPro = false, highlightTop = 0, highlightedId }: SectionConfig) {
   const { t } = useI18n();
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [expandedSet, setExpandedSet] = useState<Set<number>>(new Set());
+  const [feedbackGiven, setFeedbackGiven] = useState<Record<number, 'helpful' | 'vague'>>({});
   const points = parsePoints(body);
 
   function handleCopy(text: string, index: number) {
@@ -315,6 +317,10 @@ function CritiqueSection({ accent, borderColor, bgColor, icon, title, body, show
       else next.add(index);
       return next;
     });
+  }
+
+  function handleFeedback(index: number, type: 'helpful' | 'vague') {
+    setFeedbackGiven((prev) => ({ ...prev, [index]: type }));
   }
 
   return (
@@ -381,6 +387,29 @@ function CritiqueSection({ accent, borderColor, bgColor, icon, title, body, show
                   {copiedIndex === i ? <Check size={12} className="text-sage" /> : <Copy size={12} />}
                 </button>
               </div>
+              {showFeedback && (
+                <div className="mt-2 pt-2 border-t border-border-subtle/40 flex items-center gap-2">
+                  {feedbackGiven[i] !== undefined ? (
+                    <p className="text-[10px] text-ink-subtle">{t('review_feedback_thanks')}</p>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => handleFeedback(i, 'helpful')}
+                        className="flex items-center gap-1 text-[10px] text-ink-subtle hover:text-sage transition-colors"
+                      >
+                        <ThumbsUp size={9} />{t('review_feedback_helpful')}
+                      </button>
+                      <span className="text-[10px] text-ink-subtle/30">·</span>
+                      <button
+                        onClick={() => handleFeedback(i, 'vague')}
+                        className="flex items-center gap-1 text-[10px] text-ink-subtle hover:text-rust transition-colors"
+                      >
+                        <ThumbsDown size={9} />{t('review_feedback_vague')}
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           );
         })}
@@ -401,7 +430,7 @@ export default function ReviewPage() {
     { key: 'composition', label: t('score_composition'), desc: t('score_dim_desc_composition') },
     { key: 'lighting',    label: t('score_lighting'),    desc: t('score_dim_desc_lighting') },
     { key: 'color',       label: t('score_color'),       desc: t('score_dim_desc_color') },
-    { key: 'story',       label: t('score_story'),       desc: t('score_dim_desc_story') },
+    { key: 'impact',      label: t('score_impact'),      desc: t('score_dim_desc_impact') },
     { key: 'technical',   label: t('score_technical'),   desc: t('score_dim_desc_technical') },
   ];
 
@@ -421,6 +450,8 @@ export default function ReviewPage() {
   const [activeDim, setActiveDim] = useState<string | null>(null);
   const [highlightedCardId, setHighlightedCardId] = useState<string | null>(null);
   const [usage, setUsage] = useState<UsageResponse | null>(null);
+  const [imgNaturalSize, setImgNaturalSize] = useState<{ w: number; h: number } | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
   const rightColRef = useRef<HTMLDivElement>(null);
 
   // Close zoom on Escape key
@@ -561,6 +592,47 @@ export default function ReviewPage() {
     quotaTotal > 0 &&
     (quotaRemaining <= 2 || quotaRemaining / quotaTotal <= 0.2);
   const plan = userInfo?.plan ?? 'guest';
+  const isLowScore = r.final_score < 5.0;
+
+  function handleShareLink() {
+    navigator.clipboard.writeText(window.location.href).then(() => {
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    }).catch(() => {});
+  }
+
+  function handleExportSummary() {
+    if (!review) return;
+    const dimScores = SCORE_DIMS.map(
+      (d) => `${d.label}: ${((r.scores as unknown as Record<string, number>)[d.key] ?? 0).toFixed(1)}`,
+    ).join(' / ');
+    const lines = [
+      `PicSpeak — ${t('review_page_headline')}`,
+      `${t('score_overall')}: ${r.final_score.toFixed(1)} (${scoreLabel})`,
+      dimScores,
+      '',
+      `——— ${t('review_advantage')} ———`,
+      displayAdvantage,
+      '',
+      `——— ${t('review_critique')} ———`,
+      displayCritique,
+      '',
+      `——— ${t('review_suggestions')} ———`,
+      displaySuggestions,
+      '',
+      `#${review.review_id.slice(0, 8)} · ${new Date(review.created_at).toLocaleString(locale)}`,
+      t('review_ai_disclaimer'),
+    ];
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `picspeak-${review.review_id.slice(0, 8)}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
 
   return (
     <div className="pt-14 min-h-screen">
@@ -609,6 +681,10 @@ export default function ReviewPage() {
                     height={900}
                     className="w-full h-auto object-contain max-h-[65vh]"
                     onError={() => setPhotoError(true)}
+                    onLoad={(e) => {
+                      const img = e.currentTarget;
+                      setImgNaturalSize({ w: img.naturalWidth, h: img.naturalHeight });
+                    }}
                     unoptimized
                   />
                   <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-void/30">
@@ -672,10 +748,55 @@ export default function ReviewPage() {
               </div>
 
               {/* Meta footer */}
-              <div className="border-t border-border-subtle px-5 py-2.5">
+              <div className="border-t border-border-subtle px-5 py-2.5 space-y-0.5">
                 <p className="text-xs text-ink-subtle font-mono">
                   {new Date(review.created_at).toLocaleString(locale)} · #{review.review_id.slice(0, 8)}
                 </p>
+                {imgNaturalSize && (
+                  <p className="text-xs text-ink-subtle font-mono">
+                    {t('review_img_resolution')}: {imgNaturalSize.w} × {imgNaturalSize.h}
+                  </p>
+                )}
+                {review.exif_data && (() => {
+                  const exif = review.exif_data;
+                  const make = typeof exif.Make === 'string' ? exif.Make.trim() : '';
+                  const model = typeof exif.Model === 'string' ? exif.Model.trim() : '';
+                  const camera = model.startsWith(make) || !make ? model : `${make} ${model}`;
+                  const lens = typeof exif.LensModel === 'string' ? exif.LensModel.trim() : '';
+                  const focalRaw = exif.FocalLength;
+                  const focal35 = exif.FocalLengthIn35mm;
+                  const focal = typeof focalRaw === 'number' && focalRaw > 0
+                    ? `${focalRaw % 1 === 0 ? focalRaw : focalRaw.toFixed(1)} mm${typeof focal35 === 'number' && focal35 > 0 && focal35 !== focalRaw ? ` (35mm: ${focal35} mm)` : ''}`
+                    : '';
+                  const fNumber = exif.FNumber;
+                  const aperture = typeof fNumber === 'number' && fNumber > 0 ? `f/${fNumber % 1 === 0 ? fNumber : fNumber.toFixed(1)}` : '';
+                  const expTime = exif.ExposureTime;
+                  let shutter = '';
+                  if (typeof expTime === 'number' && expTime > 0) {
+                    if (expTime >= 1) shutter = `${expTime % 1 === 0 ? expTime : expTime.toFixed(1)}s`;
+                    else shutter = `1/${Math.round(1 / expTime)}s`;
+                  }
+                  const iso = typeof exif.ISO === 'number' && exif.ISO > 0 ? String(exif.ISO) : '';
+                  const rows: [string, string][] = [
+                    [t('review_exif_camera'), camera],
+                    [t('review_exif_lens'), lens],
+                    [t('review_exif_focal'), focal],
+                    [t('review_exif_aperture'), aperture],
+                    [t('review_exif_shutter'), shutter],
+                    [t('review_exif_iso'), iso],
+                  ].filter(([, v]) => v) as [string, string][];
+                  if (rows.length === 0) return null;
+                  return (
+                    <div className="pt-1.5 mt-0.5 border-t border-border-subtle/50 space-y-0.5">
+                      <p className="text-[10px] text-ink-muted uppercase tracking-widest font-mono mb-1">{t('review_exif_params')}</p>
+                      {rows.map(([label, value]) => (
+                        <p key={label} className="text-xs text-ink-subtle font-mono truncate">
+                          <span className="text-ink-muted">{label}: </span>{value}
+                        </p>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           </div>
@@ -725,6 +846,20 @@ export default function ReviewPage() {
                   {t('review_btn_history_all')}
                 </Link>
               )}
+              <button
+                onClick={handleShareLink}
+                className="flex items-center gap-2 px-4 py-2 border border-border text-ink-muted text-sm rounded hover:border-gold/40 hover:text-gold transition-colors"
+              >
+                {linkCopied ? <Check size={13} className="text-sage" /> : <Share2 size={13} />}
+                {linkCopied ? t('review_link_copied') : t('review_share_link')}
+              </button>
+              <button
+                onClick={handleExportSummary}
+                className="flex items-center gap-2 px-4 py-2 border border-border text-ink-muted text-sm rounded hover:border-gold/40 hover:text-gold transition-colors"
+              >
+                <Download size={13} />
+                {t('review_export_summary')}
+              </button>
             </div>
 
             <div className="border-t border-border-subtle" />
@@ -759,6 +894,7 @@ export default function ReviewPage() {
                 title={t('review_suggestions')}
                 body={displaySuggestions}
                 showTags
+                showFeedback
                 isPro={isPro}
                 highlightTop={2}
                 highlightedId={highlightedCardId}
@@ -820,19 +956,29 @@ export default function ReviewPage() {
               </div>
             )}
 
-            {/* Free → Pro lightweight upgrade entry */}
+            {/* Free → Pro lightweight upgrade entry (low-score variant when score < 5) */}
             {plan === 'free' && !isLowQuota && (
-              <div className="mt-2 rounded-lg border border-border-subtle bg-raised/30 px-5 py-3 flex items-center justify-between gap-3">
+              <div className={`mt-2 rounded-lg border px-5 py-3 flex items-center justify-between gap-3 ${
+                isLowScore ? 'border-rust/30 bg-rust/5' : 'border-border-subtle bg-raised/30'
+              }`}>
                 <div className="min-w-0">
-                  <p className="text-xs font-medium text-ink-muted">{t('review_free_upgrade_title')}</p>
-                  <p className="text-[11px] text-ink-subtle mt-0.5">{t('review_free_upgrade_body')}</p>
+                  <p className={`text-xs font-medium ${isLowScore ? 'text-rust/80' : 'text-ink-muted'}`}>
+                    {isLowScore ? t('review_low_score_title') : t('review_free_upgrade_title')}
+                  </p>
+                  <p className="text-[11px] text-ink-subtle mt-0.5">
+                    {isLowScore ? t('review_low_score_body') : t('review_free_upgrade_body')}
+                  </p>
                 </div>
                 <Link
                   href="/account/usage"
-                  className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 border border-gold/30 text-gold text-xs font-medium rounded hover:bg-gold/10 transition-colors"
+                  className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 border text-xs font-medium rounded transition-colors ${
+                    isLowScore
+                      ? 'border-rust/40 text-rust/80 hover:bg-rust/10'
+                      : 'border-gold/30 text-gold hover:bg-gold/10'
+                  }`}
                 >
                   <Sparkles size={11} />
-                  {t('review_free_upgrade_cta')}
+                  {isLowScore ? t('review_low_score_cta') : t('review_free_upgrade_cta')}
                 </Link>
               </div>
             )}

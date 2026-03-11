@@ -6,6 +6,19 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 
+REVIEW_SCHEMA_VERSION = '1.0'
+
+
+def default_review_scores() -> dict[str, int]:
+    return {
+        'composition': 0,
+        'lighting': 0,
+        'color': 0,
+        'impact': 0,
+        'technical': 0,
+    }
+
+
 class ErrorPayload(BaseModel):
     code: str
     message: str
@@ -52,12 +65,18 @@ class ReviewCreateRequest(BaseModel):
 
 
 class ReviewResult(BaseModel):
-    schema_version: str = '1.0'
-    scores: dict[str, int]
-    final_score: float
-    advantage: str
-    critique: str
-    suggestions: str
+    schema_version: str = REVIEW_SCHEMA_VERSION
+    prompt_version: str = ''
+    model_name: str = ''
+    model_version: str = ''
+    scores: dict[str, int] = Field(default_factory=default_review_scores)
+    final_score: float = 0.0
+    advantage: str = ''
+    critique: str = ''
+    suggestions: str = ''
+    visual_analysis: dict[str, Any] = Field(default_factory=dict)
+    exif_info: dict[str, Any] = Field(default_factory=dict)
+    share_info: dict[str, Any] = Field(default_factory=dict)
 
 
 class ReviewCreateAsyncResponse(BaseModel):
@@ -96,6 +115,7 @@ class ReviewGetResponse(BaseModel):
     status: str
     result: ReviewResult
     created_at: datetime
+    exif_data: dict[str, Any] | None = None
 
 
 class ReviewListItem(BaseModel):

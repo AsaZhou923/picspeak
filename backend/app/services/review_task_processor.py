@@ -21,6 +21,61 @@ from app.services.task_events import record_task_event
 logger = logging.getLogger(__name__)
 
 
+def _normalize_review_result_payload(
+    result_json: dict | None,
+    *,
+    final_score: float | None,
+    prompt_version: str,
+    model_name: str,
+    model_version: str,
+    exif_info: dict | None,
+) -> dict:
+    raw_payload = dict(result_json or {})
+    scores = {
+        'composition': 0,
+        'lighting': 0,
+        'color': 0,
+        'impact': 0,
+        'technical': 0,
+    }
+    raw_scores = raw_payload.get('scores')
+    if isinstance(raw_scores, dict):
+        for key in scores:
+            value = raw_scores.get(key)
+            if value is None and key == 'impact':
+                value = raw_scores.get('story')
+            try:
+                scores[key] = max(0, min(int(value), 10))
+            except (TypeError, ValueError):
+                continue
+
+    resolved_final_score = final_score
+    if resolved_final_score is None:
+        try:
+            resolved_final_score = float(raw_payload.get('final_score'))
+        except (TypeError, ValueError):
+            resolved_final_score = round(sum(scores.values()) / len(scores), 1)
+
+    visual_analysis = raw_payload.get('visual_analysis')
+    share_info = raw_payload.get('share_info')
+    stored_exif_info = raw_payload.get('exif_info')
+
+    return {
+        'schema_version': str(raw_payload.get('schema_version') or '1.0'),
+        'prompt_version': str(raw_payload.get('prompt_version') or prompt_version),
+        'model_name': str(raw_payload.get('model_name') or model_name),
+        'model_version': str(raw_payload.get('model_version') or model_version),
+        'scores': scores,
+        'final_score': float(resolved_final_score),
+        'advantage': str(raw_payload.get('advantage') or ''),
+        'critique': str(raw_payload.get('critique') or ''),
+        'suggestions': str(raw_payload.get('suggestions') or ''),
+        'visual_analysis': visual_analysis if isinstance(visual_analysis, dict) else {},
+        'exif_info': exif_info if isinstance(exif_info, dict) else (stored_exif_info if isinstance(stored_exif_info, dict) else {}),
+        'share_info': share_info if isinstance(share_info, dict) else {},
+    }
+
+
 def expire_review_tasks(db: Session) -> None:
     _reconcile_completed_tasks(db)
     now = datetime.now(timezone.utc)
@@ -330,12 +385,20 @@ def _process_task(db: Session, task: ReviewTask) -> None:
             task.mode.value if isinstance(task.mode, ReviewMode) else str(task.mode),
             image_url=image_url,
             locale=payload_locale,
+            exif_data=photo.exif_data or None,
         )
     except AIReviewError as exc:
         _handle_failure(db, task, error_code='AI_CALL_FAILED', error_message=str(exc), retryable=True)
         return
 
-    result = ai_response.result
+    result_payload = _normalize_review_result_payload(
+        ai_response.result.model_dump(),
+        final_score=ai_response.result.final_score,
+        prompt_version=ai_response.prompt_version,
+        model_name=ai_response.model_name,
+        model_version=ai_response.model_version,
+        exif_info=photo.exif_data or None,
+    )
     owner = db.query(User).filter(User.id == task.owner_user_id).first()
     if owner is None:
         _handle_failure(db, task, error_code='USER_NOT_FOUND', error_message='Task owner not found', retryable=False)
@@ -364,9 +427,9 @@ def _process_task(db: Session, task: ReviewTask) -> None:
         owner_user_id=task.owner_user_id,
         mode=task.mode,
         status=ReviewStatus.SUCCEEDED,
-        schema_version=result.schema_version,
-        result_json=result.model_dump(),
-        final_score=result.final_score,
+        schema_version=result_payload['schema_version'],
+        result_json=result_payload,
+        final_score=result_payload['final_score'],
         input_tokens=ai_response.input_tokens,
         output_tokens=ai_response.output_tokens,
         cost_usd=ai_response.cost_usd,

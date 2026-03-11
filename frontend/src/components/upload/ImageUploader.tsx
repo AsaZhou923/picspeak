@@ -3,10 +3,11 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { Camera, X, AlertCircle, Loader, CheckCircle2 } from 'lucide-react';
 import { compressImage, formatBytes, compressionRatio, CompressionResult } from '@/lib/compress';
+import { extractExif, ExifData } from '@/lib/exif';
 import { useI18n } from '@/lib/i18n';
 
 interface ImageUploaderProps {
-  onFileSelected: (file: File, preview: string) => void;
+  onFileSelected: (file: File, preview: string, exifData?: ExifData) => void;
   disabled?: boolean;
   maxBytes?: number;
 }
@@ -52,6 +53,14 @@ export default function ImageUploader({
       setCompressionInfo(null);
       setCompressing(true);
 
+      // Extract EXIF from the original file before compression strips metadata
+      let exifData: ExifData = {};
+      try {
+        exifData = await extractExif(file);
+      } catch {
+        // non-critical
+      }
+
       let result: CompressionResult;
       try {
         result = await compressImage(file);
@@ -74,7 +83,7 @@ export default function ImageUploader({
 
       const reader = new FileReader();
       reader.onload = (e) => {
-        onFileSelected(result.file, e.target?.result as string);
+        onFileSelected(result.file, e.target?.result as string, exifData);
       };
       reader.readAsDataURL(result.file);
     },
