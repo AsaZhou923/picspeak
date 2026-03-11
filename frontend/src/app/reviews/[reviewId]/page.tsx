@@ -259,20 +259,26 @@ function parsePointWithTitle(raw: string): { title: string; detail: string } {
 }
 
 // ─── Score dimension → suggestion tag mapping ─────────────────────────────────
-// Maps each score dimension to the suggestion tag most likely to represent it.
-// Note: not all mappings are 1:1 by name — lighting issues surface as
-// exposure suggestions, color/tone work shows up as post-processing suggestions,
-// and narrative timing cues map to the story dimension.
-const DIM_TO_TAG: Partial<Record<string, TagKey>> = {
-  composition: 'composition',
-  lighting: 'exposure',  // lighting problems → exposure/camera advice
-  color: 'post',         // color issues → post-processing (color grading)
-  story: 'timing',       // storytelling → shooting timing cues
-  technical: 'focus',    // technical quality → focus/sharpness advice
+// Each dimension maps to an ordered list of tag candidates to try.
+// The first tag whose corresponding card exists in the DOM is used.
+// Rationale for non-obvious mappings:
+//   lighting  → exposure first (camera exposure adjustment), then post (RAW correction)
+//   color     → post first (color grading / white balance), then exposure (WB in-camera)
+//   story     → timing first (golden hour / moment), then pre (framing for narrative)
+//   technical → focus first (sharpness / depth-of-field), then exposure (settings), then post (noise/sharpen)
+const DIM_TO_TAGS: Partial<Record<string, TagKey[]>> = {
+  composition: ['composition', 'pre'],
+  lighting:    ['exposure', 'post', 'pre'],
+  color:       ['post', 'exposure'],
+  story:       ['timing', 'pre'],
+  technical:   ['focus', 'exposure', 'post'],
 };
 
 // Max detail chars shown before truncation in Flash mode
 const FLASH_DETAIL_LIMIT = 120;
+
+// Duration (ms) of the card-highlight animation in tailwind.config.ts
+const CARD_HIGHLIGHT_DURATION_MS = 1800;
 
 // ─── Critique section with per-item cards ─────────────────────────────────────
 
@@ -286,9 +292,10 @@ type SectionConfig = {
   showTags?: boolean;
   isPro?: boolean;
   highlightTop?: number;
+  highlightedId?: string | null;
 };
 
-function CritiqueSection({ accent, borderColor, bgColor, icon, title, body, showTags, isPro = false, highlightTop = 0 }: SectionConfig) {
+function CritiqueSection({ accent, borderColor, bgColor, icon, title, body, showTags, isPro = false, highlightTop = 0, highlightedId }: SectionConfig) {
   const { t } = useI18n();
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [expandedSet, setExpandedSet] = useState<Set<number>>(new Set());
@@ -334,7 +341,7 @@ function CritiqueSection({ accent, borderColor, bgColor, icon, title, body, show
             <div
               key={i}
               id={cardId}
-              className={`group ${bgColor} border-l-2 ${isPriority ? 'border-l-[3px]' : ''} ${borderColor} rounded-r-md px-4 py-3`}
+              className={`group ${bgColor} border-l-2 ${isPriority ? 'border-l-[3px]' : ''} ${borderColor} rounded-r-md px-4 py-3 ${cardId && cardId === highlightedId ? 'animate-card-highlight' : ''}`}
             >
               {isPriority && (
                 <div className={`text-[10px] font-semibold ${accent} opacity-60 mb-1.5 tracking-widest uppercase`}>
@@ -412,6 +419,7 @@ export default function ReviewPage() {
   const [photoError, setPhotoError] = useState(false);
   const [zoomOpen, setZoomOpen] = useState(false);
   const [activeDim, setActiveDim] = useState<string | null>(null);
+  const [highlightedCardId, setHighlightedCardId] = useState<string | null>(null);
   const [usage, setUsage] = useState<UsageResponse | null>(null);
   const rightColRef = useRef<HTMLDivElement>(null);
 
@@ -451,14 +459,31 @@ export default function ReviewPage() {
       .catch(() => {});
   }, [ensureToken]);
 
-  // Click a score dimension → scroll to first matching tagged suggestion
+  // Click a score dimension → scroll to the best matching tagged suggestion.
+  // Tries each tag candidate for the dimension in priority order until a card is found.
+  // Uses a brief 150 ms delay so the row-highlight (activeDim) is visible before the
+  // page scrolls, making the interaction feel intentional rather than abrupt.
   function handleDimClick(dimKey: string) {
-    const tag = DIM_TO_TAG[dimKey];
-    if (!tag) return;
-    const el = document.getElementById(`suggestion-tag-${tag}`);
-    if (!el) return; // no suggestion with that tag – do nothing
-    setActiveDim(dimKey);
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const tags = DIM_TO_TAGS[dimKey];
+    if (!tags || tags.length === 0) return;
+
+    for (const tag of tags) {
+      const targetId = `suggestion-tag-${tag}`;
+      const el = document.getElementById(targetId);
+      if (el) {
+        // Highlight the dimension row immediately as tactile feedback
+        setActiveDim(dimKey);
+        // Short pause lets the highlight register before the viewport moves
+        setTimeout(() => {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          setHighlightedCardId(targetId);
+          // Clear the card glow once the animation finishes
+          setTimeout(() => setHighlightedCardId(null), CARD_HIGHLIGHT_DURATION_MS);
+        }, 150);
+        return;
+      }
+    }
+    // No matching suggestion card found in the DOM — don't activate anything
   }
 
   if (loading) {
@@ -602,13 +627,12 @@ export default function ReviewPage() {
                   const score = (r.scores as unknown as Record<string, number>)[d.key] ?? 0;
                   const isWeakest = d.key === weakestKey;
                   const isActive = activeDim === d.key;
-                  const hasTarget = DIM_TO_TAG[d.key] !== undefined;
+                  const hasTarget = (DIM_TO_TAGS[d.key]?.length ?? 0) > 0;
                   return (
                     <div
                       key={d.key}
                       className={`group/dim relative rounded px-1 -mx-1 py-0.5 transition-colors ${hasTarget ? 'cursor-pointer' : ''} ${isActive ? 'bg-gold/10' : hasTarget ? 'hover:bg-void/30' : ''}`}
                       onClick={() => handleDimClick(d.key)}
-                      title={hasTarget ? d.desc : undefined}
                     >
                       <div className="flex items-center gap-2.5">
                         <span className={`text-xs w-16 shrink-0 ${isWeakest ? 'text-rust' : isActive ? 'text-gold' : 'text-ink-muted'}`}>
@@ -624,10 +648,20 @@ export default function ReviewPage() {
                           {score.toFixed(1)}
                         </span>
                         {isWeakest && <TrendingDown size={10} className="text-rust shrink-0" />}
+                        {/* Hover arrow: appears only when the row has a candidate tag and is not already weakest-marked */}
+                        {hasTarget && (
+                          <span className="text-[10px] text-gold/0 group-hover/dim:text-gold/50 transition-colors shrink-0 select-none" aria-hidden>↓</span>
+                        )}
                       </div>
-                      {/* Dimension tooltip */}
-                      <div className="pointer-events-none absolute left-0 bottom-full mb-2 z-10 hidden group-hover/dim:block w-56 rounded-md bg-surface border border-border-subtle px-3 py-2 shadow-lg">
+                      {/* Dimension tooltip: shows description + click hint */}
+                      <div className="pointer-events-none absolute left-0 bottom-full mb-2 z-10 hidden group-hover/dim:block w-60 rounded-md bg-surface border border-border-subtle px-3 py-2 shadow-lg">
                         <p className="text-[11px] text-ink-muted leading-relaxed">{d.desc}</p>
+                        {hasTarget && (
+                          <p className="text-[10px] text-gold/70 mt-1.5 pt-1.5 border-t border-border-subtle flex items-center gap-1">
+                            <span aria-hidden>↓</span>
+                            {t('dim_click_hint')}
+                          </p>
+                        )}
                         <div className="absolute left-4 top-full w-2 h-2 overflow-hidden">
                           <div className="w-2 h-2 bg-surface border-r border-b border-border-subtle rotate-45 -translate-y-1" />
                         </div>
@@ -727,6 +761,7 @@ export default function ReviewPage() {
                 showTags
                 isPro={isPro}
                 highlightTop={2}
+                highlightedId={highlightedCardId}
               />
             </div>
 

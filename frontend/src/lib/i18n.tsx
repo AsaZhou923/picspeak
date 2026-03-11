@@ -297,6 +297,7 @@ const translations = {
     review_free_upgrade_body: '无每日次数限制 · 永久保留历史 · 优先分析队列',
     review_free_upgrade_cta: '开通 Pro',
     review_quota_low_remaining: '今日仅剩 {n} 次',
+    dim_click_hint: '点击查看相关建议',
   },
 
   en: {
@@ -581,6 +582,7 @@ const translations = {
     review_free_upgrade_body: 'No daily cap · Permanent history · Priority queue',
     review_free_upgrade_cta: 'Upgrade to Pro',
     review_quota_low_remaining: '{n} critiques left today',
+    dim_click_hint: 'Click to see related suggestions',
   },
 
   ja: {
@@ -865,6 +867,7 @@ const translations = {
     review_free_upgrade_body: '1日上限なし · 永久履歴保存 · 優先キュー処理',
     review_free_upgrade_cta: 'Pro へ移行',
     review_quota_low_remaining: '本日残り {n} 回',
+    dim_click_hint: 'クリックして関連する提案を表示',
   },
 } as const;
 

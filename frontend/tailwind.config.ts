@@ -57,6 +57,7 @@ const config: Config = {
         'spin-slow': 'spin 3s linear infinite',
         'shimmer': 'shimmer 2s infinite',
         'glow-pulse': 'glowPulse 2.5s ease-in-out infinite',
+        'card-highlight': 'cardHighlight 1.8s ease-out forwards',
       },
       keyframes: {
         fadeIn: {
@@ -78,6 +79,12 @@ const config: Config = {
         glowPulse: {
           '0%, 100%': { boxShadow: '0 0 0 0 rgba(200,162,104,0)' },
           '50%': { boxShadow: '0 0 18px 3px rgba(200,162,104,0.22)' },
+        },
+        cardHighlight: {
+          '0%':       { boxShadow: '0 0 0 0 rgba(200,162,104,0)' },
+          '15%':      { boxShadow: '0 0 0 2px rgba(200,162,104,0.55), 0 0 14px 3px rgba(200,162,104,0.18)' },
+          '75%':      { boxShadow: '0 0 0 2px rgba(200,162,104,0.55), 0 0 14px 3px rgba(200,162,104,0.18)' },
+          '100%':     { boxShadow: '0 0 0 0 rgba(200,162,104,0)' },
         },
       },
     },
