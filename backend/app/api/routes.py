@@ -297,7 +297,7 @@ def migrate_guest_reviews(
 
     migrated_reviews = (
         db.query(Review)
-        .filter(Review.id.in_(review_ids))
+        .filter(Review.id.in_(review_ids), Review.owner_user_id == guest_user.id)
         .update({Review.owner_user_id: actor.user.id}, synchronize_session=False)
     )
 
