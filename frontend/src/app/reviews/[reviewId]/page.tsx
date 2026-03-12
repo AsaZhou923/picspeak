@@ -402,6 +402,17 @@ function parsePoints(body: string): string[] {
 
 function parsePointWithTitle(raw: string): { title: string; detail: string } {
   const text = raw.replace(/^\d+[.、．]\s*/, '');
+  // Detect three-part structure (观察/Observation + 原因/Reason + 处理方法/可执行动作/Action)
+  // and use the first sentence of the action part as the card title
+  const actionRe = /(?:处理方法|可执行动作|Action)[：:]\s*(.+)/is;
+  const actionMatch = text.match(actionRe);
+  if (actionMatch) {
+    const actionText = actionMatch[1].trim();
+    // Take the first sentence: split on Chinese sentence-ending punctuation or English period+space
+    // Use \.\s+ (period followed by space) to avoid splitting on decimal numbers like "1.5"
+    const firstSentence = actionText.split(/[。！]|\.\s+|!\s+/)[0].replace(/[.。！]+$/, '').trim();
+    return { title: firstSentence || actionText, detail: text.trim() };
+  }
   const colonRe = /^([^：:\n。，,]{2,20})[：:]\s*(.+)/s;
   const m = text.match(colonRe);
   if (m) return { title: m[1].trim(), detail: m[2].trim() };
@@ -817,7 +828,7 @@ export default function ReviewPage() {
         <div className="grid lg:grid-cols-[360px_1fr] gap-8 items-start">
 
           {/* ── LEFT: Photo + Scores ──────────────────────────────────────── */}
-          <div className="lg:sticky lg:top-20">
+          <div className="lg:sticky lg:top-20 min-w-0">
             <div className="rounded-xl overflow-hidden border border-border-subtle bg-raised">
               {/* Photo */}
               {photoUrl && !photoError ? (
@@ -831,7 +842,7 @@ export default function ReviewPage() {
                     alt={t('review_photo_alt')}
                     width={1200}
                     height={900}
-                    className="w-full h-auto object-contain max-h-[65vh]"
+                    className="w-full max-w-full h-auto object-contain max-h-[65vh]"
                     onError={() => setPhotoError(true)}
                     onLoad={(e) => {
                       const img = e.currentTarget;
@@ -954,7 +965,7 @@ export default function ReviewPage() {
           </div>
 
           {/* ── RIGHT: Results ───────────────────────────────────────────── */}
-          <div ref={rightColRef} className="space-y-6">
+          <div ref={rightColRef} className="space-y-6 min-w-0">
 
             {/* Header */}
             <div>
