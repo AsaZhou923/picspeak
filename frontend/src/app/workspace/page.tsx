@@ -20,6 +20,7 @@ import {
   UsageResponse,
   ReviewCreateAsyncResponse,
   ReviewCreateSyncResponse,
+  ImageType,
 } from '@/lib/types';
 import ImageUploader from '@/components/upload/ImageUploader';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
@@ -126,6 +127,7 @@ export default function WorkspacePage() {
   const [errMessage, setErrMessage] = useState('');
 
   const [reviewMode, setReviewMode] = useState<'flash' | 'pro'>('flash');
+  const [imageType, setImageType] = useState<ImageType>('default');
   const [showQuotaModal, setShowQuotaModal] = useState(false);
   const remainingQuota =
     usage?.quota.daily_remaining ?? usage?.quota.monthly_remaining ?? null;
@@ -288,6 +290,7 @@ export default function WorkspacePage() {
           async: true,
           idempotency_key: idempotencyKey,
           locale,
+          image_type: imageType,
         },
         token
       );
@@ -313,7 +316,7 @@ export default function WorkspacePage() {
         setErrMessage(t('err_upload'));
       }
     }
-  }, [photo, reviewMode, locale, ensureToken, router, t, usage, remainingQuota]);
+  }, [photo, reviewMode, locale, imageType, ensureToken, router, t, usage, remainingQuota]);
 
   const handleReset = () => {
     setSelectedFile(null);
@@ -479,6 +482,31 @@ export default function WorkspacePage() {
                 <div className="flex items-center gap-2 text-rust text-sm bg-rust/5 border border-rust/20 rounded px-3 py-2 animate-scale-in">
                   <AlertCircle size={14} className="shrink-0" />
                   <span>{errMessage}</span>
+                </div>
+              )}
+
+              {/* Image type selector */}
+              {stage === 'ready' && photo && (
+                <div>
+                  <p className="text-xs text-ink-muted mb-3">{t('select_image_type')}</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {([
+                      ['default', t('image_type_default')],
+                      ['landscape', t('image_type_landscape')],
+                      ['portrait', t('image_type_portrait')],
+                      ['street', t('image_type_street')],
+                      ['still_life', t('image_type_still_life')],
+                      ['architecture', t('image_type_architecture')],
+                    ] as const).map(([id, label]) => (
+                      <button
+                        key={id}
+                        onClick={() => setImageType(id as ImageType)}
+                        className={`px-3 py-2 rounded border text-xs transition-colors ${imageType === id ? 'border-gold/60 text-gold bg-gold/5' : 'border-border text-ink-muted hover:text-ink hover:border-gold/30'}`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
 

@@ -14,11 +14,31 @@ from app.db.models import Photo, PhotoStatus, Review, ReviewMode, ReviewStatus, 
 from app.db.session import SessionLocal
 from app.services.ai import AIReviewError, run_ai_review
 from app.services.content_audit import ContentAuditError, run_content_audit
-from app.services.guard import enforce_user_quota, increment_quota
+from app.services.guard import enforce_user_quota, increment_quota, user_usage_snapshot
 from app.services.task_events import record_task_event
 
 
 logger = logging.getLogger(__name__)
+
+
+def _default_visual_analysis_payload() -> dict:
+    return {
+        'composition_guides': {
+            'subject_region': None,
+            'horizon_line': None,
+            'leading_lines': [],
+            'suggested_crop': None,
+        }
+    }
+
+
+def _default_tonal_analysis_payload() -> dict:
+    return {
+        'brightness': None,
+        'contrast': None,
+        'color_balance': None,
+        'saturation': None,
+    }
 
 
 def _normalize_review_result_payload(
@@ -59,6 +79,11 @@ def _normalize_review_result_payload(
     visual_analysis = raw_payload.get('visual_analysis')
     share_info = raw_payload.get('share_info')
     stored_exif_info = raw_payload.get('exif_info')
+    tonal_analysis = raw_payload.get('tonal_analysis')
+    issue_marks = raw_payload.get('issue_marks')
+    billing_info = raw_payload.get('billing_info')
+    resolved_visual_analysis = visual_analysis if isinstance(visual_analysis, dict) else {}
+    resolved_visual_analysis.setdefault('composition_guides', _default_visual_analysis_payload()['composition_guides'])
 
     return {
         'schema_version': str(raw_payload.get('schema_version') or '1.0'),
@@ -70,7 +95,11 @@ def _normalize_review_result_payload(
         'advantage': str(raw_payload.get('advantage') or ''),
         'critique': str(raw_payload.get('critique') or ''),
         'suggestions': str(raw_payload.get('suggestions') or ''),
-        'visual_analysis': visual_analysis if isinstance(visual_analysis, dict) else {},
+        'image_type': str(raw_payload.get('image_type') or 'default'),
+        'visual_analysis': resolved_visual_analysis,
+        'tonal_analysis': tonal_analysis if isinstance(tonal_analysis, dict) else _default_tonal_analysis_payload(),
+        'issue_marks': issue_marks if isinstance(issue_marks, list) else [],
+        'billing_info': billing_info if isinstance(billing_info, dict) else {},
         'exif_info': exif_info if isinstance(exif_info, dict) else (stored_exif_info if isinstance(stored_exif_info, dict) else {}),
         'share_info': share_info if isinstance(share_info, dict) else {},
     }
@@ -356,6 +385,7 @@ def _process_task(db: Session, task: ReviewTask) -> None:
 
     image_url = f'{settings.object_base_url.rstrip("/")}/{quote(photo.object_key)}'
     payload_locale = (task.request_payload or {}).get('locale', 'zh')
+    payload_image_type = (task.request_payload or {}).get('image_type', 'default')
     if payload_locale not in {'zh', 'en', 'ja'}:
         payload_locale = 'zh'
     if settings.image_audit_enabled and photo.nsfw_label is None:
@@ -386,6 +416,7 @@ def _process_task(db: Session, task: ReviewTask) -> None:
             image_url=image_url,
             locale=payload_locale,
             exif_data=photo.exif_data or None,
+            image_type=payload_image_type,
         )
     except AIReviewError as exc:
         _handle_failure(db, task, error_code='AI_CALL_FAILED', error_message=str(exc), retryable=True)
@@ -451,6 +482,16 @@ def _process_task(db: Session, task: ReviewTask) -> None:
     )
     db.add(ledger)
     increment_quota(db, owner)
+    usage = user_usage_snapshot(db, owner)
+    result_payload['billing_info'] = {
+        'quota_charged': True,
+        'remaining_quota': {
+            'daily_remaining': usage.get('daily_remaining'),
+            'monthly_remaining': usage.get('monthly_remaining'),
+        },
+    }
+    review.result_json = result_payload
+    db.add(review)
 
     task.status = TaskStatus.SUCCEEDED
     task.progress = 100

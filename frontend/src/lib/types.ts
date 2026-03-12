@@ -68,6 +68,7 @@ export interface PhotoCreateResponse {
 // ─── Review ──────────────────────────────────────────────────────────────────
 
 export type ReviewMode = 'flash' | 'pro';
+export type ImageType = 'default' | 'landscape' | 'portrait' | 'street' | 'still_life' | 'architecture';
 export type ReviewStatus = 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'EXPIRED';
 export type TaskStatus = 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'EXPIRED' | 'DEAD_LETTER';
 
@@ -89,7 +90,17 @@ export interface ReviewResult {
   advantage: string;
   critique: string;
   suggestions: string;
+  image_type: ImageType;
+  billing_info: {
+    quota_charged?: boolean;
+    remaining_quota?: {
+      daily_remaining?: number | null;
+      monthly_remaining?: number | null;
+    };
+  };
   visual_analysis: Record<string, unknown>;
+  tonal_analysis: Record<string, unknown>;
+  issue_marks: Array<Record<string, unknown>>;
   exif_info: Record<string, unknown>;
   share_info: Record<string, unknown>;
 }
@@ -100,6 +111,7 @@ export interface ReviewCreateRequest {
   async: boolean;
   idempotency_key?: string;
   locale?: 'zh' | 'en' | 'ja';
+  image_type?: ImageType;
 }
 
 export interface ReviewCreateAsyncResponse {
@@ -125,6 +137,8 @@ export interface TaskStatusResponse {
   max_attempts: number;
   next_attempt_at: string | null;
   last_heartbeat_at: string | null;
+  started_at: string | null;
+  finished_at: string | null;
   error: Record<string, unknown> | null;
 }
 

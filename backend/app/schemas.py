@@ -59,9 +59,20 @@ class PhotoCreateResponse(BaseModel):
 class ReviewCreateRequest(BaseModel):
     photo_id: str
     mode: str = Field(pattern='^(flash|pro)$')
+    image_type: str = Field(default='default', pattern='^(default|landscape|portrait|street|still_life|architecture)$')
     async_mode: bool = Field(default=True, alias='async')
     idempotency_key: str | None = None
     locale: str = Field(default='zh', pattern='^(zh|en|ja)$')
+
+
+class GuestReviewMigrateRequest(BaseModel):
+    guest_token: str | None = None
+    recent_limit: int = Field(default=20, ge=1, le=100)
+
+
+class GuestReviewMigrateResponse(BaseModel):
+    migrated_reviews: int
+    migrated_photos: int
 
 
 class ReviewResult(BaseModel):
@@ -74,7 +85,11 @@ class ReviewResult(BaseModel):
     advantage: str = ''
     critique: str = ''
     suggestions: str = ''
+    image_type: str = 'default'
+    billing_info: dict[str, Any] = Field(default_factory=dict)
     visual_analysis: dict[str, Any] = Field(default_factory=dict)
+    tonal_analysis: dict[str, Any] = Field(default_factory=dict)
+    issue_marks: list[dict[str, Any]] = Field(default_factory=list)
     exif_info: dict[str, Any] = Field(default_factory=dict)
     share_info: dict[str, Any] = Field(default_factory=dict)
 
@@ -104,6 +119,8 @@ class TaskStatusResponse(BaseModel):
     max_attempts: int = 0
     next_attempt_at: datetime | None = None
     last_heartbeat_at: datetime | None = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
     error: dict[str, Any] | None = None
 
 

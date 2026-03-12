@@ -66,6 +66,8 @@ from app.schemas import (
     AuthGuestResponse,
     AuthGoogleLoginRequest,
     AuthTokenResponse,
+    GuestReviewMigrateRequest,
+    GuestReviewMigrateResponse,
 )
 from app.services.ai import AIReviewError, run_ai_review
 from app.services.content_audit import ContentAuditError, run_content_audit
@@ -256,6 +258,65 @@ def auth_google_login(payload: AuthGoogleLoginRequest, db: Session = Depends(get
     return _login_from_google_claims(claims, db)
 
 
+
+
+@router.post('/auth/guest/migrate', response_model=GuestReviewMigrateResponse)
+def migrate_guest_reviews(
+    payload: GuestReviewMigrateRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    actor: CurrentActor = Depends(get_current_actor),
+):
+    if actor.plan == UserPlan.guest:
+        raise api_error(status.HTTP_400_BAD_REQUEST, 'GUEST_MIGRATE_TARGET_INVALID', 'Please sign in before migrating guest records')
+
+    guest_token = payload.guest_token or request.cookies.get(GUEST_TOKEN_COOKIE)
+    if not guest_token:
+        raise api_error(status.HTTP_400_BAD_REQUEST, 'GUEST_TOKEN_MISSING', 'Guest token is required')
+
+    guest_user = get_user_from_token(guest_token, db)
+    if guest_user.plan != UserPlan.guest:
+        raise api_error(status.HTTP_400_BAD_REQUEST, 'GUEST_TOKEN_INVALID', 'Provided token does not belong to a guest account')
+
+    if guest_user.id == actor.user.id:
+        return GuestReviewMigrateResponse(migrated_reviews=0, migrated_photos=0)
+
+    guest_reviews = (
+        db.query(Review)
+        .filter(Review.owner_user_id == guest_user.id)
+        .order_by(Review.created_at.desc(), Review.id.desc())
+        .limit(payload.recent_limit)
+        .all()
+    )
+    if not guest_reviews:
+        db.commit()
+        return GuestReviewMigrateResponse(migrated_reviews=0, migrated_photos=0)
+
+    review_ids = [item.id for item in guest_reviews]
+    photo_ids = sorted({item.photo_id for item in guest_reviews})
+
+    migrated_reviews = (
+        db.query(Review)
+        .filter(Review.id.in_(review_ids))
+        .update({Review.owner_user_id: actor.user.id}, synchronize_session=False)
+    )
+
+    migrated_photos = 0
+    if photo_ids:
+        migrated_photos = (
+            db.query(Photo)
+            .filter(Photo.id.in_(photo_ids), Photo.owner_user_id == guest_user.id)
+            .update({Photo.owner_user_id: actor.user.id}, synchronize_session=False)
+        )
+        db.query(ReviewTask).filter(
+            ReviewTask.owner_user_id == guest_user.id,
+            ReviewTask.photo_id.in_(photo_ids),
+        ).update({ReviewTask.owner_user_id: actor.user.id, ReviewTask.idempotency_key: None}, synchronize_session=False)
+
+    db.commit()
+    return GuestReviewMigrateResponse(migrated_reviews=int(migrated_reviews or 0), migrated_photos=int(migrated_photos or 0))
+
+
 @router.get('/auth/google/callback')
 def auth_google_callback(
     code: str = Query(..., min_length=1),
@@ -311,10 +372,59 @@ def auth_google_callback(
     return response
 
 
+
+
+def _default_visual_analysis_payload() -> dict[str, Any]:
+    return {
+        'composition_guides': {
+            'subject_region': None,
+            'horizon_line': None,
+            'leading_lines': [],
+            'suggested_crop': None,
+        }
+    }
+
+
+def _default_tonal_analysis_payload() -> dict[str, Any]:
+    return {
+        'brightness': None,
+        'contrast': None,
+        'color_balance': None,
+        'saturation': None,
+    }
+
+
+def _is_retryable_task_error(task: ReviewTask) -> bool:
+    if not task.error_code:
+        return False
+    if task.status == TaskStatus.PENDING and task.next_attempt_at is not None:
+        return True
+    if task.status == TaskStatus.RUNNING:
+        return True
+    return False
+
+
+def _attach_billing_info(result_payload: dict[str, Any], *, db: Session, user: User, charged: bool) -> None:
+    usage = user_usage_snapshot(db, user)
+    result_payload['billing_info'] = {
+        'quota_charged': charged,
+        'remaining_quota': {
+            'daily_remaining': usage.get('daily_remaining'),
+            'monthly_remaining': usage.get('monthly_remaining'),
+        },
+    }
+
 def _serialize_task_status(task: ReviewTask, review: Review | None = None) -> dict:
     error = None
     if task.error_code or task.error_message:
-        error = {'code': task.error_code, 'message': task.error_message}
+        error = {
+            'code': task.error_code,
+            'message': task.error_message,
+            'retryable': _is_retryable_task_error(task),
+            'timeout': task.error_code in {'TASK_EXPIRED', 'TASK_STALLED'},
+            'failure_stage': 'pre_charge',
+            'quota_charged': False,
+        }
     return {
         'task_id': task.public_id,
         'status': task.status.value,
@@ -324,6 +434,8 @@ def _serialize_task_status(task: ReviewTask, review: Review | None = None) -> di
         'max_attempts': task.max_attempts,
         'next_attempt_at': task.next_attempt_at,
         'last_heartbeat_at': task.last_heartbeat_at,
+        'started_at': task.started_at,
+        'finished_at': task.finished_at,
         'error': error,
     }
 
@@ -501,14 +613,22 @@ def _coerce_review_scores(raw_scores: Any) -> dict[str, int]:
     return normalized
 
 
-def _build_review_extensions(raw_payload: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+def _build_review_extensions(raw_payload: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any], list[dict[str, Any]], dict[str, Any]]:
     visual_analysis = raw_payload.get('visual_analysis')
     exif_info = raw_payload.get('exif_info')
     share_info = raw_payload.get('share_info')
+    tonal_analysis = raw_payload.get('tonal_analysis')
+    issue_marks = raw_payload.get('issue_marks')
+    billing_info = raw_payload.get('billing_info')
+    resolved_visual = visual_analysis if isinstance(visual_analysis, dict) else {}
+    resolved_visual.setdefault('composition_guides', _default_visual_analysis_payload()['composition_guides'])
     return (
-        visual_analysis if isinstance(visual_analysis, dict) else {},
+        resolved_visual,
         exif_info if isinstance(exif_info, dict) else {},
         share_info if isinstance(share_info, dict) else {},
+        tonal_analysis if isinstance(tonal_analysis, dict) else _default_tonal_analysis_payload(),
+        issue_marks if isinstance(issue_marks, list) else [],
+        billing_info if isinstance(billing_info, dict) else {},
     )
 
 
@@ -523,7 +643,7 @@ def _review_result_payload(
 ) -> dict:
     raw_payload = dict(result_json or {})
     scores = _coerce_review_scores(raw_payload.get('scores'))
-    visual_analysis, stored_exif_info, share_info = _build_review_extensions(raw_payload)
+    visual_analysis, stored_exif_info, share_info, tonal_analysis, issue_marks, billing_info = _build_review_extensions(raw_payload)
 
     resolved_final_score = final_score
     if resolved_final_score is None:
@@ -543,7 +663,11 @@ def _review_result_payload(
         'advantage': str(raw_payload.get('advantage') or ''),
         'critique': str(raw_payload.get('critique') or ''),
         'suggestions': str(raw_payload.get('suggestions') or ''),
+        'image_type': str(raw_payload.get('image_type') or 'default'),
         'visual_analysis': visual_analysis,
+        'tonal_analysis': tonal_analysis,
+        'issue_marks': issue_marks,
+        'billing_info': billing_info,
         'exif_info': exif_info if isinstance(exif_info, dict) else stored_exif_info,
         'share_info': share_info,
     }
@@ -711,7 +835,7 @@ def create_review(
         if photo.status != PhotoStatus.READY:
             raise api_error(status.HTTP_400_BAD_REQUEST, 'IMAGE_REJECTED', photo.rejected_reason or 'Image content is not allowed')
     try:
-        ai_response = run_ai_review(payload.mode, image_url=image_url, locale=payload.locale, exif_data=photo.exif_data or None)
+        ai_response = run_ai_review(payload.mode, image_url=image_url, locale=payload.locale, exif_data=photo.exif_data or None, image_type=payload.image_type)
     except AIReviewError as exc:
         raise api_error(status.HTTP_502_BAD_GATEWAY, 'AI_REVIEW_FAILED', f'AI review failed: {exc}') from exc
 
@@ -754,6 +878,9 @@ def create_review(
         )
     )
     increment_quota(db, actor.user)
+    _attach_billing_info(result_payload, db=db, user=actor.user, charged=True)
+    review.result_json = result_payload
+    db.add(review)
     db.commit()
     db.refresh(review)
 
