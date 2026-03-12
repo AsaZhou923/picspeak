@@ -297,7 +297,7 @@ export default function WorkspacePage() {
 
       if ('task_id' in result) {
         const async_result = result as ReviewCreateAsyncResponse;
-        router.push(`/tasks/${async_result.task_id}`);
+        router.push(`/tasks/${async_result.task_id}?mode=${reviewMode}`);
       } else {
         const sync_result = result as ReviewCreateSyncResponse;
         router.push(`/reviews/${sync_result.review_id}`);

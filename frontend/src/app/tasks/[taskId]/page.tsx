@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { AlertCircle, RotateCcw, ArrowLeft, ShieldCheck, Cpu, CheckCircle2, Clock } from 'lucide-react';
 import { buildTaskWebSocketUrl, getTask } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
@@ -16,6 +16,8 @@ export default function TaskPage() {
   const router = useRouter();
   const params = useParams();
   const taskId = params.taskId as string;
+  const searchParams = useSearchParams();
+  const urlMode = searchParams.get('mode');
   const { ensureToken } = useAuth();
   const { t } = useI18n();
 
@@ -304,6 +306,12 @@ export default function TaskPage() {
         )}
 
         {eventMessage && !isFinal && <p className="text-xs text-ink-muted font-mono">{eventMessage}</p>}
+
+        {urlMode === 'pro' && activeStep?.id === 'ai' && !isFinal && !isSuccess && (
+          <p className="text-xs text-ink-muted bg-raised border border-border rounded px-4 py-2">
+            {t('task_pro_analysis_hint')}
+          </p>
+        )}
 
         {error && (
           <p className="text-sm text-rust bg-rust/5 border border-rust/20 rounded px-4 py-2">

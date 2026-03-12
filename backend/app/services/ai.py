@@ -346,9 +346,10 @@ def run_ai_review(mode: str, image_url: str, locale: str = 'zh', exif_data: dict
         method='POST',
     )
 
+    timeout = settings.pro_ai_timeout_seconds if (mode or '').strip().lower() == 'pro' else settings.ai_timeout_seconds
     start = time.perf_counter()
     try:
-        with urlopen(req, timeout=settings.ai_timeout_seconds) as resp:
+        with urlopen(req, timeout=timeout) as resp:
             body = json.loads(resp.read().decode('utf-8'))
     except HTTPError as exc:
         err_body = exc.read().decode('utf-8', errors='ignore') if hasattr(exc, 'read') else str(exc)

@@ -1,14 +1,15 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { CheckCircle, XCircle, Loader } from 'lucide-react';
+import { CheckCircle, XCircle, Loader, ArrowDownToLine } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { useI18n } from '@/lib/i18n';
 import { AuthToken } from '@/lib/types';
+import { migrateGuestReviews } from '@/lib/api';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
-type Status = 'processing' | 'success' | 'error';
+type Status = 'processing' | 'migrate_prompt' | 'migrating' | 'done' | 'error';
 
 export default function GoogleCallbackPage() {
   return (
@@ -31,6 +32,16 @@ function GoogleCallbackInner() {
   const { t } = useI18n();
   const [status, setStatus] = useState<Status>('processing');
   const [errorMsg, setErrorMsg] = useState('');
+  const [accessToken, setAccessToken] = useState('');
+  const [migratedCount, setMigratedCount] = useState<number | null>(null);
+  const redirectedRef = useRef(false);
+
+  const goWorkspace = useCallback(() => {
+    if (!redirectedRef.current) {
+      redirectedRef.current = true;
+      router.push('/workspace');
+    }
+  }, [router]);
 
   useEffect(() => {
     const hashParams = typeof window !== 'undefined'
@@ -51,28 +62,49 @@ function GoogleCallbackInner() {
       return;
     }
 
-    const accessToken = readParam('access_token');
+    const token = readParam('access_token');
     const tokenType = readParam('token_type') ?? 'bearer';
     const userId = readParam('user_id');
     const plan = readParam('plan');
 
-    if (!accessToken || !userId || !plan) {
+    if (!token || !userId || !plan) {
       setStatus('error');
       setErrorMsg(t('auth_error_missing_params'));
       return;
     }
 
     const authData: AuthToken = {
-      access_token: accessToken,
+      access_token: token,
       token_type: tokenType,
       user_id: userId,
       plan: plan as AuthToken['plan'],
     };
 
     login(authData);
-    setStatus('success');
-    setTimeout(() => router.push('/workspace'), 1200);
-  }, [searchParams, login, router]);
+    setAccessToken(token);
+    setStatus('migrate_prompt');
+  }, [searchParams, login, t]);
+
+  const handleMigrate = useCallback(async () => {
+    setStatus('migrating');
+    try {
+      const result = await migrateGuestReviews(accessToken);
+      setMigratedCount(result.migrated_reviews);
+    } catch {
+      // migration failed silently — still go to workspace
+    }
+    setStatus('done');
+    setTimeout(goWorkspace, 1800);
+  }, [accessToken, goWorkspace]);
+
+  const handleSkip = useCallback(() => {
+    goWorkspace();
+  }, [goWorkspace]);
+
+  const doneMsg =
+    migratedCount === null || migratedCount === 0
+      ? t('auth_migrate_none')
+      : t('auth_migrate_done').replace('{count}', String(migratedCount));
 
   return (
     <div className="min-h-screen flex items-center justify-center px-6 pt-14">
@@ -89,14 +121,51 @@ function GoogleCallbackInner() {
           </>
         )}
 
-        {status === 'success' && (
+        {status === 'migrate_prompt' && (
           <>
             <div className="flex justify-center">
               <CheckCircle size={40} className="text-sage" />
             </div>
             <div>
-              <h1 className="font-display text-2xl mb-2">{t('auth_success_title')}</h1>
-              <p className="text-sm text-ink-muted">{t('auth_success_body')}</p>
+              <h1 className="font-display text-2xl mb-2">{t('auth_migrate_title')}</h1>
+              <p className="text-sm text-ink-muted">{t('auth_migrate_body')}</p>
+            </div>
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={handleMigrate}
+                className="flex items-center justify-center gap-2 px-6 py-2.5 bg-gold text-void text-sm font-medium rounded hover:bg-gold-light transition-colors"
+              >
+                <ArrowDownToLine size={15} />
+                {t('auth_migrate_confirm')}
+              </button>
+              <button
+                onClick={handleSkip}
+                className="text-sm text-ink-subtle hover:text-ink-muted transition-colors"
+              >
+                {t('auth_migrate_skip')}
+              </button>
+            </div>
+          </>
+        )}
+
+        {status === 'migrating' && (
+          <>
+            <div className="flex justify-center">
+              <Loader size={40} className="text-gold animate-spin-slow" style={{ animationDuration: '2s' }} />
+            </div>
+            <div>
+              <p className="text-sm text-ink-muted">{t('auth_migrating_body')}</p>
+            </div>
+          </>
+        )}
+
+        {status === 'done' && (
+          <>
+            <div className="flex justify-center">
+              <CheckCircle size={40} className="text-sage" />
+            </div>
+            <div>
+              <p className="text-sm text-ink-muted">{doneMsg}</p>
             </div>
           </>
         )}

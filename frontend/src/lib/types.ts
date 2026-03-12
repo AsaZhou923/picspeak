@@ -200,6 +200,13 @@ export interface TaskStreamMessage {
   } | null;
 }
 
+// ─── Guest Migration ────────────────────────────────────────────────────────
+
+export interface GuestMigrateResponse {
+  migrated_reviews: number;
+  migrated_photos: number;
+}
+
 export class ApiException extends Error {
   constructor(
     public status: number,

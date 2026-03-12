@@ -2,6 +2,7 @@ import {
   ApiException,
   AuthToken,
   BillingCheckoutResponse,
+  GuestMigrateResponse,
   PhotoCreateResponse,
   PhotoReviewsResponse,
   PresignRequest,
@@ -97,6 +98,17 @@ export async function authGoogleLogin(idToken: string): Promise<AuthToken> {
   return request<AuthToken>('/auth/google/login', {
     method: 'POST',
     body: JSON.stringify({ id_token: idToken }),
+  });
+}
+
+export async function migrateGuestReviews(
+  token: string,
+  recentLimit = 20
+): Promise<GuestMigrateResponse> {
+  return request<GuestMigrateResponse>('/auth/guest/migrate', {
+    method: 'POST',
+    body: JSON.stringify({ recent_limit: recentLimit }),
+    token,
   });
 }
 

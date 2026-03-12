@@ -55,6 +55,7 @@ class Settings(BaseSettings):
     flash_model_name: str = ''
     pro_model_name: str = ''
     ai_timeout_seconds: int = 60
+    pro_ai_timeout_seconds: int = 180
     review_worker_concurrency: int = 2
     review_worker_idle_sleep_ms: int = 200
     run_embedded_worker: bool = True
