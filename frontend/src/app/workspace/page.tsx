@@ -500,7 +500,7 @@ export default function WorkspacePage() {
                     ] as const).map(([id, label]) => (
                       <button
                         key={id}
-                        onClick={() => setImageType(id as ImageType)}
+                        onClick={() => setImageType(id)}
                         className={`px-3 py-2 rounded border text-xs transition-colors ${imageType === id ? 'border-gold/60 text-gold bg-gold/5' : 'border-border text-ink-muted hover:text-ink hover:border-gold/30'}`}
                       >
                         {label}
