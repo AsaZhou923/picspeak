@@ -14,7 +14,7 @@ from app.db.models import Photo, PhotoStatus, Review, ReviewMode, ReviewStatus, 
 from app.db.session import SessionLocal
 from app.services.ai import AIReviewError, run_ai_review
 from app.services.content_audit import ContentAuditError, run_content_audit
-from app.services.guard import enforce_user_quota, increment_quota, user_usage_snapshot
+from app.services.guard import enforce_user_quota, guest_usage_snapshot, increment_quota, user_usage_snapshot
 from app.services.task_events import record_task_event
 
 
@@ -482,7 +482,8 @@ def _process_task(db: Session, task: ReviewTask) -> None:
     )
     db.add(ledger)
     increment_quota(db, owner)
-    usage = user_usage_snapshot(db, owner)
+    guest_scope_key = (task.request_payload or {}).get('_guest_scope_key') if owner.plan == UserPlan.guest else None
+    usage = guest_usage_snapshot(db, guest_scope_key) if guest_scope_key else user_usage_snapshot(db, owner)
     result_payload['billing_info'] = {
         'quota_charged': True,
         'remaining_quota': {

@@ -491,12 +491,14 @@ function CritiqueSection({ accent, borderColor, bgColor, icon, title, body, show
           const displayDetail = needsTruncation && !isExpanded
             ? `${detail.slice(0, FLASH_DETAIL_LIMIT)}…`
             : detail;
-          // Stable scroll-target ID: use first tag so dimension click can find this card
-          const cardId = showTags && tags.length > 0 ? `suggestion-tag-${tags[0]}` : undefined;
+          const hasTags = showTags && tags.length > 0;
+          const cardId = hasTags ? `suggestion-card-${i}` : undefined;
+          const tagData = hasTags ? tags.join(' ') : undefined;
           return (
             <div
               key={i}
               id={cardId}
+              data-suggestion-tags={tagData}
               className={`group ${bgColor} border-l-2 ${isPriority ? 'border-l-[3px]' : ''} ${borderColor} rounded-r-md px-4 py-3 ${cardId && cardId === highlightedId ? 'animate-card-highlight' : ''}`}
             >
               {isPriority && (
@@ -650,15 +652,14 @@ export default function ReviewPage() {
     if (!tags || tags.length === 0) return;
 
     for (const tag of tags) {
-      const targetId = `suggestion-tag-${tag}`;
-      const el = document.getElementById(targetId);
-      if (el) {
+      const el = document.querySelector<HTMLElement>(`[data-suggestion-tags~="${tag}"]`);
+      if (el?.id) {
         // Highlight the dimension row immediately as tactile feedback
         setActiveDim(dimKey);
         // Short pause lets the highlight register before the viewport moves
         setTimeout(() => {
           el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          setHighlightedCardId(targetId);
+          setHighlightedCardId(el.id);
           // Clear the card glow once the animation finishes
           setTimeout(() => setHighlightedCardId(null), CARD_HIGHLIGHT_DURATION_MS);
         }, 150);

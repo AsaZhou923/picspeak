@@ -404,14 +404,29 @@ def _is_retryable_task_error(task: ReviewTask) -> bool:
     return False
 
 
-def _attach_billing_info(result_payload: dict[str, Any], *, db: Session, user: User, charged: bool) -> None:
-    usage = user_usage_snapshot(db, user)
+def _attach_billing_info(
+    result_payload: dict[str, Any],
+    *,
+    db: Session,
+    user: User,
+    charged: bool,
+    guest_scope_key: str | None = None,
+) -> None:
+    if user.plan == UserPlan.guest:
+        usage = guest_usage_snapshot(db, guest_scope_key) if guest_scope_key else None
+    else:
+        usage = user_usage_snapshot(db, user)
+
     result_payload['billing_info'] = {
         'quota_charged': charged,
-        'remaining_quota': {
-            'daily_remaining': usage.get('daily_remaining'),
-            'monthly_remaining': usage.get('monthly_remaining'),
-        },
+        'remaining_quota': (
+            {
+                'daily_remaining': usage.get('daily_remaining'),
+                'monthly_remaining': usage.get('monthly_remaining'),
+            }
+            if usage is not None
+            else None
+        ),
     }
 
 def _serialize_task_status(task: ReviewTask, review: Review | None = None) -> dict:
@@ -757,7 +772,12 @@ def create_review(
     else:
         enforce_user_quota(db, actor.user)
 
+    guest_scope_key = guest_rate_limit_scope_key(request) if actor.plan == UserPlan.guest else None
+
     if payload.async_mode:
+        task_payload = payload.model_dump(by_alias=True)
+        if guest_scope_key:
+            task_payload['_guest_scope_key'] = guest_scope_key
         task = ReviewTask(
             public_id=new_public_id('tsk'),
             photo_id=photo.id,
@@ -765,7 +785,7 @@ def create_review(
             mode=mode_enum,
             status=TaskStatus.PENDING,
             idempotency_key=idempotency_key,
-            request_payload=payload.model_dump(by_alias=True),
+            request_payload=task_payload,
             attempt_count=0,
             max_attempts=3,
             progress=0,
@@ -878,7 +898,7 @@ def create_review(
         )
     )
     increment_quota(db, actor.user)
-    _attach_billing_info(result_payload, db=db, user=actor.user, charged=True)
+    _attach_billing_info(result_payload, db=db, user=actor.user, charged=True, guest_scope_key=guest_scope_key)
     review.result_json = result_payload
     db.add(review)
     db.commit()
