@@ -3,7 +3,8 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import Script from 'next/script';
-import { ArrowRight, Aperture, Zap, Star, BarChart2, Mail } from 'lucide-react';
+import { ArrowRight, Aperture, Zap, Star, BarChart2, Mail, ChevronDown } from 'lucide-react';
+import { useState } from 'react';
 import { buildGoogleOAuthUrl } from '@/lib/api';
 import ScoreRing from '@/components/ui/ScoreRing';
 import { useI18n } from '@/lib/i18n';
@@ -23,6 +24,8 @@ const DEMO_REVIEW_ID = 'rev_8424d4fbde054759';
 
 export default function HomePage() {
   const { t } = useI18n();
+  const [openFaq, setOpenFaq] = useState<number | null>(null);
+
   const softwareJsonLd = {
     '@context': 'https://schema.org',
     '@type': 'SoftwareApplication',
@@ -37,6 +40,32 @@ export default function HomePage() {
       price: '0',
       priceCurrency: 'USD',
     },
+  };
+
+  const FAQ_KEYS = [
+    { q: 'faq_q1' as const, a: 'faq_a1' as const },
+    { q: 'faq_q2' as const, a: 'faq_a2' as const },
+    { q: 'faq_q3' as const, a: 'faq_a3' as const },
+    { q: 'faq_q4' as const, a: 'faq_a4' as const },
+    { q: 'faq_q5' as const, a: 'faq_a5' as const },
+    { q: 'faq_q6' as const, a: 'faq_a6' as const },
+    { q: 'faq_q7' as const, a: 'faq_a7' as const },
+    { q: 'faq_q8' as const, a: 'faq_a8' as const },
+    { q: 'faq_q9' as const, a: 'faq_a9' as const },
+    { q: 'faq_q10' as const, a: 'faq_a10' as const },
+  ];
+
+  const faqJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: FAQ_KEYS.map(({ q, a }) => ({
+      '@type': 'Question',
+      name: t(q),
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: t(a),
+      },
+    })),
   };
 
   const FEATURES = [
@@ -70,6 +99,11 @@ export default function HomePage() {
         id="picspeak-structured-data"
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareJsonLd) }}
+      />
+      <Script
+        id="picspeak-faq-structured-data"
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
       />
       <section className="relative min-h-screen flex flex-col items-center justify-center px-6 pt-24 pb-20 overflow-hidden">
         <div
@@ -260,6 +294,46 @@ export default function HomePage() {
             {t('hero_cta_start')}
             <ArrowRight size={14} />
           </Link>
+        </div>
+      </section>
+
+      <section id="faq" className="px-6 py-24 border-t border-border-subtle">
+        <div className="max-w-3xl mx-auto">
+          <p className="text-xs text-gold/70 font-mono mb-4 tracking-widest uppercase">
+            {t('faq_label')}
+          </p>
+          <h2 className="font-display text-3xl sm:text-4xl mb-12">{t('faq_headline')}</h2>
+
+          <div className="space-y-2">
+            {FAQ_KEYS.map(({ q, a }, index) => {
+              const isOpen = openFaq === index;
+              return (
+                <div
+                  key={q}
+                  className={`border rounded-lg overflow-hidden transition-colors duration-200 ${
+                    isOpen ? 'border-gold/40 bg-raised/50' : 'border-border-subtle bg-raised/20 hover:border-border'
+                  }`}
+                >
+                  <button
+                    className="w-full flex items-center justify-between gap-4 px-6 py-4 text-left"
+                    onClick={() => setOpenFaq(isOpen ? null : index)}
+                    aria-expanded={isOpen}
+                  >
+                    <span className="text-sm font-medium text-ink leading-snug">{t(q)}</span>
+                    <ChevronDown
+                      size={16}
+                      className={`text-gold shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+                    />
+                  </button>
+                  {isOpen && (
+                    <div className="px-6 pb-5 text-sm text-ink-muted leading-relaxed border-t border-border-subtle pt-4">
+                      {t(a)}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </section>
 
