@@ -833,6 +833,7 @@ def _attach_billing_info(
             {
                 'daily_remaining': usage.get('daily_remaining'),
                 'monthly_remaining': usage.get('monthly_remaining'),
+                'pro_monthly_remaining': usage.get('pro_monthly_remaining'),
             }
             if usage is not None
             else None
@@ -1180,7 +1181,7 @@ def create_review(
     if actor.plan == UserPlan.guest:
         enforce_guest_review_limits(db, actor, guest_rate_limit_scope_key(request))
     else:
-        enforce_user_quota(db, actor.user)
+        enforce_user_quota(db, actor.user, mode=mode_enum)
 
     guest_scope_key = guest_rate_limit_scope_key(request) if actor.plan == UserPlan.guest else None
 

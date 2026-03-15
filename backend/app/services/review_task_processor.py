@@ -437,7 +437,7 @@ def _process_task(db: Session, task: ReviewTask) -> None:
 
     if owner.plan != UserPlan.guest:
         try:
-            enforce_user_quota(db, owner)
+            enforce_user_quota(db, owner, mode=task.mode if isinstance(task.mode, ReviewMode) else ReviewMode(task.mode))
         except ApiHTTPException as exc:
             db.rollback()
             task = db.query(ReviewTask).filter(ReviewTask.id == task.id).first() or task
@@ -489,6 +489,7 @@ def _process_task(db: Session, task: ReviewTask) -> None:
         'remaining_quota': {
             'daily_remaining': usage.get('daily_remaining'),
             'monthly_remaining': usage.get('monthly_remaining'),
+            'pro_monthly_remaining': usage.get('pro_monthly_remaining'),
         },
     }
     review.result_json = result_payload

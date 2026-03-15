@@ -33,6 +33,43 @@ function getScoreLabelColor(score: number): string {
   return 'text-rust';
 }
 
+function getEffectiveQuota(
+  usage: UsageResponse | null,
+  reviewMode: 'flash' | 'pro'
+): { remaining: number | null; total: number | null } {
+  if (!usage) {
+    return { remaining: null, total: null };
+  }
+
+  const candidates: Array<{ remaining: number; total: number }> = [];
+  const {
+    daily_remaining,
+    daily_total,
+    monthly_remaining,
+    monthly_total,
+    pro_monthly_remaining,
+    pro_monthly_total,
+  } = usage.quota;
+
+  if (daily_remaining !== null && daily_total !== null) {
+    candidates.push({ remaining: daily_remaining, total: daily_total });
+  }
+  if (monthly_remaining !== null && monthly_total !== null) {
+    candidates.push({ remaining: monthly_remaining, total: monthly_total });
+  }
+  if (reviewMode === 'pro' && pro_monthly_remaining !== null && pro_monthly_total !== null) {
+    candidates.push({ remaining: pro_monthly_remaining, total: pro_monthly_total });
+  }
+
+  if (candidates.length === 0) {
+    return { remaining: null, total: null };
+  }
+
+  return candidates.reduce((current, candidate) =>
+    candidate.remaining < current.remaining ? candidate : current
+  );
+}
+
 function getWeakestDimKey(scores: ReviewScores): keyof ReviewScores {
   const dims: (keyof ReviewScores)[] = ['composition', 'lighting', 'color', 'impact', 'technical'];
   return dims.reduce((weakest, d) => (scores[d] < scores[weakest] ? d : weakest), dims[0]);
@@ -762,18 +799,10 @@ export default function ReviewPage() {
   const scoreSummary = generateScoreSummary(r.scores, SCORE_DIMS, locale);
 
   // Determine if quota is low for conversion banner
-  const quotaRemaining = (() => {
-    if (!usage) return null;
-    const { daily_remaining, monthly_remaining } = usage.quota;
-    if (daily_remaining !== null) return daily_remaining;
-    return monthly_remaining;
-  })();
-  const quotaTotal = (() => {
-    if (!usage) return null;
-    const { daily_total, monthly_total } = usage.quota;
-    if (daily_total !== null) return daily_total;
-    return monthly_total;
-  })();
+  const { remaining: quotaRemaining, total: quotaTotal } = getEffectiveQuota(
+    usage,
+    review.mode === 'pro' ? 'pro' : 'flash'
+  );
   const isLowQuota =
     quotaRemaining !== null &&
     quotaTotal !== null &&

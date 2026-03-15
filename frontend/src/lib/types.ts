@@ -22,6 +22,9 @@ export interface UsageResponse {
     monthly_total: number | null;
     monthly_used: number | null;
     monthly_remaining: number | null;
+    pro_monthly_total: number | null;
+    pro_monthly_used: number | null;
+    pro_monthly_remaining: number | null;
   };
   features: {
     review_modes: Array<'flash' | 'pro'>;
@@ -100,6 +103,7 @@ export interface ReviewResult {
     remaining_quota?: {
       daily_remaining?: number | null;
       monthly_remaining?: number | null;
+      pro_monthly_remaining?: number | null;
     };
   };
   visual_analysis: Record<string, unknown>;

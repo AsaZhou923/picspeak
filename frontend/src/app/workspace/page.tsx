@@ -106,6 +106,43 @@ function cachePhoto(sha256: string, photo: PhotoCreateResponse): void {
   }
 }
 
+function getEffectiveQuota(
+  usage: UsageResponse | null,
+  reviewMode: 'flash' | 'pro'
+): { remaining: number | null; total: number | null } {
+  if (!usage) {
+    return { remaining: null, total: null };
+  }
+
+  const candidates: Array<{ remaining: number; total: number }> = [];
+  const {
+    daily_remaining,
+    daily_total,
+    monthly_remaining,
+    monthly_total,
+    pro_monthly_remaining,
+    pro_monthly_total,
+  } = usage.quota;
+
+  if (daily_remaining !== null && daily_total !== null) {
+    candidates.push({ remaining: daily_remaining, total: daily_total });
+  }
+  if (monthly_remaining !== null && monthly_total !== null) {
+    candidates.push({ remaining: monthly_remaining, total: monthly_total });
+  }
+  if (reviewMode === 'pro' && pro_monthly_remaining !== null && pro_monthly_total !== null) {
+    candidates.push({ remaining: pro_monthly_remaining, total: pro_monthly_total });
+  }
+
+  if (candidates.length === 0) {
+    return { remaining: null, total: null };
+  }
+
+  return candidates.reduce((current, candidate) =>
+    candidate.remaining < current.remaining ? candidate : current
+  );
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function WorkspacePage() {
@@ -129,10 +166,7 @@ export default function WorkspacePage() {
   const [reviewMode, setReviewMode] = useState<'flash' | 'pro'>('flash');
   const [imageType, setImageType] = useState<ImageType>('default');
   const [showQuotaModal, setShowQuotaModal] = useState(false);
-  const remainingQuota =
-    usage?.quota.daily_remaining ?? usage?.quota.monthly_remaining ?? null;
-  const totalQuota =
-    usage?.quota.daily_total ?? usage?.quota.monthly_total ?? null;
+  const { remaining: remainingQuota, total: totalQuota } = getEffectiveQuota(usage, reviewMode);
 
   // ── Fetch usage ────────────────────────────────────────────────────────────
 

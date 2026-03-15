@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.errors import api_error
 from app.core.network import client_ip_from_request, device_key_from_request
-from app.db.models import IdempotencyKey, RateLimitCounter, UsageLedger, User, UserPlan
+from app.db.models import IdempotencyKey, RateLimitCounter, ReviewMode, UsageLedger, User, UserPlan
 
 if TYPE_CHECKING:
     from app.api.deps import CurrentActor
@@ -51,7 +51,7 @@ def refresh_user_quota(db: Session, user: User) -> None:
     db.add(user)
 
 
-def enforce_user_quota(db: Session, user: User) -> None:
+def enforce_user_quota(db: Session, user: User, *, mode: ReviewMode | None = None) -> None:
     refresh_user_quota(db, user)
 
     daily_total = daily_quota_for_plan(user.plan)
@@ -61,6 +61,12 @@ def enforce_user_quota(db: Session, user: User) -> None:
     monthly_total = monthly_quota_for_plan(user.plan)
     if monthly_total is not None and count_monthly_review_usage(db, user) >= monthly_total:
         raise api_error(429, 'QUOTA_EXCEEDED', 'Monthly quota exceeded')
+
+    pro_monthly_total = pro_mode_monthly_quota_for_plan(user.plan)
+    if mode == ReviewMode.pro and pro_monthly_total is not None:
+        pro_monthly_used = count_monthly_review_usage(db, user, mode=ReviewMode.pro)
+        if pro_monthly_used >= pro_monthly_total:
+            raise api_error(429, 'QUOTA_EXCEEDED', 'Pro review monthly quota exceeded')
 
 
 def increment_quota(db: Session, user: User) -> None:
@@ -83,8 +89,12 @@ def monthly_quota_for_plan(plan: UserPlan) -> int | None:
         return settings.guest_review_limit_per_month
     if plan == UserPlan.free:
         return settings.free_review_limit_per_month
-    if plan == UserPlan.pro:
-        return settings.pro_review_limit_per_month
+    return None
+
+
+def pro_mode_monthly_quota_for_plan(plan: UserPlan) -> int | None:
+    if plan == UserPlan.free:
+        return settings.free_pro_review_limit_per_month
     return None
 
 
@@ -116,11 +126,13 @@ def review_history_cutoff(plan: UserPlan, *, now: datetime | None = None) -> dat
     return current - timedelta(days=retention_days)
 
 
-def count_monthly_review_usage(db: Session, user: User, *, now: datetime | None = None) -> int:
-    monthly_total = monthly_quota_for_plan(user.plan)
-    if monthly_total is None:
-        return 0
-
+def count_monthly_review_usage(
+    db: Session,
+    user: User,
+    *,
+    now: datetime | None = None,
+    mode: ReviewMode | str | None = None,
+) -> int:
     current = now or utc_now()
     period_start = current.date().replace(day=1)
     if period_start.month == 12:
@@ -128,7 +140,7 @@ def count_monthly_review_usage(db: Session, user: User, *, now: datetime | None 
     else:
         next_period_start = period_start.replace(month=period_start.month + 1)
 
-    used = (
+    query = (
         db.query(func.coalesce(func.sum(UsageLedger.amount), 0))
         .filter(
             UsageLedger.user_id == user.id,
@@ -136,8 +148,12 @@ def count_monthly_review_usage(db: Session, user: User, *, now: datetime | None 
             UsageLedger.bill_date >= period_start,
             UsageLedger.bill_date < next_period_start,
         )
-        .scalar()
     )
+    if mode is not None:
+        mode_value = mode.value if isinstance(mode, ReviewMode) else str(mode)
+        query = query.filter(UsageLedger.metadata_json.contains({'mode': mode_value}))
+
+    used = query.scalar()
     return int(used or 0)
 
 
@@ -168,6 +184,9 @@ def guest_usage_snapshot(db: Session, scope_key: str, *, now: datetime | None = 
         'monthly_total': monthly_total,
         'monthly_used': monthly_used,
         'monthly_remaining': max(monthly_total - monthly_used, 0),
+        'pro_monthly_total': None,
+        'pro_monthly_used': None,
+        'pro_monthly_remaining': None,
     }
 
 
@@ -176,6 +195,8 @@ def user_usage_snapshot(db: Session, user: User, *, now: datetime | None = None)
     monthly_used = count_monthly_review_usage(db, user, now=now)
     daily_total = daily_quota_for_plan(user.plan)
     monthly_total = monthly_quota_for_plan(user.plan)
+    pro_monthly_total = pro_mode_monthly_quota_for_plan(user.plan)
+    pro_monthly_used = count_monthly_review_usage(db, user, now=now, mode=ReviewMode.pro) if pro_monthly_total is not None else None
     return {
         'daily_total': daily_total,
         'daily_used': user.daily_quota_used if daily_total is not None else None,
@@ -183,6 +204,9 @@ def user_usage_snapshot(db: Session, user: User, *, now: datetime | None = None)
         'monthly_total': monthly_total,
         'monthly_used': monthly_used if monthly_total is not None else None,
         'monthly_remaining': max(monthly_total - monthly_used, 0) if monthly_total is not None else None,
+        'pro_monthly_total': pro_monthly_total,
+        'pro_monthly_used': pro_monthly_used,
+        'pro_monthly_remaining': max(pro_monthly_total - pro_monthly_used, 0) if pro_monthly_total is not None and pro_monthly_used is not None else None,
     }
 
 

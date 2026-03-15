@@ -277,7 +277,7 @@ def _prompt_for_mode_v3(mode: str, locale: str, exif_data: dict | None = None, i
         )
         type_guide = IMAGE_TYPE_DIMENSION_GUIDE_EN[normalized_image_type]
         mode_note = (
-            'Current mode is flash. Advantage and critique should stay concise and direct: prefer 1-2 points, and keep each point to one compact sentence or two short clauses. '
+            'Current mode is flash. Advantage and critique should stay concise and direct: 1-3 points, and keep each point to one compact sentence or two short clauses. '
             'The flash version should feel like a quick, high-signal review rather than a long breakdown. '
             if normalized_mode == 'flash' else
             'Current mode is pro. Advantage and critique must be noticeably more developed than flash: prefer 2-3 points when the image evidence supports it, '
@@ -323,7 +323,7 @@ def _prompt_for_mode_v3(mode: str, locale: str, exif_data: dict | None = None, i
         )
         type_guide = IMAGE_TYPE_DIMENSION_GUIDE_JA[normalized_image_type]
         mode_note = (
-            '現在のモードは flash です。advantage と critique は短く要点重視で、1-2項目を優先し、各項目は1文または短い2節程度に収めてください。 '
+            '現在のモードは flash です。advantage と critique は短く要点重視で、1-3項目を優先し、各項目は1文または短い2節程度に収めてください。 '
             'flash は素早く読める高密度レビューにしてください。 '
             if normalized_mode == 'flash' else
             '現在のモードは pro です。advantage と critique は flash より明確に掘り下げ、根拠が十分なら 2-3 項目を優先してください。 '
@@ -364,7 +364,7 @@ def _prompt_for_mode_v3(mode: str, locale: str, exif_data: dict | None = None, i
     exif_note = f'以下拍摄参数供技术维度评估参考：{exif_context}。' if exif_context else ''
     type_guide = IMAGE_TYPE_DIMENSION_GUIDE_ZH[normalized_image_type]
     mode_note = (
-        '当前模式为 flash。advantage 和 critique 以短评为主，优先写 1-2 条；每条尽量控制在一句话或两个短分句内，直接说清观察到的优点或问题，不要展开过长分析。 '
+        '当前模式为 flash。advantage 和 critique 以短评为主，写 1-3 条；每条尽量控制在一句话或两个短分句内，直接说清观察到的优点或问题，不要展开过长分析。 '
         'flash 的体验应该像快速、高密度的判断。 '
         if normalized_mode == 'flash' else
         '当前模式为 pro。advantage 和 critique 必须明显比 flash 更展开：在画面证据足够时优先写 2-3 条，'

@@ -203,6 +203,24 @@ export default function UsagePage() {
                 </div>
               )}
 
+              {usage.quota.pro_monthly_total !== null && usage.quota.pro_monthly_used !== null && (
+                <div className="space-y-3">
+                  <div className="flex items-end gap-2">
+                    <span className="font-display text-3xl text-ink">
+                      {usage.quota.pro_monthly_remaining}
+                    </span>
+                    <span className="text-ink-muted mb-1 text-sm">
+                      {t('usage_pro_monthly_remaining').replace('{total}', String(usage.quota.pro_monthly_total))}
+                    </span>
+                  </div>
+                  <UsageBar
+                    label={t('usage_pro_monthly_quota')}
+                    used={usage.quota.pro_monthly_used}
+                    total={usage.quota.pro_monthly_total}
+                  />
+                </div>
+              )}
+
               <div className="grid sm:grid-cols-3 gap-3 text-sm">
                 <div className="border border-border-subtle rounded-md px-4 py-3">
                   <p className="text-xs text-ink-muted mb-1">{t('usage_review_modes')}</p>
