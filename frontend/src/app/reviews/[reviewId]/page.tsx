@@ -436,6 +436,29 @@ const DIM_TO_TAGS: Partial<Record<string, TagKey[]>> = {
   technical:   ['focus', 'exposure', 'post'],
 };
 
+function parsePointWithShortActionTitle(raw: string): { title: string; detail: string } {
+  const text = raw.replace(/^\d+[.、．]\s*/, '').trim();
+  const actionMatch = text.match(/(?:处理方法|可执行动作|Action)[：:]\s*(.+)/is);
+
+  if (actionMatch) {
+    const actionText = actionMatch[1].trim();
+    const firstClause = actionText.split(/[，,]/)[0]?.trim() ?? '';
+    const fallbackSentence = actionText
+      .split(/[。！？!?]|\.\s+/)[0]
+      .replace(/[.。！？!?；;]+$/, '')
+      .trim();
+    const title = firstClause.replace(/[.。！？!?；;]+$/, '').trim() || fallbackSentence || actionText;
+    return { title, detail: text };
+  }
+
+  const colonMatch = text.match(/^([^：:\n。，，,]{2,20})[：:]\s*(.+)/s);
+  if (colonMatch) {
+    return { title: colonMatch[1].trim(), detail: colonMatch[2].trim() };
+  }
+
+  return parsePointWithTitle(raw);
+}
+
 // Max detail chars shown before truncation in Flash mode
 const FLASH_DETAIL_LIMIT = 120;
 
@@ -493,7 +516,7 @@ function CritiqueSection({ accent, borderColor, bgColor, icon, title, body, show
       </div>
       <div className="space-y-2.5">
         {points.map((point, i) => {
-          const parsed = parsePointWithTitle(point);
+          const parsed = parsePointWithShortActionTitle(point);
           const tags = showTags ? detectSuggestionTags(parsed.title, parsed.detail) : [];
           const fullText = parsed.title ? `${parsed.title}: ${parsed.detail}` : parsed.detail;
           const isPriority = highlightTop > 0 && i < highlightTop;
