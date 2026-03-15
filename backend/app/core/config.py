@@ -42,6 +42,10 @@ class Settings(BaseSettings):
     google_oauth_client_id: str = ''
     google_oauth_client_secret: str = ''
     google_oauth_redirect_uri: str = ''
+    clerk_secret_key: str = ''
+    clerk_webhook_signing_secret: str = ''
+    clerk_api_url: str = 'https://api.clerk.com'
+    clerk_api_version: str = '2025-11-10'
     # Frontend origin used for post-login redirect (e.g. http://localhost:3000)
     frontend_origin: str = 'http://localhost:3000'
     backend_cors_origins: list[str] = Field(
@@ -117,7 +121,14 @@ class Settings(BaseSettings):
             return ''
         return value.strip()
 
-    @field_validator('cloud_tasks_target_url', 'cloud_tasks_service_account_email', 'cloud_tasks_oidc_audience', mode='before')
+    @field_validator('clerk_secret_key', 'clerk_webhook_signing_secret', 'clerk_api_version', mode='before')
+    @classmethod
+    def normalize_plain_string_settings(cls, value: Any) -> str:
+        if not isinstance(value, str):
+            return ''
+        return value.strip()
+
+    @field_validator('cloud_tasks_target_url', 'cloud_tasks_service_account_email', 'cloud_tasks_oidc_audience', 'clerk_api_url', mode='before')
     @classmethod
     def normalize_string_settings(cls, value: Any) -> str:
         if not isinstance(value, str):

@@ -10,8 +10,8 @@ import {
   confirmPhoto,
   createReview,
   getUsage,
-  buildGoogleOAuthUrl,
 } from '@/lib/api';
+import ClerkSignInTrigger from '@/components/auth/ClerkSignInTrigger';
 import { useAuth } from '@/lib/auth-context';
 import { planLabel, planColor } from '@/lib/auth-context';
 import {
@@ -361,13 +361,13 @@ export default function WorkspacePage() {
             </div>
             <div className="flex flex-col gap-2 pt-1">
               {usage?.plan === 'guest' ? (
-                <a
-                  href={buildGoogleOAuthUrl()}
+                <ClerkSignInTrigger
                   className="flex items-center justify-center gap-2 px-5 py-2.5 bg-gold text-void text-sm font-medium rounded hover:bg-gold-light transition-colors"
+                  signedInClassName="inline-flex items-center justify-center"
                 >
                   {t('quota_modal_upgrade')}
                   <ArrowRight size={13} />
-                </a>
+                </ClerkSignInTrigger>
               ) : (
                 <p className="text-xs text-ink-muted text-center">{t('quota_modal_upgrade')}</p>
               )}

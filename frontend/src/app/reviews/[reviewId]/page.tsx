@@ -5,7 +5,8 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowLeft, History, RotateCcw, AlertCircle, ThumbsUp, ThumbsDown, AlertTriangle, Lightbulb, Upload, TrendingDown, ZoomIn, X, Copy, Check, LogIn, Sparkles, Share2, Download } from 'lucide-react';
-import { getReview, getUsage, buildGoogleOAuthUrl } from '@/lib/api';
+import { getReview, getUsage } from '@/lib/api';
+import ClerkSignInTrigger from '@/components/auth/ClerkSignInTrigger';
 import { useAuth } from '@/lib/auth-context';
 import { ReviewGetResponse, ApiException, ReviewScores, UsageResponse } from '@/lib/types';
 import { FinalScoreRing } from '@/components/ui/ScoreRing';
@@ -1083,13 +1084,13 @@ export default function ReviewPage() {
                   )}
                 </div>
                 {plan === 'guest' ? (
-                  <a
-                    href={buildGoogleOAuthUrl()}
+                  <ClerkSignInTrigger
                     className="shrink-0 flex items-center gap-2 px-4 py-2 bg-gold text-void text-xs font-medium rounded hover:bg-gold-light transition-colors"
+                    signedInClassName="shrink-0 inline-flex items-center"
                   >
                     <LogIn size={12} />
                     {t('guest_login_cta')}
-                  </a>
+                  </ClerkSignInTrigger>
                 ) : (
                   <Link
                     href="/account/usage"
@@ -1109,13 +1110,13 @@ export default function ReviewPage() {
                   <p className="text-sm font-medium text-gold/90">{t('guest_login_banner_title')}</p>
                   <p className="text-xs text-ink-subtle mt-0.5">{t('guest_login_banner_body')}</p>
                 </div>
-                <a
-                  href={buildGoogleOAuthUrl()}
+                <ClerkSignInTrigger
                   className="shrink-0 flex items-center gap-2 px-4 py-2 bg-gold text-void text-xs font-medium rounded hover:bg-gold-light transition-colors"
+                  signedInClassName="shrink-0 inline-flex items-center"
                 >
                   <LogIn size={12} />
                   {t('guest_login_cta')}
-                </a>
+                </ClerkSignInTrigger>
               </div>
             )}
 

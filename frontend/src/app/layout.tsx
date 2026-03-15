@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Cormorant_Garamond, DM_Sans, JetBrains_Mono } from 'next/font/google';
+import { ClerkProvider } from '@clerk/nextjs';
 import './globals.css';
 import { AuthProvider } from '@/lib/auth-context';
 import { ThemeProvider } from '@/lib/theme-context';
@@ -104,23 +105,24 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className="text-ink min-h-screen">
-        <Analytics />
-        <SpeedInsights />
-        {/* Fixed z-0: aurora + particles background layer */}
-        <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
-          <BackgroundEffect />
-        </div>
-        <div className="relative z-10 min-h-screen flex flex-col">
-          <I18nProvider>
-            <ThemeProvider>
-              <AuthProvider>
-                <Header />
-                <main className="flex-1 pt-12 md:pt-0">{children}</main>
-                <Footer />
-              </AuthProvider>
-            </ThemeProvider>
-          </I18nProvider>
-        </div>
+        <ClerkProvider>
+          <Analytics />
+          <SpeedInsights />
+          <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
+            <BackgroundEffect />
+          </div>
+          <div className="relative z-10 min-h-screen flex flex-col">
+            <I18nProvider>
+              <ThemeProvider>
+                <AuthProvider>
+                  <Header />
+                  <main className="flex-1 pt-12 md:pt-0">{children}</main>
+                  <Footer />
+                </AuthProvider>
+              </ThemeProvider>
+            </I18nProvider>
+          </div>
+        </ClerkProvider>
       </body>
     </html>
   );

@@ -8,7 +8,8 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { authGuest, registerUnauthorizedHandler } from './api';
+import { useAuth as useClerkAuth } from '@clerk/nextjs';
+import { authClerkExchange, authGuest, registerUnauthorizedHandler } from './api';
 import { AuthToken } from './types';
 
 const TOKEN_KEY = 'ps_token';
@@ -114,11 +115,28 @@ function clearStoredAuthToken(): void {
   }
 }
 
+function isMatchingClerkSession(userInfo: AuthToken | null, clerkUserId: string | null | undefined): boolean {
+  return Boolean(
+    userInfo &&
+      userInfo.auth_provider === 'clerk' &&
+      userInfo.clerk_user_id &&
+      clerkUserId &&
+      userInfo.clerk_user_id === clerkUserId &&
+      !isExpiredToken(userInfo.access_token)
+  );
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const { isLoaded: isClerkLoaded, isSignedIn, userId: clerkUserId, getToken } = useClerkAuth();
   const [token, setToken] = useState<string | null>(null);
   const [userInfo, setUserInfo] = useState<AuthToken | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const pendingGuestTokenRef = useRef<Promise<string> | null>(null);
+  const isLoadingRef = useRef(true);
+
+  useEffect(() => {
+    isLoadingRef.current = isLoading;
+  }, [isLoading]);
 
   useEffect(() => {
     try {
@@ -127,18 +145,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // ignore legacy cache cleanup
     }
+
     let parsed = readSessionAuthToken();
     if (!parsed) {
       parsed = readLegacyAuthToken();
-      if (parsed) {
-        persistAuthToken(parsed);
-      }
+      if (parsed) persistAuthToken(parsed);
     }
     if (parsed) {
       setToken(parsed.access_token);
       setUserInfo(parsed);
     }
-    setIsLoading(false);
   }, []);
 
   const login = useCallback((tokenData: AuthToken) => {
@@ -153,23 +169,134 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUserInfo(null);
   }, []);
 
+  const waitForReady = useCallback(async (): Promise<void> => {
+    if (!isLoadingRef.current) return;
+    await new Promise<void>((resolve) => {
+      const startedAt = Date.now();
+      const timer = window.setInterval(() => {
+        if (!isLoadingRef.current || Date.now() - startedAt > 10000) {
+          window.clearInterval(timer);
+          resolve();
+        }
+      }, 25);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!isClerkLoaded) return;
+
+    let cancelled = false;
+
+    const syncAuthState = async (): Promise<void> => {
+      setIsLoading(true);
+
+      let parsed = readSessionAuthToken();
+      if (!parsed) {
+        parsed = readLegacyAuthToken();
+        if (parsed) persistAuthToken(parsed);
+      }
+
+      if (!isSignedIn) {
+        if (parsed?.auth_provider === 'clerk') {
+          clearStoredAuthToken();
+          if (!cancelled) {
+            setToken(null);
+            setUserInfo(null);
+          }
+        } else if (parsed && !cancelled) {
+          setToken(parsed.access_token);
+          setUserInfo(parsed);
+        }
+        if (!cancelled) setIsLoading(false);
+        return;
+      }
+
+      if (isMatchingClerkSession(parsed, clerkUserId)) {
+        if (!cancelled && parsed) {
+          setToken(parsed.access_token);
+          setUserInfo(parsed);
+          setIsLoading(false);
+        }
+        return;
+      }
+
+      const guestToken = parsed?.plan === 'guest' ? parsed.access_token : undefined;
+      const sessionToken = await getToken();
+      if (!sessionToken) {
+        clearStoredAuthToken();
+        if (!cancelled) {
+          setToken(null);
+          setUserInfo(null);
+          setIsLoading(false);
+        }
+        return;
+      }
+
+      const exchanged = await authClerkExchange(sessionToken, guestToken);
+      if (!cancelled) {
+        login(exchanged);
+        setIsLoading(false);
+      }
+    };
+
+    void syncAuthState()
+      .catch(() => {
+        clearStoredAuthToken();
+        if (!cancelled) {
+          setToken(null);
+          setUserInfo(null);
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [clerkUserId, getToken, isClerkLoaded, isSignedIn, login]);
+
   const ensureToken = useCallback(async (): Promise<string> => {
-    if (token && !isExpiredToken(token)) return token;
-    if (token && isExpiredToken(token)) {
+    await waitForReady();
+
+    const currentToken = token ?? readSessionAuthToken()?.access_token ?? null;
+    const currentUserInfo = userInfo ?? readSessionAuthToken();
+
+    if (currentToken && !isExpiredToken(currentToken)) {
+      if (!isSignedIn) {
+        return currentToken;
+      }
+      if (isMatchingClerkSession(currentUserInfo, clerkUserId)) {
+        return currentToken;
+      }
+    }
+
+    if (currentToken && isExpiredToken(currentToken)) {
       clearStoredAuthToken();
       setToken(null);
       setUserInfo(null);
     }
 
     const parsed = readSessionAuthToken();
-    if (parsed) {
-      // Keep in-memory state consistent when caller asks token before provider hydrate settles.
+    if (parsed && !isSignedIn) {
+      setToken(parsed.access_token);
+      setUserInfo(parsed);
+      return parsed.access_token;
+    }
+    if (parsed && isMatchingClerkSession(parsed, clerkUserId)) {
       setToken(parsed.access_token);
       setUserInfo(parsed);
       return parsed.access_token;
     }
 
-    // Deduplicate concurrent guest-session creation to avoid generating multiple guest users.
+    if (isClerkLoaded && isSignedIn) {
+      const sessionToken = await getToken();
+      if (!sessionToken) {
+        throw new Error('Missing Clerk session token');
+      }
+      const exchanged = await authClerkExchange(sessionToken);
+      login(exchanged);
+      return exchanged.access_token;
+    }
+
     if (!pendingGuestTokenRef.current) {
       pendingGuestTokenRef.current = authGuest()
         .then((data) => {
@@ -182,7 +309,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     return pendingGuestTokenRef.current;
-  }, [login, token]);
+  }, [clerkUserId, getToken, isClerkLoaded, isSignedIn, login, token, userInfo, waitForReady]);
 
   useEffect(() => {
     registerUnauthorizedHandler(async (failedToken) => {

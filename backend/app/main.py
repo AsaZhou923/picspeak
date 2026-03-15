@@ -9,6 +9,7 @@ from fastapi.exceptions import RequestValidationError
 from app.api.routes import router
 from app.core.config import settings
 from app.core.errors import normalize_http_error
+from app.db.bootstrap import ensure_runtime_schema
 from app.core.network import client_ip_from_request
 from app.db.session import SessionLocal
 from app.services.audit import log_api_request
@@ -17,6 +18,7 @@ from app.services.worker import worker
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    ensure_runtime_schema()
     if settings.run_embedded_worker:
         worker.start()
     yield

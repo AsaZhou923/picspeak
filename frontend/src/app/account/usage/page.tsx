@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { AlertCircle, ArrowRight, Mail, X } from 'lucide-react';
-import { buildGoogleOAuthUrl, createBillingCheckout, getUsage } from '@/lib/api';
+import { createBillingCheckout, getUsage } from '@/lib/api';
+import ClerkSignInTrigger from '@/components/auth/ClerkSignInTrigger';
 import { useAuth } from '@/lib/auth-context';
 import { planColor, planLabel } from '@/lib/auth-context';
 import { ApiException, BillingCheckoutResponse, UsageResponse } from '@/lib/types';
@@ -139,13 +140,13 @@ export default function UsagePage() {
                   )}
                 </div>
                 {usage.plan === 'guest' ? (
-                  <a
-                    href={buildGoogleOAuthUrl()}
+                  <ClerkSignInTrigger
                     className="flex items-center gap-1.5 text-xs text-gold border border-gold/30 rounded px-3 py-1.5 hover:bg-gold/10 transition-colors"
+                    signedInClassName="shrink-0 inline-flex items-center"
                   >
                     {t('usage_login_now')}
                     <ArrowRight size={11} />
-                  </a>
+                  </ClerkSignInTrigger>
                 ) : usage.plan === 'free' ? (
                   <button
                     type="button"
@@ -226,12 +227,12 @@ export default function UsagePage() {
                 <p className="text-xs text-ink-muted leading-relaxed">
                   {t('usage_login_unlock_body')}
                 </p>
-                <a
-                  href={buildGoogleOAuthUrl()}
+                <ClerkSignInTrigger
                   className="inline-flex items-center gap-1.5 text-sm text-gold hover:text-gold-light transition-colors"
+                  signedInClassName="inline-flex items-center"
                 >
                   {t('usage_login_now')} <ArrowRight size={12} />
-                </a>
+                </ClerkSignInTrigger>
               </div>
             )}
           </div>

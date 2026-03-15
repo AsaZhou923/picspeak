@@ -5,6 +5,10 @@ export interface AuthToken {
   token_type: string;
   user_id: string;
   plan: 'guest' | 'free' | 'pro';
+  auth_provider?: 'guest' | 'google' | 'clerk';
+  clerk_user_id?: string | null;
+  migrated_reviews?: number;
+  migrated_photos?: number;
 }
 
 // ─── Usage ───────────────────────────────────────────────────────────────────

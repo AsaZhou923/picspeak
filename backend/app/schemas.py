@@ -70,6 +70,11 @@ class GuestReviewMigrateRequest(BaseModel):
     recent_limit: int = Field(default=20, ge=1, le=100)
 
 
+class AuthClerkExchangeRequest(BaseModel):
+    guest_token: str | None = None
+    recent_limit: int = Field(default=20, ge=1, le=100)
+
+
 class GuestReviewMigrateResponse(BaseModel):
     migrated_reviews: int
     migrated_photos: int
@@ -203,7 +208,11 @@ class AuthTokenResponse(BaseModel):
     token_type: str = 'bearer'
     user_id: str
     plan: str
+    auth_provider: str = 'google'
+    clerk_user_id: str | None = None
+    migrated_reviews: int = 0
+    migrated_photos: int = 0
 
 
 class AuthGuestResponse(AuthTokenResponse):
-    pass
+    auth_provider: str = 'guest'

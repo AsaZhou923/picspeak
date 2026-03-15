@@ -4,6 +4,8 @@ create table users
         primary key,
     public_id         text                                                   not null
         unique,
+    clerk_user_id     text
+        unique,
     email             text                                                   not null
         unique,
     username          text                                                   not null

@@ -101,6 +101,18 @@ export async function authGoogleLogin(idToken: string): Promise<AuthToken> {
   });
 }
 
+export async function authClerkExchange(
+  sessionToken: string,
+  guestToken?: string,
+  recentLimit = 20
+): Promise<AuthToken> {
+  return request<AuthToken>('/auth/clerk/exchange', {
+    method: 'POST',
+    body: JSON.stringify({ guest_token: guestToken, recent_limit: recentLimit }),
+    token: sessionToken,
+  });
+}
+
 export async function migrateGuestReviews(
   token: string,
   recentLimit = 20

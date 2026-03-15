@@ -4,12 +4,18 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { Sun, Moon, ChevronDown, Camera, Clock, BarChart2 } from 'lucide-react';
+import { Show, SignInButton, SignUpButton, UserButton } from '@clerk/nextjs';
 import { useAuth } from '@/lib/auth-context';
 import { planLabel, planColor } from '@/lib/auth-context';
-import { buildGoogleOAuthUrl } from '@/lib/api';
 import { useTheme } from '@/lib/theme-context';
 import { useI18n, LOCALE_LABELS, Locale } from '@/lib/i18n';
 import { useState, useRef, useEffect } from 'react';
+
+const AUTH_LABELS: Record<Locale, { signIn: string; signUp: string }> = {
+  zh: { signIn: '登录', signUp: '注册' },
+  en: { signIn: 'Sign in', signUp: 'Sign up' },
+  ja: { signIn: 'サインイン', signUp: '新規登録' },
+};
 
 function LanguageSwitcher() {
   const { locale, setLocale } = useI18n();
@@ -58,7 +64,11 @@ export default function Header() {
   const pathname = usePathname();
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const authLabels = AUTH_LABELS[locale];
+  const isLegacyAuthenticated = Boolean(
+    userInfo && userInfo.plan !== 'guest' && userInfo.auth_provider !== 'clerk'
+  );
 
   const isActive = (href: string) =>
     pathname === href ? 'text-gold' : 'text-ink-muted hover:text-ink';
@@ -132,29 +142,68 @@ export default function Header() {
                 </span>
               </span>
 
-              {userInfo.plan === 'guest' ? (
-                <a
-                  href={buildGoogleOAuthUrl()}
-                  className="px-2.5 sm:px-3 py-1.5 text-sm border border-gold/40 text-gold rounded hover:bg-gold/10 transition-colors whitespace-nowrap"
-                >
-                  {t('login_google')}
-                </a>
+              {isLegacyAuthenticated ? (
+                <>
+                  <Show when="signed-in">
+                    <UserButton />
+                  </Show>
+                  <button
+                    onClick={handleLogout}
+                    className="text-sm text-ink-subtle hover:text-ink transition-colors"
+                  >
+                    {t('logout')}
+                  </button>
+                </>
               ) : (
-                <button
-                  onClick={handleLogout}
-                  className="text-sm text-ink-subtle hover:text-ink transition-colors"
-                >
-                  {t('logout')}
-                </button>
+                <>
+                  <Show when="signed-out">
+                    <SignInButton mode="modal" fallbackRedirectUrl="/workspace">
+                      <button
+                        type="button"
+                        className="px-2.5 sm:px-3 py-1.5 text-sm border border-gold/40 text-gold rounded hover:bg-gold/10 transition-colors whitespace-nowrap"
+                      >
+                        {authLabels.signIn}
+                      </button>
+                    </SignInButton>
+                    <SignUpButton mode="modal" fallbackRedirectUrl="/workspace">
+                      <button
+                        type="button"
+                        className="hidden sm:inline-flex px-2.5 sm:px-3 py-1.5 text-sm border border-border text-ink-muted rounded hover:border-gold/40 hover:text-gold transition-colors whitespace-nowrap"
+                      >
+                        {authLabels.signUp}
+                      </button>
+                    </SignUpButton>
+                  </Show>
+                  <Show when="signed-in">
+                    <UserButton />
+                  </Show>
+                </>
               )}
             </div>
           ) : (
-            <a
-              href={buildGoogleOAuthUrl()}
-              className="px-2.5 sm:px-3 py-1.5 text-sm border border-gold/40 text-gold rounded hover:bg-gold/10 transition-colors whitespace-nowrap"
-            >
-              {t('login_google')}
-            </a>
+            <>
+              <Show when="signed-out">
+                <SignInButton mode="modal" fallbackRedirectUrl="/workspace">
+                  <button
+                    type="button"
+                    className="px-2.5 sm:px-3 py-1.5 text-sm border border-gold/40 text-gold rounded hover:bg-gold/10 transition-colors whitespace-nowrap"
+                  >
+                    {authLabels.signIn}
+                  </button>
+                </SignInButton>
+                <SignUpButton mode="modal" fallbackRedirectUrl="/workspace">
+                  <button
+                    type="button"
+                    className="hidden sm:inline-flex px-2.5 sm:px-3 py-1.5 text-sm border border-border text-ink-muted rounded hover:border-gold/40 hover:text-gold transition-colors whitespace-nowrap"
+                  >
+                    {authLabels.signUp}
+                  </button>
+                </SignUpButton>
+              </Show>
+              <Show when="signed-in">
+                <UserButton />
+              </Show>
+            </>
           )}
         </div>
       </div>
