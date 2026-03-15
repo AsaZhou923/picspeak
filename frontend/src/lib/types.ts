@@ -172,6 +172,7 @@ export interface ReviewHistoryItem {
   review_id: string;
   photo_id: string;
   photo_url: string | null;
+  photo_thumbnail_url?: string | null;
   mode: ReviewMode;
   status: ReviewStatus;
   final_score: number;

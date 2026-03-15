@@ -76,7 +76,6 @@ export default function Header() {
   const handleLogout = () => {
     logout();
     router.push('/workspace');
-    router.refresh();
   };
 
   return (

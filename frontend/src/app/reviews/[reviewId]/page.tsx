@@ -603,6 +603,7 @@ export default function ReviewPage() {
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [photoError, setPhotoError] = useState(false);
   const [zoomOpen, setZoomOpen] = useState(false);
+  const [zoomMounted, setZoomMounted] = useState(false);
   const [activeDim, setActiveDim] = useState<string | null>(null);
   const [highlightedCardId, setHighlightedCardId] = useState<string | null>(null);
   const [usage, setUsage] = useState<UsageResponse | null>(null);
@@ -835,7 +836,10 @@ export default function ReviewPage() {
               {photoUrl && !photoError ? (
                 <div
                   className="photo-frame relative cursor-zoom-in group"
-                  onClick={() => setZoomOpen(true)}
+                  onClick={() => {
+                    setZoomMounted(true);
+                    setZoomOpen(true);
+                  }}
                   title={t('img_zoom_label')}
                 >
                   <Image
@@ -1152,10 +1156,11 @@ export default function ReviewPage() {
       </div>
 
       {/* ── Image zoom overlay ───────────────────────────────────────────── */}
-      {zoomOpen && photoUrl && (
+      {zoomMounted && photoUrl && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-void/90 backdrop-blur-sm"
+          className={`fixed inset-0 z-50 flex items-center justify-center bg-void/90 backdrop-blur-sm transition-opacity duration-200 ${zoomOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
           onClick={() => setZoomOpen(false)}
+          aria-hidden={!zoomOpen}
         >
           <button
             onClick={() => setZoomOpen(false)}

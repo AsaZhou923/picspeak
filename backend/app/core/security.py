@@ -25,6 +25,12 @@ def _b64url_decode(raw: str) -> bytes:
 def sign_payload(payload: dict[str, Any], ttl_seconds: int) -> str:
     body = payload.copy()
     body['exp'] = int(time.time()) + ttl_seconds
+    return sign_payload_with_exp(body, body['exp'])
+
+
+def sign_payload_with_exp(payload: dict[str, Any], exp_timestamp: int) -> str:
+    body = payload.copy()
+    body['exp'] = int(exp_timestamp)
     serialized = json.dumps(body, separators=(',', ':'), ensure_ascii=False).encode('utf-8')
     payload_encoded = _b64url_encode(serialized)
     signature = hmac.new(settings.app_secret.encode('utf-8'), payload_encoded.encode('utf-8'), hashlib.sha256).digest()

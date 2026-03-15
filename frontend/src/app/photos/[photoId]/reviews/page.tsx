@@ -104,6 +104,7 @@ export default function PhotoReviewsPage() {
               <Link
                 key={item.review_id}
                 href={`/reviews/${item.review_id}`}
+                prefetch={false}
                 className="flex items-center justify-between gap-3 bg-raised px-5 py-4 hover:bg-overlay transition-colors group"
               >
                 <div className="flex items-center gap-3">

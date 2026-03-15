@@ -17,14 +17,31 @@ import {
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000').replace(/\/$/, '');
 const GOOGLE_OAUTH_START_PATH = '/api/v1/auth/google/start';
+const USAGE_CACHE_TTL_MS = 30_000;
 
 type UnauthorizedHandler = (failedToken: string) => Promise<string | null>;
 type UnauthorizedRecoveryMode = 'disabled' | 'guest';
+type UsageOptions = {
+  force?: boolean;
+};
+type UsageCacheEntry = {
+  token: string;
+  expiresAt: number;
+  data?: UsageResponse;
+  promise?: Promise<UsageResponse>;
+};
 
 let unauthorizedHandler: UnauthorizedHandler | null = null;
+let usageCache: UsageCacheEntry | null = null;
 
 export function registerUnauthorizedHandler(handler: UnauthorizedHandler | null): void {
   unauthorizedHandler = handler;
+}
+
+export function clearUsageCache(token?: string): void {
+  if (!token || usageCache?.token === token) {
+    usageCache = null;
+  }
 }
 
 async function request<T>(
@@ -126,8 +143,46 @@ export async function migrateGuestReviews(
 
 // ─── Usage ───────────────────────────────────────────────────────────────────
 
-export async function getUsage(token: string): Promise<UsageResponse> {
-  return request<UsageResponse>('/me/usage', { token, unauthorizedRecovery: 'guest' });
+export async function getUsage(token: string, options: UsageOptions = {}): Promise<UsageResponse> {
+  const useCache =
+    !options.force &&
+    usageCache?.token === token &&
+    usageCache.expiresAt > Date.now();
+
+  if (useCache && usageCache?.data) {
+    return usageCache.data;
+  }
+
+  if (useCache && usageCache?.promise) {
+    return usageCache.promise;
+  }
+
+  const usagePromise = request<UsageResponse>('/me/usage', {
+    token,
+    unauthorizedRecovery: 'guest',
+  })
+    .then((data) => {
+      usageCache = {
+        token,
+        expiresAt: Date.now() + USAGE_CACHE_TTL_MS,
+        data,
+      };
+      return data;
+    })
+    .catch((error) => {
+      if (usageCache?.promise === usagePromise) {
+        usageCache = null;
+      }
+      throw error;
+    });
+
+  usageCache = {
+    token,
+    expiresAt: Date.now() + USAGE_CACHE_TTL_MS,
+    promise: usagePromise,
+  };
+
+  return usagePromise;
 }
 
 export async function createBillingCheckout(token: string, plan: 'pro'): Promise<BillingCheckoutResponse> {
@@ -210,11 +265,13 @@ export async function createReview(
   payload: ReviewCreateRequest,
   token: string
 ): Promise<ReviewCreateResponse> {
-  return request<ReviewCreateResponse>('/reviews', {
+  const response = await request<ReviewCreateResponse>('/reviews', {
     method: 'POST',
     body: JSON.stringify(payload),
     token,
   });
+  clearUsageCache(token);
+  return response;
 }
 
 export async function getTask(taskId: string, token: string): Promise<TaskStatusResponse> {

@@ -9,7 +9,8 @@ import React, {
   useState,
 } from 'react';
 import { useAuth as useClerkAuth } from '@clerk/nextjs';
-import { authClerkExchange, authGuest, registerUnauthorizedHandler } from './api';
+import { authClerkExchange, authGuest, clearUsageCache, registerUnauthorizedHandler } from './api';
+import { clearReviewThumbnailCache } from './review-thumbnail-cache';
 import { AuthToken } from './types';
 
 const TOKEN_KEY = 'ps_token';
@@ -113,6 +114,8 @@ function clearStoredAuthToken(): void {
   } catch {
     // ignore legacy cookie cleanup
   }
+  clearUsageCache();
+  void clearReviewThumbnailCache();
 }
 
 function isMatchingClerkSession(userInfo: AuthToken | null, clerkUserId: string | null | undefined): boolean {

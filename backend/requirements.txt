@@ -7,3 +7,4 @@ pydantic-settings==2.10.1
 python-multipart==0.0.20
 boto3==1.40.34
 google-cloud-tasks>=2.18.0,<3
+Pillow==11.3.0

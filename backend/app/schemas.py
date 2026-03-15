@@ -155,6 +155,7 @@ class ReviewHistoryItem(BaseModel):
     review_id: str
     photo_id: str
     photo_url: str | None = None
+    photo_thumbnail_url: str | None = None
     mode: str
     status: str
     final_score: float

@@ -140,7 +140,7 @@ export default function TaskPage() {
         setTransientError(t('task_fetch_error'));
       }
     } finally {
-      if (!finalRef.current && !errorTerminalRef.current) {
+      if (!finalRef.current && !errorTerminalRef.current && !wsConnectedRef.current) {
         timerRef.current = setTimeout(poll, POLL_INTERVAL);
       }
     }
@@ -161,6 +161,10 @@ export default function TaskPage() {
           wsConnectedRef.current = true;
           transientErrorCountRef.current = 0;
           setError('');
+          if (timerRef.current) {
+            clearTimeout(timerRef.current);
+            timerRef.current = null;
+          }
         };
 
         ws.onmessage = (event) => {

@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
-import { AlertCircle, ChevronRight, ImageOff, RefreshCw } from 'lucide-react';
+import { AlertCircle, ChevronRight, RefreshCw } from 'lucide-react';
 import { getMyReviews } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { ReviewHistoryItem, ApiException } from '@/lib/types';
 import { ModeBadge, StatusBadge } from '@/components/ui/Badge';
+import CachedThumbnail from '@/components/ui/CachedThumbnail';
 import { SkeletonBlock } from '@/components/ui/LoadingSpinner';
 import { useI18n } from '@/lib/i18n';
 
@@ -33,7 +33,6 @@ function ScoreBar({ score }: { score: number }) {
 // ─── Review card ──────────────────────────────────────────────────────────────
 
 function ReviewCard({ item }: { item: ReviewHistoryItem }) {
-  const [imgError, setImgError] = useState(false);
   const { locale, t } = useI18n();
   const dateLocale = locale === 'zh' ? 'zh-CN' : locale === 'ja' ? 'ja-JP' : 'en-US';
   const date = new Date(item.created_at).toLocaleString(dateLocale, {
@@ -47,24 +46,16 @@ function ReviewCard({ item }: { item: ReviewHistoryItem }) {
   return (
     <Link
       href={`/reviews/${item.review_id}?back=/account/reviews`}
+      prefetch={false}
       className="group flex items-center gap-4 border border-border-subtle rounded-lg bg-raised px-4 py-3 hover:border-gold/40 hover:bg-raised/80 transition-all"
     >
-      {/* Thumbnail */}
-      <div className="shrink-0 w-16 h-16 rounded overflow-hidden bg-void border border-border-subtle flex items-center justify-center">
-        {item.photo_url && !imgError ? (
-          <Image
-            src={item.photo_url}
-            alt={t('photo_thumbnail_alt')}
-            width={64}
-            height={64}
-            className="w-full h-full object-cover"
-            onError={() => setImgError(true)}
-            unoptimized
-          />
-        ) : (
-          <ImageOff size={20} className="text-ink-subtle" />
-        )}
-      </div>
+      <CachedThumbnail
+        photoId={item.photo_id}
+        photoUrl={item.photo_thumbnail_url ?? item.photo_url}
+        fallbackUrl={item.photo_url}
+        alt={t('photo_thumbnail_alt')}
+        sourceIsThumbnail={Boolean(item.photo_thumbnail_url)}
+      />
 
       {/* Info */}
       <div className="flex-1 min-w-0 space-y-1.5">
