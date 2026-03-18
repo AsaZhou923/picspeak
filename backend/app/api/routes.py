@@ -1670,6 +1670,26 @@ def _active_subscription_for_user(db: Session, user: User) -> BillingSubscriptio
     return None
 
 
+def _best_subscription_for_portal(subscriptions: list[BillingSubscription]) -> BillingSubscription | None:
+    active_with_portal: BillingSubscription | None = None
+    active_without_portal: BillingSubscription | None = None
+    latest_with_portal: BillingSubscription | None = None
+
+    for subscription in subscriptions:
+        portal_url = _subscription_portal_url(subscription)
+        if portal_url and latest_with_portal is None:
+            latest_with_portal = subscription
+
+        if _subscription_grants_pro_access(subscription):
+            if portal_url:
+                active_with_portal = subscription
+                break
+            if active_without_portal is None:
+                active_without_portal = subscription
+
+    return active_with_portal or active_without_portal or latest_with_portal or (subscriptions[0] if subscriptions else None)
+
+
 @router.post('/billing/checkout', response_model=BillingCheckoutResponse)
 def create_billing_checkout(
     payload: BillingCheckoutRequest,
@@ -1709,15 +1729,16 @@ def get_billing_portal(
     if actor.plan != UserPlan.pro:
         raise api_error(status.HTTP_403_FORBIDDEN, 'BILLING_PORTAL_PRO_REQUIRED', 'Only Pro users can manage a subscription')
 
-    subscription = (
+    subscriptions = (
         db.query(BillingSubscription)
         .filter(
             BillingSubscription.user_id == actor.user.id,
             BillingSubscription.provider == 'lemonsqueezy',
         )
         .order_by(BillingSubscription.updated_at.desc(), BillingSubscription.id.desc())
-        .first()
+        .all()
     )
+    subscription = _best_subscription_for_portal(subscriptions)
     if subscription is None:
         raise api_error(status.HTTP_404_NOT_FOUND, 'BILLING_SUBSCRIPTION_NOT_FOUND', 'No subscription was found for this account')
 
