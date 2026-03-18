@@ -182,8 +182,9 @@ def _prompt_for_mode_legacy(mode: str, locale: str, exif_data: dict | None = Non
             f'You are a photography critic. Provide a {depth} review for the input photo.{exif_note} '
             f'The image genre for this review is: {normalized_image_type}. Use this mapping for dimension interpretation: {type_guide} '
             'Scoring baseline: 10 means top master-level work within the same genre (landscape, portrait, street, documentary, etc.). '
-            'Scores must be strict and clearly differentiated; avoid giving 7-8 to ordinary photos. '
-            'Most ordinary photos should be in the 3-6 range; only clearly strong photos should exceed 7. '
+            'Scores must be clearly differentiated and moderately strict; avoid giving 7-8 to ordinary photos. '
+            'However, do not mechanically suppress scores for clearly excellent, strongly stylized work when the style is intentional, coherent, and well executed. '
+            'Most ordinary photos should be in the 3-6 range; clearly strong photos can exceed 7, and outstanding stylized work may receive more generous scores across all five dimensions when the execution truly supports it. '
             'Output only one JSON object; do not output markdown. '
             'JSON schema must be exactly: '
             '{"schema_version":"1.0","scores":{"composition":0-10,"lighting":0-10,"color":0-10,"impact":0-10,"technical":0-10},'
@@ -338,8 +339,9 @@ def _prompt_for_mode_v3(mode: str, locale: str, exif_data: dict | None = None, i
             f'あなたは写真講評者です。入力写真に対して{"簡潔で直接的" if normalized_mode == "flash" else "詳細でプロフェッショナル"}な講評を行ってください。{exif_note}'
             f'今回の画像タイプは {normalized_image_type} です。次の次元解釈ロジックを適用してください：{type_guide} '
             '採点基準：同ジャンル内で巨匠級の作品を 10 点とします。 '
-            '採点は厳しめかつ差が出るようにし、普通の写真に安易に 7-8 点を付けないでください。 '
-            '一般的な写真は主に 3-6 点、明確に優れた写真だけを 7 点以上にしてください。 '
+            '採点は差が出るようにしつつ、やや厳しめを保ってください。普通の写真に安易に 7-8 点を付けないでください。 '
+            'ただし、強いスタイル性が明確な意図と一貫した実行に支えられている優秀作については、型破りという理由だけで機械的に減点しないでください。 '
+            '一般的な写真は主に 3-6 点、明確に優れた写真は 7 点以上にしてください。スタイル化が明確で完成度も高い作品には、5 次元ともやや広めに高得点を与えて構いません。 '
             '出力は JSON オブジェクト 1 つのみで、markdown は不要です。 '
             'JSON スキーマは厳密に次の形です：'
             '{"schema_version":"1.0","scores":{"composition":0-10,"lighting":0-10,"color":0-10,"impact":0-10,"technical":0-10},'
@@ -379,8 +381,9 @@ def _prompt_for_mode_v3(mode: str, locale: str, exif_data: dict | None = None, i
         f'请你作为摄影点评师，对输入照片进行{"简洁直接" if normalized_mode == "flash" else "详细专业"}的点评。{exif_note}'
         f'本次图片类型为 {normalized_image_type}，请按以下维度解释逻辑评分：{type_guide} '
         '评分基准：以该照片所属题材中的顶级大师作品作为 10 分参考标准。 '
-        '打分必须严格且有明显差异性，普通照片不要轻易给到 7-8 分。 '
-        '普通照片应更多落在 3-6 分区间，只有明显优秀的作品才进入 7 分以上。 '
+        '打分必须有明显差异性，并保持偏严格口径，普通照片不要轻易给到 7-8 分。 '
+        '但如果作品风格化意图非常明确、执行一致且整体完成度高，不要因为它打破常规就机械压分。 '
+        '普通照片应更多落在 3-6 分区间，明显优秀的作品可以进入 7 分以上；对于风格化明显且控制到位的优秀作品，五维评分可以适当放宽。 '
         '必须只输出一个 JSON 对象，不要输出 markdown。 '
         'JSON 字段必须严格为：'
         '{"schema_version":"1.0","scores":{"composition":0-10,"lighting":0-10,"color":0-10,"impact":0-10,"technical":0-10},'
@@ -466,7 +469,7 @@ def run_ai_review(mode: str, image_url: str, locale: str = 'zh', exif_data: dict
         'temperature': 0.2,
         'response_format': {'type': 'json_object'},
         'messages': [
-            {'role': 'system', 'content': '你是一个严格返回 JSON 的摄影点评助手，审美标准高、评分偏严格。'},
+            {'role': 'system', 'content': '你是一个严格返回 JSON 的摄影点评助手，审美标准高、评分有区分度，但会认可风格化且完成度高的优秀作品。'},
             {
                 'role': 'user',
                 'content': [

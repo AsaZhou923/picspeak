@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 from io import BytesIO
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit, urlunsplit
 
 from fastapi import APIRouter, Cookie, Depends, Header, HTTPException, Query, Request, Response, WebSocket, WebSocketDisconnect, status
 from fastapi.responses import RedirectResponse, StreamingResponse
@@ -102,6 +102,7 @@ from app.services.lemonsqueezy import (
     LemonSqueezyAPIError,
     LemonSqueezyConfigurationError,
     create_checkout_for_user,
+    retrieve_subscription,
 )
 from app.services.lemonsqueezy_webhooks import (
     process_lemonsqueezy_webhook_event,
@@ -1642,6 +1643,59 @@ def _subscription_portal_url(subscription: BillingSubscription) -> str | None:
     return None
 
 
+def _configured_customer_portal_url() -> str | None:
+    checkout_url = settings.lemonsqueezy_pro_checkout_url.strip()
+    if not checkout_url:
+        return None
+
+    parsed = urlsplit(checkout_url)
+    if not parsed.scheme or not parsed.netloc:
+        return None
+
+    return urlunsplit((parsed.scheme, parsed.netloc, '/billing', '', ''))
+
+
+def _is_lemonsqueezy_dashboard_url(url: str | None) -> bool:
+    if not isinstance(url, str) or not url.strip():
+        return False
+
+    parsed = urlsplit(url.strip())
+    return parsed.netloc == 'app.lemonsqueezy.com' and parsed.path.startswith('/dashboard')
+
+
+def _customer_portal_destination(subscription: BillingSubscription) -> str | None:
+    portal_url = _subscription_portal_url(subscription)
+    if portal_url and not _is_lemonsqueezy_dashboard_url(portal_url):
+        return portal_url
+    return _configured_customer_portal_url() or portal_url
+
+
+def _refresh_subscription_portal_urls(db: Session, subscription: BillingSubscription) -> BillingSubscription:
+    subscription_id = str(subscription.provider_subscription_id or '').strip()
+    if not subscription_id:
+        return subscription
+
+    data = retrieve_subscription(subscription_id)
+    attributes = data.get('attributes')
+    if not isinstance(attributes, dict):
+        return subscription
+
+    urls = attributes.get('urls')
+    url_map = urls if isinstance(urls, dict) else {}
+
+    subscription.update_payment_method_url = str(
+        url_map.get('update_payment_method') or subscription.update_payment_method_url or ''
+    ).strip() or None
+    subscription.customer_portal_url = str(url_map.get('customer_portal') or subscription.customer_portal_url or '').strip() or None
+    subscription.customer_portal_update_subscription_url = str(
+        url_map.get('customer_portal_update_subscription') or subscription.customer_portal_update_subscription_url or ''
+    ).strip() or None
+    subscription.raw_payload = data
+    db.add(subscription)
+    db.flush()
+    return subscription
+
+
 def _subscription_grants_pro_access(subscription: BillingSubscription, *, now: datetime | None = None) -> bool:
     current = now or datetime.now(timezone.utc)
     status = (subscription.status or '').strip().lower()
@@ -1742,7 +1796,14 @@ def get_billing_portal(
     if subscription is None:
         raise api_error(status.HTTP_404_NOT_FOUND, 'BILLING_SUBSCRIPTION_NOT_FOUND', 'No subscription was found for this account')
 
-    portal_url = _subscription_portal_url(subscription)
+    try:
+        subscription = _refresh_subscription_portal_urls(db, subscription)
+    except LemonSqueezyConfigurationError:
+        logger.warning('Lemon Squeezy is not configured while refreshing billing portal links')
+    except LemonSqueezyAPIError as exc:
+        logger.warning('Failed to refresh billing portal link from Lemon Squeezy: %s', exc)
+
+    portal_url = _customer_portal_destination(subscription)
     if not portal_url:
         raise api_error(
             status.HTTP_409_CONFLICT,

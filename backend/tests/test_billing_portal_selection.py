@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import unittest
 from datetime import datetime, timedelta, timezone
+from unittest.mock import Mock, patch
 
-from app.api.routes import _best_subscription_for_portal
+from app.api import routes
+from app.api.routes import _best_subscription_for_portal, _customer_portal_destination, _refresh_subscription_portal_urls
 from app.db.models import BillingSubscription
 
 
@@ -75,6 +77,45 @@ class BillingPortalSelectionTests(unittest.TestCase):
 
         self.assertIsNotNone(selected)
         self.assertEqual(selected.update_payment_method_url, 'https://portal.example.com/recover')
+
+    def test_uses_store_billing_page_when_dashboard_url_is_returned(self) -> None:
+        subscription = _subscription(status='active', updated_minutes_ago=1, portal_url='https://app.lemonsqueezy.com/dashboard')
+
+        with patch.object(
+            routes.settings,
+            'lemonsqueezy_pro_checkout_url',
+            'https://picspeak.lemonsqueezy.com/checkout/buy/example',
+        ):
+            destination = _customer_portal_destination(subscription)
+
+        self.assertEqual(destination, 'https://picspeak.lemonsqueezy.com/billing')
+
+    def test_refreshes_portal_urls_from_latest_subscription_api_response(self) -> None:
+        subscription = _subscription(status='active', updated_minutes_ago=1, portal_url='https://old.example.com/portal')
+        subscription.provider_subscription_id = 'sub_123'
+        db = Mock()
+
+        with patch(
+            'app.api.routes.retrieve_subscription',
+            return_value={
+                'attributes': {
+                    'urls': {
+                        'customer_portal': 'https://picspeak.lemonsqueezy.com/billing?expires=123',
+                        'customer_portal_update_subscription': 'https://picspeak.lemonsqueezy.com/billing/subscription?expires=123',
+                    }
+                }
+            },
+        ):
+            refreshed = _refresh_subscription_portal_urls(db, subscription)
+
+        self.assertIs(refreshed, subscription)
+        self.assertEqual(refreshed.customer_portal_url, 'https://picspeak.lemonsqueezy.com/billing?expires=123')
+        self.assertEqual(
+            refreshed.customer_portal_update_subscription_url,
+            'https://picspeak.lemonsqueezy.com/billing/subscription?expires=123',
+        )
+        db.add.assert_called_once_with(subscription)
+        db.flush.assert_called_once_with()
 
 
 if __name__ == '__main__':
