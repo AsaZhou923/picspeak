@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import Request, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -218,7 +219,10 @@ def _lookup_user_by_public_id(db: Session, public_id: str | None) -> User | None
 def _lookup_user_by_email(db: Session, email: str | None) -> User | None:
     if not email:
         return None
-    return db.query(User).filter(User.email == email).first()
+    normalized = email.strip().lower()
+    if not normalized:
+        return None
+    return db.query(User).filter(func.lower(User.email) == normalized).first()
 
 
 def _lookup_subscription(

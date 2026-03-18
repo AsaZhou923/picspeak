@@ -719,8 +719,7 @@ async def clerk_webhook(request: Request, db: Session = Depends(get_db)):
     return {'ok': True, 'event_type': event.type, 'outcome': outcome}
 
 
-@webhook_router.post('/webhook/lemonsqueezy')
-async def lemonsqueezy_webhook(request: Request, db: Session = Depends(get_db)):
+async def _handle_lemonsqueezy_webhook(request: Request, db: Session) -> dict[str, Any]:
     event = await verify_lemonsqueezy_webhook(request)
     event_record, duplicate = record_lemonsqueezy_webhook_event(db, event)
     if duplicate:
@@ -746,6 +745,16 @@ async def lemonsqueezy_webhook(request: Request, db: Session = Depends(get_db)):
         raise
 
     return {'ok': True, 'event_name': event.event_name, 'outcome': event_record.outcome}
+
+
+@webhook_router.post('/webhook/lemonsqueezy')
+async def lemonsqueezy_webhook(request: Request, db: Session = Depends(get_db)):
+    return await _handle_lemonsqueezy_webhook(request, db)
+
+
+@router.post('/webhooks/lemonsqueezy')
+async def lemonsqueezy_webhook_v1(request: Request, db: Session = Depends(get_db)):
+    return await _handle_lemonsqueezy_webhook(request, db)
 
 
 @router.post('/auth/guest/migrate', response_model=GuestReviewMigrateResponse)
@@ -1667,7 +1676,10 @@ def _customer_portal_destination(subscription: BillingSubscription) -> str | Non
     portal_url = _subscription_portal_url(subscription)
     if portal_url and not _is_lemonsqueezy_dashboard_url(portal_url):
         return portal_url
-    return _configured_customer_portal_url() or portal_url
+    fallback_url = _configured_customer_portal_url()
+    if fallback_url and not _is_lemonsqueezy_dashboard_url(fallback_url):
+        return fallback_url
+    return None
 
 
 def _refresh_subscription_portal_urls(db: Session, subscription: BillingSubscription) -> BillingSubscription:

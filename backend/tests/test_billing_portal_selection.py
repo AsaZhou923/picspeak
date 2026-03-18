@@ -90,6 +90,14 @@ class BillingPortalSelectionTests(unittest.TestCase):
 
         self.assertEqual(destination, 'https://picspeak.lemonsqueezy.com/billing')
 
+    def test_rejects_dashboard_url_when_no_store_billing_fallback_exists(self) -> None:
+        subscription = _subscription(status='active', updated_minutes_ago=1, portal_url='https://app.lemonsqueezy.com/dashboard')
+
+        with patch.object(routes.settings, 'lemonsqueezy_pro_checkout_url', ''):
+            destination = _customer_portal_destination(subscription)
+
+        self.assertIsNone(destination)
+
     def test_refreshes_portal_urls_from_latest_subscription_api_response(self) -> None:
         subscription = _subscription(status='active', updated_minutes_ago=1, portal_url='https://old.example.com/portal')
         subscription.provider_subscription_id = 'sub_123'

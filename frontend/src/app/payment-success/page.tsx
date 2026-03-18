@@ -19,18 +19,29 @@ export default function PaymentSuccessPage() {
   useEffect(() => {
     let cancelled = false;
 
-    ensureToken()
-      .then((token) => getUsage(token, { force: true }))
-      .then((data) => {
-        if (cancelled) {
-          return;
+    async function loadUsageWithRetry() {
+      try {
+        const token = await ensureToken();
+        let latest: UsageResponse | null = null;
+
+        for (let attempt = 0; attempt < 6; attempt += 1) {
+          latest = await getUsage(token, { force: true });
+          if (cancelled) {
+            return;
+          }
+
+          syncPlan(latest.plan);
+          setUsage(latest);
+          setError('');
+          setLoading(false);
+
+          if (latest.plan === 'pro' || attempt === 5) {
+            return;
+          }
+
+          await new Promise((resolve) => window.setTimeout(resolve, 2500));
         }
-        syncPlan(data.plan);
-        setUsage(data);
-        setError('');
-        setLoading(false);
-      })
-      .catch((err) => {
+      } catch (err) {
         if (cancelled) {
           return;
         }
@@ -41,7 +52,10 @@ export default function PaymentSuccessPage() {
         } else {
           setError(t('payment_success_error'));
         }
-      });
+      }
+    }
+
+    void loadUsageWithRetry();
 
     return () => {
       cancelled = true;
