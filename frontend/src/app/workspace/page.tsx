@@ -147,7 +147,7 @@ function getEffectiveQuota(
 
 export default function WorkspacePage() {
   const router = useRouter();
-  const { userInfo, ensureToken, isLoading: authLoading } = useAuth();
+  const { userInfo, ensureToken, isLoading: authLoading, syncPlan } = useAuth();
   const { t, locale } = useI18n();
 
   const [usage, setUsage] = useState<UsageResponse | null>(null);
@@ -175,11 +175,12 @@ export default function WorkspacePage() {
       setUsageError(false);
       const token = await ensureToken();
       const data = await getUsage(token);
+      syncPlan(data.plan);
       setUsage(data);
     } catch {
       setUsageError(true);
     }
-  }, [ensureToken]);
+  }, [ensureToken, syncPlan]);
 
   useEffect(() => {
     if (authLoading) return;

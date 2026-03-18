@@ -344,3 +344,79 @@ create index idx_review_task_events_type_created
     on review_task_events (event_type asc, created_at desc);
 
 
+create table billing_subscriptions
+(
+    id                                          bigserial
+        primary key,
+    user_id                                     bigint                                       not null
+        references users,
+    provider                                    text                     default 'lemonsqueezy'::text not null,
+    provider_customer_id                        text,
+    provider_order_id                           text,
+    provider_subscription_id                    text,
+    store_id                                    text,
+    product_id                                  text,
+    variant_id                                  text,
+    product_name                                text,
+    variant_name                                text,
+    status                                      text                     default 'pending'::text not null,
+    user_email                                  text,
+    cancelled                                   boolean                  default false      not null,
+    test_mode                                   boolean                  default false      not null,
+    renews_at                                   timestamp with time zone,
+    ends_at                                     timestamp with time zone,
+    trial_ends_at                               timestamp with time zone,
+    update_payment_method_url                   text,
+    customer_portal_url                         text,
+    customer_portal_update_subscription_url     text,
+    last_event_name                             text,
+    last_event_at                               timestamp with time zone,
+    last_invoice_id                             text,
+    last_payment_status                         text,
+    last_payment_at                             timestamp with time zone,
+    raw_payload                                 jsonb                    default '{}'::jsonb not null,
+    created_at                                  timestamp with time zone default now()       not null,
+    updated_at                                  timestamp with time zone default now()       not null
+);
+
+alter table billing_subscriptions
+    owner to pic;
+
+create unique index uq_billing_subscriptions_provider_subscription
+    on billing_subscriptions (provider asc, provider_subscription_id asc);
+
+create index idx_billing_subscriptions_user_provider
+    on billing_subscriptions (user_id asc, provider asc);
+
+create index idx_billing_subscriptions_status_updated
+    on billing_subscriptions (status asc, updated_at desc);
+
+create table billing_webhook_events
+(
+    id             bigserial
+        primary key,
+    provider       text                     default 'lemonsqueezy'::text not null,
+    event_name     text                                         not null,
+    event_hash     text                                         not null,
+    resource_type  text,
+    resource_id    text,
+    test_mode      boolean                  default false        not null,
+    outcome        text,
+    user_id        bigint
+        references users,
+    payload_json   jsonb                    default '{}'::jsonb not null,
+    processed_at   timestamp with time zone,
+    created_at     timestamp with time zone default now()       not null
+);
+
+alter table billing_webhook_events
+    owner to pic;
+
+create unique index uq_billing_webhook_events_provider_hash
+    on billing_webhook_events (provider asc, event_hash asc);
+
+create index idx_billing_webhook_events_provider_created
+    on billing_webhook_events (provider asc, created_at desc);
+
+create index idx_billing_webhook_events_event_name_created
+    on billing_webhook_events (event_name asc, created_at desc);

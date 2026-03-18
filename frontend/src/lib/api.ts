@@ -2,6 +2,7 @@ import {
   ApiException,
   AuthToken,
   BillingCheckoutResponse,
+  BillingPortalResponse,
   GuestMigrateResponse,
   PhotoCreateResponse,
   PhotoReviewsResponse,
@@ -189,6 +190,13 @@ export async function createBillingCheckout(token: string, plan: 'pro'): Promise
   return request<BillingCheckoutResponse>('/billing/checkout', {
     method: 'POST',
     body: JSON.stringify({ plan }),
+    token,
+    unauthorizedRecovery: 'guest',
+  });
+}
+
+export async function getBillingPortal(token: string): Promise<BillingPortalResponse> {
+  return request<BillingPortalResponse>('/billing/portal', {
     token,
     unauthorizedRecovery: 'guest',
   });

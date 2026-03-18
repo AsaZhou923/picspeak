@@ -23,6 +23,7 @@ interface AuthState {
   login: (tokenData: AuthToken) => void;
   logout: () => void;
   ensureToken: () => Promise<string>;
+  syncPlan: (plan: AuthToken['plan']) => void;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -171,6 +172,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(null);
     setUserInfo(null);
   }, []);
+
+  const syncPlan = useCallback((plan: AuthToken['plan']) => {
+    const currentAuth = userInfo ?? readSessionAuthToken();
+    if (!currentAuth || currentAuth.plan === plan) {
+      return;
+    }
+
+    const nextAuth = { ...currentAuth, plan };
+    persistAuthToken(nextAuth);
+    setToken(nextAuth.access_token);
+    setUserInfo(nextAuth);
+  }, [userInfo]);
 
   const waitForReady = useCallback(async (): Promise<void> => {
     if (!isLoadingRef.current) return;
@@ -329,7 +342,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [ensureToken, token]);
 
   return (
-    <AuthContext.Provider value={{ token, userInfo, isLoading, login, logout, ensureToken }}>
+    <AuthContext.Provider value={{ token, userInfo, isLoading, login, logout, ensureToken, syncPlan }}>
       {children}
     </AuthContext.Provider>
   );

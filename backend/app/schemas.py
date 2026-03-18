@@ -185,10 +185,19 @@ class UsageFeatures(BaseModel):
     priority_queue: bool
 
 
+class UsageSubscription(BaseModel):
+    status: str
+    cancelled: bool = False
+    renews_at: datetime | None = None
+    ends_at: datetime | None = None
+    current_period_ends_at: datetime | None = None
+
+
 class UsageResponse(BaseModel):
     plan: str
     quota: UsageQuota
     features: UsageFeatures
+    subscription: UsageSubscription | None = None
     rate_limit: dict[str, Any]
 
 
@@ -201,6 +210,12 @@ class BillingCheckoutResponse(BaseModel):
     plan: str
     message: str
     checkout_url: str | None = None
+
+
+class BillingPortalResponse(BaseModel):
+    status: str
+    portal_url: str | None = None
+    message: str
 
 
 class AuthGoogleLoginRequest(BaseModel):

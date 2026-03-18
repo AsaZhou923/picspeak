@@ -75,7 +75,6 @@ const translations = {
     plan_pro_feature: '不限每日次数',
     plan_pro_feature_2: '永久保留历史记录',
     plan_pro_feature_3: '优先进入分析队列',
-    quota_payment_note: 'Pro 支付能力即将接入，当前页面中的升级支付为占位流程。',
 
     // Score dimension labels
     score_composition: '构图',
@@ -174,10 +173,20 @@ const translations = {
     usage_login_now: '立即登录',
     usage_checkout_pro: '开通 Pro',
     usage_checkout_loading: '请求支付中…',
-    usage_checkout_unavailable: '支付占位接口暂不可用，请稍后再试。',
+    usage_checkout_unavailable: '暂时无法发起支付，请稍后再试。',
+    usage_manage_subscription: '管理我的订阅',
+    usage_manage_loading: '正在打开订阅…',
+    usage_manage_unavailable: '暂时无法打开订阅管理，请稍后再试。',
     usage_goto_workspace: '前往评图工作台',
-    billing_payment_placeholder: 'Pro 支付功能即将上线，当前为占位流程，暂未正式开放。',
+    billing_payment_placeholder: '暂时无法打开支付页面，请稍后重试；如果问题持续存在，请联系我协助处理。',
     billing_contact_prompt: '如有需要请联系我，我会尽快为您处理。',
+    payment_success_label: '支付成功',
+    payment_success_headline: '你的支付已经完成',
+    payment_success_body: 'Pro 已经激活，现在可以返回额度页管理订阅，或直接继续评图。',
+    payment_success_pending_body: '支付已经完成，我们正在等待订阅状态同步。通常几秒内会更新，你也可以先返回额度页查看。',
+    payment_success_error: '暂时无法确认订阅状态，请稍后到额度页查看。',
+    payment_success_usage_cta: '查看我的额度',
+    payment_success_workspace_cta: '继续去评图',
 
     // Error page
     error_title: '出错了',
@@ -418,7 +427,6 @@ const translations = {
     plan_pro_feature: 'No daily cap',
     plan_pro_feature_2: 'Permanent history',
     plan_pro_feature_3: 'Priority queue',
-    quota_payment_note: 'Pro checkout is still a placeholder while payment integration is being wired up.',
 
     // Score dimension labels
     score_composition: 'Composition',
@@ -517,10 +525,20 @@ const translations = {
     usage_login_now: 'Sign in now',
     usage_checkout_pro: 'Upgrade to Pro',
     usage_checkout_loading: 'Preparing checkout…',
-    usage_checkout_unavailable: 'Checkout placeholder is temporarily unavailable.',
+    usage_checkout_unavailable: 'Unable to start checkout right now. Please try again shortly.',
+    usage_manage_subscription: 'Manage my subscription',
+    usage_manage_loading: 'Opening subscription…',
+    usage_manage_unavailable: 'Unable to open subscription management right now. Please try again later.',
     usage_goto_workspace: 'Go to Workspace',
-    billing_payment_placeholder: 'Pro payment is coming soon — this is a placeholder flow and checkout is not enabled yet.',
+    billing_payment_placeholder: 'Unable to open checkout right now. Please try again shortly, or reach out if the issue persists.',
     billing_contact_prompt: 'If you need help, feel free to reach out and I will get back to you as soon as possible.',
+    payment_success_label: 'Payment Success',
+    payment_success_headline: 'Your payment is complete',
+    payment_success_body: 'Pro is active now. You can return to your usage page to manage the subscription, or head back to the workspace.',
+    payment_success_pending_body: 'Your payment is complete and we are waiting for the subscription status to sync. This usually updates within a few seconds.',
+    payment_success_error: 'Unable to confirm your subscription status right now. Please check your usage page in a moment.',
+    payment_success_usage_cta: 'View my usage',
+    payment_success_workspace_cta: 'Back to workspace',
 
     // Error page
     error_title: 'Something went wrong',
@@ -761,7 +779,6 @@ const translations = {
     plan_pro_feature: '1日の上限なし',
     plan_pro_feature_2: '履歴は永久保存',
     plan_pro_feature_3: '優先キュー処理',
-    quota_payment_note: 'Pro の決済はまだ占位実装で、本番接続はこれからです。',
 
     // Score dimension labels
     score_composition: '構図',
@@ -860,10 +877,20 @@ const translations = {
     usage_login_now: '今すぐサインイン',
     usage_checkout_pro: 'Pro を開始',
     usage_checkout_loading: '決済を準備中…',
-    usage_checkout_unavailable: '決済の占位 API が一時的に利用できません。',
+    usage_checkout_unavailable: '今は決済を開始できません。しばらくしてからもう一度お試しください。',
+    usage_manage_subscription: 'サブスクを管理',
+    usage_manage_loading: '管理画面を開いています…',
+    usage_manage_unavailable: '今はサブスク管理を開けません。しばらくしてからもう一度お試しください。',
     usage_goto_workspace: 'ワークスペースへ',
-    billing_payment_placeholder: 'Pro 決済は近日公開予定です。現在は仮フローのため、チェックアウトはまだご利用いただけません。',
+    billing_payment_placeholder: '今はチェックアウトを開けません。少し待って再試行するか、必要であればご連絡ください。',
     billing_contact_prompt: 'ご不明な点がございましたら、お気軽にご連絡ください。できる限り早くご対応いたします。',
+    payment_success_label: '支払い完了',
+    payment_success_headline: '支払いが完了しました',
+    payment_success_body: 'Pro は有効になりました。使用状況ページでサブスクを管理するか、そのまま評価を続けられます。',
+    payment_success_pending_body: '支払いは完了しています。現在サブスク状態を同期中です。通常は数秒で反映されます。',
+    payment_success_error: 'サブスク状態を今すぐ確認できません。少し待ってから使用状況ページをご確認ください。',
+    payment_success_usage_cta: '使用状況を見る',
+    payment_success_workspace_cta: '評価に戻る',
 
     // Error page
     error_title: 'エラーが発生しました',
@@ -1056,7 +1083,7 @@ interface I18nContextValue {
 }
 
 const I18nContext = createContext<I18nContextValue>({
-  locale: 'zh',
+  locale: 'en',
   setLocale: () => {},
   t: (key) => key,
 });
@@ -1065,16 +1092,38 @@ const I18nContext = createContext<I18nContextValue>({
 
 const STORAGE_KEY = 'picspeak-locale';
 
+function detectBrowserLocale(): Locale {
+  if (typeof navigator === 'undefined') return 'en';
+
+  const candidates = Array.isArray(navigator.languages) && navigator.languages.length > 0
+    ? navigator.languages
+    : [navigator.language];
+
+  for (const candidate of candidates) {
+    const normalized = String(candidate || '').trim().toLowerCase();
+    if (normalized.startsWith('zh')) return 'zh';
+    if (normalized.startsWith('ja')) return 'ja';
+    if (normalized.startsWith('en')) return 'en';
+  }
+
+  return 'en';
+}
+
 export function I18nProvider({ children }: { children: React.ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>('zh');
+  const [locale, setLocaleState] = useState<Locale>('en');
 
   useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY) as Locale | null;
-      if (saved && saved in translations) setLocaleState(saved);
+      if (saved && saved in translations) {
+        setLocaleState(saved);
+        return;
+      }
     } catch {
       // ignore
     }
+
+    setLocaleState(detectBrowserLocale());
   }, []);
 
   const setLocale = useCallback((l: Locale) => {
@@ -1085,6 +1134,11 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
       // ignore
     }
   }, []);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    document.documentElement.lang = locale;
+  }, [locale]);
 
   const t = useCallback(
     (key: TranslationKey): string => {

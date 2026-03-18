@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 
-from app.api.routes import router
+from app.api.routes import router, webhook_router
 from app.core.config import settings
 from app.core.errors import normalize_http_error
 from app.db.bootstrap import ensure_runtime_schema
@@ -37,6 +37,7 @@ app.add_middleware(
     expose_headers=['X-Request-Id', 'X-Guest-Access-Token'],
 )
 app.include_router(router)
+app.include_router(webhook_router)
 
 
 def _error_response(*, status_code: int, request_id: str | None, code: str, message: str, extra: dict | None = None) -> JSONResponse:

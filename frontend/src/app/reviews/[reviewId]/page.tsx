@@ -784,9 +784,9 @@ export default function ReviewPage() {
   const r = review.result;
   const isPro = review.mode === 'pro';
   const isDemoReview = reviewId === DEMO_REVIEW_ID;
-  const displayAdvantage   = isDemoReview && locale !== 'zh' ? t('demo_review_advantage')   : r.advantage;
-  const displayCritique    = isDemoReview && locale !== 'zh' ? t('demo_review_critique')    : r.critique;
-  const displaySuggestions = isDemoReview && locale !== 'zh' ? t('demo_review_suggestions') : r.suggestions;
+  const displayAdvantage   = isDemoReview ? t('demo_review_advantage') : r.advantage;
+  const displayCritique    = isDemoReview ? t('demo_review_critique') : r.critique;
+  const displaySuggestions = isDemoReview ? t('demo_review_suggestions') : r.suggestions;
   const weakestKey = getWeakestDimKey(r.scores);
   const weakestDim = SCORE_DIMS.find((d) => d.key === weakestKey) ?? SCORE_DIMS[0];
   const scoreLabelColor = getScoreLabelColor(r.final_score);

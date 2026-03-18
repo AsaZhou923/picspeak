@@ -46,6 +46,15 @@ class Settings(BaseSettings):
     clerk_webhook_signing_secret: str = ''
     clerk_api_url: str = 'https://api.clerk.com'
     clerk_api_version: str = '2025-11-10'
+    lemonsqueezy_api_key: str = ''
+    lemonsqueezy_store_id: str = ''
+    lemonsqueezy_pro_variant_id: str = ''
+    lemonsqueezy_pro_checkout_url: str = ''
+    lemonsqueezy_webhook_signing_secret: str = ''
+    lemonsqueezy_webhook_url: str = ''
+    lemonsqueezy_checkout_success_url: str = ''
+    lemonsqueezy_checkout_test_mode: bool = True
+    lemonsqueezy_webhook_test_mode: bool = True
     # Frontend origin used for post-login redirect (e.g. http://localhost:3000)
     frontend_origin: str = 'http://localhost:3000'
     backend_cors_origins: list[str] = Field(
@@ -121,14 +130,33 @@ class Settings(BaseSettings):
             return ''
         return value.strip()
 
-    @field_validator('clerk_secret_key', 'clerk_webhook_signing_secret', 'clerk_api_version', mode='before')
+    @field_validator(
+        'clerk_secret_key',
+        'clerk_webhook_signing_secret',
+        'clerk_api_version',
+        'lemonsqueezy_api_key',
+        'lemonsqueezy_store_id',
+        'lemonsqueezy_pro_variant_id',
+        'lemonsqueezy_pro_checkout_url',
+        'lemonsqueezy_webhook_signing_secret',
+        mode='before',
+    )
     @classmethod
     def normalize_plain_string_settings(cls, value: Any) -> str:
         if not isinstance(value, str):
             return ''
         return value.strip()
 
-    @field_validator('cloud_tasks_target_url', 'cloud_tasks_service_account_email', 'cloud_tasks_oidc_audience', 'clerk_api_url', mode='before')
+    @field_validator(
+        'cloud_tasks_target_url',
+        'cloud_tasks_service_account_email',
+        'cloud_tasks_oidc_audience',
+        'clerk_api_url',
+        'lemonsqueezy_pro_checkout_url',
+        'lemonsqueezy_webhook_url',
+        'lemonsqueezy_checkout_success_url',
+        mode='before',
+    )
     @classmethod
     def normalize_string_settings(cls, value: Any) -> str:
         if not isinstance(value, str):

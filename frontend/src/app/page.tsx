@@ -23,7 +23,7 @@ const DEMO_IMAGE_URL =
 const DEMO_REVIEW_ID = 'rev_8424d4fbde054759';
 
 export default function HomePage() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
   const softwareJsonLd = {
@@ -89,6 +89,7 @@ export default function HomePage() {
       plan: t('plan_pro_name'),
       quotaLabel: t('plan_pro_quota'),
       features: [t('plan_pro_feature'), t('plan_pro_feature_2'), t('plan_pro_feature_3')],
+      priceLabel: locale === 'en' ? '$3.99 / month' : '$3.99 / 月',
       highlight: true,
     },
   ];
@@ -233,52 +234,65 @@ export default function HomePage() {
             {t('quota_subhead')}
           </p>
 
-          <div className="grid sm:grid-cols-3 gap-4 items-start">
-            {TIERS.map((tier) => (
-              <div
-                key={tier.plan}
-                className={`relative rounded-lg border overflow-hidden transition-all duration-300 ${
-                  tier.highlight
-                    ? 'bg-raised border-gold/50 shadow-[0_0_48px_rgba(200,162,104,0.18)] ring-1 ring-gold/20 sm:scale-[1.05] sm:z-10'
-                    : 'bg-raised/20 border-border-subtle'
-                }`}
-              >
+	          <div className="grid sm:grid-cols-3 gap-4 items-start">
+	            {TIERS.map((tier) => (
+	              <div
+	                key={tier.plan}
+	                className={`relative rounded-lg border overflow-hidden transition-all duration-300 h-full ${
+	                  tier.highlight
+	                    ? 'bg-raised border-gold/50 shadow-[0_0_48px_rgba(200,162,104,0.18)] ring-1 ring-gold/20 sm:scale-[1.05] sm:z-10'
+	                    : 'bg-raised/20 border-border-subtle'
+	                }`}
+	              >
                 {tier.highlight && (
                   <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-gold to-transparent" />
                 )}
-                <div className="p-8">
-                  {tier.highlight && (
-                    <span className="inline-block mb-3 text-xs text-void bg-gold rounded-full px-2.5 py-0.5 font-medium tracking-wide">
-                      Most Popular
-                    </span>
-                  )}
-                  <p
-                    className={`font-display text-2xl mb-1 ${
-                      tier.highlight ? 'text-gold' : 'text-ink'
-                    }`}
-                  >
-                    {tier.plan}
-                  </p>
-                  <p className={`text-3xl font-display mb-6 ${tier.highlight ? 'text-ink' : 'text-ink-muted'}`}>
-                    {tier.quotaLabel}
-                  </p>
-                  <ul className="space-y-2.5">
-                    {tier.features.map((f) => (
-                      <li key={f} className="text-sm text-ink-muted flex items-center gap-2">
-                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${tier.highlight ? 'bg-gold' : 'bg-gold/40'}`} />
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            ))}
-          </div>
-          <p className="text-xs text-ink-subtle mt-5">
-            {t('quota_payment_note')}
-          </p>
-        </div>
-      </section>
+	                <div className="p-8 h-full min-h-[22rem] flex flex-col">
+	                  {tier.highlight && (
+	                    <span className="inline-block mb-3 text-xs text-void bg-gold rounded-full px-2.5 py-0.5 font-medium tracking-wide">
+	                      Most Popular
+	                    </span>
+	                  )}
+	                  <p
+	                    className={`font-display text-2xl mb-1 ${
+	                      tier.highlight ? 'text-gold' : 'text-ink'
+	                    }`}
+	                  >
+	                    {tier.plan}
+	                  </p>
+	                  {tier.priceLabel && (
+	                    <p className="text-xs font-mono tracking-wide text-gold/75 mb-2">
+	                      {tier.priceLabel}
+	                    </p>
+	                  )}
+	                  <p className={`text-3xl font-display mb-6 ${tier.highlight ? 'text-ink' : 'text-ink-muted'}`}>
+	                    {tier.quotaLabel}
+	                  </p>
+	                  <ul className="space-y-2.5 flex-1">
+	                    {tier.features.map((f) => (
+	                      <li key={f} className="text-sm text-ink-muted flex items-center gap-2">
+	                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${tier.highlight ? 'bg-gold' : 'bg-gold/40'}`} />
+	                        {f}
+	                      </li>
+	                    ))}
+	                  </ul>
+	                  {tier.highlight && (
+	                    <div className="mt-8 pt-2">
+	                      <Link
+	                        href="/account/usage"
+	                        className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-gold px-4 py-3 text-sm font-medium text-void transition-all duration-200 hover:bg-gold-light hover:shadow-[0_0_24px_rgba(200,162,104,0.35)]"
+	                      >
+	                        {t('usage_checkout_pro')}
+	                        <ArrowRight size={14} />
+	                      </Link>
+	                    </div>
+	                  )}
+	                </div>
+	              </div>
+	            ))}
+	          </div>
+	        </div>
+	      </section>
 
       <section className="px-6 py-24 border-t border-border-subtle">
         <div className="max-w-2xl mx-auto text-center space-y-8">

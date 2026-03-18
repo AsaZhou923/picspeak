@@ -37,6 +37,7 @@ from app.core.config import settings
 from app.core.errors import api_error
 from app.core.security import create_access_token, sign_payload, sign_payload_with_exp, verify_payload
 from app.db.models import (
+    BillingSubscription,
     Photo,
     PhotoStatus,
     Review,
@@ -54,6 +55,7 @@ from app.db.session import SessionLocal, get_db
 from app.schemas import (
     BillingCheckoutRequest,
     BillingCheckoutResponse,
+    BillingPortalResponse,
     PhotoCreateRequest,
     PhotoCreateResponse,
     PhotoReviewsResponse,
@@ -96,12 +98,23 @@ from app.services.guard import (
     save_idempotency_record,
     user_usage_snapshot,
 )
+from app.services.lemonsqueezy import (
+    LemonSqueezyAPIError,
+    LemonSqueezyConfigurationError,
+    create_checkout_for_user,
+)
+from app.services.lemonsqueezy_webhooks import (
+    process_lemonsqueezy_webhook_event,
+    record_lemonsqueezy_webhook_event,
+    verify_lemonsqueezy_webhook,
+)
 from app.services.object_storage import get_object_storage_client
 from app.services.review_task_processor import expire_review_tasks, process_review_task
 from app.services.task_dispatcher import TaskDispatchError, enqueue_review_task
 from app.services.task_events import record_task_event
 
 router = APIRouter(prefix='/api/v1', tags=['v1'])
+webhook_router = APIRouter(prefix='/api', tags=['webhooks'])
 ALLOWED_CONTENT_TYPES = {'image/jpeg', 'image/png', 'image/webp'}
 logger = logging.getLogger(__name__)
 GOOGLE_OAUTH_STATE_COOKIE = 'ps_google_oauth_state'
@@ -703,6 +716,35 @@ async def clerk_webhook(request: Request, db: Session = Depends(get_db)):
     if user_public_id:
         request.state.current_user_public_id = user_public_id
     return {'ok': True, 'event_type': event.type, 'outcome': outcome}
+
+
+@webhook_router.post('/webhook/lemonsqueezy')
+async def lemonsqueezy_webhook(request: Request, db: Session = Depends(get_db)):
+    event = await verify_lemonsqueezy_webhook(request)
+    event_record, duplicate = record_lemonsqueezy_webhook_event(db, event)
+    if duplicate:
+        db.commit()
+        return {'ok': True, 'event_name': event.event_name, 'outcome': 'duplicate'}
+
+    try:
+        outcome, user_public_id = process_lemonsqueezy_webhook_event(db, event)
+        event_record.outcome = outcome
+        event_record.processed_at = datetime.now(timezone.utc)
+        if user_public_id:
+            user = db.query(User).filter(User.public_id == user_public_id).first()
+            if user is not None:
+                event_record.user_id = user.id
+                request.state.current_user_public_id = user_public_id
+        db.add(event_record)
+        db.commit()
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception:
+        db.rollback()
+        raise
+
+    return {'ok': True, 'event_name': event.event_name, 'outcome': event_record.outcome}
 
 
 @router.post('/auth/guest/migrate', response_model=GuestReviewMigrateResponse)
@@ -1563,6 +1605,17 @@ def get_usage(request: Request, db: Session = Depends(get_db), actor: CurrentAct
         if actor.plan == UserPlan.guest
         else user_usage_snapshot(db, actor.user)
     )
+    subscription = None
+    if actor.plan == UserPlan.pro:
+        active_subscription = _active_subscription_for_user(db, actor.user)
+        if active_subscription is not None:
+            subscription = {
+                'status': active_subscription.status,
+                'cancelled': active_subscription.cancelled,
+                'renews_at': active_subscription.renews_at,
+                'ends_at': active_subscription.ends_at,
+                'current_period_ends_at': _current_period_ends_at(active_subscription),
+            }
     db.commit()
     return UsageResponse(
         plan=actor.plan.value,
@@ -1572,8 +1625,49 @@ def get_usage(request: Request, db: Session = Depends(get_db), actor: CurrentAct
             'history_retention_days': history_retention_days_for_plan(actor.plan),
             'priority_queue': has_priority_queue(actor.plan),
         },
+        subscription=subscription,
         rate_limit={},
     )
+
+
+def _subscription_portal_url(subscription: BillingSubscription) -> str | None:
+    candidates = (
+        subscription.customer_portal_update_subscription_url,
+        subscription.customer_portal_url,
+        subscription.update_payment_method_url,
+    )
+    for candidate in candidates:
+        if isinstance(candidate, str) and candidate.strip():
+            return candidate.strip()
+    return None
+
+
+def _subscription_grants_pro_access(subscription: BillingSubscription, *, now: datetime | None = None) -> bool:
+    current = now or datetime.now(timezone.utc)
+    status = (subscription.status or '').strip().lower()
+    if status in {'active', 'on_trial'}:
+        return True
+    if status == 'cancelled' and subscription.ends_at and subscription.ends_at > current:
+        return True
+    return False
+
+
+def _current_period_ends_at(subscription: BillingSubscription) -> datetime | None:
+    status = (subscription.status or '').strip().lower()
+    if status == 'cancelled' and subscription.ends_at is not None:
+        return subscription.ends_at
+    return subscription.renews_at or subscription.ends_at or subscription.trial_ends_at
+
+
+def _active_subscription_for_user(db: Session, user: User) -> BillingSubscription | None:
+    for item in (
+        db.query(BillingSubscription)
+        .filter(BillingSubscription.user_id == user.id, BillingSubscription.provider == 'lemonsqueezy')
+        .order_by(BillingSubscription.updated_at.desc(), BillingSubscription.id.desc())
+    ):
+        if _subscription_grants_pro_access(item):
+            return item
+    return None
 
 
 @router.post('/billing/checkout', response_model=BillingCheckoutResponse)
@@ -1582,19 +1676,64 @@ def create_billing_checkout(
     db: Session = Depends(get_db),
     actor: CurrentActor = Depends(get_current_actor),
 ):
-    db.commit()
+    if actor.plan == UserPlan.guest:
+        raise api_error(status.HTTP_403_FORBIDDEN, 'BILLING_SIGNIN_REQUIRED', 'Please sign in before starting checkout')
     if actor.plan == UserPlan.pro:
+        db.commit()
         return BillingCheckoutResponse(
             status='already_active',
             plan=payload.plan,
             message='Your account is already on Pro.',
             checkout_url=None,
         )
+    try:
+        checkout = create_checkout_for_user(actor.user)
+    except LemonSqueezyConfigurationError as exc:
+        raise api_error(status.HTTP_503_SERVICE_UNAVAILABLE, 'LEMONSQUEEZY_NOT_CONFIGURED', str(exc)) from exc
+    except LemonSqueezyAPIError as exc:
+        raise api_error(status.HTTP_502_BAD_GATEWAY, 'LEMONSQUEEZY_API_FAILED', str(exc)) from exc
+    db.commit()
     return BillingCheckoutResponse(
-        status='placeholder',
+        status='created',
         plan=payload.plan,
-        message='Payment integration placeholder: checkout is not enabled yet.',
-        checkout_url=None,
+        message='Checkout created successfully.',
+        checkout_url=checkout.checkout_url,
+    )
+
+
+@router.get('/billing/portal', response_model=BillingPortalResponse)
+def get_billing_portal(
+    db: Session = Depends(get_db),
+    actor: CurrentActor = Depends(get_current_actor),
+):
+    if actor.plan != UserPlan.pro:
+        raise api_error(status.HTTP_403_FORBIDDEN, 'BILLING_PORTAL_PRO_REQUIRED', 'Only Pro users can manage a subscription')
+
+    subscription = (
+        db.query(BillingSubscription)
+        .filter(
+            BillingSubscription.user_id == actor.user.id,
+            BillingSubscription.provider == 'lemonsqueezy',
+        )
+        .order_by(BillingSubscription.updated_at.desc(), BillingSubscription.id.desc())
+        .first()
+    )
+    if subscription is None:
+        raise api_error(status.HTTP_404_NOT_FOUND, 'BILLING_SUBSCRIPTION_NOT_FOUND', 'No subscription was found for this account')
+
+    portal_url = _subscription_portal_url(subscription)
+    if not portal_url:
+        raise api_error(
+            status.HTTP_409_CONFLICT,
+            'BILLING_PORTAL_UNAVAILABLE',
+            'Your subscription is active, but the billing portal link is not ready yet',
+        )
+
+    db.commit()
+    return BillingPortalResponse(
+        status='ready',
+        portal_url=portal_url,
+        message='Billing portal ready.',
     )
 
 

@@ -4,6 +4,7 @@ from datetime import date, datetime
 import enum
 
 from sqlalchemy import (
+    Boolean,
     BigInteger,
     CheckConstraint,
     Date,
@@ -209,6 +210,67 @@ class UsageLedger(Base):
     unit: Mapped[str] = mapped_column(Text, nullable=False)
     bill_date: Mapped[date] = mapped_column(Date, nullable=False)
     metadata_json: Mapped[dict] = mapped_column('metadata', JSONB, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class BillingSubscription(Base):
+    __tablename__ = 'billing_subscriptions'
+    __table_args__ = (
+        Index('uq_billing_subscriptions_provider_subscription', 'provider', 'provider_subscription_id', unique=True),
+        Index('idx_billing_subscriptions_user_provider', 'user_id', 'provider'),
+        Index('idx_billing_subscriptions_status_updated', 'status', 'updated_at'),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('users.id'), nullable=False)
+    provider: Mapped[str] = mapped_column(Text, nullable=False, default='lemonsqueezy')
+    provider_customer_id: Mapped[str | None] = mapped_column(Text)
+    provider_order_id: Mapped[str | None] = mapped_column(Text)
+    provider_subscription_id: Mapped[str | None] = mapped_column(Text)
+    store_id: Mapped[str | None] = mapped_column(Text)
+    product_id: Mapped[str | None] = mapped_column(Text)
+    variant_id: Mapped[str | None] = mapped_column(Text)
+    product_name: Mapped[str | None] = mapped_column(Text)
+    variant_name: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(Text, nullable=False, default='pending')
+    user_email: Mapped[str | None] = mapped_column(Text)
+    cancelled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default='false')
+    test_mode: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default='false')
+    renews_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    trial_ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    update_payment_method_url: Mapped[str | None] = mapped_column(Text)
+    customer_portal_url: Mapped[str | None] = mapped_column(Text)
+    customer_portal_update_subscription_url: Mapped[str | None] = mapped_column(Text)
+    last_event_name: Mapped[str | None] = mapped_column(Text)
+    last_event_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_invoice_id: Mapped[str | None] = mapped_column(Text)
+    last_payment_status: Mapped[str | None] = mapped_column(Text)
+    last_payment_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    raw_payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class BillingWebhookEvent(Base):
+    __tablename__ = 'billing_webhook_events'
+    __table_args__ = (
+        Index('uq_billing_webhook_events_provider_hash', 'provider', 'event_hash', unique=True),
+        Index('idx_billing_webhook_events_provider_created', 'provider', 'created_at'),
+        Index('idx_billing_webhook_events_event_name_created', 'event_name', 'created_at'),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    provider: Mapped[str] = mapped_column(Text, nullable=False, default='lemonsqueezy')
+    event_name: Mapped[str] = mapped_column(Text, nullable=False)
+    event_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    resource_type: Mapped[str | None] = mapped_column(Text)
+    resource_id: Mapped[str | None] = mapped_column(Text)
+    test_mode: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default='false')
+    outcome: Mapped[str | None] = mapped_column(Text)
+    user_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey('users.id'))
+    payload_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 

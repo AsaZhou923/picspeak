@@ -31,6 +31,13 @@ export interface UsageResponse {
     history_retention_days: number | null;
     priority_queue: boolean;
   };
+  subscription: {
+    status: string;
+    cancelled: boolean;
+    renews_at: string | null;
+    ends_at: string | null;
+    current_period_ends_at: string | null;
+  } | null;
   rate_limit: {
     limit_per_min: number;
     remaining: number;
@@ -39,10 +46,16 @@ export interface UsageResponse {
 }
 
 export interface BillingCheckoutResponse {
-  status: 'placeholder' | 'already_active';
+  status: 'created' | 'already_active';
   plan: 'pro';
   message: string;
   checkout_url: string | null;
+}
+
+export interface BillingPortalResponse {
+  status: string;
+  portal_url: string | null;
+  message: string;
 }
 
 // ─── Upload ──────────────────────────────────────────────────────────────────

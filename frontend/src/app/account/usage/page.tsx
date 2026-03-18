@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { AlertCircle, ArrowRight, Mail, X } from 'lucide-react';
-import { createBillingCheckout, getUsage } from '@/lib/api';
+import { createBillingCheckout, getBillingPortal, getUsage } from '@/lib/api';
 import ClerkSignInTrigger from '@/components/auth/ClerkSignInTrigger';
 import { useAuth } from '@/lib/auth-context';
 import { planColor, planLabel } from '@/lib/auth-context';
-import { ApiException, BillingCheckoutResponse, UsageResponse } from '@/lib/types';
+import { ApiException, BillingCheckoutResponse, BillingPortalResponse, UsageResponse } from '@/lib/types';
 import { SkeletonBlock } from '@/components/ui/LoadingSpinner';
 import { useI18n } from '@/lib/i18n';
 
@@ -42,14 +43,22 @@ function UsageBar({
 }
 
 export default function UsagePage() {
-  const { ensureToken, userInfo } = useAuth();
-  const { t } = useI18n();
+  const router = useRouter();
+  const { ensureToken, userInfo, syncPlan } = useAuth();
+  const { locale, t } = useI18n();
   const [usage, setUsage] = useState<UsageResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [checkoutMessage, setCheckoutMessage] = useState('');
-  const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
+  const [billingMessage, setBillingMessage] = useState('');
+  const [billingModalOpen, setBillingModalOpen] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [portalLoading, setPortalLoading] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('checkout') === 'success') {
+      router.replace('/payment-success');
+    }
+  }, [router]);
 
   useEffect(() => {
     if (!userInfo) {
@@ -60,6 +69,7 @@ export default function UsagePage() {
     ensureToken()
       .then((token) => getUsage(token))
       .then((data) => {
+        syncPlan(data.plan);
         setUsage(data);
         setError('');
         setLoading(false);
@@ -73,25 +83,53 @@ export default function UsagePage() {
           setError(t('usage_error'));
         }
       });
-  }, [ensureToken, userInfo?.access_token, t]);
+  }, [ensureToken, syncPlan, userInfo?.access_token, t]);
 
   async function handleCheckout() {
     setCheckoutLoading(true);
-    setCheckoutMessage('');
+    setBillingMessage('');
     try {
       const token = await ensureToken();
       const response: BillingCheckoutResponse = await createBillingCheckout(token, 'pro');
-      setCheckoutMessage(response.message);
-      setCheckoutModalOpen(true);
+      if (response.checkout_url) {
+        window.location.assign(response.checkout_url);
+        return;
+      }
+      setBillingMessage(response.message);
+      setBillingModalOpen(true);
     } catch (err) {
       if (err instanceof ApiException) {
-        setCheckoutMessage(err.message);
+        setBillingMessage(err.message);
       } else {
-        setCheckoutMessage(t('usage_checkout_unavailable'));
+        setBillingMessage(t('usage_checkout_unavailable'));
       }
-      setCheckoutModalOpen(true);
+      setBillingModalOpen(true);
     } finally {
       setCheckoutLoading(false);
+    }
+  }
+
+  async function handleManageSubscription() {
+    setPortalLoading(true);
+    setBillingMessage('');
+    try {
+      const token = await ensureToken();
+      const response: BillingPortalResponse = await getBillingPortal(token);
+      if (response.portal_url) {
+        window.location.assign(response.portal_url);
+        return;
+      }
+      setBillingMessage(response.message);
+      setBillingModalOpen(true);
+    } catch (err) {
+      if (err instanceof ApiException) {
+        setBillingMessage(err.message);
+      } else {
+        setBillingMessage(t('usage_manage_unavailable'));
+      }
+      setBillingModalOpen(true);
+    } finally {
+      setPortalLoading(false);
     }
   }
 
@@ -103,6 +141,7 @@ export default function UsagePage() {
         : `${usage?.features.history_retention_days} ${t('usage_history_days')}`;
   const reviewModesText =
     usage?.features.review_modes.includes('pro') ? t('plan_free_feature') : t('plan_guest_feature');
+  const subscriptionEndText = formatSubscriptionDate(usage?.subscription?.current_period_ends_at, locale) ?? subscriptionCopy[locale].pending;
 
   return (
     <div className="pt-14 min-h-screen">
@@ -138,6 +177,15 @@ export default function UsagePage() {
                       {userInfo.user_id}
                     </p>
                   )}
+                  {usage.plan === 'pro' && (
+                    <div className="mt-3 space-y-1">
+                      <p className="text-xs text-ink-muted">{subscriptionCopy[locale].label}</p>
+                      <p className="text-sm text-ink">{subscriptionEndText}</p>
+                      {usage.subscription?.cancelled && (
+                        <p className="text-xs text-gold/80">{subscriptionCopy[locale].cancelledHint}</p>
+                      )}
+                    </div>
+                  )}
                 </div>
                 {usage.plan === 'guest' ? (
                   <ClerkSignInTrigger
@@ -155,6 +203,16 @@ export default function UsagePage() {
                     className="flex items-center gap-1.5 text-xs text-gold border border-gold/30 rounded px-3 py-1.5 hover:bg-gold/10 transition-colors disabled:opacity-60"
                   >
                     {checkoutLoading ? t('usage_checkout_loading') : t('usage_checkout_pro')}
+                    <ArrowRight size={11} />
+                  </button>
+                ) : usage.plan === 'pro' ? (
+                  <button
+                    type="button"
+                    onClick={handleManageSubscription}
+                    disabled={portalLoading}
+                    className="flex items-center gap-1.5 text-xs text-gold border border-gold/30 rounded px-3 py-1.5 hover:bg-gold/10 transition-colors disabled:opacity-60"
+                  >
+                    {portalLoading ? t('usage_manage_loading') : t('usage_manage_subscription')}
                     <ArrowRight size={11} />
                   </button>
                 ) : null}
@@ -266,10 +324,10 @@ export default function UsagePage() {
         </div>
       </div>
 
-      {checkoutModalOpen && (
+      {billingModalOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center px-6"
-          onClick={() => setCheckoutModalOpen(false)}
+          onClick={() => setBillingModalOpen(false)}
         >
           <div className="absolute inset-0 bg-void/80 backdrop-blur-sm" />
           <div
@@ -278,7 +336,7 @@ export default function UsagePage() {
           >
             <button
               type="button"
-              onClick={() => setCheckoutModalOpen(false)}
+              onClick={() => setBillingModalOpen(false)}
               className="absolute top-4 right-4 text-ink-muted hover:text-ink transition-colors"
               aria-label="Close"
             >
@@ -286,8 +344,10 @@ export default function UsagePage() {
             </button>
 
             <div className="mb-5">
-              <p className="text-xs text-gold/70 font-mono mb-3 tracking-widest uppercase">Pro Upgrade</p>
-              <p className="text-sm text-ink leading-relaxed">{t('billing_payment_placeholder')}</p>
+              <p className="text-xs text-gold/70 font-mono mb-3 tracking-widest uppercase">Billing</p>
+              <p className="text-sm text-ink leading-relaxed">
+                {billingMessage || t('billing_payment_placeholder')}
+              </p>
             </div>
 
             <div className="border-t border-border-subtle pt-5">
@@ -328,6 +388,49 @@ export default function UsagePage() {
       )}
     </div>
   );
+}
+
+const subscriptionCopy = {
+  zh: {
+    label: 'Pro 到期时间',
+    pending: '等待同步',
+    cancelledHint: '已取消自动续费，到期后将降级。',
+  },
+  en: {
+    label: 'Pro expires on',
+    pending: 'Syncing…',
+    cancelledHint: 'Auto-renew is off and the plan will downgrade at the end of the term.',
+  },
+  ja: {
+    label: 'Pro の終了日時',
+    pending: '同期中',
+    cancelledHint: '自動更新は停止済みで、期間終了後にダウングレードされます。',
+  },
+} as const;
+
+function formatSubscriptionDate(value: string | null | undefined, locale: 'zh' | 'en' | 'ja'): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  const localeMap = {
+    zh: 'zh-CN',
+    en: 'en-US',
+    ja: 'ja-JP',
+  } as const;
+
+  return new Intl.DateTimeFormat(localeMap[locale], {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
 }
 
 function XBrandIcon() {
