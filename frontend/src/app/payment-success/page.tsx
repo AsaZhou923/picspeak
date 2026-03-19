@@ -5,9 +5,10 @@ import Link from 'next/link';
 import { ArrowRight, CheckCircle2 } from 'lucide-react';
 import { getUsage } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
-import { ApiException, UsageResponse } from '@/lib/types';
+import { UsageResponse } from '@/lib/types';
 import { SkeletonBlock } from '@/components/ui/LoadingSpinner';
 import { useI18n } from '@/lib/i18n';
+import { formatUserFacingError } from '@/lib/error-utils';
 
 export default function PaymentSuccessPage() {
   const { ensureToken, syncPlan } = useAuth();
@@ -47,11 +48,7 @@ export default function PaymentSuccessPage() {
         }
         setUsage(null);
         setLoading(false);
-        if (err instanceof ApiException) {
-          setError(err.message);
-        } else {
-          setError(t('payment_success_error'));
-        }
+        setError(formatUserFacingError(t, err, t('payment_success_error')));
       }
     }
 

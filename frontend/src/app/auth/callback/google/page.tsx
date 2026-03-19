@@ -8,6 +8,7 @@ import { useI18n } from '@/lib/i18n';
 import { AuthToken } from '@/lib/types';
 import { migrateGuestReviews } from '@/lib/api';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import { formatUserFacingError } from '@/lib/error-utils';
 
 type Status = 'processing' | 'migrate_prompt' | 'migrating' | 'done' | 'error';
 
@@ -90,12 +91,14 @@ function GoogleCallbackInner() {
     try {
       const result = await migrateGuestReviews(accessToken);
       setMigratedCount(result.migrated_reviews);
-    } catch {
-      // migration failed silently — still go to workspace
+    } catch (err) {
+      setStatus('error');
+      setErrorMsg(formatUserFacingError(t, err, t('auth_migrate_failed')));
+      return;
     }
     setStatus('done');
     setTimeout(goWorkspace, 1800);
-  }, [accessToken, goWorkspace]);
+  }, [accessToken, goWorkspace, t]);
 
   const handleSkip = useCallback(() => {
     goWorkspace();

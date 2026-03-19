@@ -8,9 +8,10 @@ import { createBillingCheckout, getBillingPortal, getUsage } from '@/lib/api';
 import ClerkSignInTrigger from '@/components/auth/ClerkSignInTrigger';
 import { useAuth } from '@/lib/auth-context';
 import { planColor, planLabel } from '@/lib/auth-context';
-import { ApiException, BillingCheckoutResponse, BillingPortalResponse, UsageResponse } from '@/lib/types';
+import { BillingCheckoutResponse, BillingPortalResponse, UsageResponse } from '@/lib/types';
 import { SkeletonBlock } from '@/components/ui/LoadingSpinner';
 import { useI18n } from '@/lib/i18n';
+import { formatUserFacingError } from '@/lib/error-utils';
 
 function UsageBar({
   label,
@@ -77,11 +78,7 @@ export default function UsagePage() {
       .catch((err) => {
         setUsage(null);
         setLoading(false);
-        if (err instanceof ApiException) {
-          setError(err.message);
-        } else {
-          setError(t('usage_error'));
-        }
+        setError(formatUserFacingError(t, err, t('usage_error')));
       });
   }, [ensureToken, syncPlan, userInfo?.access_token, t]);
 
@@ -98,11 +95,7 @@ export default function UsagePage() {
       setBillingMessage(response.message);
       setBillingModalOpen(true);
     } catch (err) {
-      if (err instanceof ApiException) {
-        setBillingMessage(err.message);
-      } else {
-        setBillingMessage(t('usage_checkout_unavailable'));
-      }
+      setBillingMessage(formatUserFacingError(t, err, t('usage_checkout_unavailable')));
       setBillingModalOpen(true);
     } finally {
       setCheckoutLoading(false);
@@ -122,11 +115,7 @@ export default function UsagePage() {
       setBillingMessage(response.message);
       setBillingModalOpen(true);
     } catch (err) {
-      if (err instanceof ApiException) {
-        setBillingMessage(err.message);
-      } else {
-        setBillingMessage(t('usage_manage_unavailable'));
-      }
+      setBillingMessage(formatUserFacingError(t, err, t('usage_manage_unavailable')));
       setBillingModalOpen(true);
     } finally {
       setPortalLoading(false);

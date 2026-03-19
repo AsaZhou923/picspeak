@@ -8,10 +8,11 @@ import { ArrowLeft, History, RotateCcw, AlertCircle, ThumbsUp, ThumbsDown, Alert
 import { getReview, getUsage } from '@/lib/api';
 import ClerkSignInTrigger from '@/components/auth/ClerkSignInTrigger';
 import { useAuth } from '@/lib/auth-context';
-import { ReviewGetResponse, ApiException, ReviewScores, UsageResponse } from '@/lib/types';
+import { ReviewGetResponse, ReviewScores, UsageResponse } from '@/lib/types';
 import { FinalScoreRing } from '@/components/ui/ScoreRing';
 import { SkeletonBlock } from '@/components/ui/LoadingSpinner';
 import { useI18n } from '@/lib/i18n';
+import { formatUserFacingError } from '@/lib/error-utils';
 
 // ─── Score helpers ────────────────────────────────────────────────────────────
 
@@ -667,6 +668,7 @@ export default function ReviewPage() {
   const [activeDim, setActiveDim] = useState<string | null>(null);
   const [highlightedCardId, setHighlightedCardId] = useState<string | null>(null);
   const [usage, setUsage] = useState<UsageResponse | null>(null);
+  const [usageError, setUsageError] = useState('');
   const [imgNaturalSize, setImgNaturalSize] = useState<{ w: number; h: number } | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
   const rightColRef = useRef<HTMLDivElement>(null);
@@ -700,21 +702,23 @@ export default function ReviewPage() {
       })
       .catch((err) => {
         setLoading(false);
-        if (err instanceof ApiException) {
-          setError(err.message);
-        } else {
-          setError(t('review_err_fetch'));
-        }
+        setError(formatUserFacingError(t, err, t('review_err_fetch')));
       });
-  }, [reviewId, ensureToken]);
+  }, [reviewId, ensureToken, t]);
 
-  // Fetch usage info for quota-low conversion banner (silently ignore failures)
+  // Fetch usage info for quota-low conversion banner and record failures explicitly.
   useEffect(() => {
     ensureToken()
       .then((token) => getUsage(token))
-      .then(setUsage)
-      .catch(() => {});
-  }, [ensureToken]);
+      .then((data) => {
+        setUsage(data);
+        setUsageError('');
+      })
+      .catch((err) => {
+        console.error('Failed to fetch usage on review page', err);
+        setUsageError(formatUserFacingError(t, err, t('usage_error')));
+      });
+  }, [ensureToken, t]);
 
   // Click a score dimension → scroll to the best matching tagged suggestion.
   // Tries each tag candidate for the dimension in priority order until a card is found.
@@ -863,6 +867,13 @@ export default function ReviewPage() {
           <ArrowLeft size={12} />
           {backLabel}
         </button>
+
+        {usageError && (
+          <div className="mb-6 flex items-center gap-2 text-rust text-sm bg-rust/5 border border-rust/20 rounded px-4 py-3">
+            <AlertCircle size={14} className="shrink-0" />
+            <span>{usageError}</span>
+          </div>
+        )}
 
         {/* ── Score hero strip ─────────────────────────────────────────────── */}
         <div className="mb-6 rounded-xl border border-border-subtle bg-raised/50 px-6 py-5 flex items-center gap-5">

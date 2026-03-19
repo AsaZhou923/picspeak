@@ -180,6 +180,8 @@ const translations = {
     usage_goto_workspace: '前往评图工作台',
     billing_payment_placeholder: '暂时无法打开支付页面，请稍后重试；如果问题持续存在，请联系我协助处理。',
     billing_contact_prompt: '如有需要请联系我，我会尽快为您处理。',
+    support_contact_prompt: '如问题持续，请联系我协助处理。',
+    support_request_id: '请求编号：{id}',
     payment_success_label: '支付成功',
     payment_success_headline: '你的支付已经完成',
     payment_success_body: 'Pro 已经激活，现在可以返回额度页管理订阅，或直接继续评图。',
@@ -254,6 +256,7 @@ const translations = {
     auth_migrate_body: '检测到你之前以游客身份进行了分析，是否将最近的记录迁移到你的账户？',
     auth_migrate_confirm: '迁移记录',
     auth_migrate_skip: '跳过',
+    auth_migrate_failed: '游客记录迁移失败，请暂时不要继续操作。',
     auth_migrating_body: '正在迁移游客记录…',
     auth_migrate_done: '已迁移 {count} 条分析记录，正在跳转…',
     auth_migrate_none: '暂无游客记录，正在跳转…',
@@ -532,6 +535,8 @@ const translations = {
     usage_goto_workspace: 'Go to Workspace',
     billing_payment_placeholder: 'Unable to open checkout right now. Please try again shortly, or reach out if the issue persists.',
     billing_contact_prompt: 'If you need help, feel free to reach out and I will get back to you as soon as possible.',
+    support_contact_prompt: 'If the issue continues, please contact me for help.',
+    support_request_id: 'Request ID: {id}',
     payment_success_label: 'Payment Success',
     payment_success_headline: 'Your payment is complete',
     payment_success_body: 'Pro is active now. You can return to your usage page to manage the subscription, or head back to the workspace.',
@@ -606,6 +611,7 @@ const translations = {
     auth_migrate_body: 'We found analyses from your guest session. Would you like to import them into your account?',
     auth_migrate_confirm: 'Import',
     auth_migrate_skip: 'Skip',
+    auth_migrate_failed: 'We could not import your guest analyses. Please do not continue until we check it.',
     auth_migrating_body: 'Importing guest analyses…',
     auth_migrate_done: '{count} analyses imported. Redirecting…',
     auth_migrate_none: 'No guest analyses found. Redirecting…',
@@ -884,6 +890,8 @@ const translations = {
     usage_goto_workspace: 'ワークスペースへ',
     billing_payment_placeholder: '今はチェックアウトを開けません。少し待って再試行するか、必要であればご連絡ください。',
     billing_contact_prompt: 'ご不明な点がございましたら、お気軽にご連絡ください。できる限り早くご対応いたします。',
+    support_contact_prompt: '問題が続く場合は、ご連絡ください。',
+    support_request_id: 'リクエストID：{id}',
     payment_success_label: '支払い完了',
     payment_success_headline: '支払いが完了しました',
     payment_success_body: 'Pro は有効になりました。使用状況ページでサブスクを管理するか、そのまま評価を続けられます。',
@@ -958,6 +966,7 @@ const translations = {
     auth_migrate_body: 'ゲストとして行った分析が見つかりました。アカウントに引き継ぎますか？',
     auth_migrate_confirm: '引き継ぐ',
     auth_migrate_skip: 'スキップ',
+    auth_migrate_failed: 'ゲスト履歴の引き継ぎに失敗しました。確認が終わるまで続行しないでください。',
     auth_migrating_body: 'ゲスト履歴をインポート中…',
     auth_migrate_done: '{count} 件の分析をインポートしました。移動します…',
     auth_migrate_none: 'インポートするゲスト記録がありません。移動します…',
@@ -1073,13 +1082,14 @@ const translations = {
 } as const;
 
 export type TranslationKey = keyof typeof translations['zh'];
+export type Translator = (key: TranslationKey) => string;
 
 // ─── Context ──────────────────────────────────────────────────────────────────
 
 interface I18nContextValue {
   locale: Locale;
   setLocale: (l: Locale) => void;
-  t: (key: TranslationKey) => string;
+  t: Translator;
 }
 
 const I18nContext = createContext<I18nContextValue>({

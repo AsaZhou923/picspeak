@@ -279,9 +279,16 @@ def _counter_hit_count(
     return int(counter.hit_count) if counter else 0
 
 
-def guest_rate_limit_scope_key(request: Request) -> str:
-    key_basis = device_key_from_request(request) or client_ip_from_request(request) or 'anonymous'
-    hashed_basis = hashlib.sha256(key_basis.encode('utf-8')).hexdigest()
+def guest_rate_limit_scope_key(request: Request, user: User | None = None) -> str:
+    key_basis = device_key_from_request(request) or client_ip_from_request(request)
+    if key_basis:
+        hashed_basis = hashlib.sha256(key_basis.encode('utf-8')).hexdigest()
+        return f'guest:{hashed_basis}'
+
+    if user is not None and user.plan == UserPlan.guest and user.public_id.strip():
+        return f'guest_user:{user.public_id.strip()}'
+
+    hashed_basis = hashlib.sha256('anonymous'.encode('utf-8')).hexdigest()
     return f'guest:{hashed_basis}'
 
 

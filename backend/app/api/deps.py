@@ -123,7 +123,6 @@ def get_current_actor(
     guest_cookie_token: str | None = Cookie(default=None, alias=GUEST_TOKEN_COOKIE),
 ) -> CurrentActor:
     endpoint = request.url.path
-    scope_key = guest_rate_limit_scope_key(request)
     token: str | None = None
     if authorization:
         token = _extract_bearer_token(authorization)
@@ -134,7 +133,7 @@ def get_current_actor(
         user = _fetch_user_by_token(token, db)
         request.state.current_user_public_id = user.public_id
         actor = CurrentActor(user)
-        enforce_guest_api_rate_limit(db, actor, endpoint, scope_key)
+        enforce_guest_api_rate_limit(db, actor, endpoint, guest_rate_limit_scope_key(request, user))
         _touch_user_login(user, db)
         return actor
 
@@ -143,5 +142,5 @@ def get_current_actor(
     token = issue_guest_token(user)
     bind_guest_token(response, token)
     actor = CurrentActor(user)
-    enforce_guest_api_rate_limit(db, actor, endpoint, scope_key)
+    enforce_guest_api_rate_limit(db, actor, endpoint, guest_rate_limit_scope_key(request, user))
     return actor

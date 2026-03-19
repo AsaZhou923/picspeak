@@ -5,11 +5,12 @@ import Link from 'next/link';
 import { AlertCircle, ChevronRight, RefreshCw } from 'lucide-react';
 import { getMyReviews } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
-import { ReviewHistoryItem, ApiException } from '@/lib/types';
+import { ReviewHistoryItem } from '@/lib/types';
 import { ModeBadge, StatusBadge } from '@/components/ui/Badge';
 import CachedThumbnail from '@/components/ui/CachedThumbnail';
 import { SkeletonBlock } from '@/components/ui/LoadingSpinner';
 import { useI18n } from '@/lib/i18n';
+import { formatUserFacingError } from '@/lib/error-utils';
 
 // ─── Score bar ────────────────────────────────────────────────────────────────
 
@@ -116,12 +117,10 @@ export default function ReviewHistoryPage() {
         setCursor(data.next_cursor);
         setHasMore(data.next_cursor !== null);
       } catch (err) {
-        const msg =
-          err instanceof ApiException ? err.message : t('reviews_err_fetch');
-        setError(msg);
+        setError(formatUserFacingError(t, err, t('reviews_err_fetch')));
       }
     },
-    [ensureToken]
+    [ensureToken, t]
   );
 
   useEffect(() => {
