@@ -40,8 +40,27 @@ def _user(*, plan: UserPlan, public_id: str, daily_quota_used: int = 0) -> User:
 
 
 class GuestQuotaScopeTests(unittest.TestCase):
-    def test_guest_scope_uses_guest_user_id_when_available(self) -> None:
+    def test_guest_scope_prefers_stable_request_fingerprint_even_with_guest_user(self) -> None:
         request = _request(user_agent='SharedAgent/1.0', client_host='203.0.113.10')
+        guest = _user(plan=UserPlan.guest, public_id='gst_abc123')
+
+        scope_key = guest_rate_limit_scope_key(request, guest)
+
+        self.assertTrue(scope_key.startswith('guest:'))
+        self.assertNotEqual(scope_key, 'guest_user:gst_abc123')
+
+    def test_guest_scope_falls_back_to_guest_user_when_request_fingerprint_missing(self) -> None:
+        request = Request(
+            {
+                'type': 'http',
+                'method': 'GET',
+                'path': '/api/v1/me/usage',
+                'headers': [],
+                'scheme': 'http',
+                'server': ('testserver', 80),
+                'query_string': b'',
+            }
+        )
         guest = _user(plan=UserPlan.guest, public_id='gst_abc123')
 
         scope_key = guest_rate_limit_scope_key(request, guest)
