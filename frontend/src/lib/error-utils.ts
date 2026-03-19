@@ -1,8 +1,7 @@
 'use client';
 
+import { Translator } from './i18n';
 import { ApiException } from './types';
-
-type Translator = (key: string) => string;
 
 export function formatSupportMessage(
   t: Translator,

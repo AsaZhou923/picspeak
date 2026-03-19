@@ -1082,13 +1082,14 @@ const translations = {
 } as const;
 
 export type TranslationKey = keyof typeof translations['zh'];
+export type Translator = (key: TranslationKey) => string;
 
 // ─── Context ──────────────────────────────────────────────────────────────────
 
 interface I18nContextValue {
   locale: Locale;
   setLocale: (l: Locale) => void;
-  t: (key: TranslationKey) => string;
+  t: Translator;
 }
 
 const I18nContext = createContext<I18nContextValue>({
