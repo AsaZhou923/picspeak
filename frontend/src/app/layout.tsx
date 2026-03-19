@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Cormorant_Garamond, DM_Sans, JetBrains_Mono } from 'next/font/google';
+import Script from 'next/script';
 import { ClerkProvider } from '@clerk/nextjs';
 import './globals.css';
 import { AuthProvider } from '@/lib/auth-context';
@@ -102,6 +103,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           dangerouslySetInnerHTML={{
             __html: `(function(){try{var s=localStorage.getItem('picspeak-theme');var p=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';if((s||p)==='dark')document.documentElement.classList.add('dark');}catch(e){}})();`,
           }}
+        />
+        <Script id="lemonsqueezy-affiliate-config" strategy="beforeInteractive">
+          {`window.lemonSqueezyAffiliateConfig = { store: "picspeak" };`}
+        </Script>
+        <Script
+          id="lemonsqueezy-affiliate-sdk"
+          src="https://lmsqueezy.com/affiliate.js"
+          strategy="afterInteractive"
         />
       </head>
       <body className="text-ink min-h-screen">
