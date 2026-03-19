@@ -11,6 +11,7 @@ import { useAuth } from '@/lib/auth-context';
 import { ReviewGetResponse, ReviewScores, UsageResponse } from '@/lib/types';
 import { FinalScoreRing } from '@/components/ui/ScoreRing';
 import { SkeletonBlock } from '@/components/ui/LoadingSpinner';
+import { isDemoReviewId } from '@/lib/demo-review';
 import { useI18n } from '@/lib/i18n';
 import { formatUserFacingError } from '@/lib/error-utils';
 
@@ -656,8 +657,6 @@ export default function ReviewPage() {
   const backLabel = backHref === '/account/reviews' ? t('review_back_history') : t('review_back_workspace');
   const { ensureToken, userInfo } = useAuth();
 
-  const DEMO_REVIEW_ID = 'rev_35e0951d0df94a1e';
-
   const [review, setReview] = useState<ReviewGetResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -787,7 +786,7 @@ export default function ReviewPage() {
 
   const r = review.result;
   const isPro = review.mode === 'pro';
-  const isDemoReview = reviewId === DEMO_REVIEW_ID;
+  const isDemoReview = isDemoReviewId(reviewId);
   const displayAdvantage   = isDemoReview ? t('demo_review_advantage') : r.advantage;
   const displayCritique    = isDemoReview ? t('demo_review_critique') : r.critique;
   const displaySuggestions = isDemoReview ? t('demo_review_suggestions') : r.suggestions;

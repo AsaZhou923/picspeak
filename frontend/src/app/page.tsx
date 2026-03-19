@@ -7,6 +7,7 @@ import { ArrowRight, Aperture, Zap, Star, BarChart2, Mail, ChevronDown } from 'l
 import { useState } from 'react';
 import ScoreRing from '@/components/ui/ScoreRing';
 import ClerkSignInTrigger from '@/components/auth/ClerkSignInTrigger';
+import { DEMO_IMAGE_URL, DEMO_REVIEW_ID } from '@/lib/demo-review';
 import { useI18n } from '@/lib/i18n';
 import { siteConfig } from '@/lib/site';
 
@@ -17,10 +18,6 @@ const DEMO_SCORES_KEYS = [
   { labelKey: 'score_impact' as const, score: 7 },
   { labelKey: 'score_technical' as const, score: 6 },
 ];
-
-const DEMO_IMAGE_URL =
-  'https://pub-7ae066210514433e84a850bc95c5f1a2.r2.dev/user_108706949454492657694/2026/03/obj_4fea1f667283448c.jpg';
-const DEMO_REVIEW_ID = 'rev_8424d4fbde054759';
 
 export default function HomePage() {
   const { t, locale } = useI18n();
@@ -150,7 +147,7 @@ export default function HomePage() {
               <div className="relative w-28 sm:w-36 shrink-0">
                 <Image
                   src={DEMO_IMAGE_URL}
-                  alt="Sample critique — autumn ginkgo trees against blue sky"
+                  alt={t('demo_image_alt')}
                   fill
                   className="object-cover"
                   sizes="144px"

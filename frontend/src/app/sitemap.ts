@@ -1,4 +1,5 @@
 import type { MetadataRoute } from 'next';
+import { DEMO_REVIEW_ID } from '@/lib/demo-review';
 import { siteConfig } from '@/lib/site';
 
 export default function sitemap(): MetadataRoute.Sitemap {
@@ -19,7 +20,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     },
     {
       // Canonical public example of an AI photo critique result
-      url: `${siteConfig.url}/reviews/rev_35e0951d0df94a1e`,
+      url: `${siteConfig.url}/reviews/${DEMO_REVIEW_ID}`,
       lastModified: new Date('2026-03-08'),
       changeFrequency: 'monthly',
       priority: 0.8,
