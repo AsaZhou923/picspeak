@@ -1231,11 +1231,11 @@ def create_review(
             return response_sync
 
     if actor.plan == UserPlan.guest:
-        enforce_guest_review_limits(db, actor, guest_rate_limit_scope_key(request))
+        enforce_guest_review_limits(db, actor, guest_rate_limit_scope_key(request, actor.user))
     else:
         enforce_user_quota(db, actor.user, mode=mode_enum)
 
-    guest_scope_key = guest_rate_limit_scope_key(request) if actor.plan == UserPlan.guest else None
+    guest_scope_key = guest_rate_limit_scope_key(request, actor.user) if actor.plan == UserPlan.guest else None
 
     if payload.async_mode:
         task_payload = payload.model_dump(by_alias=True)
@@ -1611,7 +1611,7 @@ def get_photo_thumbnail(
 @router.get('/me/usage', response_model=UsageResponse)
 def get_usage(request: Request, db: Session = Depends(get_db), actor: CurrentActor = Depends(get_current_actor)):
     quota = (
-        guest_usage_snapshot(db, guest_rate_limit_scope_key(request))
+        guest_usage_snapshot(db, guest_rate_limit_scope_key(request, actor.user))
         if actor.plan == UserPlan.guest
         else user_usage_snapshot(db, actor.user)
     )

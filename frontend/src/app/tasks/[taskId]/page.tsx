@@ -7,6 +7,7 @@ import { buildTaskWebSocketUrl, getTask } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useI18n } from '@/lib/i18n';
 import { ApiException, TaskStatusResponse, TaskStreamMessage } from '@/lib/types';
+import { formatSupportMessage, formatUserFacingError } from '@/lib/error-utils';
 
 const POLL_INTERVAL = 1000;
 const HEARTBEAT_STALE_MS = 3 * 60 * 1000;
@@ -128,16 +129,16 @@ export default function TaskPage() {
         if (err.code === 'TASK_NOT_FOUND') {
           const withinGraceWindow = Date.now() - pageStartedAtRef.current < INITIAL_TASK_LOOKUP_GRACE_MS;
           const hasTaskSnapshot = taskRef.current !== null;
-          if (!withinGraceWindow || hasTaskSnapshot) {
-            errorTerminalRef.current = true;
-            if (wsRef.current) wsRef.current.close();
-            setError(err.message);
-            return;
+            if (!withinGraceWindow || hasTaskSnapshot) {
+              errorTerminalRef.current = true;
+              if (wsRef.current) wsRef.current.close();
+              setError(formatUserFacingError(t, err, err.message));
+              return;
+            }
           }
-        }
-        setTransientError(err.message);
+        setTransientError(formatUserFacingError(t, err, err.message));
       } else {
-        setTransientError(t('task_fetch_error'));
+        setTransientError(formatUserFacingError(t, err, t('task_fetch_error')));
       }
     } finally {
       if (!finalRef.current && !errorTerminalRef.current && !wsConnectedRef.current) {
@@ -180,11 +181,11 @@ export default function TaskPage() {
               const hasTaskSnapshot = taskRef.current !== null;
               if (!withinGraceWindow || hasTaskSnapshot) {
                 errorTerminalRef.current = true;
-                setError(message.error.message);
+                setError(formatUserFacingError(t, new ApiException(404, 'TASK_NOT_FOUND', message.error.message), message.error.message));
                 return;
               }
             }
-            setTransientError(message.error.message);
+            setTransientError(formatUserFacingError(t, new ApiException(500, 'TASK_STREAM_ERROR', message.error.message), message.error.message));
           }
         };
 
@@ -205,8 +206,11 @@ export default function TaskPage() {
             poll();
           }
         };
-      } catch {
-        if (!cancelled) poll();
+      } catch (err) {
+        if (!cancelled) {
+          console.error('Failed to connect task websocket', err);
+          poll();
+        }
       }
     };
 
@@ -220,7 +224,7 @@ export default function TaskPage() {
       if (wsRef.current) wsRef.current.close();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [taskId]);
+  }, [taskId, ensureToken, t]);
 
   const stageInfo = task
     ? task.status === 'FAILED'
@@ -235,6 +239,13 @@ export default function TaskPage() {
   const isSuccess = task?.status === 'SUCCEEDED';
   const activeStepIdx = task ? getActiveStep(task.progress, task.status) : 0;
   const activeStep = STEPS[activeStepIdx];
+  const taskErrorMessage =
+    task?.error
+      ? formatSupportMessage(
+          t,
+          String((task.error as Record<string, unknown>).message ?? t('err_unknown_title'))
+        )
+      : '';
 
   return (
     <div className="pt-14 min-h-screen flex items-center justify-center px-6">
@@ -324,7 +335,7 @@ export default function TaskPage() {
         )}
         {task?.error && (
           <p className="text-sm text-rust bg-rust/5 border border-rust/20 rounded px-4 py-2">
-            {String((task.error as Record<string, unknown>).message ?? t('err_unknown_title'))}
+            {taskErrorMessage}
           </p>
         )}
 

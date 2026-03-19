@@ -6,15 +6,18 @@ import Link from 'next/link';
 import { ArrowLeft, ChevronRight, AlertCircle } from 'lucide-react';
 import { getPhotoReviews } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
-import { PhotoReviewsResponse, ReviewListItem, ApiException } from '@/lib/types';
+import { PhotoReviewsResponse, ReviewListItem } from '@/lib/types';
 import { ModeBadge, StatusBadge } from '@/components/ui/Badge';
 import LoadingSpinner, { SkeletonBlock } from '@/components/ui/LoadingSpinner';
+import { formatUserFacingError } from '@/lib/error-utils';
+import { useI18n } from '@/lib/i18n';
 
 export default function PhotoReviewsPage() {
   const params = useParams();
   const router = useRouter();
   const photoId = params.photoId as string;
   const { ensureToken } = useAuth();
+  const { t } = useI18n();
 
   const [items, setItems] = useState<ReviewListItem[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -38,17 +41,13 @@ export default function PhotoReviewsPage() {
         setItems((prev) => (nextCursor ? [...prev, ...data.items] : data.items));
         setCursor(data.next_cursor);
       } catch (err) {
-        if (err instanceof ApiException) {
-          setError(err.message);
-        } else {
-          setError('获取历史点评失败，请重试');
-        }
+        setError(formatUserFacingError(t, err, '获取历史点评失败，请重试'));
       } finally {
         setLoading(false);
         setLoadingMore(false);
       }
     },
-    [photoId, ensureToken]
+    [photoId, ensureToken, t]
   );
 
   useEffect(() => {

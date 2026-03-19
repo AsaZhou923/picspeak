@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import logging
 import time
 
 from fastapi import FastAPI, HTTPException, Request, status
@@ -14,6 +15,8 @@ from app.core.network import client_ip_from_request
 from app.db.session import SessionLocal
 from app.services.audit import log_api_request
 from app.services.worker import worker
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -47,9 +50,44 @@ def _error_response(*, status_code: int, request_id: str | None, code: str, mess
     return JSONResponse(status_code=status_code, content=payload)
 
 
+def _log_error_response(
+    request: Request,
+    *,
+    status_code: int,
+    code: str,
+    message: str,
+    extra: dict | None = None,
+    exc: Exception | None = None,
+) -> None:
+    log_payload = {
+        'request_id': getattr(request.state, 'request_id', None),
+        'http_method': request.method,
+        'request_path': request.url.path,
+        'status_code': status_code,
+        'error_code': code,
+        'error_message': message,
+        'client_ip': client_ip_from_request(request),
+        'user_public_id': getattr(request.state, 'current_user_public_id', None),
+    }
+    if extra:
+        log_payload['extra'] = extra
+
+    if exc is not None:
+        logger.error(
+            'Unhandled API exception',
+            extra=log_payload,
+            exc_info=(type(exc), exc, exc.__traceback__),
+        )
+    elif status_code >= 500:
+        logger.error('API request failed', extra=log_payload)
+    else:
+        logger.warning('API request rejected', extra=log_payload)
+
+
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
     code, message, extra = normalize_http_error(exc.status_code, exc.detail)
+    _log_error_response(request, status_code=exc.status_code, code=code, message=message, extra=extra)
     return _error_response(
         status_code=exc.status_code,
         request_id=getattr(request.state, 'request_id', None),
@@ -61,6 +99,13 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    _log_error_response(
+        request,
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        code='VALIDATION_ERROR',
+        message='Request validation failed',
+        extra={'fields': exc.errors()},
+    )
     return _error_response(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         request_id=getattr(request.state, 'request_id', None),
@@ -72,6 +117,13 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
+    _log_error_response(
+        request,
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        code='INTERNAL_ERROR',
+        message='Internal server error',
+        exc=exc,
+    )
     return _error_response(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         request_id=getattr(request.state, 'request_id', None),
@@ -125,6 +177,10 @@ async def request_audit_middleware(request: Request, call_next):
             db.commit()
         except Exception:
             db.rollback()
+            logger.exception(
+                'Failed to persist API audit log',
+                extra={'request_id': request_id, 'request_path': request.url.path, 'http_method': request.method},
+            )
         finally:
             db.close()
 

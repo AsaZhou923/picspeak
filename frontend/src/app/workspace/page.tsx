@@ -27,6 +27,7 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Badge from '@/components/ui/Badge';
 import { useI18n } from '@/lib/i18n';
 import type { ExifData } from '@/lib/exif';
+import { formatUserFacingError } from '@/lib/error-utils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -177,7 +178,8 @@ export default function WorkspacePage() {
       const data = await getUsage(token);
       syncPlan(data.plan);
       setUsage(data);
-    } catch {
+    } catch (err) {
+      console.error('Failed to fetch usage in workspace', err);
       setUsageError(true);
     }
   }, [ensureToken, syncPlan]);
@@ -289,14 +291,14 @@ export default function WorkspacePage() {
         setStage('error');
         if (err instanceof ApiException) {
           if (err.status === 429) {
-            setErrMessage(t('err_rate_limit'));
+            setErrMessage(formatUserFacingError(t, err, t('err_rate_limit')));
           } else if (err.status === 402 || err.code === 'QUOTA_EXCEEDED') {
-            setErrMessage(t('err_quota'));
+            setErrMessage(formatUserFacingError(t, err, t('err_quota')));
           } else {
-            setErrMessage(err.message);
+            setErrMessage(formatUserFacingError(t, err, err.message));
           }
         } else {
-          setErrMessage(t('err_upload'));
+          setErrMessage(formatUserFacingError(t, err, t('err_upload')));
         }
       }
     },
@@ -341,14 +343,14 @@ export default function WorkspacePage() {
       setStage('ready');
       if (err instanceof ApiException) {
         if (err.status === 429) {
-          setErrMessage(t('err_rate_limit'));
+          setErrMessage(formatUserFacingError(t, err, t('err_rate_limit')));
         } else if (err.code === 'QUOTA_EXCEEDED') {
-          setErrMessage(t('err_quota'));
+          setErrMessage(formatUserFacingError(t, err, t('err_quota')));
         } else {
-          setErrMessage(err.message);
+          setErrMessage(formatUserFacingError(t, err, err.message));
         }
       } else {
-        setErrMessage(t('err_upload'));
+        setErrMessage(formatUserFacingError(t, err, t('err_upload')));
       }
     }
   }, [photo, reviewMode, locale, imageType, ensureToken, router, t, usage, remainingQuota]);
@@ -447,7 +449,9 @@ export default function WorkspacePage() {
           )}
 
           {usageError && (
-            <p className="text-xs text-ink-subtle mt-2">{t('usage_error')}</p>
+            <p className="text-xs text-ink-subtle mt-2">
+              {`${t('usage_error')} ${t('support_contact_prompt')}`}
+            </p>
           )}
         </div>
 
