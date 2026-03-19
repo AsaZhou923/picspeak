@@ -31,6 +31,19 @@ def _subscription(
 
 
 class BillingPortalSelectionTests(unittest.TestCase):
+    def test_prefers_customer_portal_url_over_update_subscription_url(self) -> None:
+        subscription = _subscription(
+            status='active',
+            updated_minutes_ago=1,
+            portal_url='https://portal.example.com/billing',
+            update_subscription_url='https://portal.example.com/subscription',
+            payment_url='https://portal.example.com/payment',
+        )
+
+        destination = _customer_portal_destination(subscription)
+
+        self.assertEqual(destination, 'https://portal.example.com/billing')
+
     def test_prefers_active_subscription_with_portal_over_newer_pending_record(self) -> None:
         subscriptions = [
             _subscription(status='pending', updated_minutes_ago=1),

@@ -1642,8 +1642,8 @@ def get_usage(request: Request, db: Session = Depends(get_db), actor: CurrentAct
 
 def _subscription_portal_url(subscription: BillingSubscription) -> str | None:
     candidates = (
-        subscription.customer_portal_update_subscription_url,
         subscription.customer_portal_url,
+        subscription.customer_portal_update_subscription_url,
         subscription.update_payment_method_url,
     )
     for candidate in candidates:
