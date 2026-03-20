@@ -365,6 +365,30 @@ function getGalleryActionCopy(locale: 'zh' | 'en' | 'ja') {
   };
 }
 
+function getReviewGalleryCardCopy(locale: 'zh' | 'en' | 'ja') {
+  if (locale === 'ja') {
+    return {
+      title: 'この一枚はギャラリーに残す価値があります',
+      body:
+        '総合スコア 6.0 以上の作品だけがギャラリー申請できます。今回の仕上がりは十分に良いので、公開審査に出してお気に入りにも残しておきましょう。承認後に公開ギャラリーへ掲載され、あとから履歴詳細で外せます。',
+    };
+  }
+
+  if (locale === 'en') {
+    return {
+      title: 'This result is strong enough for your gallery',
+      body:
+        'Only critiques with a total score of 6.0 or higher can be submitted here. This one has cleared that bar, so it is worth saving to favorites and sending to gallery moderation for a chance to appear publicly after approval.',
+    };
+  }
+
+  return {
+    title: '这次作品已经达到长廊收录门槛',
+    body:
+      '仅总分 6 分及以上的作品开放加入影像长廊。这次结果已经值得留档展示，加入后会先进入公开长廊审核，并默认加入收藏；审核通过后会出现在公开长廊，之后也可以在历史记录详情页移出。',
+  };
+}
+
 function getExportSummaryCopy(locale: 'zh' | 'en' | 'ja') {
   if (locale === 'ja') {
     return {
@@ -908,6 +932,7 @@ export default function ReviewPage() {
   const actionCopy = getReviewActionCopy(locale);
   const favoriteCopy = getFavoriteActionCopy(locale);
   const galleryActionCopy = getGalleryActionCopy(locale);
+  const reviewGalleryCardCopy = getReviewGalleryCardCopy(locale);
   const exportSummaryCopy = getExportSummaryCopy(locale);
 
   const reviewId = params.reviewId as string;
@@ -1092,6 +1117,7 @@ export default function ReviewPage() {
   const canManageReview = Boolean(review.viewer_is_owner);
   const showPersonalActions = !isPublicGalleryContext;
   const showOwnerActions = canManageReview && !isPublicGalleryContext;
+  const showGalleryCta = showOwnerActions && r.final_score >= 6.0;
   const gallerySaved = Boolean(review.gallery_visible);
   const isLowScore = r.final_score < 5.0;
 
@@ -1654,7 +1680,7 @@ export default function ReviewPage() {
               />
             </div>
 
-            {showOwnerActions && (
+            {showGalleryCta && (
               <section className="relative overflow-hidden rounded-[24px] border border-border-subtle bg-[radial-gradient(circle_at_top_left,rgba(200,171,90,0.16),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(149,113,87,0.14),transparent_36%),rgba(18,16,13,0.76)] px-5 py-5">
                 <div className="absolute inset-0 opacity-25 [background-image:linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] [background-size:20px_20px]" />
                 <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -1663,16 +1689,16 @@ export default function ReviewPage() {
                       <LayoutGrid size={12} />
                       {t('review_gallery_label')}
                     </p>
-                    <h2 className="font-display text-2xl text-ink">{t('review_gallery_title')}</h2>
-                    <p className="mt-2 text-sm leading-7 text-ink-muted">{t('review_gallery_body')}</p>
+                    <h2 className="font-display text-2xl text-ink">{reviewGalleryCardCopy.title}</h2>
+                    <p className="mt-2 text-sm leading-7 text-ink-muted">{reviewGalleryCardCopy.body}</p>
                   </div>
 
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex shrink-0 flex-col items-stretch gap-2 lg:min-w-[172px]">
                     <button
                       type="button"
                       onClick={handleGalleryToggle}
                       disabled={actionBusy !== null}
-                      className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors disabled:opacity-60 ${
+                      className={`inline-flex min-h-[52px] items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-medium leading-5 whitespace-nowrap text-center transition-colors disabled:opacity-60 ${
                         gallerySaved
                           ? 'border border-sage/30 bg-sage/10 text-sage hover:bg-sage/15'
                           : 'bg-gold text-void hover:bg-gold-light'
@@ -1683,7 +1709,7 @@ export default function ReviewPage() {
                     </button>
                     <Link
                       href="/gallery"
-                      className="inline-flex items-center gap-2 rounded-full border border-border-subtle px-4 py-2 text-sm text-ink-muted transition-colors hover:border-gold/30 hover:text-gold"
+                      className="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-full border border-border-subtle px-5 py-3 text-sm leading-5 whitespace-nowrap text-center text-ink-muted transition-colors hover:border-gold/30 hover:text-gold"
                     >
                       <LayoutGrid size={14} />
                       {t('review_gallery_open')}

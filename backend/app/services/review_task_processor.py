@@ -10,10 +10,9 @@ from sqlalchemy.orm import Session
 from app.api.deps import new_public_id
 from app.core.config import settings
 from app.core.errors import ApiHTTPException
-from app.db.models import Photo, PhotoStatus, Review, ReviewMode, ReviewStatus, ReviewTask, TaskStatus, UsageLedger, User, UserPlan
+from app.db.models import Photo, Review, ReviewMode, ReviewStatus, ReviewTask, TaskStatus, UsageLedger, User, UserPlan
 from app.db.session import SessionLocal
 from app.services.ai import AIReviewError, run_ai_review
-from app.services.content_audit import ContentAuditError, run_content_audit
 from app.services.guard import enforce_user_quota, guest_usage_snapshot, increment_quota, user_usage_snapshot
 from app.services.task_events import record_task_event
 
@@ -388,26 +387,6 @@ def _process_task(db: Session, task: ReviewTask) -> None:
     payload_image_type = (task.request_payload or {}).get('image_type', 'default')
     if payload_locale not in {'zh', 'en', 'ja'}:
         payload_locale = 'zh'
-    if settings.image_audit_enabled and photo.nsfw_label is None:
-        _transition_progress(db, task, 40, 'CONTENT_AUDIT_STARTED', 'Running content audit')
-        try:
-            audit_result = run_content_audit(image_url=image_url)
-        except ContentAuditError as exc:
-            _handle_failure(db, task, error_code='IMAGE_AUDIT_FAILED', error_message=str(exc), retryable=True)
-            return
-        photo.nsfw_label = audit_result.label
-        photo.nsfw_score = audit_result.nsfw_score
-        photo.rejected_reason = None if audit_result.safe else (audit_result.reason or 'Image content is not allowed')
-        photo.status = PhotoStatus.READY if audit_result.safe else PhotoStatus.REJECTED
-        if not audit_result.safe:
-            db.add(photo)
-            db.commit()
-            _handle_failure(db, task, error_code='IMAGE_NOT_ALLOWED', error_message=photo.rejected_reason or 'Image content is not allowed', retryable=False)
-            return
-        db.add(photo)
-        record_task_event(db, task, event_type='CONTENT_AUDIT_PASSED', message='Content audit passed')
-        db.commit()
-
     _transition_progress(db, task, 70, 'AI_REVIEW_STARTED', 'Running AI review')
 
     try:

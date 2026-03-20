@@ -1349,7 +1349,7 @@ def _public_gallery_item(request: Request, review: Review, photo: Photo, owner: 
         review_id=review.public_id,
         photo_id=photo.public_id,
         photo_url=_build_photo_proxy_url(request, photo.public_id, owner.public_id),
-        photo_thumbnail_url=_build_photo_proxy_url(request, photo.public_id, owner.public_id, size=PHOTO_THUMBNAIL_SIZE),
+        photo_thumbnail_url=_build_photo_proxy_url(request, photo.public_id, owner.public_id, size=PHOTO_THUMBNAIL_MAX_SIZE),
         mode=review.mode.value,
         image_type=_review_image_type(review),
         final_score=float(review.final_score),
@@ -1548,20 +1548,6 @@ def create_review(
         return response
 
     image_url = _build_storage_photo_url(photo.bucket, photo.object_key)
-    if settings.image_audit_enabled and photo.nsfw_label is None:
-        try:
-            audit_result = run_content_audit(image_url=image_url)
-        except ContentAuditError as exc:
-            raise api_error(status.HTTP_502_BAD_GATEWAY, 'IMAGE_AUDIT_FAILED', f'Image content audit failed: {exc}') from exc
-        photo.nsfw_label = audit_result.label
-        photo.nsfw_score = audit_result.nsfw_score
-        photo.rejected_reason = None if audit_result.safe else (audit_result.reason or 'Image content is not allowed')
-        photo.status = PhotoStatus.READY if audit_result.safe else PhotoStatus.REJECTED
-        db.add(photo)
-        db.commit()
-        db.refresh(photo)
-        if photo.status != PhotoStatus.READY:
-            raise api_error(status.HTTP_400_BAD_REQUEST, 'IMAGE_REJECTED', photo.rejected_reason or 'Image content is not allowed')
     try:
         ai_response = run_ai_review(payload.mode, image_url=image_url, locale=payload.locale, exif_data=photo.exif_data or None, image_type=payload.image_type)
     except AIReviewError as exc:

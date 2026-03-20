@@ -91,7 +91,7 @@ class Settings(BaseSettings):
     cloud_tasks_oidc_audience: str = ''
     cloud_tasks_dispatch_deadline_seconds: int = 1800
 
-    image_audit_enabled: bool = False
+    image_audit_enabled: bool = True
     image_audit_reject_threshold: float = 0.78
 
     @field_validator('backend_cors_origins', mode='before')
