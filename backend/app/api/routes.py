@@ -65,11 +65,15 @@ from app.schemas import (
     ReviewCreateAsyncResponse,
     ReviewCreateRequest,
     ReviewCreateSyncResponse,
+    ReviewExportResponse,
     ReviewGetResponse,
     ReviewHistoryItem,
     ReviewHistoryResponse,
     ReviewListItem,
+    ReviewMetaResponse,
+    ReviewMetaUpdateRequest,
     REVIEW_SCHEMA_VERSION,
+    ReviewShareResponse,
     TaskStatusResponse,
     UsageResponse,
     AuthClerkExchangeRequest,
@@ -128,6 +132,9 @@ PHOTO_THUMBNAIL_TTL_SECONDS = 24 * 3600
 PHOTO_THUMBNAIL_STABLE_WINDOW_SECONDS = 3600
 PHOTO_THUMBNAIL_CACHE_CONTROL = 'private, max-age=86400, stale-while-revalidate=604800'
 IMAGE_RESAMPLING = getattr(Image, 'Resampling', Image).LANCZOS
+REVIEW_TAG_LIMIT = 8
+REVIEW_TAG_MAX_LENGTH = 32
+REVIEW_NOTE_MAX_LENGTH = 1000
 
 
 def _build_storage_photo_url(bucket: str, object_key: str) -> str:
@@ -1110,6 +1117,68 @@ def _build_review_extensions(raw_payload: dict[str, Any]) -> tuple[dict[str, Any
     )
 
 
+def _normalize_review_tags(raw_tags: list[str] | None) -> list[str]:
+    if not raw_tags:
+        return []
+
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for raw_tag in raw_tags:
+        if not isinstance(raw_tag, str):
+            continue
+        tag = re.sub(r'\s+', ' ', raw_tag).strip()
+        if not tag:
+            continue
+        tag = tag[:REVIEW_TAG_MAX_LENGTH]
+        dedupe_key = tag.lower()
+        if dedupe_key in seen:
+            continue
+        seen.add(dedupe_key)
+        normalized.append(tag)
+        if len(normalized) >= REVIEW_TAG_LIMIT:
+            break
+    return normalized
+
+
+def _normalize_review_note(raw_note: str | None) -> str | None:
+    if raw_note is None:
+        return None
+    note = re.sub(r'\s+', ' ', str(raw_note)).strip()
+    if not note:
+        return None
+    return note[:REVIEW_NOTE_MAX_LENGTH]
+
+
+def _review_image_type(review: Review) -> str:
+    raw_payload = dict(review.result_json or {})
+    return str(review.image_type or raw_payload.get('image_type') or 'default')
+
+
+def _review_model_version(review: Review) -> str:
+    raw_payload = dict(review.result_json or {})
+    return str(raw_payload.get('model_version') or review.model_name or '')
+
+
+def _review_source_public_id(db: Session, review: Review) -> str | None:
+    if not review.source_review_id:
+        return None
+    source_review = db.query(Review).filter(Review.id == review.source_review_id).first()
+    return source_review.public_id if source_review else None
+
+
+def _review_share_info(request: Request, review: Review, *, include_token: bool) -> dict[str, Any]:
+    if not review.is_public or not review.share_token:
+        return {}
+
+    payload: dict[str, Any] = {
+        'enabled': True,
+        'share_url': str(request.url_for('get_public_review', share_token=review.share_token)),
+    }
+    if include_token:
+        payload['share_token'] = review.share_token
+    return payload
+
+
 def _review_result_payload(
     result_json: dict | None,
     final_score: float | None,
@@ -1118,6 +1187,7 @@ def _review_result_payload(
     model_name: str | None = None,
     model_version: str | None = None,
     exif_info: dict[str, Any] | None = None,
+    share_info_override: dict[str, Any] | None = None,
 ) -> dict:
     raw_payload = dict(result_json or {})
     scores = _coerce_review_scores(raw_payload.get('scores'))
@@ -1147,7 +1217,7 @@ def _review_result_payload(
         'issue_marks': issue_marks,
         'billing_info': billing_info,
         'exif_info': exif_info if isinstance(exif_info, dict) else stored_exif_info,
-        'share_info': share_info,
+        'share_info': share_info_override if isinstance(share_info_override, dict) else share_info,
     }
 
 
@@ -1158,11 +1228,126 @@ def _find_photo_owned(db: Session, photo_public_id: str, owner_user_id: int) -> 
     return photo
 
 
+def _find_review_owned(db: Session, review_public_id: str, owner_user_id: int, *, include_deleted: bool = False) -> Review:
+    query = db.query(Review).filter(Review.public_id == review_public_id, Review.owner_user_id == owner_user_id)
+    if not include_deleted:
+        query = query.filter(Review.deleted_at.is_(None))
+    review = query.first()
+    if review is None:
+        raise api_error(status.HTTP_404_NOT_FOUND, 'REVIEW_NOT_FOUND', 'Review not found')
+    return review
+
+
+def _resolve_source_review(db: Session, actor: CurrentActor, payload: ReviewCreateRequest, photo: Photo) -> Review | None:
+    if not payload.source_review_id:
+        return None
+
+    source_review = _find_review_owned(db, payload.source_review_id, actor.user.id)
+    if source_review.photo_id != photo.id:
+        raise api_error(status.HTTP_400_BAD_REQUEST, 'REANALYZE_PHOTO_MISMATCH', 'Source review does not belong to this photo')
+    return source_review
+
+
 def _apply_review_history_visibility(query, plan: UserPlan):
     cutoff = review_history_cutoff(plan)
     if cutoff is not None:
         query = query.filter(Review.created_at >= cutoff)
     return query
+
+
+def _apply_review_history_filters(
+    query,
+    *,
+    created_from: datetime | None = None,
+    created_to: datetime | None = None,
+    min_score: float | None = None,
+    max_score: float | None = None,
+    image_type: str | None = None,
+    favorite_only: bool = False,
+):
+    query = query.filter(Review.deleted_at.is_(None))
+    if created_from is not None:
+        query = query.filter(Review.created_at >= created_from)
+    if created_to is not None:
+        query = query.filter(Review.created_at <= created_to)
+    if min_score is not None:
+        query = query.filter(Review.final_score >= min_score)
+    if max_score is not None:
+        query = query.filter(Review.final_score <= max_score)
+    if image_type:
+        query = query.filter(Review.image_type == image_type)
+    if favorite_only:
+        query = query.filter(Review.favorite == True)  # noqa: E712
+    return query
+
+
+def _review_history_item(request: Request, review: Review, photo: Photo, owner_public_id: str, source_review_id: str | None) -> ReviewHistoryItem:
+    result_payload = dict(review.result_json or {})
+    return ReviewHistoryItem(
+        review_id=review.public_id,
+        photo_id=photo.public_id,
+        photo_url=_build_photo_proxy_url(request, photo.public_id, owner_public_id),
+        photo_thumbnail_url=_build_photo_proxy_url(request, photo.public_id, owner_public_id, size=PHOTO_THUMBNAIL_SIZE),
+        mode=review.mode.value,
+        status=review.status.value,
+        image_type=_review_image_type(review),
+        source_review_id=source_review_id,
+        final_score=float(review.final_score),
+        scores=_coerce_review_scores(result_payload.get('scores')),
+        model_name=str(review.model_name or ''),
+        model_version=_review_model_version(review),
+        favorite=bool(review.favorite),
+        tags=_normalize_review_tags(review.tags_json if isinstance(review.tags_json, list) else []),
+        note=review.note,
+        is_shared=bool(review.is_public and review.share_token),
+        created_at=review.created_at,
+    )
+
+
+def _build_review_export_payload(
+    *,
+    review: Review,
+    photo_id: str,
+    photo_url: str | None,
+    photo_thumbnail_url: str | None,
+    source_review_id: str | None,
+) -> ReviewExportResponse:
+    result_payload = dict(review.result_json or {})
+    return ReviewExportResponse(
+        photo={
+            'photo_id': photo_id,
+            'photo_url': photo_url,
+            'photo_thumbnail_url': photo_thumbnail_url,
+        },
+        review={
+            'review_id': review.public_id,
+            'source_review_id': source_review_id,
+            'mode': review.mode.value,
+            'status': review.status.value,
+            'image_type': _review_image_type(review),
+            'model_name': str(review.model_name or ''),
+            'model_version': _review_model_version(review),
+            'final_score': float(review.final_score),
+            'scores': _coerce_review_scores(result_payload.get('scores')),
+            'advantage': str(result_payload.get('advantage') or ''),
+            'critique': str(result_payload.get('critique') or ''),
+            'suggestions': str(result_payload.get('suggestions') or ''),
+            'favorite': bool(review.favorite),
+            'tags': _normalize_review_tags(review.tags_json if isinstance(review.tags_json, list) else []),
+            'note': review.note,
+            'created_at': review.created_at,
+            'exported_at': datetime.now(timezone.utc),
+        },
+    )
+
+
+def _generate_review_share_token(db: Session) -> str:
+    for _ in range(5):
+        share_token = secrets.token_urlsafe(18)
+        exists = db.query(Review.id).filter(Review.share_token == share_token).first()
+        if exists is None:
+            return share_token
+    raise api_error(status.HTTP_500_INTERNAL_SERVER_ERROR, 'SHARE_TOKEN_GENERATION_FAILED', 'Failed to generate share token')
 
 
 @router.post('/reviews', response_model=ReviewCreateAsyncResponse | ReviewCreateSyncResponse)
@@ -1176,8 +1361,8 @@ def create_review(
         raise api_error(status.HTTP_403_FORBIDDEN, 'PLAN_MODE_FORBIDDEN', 'Guest users cannot use pro review mode')
 
     mode_enum = ReviewMode(payload.mode)
-
     photo = _find_photo_owned(db, payload.photo_id, actor.user.id)
+    source_review = _resolve_source_review(db, actor, payload, photo)
     if photo.status != PhotoStatus.READY:
         raise api_error(status.HTTP_400_BAD_REQUEST, 'PHOTO_NOT_READY', 'Photo is not ready for review')
 
@@ -1193,7 +1378,7 @@ def create_review(
                 response_json['result'] = _review_result_payload(result_payload, None)
             return response_json
 
-    if actor.plan != UserPlan.guest:
+    if actor.plan != UserPlan.guest and source_review is None:
         existing_review = (
             db.query(Review)
             .filter(
@@ -1201,6 +1386,7 @@ def create_review(
                 Review.owner_user_id == actor.user.id,
                 Review.mode == mode_enum,
                 Review.status == ReviewStatus.SUCCEEDED,
+                Review.deleted_at.is_(None),
             )
             .order_by(Review.created_at.desc(), Review.id.desc())
             .first()
@@ -1213,8 +1399,9 @@ def create_review(
                     existing_review.result_json,
                     existing_review.final_score,
                     model_name=existing_review.model_name,
-                    model_version=existing_review.model_name,
+                    model_version=_review_model_version(existing_review),
                     exif_info=photo.exif_data if photo.exif_data else None,
+                    share_info_override=_review_share_info(request, existing_review, include_token=True),
                 ),
             }
             if idempotency_key:
@@ -1239,6 +1426,8 @@ def create_review(
 
     if payload.async_mode:
         task_payload = payload.model_dump(by_alias=True)
+        if source_review is not None:
+            task_payload['source_review_internal_id'] = source_review.id
         if guest_scope_key:
             task_payload['_guest_scope_key'] = guest_scope_key
         task = ReviewTask(
@@ -1335,8 +1524,10 @@ def create_review(
         task_id=None,
         photo_id=photo.id,
         owner_user_id=actor.user.id,
+        source_review_id=source_review.id if source_review is not None else None,
         mode=mode_enum,
         status=ReviewStatus.SUCCEEDED,
+        image_type=payload.image_type,
         schema_version=result_payload['schema_version'],
         result_json=result_payload,
         final_score=result_payload['final_score'],
@@ -1421,14 +1612,16 @@ def get_review(
 ):
     review = db.query(Review).filter(
         Review.public_id == review_id,
+        Review.deleted_at.is_(None),
         (Review.owner_user_id == actor.user.id) | (Review.is_public == True),  # noqa: E712
     ).first()
     if review is None:
         raise api_error(status.HTTP_404_NOT_FOUND, 'REVIEW_NOT_FOUND', 'Review not found')
+    is_owner = review.owner_user_id == actor.user.id
     cutoff = review_history_cutoff(actor.plan)
     if (
         cutoff is not None
-        and review.owner_user_id == actor.user.id
+        and is_owner
         and not review.is_public
         and review.created_at < cutoff
     ):
@@ -1447,15 +1640,67 @@ def get_review(
         photo_url=photo_url,
         mode=review.mode.value,
         status=review.status.value,
+        image_type=_review_image_type(review),
+        source_review_id=_review_source_public_id(db, review) if is_owner else None,
+        favorite=bool(review.favorite) if is_owner else False,
+        tags=_normalize_review_tags(review.tags_json if isinstance(review.tags_json, list) else []) if is_owner else [],
+        note=review.note if is_owner else None,
         result=_review_result_payload(
             review.result_json,
             review.final_score,
             model_name=review.model_name,
-            model_version=review.model_name,
+            model_version=_review_model_version(review),
             exif_info=photo.exif_data if photo and photo.exif_data else None,
+            share_info_override=_review_share_info(request, review, include_token=is_owner),
         ),
         created_at=review.created_at,
         exif_data=photo.exif_data if photo and photo.exif_data else None,
+    )
+
+
+@router.get('/public/reviews/{share_token}', response_model=ReviewGetResponse, name='get_public_review')
+def get_public_review(
+    share_token: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    review = db.query(Review).filter(
+        Review.share_token == share_token,
+        Review.is_public == True,  # noqa: E712
+        Review.deleted_at.is_(None),
+    ).first()
+    if review is None:
+        raise api_error(status.HTTP_404_NOT_FOUND, 'REVIEW_NOT_FOUND', 'Review not found')
+
+    photo = db.query(Photo).filter(Photo.id == review.photo_id).first()
+    if photo is not None:
+        photo_owner = db.query(User).filter(User.id == photo.owner_user_id).first()
+        photo_url = _build_photo_proxy_url(request, photo.public_id, photo_owner.public_id) if photo_owner else None
+    else:
+        photo_url = None
+
+    db.commit()
+    return ReviewGetResponse(
+        review_id=review.public_id,
+        photo_id=photo.public_id if photo else 'unknown',
+        photo_url=photo_url,
+        mode=review.mode.value,
+        status=review.status.value,
+        image_type=_review_image_type(review),
+        source_review_id=None,
+        favorite=False,
+        tags=[],
+        note=None,
+        result=_review_result_payload(
+            review.result_json,
+            review.final_score,
+            model_name=review.model_name,
+            model_version=_review_model_version(review),
+            exif_info=None,
+            share_info_override=_review_share_info(request, review, include_token=False),
+        ),
+        created_at=review.created_at,
+        exif_data=None,
     )
 
 
@@ -1464,12 +1709,22 @@ def list_my_reviews(
     request: Request,
     limit: int = Query(default=20, ge=1, le=100),
     cursor: str | None = Query(default=None),
+    created_from: datetime | None = Query(default=None),
+    created_to: datetime | None = Query(default=None),
+    min_score: float | None = Query(default=None, ge=0, le=10),
+    max_score: float | None = Query(default=None, ge=0, le=10),
+    image_type: str | None = Query(default=None, pattern='^(default|landscape|portrait|street|still_life|architecture)$'),
+    favorite_only: bool = Query(default=False),
     db: Session = Depends(get_db),
     actor: CurrentActor = Depends(get_current_actor),
 ):
     if actor.plan == UserPlan.guest:
         db.commit()
         return ReviewHistoryResponse(items=[], next_cursor=None)
+    if created_from is not None and created_to is not None and created_from > created_to:
+        raise api_error(status.HTTP_400_BAD_REQUEST, 'REVIEW_FILTER_INVALID', 'created_from cannot be later than created_to')
+    if min_score is not None and max_score is not None and min_score > max_score:
+        raise api_error(status.HTTP_400_BAD_REQUEST, 'REVIEW_FILTER_INVALID', 'min_score cannot be greater than max_score')
 
     query = (
         db.query(Review, Photo)
@@ -1478,6 +1733,15 @@ def list_my_reviews(
         .order_by(Review.created_at.desc(), Review.id.desc())
     )
     query = _apply_review_history_visibility(query, actor.plan)
+    query = _apply_review_history_filters(
+        query,
+        created_from=created_from,
+        created_to=created_to,
+        min_score=min_score,
+        max_score=max_score,
+        image_type=image_type,
+        favorite_only=favorite_only,
+    )
 
     if cursor:
         try:
@@ -1489,18 +1753,14 @@ def list_my_reviews(
     rows = query.limit(limit + 1).all()
     has_next = len(rows) > limit
     rows = rows[:limit]
+    source_review_ids = {review.source_review_id for review, _photo in rows if review.source_review_id}
+    source_review_map = {
+        review_id: public_id
+        for review_id, public_id in db.query(Review.id, Review.public_id).filter(Review.id.in_(source_review_ids)).all()
+    } if source_review_ids else {}
 
     items = [
-        ReviewHistoryItem(
-            review_id=review.public_id,
-            photo_id=photo.public_id,
-            photo_url=_build_photo_proxy_url(request, photo.public_id, actor.user.public_id),
-            photo_thumbnail_url=_build_photo_proxy_url(request, photo.public_id, actor.user.public_id, size=PHOTO_THUMBNAIL_SIZE),
-            mode=review.mode.value,
-            status=review.status.value,
-            final_score=float(review.final_score),
-            created_at=review.created_at,
-        )
+        _review_history_item(request, review, photo, actor.user.public_id, source_review_map.get(review.source_review_id))
         for review, photo in rows
     ]
     next_cursor = rows[-1][0].created_at.isoformat() if has_next and rows else None
@@ -1525,7 +1785,7 @@ def list_photo_reviews(
 
     query = (
         db.query(Review)
-        .filter(Review.photo_id == photo.id, Review.owner_user_id == actor.user.id)
+        .filter(Review.photo_id == photo.id, Review.owner_user_id == actor.user.id, Review.deleted_at.is_(None))
         .order_by(Review.created_at.desc())
     )
     query = _apply_review_history_visibility(query, actor.plan)
@@ -1546,6 +1806,96 @@ def list_photo_reviews(
 
     db.commit()
     return PhotoReviewsResponse(items=items, next_cursor=next_cursor)
+
+
+@router.post('/reviews/{review_id}/share', response_model=ReviewShareResponse)
+def enable_review_share(
+    review_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    actor: CurrentActor = Depends(get_current_actor),
+):
+    review = _find_review_owned(db, review_id, actor.user.id)
+    if not review.share_token:
+        review.share_token = _generate_review_share_token(db)
+    review.is_public = True
+    db.add(review)
+    db.commit()
+    db.refresh(review)
+    return ReviewShareResponse(
+        review_id=review.public_id,
+        share_token=review.share_token,
+        share_url=str(request.url_for('get_public_review', share_token=review.share_token)),
+        enabled=True,
+    )
+
+
+@router.patch('/reviews/{review_id}/meta', response_model=ReviewMetaResponse)
+def update_review_meta(
+    review_id: str,
+    payload: ReviewMetaUpdateRequest,
+    db: Session = Depends(get_db),
+    actor: CurrentActor = Depends(get_current_actor),
+):
+    review = _find_review_owned(db, review_id, actor.user.id)
+    if payload.favorite is not None:
+        review.favorite = bool(payload.favorite)
+    if payload.tags is not None:
+        review.tags_json = _normalize_review_tags(payload.tags)
+    if payload.note is not None:
+        review.note = _normalize_review_note(payload.note)
+    db.add(review)
+    db.commit()
+    db.refresh(review)
+    return ReviewMetaResponse(
+        review_id=review.public_id,
+        favorite=bool(review.favorite),
+        tags=_normalize_review_tags(review.tags_json if isinstance(review.tags_json, list) else []),
+        note=review.note,
+    )
+
+
+@router.get('/reviews/{review_id}/export', response_model=ReviewExportResponse)
+def export_review(
+    review_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    actor: CurrentActor = Depends(get_current_actor),
+):
+    review = _find_review_owned(db, review_id, actor.user.id)
+    photo = db.query(Photo).filter(Photo.id == review.photo_id).first()
+    photo_public_id = photo.public_id if photo else 'unknown'
+    photo_url = _build_photo_proxy_url(request, photo.public_id, actor.user.public_id) if photo else None
+    photo_thumbnail_url = (
+        _build_photo_proxy_url(request, photo.public_id, actor.user.public_id, size=PHOTO_THUMBNAIL_SIZE)
+        if photo else None
+    )
+    payload = _build_review_export_payload(
+        review=review,
+        photo_id=photo_public_id,
+        photo_url=photo_url,
+        photo_thumbnail_url=photo_thumbnail_url,
+        source_review_id=_review_source_public_id(db, review),
+    )
+    db.commit()
+    return payload
+
+
+@router.delete('/reviews/{review_id}', status_code=status.HTTP_204_NO_CONTENT)
+def delete_review(
+    review_id: str,
+    db: Session = Depends(get_db),
+    actor: CurrentActor = Depends(get_current_actor),
+):
+    review = _find_review_owned(db, review_id, actor.user.id, include_deleted=True)
+    if review.deleted_at is None:
+        review.deleted_at = datetime.now(timezone.utc)
+        review.is_public = False
+        db.add(review)
+        db.commit()
+    else:
+        db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get('/photos/{photo_id}/image', name='get_photo_image')

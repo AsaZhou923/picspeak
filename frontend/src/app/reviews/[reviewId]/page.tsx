@@ -1,11 +1,11 @@
-'use client';
+﻿'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowLeft, History, RotateCcw, AlertCircle, ThumbsUp, ThumbsDown, AlertTriangle, Lightbulb, Upload, TrendingDown, ZoomIn, X, Copy, Check, LogIn, Sparkles, Share2, Download } from 'lucide-react';
-import { getReview, getUsage } from '@/lib/api';
+import { ArrowLeft, History, RotateCcw, AlertCircle, ThumbsUp, ThumbsDown, AlertTriangle, Lightbulb, Upload, TrendingDown, ZoomIn, X, Copy, Check, LogIn, Sparkles, Share2, Download, LayoutGrid, BookmarkPlus, BookmarkCheck, Heart } from 'lucide-react';
+import { createReviewShare, exportReview, getReview, getUsage, updateReviewMeta } from '@/lib/api';
 import ClerkSignInTrigger from '@/components/auth/ClerkSignInTrigger';
 import { useAuth } from '@/lib/auth-context';
 import { ReviewGetResponse, ReviewScores, UsageResponse } from '@/lib/types';
@@ -14,6 +14,7 @@ import { SkeletonBlock } from '@/components/ui/LoadingSpinner';
 import { isDemoReviewId } from '@/lib/demo-review';
 import { useI18n } from '@/lib/i18n';
 import { formatUserFacingError } from '@/lib/error-utils';
+import { hasGalleryItem, removeGalleryItem, saveGalleryItem } from '@/lib/gallery';
 
 // ─── Score helpers ────────────────────────────────────────────────────────────
 
@@ -242,6 +243,222 @@ function generateScoreSummary(
   if (locale === 'zh') return `${top.label}为本次亮点，${bottom.label}有提升空间`;
   if (locale === 'ja') return `${top.label}が際立っており、${bottom.label}を伸ばす余地があります`;
   return `${top.label} is the highlight; ${bottom.label} has room to grow`;
+}
+
+function getReviewActionCopy(locale: 'zh' | 'en' | 'ja') {
+  if (locale === 'ja') {
+    return {
+      sharePending: '共有リンクを生成中...',
+      shareDone: '共有リンクをコピーしました',
+      exportPending: '簡易データを準備中...',
+      exportDone: '簡易データをダウンロードしました',
+      replayPending: '前回結果を引き継いで再分析を開いています...',
+    };
+  }
+
+  if (locale === 'en') {
+    return {
+      sharePending: 'Generating share link...',
+      shareDone: 'Share link copied',
+      exportPending: 'Preparing compact export...',
+      exportDone: 'Compact export downloaded',
+      replayPending: 'Opening replay analysis...',
+    };
+  }
+
+  return {
+    sharePending: '正在生成分享链接...',
+    shareDone: '分享链接已复制',
+    exportPending: '正在导出简版结果...',
+    exportDone: '简版结果已下载',
+    replayPending: '正在跳转到再次分析...',
+  };
+}
+
+function getFavoriteActionCopy(locale: 'zh' | 'en' | 'ja') {
+  if (locale === 'ja') {
+    return {
+      add: 'お気に入りに追加',
+      remove: 'お気に入り解除',
+      pendingAdd: 'お気に入りに保存中...',
+      pendingRemove: 'お気に入りを解除中...',
+      doneAdd: 'お気に入りに追加しました',
+      doneRemove: 'お気に入りを解除しました',
+    };
+  }
+
+  if (locale === 'en') {
+    return {
+      add: 'Add to favorites',
+      remove: 'Remove favorite',
+      pendingAdd: 'Saving to favorites...',
+      pendingRemove: 'Removing from favorites...',
+      doneAdd: 'Added to favorites',
+      doneRemove: 'Removed from favorites',
+    };
+  }
+
+  return {
+    add: '加入收藏',
+    remove: '取消收藏',
+    pendingAdd: '正在加入收藏...',
+    pendingRemove: '正在取消收藏...',
+    doneAdd: '已加入收藏',
+    doneRemove: '已取消收藏',
+  };
+}
+
+function getGalleryActionCopy(locale: 'zh' | 'en' | 'ja') {
+  if (locale === 'ja') {
+    return {
+      confirmPublic:
+        'この評価を長廊に追加すると、公開展示として他のユーザーからも閲覧できる想定です。続行しますか？',
+    };
+  }
+
+  if (locale === 'en') {
+    return {
+      confirmPublic:
+        'Adding this critique to the gallery means it is intended to appear in the public gallery for other users to view. Continue?',
+    };
+  }
+
+  return {
+    confirmPublic: '加入影像长廊后，这条评图结果会按公开展示处理，其他用户也可能看到。是否继续加入？',
+  };
+}
+
+function getExportSummaryCopy(locale: 'zh' | 'en' | 'ja') {
+  if (locale === 'ja') {
+    return {
+      filePrefix: 'picspeak-summary',
+      title: 'PicSpeak 評価サマリー',
+      exportedAt: '出力時間',
+      reviewInfo: 'レビュー情報',
+      reviewId: 'レビュー ID',
+      sourceReviewId: '再分析元',
+      createdAt: '作成時間',
+      mode: 'モード',
+      imageType: '写真タイプ',
+      model: 'モデル',
+      scoreSummary: '総合スコア',
+      strengths: '良かった点',
+      issues: '改善ポイント',
+      suggestions: '改善提案',
+      scores: '各次元スコア',
+      photoInfo: '写真情報',
+      photoId: '写真 ID',
+      favorite: 'お気に入り',
+      tags: 'タグ',
+      note: 'メモ',
+      yes: 'はい',
+      no: 'いいえ',
+    };
+  }
+
+  if (locale === 'en') {
+    return {
+      filePrefix: 'picspeak-summary',
+      title: 'PicSpeak Critique Summary',
+      exportedAt: 'Exported at',
+      reviewInfo: 'Review Info',
+      reviewId: 'Review ID',
+      sourceReviewId: 'Replay source',
+      createdAt: 'Created at',
+      mode: 'Mode',
+      imageType: 'Image type',
+      model: 'Model',
+      scoreSummary: 'Overall Score',
+      strengths: 'Strengths',
+      issues: 'Issues',
+      suggestions: 'Suggestions',
+      scores: 'Dimension Scores',
+      photoInfo: 'Photo Info',
+      photoId: 'Photo ID',
+      favorite: 'Favorite',
+      tags: 'Tags',
+      note: 'Note',
+      yes: 'Yes',
+      no: 'No',
+    };
+  }
+
+  return {
+    filePrefix: 'picspeak-摘要',
+    title: 'PicSpeak 评图摘要',
+    exportedAt: '导出时间',
+    reviewInfo: '评图信息',
+    reviewId: '评图 ID',
+    sourceReviewId: '再次分析来源',
+    createdAt: '创建时间',
+    mode: '评图模式',
+    imageType: '图片类型',
+    model: '模型',
+    scoreSummary: '总分',
+    strengths: '优点',
+    issues: '问题',
+    suggestions: '建议',
+    scores: '分项得分',
+    photoInfo: '照片信息',
+    photoId: '照片 ID',
+    favorite: '收藏',
+    tags: '标签',
+    note: '备注',
+    yes: '是',
+    no: '否',
+  };
+}
+
+function getImageTypeLabelForLocale(locale: 'zh' | 'en' | 'ja', imageType?: CritiqueImageType | string) {
+  const normalized = (imageType ?? 'default') as CritiqueImageType;
+  const zh: Record<CritiqueImageType, string> = {
+    default: '默认',
+    landscape: '风景',
+    portrait: '人像',
+    street: '街拍',
+    still_life: '静物',
+    architecture: '建筑',
+  };
+  const en: Record<CritiqueImageType, string> = {
+    default: 'Default',
+    landscape: 'Landscape',
+    portrait: 'Portrait',
+    street: 'Street',
+    still_life: 'Still Life',
+    architecture: 'Architecture',
+  };
+  const ja: Record<CritiqueImageType, string> = {
+    default: '標準',
+    landscape: '風景',
+    portrait: 'ポートレート',
+    street: 'ストリート',
+    still_life: '静物',
+    architecture: '建築',
+  };
+
+  if (locale === 'ja') return ja[normalized] ?? ja.default;
+  if (locale === 'en') return en[normalized] ?? en.default;
+  return zh[normalized] ?? zh.default;
+}
+
+function formatExposureValue(exposureTime: unknown): string {
+  if (typeof exposureTime === 'string') {
+    const trimmed = exposureTime.trim();
+    if (!trimmed) return '';
+    if (/^\d+\/\d+$/.test(trimmed)) return trimmed;
+    const normalized = trimmed.replace(/sec(onds?)?/i, '').replace(/s$/i, '').trim();
+    const parsed = Number(normalized);
+    if (!Number.isFinite(parsed) || parsed <= 0) return trimmed;
+    exposureTime = parsed;
+  }
+
+  if (typeof exposureTime !== 'number' || exposureTime <= 0) return '';
+  if (exposureTime >= 1) {
+    return `${exposureTime % 1 === 0 ? exposureTime : exposureTime.toFixed(1)}s`;
+  }
+
+  const denominator = Math.round(1 / exposureTime);
+  return denominator > 0 ? `1/${denominator}s` : '';
 }
 
 // ─── Suggestion tag detection ─────────────────────────────────────────────────
@@ -651,10 +868,20 @@ export default function ReviewPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { t, locale } = useI18n();
+  const actionCopy = getReviewActionCopy(locale);
+  const favoriteCopy = getFavoriteActionCopy(locale);
+  const galleryActionCopy = getGalleryActionCopy(locale);
+  const exportSummaryCopy = getExportSummaryCopy(locale);
 
   const reviewId = params.reviewId as string;
   const backHref = searchParams.get('back') ?? '/workspace';
-  const backLabel = backHref === '/account/reviews' ? t('review_back_history') : t('review_back_workspace');
+  const favoritesNavLabel = locale === 'ja' ? 'お気に入り' : locale === 'en' ? 'Favorites' : '我的收藏';
+  const backLabel =
+    backHref === '/account/reviews'
+      ? t('review_back_history')
+      : backHref === '/account/favorites'
+        ? favoritesNavLabel
+        : t('review_back_workspace');
   const { ensureToken, userInfo } = useAuth();
 
   const [review, setReview] = useState<ReviewGetResponse | null>(null);
@@ -670,7 +897,10 @@ export default function ReviewPage() {
   const [usageError, setUsageError] = useState('');
   const [imgNaturalSize, setImgNaturalSize] = useState<{ w: number; h: number } | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
-  const rightColRef = useRef<HTMLDivElement>(null);
+  const [gallerySaved, setGallerySaved] = useState(false);
+  const [actionBusy, setActionBusy] = useState<'share' | 'export' | 'replay' | 'favorite' | null>(null);
+  const [actionFeedback, setActionFeedback] = useState('');
+  const [actionError, setActionError] = useState('');
 
   const resultImageType = review?.result?.image_type ?? 'default';
   const SCORE_DIMS = [
@@ -704,6 +934,10 @@ export default function ReviewPage() {
         setError(formatUserFacingError(t, err, t('review_err_fetch')));
       });
   }, [reviewId, ensureToken, t]);
+
+  useEffect(() => {
+    setGallerySaved(hasGalleryItem(reviewId));
+  }, [reviewId]);
 
   // Fetch usage info for quota-low conversion banner and record failures explicitly.
   useEffect(() => {
@@ -814,44 +1048,186 @@ export default function ReviewPage() {
   const plan = userInfo?.plan ?? 'guest';
   const isLowScore = r.final_score < 5.0;
 
-  function handleShareLink() {
-    navigator.clipboard.writeText(window.location.href).then(() => {
-      setLinkCopied(true);
-      setTimeout(() => setLinkCopied(false), 2000);
-    }).catch(() => {});
+  function buildGallerySummary() {
+    const primarySuggestion = displaySuggestions
+      .split('\n')
+      .map((line) => line.replace(/^\d+\.\s*/, '').trim())
+      .find(Boolean);
+    return primarySuggestion ?? scoreSummary;
   }
 
-  function handleExportSummary() {
+  function handleGalleryToggle() {
     if (!review) return;
-    const dimScores = SCORE_DIMS.map(
-      (d) => `${d.label}: ${((r.scores as unknown as Record<string, number>)[d.key] ?? 0).toFixed(1)}`,
-    ).join(' / ');
-    const lines = [
-      `PicSpeak — ${t('review_page_headline')}`,
-      `${t('score_overall')}: ${r.final_score.toFixed(1)} (${scoreLabel})`,
-      dimScores,
-      '',
-      `——— ${t('review_advantage')} ———`,
-      displayAdvantage,
-      '',
-      `——— ${t('review_critique')} ———`,
-      displayCritique,
-      '',
-      `——— ${t('review_suggestions')} ———`,
-      displaySuggestions,
-      '',
-      `#${review.review_id.slice(0, 8)} · ${new Date(review.created_at).toLocaleString(locale)}`,
-      t('review_ai_disclaimer'),
-    ];
-    const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `picspeak-${review.review_id.slice(0, 8)}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    if (gallerySaved) {
+      removeGalleryItem(review.review_id);
+      setGallerySaved(false);
+      return;
+    }
+
+    if (!window.confirm(galleryActionCopy.confirmPublic)) {
+      return;
+    }
+
+    saveGalleryItem({
+      review_id: review.review_id,
+      photo_id: review.photo_id,
+      photo_url: review.photo_url,
+      photo_thumbnail_url: null,
+      mode: review.mode,
+      image_type: (review.image_type ?? review.result.image_type ?? 'default'),
+      final_score: review.result.final_score,
+      created_at: review.created_at,
+      saved_at: new Date().toISOString(),
+      summary: buildGallerySummary(),
+    });
+    setGallerySaved(true);
+  }
+
+  async function handleBackendShareLink() {
+    if (!review || actionBusy) return;
+
+    setActionBusy('share');
+    setActionError('');
+    setActionFeedback(actionCopy.sharePending);
+
+    try {
+      const token = await ensureToken();
+      const payload = await createReviewShare(review.review_id, token);
+      const sharePageUrl = new URL(`/share/${payload.share_token}`, window.location.origin).toString();
+      await navigator.clipboard.writeText(sharePageUrl);
+      setLinkCopied(true);
+      setActionFeedback(actionCopy.shareDone);
+      setTimeout(() => setLinkCopied(false), 2000);
+    } catch (err) {
+      setActionFeedback('');
+      setActionError(formatUserFacingError(t, err, t('review_err_fetch')));
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  async function handleBackendExportSummary() {
+    if (!review || actionBusy) return;
+
+    setActionBusy('export');
+    setActionError('');
+    setActionFeedback(actionCopy.exportPending);
+
+    try {
+      const token = await ensureToken();
+      const payload = await exportReview(review.review_id, token);
+      const lines = [
+        `# ${exportSummaryCopy.title}`,
+        '',
+        `- ${exportSummaryCopy.exportedAt}: ${new Date(payload.review.exported_at).toLocaleString(locale)}`,
+        `- ${exportSummaryCopy.createdAt}: ${new Date(payload.review.created_at).toLocaleString(locale)}`,
+        '',
+        `## ${exportSummaryCopy.reviewInfo}`,
+        `- ${exportSummaryCopy.reviewId}: ${payload.review.review_id}`,
+        `- ${exportSummaryCopy.mode}: ${payload.review.mode === 'pro' ? 'Pro' : 'Flash'}`,
+        `- ${exportSummaryCopy.imageType}: ${getImageTypeLabelForLocale(locale, payload.review.image_type)}`,
+        `- ${exportSummaryCopy.model}: ${payload.review.model_name}${payload.review.model_version ? ` (${payload.review.model_version})` : ''}`,
+        `- ${exportSummaryCopy.scoreSummary}: ${payload.review.final_score.toFixed(1)} / 10`,
+        `- ${exportSummaryCopy.favorite}: ${payload.review.favorite ? exportSummaryCopy.yes : exportSummaryCopy.no}`,
+      ];
+
+      if (payload.review.source_review_id) {
+        lines.push(`- ${exportSummaryCopy.sourceReviewId}: ${payload.review.source_review_id}`);
+      }
+      if (payload.review.tags.length > 0) {
+        lines.push(`- ${exportSummaryCopy.tags}: ${payload.review.tags.join(' / ')}`);
+      }
+      if (payload.review.note) {
+        lines.push(`- ${exportSummaryCopy.note}: ${payload.review.note}`);
+      }
+
+      lines.push(
+        '',
+        `## ${exportSummaryCopy.scores}`,
+        `- ${t('score_composition')}: ${payload.review.scores.composition.toFixed(1)}`,
+        `- ${t('score_lighting')}: ${payload.review.scores.lighting.toFixed(1)}`,
+        `- ${t('score_color')}: ${payload.review.scores.color.toFixed(1)}`,
+        `- ${t('score_impact')}: ${payload.review.scores.impact.toFixed(1)}`,
+        `- ${t('score_technical')}: ${payload.review.scores.technical.toFixed(1)}`,
+        '',
+        `## ${exportSummaryCopy.strengths}`,
+        payload.review.advantage || '-',
+        '',
+        `## ${exportSummaryCopy.issues}`,
+        payload.review.critique || '-',
+        '',
+        `## ${exportSummaryCopy.suggestions}`,
+        payload.review.suggestions || '-',
+        '',
+        `## ${exportSummaryCopy.photoInfo}`,
+        `- ${exportSummaryCopy.photoId}: ${payload.photo.photo_id}`,
+      );
+
+      const blob = new Blob([lines.join('\n')], {
+        type: 'text/markdown;charset=utf-8',
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${exportSummaryCopy.filePrefix}-${review.review_id.slice(0, 8)}.md`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setActionFeedback(actionCopy.exportDone);
+    } catch (err) {
+      setActionFeedback('');
+      setActionError(formatUserFacingError(t, err, t('review_err_fetch')));
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  async function handleFavoriteToggle() {
+    if (!review || actionBusy) return;
+
+    const nextFavorite = !Boolean(review.favorite);
+    setActionBusy('favorite');
+    setActionError('');
+    setActionFeedback(nextFavorite ? favoriteCopy.pendingAdd : favoriteCopy.pendingRemove);
+
+    try {
+      const token = await ensureToken();
+      const payload = await updateReviewMeta(review.review_id, { favorite: nextFavorite }, token);
+      setReview((prev) => (
+        prev
+          ? {
+              ...prev,
+              favorite: payload.favorite,
+              tags: payload.tags,
+              note: payload.note,
+            }
+          : prev
+      ));
+      setActionFeedback(payload.favorite ? favoriteCopy.doneAdd : favoriteCopy.doneRemove);
+    } catch (err) {
+      setActionFeedback('');
+      setActionError(formatUserFacingError(t, err, t('review_err_fetch')));
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  function handleReplayReview() {
+    if (!review || actionBusy) return;
+
+    setActionBusy('replay');
+    setActionError('');
+    setActionFeedback(actionCopy.replayPending);
+
+    const nextParams = new URLSearchParams({
+      source_review_id: review.review_id,
+      photo_id: review.photo_id,
+      mode: review.mode,
+      image_type: review.image_type ?? review.result.image_type ?? 'default',
+    });
+
+    router.push(`/workspace?${nextParams.toString()}`);
   }
 
   return (
@@ -1000,12 +1376,7 @@ export default function ReviewPage() {
                     : '';
                   const fNumber = exif.FNumber;
                   const aperture = typeof fNumber === 'number' && fNumber > 0 ? `f/${fNumber % 1 === 0 ? fNumber : fNumber.toFixed(1)}` : '';
-                  const expTime = exif.ExposureTime;
-                  let shutter = '';
-                  if (typeof expTime === 'number' && expTime > 0) {
-                    if (expTime >= 1) shutter = `${expTime % 1 === 0 ? expTime : expTime.toFixed(1)}s`;
-                    else shutter = `1/${Math.round(1 / expTime)}s`;
-                  }
+                  const shutter = formatExposureValue(exif.ExposureTime);
                   const iso = typeof exif.ISO === 'number' && exif.ISO > 0 ? String(exif.ISO) : '';
                   const rows: [string, string][] = [
                     [t('review_exif_camera'), camera],
@@ -1032,7 +1403,7 @@ export default function ReviewPage() {
           </div>
 
           {/* ── RIGHT: Results ───────────────────────────────────────────── */}
-          <div ref={rightColRef} className="space-y-6 min-w-0">
+          <div className="space-y-6 min-w-0">
 
             {/* Header */}
             <div>
@@ -1054,8 +1425,9 @@ export default function ReviewPage() {
             {/* Action buttons */}
             <div className="flex flex-wrap gap-2.5">
               <button
-                onClick={() => router.push('/workspace')}
-                className="flex items-center gap-2 px-4 py-2 bg-gold text-void text-sm font-medium rounded hover:bg-gold-light transition-colors"
+                onClick={handleReplayReview}
+                disabled={actionBusy !== null}
+                className="flex items-center gap-2 px-4 py-2 bg-gold text-void text-sm font-medium rounded hover:bg-gold-light transition-colors disabled:opacity-60"
               >
                 <RotateCcw size={13} />
                 {t('review_btn_again')}
@@ -1077,20 +1449,40 @@ export default function ReviewPage() {
                 </Link>
               )}
               <button
-                onClick={handleShareLink}
-                className="flex items-center gap-2 px-4 py-2 border border-border text-ink-muted text-sm rounded hover:border-gold/40 hover:text-gold transition-colors"
+                onClick={handleFavoriteToggle}
+                disabled={actionBusy !== null}
+                className={`flex items-center gap-2 px-4 py-2 border text-sm rounded transition-colors disabled:opacity-60 ${
+                  review.favorite
+                    ? 'border-rust/35 bg-rust/10 text-rust hover:bg-rust/15'
+                    : 'border-border text-ink-muted hover:border-rust/35 hover:text-rust'
+                }`}
+              >
+                <Heart size={13} className={review.favorite ? 'fill-current' : ''} />
+                {review.favorite ? favoriteCopy.remove : favoriteCopy.add}
+              </button>
+              <button
+                onClick={handleBackendShareLink}
+                disabled={actionBusy !== null}
+                className="flex items-center gap-2 px-4 py-2 border border-border text-ink-muted text-sm rounded hover:border-gold/40 hover:text-gold transition-colors disabled:opacity-60"
               >
                 {linkCopied ? <Check size={13} className="text-sage" /> : <Share2 size={13} />}
                 {linkCopied ? t('review_link_copied') : t('review_share_link')}
               </button>
               <button
-                onClick={handleExportSummary}
-                className="flex items-center gap-2 px-4 py-2 border border-border text-ink-muted text-sm rounded hover:border-gold/40 hover:text-gold transition-colors"
+                onClick={handleBackendExportSummary}
+                disabled={actionBusy !== null}
+                className="flex items-center gap-2 px-4 py-2 border border-border text-ink-muted text-sm rounded hover:border-gold/40 hover:text-gold transition-colors disabled:opacity-60"
               >
                 <Download size={13} />
                 {t('review_export_summary')}
               </button>
             </div>
+
+            {(actionFeedback || actionError) && (
+              <div className={`rounded-lg border px-4 py-3 text-sm ${actionError ? 'border-rust/20 bg-rust/5 text-rust' : 'border-sage/20 bg-sage/5 text-sage'}`}>
+                {actionError || actionFeedback}
+              </div>
+            )}
 
             <div className="border-t border-border-subtle" />
 
@@ -1130,6 +1522,42 @@ export default function ReviewPage() {
                 highlightedId={highlightedCardId}
               />
             </div>
+
+            <section className="relative overflow-hidden rounded-[24px] border border-border-subtle bg-[radial-gradient(circle_at_top_left,rgba(200,171,90,0.16),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(149,113,87,0.14),transparent_36%),rgba(18,16,13,0.76)] px-5 py-5">
+              <div className="absolute inset-0 opacity-25 [background-image:linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] [background-size:20px_20px]" />
+              <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="max-w-xl">
+                  <p className="mb-2 inline-flex items-center gap-2 rounded-full border border-gold/20 bg-gold/10 px-3 py-1 text-[11px] uppercase tracking-[0.26em] text-gold/80">
+                    <LayoutGrid size={12} />
+                    {t('review_gallery_label')}
+                  </p>
+                  <h2 className="font-display text-2xl text-ink">{t('review_gallery_title')}</h2>
+                  <p className="mt-2 text-sm leading-7 text-ink-muted">{t('review_gallery_body')}</p>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={handleGalleryToggle}
+                    className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                      gallerySaved
+                        ? 'border border-sage/30 bg-sage/10 text-sage hover:bg-sage/15'
+                        : 'bg-gold text-void hover:bg-gold-light'
+                    }`}
+                  >
+                    {gallerySaved ? <BookmarkCheck size={14} /> : <BookmarkPlus size={14} />}
+                    {gallerySaved ? t('review_gallery_remove') : t('review_gallery_add')}
+                  </button>
+                  <Link
+                    href="/gallery"
+                    className="inline-flex items-center gap-2 rounded-full border border-border-subtle px-4 py-2 text-sm text-ink-muted transition-colors hover:border-gold/30 hover:text-gold"
+                  >
+                    <LayoutGrid size={14} />
+                    {t('review_gallery_open')}
+                  </Link>
+                </div>
+              </div>
+            </section>
 
             {/* AI disclaimer */}
             <p className="text-xs text-ink-subtle pt-2 border-t border-border-subtle">

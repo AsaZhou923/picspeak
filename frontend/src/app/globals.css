@@ -333,6 +333,28 @@ h3 {
 .delay-500 { animation-delay: 500ms; }
 .anim-fill-both { animation-fill-mode: both; }
 
+.date-field {
+  color-scheme: light;
+}
+
+.dark .date-field {
+  color-scheme: dark;
+}
+
+.dark .date-field::-webkit-calendar-picker-indicator {
+  filter: invert(0.86) sepia(0.22) saturate(0.55) hue-rotate(348deg) brightness(1.05);
+  opacity: 0.9;
+  cursor: pointer;
+}
+
+.date-field::-webkit-datetime-edit,
+.date-field::-webkit-datetime-edit-text,
+.date-field::-webkit-datetime-edit-month-field,
+.date-field::-webkit-datetime-edit-day-field,
+.date-field::-webkit-datetime-edit-year-field {
+  color: rgb(var(--color-ink));
+}
+
 /* Score ring stagger (used in demo card) */
 .score-stagger > *:nth-child(1) { animation-delay: 500ms; }
 .score-stagger > *:nth-child(2) { animation-delay: 580ms; }

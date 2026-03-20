@@ -160,10 +160,20 @@ create table reviews
         references photos,
     owner_user_id  bigint                                       not null
         references users,
+    source_review_id bigint
+        references reviews,
     mode           review_mode                                  not null,
     status         review_status                                not null,
+    image_type     text                     default 'default'::text not null,
     schema_version text                     default '1.0'::text not null,
     result_json    jsonb                    default '{}'::jsonb not null,
+    is_public      boolean                  default false        not null,
+    share_token    text
+        unique,
+    favorite       boolean                  default false        not null,
+    tags_json      jsonb                    default '[]'::jsonb not null,
+    note           text,
+    deleted_at     timestamp with time zone,
     input_tokens   integer,
     output_tokens  integer,
     cost_usd       numeric(12, 6),
@@ -185,6 +195,15 @@ create index idx_reviews_photo_created
 
 create index idx_reviews_owner_created
     on reviews (owner_user_id asc, created_at desc);
+
+create index idx_reviews_owner_deleted_created
+    on reviews (owner_user_id asc, deleted_at asc, created_at desc);
+
+create index idx_reviews_owner_image_type_created
+    on reviews (owner_user_id asc, image_type asc, created_at desc);
+
+create index idx_reviews_source_review
+    on reviews (source_review_id);
 
 create trigger trg_reviews_updated_at
     before update

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
-import { Sun, Moon, ChevronDown, Camera, Clock, BarChart2 } from 'lucide-react';
+import { Sun, Moon, ChevronDown, Camera, Clock, BarChart2, BadgeDollarSign, LayoutGrid, ChevronRight, Heart } from 'lucide-react';
 import { Show, SignInButton, SignUpButton, UserButton } from '@clerk/nextjs';
 import { useAuth } from '@/lib/auth-context';
 import { planLabel, planColor } from '@/lib/auth-context';
@@ -59,6 +59,76 @@ function LanguageSwitcher() {
   );
 }
 
+function QuickLinksMenu() {
+  const pathname = usePathname();
+  const { t, locale } = useI18n();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
+
+  const favoritesLabel =
+    locale === 'ja' ? 'お気に入り' : locale === 'en' ? 'Favorites' : '我的收藏';
+
+  const links = [
+    { href: '/account/favorites', label: favoritesLabel, icon: Heart },
+    { href: '/affiliate', label: t('nav_affiliate'), icon: BadgeDollarSign },
+    { href: '/account/usage', label: t('nav_usage'), icon: BarChart2 },
+  ];
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-label={t('nav_more')}
+        aria-expanded={open}
+        className={`flex h-8 items-center gap-1 rounded-full border border-border-subtle bg-raised/55 px-2.5 text-xs text-ink-muted transition-all hover:border-gold/30 hover:text-gold ${
+          open ? 'border-gold/40 text-gold' : ''
+        }`}
+      >
+        <span className="hidden sm:inline">{t('nav_more')}</span>
+        <ChevronDown size={13} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full z-50 mt-2 w-48 overflow-hidden rounded-2xl border border-border-subtle bg-void/95 p-1.5 shadow-[0_18px_48px_rgba(0,0,0,0.28)] backdrop-blur-xl">
+          {links.map(({ href, label, icon: Icon }) => {
+            const active = pathname === href;
+            return (
+              <Link
+                key={href}
+                href={href}
+                className={`flex items-center gap-3 rounded-[14px] px-3 py-2.5 text-sm transition-colors ${
+                  active
+                    ? 'bg-gold/10 text-gold'
+                    : 'text-ink-muted hover:bg-raised hover:text-ink'
+                }`}
+              >
+                <Icon size={15} />
+                <span className="flex-1">{label}</span>
+                <ChevronRight size={13} className="opacity-60" />
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Header() {
   const { userInfo, logout } = useAuth();
   const pathname = usePathname();
@@ -105,6 +175,9 @@ export default function Header() {
           <Link href="/workspace" className={`transition-colors ${isActive('/workspace')}`}>
             {t('nav_workspace')}
           </Link>
+          <Link href="/gallery" className={`transition-colors ${isActive('/gallery')}`}>
+            {t('nav_gallery')}
+          </Link>
           {userInfo && (
             <>
               {userInfo.plan !== 'guest' && (
@@ -112,9 +185,6 @@ export default function Header() {
                   {t('nav_history')}
                 </Link>
               )}
-              <Link href="/account/usage" className={`transition-colors ${isActive('/account/usage')}`}>
-                {t('nav_usage')}
-              </Link>
             </>
           )}
         </nav>
@@ -140,6 +210,7 @@ export default function Header() {
                   {userInfo.plan === 'guest' ? t('plan_guest_label') : planLabel(userInfo.plan)}
                 </span>
               </span>
+              <QuickLinksMenu />
 
               {isLegacyAuthenticated ? (
                 <>
@@ -181,6 +252,7 @@ export default function Header() {
             </div>
           ) : (
             <>
+              <QuickLinksMenu />
               <Show when="signed-out">
                 <SignInButton mode="modal" fallbackRedirectUrl="/workspace">
                   <button
@@ -221,6 +293,17 @@ export default function Header() {
               <Camera size={14} />
               <span className="tracking-wide">{t('nav_workspace')}</span>
             </Link>
+            <Link
+              href="/gallery"
+              className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-[10px] text-[10px] font-medium transition-all duration-200 ${
+                pathname === '/gallery'
+                  ? 'bg-void shadow-sm text-gold'
+                  : 'text-ink-subtle hover:text-ink-muted active:scale-95'
+              }`}
+            >
+              <LayoutGrid size={14} />
+              <span className="tracking-wide">{t('nav_gallery')}</span>
+            </Link>
             {userInfo.plan !== 'guest' && (
               <Link
                 href="/account/reviews"
@@ -234,17 +317,6 @@ export default function Header() {
                 <span className="tracking-wide">{t('nav_history')}</span>
               </Link>
             )}
-            <Link
-              href="/account/usage"
-              className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-[10px] text-[10px] font-medium transition-all duration-200 ${
-                pathname === '/account/usage'
-                  ? 'bg-void shadow-sm text-gold'
-                  : 'text-ink-subtle hover:text-ink-muted active:scale-95'
-              }`}
-            >
-              <BarChart2 size={14} />
-              <span className="tracking-wide">{t('nav_usage')}</span>
-            </Link>
           </nav>
         </div>
       )}

@@ -11,6 +11,8 @@ interface CachedThumbnailProps {
   alt: string;
   size?: number;
   sourceIsThumbnail?: boolean;
+  containerClassName?: string;
+  imageClassName?: string;
 }
 
 export default function CachedThumbnail({
@@ -20,6 +22,8 @@ export default function CachedThumbnail({
   alt,
   size = 64,
   sourceIsThumbnail = false,
+  containerClassName = '',
+  imageClassName = '',
 }: CachedThumbnailProps) {
   const [src, setSrc] = useState<string | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -94,7 +98,7 @@ export default function CachedThumbnail({
   return (
     <div
       ref={containerRef}
-      className="shrink-0 w-16 h-16 rounded overflow-hidden bg-void border border-border-subtle flex items-center justify-center"
+      className={`shrink-0 w-16 h-16 rounded overflow-hidden bg-void border border-border-subtle flex items-center justify-center ${containerClassName}`.trim()}
     >
       {displaySrc ? (
         <img
@@ -102,7 +106,7 @@ export default function CachedThumbnail({
           alt={alt}
           width={size}
           height={size}
-          className="w-full h-full object-cover"
+          className={`w-full h-full object-cover ${imageClassName}`.trim()}
           loading="lazy"
           decoding="async"
           onError={() => {

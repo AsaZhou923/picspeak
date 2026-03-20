@@ -17,8 +17,11 @@ const translations = {
     // Header
     nav_home: '首页',
     nav_workspace: '评图工作台',
+    nav_affiliate: '联盟推广',
     nav_history: '评图历史',
+    nav_gallery: '影像长廊',
     nav_usage: '我的额度',
+    nav_more: '更多',
     theme_dark: '切换至亮色主题',
     theme_light: '切换至暗色主题',
     plan_guest_label: '游客',
@@ -28,7 +31,32 @@ const translations = {
     // Footer
     footer_home: '首页',
     footer_workspace: '评图',
+    footer_affiliate: '联盟',
     footer_usage: '额度',
+
+    // Affiliate page
+    affiliate_badge: 'Affiliate Program',
+    affiliate_title_1: '推广 PicSpeak。',
+    affiliate_title_2: '赚取持续佣金。',
+    affiliate_desc: 'PicSpeak 用 AI 为摄影师提供即时照片点评。产品容易理解、容易试用，也更容易转化。',
+    affiliate_cta_primary: '加入 PicSpeak Affiliates',
+    affiliate_cta_secondary: '查看产品',
+    affiliate_intro_title: '你在推广什么',
+    affiliate_intro_body:
+      'PicSpeak 是一款面向摄影师、内容创作者、学生和爱好者的 AI 摄影点评工具。用户上传照片后，几秒内即可获得构图、光线、色彩、表现力和技术完成度的实用反馈。',
+    affiliate_intro_item_1: 'Guest 模式降低注册门槛。',
+    affiliate_intro_item_2: 'Free 用户登录后可解锁更多额度。',
+    affiliate_intro_item_3: 'Pro 提供不限次数、永久历史记录和优先处理。',
+    affiliate_intro_item_4: 'Pro 价格仅 $3.99/月，试用成本低，更容易成交。',
+    affiliate_commission_title: '你能赚什么',
+    affiliate_commission_rate_caption: '订阅的持续佣金',
+    affiliate_commission_window_caption: '推荐用户跟踪窗口',
+    affiliate_commission_body:
+      '适合摄影、AI 工具、创作者工作流、修图和效率类内容。如果你的受众会购买工具，PicSpeak 有明确的持续收益空间。',
+    affiliate_join_label: 'Join Early',
+    affiliate_join_title: '推荐一个创作者真正会用的产品，然后随着订阅增长持续获利。',
+    affiliate_join_cta: '立即申请',
+    affiliate_product_site: '产品网站',
 
     // Home page
     hero_label: 'AI Photography Critique',
@@ -144,6 +172,17 @@ const translations = {
     reviews_err_fetch: '获取历史失败',
     reviews_err_retry: '重试',
     photo_thumbnail_alt: '照片缩略图',
+    gallery_label: 'Image Gallery',
+    gallery_headline: '影像长廊',
+    gallery_intro: '把你想反复回看的评图结果收进长廊。它更像你的精选接触表，不是全部历史，而是你愿意留下来继续打磨的作品。',
+    gallery_count_label: '已收录',
+    gallery_empty: '长廊里还没有作品',
+    gallery_empty_body: '当你在评图结果页看到值得保留的作品时，把它加入长廊，这里就会逐渐形成你的个人作品墙。',
+    gallery_empty_cta: '先去分析一张照片',
+    gallery_open_review: '打开评图结果',
+    gallery_remove: '移出长廊',
+    gallery_saved_at: '收录时间',
+    gallery_summary_fallback: '这条评图已加入长廊，适合作为之后继续复盘和比较的参考。',
 
     // Account usage
     usage_label: '账户状态',
@@ -330,6 +369,12 @@ const translations = {
     review_share_link: '分享链接',
     review_link_copied: '链接已复制',
     review_export_summary: '导出摘要',
+    review_gallery_label: 'Image Gallery',
+    review_gallery_title: '把这次评图收进你的影像长廊',
+    review_gallery_body: '把真正想保留下来的分析结果放进长廊，后面回看作品进步、风格偏好和得分变化会更直观。',
+    review_gallery_add: '加入影像长廊',
+    review_gallery_remove: '移出影像长廊',
+    review_gallery_open: '查看长廊',
     review_img_resolution: '分辨率',
     review_low_score_title: '分数偏低，试试 Pro 深度建议',
     review_low_score_body: '升级到 Pro 可获得更深入的分析和更具体的改进建议。',
@@ -375,8 +420,11 @@ const translations = {
     // Header
     nav_home: 'Home',
     nav_workspace: 'Workspace',
+    nav_affiliate: 'Affiliates',
     nav_history: 'History',
+    nav_gallery: 'Gallery',
     nav_usage: 'Quota',
+    nav_more: 'More',
     theme_dark: 'Switch to light theme',
     theme_light: 'Switch to dark theme',
     plan_guest_label: 'Guest',
@@ -386,7 +434,34 @@ const translations = {
     // Footer
     footer_home: 'Home',
     footer_workspace: 'Workspace',
+    footer_affiliate: 'Affiliates',
     footer_usage: 'Quota',
+
+    // Affiliate page
+    affiliate_badge: 'Affiliate Program',
+    affiliate_title_1: 'Promote PicSpeak.',
+    affiliate_title_2: 'Earn recurring revenue.',
+    affiliate_desc:
+      'PicSpeak gives photographers instant AI photo critique. It is easy to explain, easy to try, and priced to convert.',
+    affiliate_cta_primary: 'Join PicSpeak Affiliates',
+    affiliate_cta_secondary: 'View Product',
+    affiliate_intro_title: 'What You Promote',
+    affiliate_intro_body:
+      'PicSpeak is an AI photography critique tool for photographers, creators, students, and hobbyists. Users upload a photo and get practical feedback on composition, lighting, color, impact, and technique in seconds.',
+    affiliate_intro_item_1: 'Guest mode removes signup friction.',
+    affiliate_intro_item_2: 'Free users can unlock more usage by signing in.',
+    affiliate_intro_item_3: 'Pro converts with unlimited reviews, permanent history, and priority processing.',
+    affiliate_intro_item_4: 'Pro is priced at $3.99/month, which makes the offer easy to test and easy to sell.',
+    affiliate_commission_title: 'What You Earn',
+    affiliate_commission_rate_caption: 'Recurring commission on subscriptions',
+    affiliate_commission_window_caption: 'Tracking window for referred users',
+    affiliate_commission_body:
+      'This is a fit for photography, AI tools, creator workflow, editing, and productivity audiences. If your traffic trusts tool recommendations, PicSpeak gives you a clear path to recurring affiliate revenue.',
+    affiliate_join_label: 'Join Early',
+    affiliate_join_title:
+      'Recommend a product creators can actually use, then earn as subscriptions grow.',
+    affiliate_join_cta: 'Apply Now',
+    affiliate_product_site: 'Product site',
 
     // Home page
     hero_label: 'AI Photography Critique',
@@ -500,6 +575,17 @@ const translations = {
     reviews_err_fetch: 'Failed to load history',
     reviews_err_retry: 'Retry',
     photo_thumbnail_alt: 'Photo thumbnail',
+    gallery_label: 'Image Gallery',
+    gallery_headline: 'Image Gallery',
+    gallery_intro: 'Keep only the critique results you want to revisit. This is your curated wall, not your full history.',
+    gallery_count_label: 'Collected',
+    gallery_empty: 'Your gallery is still empty',
+    gallery_empty_body: 'When a critique feels worth keeping, add it to the gallery and build a tighter visual edit of your progress.',
+    gallery_empty_cta: 'Analyze a photo first',
+    gallery_open_review: 'Open critique',
+    gallery_remove: 'Remove from gallery',
+    gallery_saved_at: 'Saved on',
+    gallery_summary_fallback: 'Saved to your gallery for future comparison and review.',
 
     // Account usage
     usage_label: 'Account Status',
@@ -686,6 +772,12 @@ const translations = {
     review_share_link: 'Share link',
     review_link_copied: 'Link copied',
     review_export_summary: 'Export summary',
+    review_gallery_label: 'Image Gallery',
+    review_gallery_title: 'Pin this critique into your image gallery',
+    review_gallery_body: 'Keep the results that deserve a second look. Your gallery turns scattered critique sessions into a more intentional visual edit.',
+    review_gallery_add: 'Add to gallery',
+    review_gallery_remove: 'Remove from gallery',
+    review_gallery_open: 'Open gallery',
     review_img_resolution: 'Resolution',
     review_low_score_title: 'Low score? Try Pro for deeper guidance',
     review_low_score_body: 'Upgrade to Pro for deeper analysis and more actionable suggestions.',
@@ -731,8 +823,11 @@ const translations = {
     // Header
     nav_home: 'ホーム',
     nav_workspace: '評価ワークスペース',
+    nav_affiliate: 'アフィリエイト',
     nav_history: '評価履歴',
+    nav_gallery: 'ギャラリー',
     nav_usage: 'クォータ',
+    nav_more: 'その他',
     theme_dark: 'ライトテーマへ切替',
     theme_light: 'ダークテーマへ切替',
     plan_guest_label: 'ゲスト',
@@ -742,7 +837,34 @@ const translations = {
     // Footer
     footer_home: 'ホーム',
     footer_workspace: 'ワークスペース',
+    footer_affiliate: 'アフィリエイト',
     footer_usage: 'クォータ',
+
+    // Affiliate page
+    affiliate_badge: 'Affiliate Program',
+    affiliate_title_1: 'PicSpeakを紹介。',
+    affiliate_title_2: '継続収益を得る。',
+    affiliate_desc:
+      'PicSpeak は写真家向けの AI 写真講評ツールです。伝えやすく、試してもらいやすく、成約しやすい価格設計です。',
+    affiliate_cta_primary: 'PicSpeak Affiliates に参加',
+    affiliate_cta_secondary: '製品を見る',
+    affiliate_intro_title: '何を紹介するのか',
+    affiliate_intro_body:
+      'PicSpeak は写真家、クリエイター、学生、趣味ユーザー向けの AI 写真講評ツールです。写真をアップロードすると、構図、光、色、印象、技術面の実用的なフィードバックを数秒で受け取れます。',
+    affiliate_intro_item_1: 'Guest モードで登録のハードルを下げています。',
+    affiliate_intro_item_2: 'Free ユーザーはサインインで利用枠を増やせます。',
+    affiliate_intro_item_3: 'Pro は無制限レビュー、永続履歴、優先処理で成約しやすい構成です。',
+    affiliate_intro_item_4: 'Pro は月額 $3.99 で、試しやすく売りやすい価格です。',
+    affiliate_commission_title: '何を得られるか',
+    affiliate_commission_rate_caption: 'サブスクリプションの継続コミッション',
+    affiliate_commission_window_caption: '紹介ユーザーのトラッキング期間',
+    affiliate_commission_body:
+      '写真、AI ツール、クリエイターワークフロー、編集、効率化系のオーディエンスと相性があります。ツール紹介で成果が出るトラフィックなら、PicSpeak は継続収益につなげやすいです。',
+    affiliate_join_label: 'Join Early',
+    affiliate_join_title:
+      '実際に使われるプロダクトを紹介し、サブスクリプションの積み上がりと一緒に収益化。',
+    affiliate_join_cta: '今すぐ申請',
+    affiliate_product_site: '製品サイト',
 
     // Home page
     hero_label: 'AI写真評価',
@@ -856,6 +978,17 @@ const translations = {
     reviews_err_fetch: '履歴の取得に失敗しました',
     reviews_err_retry: '再試行',
     photo_thumbnail_alt: '写真サムネイル',
+    gallery_label: 'Image Gallery',
+    gallery_headline: 'イメージギャラリー',
+    gallery_intro: 'あとで見返したい評価結果だけを残す場所です。全履歴ではなく、手元に残したい作品だけを並べます。',
+    gallery_count_label: '保存枚数',
+    gallery_empty: 'ギャラリーはまだ空です',
+    gallery_empty_body: '残しておきたい評価結果が出たらギャラリーに追加してください。作品の変化を見返しやすくなります。',
+    gallery_empty_cta: 'まずは1枚分析する',
+    gallery_open_review: '評価結果を開く',
+    gallery_remove: 'ギャラリーから外す',
+    gallery_saved_at: '保存日',
+    gallery_summary_fallback: 'あとで比較・復盤できるようギャラリーに保存された評価です。',
 
     // Account usage
     usage_label: 'アカウント状態',
@@ -1042,6 +1175,12 @@ const translations = {
     review_share_link: '共有リンク',
     review_link_copied: 'リンクをコピーしました',
     review_export_summary: '要約を出力',
+    review_gallery_label: 'Image Gallery',
+    review_gallery_title: 'この評価をイメージギャラリーに残す',
+    review_gallery_body: 'あとで見返したい評価だけを長廊に集めて、作品の伸びや傾向をひと目で追えるようにします。',
+    review_gallery_add: 'ギャラリーに追加',
+    review_gallery_remove: 'ギャラリーから外す',
+    review_gallery_open: 'ギャラリーを見る',
     review_img_resolution: '解像度',
     review_low_score_title: 'スコアが低めです。Pro で詳細な提案を確認',
     review_low_score_body: 'Pro にアップグレードすると、より深い分析と具体的な改善提案を利用できます。',

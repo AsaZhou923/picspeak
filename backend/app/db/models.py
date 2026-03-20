@@ -151,6 +151,10 @@ class Review(Base):
     __table_args__ = (
         Index('idx_reviews_photo_created', 'photo_id', 'created_at'),
         Index('idx_reviews_owner_created', 'owner_user_id', 'created_at'),
+        Index('idx_reviews_owner_deleted_created', 'owner_user_id', 'deleted_at', 'created_at'),
+        Index('idx_reviews_owner_image_type_created', 'owner_user_id', 'image_type', 'created_at'),
+        Index('idx_reviews_source_review', 'source_review_id'),
+        Index('uq_reviews_share_token', 'share_token', unique=True),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
@@ -158,12 +162,19 @@ class Review(Base):
     task_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey('review_tasks.id'), unique=True)
     photo_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('photos.id'), nullable=False)
     owner_user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('users.id'), nullable=False)
+    source_review_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey('reviews.id'))
     mode: Mapped[ReviewMode] = mapped_column(Enum(ReviewMode, name='review_mode', create_type=False), nullable=False)
     status: Mapped[ReviewStatus] = mapped_column(Enum(ReviewStatus, name='review_status', create_type=False), nullable=False)
+    image_type: Mapped[str] = mapped_column(Text, nullable=False, default='default', server_default='default')
     schema_version: Mapped[str] = mapped_column(Text, nullable=False, default='1.0')
     result_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     final_score: Mapped[float] = mapped_column(Numeric(4, 2), nullable=False)
     is_public: Mapped[bool] = mapped_column(nullable=False, default=False, server_default='false')
+    share_token: Mapped[str | None] = mapped_column(Text)
+    favorite: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default='false')
+    tags_json: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    note: Mapped[str | None] = mapped_column(Text)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     input_tokens: Mapped[int | None] = mapped_column(Integer)
     output_tokens: Mapped[int | None] = mapped_column(Integer)
     cost_usd: Mapped[float | None] = mapped_column(Numeric(12, 6))

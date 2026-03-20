@@ -10,8 +10,13 @@ import {
   PresignResponse,
   ReviewCreateRequest,
   ReviewCreateResponse,
+  ReviewExportResponse,
   ReviewGetResponse,
+  ReviewHistoryQuery,
   ReviewHistoryResponse,
+  ReviewMetaResponse,
+  ReviewMetaUpdateRequest,
+  ReviewShareResponse,
   TaskStatusResponse,
   UsageResponse,
 } from './types';
@@ -315,12 +320,52 @@ export async function getPhotoReviews(
 
 export async function getMyReviews(
   token: string,
-  cursor?: string,
-  limit = 20
+  query: ReviewHistoryQuery = {}
 ): Promise<ReviewHistoryResponse> {
-  const params = new URLSearchParams({ limit: String(limit) });
-  if (cursor) params.set('cursor', cursor);
+  const params = new URLSearchParams({ limit: String(query.limit ?? 20) });
+  if (query.cursor) params.set('cursor', query.cursor);
+  if (query.created_from) params.set('created_from', query.created_from);
+  if (query.created_to) params.set('created_to', query.created_to);
+  if (typeof query.min_score === 'number') params.set('min_score', String(query.min_score));
+  if (typeof query.max_score === 'number') params.set('max_score', String(query.max_score));
+  if (query.image_type) params.set('image_type', query.image_type);
+  if (query.favorite_only) params.set('favorite_only', 'true');
   return request<ReviewHistoryResponse>(`/me/reviews?${params.toString()}`, { token });
+}
+
+export async function createReviewShare(
+  reviewId: string,
+  token: string
+): Promise<ReviewShareResponse> {
+  return request<ReviewShareResponse>(`/reviews/${reviewId}/share`, {
+    method: 'POST',
+    token,
+  });
+}
+
+export async function exportReview(
+  reviewId: string,
+  token: string
+): Promise<ReviewExportResponse> {
+  return request<ReviewExportResponse>(`/reviews/${reviewId}/export`, {
+    token,
+  });
+}
+
+export async function getPublicReview(shareToken: string): Promise<ReviewGetResponse> {
+  return request<ReviewGetResponse>(`/public/reviews/${shareToken}`);
+}
+
+export async function updateReviewMeta(
+  reviewId: string,
+  payload: ReviewMetaUpdateRequest,
+  token: string
+): Promise<ReviewMetaResponse> {
+  return request<ReviewMetaResponse>(`/reviews/${reviewId}/meta`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+    token,
+  });
 }
 
 // ─── Google OAuth URL builder ─────────────────────────────────────────────────

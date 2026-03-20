@@ -29,6 +29,9 @@ export default function Footer() {
           <Link href="/workspace" className="hover:text-ink transition-colors">
             {t('footer_workspace')}
           </Link>
+          <Link href="/affiliate" className="hover:text-ink transition-colors">
+            {t('footer_affiliate')}
+          </Link>
           <Link href="/account/usage" className="hover:text-ink transition-colors">
             {t('footer_usage')}
           </Link>

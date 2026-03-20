@@ -133,6 +133,7 @@ export interface ReviewCreateRequest {
   idempotency_key?: string;
   locale?: 'zh' | 'en' | 'ja';
   image_type?: ImageType;
+  source_review_id?: string;
 }
 
 export interface ReviewCreateAsyncResponse {
@@ -169,6 +170,11 @@ export interface ReviewGetResponse {
   photo_url: string | null;
   mode: ReviewMode;
   status: ReviewStatus;
+  image_type?: ImageType;
+  source_review_id?: string | null;
+  favorite?: boolean;
+  tags?: string[];
+  note?: string | null;
   result: ReviewResult;
   created_at: string;
   exif_data?: Record<string, unknown>;
@@ -192,13 +198,97 @@ export interface ReviewHistoryItem {
   photo_thumbnail_url?: string | null;
   mode: ReviewMode;
   status: ReviewStatus;
+  image_type?: ImageType;
+  source_review_id?: string | null;
   final_score: number;
+  scores?: ReviewScores;
+  model_name?: string;
+  model_version?: string;
+  favorite?: boolean;
+  tags?: string[];
+  note?: string | null;
+  is_shared?: boolean;
   created_at: string;
 }
 
 export interface ReviewHistoryResponse {
   items: ReviewHistoryItem[];
   next_cursor: string | null;
+}
+
+export interface ReviewHistoryQuery {
+  cursor?: string;
+  limit?: number;
+  created_from?: string;
+  created_to?: string;
+  min_score?: number;
+  max_score?: number;
+  image_type?: ImageType;
+  favorite_only?: boolean;
+}
+
+export interface ReviewShareResponse {
+  review_id: string;
+  share_token: string;
+  share_url: string;
+  enabled: boolean;
+}
+
+export interface ReviewMetaUpdateRequest {
+  favorite?: boolean;
+  tags?: string[];
+  note?: string | null;
+}
+
+export interface ReviewMetaResponse {
+  review_id: string;
+  favorite: boolean;
+  tags: string[];
+  note: string | null;
+}
+
+export interface ReviewExportPhoto {
+  photo_id: string;
+  photo_url: string | null;
+  photo_thumbnail_url: string | null;
+}
+
+export interface ReviewExportData {
+  review_id: string;
+  source_review_id: string | null;
+  mode: ReviewMode;
+  status: ReviewStatus;
+  image_type: ImageType;
+  model_name: string;
+  model_version: string;
+  final_score: number;
+  scores: ReviewScores;
+  advantage: string;
+  critique: string;
+  suggestions: string;
+  favorite: boolean;
+  tags: string[];
+  note: string | null;
+  created_at: string;
+  exported_at: string;
+}
+
+export interface ReviewExportResponse {
+  photo: ReviewExportPhoto;
+  review: ReviewExportData;
+}
+
+export interface GalleryItem {
+  review_id: string;
+  photo_id: string;
+  photo_url: string | null;
+  photo_thumbnail_url?: string | null;
+  mode: ReviewMode;
+  image_type: ImageType;
+  final_score: number;
+  created_at: string;
+  saved_at: string;
+  summary: string;
 }
 
 // ─── Error ───────────────────────────────────────────────────────────────────

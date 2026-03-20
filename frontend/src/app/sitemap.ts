@@ -19,6 +19,18 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.9,
     },
     {
+      url: `${siteConfig.url}/affiliate`,
+      lastModified: now,
+      changeFrequency: 'weekly',
+      priority: 0.8,
+    },
+    {
+      url: `${siteConfig.url}/updates`,
+      lastModified: new Date('2026-03-20'),
+      changeFrequency: 'monthly',
+      priority: 0.5,
+    },
+    {
       // Canonical public example of an AI photo critique result
       url: `${siteConfig.url}/reviews/${DEMO_REVIEW_ID}`,
       lastModified: new Date('2026-03-08'),

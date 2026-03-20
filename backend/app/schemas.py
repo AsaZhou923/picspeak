@@ -19,6 +19,10 @@ def default_review_scores() -> dict[str, int]:
     }
 
 
+def default_review_tags() -> list[str]:
+    return []
+
+
 class ErrorPayload(BaseModel):
     code: str
     message: str
@@ -60,6 +64,7 @@ class ReviewCreateRequest(BaseModel):
     photo_id: str
     mode: str = Field(pattern='^(flash|pro)$')
     image_type: str = Field(default='default', pattern='^(default|landscape|portrait|street|still_life|architecture)$')
+    source_review_id: str | None = None
     async_mode: bool = Field(default=True, alias='async')
     idempotency_key: str | None = None
     locale: str = Field(default='zh', pattern='^(zh|en|ja)$')
@@ -135,6 +140,11 @@ class ReviewGetResponse(BaseModel):
     photo_url: str | None = None
     mode: str
     status: str
+    image_type: str = 'default'
+    source_review_id: str | None = None
+    favorite: bool = False
+    tags: list[str] = Field(default_factory=default_review_tags)
+    note: str | None = None
     result: ReviewResult
     created_at: datetime
     exif_data: dict[str, Any] | None = None
@@ -158,13 +168,73 @@ class ReviewHistoryItem(BaseModel):
     photo_thumbnail_url: str | None = None
     mode: str
     status: str
+    image_type: str = 'default'
+    source_review_id: str | None = None
     final_score: float
+    scores: dict[str, int] = Field(default_factory=default_review_scores)
+    model_name: str = ''
+    model_version: str = ''
+    favorite: bool = False
+    tags: list[str] = Field(default_factory=default_review_tags)
+    note: str | None = None
+    is_shared: bool = False
     created_at: datetime
 
 
 class ReviewHistoryResponse(BaseModel):
     items: list[ReviewHistoryItem]
     next_cursor: str | None = None
+
+
+class ReviewShareResponse(BaseModel):
+    review_id: str
+    share_token: str
+    share_url: str
+    enabled: bool = True
+
+
+class ReviewMetaUpdateRequest(BaseModel):
+    favorite: bool | None = None
+    tags: list[str] | None = None
+    note: str | None = None
+
+
+class ReviewMetaResponse(BaseModel):
+    review_id: str
+    favorite: bool = False
+    tags: list[str] = Field(default_factory=default_review_tags)
+    note: str | None = None
+
+
+class ReviewExportPhoto(BaseModel):
+    photo_id: str
+    photo_url: str | None = None
+    photo_thumbnail_url: str | None = None
+
+
+class ReviewExportData(BaseModel):
+    review_id: str
+    source_review_id: str | None = None
+    mode: str
+    status: str
+    image_type: str = 'default'
+    model_name: str = ''
+    model_version: str = ''
+    final_score: float
+    scores: dict[str, int] = Field(default_factory=default_review_scores)
+    advantage: str = ''
+    critique: str = ''
+    suggestions: str = ''
+    favorite: bool = False
+    tags: list[str] = Field(default_factory=default_review_tags)
+    note: str | None = None
+    created_at: datetime
+    exported_at: datetime
+
+
+class ReviewExportResponse(BaseModel):
+    photo: ReviewExportPhoto
+    review: ReviewExportData
 
 
 class UsageQuota(BaseModel):

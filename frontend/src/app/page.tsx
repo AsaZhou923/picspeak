@@ -22,6 +22,11 @@ const DEMO_SCORES_KEYS = [
 export default function HomePage() {
   const { t, locale } = useI18n();
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const updatesCopy = locale === 'ja'
+    ? { label: '更新記録', hint: '最近の変更を見る' }
+    : locale === 'en'
+      ? { label: 'Updates', hint: 'See recent changes' }
+      : { label: '更新记录', hint: '查看最近改动' };
 
   const softwareJsonLd = {
     '@context': 'https://schema.org',
@@ -375,6 +380,16 @@ export default function HomePage() {
                 <p className="text-xs text-ink-subtle mt-0.5">xavierzhou23@gmail.com</p>
               </div>
             </a>
+          </div>
+          <div className="mt-8 flex justify-end">
+            <Link
+              href="/updates"
+              className="inline-flex items-center gap-2 text-xs text-ink-subtle transition-colors hover:text-gold"
+            >
+              <span>{updatesCopy.label}</span>
+              <span className="hidden sm:inline">{updatesCopy.hint}</span>
+              <ArrowRight size={11} />
+            </Link>
           </div>
         </div>
       </section>

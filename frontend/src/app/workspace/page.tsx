@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useCallback, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { CheckCircle, AlertCircle, Info, Zap, Star, X, ArrowRight } from 'lucide-react';
 import Image from 'next/image';
 import {
@@ -9,6 +9,7 @@ import {
   putObjectStorage,
   confirmPhoto,
   createReview,
+  getReview,
   getUsage,
 } from '@/lib/api';
 import ClerkSignInTrigger from '@/components/auth/ClerkSignInTrigger';
@@ -144,12 +145,55 @@ function getEffectiveQuota(
   );
 }
 
+function isImageType(value: string | null): value is ImageType {
+  return value === 'default' ||
+    value === 'landscape' ||
+    value === 'portrait' ||
+    value === 'street' ||
+    value === 'still_life' ||
+    value === 'architecture';
+}
+
+function getReplayCopy(locale: 'zh' | 'en' | 'ja') {
+  if (locale === 'ja') {
+    return {
+      title: '前回の分析を引き継いで再分析',
+      body: '同じ写真を再アップロードせず、そのまま新しい分析を開始できます。必要なら別の写真に切り替えてください。',
+      currentPhoto: '前回の写真を使用',
+      uploadNew: '別の写真をアップロード',
+    };
+  }
+
+  if (locale === 'en') {
+    return {
+      title: 'Replay from the previous analysis',
+      body: 'You can launch a new run from the same photo without uploading again, or switch to a different image if needed.',
+      currentPhoto: 'Use previous photo',
+      uploadNew: 'Upload a different photo',
+    };
+  }
+
+  return {
+    title: '基于上一条分析再次发起评图',
+    body: '可以直接复用上一张照片继续分析，无需重新上传；如果要换图，也可以随时切回上传流程。',
+    currentPhoto: '复用上一张照片',
+    uploadNew: '改为上传新照片',
+  };
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function WorkspacePage() {
+function WorkspacePageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { userInfo, ensureToken, isLoading: authLoading, syncPlan } = useAuth();
   const { t, locale } = useI18n();
+  const replayCopy = getReplayCopy(locale);
+
+  const initialSourceReviewId = searchParams.get('source_review_id');
+  const initialPhotoId = searchParams.get('photo_id');
+  const initialMode = searchParams.get('mode');
+  const initialImageType = searchParams.get('image_type');
 
   const [usage, setUsage] = useState<UsageResponse | null>(null);
   const [usageError, setUsageError] = useState(false);
@@ -166,8 +210,12 @@ export default function WorkspacePage() {
 
   const [reviewMode, setReviewMode] = useState<'flash' | 'pro'>('flash');
   const [imageType, setImageType] = useState<ImageType>('default');
+  const [sourceReviewId, setSourceReviewId] = useState<string | null>(initialSourceReviewId);
+  const [replayPhotoId, setReplayPhotoId] = useState<string | null>(initialPhotoId);
+  const [replayPhotoUrl, setReplayPhotoUrl] = useState<string | null>(null);
   const [showQuotaModal, setShowQuotaModal] = useState(false);
   const { remaining: remainingQuota, total: totalQuota } = getEffectiveQuota(usage, reviewMode);
+  const canReplayWithoutUpload = Boolean(sourceReviewId && replayPhotoId && !preview);
 
   // ── Fetch usage ────────────────────────────────────────────────────────────
 
@@ -196,10 +244,45 @@ export default function WorkspacePage() {
     }
   }, [isGuest, reviewMode]);
 
+  useEffect(() => {
+    if (initialMode === 'flash' || initialMode === 'pro') {
+      setReviewMode(initialMode);
+    }
+  }, [initialMode]);
+
+  useEffect(() => {
+    if (isImageType(initialImageType)) {
+      setImageType(initialImageType);
+    }
+  }, [initialImageType]);
+
+  useEffect(() => {
+    if (!sourceReviewId || preview) return;
+
+    let cancelled = false;
+    ensureToken()
+      .then((token) => getReview(sourceReviewId, token))
+      .then((data) => {
+        if (cancelled) return;
+        setReplayPhotoUrl(data.photo_url);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error('Failed to hydrate replay photo in workspace', err);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [sourceReviewId, preview, ensureToken]);
+
   // ── File selected → upload flow ────────────────────────────────────────────
 
   const handleFileSelected = useCallback(
     async (file: File, dataUrl: string, exif: ExifData = {}) => {
+      setSourceReviewId(null);
+      setReplayPhotoId(null);
+      setReplayPhotoUrl(null);
       setSelectedFile(file);
       setPreview(dataUrl);
       setExifData(exif);
@@ -308,7 +391,8 @@ export default function WorkspacePage() {
   // ── Submit review ──────────────────────────────────────────────────────────
 
   const handleReview = useCallback(async () => {
-    if (!photo) return;
+    const activePhotoId = photo?.photo_id ?? replayPhotoId;
+    if (!activePhotoId) return;
     // Guard: check quota before making any API call
     if (usage && remainingQuota !== null && remainingQuota <= 0) {
       setShowQuotaModal(true);
@@ -319,15 +403,16 @@ export default function WorkspacePage() {
 
     try {
       const token = await ensureToken();
-      const idempotencyKey = `${photo.photo_id}-${reviewMode}-${Date.now()}`;
+      const idempotencyKey = `${activePhotoId}-${reviewMode}-${Date.now()}`;
       const result = await createReview(
         {
-          photo_id: photo.photo_id,
+          photo_id: activePhotoId,
           mode: reviewMode,
           async: true,
           idempotency_key: idempotencyKey,
           locale,
           image_type: imageType,
+          ...(sourceReviewId ? { source_review_id: sourceReviewId } : {}),
         },
         token
       );
@@ -353,7 +438,7 @@ export default function WorkspacePage() {
         setErrMessage(formatUserFacingError(t, err, t('err_upload')));
       }
     }
-  }, [photo, reviewMode, locale, imageType, ensureToken, router, t, usage, remainingQuota]);
+  }, [photo, replayPhotoId, reviewMode, locale, imageType, sourceReviewId, ensureToken, router, t, usage, remainingQuota]);
 
   const handleReset = () => {
     setSelectedFile(null);
@@ -458,10 +543,143 @@ export default function WorkspacePage() {
         {/* Upload zone or preview */}
         <div className="animate-slide-up anim-fill-both delay-100">
           {!preview ? (
-            <ImageUploader
-              onFileSelected={handleFileSelected}
-              disabled={stage !== 'idle' && stage !== 'error'}
-            />
+            <div className="space-y-5">
+              {canReplayWithoutUpload && (
+                <div className="overflow-hidden rounded-[24px] border border-border-subtle bg-[radial-gradient(circle_at_top_left,rgba(200,171,90,0.16),transparent_34%),rgba(18,16,13,0.82)] p-5">
+                  <div className="grid gap-5 md:grid-cols-[180px_1fr]">
+                    <div className="space-y-3">
+                      <div className="relative aspect-[4/3] overflow-hidden rounded-xl border border-border bg-raised">
+                        {replayPhotoUrl ? (
+                          <Image
+                            src={replayPhotoUrl}
+                            alt={replayCopy.currentPhoto}
+                            fill
+                            className="object-cover"
+                            unoptimized
+                          />
+                        ) : (
+                          <div className="flex h-full items-center justify-center px-4 text-center text-xs text-ink-subtle">
+                            {replayCopy.currentPhoto}
+                          </div>
+                        )}
+                      </div>
+                      <div className="rounded-full border border-gold/30 bg-gold/10 px-3 py-1 text-center text-[11px] uppercase tracking-[0.22em] text-gold/85">
+                        {replayCopy.currentPhoto}
+                      </div>
+                    </div>
+
+                    <div className="space-y-5">
+                      <div className="space-y-2">
+                        <h2 className="font-display text-2xl text-ink">{replayCopy.title}</h2>
+                        <p className="text-sm leading-7 text-ink-muted">{replayCopy.body}</p>
+                      </div>
+
+                      <div>
+                        <p className="mb-3 text-xs text-ink-muted">{t('select_image_type')}</p>
+                        <div className="grid grid-cols-3 gap-2">
+                          {([
+                            ['default', t('image_type_default')],
+                            ['landscape', t('image_type_landscape')],
+                            ['portrait', t('image_type_portrait')],
+                            ['street', t('image_type_street')],
+                            ['still_life', t('image_type_still_life')],
+                            ['architecture', t('image_type_architecture')],
+                          ] as const).map(([id, label]) => (
+                            <button
+                              key={id}
+                              type="button"
+                              onClick={() => setImageType(id)}
+                              className={`rounded border px-3 py-2 text-xs transition-colors ${imageType === id ? 'border-gold/60 bg-gold/5 text-gold' : 'border-border text-ink-muted hover:border-gold/30 hover:text-ink'}`}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <p className="mb-3 text-xs text-ink-muted">{t('select_mode')}</p>
+                        <div className="grid grid-cols-2 gap-3">
+                          {(
+                            [
+                              { id: 'flash' as const, icon: Zap, title: 'Flash', desc: t('mode_flash_desc') },
+                              { id: 'pro' as const, icon: Star, title: 'Pro', desc: t('mode_pro_desc') },
+                            ] as const
+                          ).map((modeOption) => {
+                            const disabled = isGuest && modeOption.id === 'pro';
+                            return (
+                              <button
+                                key={modeOption.id}
+                                type="button"
+                                onClick={() => !disabled && setReviewMode(modeOption.id)}
+                                disabled={disabled}
+                                className={`flex items-start gap-3 rounded-lg border p-4 text-left transition-all duration-200 ${
+                                  disabled
+                                    ? 'cursor-not-allowed border-border opacity-40'
+                                    : reviewMode === modeOption.id
+                                      ? 'border-gold/60 bg-gold/5 shadow-[0_0_16px_rgba(200,162,104,0.12)]'
+                                      : 'border-border hover:border-gold/30 hover:bg-raised/60 active:scale-[0.98]'
+                                }`}
+                              >
+                                <modeOption.icon
+                                  size={16}
+                                  className={reviewMode === modeOption.id ? 'mt-0.5 text-gold' : 'mt-0.5 text-ink-subtle'}
+                                />
+                                <div>
+                                  <p className={`text-sm font-medium ${reviewMode === modeOption.id ? 'text-gold' : 'text-ink'}`}>
+                                    {modeOption.title}
+                                  </p>
+                                  <p className="mt-0.5 text-xs text-ink-muted">
+                                    {disabled ? t('mode_pro_guest') : modeOption.desc}
+                                  </p>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <div className="flex gap-3">
+                        <button
+                          type="button"
+                          onClick={handleReview}
+                          disabled={stage === 'reviewing'}
+                          className="btn-gold flex-1 rounded bg-gold px-6 py-3 text-sm font-medium text-void transition-all duration-200 hover:bg-gold-light hover:shadow-[0_0_24px_rgba(200,162,104,0.35)] active:scale-[0.98] disabled:cursor-wait disabled:opacity-70"
+                        >
+                          {t('btn_start_review')} {reviewMode === 'pro' ? 'Pro' : 'Flash'} {t('btn_review_suffix')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSourceReviewId(null);
+                            setReplayPhotoId(null);
+                            setReplayPhotoUrl(null);
+                            setStage('idle');
+                          }}
+                          className="rounded border border-border px-4 py-3 text-sm text-ink-muted transition-all duration-200 hover:border-gold/40 hover:text-ink active:scale-[0.98]"
+                        >
+                          {replayCopy.uploadNew}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {(stage === 'error' && errMessage) && (
+                <div className="flex items-center gap-2 rounded border border-rust/20 bg-rust/5 px-3 py-2 text-sm text-rust animate-scale-in">
+                  <AlertCircle size={14} className="shrink-0" />
+                  <span>{errMessage}</span>
+                </div>
+              )}
+
+              {(!canReplayWithoutUpload || stage === 'idle' || stage === 'error') && (
+                <ImageUploader
+                  onFileSelected={handleFileSelected}
+                  disabled={stage !== 'idle' && stage !== 'error'}
+                />
+              )}
+            </div>
           ) : (
             <div className="space-y-5">
               {/* Image preview */}
@@ -641,5 +859,13 @@ export default function WorkspacePage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function WorkspacePage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen pt-14" />}>
+      <WorkspacePageContent />
+    </Suspense>
   );
 }
