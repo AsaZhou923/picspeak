@@ -72,6 +72,8 @@ from app.schemas import (
     ReviewListItem,
     ReviewMetaResponse,
     ReviewMetaUpdateRequest,
+    PublicGalleryItem,
+    PublicGalleryResponse,
     REVIEW_SCHEMA_VERSION,
     ReviewShareResponse,
     TaskStatusResponse,
@@ -135,6 +137,10 @@ IMAGE_RESAMPLING = getattr(Image, 'Resampling', Image).LANCZOS
 REVIEW_TAG_LIMIT = 8
 REVIEW_TAG_MAX_LENGTH = 32
 REVIEW_NOTE_MAX_LENGTH = 1000
+GALLERY_AUDIT_NONE = 'none'
+GALLERY_AUDIT_APPROVED = 'approved'
+GALLERY_AUDIT_REJECTED = 'rejected'
+GALLERY_AUDIT_VALUES = {GALLERY_AUDIT_NONE, GALLERY_AUDIT_APPROVED, GALLERY_AUDIT_REJECTED}
 
 
 def _build_storage_photo_url(bucket: str, object_key: str) -> str:
@@ -1159,6 +1165,37 @@ def _review_model_version(review: Review) -> str:
     return str(raw_payload.get('model_version') or review.model_name or '')
 
 
+def _review_gallery_audit_status(review: Review) -> str:
+    value = str(review.gallery_audit_status or '').strip().lower()
+    return value if value in GALLERY_AUDIT_VALUES else GALLERY_AUDIT_NONE
+
+
+def _review_gallery_summary(review: Review) -> str:
+    payload = dict(review.result_json or {})
+    for field_name in ('suggestions', 'critique', 'advantage'):
+        raw_value = payload.get(field_name)
+        if not isinstance(raw_value, str):
+            continue
+        for line in raw_value.splitlines():
+            normalized = re.sub(r'^\d+\.\s*', '', line).strip()
+            if normalized:
+                return normalized[:180]
+    return 'Saved to the public gallery.'
+
+
+def _review_meta_payload(review: Review) -> ReviewMetaResponse:
+    return ReviewMetaResponse(
+        review_id=review.public_id,
+        favorite=bool(review.favorite),
+        gallery_visible=bool(review.gallery_visible),
+        gallery_audit_status=_review_gallery_audit_status(review),
+        gallery_added_at=review.gallery_added_at,
+        gallery_rejected_reason=review.gallery_rejected_reason,
+        tags=_normalize_review_tags(review.tags_json if isinstance(review.tags_json, list) else []),
+        note=review.note,
+    )
+
+
 def _review_source_public_id(db: Session, review: Review) -> str | None:
     if not review.source_review_id:
         return None
@@ -1297,9 +1334,28 @@ def _review_history_item(request: Request, review: Review, photo: Photo, owner_p
         model_name=str(review.model_name or ''),
         model_version=_review_model_version(review),
         favorite=bool(review.favorite),
+        gallery_visible=bool(review.gallery_visible),
+        gallery_audit_status=_review_gallery_audit_status(review),
+        gallery_added_at=review.gallery_added_at,
         tags=_normalize_review_tags(review.tags_json if isinstance(review.tags_json, list) else []),
         note=review.note,
         is_shared=bool(review.is_public and review.share_token),
+        created_at=review.created_at,
+    )
+
+
+def _public_gallery_item(request: Request, review: Review, photo: Photo, owner: User) -> PublicGalleryItem:
+    return PublicGalleryItem(
+        review_id=review.public_id,
+        photo_id=photo.public_id,
+        photo_url=_build_photo_proxy_url(request, photo.public_id, owner.public_id),
+        photo_thumbnail_url=_build_photo_proxy_url(request, photo.public_id, owner.public_id, size=PHOTO_THUMBNAIL_SIZE),
+        mode=review.mode.value,
+        image_type=_review_image_type(review),
+        final_score=float(review.final_score),
+        summary=_review_gallery_summary(review),
+        owner_username=owner.username,
+        gallery_added_at=review.gallery_added_at or review.created_at,
         created_at=review.created_at,
     )
 
@@ -1603,6 +1659,42 @@ def execute_review_task(payload: InternalTaskExecuteRequest, request: Request):
     return result
 
 
+@router.get('/gallery', response_model=PublicGalleryResponse)
+def list_public_gallery(
+    request: Request,
+    limit: int = Query(default=24, ge=1, le=60),
+    cursor: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    query = (
+        db.query(Review, Photo, User)
+        .join(Photo, Photo.id == Review.photo_id)
+        .join(User, User.id == Review.owner_user_id)
+        .filter(
+            Review.deleted_at.is_(None),
+            Review.gallery_visible == True,  # noqa: E712
+            Review.gallery_audit_status == GALLERY_AUDIT_APPROVED,
+        )
+        .order_by(Review.gallery_added_at.desc(), Review.id.desc())
+    )
+
+    if cursor:
+        try:
+            cursor_dt = datetime.fromisoformat(cursor)
+        except ValueError as exc:
+            raise api_error(status.HTTP_400_BAD_REQUEST, 'CURSOR_INVALID', 'Invalid cursor') from exc
+        query = query.filter(Review.gallery_added_at < cursor_dt)
+
+    rows = query.limit(limit + 1).all()
+    has_next = len(rows) > limit
+    rows = rows[:limit]
+    items = [_public_gallery_item(request, review, photo, owner) for review, photo, owner in rows]
+    next_cursor = rows[-1][0].gallery_added_at.isoformat() if has_next and rows and rows[-1][0].gallery_added_at else None
+
+    db.commit()
+    return PublicGalleryResponse(items=items, next_cursor=next_cursor)
+
+
 @router.get('/reviews/{review_id}', response_model=ReviewGetResponse)
 def get_review(
     review_id: str,
@@ -1642,7 +1734,12 @@ def get_review(
         status=review.status.value,
         image_type=_review_image_type(review),
         source_review_id=_review_source_public_id(db, review) if is_owner else None,
+        viewer_is_owner=is_owner,
         favorite=bool(review.favorite) if is_owner else False,
+        gallery_visible=bool(review.gallery_visible) if is_owner else False,
+        gallery_audit_status=_review_gallery_audit_status(review) if is_owner else GALLERY_AUDIT_NONE,
+        gallery_added_at=review.gallery_added_at if is_owner else None,
+        gallery_rejected_reason=review.gallery_rejected_reason if is_owner else None,
         tags=_normalize_review_tags(review.tags_json if isinstance(review.tags_json, list) else []) if is_owner else [],
         note=review.note if is_owner else None,
         result=_review_result_payload(
@@ -1688,7 +1785,12 @@ def get_public_review(
         status=review.status.value,
         image_type=_review_image_type(review),
         source_review_id=None,
+        viewer_is_owner=False,
         favorite=False,
+        gallery_visible=False,
+        gallery_audit_status=GALLERY_AUDIT_NONE,
+        gallery_added_at=None,
+        gallery_rejected_reason=None,
         tags=[],
         note=None,
         result=_review_result_payload(
@@ -1838,8 +1940,38 @@ def update_review_meta(
     actor: CurrentActor = Depends(get_current_actor),
 ):
     review = _find_review_owned(db, review_id, actor.user.id)
+    photo = db.query(Photo).filter(Photo.id == review.photo_id).first()
     if payload.favorite is not None:
         review.favorite = bool(payload.favorite)
+    if payload.gallery_visible is not None:
+        if payload.gallery_visible and actor.plan == UserPlan.guest:
+            raise api_error(status.HTTP_403_FORBIDDEN, 'GALLERY_LOGIN_REQUIRED', 'Please sign in before submitting to the gallery')
+
+        if payload.gallery_visible:
+            if photo is None:
+                raise api_error(status.HTTP_404_NOT_FOUND, 'PHOTO_NOT_FOUND', 'Photo not found')
+            try:
+                audit_result = run_content_audit(_build_storage_photo_url(photo.bucket, photo.object_key))
+            except ContentAuditError as exc:
+                raise api_error(status.HTTP_502_BAD_GATEWAY, 'IMAGE_AUDIT_FAILED', f'Image content audit failed: {exc}') from exc
+
+            review.favorite = True
+            review.gallery_visible = True
+            review.gallery_added_at = datetime.now(timezone.utc)
+            if audit_result.safe:
+                review.gallery_audit_status = GALLERY_AUDIT_APPROVED
+                review.gallery_rejected_reason = None
+                review.is_public = True
+            else:
+                review.gallery_audit_status = GALLERY_AUDIT_REJECTED
+                review.gallery_rejected_reason = audit_result.reason or 'Image content did not pass gallery audit'
+                review.is_public = bool(review.share_token)
+        else:
+            review.gallery_visible = False
+            review.gallery_audit_status = GALLERY_AUDIT_NONE
+            review.gallery_added_at = None
+            review.gallery_rejected_reason = None
+            review.is_public = bool(review.share_token)
     if payload.tags is not None:
         review.tags_json = _normalize_review_tags(payload.tags)
     if payload.note is not None:
@@ -1847,12 +1979,7 @@ def update_review_meta(
     db.add(review)
     db.commit()
     db.refresh(review)
-    return ReviewMetaResponse(
-        review_id=review.public_id,
-        favorite=bool(review.favorite),
-        tags=_normalize_review_tags(review.tags_json if isinstance(review.tags_json, list) else []),
-        note=review.note,
-    )
+    return _review_meta_payload(review)
 
 
 @router.get('/reviews/{review_id}/export', response_model=ReviewExportResponse)
@@ -1891,6 +2018,10 @@ def delete_review(
     if review.deleted_at is None:
         review.deleted_at = datetime.now(timezone.utc)
         review.is_public = False
+        review.gallery_visible = False
+        review.gallery_audit_status = GALLERY_AUDIT_NONE
+        review.gallery_added_at = None
+        review.gallery_rejected_reason = None
         db.add(review)
         db.commit()
     else:

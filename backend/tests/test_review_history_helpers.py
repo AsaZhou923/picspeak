@@ -9,7 +9,14 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-from app.api.routes import _build_review_export_payload, _normalize_review_note, _normalize_review_tags, _review_share_info
+from app.api.routes import (
+    _build_review_export_payload,
+    _normalize_review_note,
+    _normalize_review_tags,
+    _review_gallery_summary,
+    _review_meta_payload,
+    _review_share_info,
+)
 from app.db.models import Review, ReviewMode, ReviewStatus
 
 
@@ -69,6 +76,26 @@ class ReviewHistoryHelperTests(unittest.TestCase):
         self.assertEqual(payload.review.image_type, 'street')
         self.assertEqual(payload.review.model_version, '2026-03')
         self.assertEqual(payload.review.tags, ['Night', 'Street'])
+
+    def test_review_gallery_summary_prefers_first_suggestion_line(self) -> None:
+        review = _review()
+
+        summary = _review_gallery_summary(review)
+
+        self.assertEqual(summary, 'Pull highlights down a bit')
+
+    def test_review_meta_payload_includes_gallery_fields(self) -> None:
+        review = _review()
+        review.gallery_visible = True
+        review.gallery_audit_status = 'approved'
+        review.gallery_rejected_reason = None
+        review.gallery_added_at = review.created_at
+
+        payload = _review_meta_payload(review)
+
+        self.assertTrue(payload.gallery_visible)
+        self.assertEqual(payload.gallery_audit_status, 'approved')
+        self.assertEqual(payload.gallery_added_at, review.created_at)
 
     def test_review_share_info_hides_token_for_public_view(self) -> None:
         review = _review()

@@ -142,7 +142,12 @@ class ReviewGetResponse(BaseModel):
     status: str
     image_type: str = 'default'
     source_review_id: str | None = None
+    viewer_is_owner: bool = False
     favorite: bool = False
+    gallery_visible: bool = False
+    gallery_audit_status: str = 'none'
+    gallery_added_at: datetime | None = None
+    gallery_rejected_reason: str | None = None
     tags: list[str] = Field(default_factory=default_review_tags)
     note: str | None = None
     result: ReviewResult
@@ -175,6 +180,9 @@ class ReviewHistoryItem(BaseModel):
     model_name: str = ''
     model_version: str = ''
     favorite: bool = False
+    gallery_visible: bool = False
+    gallery_audit_status: str = 'none'
+    gallery_added_at: datetime | None = None
     tags: list[str] = Field(default_factory=default_review_tags)
     note: str | None = None
     is_shared: bool = False
@@ -195,6 +203,7 @@ class ReviewShareResponse(BaseModel):
 
 class ReviewMetaUpdateRequest(BaseModel):
     favorite: bool | None = None
+    gallery_visible: bool | None = None
     tags: list[str] | None = None
     note: str | None = None
 
@@ -202,8 +211,31 @@ class ReviewMetaUpdateRequest(BaseModel):
 class ReviewMetaResponse(BaseModel):
     review_id: str
     favorite: bool = False
+    gallery_visible: bool = False
+    gallery_audit_status: str = 'none'
+    gallery_added_at: datetime | None = None
+    gallery_rejected_reason: str | None = None
     tags: list[str] = Field(default_factory=default_review_tags)
     note: str | None = None
+
+
+class PublicGalleryItem(BaseModel):
+    review_id: str
+    photo_id: str
+    photo_url: str | None = None
+    photo_thumbnail_url: str | None = None
+    mode: str
+    image_type: str = 'default'
+    final_score: float
+    summary: str = ''
+    owner_username: str
+    gallery_added_at: datetime
+    created_at: datetime
+
+
+class PublicGalleryResponse(BaseModel):
+    items: list[PublicGalleryItem]
+    next_cursor: str | None = None
 
 
 class ReviewExportPhoto(BaseModel):

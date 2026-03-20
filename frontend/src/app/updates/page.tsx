@@ -8,115 +8,115 @@ function getUpdatesCopy(locale: 'zh' | 'en' | 'ja') {
   if (locale === 'ja') {
     return {
       label: 'Update Log',
-      title: '最近の更新記録',
+      title: '公開ギャラリーと審査フローを追加',
       intro:
-        '履歴・復盤・共有・再分析・お気に入りまわりの機能を、今回の更新で前後端ともに実用レベルまで接続しました。',
+        '今回の更新では、イメージギャラリーをサイト全体で閲覧できる公開モードへ切り替え、投稿審査、ゲスト制限、履歴フィルターの視認性改善までまとめて反映しました。',
       date: '2026-03-20',
       sections: [
         {
-          title: '履歴と復盤',
+          title: '公開ギャラリー',
           items: [
-            '履歴一覧でページングを継続利用できるように調整',
-            '時間・スコア・写真タイプでの絞り込みを追加',
-            '履歴カードに共有済み / 復盤連携状態を表示',
+            'ギャラリーをローカル保存からサーバー管理へ移行',
+            '承認済み作品だけをサイト全体で閲覧可能に変更',
+            'カード右下に作者表示を追加し、カード情報量を整理',
           ],
         },
         {
-          title: '共有・エクスポート・再分析',
+          title: '審査と投稿ルール',
           items: [
-            '結果共有はバックエンド発行の share token を使用',
-            '簡版エクスポートは構造化データのダウンロードに変更',
-            '前回の記録を引き継いで同じ写真から再分析できるように改善',
+            'ギャラリー追加時に画像審査を実行',
+            '追加時はお気に入りにも自動保存',
+            'ゲストは閲覧のみ可能で、投稿はログイン後に限定',
           ],
         },
         {
-          title: 'お気に入り',
+          title: '履歴ページ改善',
           items: [
-            '結果ページでお気に入り追加 / 解除が可能',
-            '新しい「お気に入り」ページを追加',
-            'アバター横のドロップダウンに「お気に入り」入口を追加',
+            '暗色テーマで日付ピッカーが見えにくい問題を修正',
+            '日付入力の横幅と表示を調整し、値欠けを改善',
+            'フィルター領域のレイアウトを狭い幅でも崩れにくく調整',
           ],
         },
       ],
-      docLabel: '文档路径',
-      docPath: 'docs/update-log-2026-03-20.md',
-      backHome: 'ホームへ戻る',
+      docLabel: 'Doc path',
+      docPath: 'docs/update-log-2026-03-20-gallery.md',
+      backHome: 'Back home',
     };
   }
 
   if (locale === 'en') {
     return {
       label: 'Update Log',
-      title: 'Recent Product Changes',
+      title: 'Public Gallery and Moderation Flow',
       intro:
-        'This release finishes the practical frontend/backend loop for history, replay analysis, sharing, exports, and favorites.',
+        'This release turns the image gallery into a site-wide public surface, adds moderation on submission, restricts guests to browsing only, and fixes the dark-mode date filters in history.',
       date: '2026-03-20',
       sections: [
         {
-          title: 'History and Replay',
+          title: 'Public Gallery',
           items: [
-            'Added real pagination for review history',
-            'Added filters for time range, score range, and image type',
-            'History cards now surface shared state and replay linkage',
+            'Moved gallery state from local storage to backend-managed data',
+            'Only approved submissions are shown in the site-wide public gallery',
+            'Gallery cards were tightened up and now show the author badge on the image',
           ],
         },
         {
-          title: 'Share, Export, Re-run',
+          title: 'Moderation Rules',
           items: [
-            'Share links now come from backend-issued share tokens',
-            'Compact export now downloads structured backend data',
-            'Re-run analysis can start directly from the previous review record',
+            'Image moderation now runs when a user submits a critique to the gallery',
+            'Submitting to gallery also saves the critique to favorites by default',
+            'Guests can browse the public gallery but cannot submit to it',
           ],
         },
         {
-          title: 'Favorites',
+          title: 'History Filter UI',
           items: [
-            'Favorite / unfavorite actions are available on the result page',
-            'Added a dedicated Favorites page',
-            'Added a Favorites entry inside the avatar dropdown menu',
+            'Improved dark-theme visibility for native date pickers',
+            'Adjusted date field sizing so values no longer clip',
+            'Rebalanced the filter layout for narrower widths',
           ],
         },
       ],
       docLabel: 'Doc path',
-      docPath: 'docs/update-log-2026-03-20.md',
+      docPath: 'docs/update-log-2026-03-20-gallery.md',
       backHome: 'Back home',
     };
   }
 
   return {
     label: 'Update Log',
-    title: '最近更新记录',
+    title: '公开长廊与审核流程更新',
     intro:
-      '这次更新把历史记录、复盘关联、分享、导出、再次分析和收藏能力真正接到了前端，形成了完整使用闭环。',
+      '这次更新把影像长廊从本地私有收藏改成了全站可浏览的公开长廊，同时接入加入长廊后的图片审核、游客只读限制，以及历史页日期筛选的可读性修复。',
     date: '2026-03-20',
     sections: [
       {
-        title: '历史记录与复盘',
+        title: '公开影像长廊',
         items: [
-          '历史列表支持真实分页加载',
-          '新增按时间、评分、图片类型筛选',
-          '历史卡片展示分享状态与复盘关联状态',
+          '影像长廊从前端本地存储切换为后端统一管理',
+          '只有审核通过的作品会出现在全站公开长廊',
+          '长廊卡片缩小重排，并在图片右下角显示作者标识',
         ],
       },
       {
-        title: '分享、导出、再次分析',
+        title: '审核与投稿规则',
         items: [
-          '分享改为使用后端生成的 share token / 公开链接',
-          '简版导出改为下载后端结构化结果数据',
-          '支持从上一条分析记录直接再次发起评图',
+          '用户点击加入长廊时触发图片审核',
+          '加入长廊会默认同步加入收藏',
+          '游客可以浏览公开长廊，但不能提交到长廊',
         ],
       },
       {
-        title: '收藏能力',
+        title: '历史页筛选优化',
         items: [
-          '结果页支持收藏 / 取消收藏',
-          '新增“我的收藏”页面',
-          '头像旁下拉菜单新增“我的收藏”入口',
+          '修复暗色主题下日期选择器对比度不足的问题',
+          '调整日期输入框宽度与字体，避免日期被截断',
+          '收紧筛选区布局，窄宽度下也更稳定',
         ],
       },
     ],
     docLabel: '文档路径',
-    docPath: 'docs/update-log-2026-03-20.md',
+    docPath: 'docs/update-log-2026-03-20-gallery.md',
     backHome: '返回首页',
   };
 }

@@ -147,6 +147,8 @@ function getImageTypeLabel(locale: 'zh' | 'en' | 'ja', imageType?: ImageType) {
 function ReviewCard({ item }: { item: ReviewHistoryItem }) {
   const { locale, t } = useI18n();
   const copy = getHistoryCopy(locale);
+  const galleryRejectedLabel =
+    locale === 'ja' ? 'ギャラリー審査未通過' : locale === 'en' ? 'Gallery rejected' : '长廊审核未通过';
   const dateLocale = locale === 'zh' ? 'zh-CN' : locale === 'ja' ? 'ja-JP' : 'en-US';
   const date = new Date(item.created_at).toLocaleString(dateLocale, {
     year: 'numeric',
@@ -185,6 +187,11 @@ function ReviewCard({ item }: { item: ReviewHistoryItem }) {
           {item.source_review_id && (
             <span className="rounded-full border border-sage/30 bg-sage/10 px-2 py-0.5 text-[11px] text-sage">
               {copy.followUp}
+            </span>
+          )}
+          {item.gallery_visible && item.gallery_audit_status === 'rejected' && (
+            <span className="rounded-full border border-rust/30 bg-rust/10 px-2 py-0.5 text-[11px] font-medium text-rust">
+              {galleryRejectedLabel}
             </span>
           )}
         </div>
@@ -292,7 +299,7 @@ export default function ReviewHistoryPage() {
             <span>{copy.filtersLabel}</span>
           </div>
 
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1.15fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.05fr)]">
+          <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.05fr)]">
             <label className="min-w-0 space-y-2 text-xs text-ink-muted">
               <span>{copy.from}</span>
               <input
@@ -301,7 +308,7 @@ export default function ReviewHistoryPage() {
                 onChange={(event) =>
                   setDraftFilters((prev) => ({ ...prev, createdFrom: event.target.value }))
                 }
-                className="date-field w-full min-w-0 rounded-xl border border-border bg-void/50 px-3 py-2.5 pr-11 font-mono text-sm text-ink [font-variant-numeric:tabular-nums] outline-none transition-colors focus:border-gold/40"
+                className="date-field w-full min-w-0 rounded-xl border border-border bg-void/60 px-3 py-2.5 pr-10 text-[13px] text-ink [font-variant-numeric:tabular-nums] outline-none transition-colors focus:border-gold/40"
               />
             </label>
 
@@ -313,7 +320,7 @@ export default function ReviewHistoryPage() {
                 onChange={(event) =>
                   setDraftFilters((prev) => ({ ...prev, createdTo: event.target.value }))
                 }
-                className="date-field w-full min-w-0 rounded-xl border border-border bg-void/50 px-3 py-2.5 pr-11 font-mono text-sm text-ink [font-variant-numeric:tabular-nums] outline-none transition-colors focus:border-gold/40"
+                className="date-field w-full min-w-0 rounded-xl border border-border bg-void/60 px-3 py-2.5 pr-10 text-[13px] text-ink [font-variant-numeric:tabular-nums] outline-none transition-colors focus:border-gold/40"
               />
             </label>
 
@@ -328,7 +335,7 @@ export default function ReviewHistoryPage() {
                 onChange={(event) =>
                   setDraftFilters((prev) => ({ ...prev, minScore: event.target.value }))
                 }
-                className="w-full min-w-0 rounded-xl border border-border bg-void/50 px-3 py-2.5 text-sm text-ink outline-none transition-colors focus:border-gold/40"
+                className="w-full min-w-0 rounded-xl border border-border bg-void/60 px-3 py-2.5 text-sm text-ink outline-none transition-colors focus:border-gold/40"
               />
             </label>
 
@@ -343,7 +350,7 @@ export default function ReviewHistoryPage() {
                 onChange={(event) =>
                   setDraftFilters((prev) => ({ ...prev, maxScore: event.target.value }))
                 }
-                className="w-full min-w-0 rounded-xl border border-border bg-void/50 px-3 py-2.5 text-sm text-ink outline-none transition-colors focus:border-gold/40"
+                className="w-full min-w-0 rounded-xl border border-border bg-void/60 px-3 py-2.5 text-sm text-ink outline-none transition-colors focus:border-gold/40"
               />
             </label>
 
@@ -357,7 +364,7 @@ export default function ReviewHistoryPage() {
                     imageType: event.target.value as '' | ImageType,
                   }))
                 }
-                className="w-full min-w-0 rounded-xl border border-border bg-void/50 px-3 py-2.5 text-sm text-ink outline-none transition-colors focus:border-gold/40"
+                className="w-full min-w-0 rounded-xl border border-border bg-void/60 px-3 py-2.5 text-sm text-ink outline-none transition-colors focus:border-gold/40"
               >
                 <option value="">{copy.allTypes}</option>
                 {(['default', 'landscape', 'portrait', 'street', 'still_life', 'architecture'] as ImageType[]).map((type) => (

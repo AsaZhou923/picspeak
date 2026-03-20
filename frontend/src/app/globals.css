@@ -335,10 +335,13 @@ h3 {
 
 .date-field {
   color-scheme: light;
+  min-width: 0;
+  line-height: 1.2;
 }
 
 .dark .date-field {
   color-scheme: dark;
+  background-color: rgba(8, 8, 8, 0.72);
 }
 
 .dark .date-field::-webkit-calendar-picker-indicator {
@@ -353,6 +356,19 @@ h3 {
 .date-field::-webkit-datetime-edit-day-field,
 .date-field::-webkit-datetime-edit-year-field {
   color: rgb(var(--color-ink));
+}
+
+.date-field::-webkit-date-and-time-value {
+  min-height: 1.2em;
+  text-align: left;
+}
+
+.date-field::-webkit-datetime-edit {
+  padding-right: 0;
+}
+
+.date-field::-webkit-calendar-picker-indicator {
+  opacity: 0.82;
 }
 
 /* Score ring stagger (used in demo card) */

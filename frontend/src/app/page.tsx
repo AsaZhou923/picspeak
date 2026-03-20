@@ -28,6 +28,12 @@ export default function HomePage() {
       ? { label: 'Updates', hint: 'See recent changes' }
       : { label: '更新记录', hint: '查看最近改动' };
 
+  const homeUpdatesCopy = locale === 'ja'
+    ? { label: '更新记录', hint: '公开ギャラリー更新を見る' }
+    : locale === 'en'
+      ? { label: 'Updates', hint: 'See the public gallery update' }
+      : { label: '更新记录', hint: '查看公开长廊更新' };
+
   const softwareJsonLd = {
     '@context': 'https://schema.org',
     '@type': 'SoftwareApplication',
@@ -386,8 +392,8 @@ export default function HomePage() {
               href="/updates"
               className="inline-flex items-center gap-2 text-xs text-ink-subtle transition-colors hover:text-gold"
             >
-              <span>{updatesCopy.label}</span>
-              <span className="hidden sm:inline">{updatesCopy.hint}</span>
+              <span>{homeUpdatesCopy.label}</span>
+              <span className="hidden sm:inline">{homeUpdatesCopy.hint}</span>
               <ArrowRight size={11} />
             </Link>
           </div>

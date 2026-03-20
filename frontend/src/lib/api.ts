@@ -8,6 +8,7 @@ import {
   PhotoReviewsResponse,
   PresignRequest,
   PresignResponse,
+  PublicGalleryResponse,
   ReviewCreateRequest,
   ReviewCreateResponse,
   ReviewExportResponse,
@@ -331,6 +332,14 @@ export async function getMyReviews(
   if (query.image_type) params.set('image_type', query.image_type);
   if (query.favorite_only) params.set('favorite_only', 'true');
   return request<ReviewHistoryResponse>(`/me/reviews?${params.toString()}`, { token });
+}
+
+export async function getPublicGallery(
+  query: { cursor?: string; limit?: number } = {}
+): Promise<PublicGalleryResponse> {
+  const params = new URLSearchParams({ limit: String(query.limit ?? 24) });
+  if (query.cursor) params.set('cursor', query.cursor);
+  return request<PublicGalleryResponse>(`/gallery?${params.toString()}`);
 }
 
 export async function createReviewShare(

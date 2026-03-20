@@ -172,7 +172,12 @@ export interface ReviewGetResponse {
   status: ReviewStatus;
   image_type?: ImageType;
   source_review_id?: string | null;
+  viewer_is_owner?: boolean;
   favorite?: boolean;
+  gallery_visible?: boolean;
+  gallery_audit_status?: 'none' | 'approved' | 'rejected';
+  gallery_added_at?: string | null;
+  gallery_rejected_reason?: string | null;
   tags?: string[];
   note?: string | null;
   result: ReviewResult;
@@ -205,6 +210,9 @@ export interface ReviewHistoryItem {
   model_name?: string;
   model_version?: string;
   favorite?: boolean;
+  gallery_visible?: boolean;
+  gallery_audit_status?: 'none' | 'approved' | 'rejected';
+  gallery_added_at?: string | null;
   tags?: string[];
   note?: string | null;
   is_shared?: boolean;
@@ -236,6 +244,7 @@ export interface ReviewShareResponse {
 
 export interface ReviewMetaUpdateRequest {
   favorite?: boolean;
+  gallery_visible?: boolean;
   tags?: string[];
   note?: string | null;
 }
@@ -243,6 +252,10 @@ export interface ReviewMetaUpdateRequest {
 export interface ReviewMetaResponse {
   review_id: string;
   favorite: boolean;
+  gallery_visible: boolean;
+  gallery_audit_status: 'none' | 'approved' | 'rejected';
+  gallery_added_at: string | null;
+  gallery_rejected_reason: string | null;
   tags: string[];
   note: string | null;
 }
@@ -278,7 +291,7 @@ export interface ReviewExportResponse {
   review: ReviewExportData;
 }
 
-export interface GalleryItem {
+export interface PublicGalleryItem {
   review_id: string;
   photo_id: string;
   photo_url: string | null;
@@ -286,9 +299,15 @@ export interface GalleryItem {
   mode: ReviewMode;
   image_type: ImageType;
   final_score: number;
-  created_at: string;
-  saved_at: string;
   summary: string;
+  owner_username: string;
+  gallery_added_at: string;
+  created_at: string;
+}
+
+export interface PublicGalleryResponse {
+  items: PublicGalleryItem[];
+  next_cursor: string | null;
 }
 
 // ─── Error ───────────────────────────────────────────────────────────────────

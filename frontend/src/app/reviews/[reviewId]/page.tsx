@@ -14,7 +14,6 @@ import { SkeletonBlock } from '@/components/ui/LoadingSpinner';
 import { isDemoReviewId } from '@/lib/demo-review';
 import { useI18n } from '@/lib/i18n';
 import { formatUserFacingError } from '@/lib/error-utils';
-import { hasGalleryItem, removeGalleryItem, saveGalleryItem } from '@/lib/gallery';
 
 // ─── Score helpers ────────────────────────────────────────────────────────────
 
@@ -311,20 +310,58 @@ function getFavoriteActionCopy(locale: 'zh' | 'en' | 'ja') {
 function getGalleryActionCopy(locale: 'zh' | 'en' | 'ja') {
   if (locale === 'ja') {
     return {
+      dialogLabel: 'Public Gallery',
+      dialogTitle: '公開ギャラリーに追加',
+      dialogBody:
+        '追加すると公開展示候補として画像審査が行われます。お気に入りにも自動保存され、承認後に公開ギャラリーへ表示されます。',
+      dialogFootnote: 'あとで履歴詳細ページからギャラリー解除できます。',
+      dialogConfirm: '追加する',
+      dialogCancel: 'キャンセル',
       confirmPublic:
-        'この評価を長廊に追加すると、公開展示として他のユーザーからも閲覧できる想定です。続行しますか？',
+        'この評価をギャラリーに追加すると、公開展示候補として画像監査が行われます。追加時にお気に入りにも保存され、監査通過後に公開ギャラリーへ表示されます。後で履歴詳細ページから外せます。続行しますか？',
+      pendingAdd: 'ギャラリー掲載を申請中...',
+      pendingRemove: 'ギャラリーから外しています...',
+      doneApproved: 'ギャラリーに追加され、お気に入りにも保存されました',
+      doneRejected: 'お気に入りには保存しましたが、画像監査未通過のため公開ギャラリーには表示されません',
+      doneRemove: 'ギャラリーから外しました',
+      guestBlocked: '公開ギャラリーへの投稿はログイン後に利用できます。閲覧はそのままできます。',
     };
   }
 
   if (locale === 'en') {
     return {
+      dialogLabel: 'Public Gallery',
+      dialogTitle: 'Submit to Public Gallery',
+      dialogBody:
+        'This will send the image through gallery moderation. It will also be saved to favorites by default and will appear publicly after approval.',
+      dialogFootnote: 'You can remove it later from the history detail page.',
+      dialogConfirm: 'Submit',
+      dialogCancel: 'Cancel',
       confirmPublic:
-        'Adding this critique to the gallery means it is intended to appear in the public gallery for other users to view. Continue?',
+        'Adding this critique submits the image for gallery moderation. It will also be saved to favorites by default, and will appear in the public gallery after approval. You can remove it later from the history detail page. Continue?',
+      pendingAdd: 'Submitting to gallery...',
+      pendingRemove: 'Removing from gallery...',
+      doneApproved: 'Added to gallery and saved to favorites',
+      doneRejected: 'Saved to favorites, but the image did not pass gallery moderation and will not appear publicly',
+      doneRemove: 'Removed from gallery',
+      guestBlocked: 'Sign in to submit to the public gallery. Browsing the gallery is still available.',
     };
   }
 
   return {
-    confirmPublic: '加入影像长廊后，这条评图结果会按公开展示处理，其他用户也可能看到。是否继续加入？',
+    dialogLabel: 'Public Gallery',
+    dialogTitle: '加入公开影像长廊',
+    dialogBody: '加入后会进入公开长廊审核，默认也会加入收藏；审核通过后才会出现在公开长廊。',
+    dialogFootnote: '之后可在历史记录详情页里移出长廊。',
+    dialogConfirm: '确认加入',
+    dialogCancel: '取消',
+    confirmPublic: '加入影像长廊后，图片会进入公开长廊审核，默认也会加入收藏；审核通过后才会出现在公开长廊。之后你可以在历史记录详情页里移出长廊。是否继续？',
+    pendingAdd: '正在提交到影像长廊...',
+    pendingRemove: '正在移出影像长廊...',
+    doneApproved: '已加入影像长廊，并默认加入收藏',
+    doneRejected: '已加入收藏，但图片未通过长廊审核，不会出现在公开长廊',
+    doneRemove: '已移出影像长廊',
+    guestBlocked: '游客可以浏览公开长廊，但不能提交到长廊，请先登录。',
   };
 }
 
@@ -897,8 +934,8 @@ export default function ReviewPage() {
   const [usageError, setUsageError] = useState('');
   const [imgNaturalSize, setImgNaturalSize] = useState<{ w: number; h: number } | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
-  const [gallerySaved, setGallerySaved] = useState(false);
-  const [actionBusy, setActionBusy] = useState<'share' | 'export' | 'replay' | 'favorite' | null>(null);
+  const [galleryConfirmOpen, setGalleryConfirmOpen] = useState(false);
+  const [actionBusy, setActionBusy] = useState<'share' | 'export' | 'replay' | 'favorite' | 'gallery' | null>(null);
   const [actionFeedback, setActionFeedback] = useState('');
   const [actionError, setActionError] = useState('');
 
@@ -920,6 +957,15 @@ export default function ReviewPage() {
   }, [zoomOpen]);
 
   useEffect(() => {
+    if (!galleryConfirmOpen) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setGalleryConfirmOpen(false);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [galleryConfirmOpen]);
+
+  useEffect(() => {
     ensureToken()
       .then((token) => getReview(reviewId, token))
       .then((data) => {
@@ -934,10 +980,6 @@ export default function ReviewPage() {
         setError(formatUserFacingError(t, err, t('review_err_fetch')));
       });
   }, [reviewId, ensureToken, t]);
-
-  useEffect(() => {
-    setGallerySaved(hasGalleryItem(reviewId));
-  }, [reviewId]);
 
   // Fetch usage info for quota-low conversion banner and record failures explicitly.
   useEffect(() => {
@@ -1046,45 +1088,72 @@ export default function ReviewPage() {
     quotaTotal > 0 &&
     (quotaRemaining <= 2 || quotaRemaining / quotaTotal <= 0.2);
   const plan = userInfo?.plan ?? 'guest';
+  const isPublicGalleryContext = backHref === '/gallery';
+  const canManageReview = Boolean(review.viewer_is_owner);
+  const showPersonalActions = !isPublicGalleryContext;
+  const showOwnerActions = canManageReview && !isPublicGalleryContext;
+  const gallerySaved = Boolean(review.gallery_visible);
   const isLowScore = r.final_score < 5.0;
 
-  function buildGallerySummary() {
-    const primarySuggestion = displaySuggestions
-      .split('\n')
-      .map((line) => line.replace(/^\d+\.\s*/, '').trim())
-      .find(Boolean);
-    return primarySuggestion ?? scoreSummary;
+  async function handleGalleryToggle() {
+    if (!review || actionBusy) return;
+    if (!canManageReview || plan === 'guest') {
+      setActionError(galleryActionCopy.guestBlocked);
+      setActionFeedback('');
+      return;
+    }
+
+    const nextVisible = !gallerySaved;
+    if (nextVisible) {
+      setGalleryConfirmOpen(true);
+      return;
+    }
+
+    await submitGalleryToggle(false);
   }
 
-  function handleGalleryToggle() {
-    if (!review) return;
-    if (gallerySaved) {
-      removeGalleryItem(review.review_id);
-      setGallerySaved(false);
-      return;
-    }
+  async function submitGalleryToggle(nextVisible: boolean) {
+    if (!review || actionBusy) return;
 
-    if (!window.confirm(galleryActionCopy.confirmPublic)) {
-      return;
-    }
+    setActionBusy('gallery');
+    setActionError('');
+    setActionFeedback(nextVisible ? galleryActionCopy.pendingAdd : galleryActionCopy.pendingRemove);
 
-    saveGalleryItem({
-      review_id: review.review_id,
-      photo_id: review.photo_id,
-      photo_url: review.photo_url,
-      photo_thumbnail_url: null,
-      mode: review.mode,
-      image_type: (review.image_type ?? review.result.image_type ?? 'default'),
-      final_score: review.result.final_score,
-      created_at: review.created_at,
-      saved_at: new Date().toISOString(),
-      summary: buildGallerySummary(),
-    });
-    setGallerySaved(true);
+    try {
+      setGalleryConfirmOpen(false);
+      const token = await ensureToken();
+      const payload = await updateReviewMeta(review.review_id, { gallery_visible: nextVisible }, token);
+      setReview((prev) => (
+        prev
+          ? {
+              ...prev,
+              favorite: payload.favorite,
+              gallery_visible: payload.gallery_visible,
+              gallery_audit_status: payload.gallery_audit_status,
+              gallery_added_at: payload.gallery_added_at,
+              gallery_rejected_reason: payload.gallery_rejected_reason,
+              tags: payload.tags,
+              note: payload.note,
+            }
+          : prev
+      ));
+      if (!payload.gallery_visible) {
+        setActionFeedback(galleryActionCopy.doneRemove);
+      } else if (payload.gallery_audit_status === 'approved') {
+        setActionFeedback(galleryActionCopy.doneApproved);
+      } else {
+        setActionFeedback(payload.gallery_rejected_reason || galleryActionCopy.doneRejected);
+      }
+    } catch (err) {
+      setActionFeedback('');
+      setActionError(formatUserFacingError(t, err, t('review_err_fetch')));
+    } finally {
+      setActionBusy(null);
+    }
   }
 
   async function handleBackendShareLink() {
-    if (!review || actionBusy) return;
+    if (!review || actionBusy || !canManageReview) return;
 
     setActionBusy('share');
     setActionError('');
@@ -1107,7 +1176,7 @@ export default function ReviewPage() {
   }
 
   async function handleBackendExportSummary() {
-    if (!review || actionBusy) return;
+    if (!review || actionBusy || !canManageReview) return;
 
     setActionBusy('export');
     setActionError('');
@@ -1184,7 +1253,7 @@ export default function ReviewPage() {
   }
 
   async function handleFavoriteToggle() {
-    if (!review || actionBusy) return;
+    if (!review || actionBusy || !canManageReview) return;
 
     const nextFavorite = !Boolean(review.favorite);
     setActionBusy('favorite');
@@ -1214,7 +1283,7 @@ export default function ReviewPage() {
   }
 
   function handleReplayReview() {
-    if (!review || actionBusy) return;
+    if (!review || actionBusy || !canManageReview) return;
 
     setActionBusy('replay');
     setActionError('');
@@ -1232,6 +1301,62 @@ export default function ReviewPage() {
 
   return (
     <div className="pt-14 min-h-screen">
+      {galleryConfirmOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center px-6"
+          onClick={() => setGalleryConfirmOpen(false)}
+        >
+          <div className="absolute inset-0 bg-[#050505]/98" />
+          <div
+            className="relative w-full max-w-lg overflow-hidden rounded-[24px] border border-[#2b2722] bg-[#11100e] p-6 shadow-[0_32px_96px_rgba(0,0,0,0.72)] animate-fade-in"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="gallery-confirm-title"
+          >
+            <button
+              type="button"
+              onClick={() => setGalleryConfirmOpen(false)}
+              className="absolute right-4 top-4 rounded-full border border-border-subtle p-2 text-ink-muted transition-colors hover:border-gold/30 hover:text-gold"
+              aria-label={galleryActionCopy.dialogCancel}
+            >
+              <X size={14} />
+            </button>
+
+            <div className="mb-5">
+              <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-gold/20 bg-gold/10 px-3 py-1 text-[11px] uppercase tracking-[0.24em] text-gold/80">
+                <LayoutGrid size={12} />
+                {galleryActionCopy.dialogLabel}
+              </p>
+              <h2 id="gallery-confirm-title" className="font-display text-3xl text-ink">
+                {galleryActionCopy.dialogTitle}
+              </h2>
+              <p className="mt-3 text-sm leading-7 text-ink-muted">{galleryActionCopy.dialogBody}</p>
+              <div className="mt-4 rounded-2xl border border-[#26231f] bg-[#161412] px-4 py-3 text-xs leading-6 text-ink-muted">
+                {galleryActionCopy.dialogFootnote}
+              </div>
+            </div>
+
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setGalleryConfirmOpen(false)}
+                className="rounded-full border border-border px-4 py-2.5 text-sm text-ink-muted transition-colors hover:border-gold/30 hover:text-ink"
+              >
+                {galleryActionCopy.dialogCancel}
+              </button>
+              <button
+                type="button"
+                onClick={() => submitGalleryToggle(true)}
+                disabled={actionBusy !== null}
+                className="rounded-full bg-gold px-5 py-2.5 text-sm font-medium text-void transition-colors hover:bg-gold-light disabled:opacity-60"
+              >
+                {galleryActionCopy.dialogConfirm}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="max-w-6xl mx-auto px-6 py-12 animate-fade-in">
 
         {/* Back */}
@@ -1423,60 +1548,66 @@ export default function ReviewPage() {
             </div>
 
             {/* Action buttons */}
-            <div className="flex flex-wrap gap-2.5">
-              <button
-                onClick={handleReplayReview}
-                disabled={actionBusy !== null}
-                className="flex items-center gap-2 px-4 py-2 bg-gold text-void text-sm font-medium rounded hover:bg-gold-light transition-colors disabled:opacity-60"
-              >
-                <RotateCcw size={13} />
-                {t('review_btn_again')}
-              </button>
-              <button
-                onClick={() => router.push('/workspace')}
-                className="flex items-center gap-2 px-4 py-2 border border-border text-ink-muted text-sm rounded hover:border-gold/40 hover:text-gold transition-colors"
-              >
-                <Upload size={13} />
-                {t('review_btn_upload_next')}
-              </button>
-              {userInfo?.plan !== 'guest' && (
-                <Link
-                  href="/account/reviews"
+            {showPersonalActions && (
+              <div className="flex flex-wrap gap-2.5">
+                <button
+                  onClick={() => router.push('/workspace')}
                   className="flex items-center gap-2 px-4 py-2 border border-border text-ink-muted text-sm rounded hover:border-gold/40 hover:text-gold transition-colors"
                 >
-                  <History size={13} />
-                  {t('review_btn_history_all')}
-                </Link>
-              )}
-              <button
-                onClick={handleFavoriteToggle}
-                disabled={actionBusy !== null}
-                className={`flex items-center gap-2 px-4 py-2 border text-sm rounded transition-colors disabled:opacity-60 ${
-                  review.favorite
-                    ? 'border-rust/35 bg-rust/10 text-rust hover:bg-rust/15'
-                    : 'border-border text-ink-muted hover:border-rust/35 hover:text-rust'
-                }`}
-              >
-                <Heart size={13} className={review.favorite ? 'fill-current' : ''} />
-                {review.favorite ? favoriteCopy.remove : favoriteCopy.add}
-              </button>
-              <button
-                onClick={handleBackendShareLink}
-                disabled={actionBusy !== null}
-                className="flex items-center gap-2 px-4 py-2 border border-border text-ink-muted text-sm rounded hover:border-gold/40 hover:text-gold transition-colors disabled:opacity-60"
-              >
-                {linkCopied ? <Check size={13} className="text-sage" /> : <Share2 size={13} />}
-                {linkCopied ? t('review_link_copied') : t('review_share_link')}
-              </button>
-              <button
-                onClick={handleBackendExportSummary}
-                disabled={actionBusy !== null}
-                className="flex items-center gap-2 px-4 py-2 border border-border text-ink-muted text-sm rounded hover:border-gold/40 hover:text-gold transition-colors disabled:opacity-60"
-              >
-                <Download size={13} />
-                {t('review_export_summary')}
-              </button>
-            </div>
+                  <Upload size={13} />
+                  {t('review_btn_upload_next')}
+                </button>
+                {showOwnerActions && (
+                  <>
+                    <button
+                      onClick={handleReplayReview}
+                      disabled={actionBusy !== null}
+                      className="flex items-center gap-2 px-4 py-2 bg-gold text-void text-sm font-medium rounded hover:bg-gold-light transition-colors disabled:opacity-60"
+                    >
+                      <RotateCcw size={13} />
+                      {t('review_btn_again')}
+                    </button>
+                    {userInfo?.plan !== 'guest' && (
+                      <Link
+                        href="/account/reviews"
+                        className="flex items-center gap-2 px-4 py-2 border border-border text-ink-muted text-sm rounded hover:border-gold/40 hover:text-gold transition-colors"
+                      >
+                        <History size={13} />
+                        {t('review_btn_history_all')}
+                      </Link>
+                    )}
+                    <button
+                      onClick={handleFavoriteToggle}
+                      disabled={actionBusy !== null}
+                      className={`flex items-center gap-2 px-4 py-2 border text-sm rounded transition-colors disabled:opacity-60 ${
+                        review.favorite
+                          ? 'border-rust/35 bg-rust/10 text-rust hover:bg-rust/15'
+                          : 'border-border text-ink-muted hover:border-rust/35 hover:text-rust'
+                      }`}
+                    >
+                      <Heart size={13} className={review.favorite ? 'fill-current' : ''} />
+                      {review.favorite ? favoriteCopy.remove : favoriteCopy.add}
+                    </button>
+                    <button
+                      onClick={handleBackendShareLink}
+                      disabled={actionBusy !== null}
+                      className="flex items-center gap-2 px-4 py-2 border border-border text-ink-muted text-sm rounded hover:border-gold/40 hover:text-gold transition-colors disabled:opacity-60"
+                    >
+                      {linkCopied ? <Check size={13} className="text-sage" /> : <Share2 size={13} />}
+                      {linkCopied ? t('review_link_copied') : t('review_share_link')}
+                    </button>
+                    <button
+                      onClick={handleBackendExportSummary}
+                      disabled={actionBusy !== null}
+                      className="flex items-center gap-2 px-4 py-2 border border-border text-ink-muted text-sm rounded hover:border-gold/40 hover:text-gold transition-colors disabled:opacity-60"
+                    >
+                      <Download size={13} />
+                      {t('review_export_summary')}
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
 
             {(actionFeedback || actionError) && (
               <div className={`rounded-lg border px-4 py-3 text-sm ${actionError ? 'border-rust/20 bg-rust/5 text-rust' : 'border-sage/20 bg-sage/5 text-sage'}`}>
@@ -1523,41 +1654,44 @@ export default function ReviewPage() {
               />
             </div>
 
-            <section className="relative overflow-hidden rounded-[24px] border border-border-subtle bg-[radial-gradient(circle_at_top_left,rgba(200,171,90,0.16),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(149,113,87,0.14),transparent_36%),rgba(18,16,13,0.76)] px-5 py-5">
-              <div className="absolute inset-0 opacity-25 [background-image:linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] [background-size:20px_20px]" />
-              <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div className="max-w-xl">
-                  <p className="mb-2 inline-flex items-center gap-2 rounded-full border border-gold/20 bg-gold/10 px-3 py-1 text-[11px] uppercase tracking-[0.26em] text-gold/80">
-                    <LayoutGrid size={12} />
-                    {t('review_gallery_label')}
-                  </p>
-                  <h2 className="font-display text-2xl text-ink">{t('review_gallery_title')}</h2>
-                  <p className="mt-2 text-sm leading-7 text-ink-muted">{t('review_gallery_body')}</p>
-                </div>
+            {showOwnerActions && (
+              <section className="relative overflow-hidden rounded-[24px] border border-border-subtle bg-[radial-gradient(circle_at_top_left,rgba(200,171,90,0.16),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(149,113,87,0.14),transparent_36%),rgba(18,16,13,0.76)] px-5 py-5">
+                <div className="absolute inset-0 opacity-25 [background-image:linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] [background-size:20px_20px]" />
+                <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="max-w-xl">
+                    <p className="mb-2 inline-flex items-center gap-2 rounded-full border border-gold/20 bg-gold/10 px-3 py-1 text-[11px] uppercase tracking-[0.26em] text-gold/80">
+                      <LayoutGrid size={12} />
+                      {t('review_gallery_label')}
+                    </p>
+                    <h2 className="font-display text-2xl text-ink">{t('review_gallery_title')}</h2>
+                    <p className="mt-2 text-sm leading-7 text-ink-muted">{t('review_gallery_body')}</p>
+                  </div>
 
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={handleGalleryToggle}
-                    className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-                      gallerySaved
-                        ? 'border border-sage/30 bg-sage/10 text-sage hover:bg-sage/15'
-                        : 'bg-gold text-void hover:bg-gold-light'
-                    }`}
-                  >
-                    {gallerySaved ? <BookmarkCheck size={14} /> : <BookmarkPlus size={14} />}
-                    {gallerySaved ? t('review_gallery_remove') : t('review_gallery_add')}
-                  </button>
-                  <Link
-                    href="/gallery"
-                    className="inline-flex items-center gap-2 rounded-full border border-border-subtle px-4 py-2 text-sm text-ink-muted transition-colors hover:border-gold/30 hover:text-gold"
-                  >
-                    <LayoutGrid size={14} />
-                    {t('review_gallery_open')}
-                  </Link>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={handleGalleryToggle}
+                      disabled={actionBusy !== null}
+                      className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors disabled:opacity-60 ${
+                        gallerySaved
+                          ? 'border border-sage/30 bg-sage/10 text-sage hover:bg-sage/15'
+                          : 'bg-gold text-void hover:bg-gold-light'
+                      }`}
+                    >
+                      {gallerySaved ? <BookmarkCheck size={14} /> : <BookmarkPlus size={14} />}
+                      {gallerySaved ? t('review_gallery_remove') : t('review_gallery_add')}
+                    </button>
+                    <Link
+                      href="/gallery"
+                      className="inline-flex items-center gap-2 rounded-full border border-border-subtle px-4 py-2 text-sm text-ink-muted transition-colors hover:border-gold/30 hover:text-gold"
+                    >
+                      <LayoutGrid size={14} />
+                      {t('review_gallery_open')}
+                    </Link>
+                  </div>
                 </div>
-              </div>
-            </section>
+              </section>
+            )}
 
             {/* AI disclaimer */}
             <p className="text-xs text-ink-subtle pt-2 border-t border-border-subtle">
@@ -1565,7 +1699,7 @@ export default function ReviewPage() {
             </p>
 
             {/* Quota-low conversion banner (shown when remaining quota is low) */}
-            {plan !== 'pro' && isLowQuota && (
+            {showPersonalActions && plan !== 'pro' && isLowQuota && (
               <div className="mt-2 rounded-lg border border-gold/40 bg-gold/5 px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gold/90">
@@ -1598,7 +1732,7 @@ export default function ReviewPage() {
             )}
 
             {/* Guest login banner (shown when quota is not low, to encourage sign-in) */}
-            {plan === 'guest' && !isLowQuota && (
+            {showPersonalActions && plan === 'guest' && !isLowQuota && (
               <div className="mt-2 rounded-lg border border-gold/25 bg-gold/5 px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gold/90">{t('guest_login_banner_title')}</p>
@@ -1615,7 +1749,7 @@ export default function ReviewPage() {
             )}
 
             {/* Free → Pro lightweight upgrade entry (low-score variant when score < 5) */}
-            {plan === 'free' && !isLowQuota && (
+            {showPersonalActions && plan === 'free' && !isLowQuota && (
               <div className={`mt-2 rounded-lg border px-5 py-3 flex items-center justify-between gap-3 ${
                 isLowScore ? 'border-rust/30 bg-rust/5' : 'border-border-subtle bg-raised/30'
               }`}>
