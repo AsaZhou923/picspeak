@@ -27,7 +27,7 @@ class AIReviewResponse:
     latency_ms: int | None = None
 
 
-PROMPT_VERSION = 'photo-review-v3'
+PROMPT_VERSION = 'photo-review-v4-strict'
 
 
 ALLOWED_IMAGE_TYPES = {'default', 'landscape', 'portrait', 'street', 'still_life', 'architecture'}
@@ -294,7 +294,10 @@ def _prompt_for_mode_v3(mode: str, locale: str, exif_data: dict | None = None, i
             f'The image genre for this review is: {normalized_image_type}. Use this mapping for dimension interpretation: {type_guide} '
             'Scoring baseline: 10 means top master-level work within the same genre (landscape, portrait, street, documentary, etc.). '
             'Scores must be strict and clearly differentiated; avoid giving 7-8 to ordinary photos. '
-            'Most ordinary photos should be in the 3-6 range; only clearly strong photos should exceed 7. '
+            'Most ordinary photos should stay in the 3-6 range; a 7 requires clear, repeatable strengths in multiple dimensions, not just a pleasant subject or one attractive element. '
+            'An 8 requires portfolio-level execution with no obvious weak dimension, and 9-10 should be extremely rare. '
+            'Do not raise scores simply because the image is stylized, cinematic, sentimental, or made with an interesting subject. Style only deserves high scores when execution, control, and coherence are all clearly visible. '
+            'If the image has an obvious main-subject flaw, distracting composition issue, unstable exposure/color control, or weak technical clarity, affected dimensions should usually stay at 6 or below. '
             'Output only one JSON object; do not output markdown. '
             'JSON schema must be exactly: '
             '{"schema_version":"1.0","scores":{"composition":0-10,"lighting":0-10,"color":0-10,"impact":0-10,"technical":0-10},'
@@ -310,7 +313,7 @@ def _prompt_for_mode_v3(mode: str, locale: str, exif_data: dict | None = None, i
             'e.g. "Exposure +1~2, Shadows +1~2, Highlights -1, White Balance -300K". '
             'Each suggestion point must follow a strict three-part structure: Observation + Reason + Action. '
             'Do not use empty generic statements such as "overall good but can be improved". '
-            'Scoring anchors: 0-2 severe flaws, 3-4 clear weaknesses, 5-6 average/usable, 7-8 strong and above average, 9-10 outstanding with near master-level control. '
+            'Scoring anchors: 0-2 severe flaws, 3-4 clear weaknesses, 5-6 average/usable, 7 clearly strong, 8 portfolio-level, 9-10 exceptional and rare. '
             'If a dimension score is 0-4, wording must be direct about problems and improvement urgency. '
             'If a dimension score is 8-10, wording should confirm strengths and only point out minor refinements. '
             'Keep score variance stable across different model calls for similar image quality; avoid random swings. '
@@ -339,9 +342,11 @@ def _prompt_for_mode_v3(mode: str, locale: str, exif_data: dict | None = None, i
             f'あなたは写真講評者です。入力写真に対して{"簡潔で直接的" if normalized_mode == "flash" else "詳細でプロフェッショナル"}な講評を行ってください。{exif_note}'
             f'今回の画像タイプは {normalized_image_type} です。次の次元解釈ロジックを適用してください：{type_guide} '
             '採点基準：同ジャンル内で巨匠級の作品を 10 点とします。 '
-            '採点は差が出るようにしつつ、やや厳しめを保ってください。普通の写真に安易に 7-8 点を付けないでください。 '
-            'ただし、強いスタイル性が明確な意図と一貫した実行に支えられている優秀作については、型破りという理由だけで機械的に減点しないでください。 '
-            '一般的な写真は主に 3-6 点、明確に優れた写真は 7 点以上にしてください。スタイル化が明確で完成度も高い作品には、5 次元ともやや広めに高得点を与えて構いません。 '
+            '採点は差が出るようにしつつ、厳しめを保ってください。普通の写真に安易に 7-8 点を付けないでください。 '
+            '一般的な写真は主に 3-6 点に留め、7 点は複数次元で明確な強さが確認できる場合に限ってください。 '
+            '8 点はポートフォリオ水準で、目立つ弱点がほぼ無い場合に限ります。9-10 点は極めて稀にしてください。 '
+            'スタイル性、被写体の魅力、雰囲気の良さだけで加点しないでください。高得点は、意図だけでなく実行・制御・一貫性が画面から明確に読める場合に限ります。 '
+            '主題の甘さ、構図の散漫さ、露出や色の不安定さ、技術的な粗さが目立つ場合、該当次元は通常 6 点以下に留めてください。 '
             '出力は JSON オブジェクト 1 つのみで、markdown は不要です。 '
             'JSON スキーマは厳密に次の形です：'
             '{"schema_version":"1.0","scores":{"composition":0-10,"lighting":0-10,"color":0-10,"impact":0-10,"technical":0-10},'
@@ -357,7 +362,7 @@ def _prompt_for_mode_v3(mode: str, locale: str, exif_data: dict | None = None, i
             '例："露出 +1~2、シャドウ +1~2、ハイライト -1、色温度 -300K"。 '
             '各 suggestion は必ず「観察 + 理由 + 実行アクション」の三段構成にしてください。 '
             '「全体的に良いが改善余地もある」のような中身の薄い定型文は禁止です。 '
-            '採点アンカー：0-2=重大な欠点、3-4=明確な弱さ、5-6=平均/実用、7-8=明確に良い、9-10=傑出。 '
+            '採点アンカー：0-2=重大な欠点、3-4=明確な弱さ、5-6=平均/実用、7=明確に強い、8=ポートフォリオ水準、9-10=傑出かつ稀。 '
             '低得点（0-4）は問題と改善優先度を率直に述べ、高得点（8-10）は強みを肯定しつつ微調整だけを添えてください。 '
             '同程度の画質に対するスコアの揺れは小さく保ってください。 '
             'すべてのテキスト項目は日本語で書いてください。'
@@ -381,9 +386,11 @@ def _prompt_for_mode_v3(mode: str, locale: str, exif_data: dict | None = None, i
         f'请你作为摄影点评师，对输入照片进行{"简洁直接" if normalized_mode == "flash" else "详细专业"}的点评。{exif_note}'
         f'本次图片类型为 {normalized_image_type}，请按以下维度解释逻辑评分：{type_guide} '
         '评分基准：以该照片所属题材中的顶级大师作品作为 10 分参考标准。 '
-        '打分必须有明显差异性，并保持偏严格口径，普通照片不要轻易给到 7-8 分。 '
-        '但如果作品风格化意图非常明确、执行一致且整体完成度高，不要因为它打破常规就机械压分。 '
-        '普通照片应更多落在 3-6 分区间，明显优秀的作品可以进入 7 分以上；对于风格化明显且控制到位的优秀作品，五维评分可以适当放宽。 '
+        '打分必须有明显差异性，并保持严格口径，普通照片不要轻易给到 7-8 分。 '
+        '普通照片应主要落在 3-6 分；7 分必须建立在多个维度都明显扎实之上，不能因为题材讨喜、氛围感强或只有一个亮点就给高分。 '
+        '8 分必须接近可入作品集的完成度，且没有明显短板；9-10 分应极少出现。 '
+        '不要因为“电影感”“情绪感”“风格化”“被摄体本身好看”就主动抬分。只有当风格意图、执行控制和整体一致性都能被画面清楚证明时，风格化才值得高分。 '
+        '如果主问题清晰可见，例如主体不够稳、构图干扰明显、曝光或色彩控制失衡、技术清晰度不足，对应维度通常应压在 6 分及以下。 '
         '必须只输出一个 JSON 对象，不要输出 markdown。 '
         'JSON 字段必须严格为：'
         '{"schema_version":"1.0","scores":{"composition":0-10,"lighting":0-10,"color":0-10,"impact":0-10,"technical":0-10},'
@@ -398,7 +405,7 @@ def _prompt_for_mode_v3(mode: str, locale: str, exif_data: dict | None = None, i
         'suggestions 必须给出有依据、可执行的建议；尽量量化，包含具体参数或区间，例如“曝光 +1~2、阴影 +1~2、高光 -1、色温 -300K”。 '
         '每条 suggestions 必须严格使用“三段式”：观察 + 原因 + 可执行动作。 '
         '禁止输出“整体不错，但还有提升空间”这类空泛模板话。 '
-        '评分锚点必须统一：0-2 严重缺陷，3-4 明显薄弱，5-6 合格/普通，7-8 明显优秀，9-10 接近大师水准。 '
+        '评分锚点必须统一：0-2 严重缺陷，3-4 明显薄弱，5-6 合格/普通，7=明确优秀，8=作品集级别，9-10=罕见且接近大师水准。 '
         '低分（0-4）措辞应直陈问题与改进优先级；高分（8-10）措辞应肯定优势，仅补充少量微调建议。 '
         '尽量保持同等质量图片在不同模型调用下分数波动小，不要随机大幅跳分。 '
         '所有文本字段请使用中文。'
@@ -469,7 +476,7 @@ def run_ai_review(mode: str, image_url: str, locale: str = 'zh', exif_data: dict
         'temperature': 0.2,
         'response_format': {'type': 'json_object'},
         'messages': [
-            {'role': 'system', 'content': '你是一个严格返回 JSON 的摄影点评助手，审美标准高、评分有区分度，但会认可风格化且完成度高的优秀作品。'},
+            {'role': 'system', 'content': '你是一个只返回 JSON 的严格摄影点评助手。审美标准高，默认从严打分，普通照片不得轻易进入高分段；只有当画面证据能清楚证明优秀执行时才给高分，不因题材讨喜、情绪感或风格化而放宽标准。'},
             {
                 'role': 'user',
                 'content': [

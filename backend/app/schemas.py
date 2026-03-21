@@ -235,6 +235,7 @@ class PublicGalleryItem(BaseModel):
 
 class PublicGalleryResponse(BaseModel):
     items: list[PublicGalleryItem]
+    total_count: int = 0
     next_cursor: str | None = None
 
 

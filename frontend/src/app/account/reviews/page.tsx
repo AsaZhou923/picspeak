@@ -1,8 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { AlertCircle, ChevronRight, RefreshCw, SlidersHorizontal } from 'lucide-react';
+import { AlertCircle, CalendarDays, ChevronRight, RefreshCw, SlidersHorizontal } from 'lucide-react';
 import { getMyReviews } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { ImageType, ReviewHistoryItem, ReviewHistoryQuery } from '@/lib/types';
@@ -28,14 +28,56 @@ const EMPTY_FILTERS: FilterDraft = {
   imageType: '',
 };
 
+function normalizeDateDisplay(raw: string): string {
+  const digits = raw.replace(/\D/g, '').slice(0, 8);
+  const year = digits.slice(0, 4);
+  const month = digits.slice(4, 6);
+  const day = digits.slice(6, 8);
+
+  if (digits.length <= 4) return year;
+  if (digits.length <= 6) return `${year}/${month}`;
+  return `${year}/${month}/${day}`;
+}
+
+function displayDateToIso(value: string): string | null {
+  const match = value.match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
+  if (!match) return null;
+
+  const [, year, month, day] = match;
+  const isoDate = `${year}-${month}-${day}`;
+  const parsed = new Date(`${isoDate}T00:00:00`);
+
+  if (Number.isNaN(parsed.getTime())) return null;
+  if (
+    parsed.getFullYear() !== Number(year) ||
+    parsed.getMonth() + 1 !== Number(month) ||
+    parsed.getDate() !== Number(day)
+  ) {
+    return null;
+  }
+
+  return isoDate;
+}
+
+function isoDateToDisplay(value: string): string {
+  return value.replace(/-/g, '/');
+}
+
+function isInvalidCompletedDate(value: string): boolean {
+  return value.length === 10 && displayDateToIso(value) === null;
+}
+
 function toQuery(filters: FilterDraft): ReviewHistoryQuery {
   const query: ReviewHistoryQuery = { limit: 20 };
 
-  if (filters.createdFrom) {
-    query.created_from = new Date(`${filters.createdFrom}T00:00:00`).toISOString();
+  const createdFromIso = displayDateToIso(filters.createdFrom);
+  const createdToIso = displayDateToIso(filters.createdTo);
+
+  if (createdFromIso) {
+    query.created_from = new Date(`${createdFromIso}T00:00:00`).toISOString();
   }
-  if (filters.createdTo) {
-    query.created_to = new Date(`${filters.createdTo}T23:59:59.999`).toISOString();
+  if (createdToIso) {
+    query.created_to = new Date(`${createdToIso}T23:59:59.999`).toISOString();
   }
   if (filters.minScore !== '') {
     query.min_score = Number(filters.minScore);
@@ -144,6 +186,64 @@ function getImageTypeLabel(locale: 'zh' | 'en' | 'ja', imageType?: ImageType) {
   return zh[normalized];
 }
 
+function DateFilterField({
+  label,
+  value,
+  error,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  error?: string;
+  onChange: (value: string) => void;
+}) {
+  const nativeInputRef = useRef<HTMLInputElement>(null);
+  const nativeValue = displayDateToIso(value) ?? '';
+
+  return (
+    <label className="min-w-0 space-y-2 text-xs text-ink-muted">
+      <span>{label}</span>
+      <div className="relative">
+        <input
+          type="text"
+          inputMode="numeric"
+          placeholder="yyyy/mm/dd"
+          value={value}
+          onChange={(event) => onChange(normalizeDateDisplay(event.target.value))}
+          aria-invalid={Boolean(error)}
+          className={`w-full min-w-0 rounded-xl border bg-void/60 px-3 py-2.5 pr-10 text-[13px] text-ink [font-variant-numeric:tabular-nums] outline-none transition-colors placeholder:text-ink-subtle ${
+            error ? 'border-rust/60 focus:border-rust' : 'border-border focus:border-gold/40'
+          }`}
+        />
+        <button
+          type="button"
+          aria-label={`${label} calendar`}
+          onClick={() => {
+            const input = nativeInputRef.current;
+            if (!input) return;
+            input.showPicker?.();
+            input.focus();
+            input.click();
+          }}
+          className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-ink-subtle transition-colors hover:text-gold"
+        >
+          <CalendarDays size={14} />
+        </button>
+        <input
+          ref={nativeInputRef}
+          type="date"
+          tabIndex={-1}
+          aria-hidden="true"
+          value={nativeValue}
+          onChange={(event) => onChange(isoDateToDisplay(event.target.value))}
+          className="pointer-events-none absolute bottom-0 right-0 h-0 w-0 opacity-0"
+        />
+      </div>
+      {error && <p className="text-[11px] leading-5 text-rust">{error}</p>}
+    </label>
+  );
+}
+
 function ReviewCard({ item }: { item: ReviewHistoryItem }) {
   const { locale, t } = useI18n();
   const copy = getHistoryCopy(locale);
@@ -223,6 +323,12 @@ export default function ReviewHistoryPage() {
   const { ensureToken, userInfo } = useAuth();
   const { t, locale } = useI18n();
   const copy = useMemo(() => getHistoryCopy(locale), [locale]);
+  const invalidDateCopy =
+    locale === 'ja'
+      ? '有効な日付を yyyy/mm/dd 形式で入力してください'
+      : locale === 'en'
+        ? 'Enter a valid date in yyyy/mm/dd format'
+        : '请输入有效日期，格式为 yyyy/mm/dd';
 
   const [items, setItems] = useState<ReviewHistoryItem[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -232,6 +338,9 @@ export default function ReviewHistoryPage() {
   const [hasMore, setHasMore] = useState(false);
   const [draftFilters, setDraftFilters] = useState<FilterDraft>(EMPTY_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState<FilterDraft>(EMPTY_FILTERS);
+  const createdFromInvalid = isInvalidCompletedDate(draftFilters.createdFrom);
+  const createdToInvalid = isInvalidCompletedDate(draftFilters.createdTo);
+  const hasInvalidDate = createdFromInvalid || createdToInvalid;
 
   const fetchPage = useCallback(
     async (nextCursor?: string, activeFilters: FilterDraft = appliedFilters) => {
@@ -299,30 +408,24 @@ export default function ReviewHistoryPage() {
             <span>{copy.filtersLabel}</span>
           </div>
 
-          <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.05fr)]">
-            <label className="min-w-0 space-y-2 text-xs text-ink-muted">
-              <span>{copy.from}</span>
-              <input
-                type="date"
-                value={draftFilters.createdFrom}
-                onChange={(event) =>
-                  setDraftFilters((prev) => ({ ...prev, createdFrom: event.target.value }))
-                }
-                className="date-field w-full min-w-0 rounded-xl border border-border bg-void/60 px-3 py-2.5 pr-10 text-[13px] text-ink [font-variant-numeric:tabular-nums] outline-none transition-colors focus:border-gold/40"
-              />
-            </label>
+          <div className="grid gap-3 xl:grid-cols-2 2xl:grid-cols-[minmax(0,1.28fr)_minmax(0,1.28fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.05fr)]">
+            <DateFilterField
+              label={copy.from}
+              value={draftFilters.createdFrom}
+              error={createdFromInvalid ? invalidDateCopy : undefined}
+              onChange={(value) =>
+                setDraftFilters((prev) => ({ ...prev, createdFrom: value }))
+              }
+            />
 
-            <label className="min-w-0 space-y-2 text-xs text-ink-muted">
-              <span>{copy.to}</span>
-              <input
-                type="date"
-                value={draftFilters.createdTo}
-                onChange={(event) =>
-                  setDraftFilters((prev) => ({ ...prev, createdTo: event.target.value }))
-                }
-                className="date-field w-full min-w-0 rounded-xl border border-border bg-void/60 px-3 py-2.5 pr-10 text-[13px] text-ink [font-variant-numeric:tabular-nums] outline-none transition-colors focus:border-gold/40"
-              />
-            </label>
+            <DateFilterField
+              label={copy.to}
+              value={draftFilters.createdTo}
+              error={createdToInvalid ? invalidDateCopy : undefined}
+              onChange={(value) =>
+                setDraftFilters((prev) => ({ ...prev, createdTo: value }))
+              }
+            />
 
             <label className="min-w-0 space-y-2 text-xs text-ink-muted">
               <span>{copy.minScore}</span>
@@ -380,7 +483,8 @@ export default function ReviewHistoryPage() {
             <button
               type="button"
               onClick={handleApplyFilters}
-              className="rounded-full bg-gold px-4 py-2 text-sm font-medium text-void transition-colors hover:bg-gold-light"
+              disabled={hasInvalidDate}
+              className="rounded-full bg-gold px-4 py-2 text-sm font-medium text-void transition-colors hover:bg-gold-light disabled:cursor-not-allowed disabled:opacity-50"
             >
               {copy.apply}
             </button>

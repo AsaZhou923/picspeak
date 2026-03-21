@@ -8,38 +8,47 @@ function getUpdatesCopy(locale: 'zh' | 'en' | 'ja') {
   if (locale === 'ja') {
     return {
       label: 'Update Log',
-      title: '公開ギャラリーと審査フローを追加',
+      title: '厳しめ採点とギャラリー件数修正',
       intro:
-        '今回の更新では、イメージギャラリーをサイト全体で閲覧できる公開モードへ切り替え、投稿審査、ゲスト制限、履歴フィルターの視認性改善までまとめて反映しました。',
-      date: '2026-03-20',
+        '今回の更新では、AI 評価の採点基準をより厳格にし、公開ギャラリーの件数表示が最初のページから正しい総数を示すよう修正しました。',
+      date: '2026-03-21',
       sections: [
         {
-          title: '公開ギャラリー',
+          title: '採点基準',
           items: [
-            'ギャラリーをローカル保存からサーバー管理へ移行',
-            '承認済み作品だけをサイト全体で閲覧可能に変更',
-            'カード右下に作者表示を追加し、カード情報量を整理',
+            'review prompt を `photo-review-v4-strict` に更新',
+            '一般的な写真は主に 3-6 点、7 点以上は明確な強さが必要と定義',
+            'スタイル性や雰囲気だけで高得点にしないルールを追加',
           ],
         },
         {
-          title: '審査と投稿ルール',
+          title: 'ギャラリー件数',
           items: [
-            'ギャラリー追加時に画像審査を実行',
-            '追加時はお気に入りにも自動保存',
-            'ゲストは閲覧のみ可能で、投稿はログイン後に限定',
+            '`/gallery` レスポンスに総件数 `total_count` を追加',
+            '上部の件数表示を読み込み済み件数から実際の総数へ変更',
+            '1 ページ目で 12、次ページで 19 と見える不整合を解消',
           ],
         },
         {
-          title: '履歴ページ改善',
+          title: '履歴フィルター',
           items: [
-            '暗色テーマで日付ピッカーが見えにくい問題を修正',
-            '日付入力の横幅と表示を調整し、値欠けを改善',
-            'フィルター領域のレイアウトを狭い幅でも崩れにくく調整',
+            'ブラウザのローカライズ表示に依存せず、日付表示を `yyyy/mm/dd` に統一',
+            'テキスト表示とカレンダーピッカーを分離し、末尾が `日` になる表示を解消',
+            '無効な日付を入力した場合は赤枠とエラーメッセージを表示し、適用ボタンも無効化',
+            '狭めの画面ではフィルターの 2 列化を遅らせ、日付欄の表示余裕を確保',
+          ],
+        },
+        {
+          title: '履歴サムネイル',
+          items: [
+            '履歴カードのサムネイル読み込み失敗時に、壊れた画像のまま残る不具合を修正',
+            'サムネイル失敗後は元画像 URL へ正しくフォールバックするように変更',
+            '元画像も失敗した場合だけ最終的な失敗状態に入るよう調整',
           ],
         },
       ],
       docLabel: 'Doc path',
-      docPath: 'docs/update-log-2026-03-20-gallery.md',
+      docPath: 'docs/update-log-2026-03-21-strict-scoring.md',
       backHome: 'Back home',
     };
   }
@@ -47,76 +56,94 @@ function getUpdatesCopy(locale: 'zh' | 'en' | 'ja') {
   if (locale === 'en') {
     return {
       label: 'Update Log',
-      title: 'Public Gallery and Moderation Flow',
+      title: 'Stricter Scoring and Gallery Count Fix',
       intro:
-        'This release turns the image gallery into a site-wide public surface, adds moderation on submission, restricts guests to browsing only, and fixes the dark-mode date filters in history.',
-      date: '2026-03-20',
+        'This release tightens the AI critique scoring rubric and fixes the public gallery header so the collected count shows the real total on the first page.',
+      date: '2026-03-21',
       sections: [
         {
-          title: 'Public Gallery',
+          title: 'Scoring Rubric',
           items: [
-            'Moved gallery state from local storage to backend-managed data',
-            'Only approved submissions are shown in the site-wide public gallery',
-            'Gallery cards were tightened up and now show the author badge on the image',
+            'Upgraded the review prompt to `photo-review-v4-strict`',
+            'Clarified that ordinary photos should mostly land in the 3-6 range',
+            'Stopped style, mood, or an attractive subject from inflating scores on their own',
           ],
         },
         {
-          title: 'Moderation Rules',
+          title: 'Gallery Count',
           items: [
-            'Image moderation now runs when a user submits a critique to the gallery',
-            'Submitting to gallery also saves the critique to favorites by default',
-            'Guests can browse the public gallery but cannot submit to it',
+            'Added `total_count` to the `/gallery` response',
+            'Changed the header stat to display the real total instead of the loaded-page count',
+            'Fixed the issue where page one showed 12 and only page two showed the real 19',
           ],
         },
         {
-          title: 'History Filter UI',
+          title: 'History Filters',
           items: [
-            'Improved dark-theme visibility for native date pickers',
-            'Adjusted date field sizing so values no longer clip',
-            'Rebalanced the filter layout for narrower widths',
+            'Standardized the date display to `yyyy/mm/dd` instead of browser-localized suffixes',
+            'Separated visible text formatting from the calendar picker so the day no longer renders as a localized marker',
+            'Added a clear invalid-date error state and disabled Apply while the date is invalid',
+            'Delayed the two-column filter layout on smaller widths to give date fields more room',
+          ],
+        },
+        {
+          title: 'History Thumbnails',
+          items: [
+            'Fixed the history card thumbnail flow so failed thumbnail loads no longer get stuck on a broken image',
+            'Thumbnail failures now fall back to the original image URL correctly',
+            'The final failed state now appears only after both thumbnail and fallback image fail',
           ],
         },
       ],
       docLabel: 'Doc path',
-      docPath: 'docs/update-log-2026-03-20-gallery.md',
+      docPath: 'docs/update-log-2026-03-21-strict-scoring.md',
       backHome: 'Back home',
     };
   }
 
   return {
     label: 'Update Log',
-    title: '公开长廊与审核流程更新',
+    title: '严格评分与长廊计数修复',
     intro:
-      '这次更新把影像长廊从本地私有收藏改成了全站可浏览的公开长廊，同时接入加入长廊后的图片审核、游客只读限制，以及历史页日期筛选的可读性修复。',
-    date: '2026-03-20',
+      '这次更新主要收紧了 AI 评图的打分口径，同时修复了公开影像长廊头部“已收录”只显示当前页数量、翻页后才显示真实总数的问题。',
+    date: '2026-03-21',
     sections: [
       {
-        title: '公开影像长廊',
+        title: '评分标准',
         items: [
-          '影像长廊从前端本地存储切换为后端统一管理',
-          '只有审核通过的作品会出现在全站公开长廊',
-          '长廊卡片缩小重排，并在图片右下角显示作者标识',
+          '评图 prompt 升级为 `photo-review-v4-strict`',
+          '普通照片主要落在 3-6 分区间，7 分以上需要多个维度同时扎实',
+          '不再因为“电影感”“情绪感”“风格化”或题材讨喜而自动抬分',
         ],
       },
       {
-        title: '审核与投稿规则',
+        title: '长廊计数',
         items: [
-          '用户点击加入长廊时触发图片审核',
-          '加入长廊会默认同步加入收藏',
-          '游客可以浏览公开长廊，但不能提交到长廊',
+          '`/gallery` 接口新增 `total_count` 返回字段',
+          '长廊头部“已收录”改为显示真实总数，而不是当前已加载条数',
+          '修复第一页显示 12、翻到下一页才显示 19 的问题',
         ],
       },
       {
-        title: '历史页筛选优化',
+        title: '历史筛选',
         items: [
-          '修复暗色主题下日期选择器对比度不足的问题',
-          '调整日期输入框宽度与字体，避免日期被截断',
-          '收紧筛选区布局，窄宽度下也更稳定',
+          '历史筛选日期显示统一为 `yyyy/mm/dd`，不再跟随浏览器本地化显示成“日”',
+          '将可见文本格式与日历选择器拆开，解决 `yyyy/mm/日` 这类显示问题',
+          '补充了明显的非法日期提示，输入无效日期时会红框提示并禁用“应用筛选”',
+          '把筛选区双列布局延后到更宽的断点，给日期字段留出更多可视空间',
+        ],
+      },
+      {
+        title: '历史缩略图',
+        items: [
+          '修复评图历史卡片里缩略图加载失败后一直停留在破图状态的问题',
+          '缩略图失败时现在会正确回退到原图 URL，而不是继续保留失效缩略图',
+          '只有缩略图和原图都失败时，才会进入最终失败态',
         ],
       },
     ],
     docLabel: '文档路径',
-    docPath: 'docs/update-log-2026-03-20-gallery.md',
+    docPath: 'docs/update-log-2026-03-21-strict-scoring.md',
     backHome: '返回首页',
   };
 }
@@ -130,7 +157,7 @@ export default function UpdatesPage() {
       <div className="mx-auto max-w-4xl px-6 py-14 animate-fade-in">
         <div className="mb-10 max-w-3xl">
           <p className="mb-3 text-xs uppercase tracking-[0.32em] text-gold/70">{copy.label}</p>
-          <h1 className="font-display text-4xl sm:text-5xl text-ink">{copy.title}</h1>
+          <h1 className="font-display text-4xl text-ink sm:text-5xl">{copy.title}</h1>
           <p className="mt-4 text-sm leading-7 text-ink-muted">{copy.intro}</p>
         </div>
 

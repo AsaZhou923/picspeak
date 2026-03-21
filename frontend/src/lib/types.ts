@@ -307,6 +307,7 @@ export interface PublicGalleryItem {
 
 export interface PublicGalleryResponse {
   items: PublicGalleryItem[];
+  total_count: number;
   next_cursor: string | null;
 }
 

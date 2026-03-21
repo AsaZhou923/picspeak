@@ -337,6 +337,7 @@ h3 {
   color-scheme: light;
   min-width: 0;
   line-height: 1.2;
+  letter-spacing: -0.01em;
 }
 
 .dark .date-field {
@@ -361,14 +362,21 @@ h3 {
 .date-field::-webkit-date-and-time-value {
   min-height: 1.2em;
   text-align: left;
+  min-width: 100%;
 }
 
 .date-field::-webkit-datetime-edit {
   padding-right: 0;
 }
 
+.date-field::-webkit-datetime-edit-fields-wrapper {
+  padding-right: 0.15rem;
+}
+
 .date-field::-webkit-calendar-picker-indicator {
   opacity: 0.82;
+  margin-left: 0.2rem;
+  padding: 0;
 }
 
 /* Score ring stagger (used in demo card) */

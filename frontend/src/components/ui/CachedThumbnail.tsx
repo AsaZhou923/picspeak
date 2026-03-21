@@ -111,9 +111,11 @@ export default function CachedThumbnail({
           decoding="async"
           onError={() => {
             if (!loadFailed) {
+              setSrc(null);
               setLoadFailed(true);
               return;
             }
+            setSrc(null);
             setFallbackFailed(true);
           }}
         />

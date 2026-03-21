@@ -34,6 +34,12 @@ export default function HomePage() {
       ? { label: 'Updates', hint: 'See the public gallery update' }
       : { label: '更新记录', hint: '查看公开长廊更新' };
 
+  const latestUpdatesCopy = locale === 'ja'
+    ? { label: '鏇存柊璁板綍', hint: '厳しめ採点と件数修正を見る' }
+    : locale === 'en'
+      ? { label: 'Updates', hint: 'See the stricter scoring update' }
+      : { label: '更新记录', hint: '查看严格评分与长廊计数修复' };
+
   const softwareJsonLd = {
     '@context': 'https://schema.org',
     '@type': 'SoftwareApplication',
@@ -392,8 +398,8 @@ export default function HomePage() {
               href="/updates"
               className="inline-flex items-center gap-2 text-xs text-ink-subtle transition-colors hover:text-gold"
             >
-              <span>{homeUpdatesCopy.label}</span>
-              <span className="hidden sm:inline">{homeUpdatesCopy.hint}</span>
+              <span>{latestUpdatesCopy.label}</span>
+              <span className="hidden sm:inline">{latestUpdatesCopy.hint}</span>
               <ArrowRight size={11} />
             </Link>
           </div>

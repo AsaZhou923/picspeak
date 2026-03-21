@@ -104,6 +104,7 @@ function GalleryCardImage({
 export default function GalleryPage() {
   const { t, locale } = useI18n();
   const [pages, setPages] = useState<PublicGalleryItem[][]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [pageIndex, setPageIndex] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -117,6 +118,7 @@ export default function GalleryPage() {
     const response = await getPublicGallery({ cursor: cursor ?? undefined, limit: PAGE_SIZE });
     return {
       items: response.items,
+      totalCount: response.total_count,
       nextCursor: response.next_cursor,
     };
   }, []);
@@ -128,12 +130,14 @@ export default function GalleryPage() {
     setError('');
     setPages([]);
     setPageIndex(0);
+    setTotalCount(0);
     setNextCursor(null);
 
     loadPage()
       .then((data) => {
         if (cancelled) return;
         setPages([data.items]);
+        setTotalCount(data.totalCount);
         setNextCursor(data.nextCursor);
       })
       .catch((err) => {
@@ -170,6 +174,7 @@ export default function GalleryPage() {
     try {
       const data = await loadPage(nextCursor);
       setPages((current) => [...current, data.items]);
+      setTotalCount(data.totalCount);
       setNextCursor(data.nextCursor);
       setPageIndex((current) => current + 1);
     } catch (err) {
@@ -180,7 +185,6 @@ export default function GalleryPage() {
   };
 
   const items = pages[pageIndex] ?? [];
-  const loadedCount = useMemo(() => pages.reduce((sum, page) => sum + page.length, 0), [pages]);
   const hasPrevPage = pageIndex > 0;
   const hasNextPage = pageIndex < pages.length - 1 || nextCursor !== null;
 
@@ -201,7 +205,7 @@ export default function GalleryPage() {
 
             <div className="rounded-2xl border border-border-subtle bg-void/55 px-5 py-4 backdrop-blur-sm">
               <p className="text-[11px] uppercase tracking-[0.22em] text-ink-subtle">{t('gallery_count_label')}</p>
-              <p className="mt-2 font-display text-4xl text-gold">{loadedCount}</p>
+              <p className="mt-2 font-display text-4xl text-gold">{totalCount}</p>
             </div>
           </div>
         </section>

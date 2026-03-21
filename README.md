@@ -113,7 +113,7 @@ cd frontend && npm run build && npm run start
 
 ## 文档
 
-- [更新日志](docs/update-log-2026-03-20-gallery.md)
+- [更新日志](docs/update-log-2026-03-21-strict-scoring.md)
 - [后端接口文档](后端接口文档_v1.md)
 - [系统架构说明](系统架构.md)
 - [Google 登录接入指南](Google登录接入指南.md)

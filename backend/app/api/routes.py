@@ -1652,15 +1652,17 @@ def list_public_gallery(
     cursor: str | None = Query(default=None),
     db: Session = Depends(get_db),
 ):
+    gallery_filters = (
+        Review.deleted_at.is_(None),
+        Review.gallery_visible == True,  # noqa: E712
+        Review.gallery_audit_status == GALLERY_AUDIT_APPROVED,
+    )
+    total_count = db.query(func.count(Review.id)).filter(*gallery_filters).scalar() or 0
     query = (
         db.query(Review, Photo, User)
         .join(Photo, Photo.id == Review.photo_id)
         .join(User, User.id == Review.owner_user_id)
-        .filter(
-            Review.deleted_at.is_(None),
-            Review.gallery_visible == True,  # noqa: E712
-            Review.gallery_audit_status == GALLERY_AUDIT_APPROVED,
-        )
+        .filter(*gallery_filters)
         .order_by(Review.gallery_added_at.desc(), Review.id.desc())
     )
 
@@ -1678,7 +1680,7 @@ def list_public_gallery(
     next_cursor = rows[-1][0].gallery_added_at.isoformat() if has_next and rows and rows[-1][0].gallery_added_at else None
 
     db.commit()
-    return PublicGalleryResponse(items=items, next_cursor=next_cursor)
+    return PublicGalleryResponse(items=items, total_count=total_count, next_cursor=next_cursor)
 
 
 @router.get('/reviews/{review_id}', response_model=ReviewGetResponse)
