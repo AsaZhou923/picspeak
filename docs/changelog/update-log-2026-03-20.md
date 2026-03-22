@@ -54,7 +54,7 @@
 
 ### 文档
 
-- `docs/update-log-2026-03-20.md`
+- `docs/changelog/update-log-2026-03-20.md`
 
 ### 前端
 
@@ -71,4 +71,3 @@
 ## 验证
 
 - `cd frontend && npm run build` 通过
-

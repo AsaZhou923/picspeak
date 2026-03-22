@@ -47,7 +47,7 @@ function getUpdatesCopy(locale: 'zh' | 'en' | 'ja') {
         },
       ],
       docLabel: 'Doc path',
-      docPath: 'docs/update-log-2026-03-22-gallery-likes.md',
+      docPath: 'docs/changelog/update-log-2026-03-22-gallery-likes.md',
       backHome: 'Back home',
     };
   }
@@ -94,7 +94,7 @@ function getUpdatesCopy(locale: 'zh' | 'en' | 'ja') {
         },
       ],
       docLabel: 'Doc path',
-      docPath: 'docs/update-log-2026-03-22-gallery-likes.md',
+      docPath: 'docs/changelog/update-log-2026-03-22-gallery-likes.md',
       backHome: 'Back home',
     };
   }
@@ -140,7 +140,7 @@ function getUpdatesCopy(locale: 'zh' | 'en' | 'ja') {
       },
     ],
     docLabel: '文档路径',
-    docPath: 'docs/update-log-2026-03-22-gallery-likes.md',
+    docPath: 'docs/changelog/update-log-2026-03-22-gallery-likes.md',
     backHome: '返回首页',
   };
 }

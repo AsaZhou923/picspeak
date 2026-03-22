@@ -65,7 +65,7 @@
 
 ### 文档
 
-- `docs/update-log-2026-03-20-gallery.md`
+- `docs/changelog/update-log-2026-03-20-gallery.md`
 
 ## 验证建议
 

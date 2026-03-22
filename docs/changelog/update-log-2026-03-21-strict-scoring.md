@@ -60,7 +60,7 @@
 
 ### 文档
 
-- `docs/update-log-2026-03-21-strict-scoring.md`
+- `docs/changelog/update-log-2026-03-21-strict-scoring.md`
 
 ## 验证
 

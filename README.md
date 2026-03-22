@@ -14,11 +14,11 @@
 
 | 主页 | 点评结果 |
 |------|---------|
-| ![主页](docs/screenshots/home.png) | ![点评结果](docs/screenshots/review.png) |
+| ![主页](docs/assets/screenshots/home.png) | ![点评结果](docs/assets/screenshots/review.png) |
 
 | 影像长廊 | 移动端 |
 |---------|---------|
-| ![影像长廊](docs/screenshots/gallery.png) | ![移动端](docs/screenshots/mobile.png) |
+| ![影像长廊](docs/assets/screenshots/gallery.png) | ![移动端](docs/assets/screenshots/mobile.png) |
 
 
 ---
@@ -113,10 +113,10 @@ cd frontend && npm run build && npm run start
 
 ## 文档
 
-- [更新日志](docs/update-log-2026-03-21-strict-scoring.md)
-- [后端接口文档](后端接口文档_v1.md)
-- [系统架构说明](系统架构.md)
-- [Google 登录接入指南](Google登录接入指南.md)
+- [更新日志](docs/changelog/update-log-2026-03-21-strict-scoring.md)
+- [后端接口文档](docs/api/后端接口文档_v1.md)
+- [系统架构说明](docs/architecture/系统架构.md)
+- [Google 登录接入指南](docs/guides/Google登录接入指南.md)
 
 ## Contributing
 
