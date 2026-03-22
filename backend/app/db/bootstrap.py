@@ -11,7 +11,14 @@ logger = logging.getLogger(__name__)
 
 
 def ensure_runtime_schema() -> None:
-    Base.metadata.create_all(bind=engine, tables=[models.BillingSubscription.__table__, models.BillingWebhookEvent.__table__])
+    Base.metadata.create_all(
+        bind=engine,
+        tables=[
+            models.BillingSubscription.__table__,
+            models.BillingWebhookEvent.__table__,
+            models.ReviewLike.__table__,
+        ],
+    )
 
     statements = [
         'ALTER TABLE users ADD COLUMN IF NOT EXISTS clerk_user_id TEXT',
@@ -51,6 +58,8 @@ def ensure_runtime_schema() -> None:
         'CREATE INDEX IF NOT EXISTS idx_reviews_owner_image_type_created ON reviews (owner_user_id, image_type, created_at DESC)',
         'CREATE INDEX IF NOT EXISTS idx_reviews_source_review ON reviews (source_review_id)',
         "CREATE INDEX IF NOT EXISTS idx_reviews_gallery_public ON reviews (gallery_added_at DESC, id DESC) WHERE gallery_visible = TRUE AND gallery_audit_status = 'approved' AND deleted_at IS NULL",
+        'CREATE INDEX IF NOT EXISTS idx_review_likes_review_created ON review_likes (review_id, created_at DESC)',
+        'CREATE INDEX IF NOT EXISTS idx_review_likes_user_created ON review_likes (user_id, created_at DESC)',
     ]
 
     with engine.begin() as conn:

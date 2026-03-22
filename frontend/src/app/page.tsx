@@ -35,10 +35,10 @@ export default function HomePage() {
       : { label: '更新记录', hint: '查看公开长廊更新' };
 
   const latestUpdatesCopy = locale === 'ja'
-    ? { label: '鏇存柊璁板綍', hint: '厳しめ採点と件数修正を見る' }
+    ? { label: 'Updates', hint: 'Gallery likes and SEO update' }
     : locale === 'en'
-      ? { label: 'Updates', hint: 'See the stricter scoring update' }
-      : { label: '更新记录', hint: '查看严格评分与长廊计数修复' };
+      ? { label: 'Updates', hint: 'See the gallery likes and SEO update' }
+      : { label: 'Updates', hint: 'Gallery likes and SEO update' };
 
   const softwareJsonLd = {
     '@context': 'https://schema.org',

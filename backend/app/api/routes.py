@@ -41,6 +41,7 @@ from app.db.models import (
     Photo,
     PhotoStatus,
     Review,
+    ReviewLike,
     ReviewMode,
     ReviewStatus,
     ReviewTask,
@@ -66,6 +67,7 @@ from app.schemas import (
     ReviewCreateRequest,
     ReviewCreateSyncResponse,
     ReviewExportResponse,
+    GalleryLikeResponse,
     ReviewGetResponse,
     ReviewHistoryItem,
     ReviewHistoryResponse,
@@ -97,6 +99,7 @@ from app.services.guard import (
     review_history_cutoff,
     enforce_guest_review_limits,
     enforce_user_quota,
+    guest_quota_scope_key,
     guest_rate_limit_scope_key,
     get_idempotency_record,
     hash_request,
@@ -1344,7 +1347,15 @@ def _review_history_item(request: Request, review: Review, photo: Photo, owner_p
     )
 
 
-def _public_gallery_item(request: Request, review: Review, photo: Photo, owner: User) -> PublicGalleryItem:
+def _public_gallery_item(
+    request: Request,
+    review: Review,
+    photo: Photo,
+    owner: User,
+    *,
+    like_count: int = 0,
+    liked_by_viewer: bool = False,
+) -> PublicGalleryItem:
     return PublicGalleryItem(
         review_id=review.public_id,
         photo_id=photo.public_id,
@@ -1355,9 +1366,62 @@ def _public_gallery_item(request: Request, review: Review, photo: Photo, owner: 
         final_score=float(review.final_score),
         summary=_review_gallery_summary(review),
         owner_username=owner.username,
+        like_count=max(0, int(like_count)),
+        liked_by_viewer=bool(liked_by_viewer),
         gallery_added_at=review.gallery_added_at or review.created_at,
         created_at=review.created_at,
     )
+
+
+def _gallery_like_counts(db: Session, review_ids: list[int]) -> dict[int, int]:
+    if not review_ids:
+        return {}
+
+    rows = (
+        db.query(ReviewLike.review_id, func.count(ReviewLike.id))
+        .filter(ReviewLike.review_id.in_(review_ids))
+        .group_by(ReviewLike.review_id)
+        .all()
+    )
+    return {int(review_id): int(count) for review_id, count in rows}
+
+
+def _gallery_viewer_likes(db: Session, review_ids: list[int], user_id: int | None) -> set[int]:
+    if not review_ids or user_id is None:
+        return set()
+
+    rows = (
+        db.query(ReviewLike.review_id)
+        .filter(ReviewLike.review_id.in_(review_ids), ReviewLike.user_id == user_id)
+        .all()
+    )
+    return {int(review_id) for (review_id,) in rows}
+
+
+def _gallery_like_count(db: Session, review_id: int) -> int:
+    return int(db.query(func.count(ReviewLike.id)).filter(ReviewLike.review_id == review_id).scalar() or 0)
+
+
+def _public_gallery_filters() -> tuple[Any, ...]:
+    return (
+        Review.deleted_at.is_(None),
+        Review.gallery_visible == True,  # noqa: E712
+        Review.gallery_audit_status == GALLERY_AUDIT_APPROVED,
+    )
+
+
+def _find_public_gallery_review(db: Session, review_public_id: str) -> Review:
+    review = db.query(Review).filter(Review.public_id == review_public_id, *_public_gallery_filters()).first()
+    if review is None:
+        raise api_error(status.HTTP_404_NOT_FOUND, 'REVIEW_NOT_FOUND', 'Review not found')
+    return review
+
+
+def _optional_gallery_viewer(authorization: str | None, db: Session) -> User | None:
+    if not authorization:
+        return None
+    token = _extract_bearer_token(authorization)
+    return get_user_from_token(token, db)
 
 
 def _build_review_export_payload(
@@ -1474,11 +1538,16 @@ def create_review(
             return response_sync
 
     if actor.plan == UserPlan.guest:
-        enforce_guest_review_limits(db, actor, guest_rate_limit_scope_key(request, actor.user))
+        enforce_guest_review_limits(
+            db,
+            actor,
+            request_scope_key=guest_rate_limit_scope_key(request, actor.user),
+            quota_scope_key=guest_quota_scope_key(request, actor.user),
+        )
     else:
         enforce_user_quota(db, actor.user, mode=mode_enum)
 
-    guest_scope_key = guest_rate_limit_scope_key(request, actor.user) if actor.plan == UserPlan.guest else None
+    guest_scope_key = guest_quota_scope_key(request, actor.user) if actor.plan == UserPlan.guest else None
 
     if payload.async_mode:
         task_payload = payload.model_dump(by_alias=True)
@@ -1650,13 +1719,11 @@ def list_public_gallery(
     request: Request,
     limit: int = Query(default=24, ge=1, le=60),
     cursor: str | None = Query(default=None),
+    authorization: str | None = Header(default=None),
     db: Session = Depends(get_db),
 ):
-    gallery_filters = (
-        Review.deleted_at.is_(None),
-        Review.gallery_visible == True,  # noqa: E712
-        Review.gallery_audit_status == GALLERY_AUDIT_APPROVED,
-    )
+    viewer = _optional_gallery_viewer(authorization, db)
+    gallery_filters = _public_gallery_filters()
     total_count = db.query(func.count(Review.id)).filter(*gallery_filters).scalar() or 0
     query = (
         db.query(Review, Photo, User)
@@ -1676,11 +1743,73 @@ def list_public_gallery(
     rows = query.limit(limit + 1).all()
     has_next = len(rows) > limit
     rows = rows[:limit]
-    items = [_public_gallery_item(request, review, photo, owner) for review, photo, owner in rows]
+    review_ids = [review.id for review, _photo, _owner in rows]
+    like_counts = _gallery_like_counts(db, review_ids)
+    viewer_likes = _gallery_viewer_likes(db, review_ids, None if viewer is None else viewer.id)
+    items = [
+        _public_gallery_item(
+            request,
+            review,
+            photo,
+            owner,
+            like_count=like_counts.get(review.id, 0),
+            liked_by_viewer=review.id in viewer_likes,
+        )
+        for review, photo, owner in rows
+    ]
     next_cursor = rows[-1][0].gallery_added_at.isoformat() if has_next and rows and rows[-1][0].gallery_added_at else None
 
     db.commit()
     return PublicGalleryResponse(items=items, total_count=total_count, next_cursor=next_cursor)
+
+
+@router.post('/gallery/{review_id}/likes', response_model=GalleryLikeResponse)
+def like_public_gallery_review(
+    review_id: str,
+    db: Session = Depends(get_db),
+    actor: CurrentActor = Depends(get_current_actor),
+):
+    if actor.plan == UserPlan.guest:
+        raise api_error(status.HTTP_403_FORBIDDEN, 'GALLERY_LIKE_LOGIN_REQUIRED', 'Please sign in before liking gallery items')
+
+    review = _find_public_gallery_review(db, review_id)
+    existing = (
+        db.query(ReviewLike)
+        .filter(ReviewLike.review_id == review.id, ReviewLike.user_id == actor.user.id)
+        .first()
+    )
+    if existing is None:
+        db.add(ReviewLike(review_id=review.id, user_id=actor.user.id))
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+    else:
+        db.commit()
+
+    like_count = _gallery_like_count(db, review.id)
+    return GalleryLikeResponse(review_id=review.public_id, like_count=like_count, liked_by_viewer=True)
+
+
+@router.delete('/gallery/{review_id}/likes', response_model=GalleryLikeResponse)
+def unlike_public_gallery_review(
+    review_id: str,
+    db: Session = Depends(get_db),
+    actor: CurrentActor = Depends(get_current_actor),
+):
+    if actor.plan == UserPlan.guest:
+        raise api_error(status.HTTP_403_FORBIDDEN, 'GALLERY_LIKE_LOGIN_REQUIRED', 'Please sign in before liking gallery items')
+
+    review = _find_public_gallery_review(db, review_id)
+    (
+        db.query(ReviewLike)
+        .filter(ReviewLike.review_id == review.id, ReviewLike.user_id == actor.user.id)
+        .delete(synchronize_session=False)
+    )
+    db.commit()
+
+    like_count = _gallery_like_count(db, review.id)
+    return GalleryLikeResponse(review_id=review.public_id, like_count=like_count, liked_by_viewer=False)
 
 
 @router.get('/reviews/{review_id}', response_model=ReviewGetResponse)
@@ -2080,7 +2209,7 @@ def get_photo_thumbnail(
 @router.get('/me/usage', response_model=UsageResponse)
 def get_usage(request: Request, db: Session = Depends(get_db), actor: CurrentActor = Depends(get_current_actor)):
     quota = (
-        guest_usage_snapshot(db, guest_rate_limit_scope_key(request, actor.user))
+        guest_usage_snapshot(db, guest_quota_scope_key(request, actor.user))
         if actor.plan == UserPlan.guest
         else user_usage_snapshot(db, actor.user)
     )

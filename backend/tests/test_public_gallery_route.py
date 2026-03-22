@@ -23,7 +23,7 @@ class PublicGalleryRouteTests(unittest.TestCase):
         count_query.filter.return_value = count_query
         count_query.scalar.return_value = 19
 
-        row_review = SimpleNamespace(gallery_added_at=datetime(2026, 3, 21, 12, 0, tzinfo=timezone.utc))
+        row_review = SimpleNamespace(id=101, gallery_added_at=datetime(2026, 3, 21, 12, 0, tzinfo=timezone.utc))
         rows = [(row_review, object(), object())]
 
         list_query = MagicMock()
@@ -36,6 +36,12 @@ class PublicGalleryRouteTests(unittest.TestCase):
         db.query.side_effect = [count_query, list_query]
 
         with patch(
+            'app.api.routes._gallery_like_counts',
+            return_value={row_review.id: 7},
+        ), patch(
+            'app.api.routes._gallery_viewer_likes',
+            return_value={row_review.id},
+        ), patch(
             'app.api.routes._public_gallery_item',
             return_value={
                 'review_id': 'rev_123',
@@ -47,14 +53,18 @@ class PublicGalleryRouteTests(unittest.TestCase):
                 'final_score': 8.5,
                 'summary': 'Test summary',
                 'owner_username': 'tester',
+                'like_count': 7,
+                'liked_by_viewer': True,
                 'gallery_added_at': row_review.gallery_added_at,
                 'created_at': row_review.gallery_added_at,
             },
         ):
-            payload = list_public_gallery(request=request, limit=12, cursor=None, db=db)
+            payload = list_public_gallery(request=request, limit=12, cursor=None, authorization=None, db=db)
 
         self.assertEqual(payload.total_count, 19)
         self.assertEqual(len(payload.items), 1)
+        self.assertEqual(payload.items[0].like_count, 7)
+        self.assertTrue(payload.items[0].liked_by_viewer)
         self.assertIsNone(payload.next_cursor)
         db.commit.assert_called_once()
 

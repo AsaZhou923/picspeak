@@ -188,6 +188,20 @@ class Review(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
+class ReviewLike(Base):
+    __tablename__ = 'review_likes'
+    __table_args__ = (
+        UniqueConstraint('review_id', 'user_id', name='uq_review_likes_review_user'),
+        Index('idx_review_likes_review_created', 'review_id', 'created_at'),
+        Index('idx_review_likes_user_created', 'user_id', 'created_at'),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    review_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('reviews.id'), nullable=False)
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('users.id'), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
 class ReviewTaskEvent(Base):
     __tablename__ = 'review_task_events'
     __table_args__ = (

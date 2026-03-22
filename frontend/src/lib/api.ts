@@ -3,6 +3,7 @@ import {
   AuthToken,
   BillingCheckoutResponse,
   BillingPortalResponse,
+  GalleryLikeResponse,
   GuestMigrateResponse,
   PhotoCreateResponse,
   PhotoReviewsResponse,
@@ -25,6 +26,7 @@ import {
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000').replace(/\/$/, '');
 const GOOGLE_OAUTH_START_PATH = '/api/v1/auth/google/start';
 const USAGE_CACHE_TTL_MS = 30_000;
+const DEVICE_ID_KEY = 'ps_device_id';
 
 type UnauthorizedHandler = (failedToken: string) => Promise<string | null>;
 type UnauthorizedRecoveryMode = 'disabled' | 'guest';
@@ -40,6 +42,29 @@ type UsageCacheEntry = {
 
 let unauthorizedHandler: UnauthorizedHandler | null = null;
 let usageCache: UsageCacheEntry | null = null;
+
+function getClientDeviceId(): string | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    const existing = window.localStorage.getItem(DEVICE_ID_KEY)?.trim();
+    if (existing) {
+      return existing.slice(0, 128);
+    }
+
+    const generated =
+      typeof window.crypto?.randomUUID === 'function'
+        ? window.crypto.randomUUID()
+        : `dev_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+    const normalized = generated.slice(0, 128);
+    window.localStorage.setItem(DEVICE_ID_KEY, normalized);
+    return normalized;
+  } catch {
+    return null;
+  }
+}
 
 export function registerUnauthorizedHandler(handler: UnauthorizedHandler | null): void {
   unauthorizedHandler = handler;
@@ -70,6 +95,11 @@ async function request<T>(
 
   if (token) {
     allHeaders['Authorization'] = `Bearer ${token}`;
+  }
+
+  const deviceId = getClientDeviceId();
+  if (deviceId) {
+    allHeaders['X-Device-Id'] = deviceId;
   }
 
   const res = await fetch(`${API_BASE}/api/v1${path}`, {
@@ -335,11 +365,32 @@ export async function getMyReviews(
 }
 
 export async function getPublicGallery(
-  query: { cursor?: string; limit?: number } = {}
+  query: { cursor?: string; limit?: number } = {},
+  token?: string
 ): Promise<PublicGalleryResponse> {
   const params = new URLSearchParams({ limit: String(query.limit ?? 24) });
   if (query.cursor) params.set('cursor', query.cursor);
-  return request<PublicGalleryResponse>(`/gallery?${params.toString()}`);
+  return request<PublicGalleryResponse>(`/gallery?${params.toString()}`, { token });
+}
+
+export async function likeGalleryReview(
+  reviewId: string,
+  token: string
+): Promise<GalleryLikeResponse> {
+  return request<GalleryLikeResponse>(`/gallery/${reviewId}/likes`, {
+    method: 'POST',
+    token,
+  });
+}
+
+export async function unlikeGalleryReview(
+  reviewId: string,
+  token: string
+): Promise<GalleryLikeResponse> {
+  return request<GalleryLikeResponse>(`/gallery/${reviewId}/likes`, {
+    method: 'DELETE',
+    token,
+  });
 }
 
 export async function createReviewShare(

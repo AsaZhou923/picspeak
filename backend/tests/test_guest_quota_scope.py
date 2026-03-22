@@ -7,16 +7,25 @@ from unittest.mock import Mock, patch
 from starlette.requests import Request
 
 from app.db.models import User, UserPlan, UserStatus
-from app.services.guard import guest_rate_limit_scope_key, user_usage_snapshot
+from app.services.guard import guest_quota_scope_key, guest_rate_limit_scope_key, user_usage_snapshot
 
 
-def _request(*, user_agent: str = 'TestAgent/1.0', client_host: str = '127.0.0.1') -> Request:
+def _request(
+    *,
+    user_agent: str = 'TestAgent/1.0',
+    client_host: str = '127.0.0.1',
+    device_id: str | None = None,
+) -> Request:
+    headers: list[tuple[bytes, bytes]] = [(b'user-agent', user_agent.encode('utf-8'))]
+    if device_id:
+        headers.append((b'x-device-id', device_id.encode('utf-8')))
+
     return Request(
         {
             'type': 'http',
             'method': 'GET',
             'path': '/api/v1/me/usage',
-            'headers': [(b'user-agent', user_agent.encode('utf-8'))],
+            'headers': headers,
             'client': (client_host, 1234),
             'scheme': 'http',
             'server': ('testserver', 80),
@@ -40,11 +49,28 @@ def _user(*, plan: UserPlan, public_id: str, daily_quota_used: int = 0) -> User:
 
 
 class GuestQuotaScopeTests(unittest.TestCase):
-    def test_guest_scope_prefers_stable_request_fingerprint_even_with_guest_user(self) -> None:
+    def test_guest_rate_limit_scope_uses_request_fingerprint_even_with_guest_user(self) -> None:
         request = _request(user_agent='SharedAgent/1.0', client_host='203.0.113.10')
         guest = _user(plan=UserPlan.guest, public_id='gst_abc123')
 
         scope_key = guest_rate_limit_scope_key(request, guest)
+
+        self.assertTrue(scope_key.startswith('guest:'))
+        self.assertNotEqual(scope_key, 'guest_user:gst_abc123')
+
+    def test_guest_quota_scope_prefers_guest_user_over_ua_fingerprint(self) -> None:
+        request = _request(user_agent='SharedAgent/1.0', client_host='203.0.113.10')
+        guest = _user(plan=UserPlan.guest, public_id='gst_abc123')
+
+        scope_key = guest_quota_scope_key(request, guest)
+
+        self.assertEqual(scope_key, 'guest_user:gst_abc123')
+
+    def test_guest_quota_scope_prefers_explicit_device_id_when_present(self) -> None:
+        request = _request(user_agent='SharedAgent/1.0', client_host='203.0.113.10', device_id='browser-123')
+        guest = _user(plan=UserPlan.guest, public_id='gst_abc123')
+
+        scope_key = guest_quota_scope_key(request, guest)
 
         self.assertTrue(scope_key.startswith('guest:'))
         self.assertNotEqual(scope_key, 'guest_user:gst_abc123')

@@ -279,20 +279,61 @@ def _counter_hit_count(
     return int(counter.hit_count) if counter else 0
 
 
+def _hashed_guest_scope_key(key_basis: str) -> str:
+    hashed_basis = hashlib.sha256(key_basis.encode('utf-8')).hexdigest()
+    return f'guest:{hashed_basis}'
+
+
 def guest_rate_limit_scope_key(request: Request, user: User | None = None) -> str:
-    key_basis = device_key_from_request(request) or client_ip_from_request(request)
-    if key_basis:
-        hashed_basis = hashlib.sha256(key_basis.encode('utf-8')).hexdigest()
-        return f'guest:{hashed_basis}'
+    device_key = device_key_from_request(request)
+    client_ip = client_ip_from_request(request)
+
+    if device_key and device_key.startswith('device:'):
+        return _hashed_guest_scope_key(device_key)
+
+    if device_key and client_ip:
+        return _hashed_guest_scope_key(f'{device_key}|ip:{client_ip}')
+
+    if client_ip:
+        return _hashed_guest_scope_key(f'ip:{client_ip}')
 
     if user is not None and user.plan == UserPlan.guest and user.public_id.strip():
         return f'guest_user:{user.public_id.strip()}'
 
-    hashed_basis = hashlib.sha256('anonymous'.encode('utf-8')).hexdigest()
-    return f'guest:{hashed_basis}'
+    if device_key:
+        return _hashed_guest_scope_key(device_key)
+
+    return _hashed_guest_scope_key('anonymous')
 
 
-def enforce_guest_review_limits(db: Session, actor: 'CurrentActor', scope_key: str) -> dict:
+def guest_quota_scope_key(request: Request, user: User | None = None) -> str:
+    device_key = device_key_from_request(request)
+    if device_key and device_key.startswith('device:'):
+        return _hashed_guest_scope_key(device_key)
+
+    if user is not None and user.plan == UserPlan.guest and user.public_id.strip():
+        return f'guest_user:{user.public_id.strip()}'
+
+    client_ip = client_ip_from_request(request)
+    if device_key and client_ip:
+        return _hashed_guest_scope_key(f'{device_key}|ip:{client_ip}')
+
+    if client_ip:
+        return _hashed_guest_scope_key(f'ip:{client_ip}')
+
+    if device_key:
+        return _hashed_guest_scope_key(device_key)
+
+    return _hashed_guest_scope_key('anonymous')
+
+
+def enforce_guest_review_limits(
+    db: Session,
+    actor: 'CurrentActor',
+    *,
+    request_scope_key: str,
+    quota_scope_key: str,
+) -> dict:
     if actor.plan != UserPlan.guest:
         return {}
 
@@ -300,7 +341,7 @@ def enforce_guest_review_limits(db: Session, actor: 'CurrentActor', scope_key: s
     minute_rate = _enforce_scope_rate_limit(
         db,
         scope='guest_review_minute',
-        scope_key=scope_key,
+        scope_key=request_scope_key,
         endpoint='review_create',
         per_minute_limit=settings.guest_review_rate_limit_per_minute,
         window_start=minute_window_start(now),
@@ -309,7 +350,7 @@ def enforce_guest_review_limits(db: Session, actor: 'CurrentActor', scope_key: s
     day_rate = _enforce_scope_rate_limit(
         db,
         scope='guest_review_daily',
-        scope_key=scope_key,
+        scope_key=quota_scope_key,
         endpoint='review_create',
         per_minute_limit=settings.guest_review_limit_per_day,
         window_start=day_window_start(now),
@@ -318,7 +359,7 @@ def enforce_guest_review_limits(db: Session, actor: 'CurrentActor', scope_key: s
     month_rate = _enforce_scope_rate_limit(
         db,
         scope='guest_review_monthly',
-        scope_key=scope_key,
+        scope_key=quota_scope_key,
         endpoint='review_create',
         per_minute_limit=settings.guest_review_limit_per_month,
         window_start=month_window_start(now),

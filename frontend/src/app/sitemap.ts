@@ -13,22 +13,22 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 1,
     },
     {
-      url: `${siteConfig.url}/workspace`,
-      lastModified: now,
-      changeFrequency: 'daily',
-      priority: 0.9,
-    },
-    {
       url: `${siteConfig.url}/affiliate`,
       lastModified: now,
       changeFrequency: 'weekly',
       priority: 0.8,
     },
     {
+      url: `${siteConfig.url}/gallery`,
+      lastModified: now,
+      changeFrequency: 'daily',
+      priority: 0.8,
+    },
+    {
       url: `${siteConfig.url}/updates`,
-      lastModified: new Date('2026-03-20'),
+      lastModified: new Date('2026-03-21'),
       changeFrequency: 'monthly',
-      priority: 0.5,
+      priority: 0.6,
     },
     {
       // Canonical public example of an AI photo critique result
@@ -36,18 +36,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified: new Date('2026-03-08'),
       changeFrequency: 'monthly',
       priority: 0.8,
-    },
-    {
-      url: `${siteConfig.url}/account/reviews`,
-      lastModified: now,
-      changeFrequency: 'weekly',
-      priority: 0.6,
-    },
-    {
-      url: `${siteConfig.url}/account/usage`,
-      lastModified: now,
-      changeFrequency: 'monthly',
-      priority: 0.5,
     },
   ];
 }

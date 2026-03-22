@@ -301,6 +301,8 @@ export interface PublicGalleryItem {
   final_score: number;
   summary: string;
   owner_username: string;
+  like_count: number;
+  liked_by_viewer: boolean;
   gallery_added_at: string;
   created_at: string;
 }
@@ -309,6 +311,12 @@ export interface PublicGalleryResponse {
   items: PublicGalleryItem[];
   total_count: number;
   next_cursor: string | null;
+}
+
+export interface GalleryLikeResponse {
+  review_id: string;
+  like_count: number;
+  liked_by_viewer: boolean;
 }
 
 // ─── Error ───────────────────────────────────────────────────────────────────

@@ -229,6 +229,8 @@ class PublicGalleryItem(BaseModel):
     final_score: float
     summary: str = ''
     owner_username: str
+    like_count: int = 0
+    liked_by_viewer: bool = False
     gallery_added_at: datetime
     created_at: datetime
 
@@ -237,6 +239,12 @@ class PublicGalleryResponse(BaseModel):
     items: list[PublicGalleryItem]
     total_count: int = 0
     next_cursor: str | None = None
+
+
+class GalleryLikeResponse(BaseModel):
+    review_id: str
+    like_count: int = 0
+    liked_by_viewer: bool = False
 
 
 class ReviewExportPhoto(BaseModel):

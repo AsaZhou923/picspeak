@@ -8,47 +8,46 @@ function getUpdatesCopy(locale: 'zh' | 'en' | 'ja') {
   if (locale === 'ja') {
     return {
       label: 'Update Log',
-      title: '厳しめ採点とギャラリー件数修正',
+      title: 'ギャラリーに「いいね」を追加',
       intro:
-        '今回の更新では、AI 評価の採点基準をより厳格にし、公開ギャラリーの件数表示が最初のページから正しい総数を示すよう修正しました。',
-      date: '2026-03-21',
+        '今回の更新では、公開ギャラリーに永続化された「いいね」機能を追加し、あわせて metadata・robots・sitemap を含む SEO 調整もまとめて行いました。',
+      date: '2026-03-22',
       sections: [
         {
-          title: '採点基準',
+          title: 'ギャラリーの反応',
           items: [
-            'review prompt を `photo-review-v4-strict` に更新',
-            '一般的な写真は主に 3-6 点、7 点以上は明確な強さが必要と定義',
-            'スタイル性や雰囲気だけで高得点にしないルールを追加',
+            '公開ギャラリーカードに「いいね」ボタンと件数表示を追加',
+            '「いいね」はフロントの一時状態ではなく、バックエンドに永続保存',
+            'ログイン済みユーザーはギャラリー上でそのまま「いいね」と解除を切り替え可能',
           ],
         },
         {
-          title: 'ギャラリー件数',
+          title: '権限ルール',
           items: [
-            '`/gallery` レスポンスに総件数 `total_count` を追加',
-            '上部の件数表示を読み込み済み件数から実際の総数へ変更',
-            '1 ページ目で 12、次ページで 19 と見える不整合を解消',
+            'ゲストはこれまでどおり公開ギャラリーを閲覧可能',
+            'ゲストが「いいね」を押した場合は、サインインが必要であることを案内',
+            'バックエンドもゲストの「いいね」リクエストを `403` で拒否',
           ],
         },
         {
-          title: '履歴フィルター',
+          title: 'SEO 調整',
           items: [
-            'ブラウザのローカライズ表示に依存せず、日付表示を `yyyy/mm/dd` に統一',
-            'テキスト表示とカレンダーピッカーを分離し、末尾が `日` になる表示を解消',
-            '無効な日付を入力した場合は赤枠とエラーメッセージを表示し、適用ボタンも無効化',
-            '狭めの画面ではフィルターの 2 列化を遅らせ、日付欄の表示余裕を確保',
+            '公開ページ向け metadata と canonical を整理',
+            'アカウント、ワークスペース、タスク、共有系ページには `noindex` を適用',
+            'sitemap を公開導線中心に見直し、affiliate ページの本文も強化',
           ],
         },
         {
-          title: '履歴サムネイル',
+          title: 'データと API',
           items: [
-            '履歴カードのサムネイル読み込み失敗時に、壊れた画像のまま残る不具合を修正',
-            'サムネイル失敗後は元画像 URL へ正しくフォールバックするように変更',
-            '元画像も失敗した場合だけ最終的な失敗状態に入るよう調整',
+            '`review_likes` テーブルを追加して作品とユーザーの「いいね」関係を保存',
+            '`/gallery` レスポンスに `like_count` と `liked_by_viewer` を追加',
+            'ギャラリー作品向けの「いいね」/解除 API を追加',
           ],
         },
       ],
       docLabel: 'Doc path',
-      docPath: 'docs/update-log-2026-03-21-strict-scoring.md',
+      docPath: 'docs/update-log-2026-03-22-gallery-likes.md',
       backHome: 'Back home',
     };
   }
@@ -56,94 +55,92 @@ function getUpdatesCopy(locale: 'zh' | 'en' | 'ja') {
   if (locale === 'en') {
     return {
       label: 'Update Log',
-      title: 'Stricter Scoring and Gallery Count Fix',
+      title: 'Gallery Likes Added',
       intro:
-        'This release tightens the AI critique scoring rubric and fixes the public gallery header so the collected count shows the real total on the first page.',
-      date: '2026-03-21',
+        'This release adds persistent likes to the public gallery and also ships a round of SEO updates across metadata, robots, sitemap, and landing-page content.',
+      date: '2026-03-22',
       sections: [
         {
-          title: 'Scoring Rubric',
+          title: 'Gallery Interaction',
           items: [
-            'Upgraded the review prompt to `photo-review-v4-strict`',
-            'Clarified that ordinary photos should mostly land in the 3-6 range',
-            'Stopped style, mood, or an attractive subject from inflating scores on their own',
+            'Added a like button and visible like count to public gallery cards',
+            'Likes are now stored on the backend instead of living only in frontend state',
+            'Signed-in users can like and unlike directly from the gallery view',
           ],
         },
         {
-          title: 'Gallery Count',
+          title: 'Guest Restriction',
           items: [
-            'Added `total_count` to the `/gallery` response',
-            'Changed the header stat to display the real total instead of the loaded-page count',
-            'Fixed the issue where page one showed 12 and only page two showed the real 19',
+            'Guests can still browse the public gallery normally',
+            'Guest like attempts now show a sign-in requirement in the UI',
+            'The backend also rejects guest like requests with `403`',
           ],
         },
         {
-          title: 'History Filters',
+          title: 'SEO Updates',
           items: [
-            'Standardized the date display to `yyyy/mm/dd` instead of browser-localized suffixes',
-            'Separated visible text formatting from the calendar picker so the day no longer renders as a localized marker',
-            'Added a clear invalid-date error state and disabled Apply while the date is invalid',
-            'Delayed the two-column filter layout on smaller widths to give date fields more room',
+            'Refined metadata and canonical coverage for public-facing pages',
+            'Applied `noindex` rules to account, workspace, task, and other private flows',
+            'Adjusted the sitemap toward public discovery pages and strengthened affiliate landing-page copy',
           ],
         },
         {
-          title: 'History Thumbnails',
+          title: 'Data and API',
           items: [
-            'Fixed the history card thumbnail flow so failed thumbnail loads no longer get stuck on a broken image',
-            'Thumbnail failures now fall back to the original image URL correctly',
-            'The final failed state now appears only after both thumbnail and fallback image fail',
+            'Added a `review_likes` table to persist user-to-review likes',
+            'Extended `/gallery` items with `like_count` and `liked_by_viewer`',
+            'Added like and unlike endpoints for public gallery reviews',
           ],
         },
       ],
       docLabel: 'Doc path',
-      docPath: 'docs/update-log-2026-03-21-strict-scoring.md',
+      docPath: 'docs/update-log-2026-03-22-gallery-likes.md',
       backHome: 'Back home',
     };
   }
 
   return {
     label: 'Update Log',
-    title: '严格评分与长廊计数修复',
+    title: '公开长廊新增点赞功能',
     intro:
-      '这次更新主要收紧了 AI 评图的打分口径，同时修复了公开影像长廊头部“已收录”只显示当前页数量、翻页后才显示真实总数的问题。',
-    date: '2026-03-21',
+      '这次更新除了给公开影像长廊加入可持久化点赞能力，也同步补了一轮 SEO 优化，统一了 metadata、robots 与 sitemap 策略。',
+    date: '2026-03-22',
     sections: [
       {
-        title: '评分标准',
+        title: '长廊互动',
         items: [
-          '评图 prompt 升级为 `photo-review-v4-strict`',
-          '普通照片主要落在 3-6 分区间，7 分以上需要多个维度同时扎实',
-          '不再因为“电影感”“情绪感”“风格化”或题材讨喜而自动抬分',
+          '公开长廊卡片新增点赞按钮与点赞数展示',
+          '点赞改为后端持久化存储，不再只是前端临时状态',
+          '已登录用户可以直接在长廊页完成点赞与取消点赞',
         ],
       },
       {
-        title: '长廊计数',
+        title: '游客权限',
         items: [
-          '`/gallery` 接口新增 `total_count` 返回字段',
-          '长廊头部“已收录”改为显示真实总数，而不是当前已加载条数',
-          '修复第一页显示 12、翻到下一页才显示 19 的问题',
+          '游客仍然可以正常浏览公开影像长廊',
+          '游客点击点赞时，前端会提示需要登录',
+          '后端也会对游客点赞请求返回 `403`，避免绕过前端限制',
         ],
       },
       {
-        title: '历史筛选',
+        title: 'SEO 优化',
         items: [
-          '历史筛选日期显示统一为 `yyyy/mm/dd`，不再跟随浏览器本地化显示成“日”',
-          '将可见文本格式与日历选择器拆开，解决 `yyyy/mm/日` 这类显示问题',
-          '补充了明显的非法日期提示，输入无效日期时会红框提示并禁用“应用筛选”',
-          '把筛选区双列布局延后到更宽的断点，给日期字段留出更多可视空间',
+          '公开页面补充更完整的 metadata 与 canonical',
+          '账户、工作台、任务、分享等私有页面统一加 `noindex`',
+          '调整 sitemap 公开页面权重，并补强 affiliate 落地页内容',
         ],
       },
       {
-        title: '历史缩略图',
+        title: '数据与接口',
         items: [
-          '修复评图历史卡片里缩略图加载失败后一直停留在破图状态的问题',
-          '缩略图失败时现在会正确回退到原图 URL，而不是继续保留失效缩略图',
-          '只有缩略图和原图都失败时，才会进入最终失败态',
+          '新增 `review_likes` 表保存用户与作品的点赞关系',
+          '`/gallery` 返回新增 `like_count` 和 `liked_by_viewer`',
+          '新增公开长廊点赞与取消点赞接口',
         ],
       },
     ],
     docLabel: '文档路径',
-    docPath: 'docs/update-log-2026-03-21-strict-scoring.md',
+    docPath: 'docs/update-log-2026-03-22-gallery-likes.md',
     backHome: '返回首页',
   };
 }

@@ -2,9 +2,9 @@ import type { Metadata } from 'next';
 import AffiliatePageContent from '@/components/marketing/AffiliatePageContent';
 
 export const metadata: Metadata = {
-  title: 'Affiliate Program',
+  title: 'PicSpeak Affiliate Program for Photography Creators and Educators',
   description:
-    'Promote PicSpeak and earn recurring affiliate revenue from photographers and creators.',
+    'Promote PicSpeak to photographers, creators, and educators, and earn recurring affiliate commissions from AI photo critique subscriptions.',
   alternates: {
     canonical: '/affiliate',
   },

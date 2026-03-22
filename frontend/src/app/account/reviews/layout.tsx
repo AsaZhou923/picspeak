@@ -1,8 +1,9 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'My Reviews',
-  description: 'Browse all AI critique reviews for your uploaded photos.',
+  title: 'Your AI Photo Critique History and Review Archive',
+  description:
+    'Browse the full archive of your PicSpeak photo critiques, including scores, feedback history, and saved review results.',
 };
 
 export default function AccountReviewsLayout({ children }: { children: React.ReactNode }) {
