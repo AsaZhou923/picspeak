@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { AlertCircle, ChevronLeft, ChevronRight, Heart, Info, LayoutGrid, Star, X } from 'lucide-react';
+import { AlertCircle, ChevronLeft, ChevronRight, Heart, Info, LayoutGrid, Star, X, Zap } from 'lucide-react';
 import ClerkSignInTrigger from '@/components/auth/ClerkSignInTrigger';
 import { getPublicGallery, likeGalleryReview, unlikeGalleryReview } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
@@ -96,6 +96,26 @@ function getAuthorBadge(username: string) {
   return {
     initial: normalized.charAt(0).toUpperCase() || 'P',
     label: normalized || 'PicSpeak',
+  };
+}
+
+function getModeBadgeConfig(mode: PublicGalleryItem['mode']) {
+  if (mode === 'pro') {
+    return {
+      label: 'Pro',
+      icon: Star,
+      className:
+        'border-gold/35 bg-[linear-gradient(135deg,rgba(200,162,104,0.24),rgba(58,40,18,0.78))] text-gold shadow-[0_10px_30px_rgba(200,162,104,0.18)]',
+      iconClassName: 'text-gold/90',
+    };
+  }
+
+  return {
+    label: 'Flash',
+    icon: Zap,
+    className:
+      'border-white/12 bg-[linear-gradient(135deg,rgba(241,237,230,0.14),rgba(22,22,24,0.78))] text-white/72 shadow-[0_10px_30px_rgba(0,0,0,0.18)]',
+    iconClassName: 'text-white/60',
   };
 }
 
@@ -438,6 +458,8 @@ export default function GalleryPage() {
             <section className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {items.map((item) => {
                 const author = getAuthorBadge(item.owner_username);
+                const modeBadge = getModeBadgeConfig(item.mode);
+                const ModeIcon = modeBadge.icon;
 
                 return (
                   <article
@@ -460,15 +482,28 @@ export default function GalleryPage() {
                             </span>
                           )}
                         </div>
-                        <span className="rounded-full border border-border-subtle bg-void/80 px-2.5 py-1 text-[11px] uppercase tracking-[0.16em] text-ink-subtle">
-                          {item.mode}
+                        <span
+                          className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.16em] backdrop-blur-sm ${modeBadge.className}`}
+                        >
+                          <ModeIcon size={11} strokeWidth={1.8} className={modeBadge.iconClassName} />
+                          {modeBadge.label}
                         </span>
                       </div>
 
                       <div className="absolute bottom-3 right-3 flex items-center gap-2 rounded-full border border-white/10 bg-[rgba(241,237,230,0.88)] px-2.5 py-1.5 shadow-[0_12px_36px_rgba(0,0,0,0.18)]">
-                        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[linear-gradient(135deg,rgba(224,186,136,0.95),rgba(138,110,67,0.95))] text-[11px] font-semibold text-void">
-                          {author.initial}
-                        </span>
+                        {item.owner_avatar_url ? (
+                          <img
+                            src={item.owner_avatar_url}
+                            alt={author.label}
+                            loading="lazy"
+                            decoding="async"
+                            className="h-7 w-7 rounded-full border border-white/45 object-cover"
+                          />
+                        ) : (
+                          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[linear-gradient(135deg,rgba(224,186,136,0.95),rgba(138,110,67,0.95))] text-[11px] font-semibold text-void">
+                            {author.initial}
+                          </span>
+                        )}
                         <span className="max-w-[96px] truncate text-xs text-void">{author.label}</span>
                       </div>
                     </div>

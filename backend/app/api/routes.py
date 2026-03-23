@@ -407,6 +407,7 @@ def _clerk_identity_from_webhook_user(user_payload: dict[str, Any]) -> ClerkIden
     first_name = user_payload.get('first_name')
     last_name = user_payload.get('last_name')
     username = user_payload.get('username')
+    image_url = user_payload.get('image_url')
     return ClerkIdentity(
         session_id='webhook',
         user_id=user_id.strip(),
@@ -415,6 +416,7 @@ def _clerk_identity_from_webhook_user(user_payload: dict[str, Any]) -> ClerkIden
         first_name=first_name.strip() if isinstance(first_name, str) and first_name.strip() else None,
         last_name=last_name.strip() if isinstance(last_name, str) and last_name.strip() else None,
         username=username.strip() if isinstance(username, str) and username.strip() else None,
+        avatar_url=image_url.strip() if isinstance(image_url, str) and image_url.strip() else None,
     )
 
 
@@ -439,6 +441,7 @@ def _sync_clerk_user(db: Session, identity: ClerkIdentity) -> User:
         user = User(
             public_id=new_public_id('usr'),
             clerk_user_id=identity.user_id,
+            avatar_url=identity.avatar_url,
             email=identity.email,
             username=_build_unique_username(db, identity),
             password_hash=None,
@@ -463,6 +466,7 @@ def _sync_clerk_user(db: Session, identity: ClerkIdentity) -> User:
         )
 
     user.clerk_user_id = identity.user_id
+    user.avatar_url = identity.avatar_url
     user.email = identity.email
     if not user.username or user.username.startswith('google_') or user.username.startswith('gst_'):
         user.username = _build_unique_username(db, identity, current_user_id=user.id)
@@ -1425,6 +1429,7 @@ def _public_gallery_item(
         score_version=str((review.result_json or {}).get('score_version') or 'legacy'),
         summary=_review_gallery_summary(review),
         owner_username=owner.username,
+        owner_avatar_url=owner.avatar_url,
         like_count=max(0, int(like_count)),
         liked_by_viewer=bool(liked_by_viewer),
         recommended=bool((recommendation or {}).get('recommended')),

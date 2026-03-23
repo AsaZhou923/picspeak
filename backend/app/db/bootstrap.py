@@ -22,6 +22,7 @@ def ensure_runtime_schema() -> None:
 
     statements = [
         'ALTER TABLE users ADD COLUMN IF NOT EXISTS clerk_user_id TEXT',
+        'ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT',
         'CREATE UNIQUE INDEX IF NOT EXISTS uq_users_clerk_user_id ON users (clerk_user_id) WHERE clerk_user_id IS NOT NULL',
         "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS source_review_id BIGINT REFERENCES reviews(id)",
         "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS image_type TEXT DEFAULT 'default'",

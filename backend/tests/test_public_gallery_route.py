@@ -81,6 +81,7 @@ class PublicGalleryRouteTests(unittest.TestCase):
                 'score_version': 'score-v2-strict',
                 'summary': 'Test summary',
                 'owner_username': 'tester',
+                'owner_avatar_url': 'https://img.clerk.com/avatar.png',
                 'like_count': 7,
                 'liked_by_viewer': True,
                 'recommended': True,
@@ -96,6 +97,7 @@ class PublicGalleryRouteTests(unittest.TestCase):
         self.assertEqual(payload.items[0].like_count, 7)
         self.assertTrue(payload.items[0].liked_by_viewer)
         self.assertEqual(payload.items[0].score_version, 'score-v2-strict')
+        self.assertEqual(payload.items[0].owner_avatar_url, 'https://img.clerk.com/avatar.png')
         self.assertTrue(payload.items[0].recommended)
         self.assertEqual(payload.items[0].score_percentile, 92.5)
         self.assertIsNone(payload.next_cursor)

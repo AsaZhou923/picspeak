@@ -31,6 +31,7 @@ class ClerkIdentity:
     first_name: str | None = None
     last_name: str | None = None
     username: str | None = None
+    avatar_url: str | None = None
 
 
 def _require_clerk_secret_key() -> str:
@@ -277,6 +278,7 @@ def verify_clerk_session_token(session_token: str) -> ClerkIdentity:
     first_name = user_payload.get('first_name')
     last_name = user_payload.get('last_name')
     username = user_payload.get('username')
+    image_url = user_payload.get('image_url')
 
     return ClerkIdentity(
         session_id=session_id.strip(),
@@ -286,4 +288,5 @@ def verify_clerk_session_token(session_token: str) -> ClerkIdentity:
         first_name=first_name.strip() if isinstance(first_name, str) and first_name.strip() else None,
         last_name=last_name.strip() if isinstance(last_name, str) and last_name.strip() else None,
         username=username.strip() if isinstance(username, str) and username.strip() else None,
+        avatar_url=image_url.strip() if isinstance(image_url, str) and image_url.strip() else None,
     )

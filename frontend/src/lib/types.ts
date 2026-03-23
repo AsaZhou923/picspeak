@@ -303,6 +303,7 @@ export interface PublicGalleryItem {
   score_version: string;
   summary: string;
   owner_username: string;
+  owner_avatar_url?: string | null;
   like_count: number;
   liked_by_viewer: boolean;
   recommended: boolean;

@@ -231,6 +231,7 @@ class PublicGalleryItem(BaseModel):
     score_version: str = 'legacy'
     summary: str = ''
     owner_username: str
+    owner_avatar_url: str | None = None
     like_count: int = 0
     liked_by_viewer: bool = False
     recommended: bool = False

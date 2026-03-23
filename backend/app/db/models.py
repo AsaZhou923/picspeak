@@ -67,6 +67,7 @@ class User(Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     public_id: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
     clerk_user_id: Mapped[str | None] = mapped_column(Text, unique=True)
+    avatar_url: Mapped[str | None] = mapped_column(Text)
     email: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
     username: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
     password_hash: Mapped[str | None] = mapped_column(Text)
