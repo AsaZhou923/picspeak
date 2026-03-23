@@ -368,24 +368,24 @@ function getGalleryActionCopy(locale: 'zh' | 'en' | 'ja') {
 function getReviewGalleryCardCopy(locale: 'zh' | 'en' | 'ja') {
   if (locale === 'ja') {
     return {
-      title: 'この一枚はギャラリーに残す価値があります',
+      title: 'この評価をギャラリーに追加できます',
       body:
-        '総合スコア 6.0 以上の作品だけがギャラリー申請できます。今回の仕上がりは十分に良いので、公開審査に出してお気に入りにも残しておきましょう。承認後に公開ギャラリーへ掲載され、あとから履歴詳細で外せます。',
+        'この評価はギャラリー申請できます。追加すると公開審査に進み、同時にお気に入りにも保存されます。承認後に公開ギャラリーへ掲載され、あとから履歴詳細ページで外せます。',
     };
   }
 
   if (locale === 'en') {
     return {
-      title: 'This result is strong enough for your gallery',
+      title: 'You can add this critique to your gallery',
       body:
-        'Only critiques with a total score of 6.0 or higher can be submitted here. This one has cleared that bar, so it is worth saving to favorites and sending to gallery moderation for a chance to appear publicly after approval.',
+        'This critique can be submitted to the gallery. It will go through gallery moderation and be saved to favorites by default. After approval, it will appear in the public gallery, and you can remove it later from the history detail page.',
     };
   }
 
   return {
-    title: '这次作品已经达到长廊收录门槛',
+    title: '这次评图很值得收进影像长廊',
     body:
-      '仅总分 6 分及以上的作品开放加入影像长廊。这次结果已经值得留档展示，加入后会先进入公开长廊审核，并默认加入收藏；审核通过后会出现在公开长廊，之后也可以在历史记录详情页移出。',
+      '这次结果很适合留档，也值得尝试公开展示。加入后会先进入公开长廊审核，并默认加入收藏；审核通过后会出现在公开长廊，之后也可以在历史记录详情页移出。',
   };
 }
 
