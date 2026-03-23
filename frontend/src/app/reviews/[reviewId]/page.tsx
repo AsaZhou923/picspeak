@@ -1117,7 +1117,7 @@ export default function ReviewPage() {
   const canManageReview = Boolean(review.viewer_is_owner);
   const showPersonalActions = !isPublicGalleryContext;
   const showOwnerActions = canManageReview && !isPublicGalleryContext;
-  const showGalleryCta = showOwnerActions && r.final_score >= 6.0;
+  const showGalleryCta = showOwnerActions;
   const gallerySaved = Boolean(review.gallery_visible);
   const isLowScore = r.final_score < 5.0;
 

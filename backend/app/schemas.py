@@ -88,6 +88,7 @@ class GuestReviewMigrateResponse(BaseModel):
 class ReviewResult(BaseModel):
     schema_version: str = REVIEW_SCHEMA_VERSION
     prompt_version: str = ''
+    score_version: str = 'legacy'
     model_name: str = ''
     model_version: str = ''
     scores: dict[str, int] = Field(default_factory=default_review_scores)
@@ -227,10 +228,13 @@ class PublicGalleryItem(BaseModel):
     mode: str
     image_type: str = 'default'
     final_score: float
+    score_version: str = 'legacy'
     summary: str = ''
     owner_username: str
     like_count: int = 0
     liked_by_viewer: bool = False
+    recommended: bool = False
+    score_percentile: float | None = None
     gallery_added_at: datetime
     created_at: datetime
 

@@ -189,6 +189,12 @@ const translations = {
     gallery_open_review: '打开评图结果',
     gallery_remove: '移出长廊',
     gallery_saved_at: '收录时间',
+    gallery_recommended: '推荐',
+    gallery_score_upgrade_badge: '评分标准已升级',
+    gallery_score_upgrade_title: '长廊评分口径已更新',
+    gallery_score_upgrade_body: '从 2026 年 3 月 24 日开始，新评图会使用更严格、且 flash 与 pro 共用同一打分口径的新评分标准。',
+    gallery_score_upgrade_detail: '影像长廊里仍会保留旧作品，因此你会同时看到旧评分和新评分口径下的作品，分数不建议直接横向对比。',
+    gallery_score_upgrade_ack: '我知道了',
     gallery_summary_fallback: '这条评图已加入长廊，适合作为之后继续复盘和比较的参考。',
 
     // Account usage
@@ -599,6 +605,12 @@ const translations = {
     gallery_open_review: 'Open critique',
     gallery_remove: 'Remove from gallery',
     gallery_saved_at: 'Saved on',
+    gallery_recommended: 'Recommended',
+    gallery_score_upgrade_badge: 'Scoring upgraded',
+    gallery_score_upgrade_title: 'Gallery scoring has been updated',
+    gallery_score_upgrade_body: 'Starting March 24, 2026, new critiques use a stricter scoring standard, and flash and pro share the same locked scoring pass.',
+    gallery_score_upgrade_detail: 'Older gallery works remain visible, so the gallery may contain both previous and current scoring standards. Avoid comparing raw scores across versions too directly.',
+    gallery_score_upgrade_ack: 'Understood',
     gallery_summary_fallback: 'Saved to your gallery for future comparison and review.',
 
     // Account usage
@@ -1009,6 +1021,12 @@ const translations = {
     gallery_open_review: '評価結果を開く',
     gallery_remove: 'ギャラリーから外す',
     gallery_saved_at: '保存日',
+    gallery_recommended: 'おすすめ',
+    gallery_score_upgrade_badge: '採点基準を更新',
+    gallery_score_upgrade_title: 'ギャラリーの採点基準が更新されました',
+    gallery_score_upgrade_body: '2026年3月24日から、新しい評価ではより厳格な採点基準を使い、flash と pro は同じ採点基準を共有します。',
+    gallery_score_upgrade_detail: 'ギャラリーには旧基準の作品も残るため、旧基準と新基準の作品が混在します。異なる基準の点数はそのまま横比較しないでください。',
+    gallery_score_upgrade_ack: '確認しました',
     gallery_summary_fallback: 'あとで比較・復盤できるようギャラリーに保存された評価です。',
 
     // Account usage

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import asyncio
+from bisect import bisect_right
 import hashlib
 import logging
 import re
@@ -144,6 +145,8 @@ GALLERY_AUDIT_NONE = 'none'
 GALLERY_AUDIT_APPROVED = 'approved'
 GALLERY_AUDIT_REJECTED = 'rejected'
 GALLERY_AUDIT_VALUES = {GALLERY_AUDIT_NONE, GALLERY_AUDIT_APPROVED, GALLERY_AUDIT_REJECTED}
+GALLERY_RECOMMEND_PERCENTILE_THRESHOLD = 80.0
+GALLERY_RECOMMEND_MIN_IMAGE_TYPE_SAMPLE = 8
 
 
 def _build_storage_photo_url(bucket: str, object_key: str) -> str:
@@ -1186,6 +1189,59 @@ def _review_gallery_summary(review: Review) -> str:
     return 'Saved to the public gallery.'
 
 
+def _score_percentile(value: float, sorted_values: list[float]) -> float | None:
+    if not sorted_values:
+        return None
+    if len(sorted_values) == 1:
+        return 100.0
+    rank = bisect_right(sorted_values, value) - 1
+    rank = max(0, min(rank, len(sorted_values) - 1))
+    return round((rank / (len(sorted_values) - 1)) * 100.0, 1)
+
+
+def _gallery_recommendation_map(db: Session, review_ids: list[int]) -> dict[int, dict[str, float | bool | None]]:
+    if not review_ids:
+        return {}
+
+    gallery_rows = (
+        db.query(Review.id, Review.image_type, Review.final_score)
+        .filter(*_public_gallery_filters())
+        .all()
+    )
+    if not gallery_rows:
+        return {}
+
+    global_scores = sorted(float(row.final_score) for row in gallery_rows)
+    scores_by_type: dict[str, list[float]] = {}
+    row_map: dict[int, tuple[str, float]] = {}
+    for row in gallery_rows:
+        image_type = str(row.image_type or 'default')
+        score = float(row.final_score)
+        scores_by_type.setdefault(image_type, []).append(score)
+        row_map[int(row.id)] = (image_type, score)
+
+    for scores in scores_by_type.values():
+        scores.sort()
+
+    recommendations: dict[int, dict[str, float | bool | None]] = {}
+    for review_id in review_ids:
+        row = row_map.get(int(review_id))
+        if row is None:
+            continue
+        image_type, score = row
+        type_scores = scores_by_type.get(image_type, [])
+        percentile = (
+            _score_percentile(score, type_scores)
+            if len(type_scores) >= GALLERY_RECOMMEND_MIN_IMAGE_TYPE_SAMPLE
+            else _score_percentile(score, global_scores)
+        )
+        recommendations[int(review_id)] = {
+            'recommended': bool(percentile is not None and percentile >= GALLERY_RECOMMEND_PERCENTILE_THRESHOLD),
+            'score_percentile': percentile,
+        }
+    return recommendations
+
+
 def _review_meta_payload(review: Review) -> ReviewMetaResponse:
     return ReviewMetaResponse(
         review_id=review.public_id,
@@ -1244,6 +1300,7 @@ def _review_result_payload(
     return {
         'schema_version': str(raw_payload.get('schema_version') or REVIEW_SCHEMA_VERSION),
         'prompt_version': str(raw_payload.get('prompt_version') or prompt_version or ''),
+        'score_version': str(raw_payload.get('score_version') or 'legacy'),
         'model_name': str(raw_payload.get('model_name') or model_name or ''),
         'model_version': str(raw_payload.get('model_version') or model_version or ''),
         'scores': scores,
@@ -1355,6 +1412,7 @@ def _public_gallery_item(
     *,
     like_count: int = 0,
     liked_by_viewer: bool = False,
+    recommendation: dict[str, float | bool | None] | None = None,
 ) -> PublicGalleryItem:
     return PublicGalleryItem(
         review_id=review.public_id,
@@ -1364,10 +1422,17 @@ def _public_gallery_item(
         mode=review.mode.value,
         image_type=_review_image_type(review),
         final_score=float(review.final_score),
+        score_version=str((review.result_json or {}).get('score_version') or 'legacy'),
         summary=_review_gallery_summary(review),
         owner_username=owner.username,
         like_count=max(0, int(like_count)),
         liked_by_viewer=bool(liked_by_viewer),
+        recommended=bool((recommendation or {}).get('recommended')),
+        score_percentile=(
+            float((recommendation or {}).get('score_percentile'))
+            if (recommendation or {}).get('score_percentile') is not None
+            else None
+        ),
         gallery_added_at=review.gallery_added_at or review.created_at,
         created_at=review.created_at,
     )
@@ -1746,6 +1811,7 @@ def list_public_gallery(
     review_ids = [review.id for review, _photo, _owner in rows]
     like_counts = _gallery_like_counts(db, review_ids)
     viewer_likes = _gallery_viewer_likes(db, review_ids, None if viewer is None else viewer.id)
+    recommendations = _gallery_recommendation_map(db, review_ids)
     items = [
         _public_gallery_item(
             request,
@@ -1754,6 +1820,7 @@ def list_public_gallery(
             owner,
             like_count=like_counts.get(review.id, 0),
             liked_by_viewer=review.id in viewer_likes,
+            recommendation=recommendations.get(review.id),
         )
         for review, photo, owner in rows
     ]

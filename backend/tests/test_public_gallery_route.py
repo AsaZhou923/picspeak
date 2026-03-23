@@ -11,10 +11,34 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-from app.api.routes import list_public_gallery
+from app.api.routes import _gallery_recommendation_map, list_public_gallery
 
 
 class PublicGalleryRouteTests(unittest.TestCase):
+    def test_gallery_recommendation_map_marks_top_percentile_with_sufficient_type_sample(self) -> None:
+        db = MagicMock()
+        query = MagicMock()
+        query.filter.return_value = query
+        query.all.return_value = [
+            SimpleNamespace(id=1, image_type='architecture', final_score=5.8),
+            SimpleNamespace(id=2, image_type='architecture', final_score=6.0),
+            SimpleNamespace(id=3, image_type='architecture', final_score=6.2),
+            SimpleNamespace(id=4, image_type='architecture', final_score=6.4),
+            SimpleNamespace(id=5, image_type='architecture', final_score=6.8),
+            SimpleNamespace(id=6, image_type='architecture', final_score=7.1),
+            SimpleNamespace(id=7, image_type='architecture', final_score=7.4),
+            SimpleNamespace(id=8, image_type='architecture', final_score=8.0),
+        ]
+        db.query.return_value = query
+
+        with patch('app.api.routes._public_gallery_filters', return_value=()):
+            recommendations = _gallery_recommendation_map(db, [1, 8])
+
+        self.assertFalse(recommendations[1]['recommended'])
+        self.assertEqual(recommendations[1]['score_percentile'], 0.0)
+        self.assertTrue(recommendations[8]['recommended'])
+        self.assertEqual(recommendations[8]['score_percentile'], 100.0)
+
     def test_list_public_gallery_returns_total_count(self) -> None:
         request = SimpleNamespace()
         db = MagicMock()
@@ -42,6 +66,9 @@ class PublicGalleryRouteTests(unittest.TestCase):
             'app.api.routes._gallery_viewer_likes',
             return_value={row_review.id},
         ), patch(
+            'app.api.routes._gallery_recommendation_map',
+            return_value={row_review.id: {'recommended': True, 'score_percentile': 92.5}},
+        ), patch(
             'app.api.routes._public_gallery_item',
             return_value={
                 'review_id': 'rev_123',
@@ -51,10 +78,13 @@ class PublicGalleryRouteTests(unittest.TestCase):
                 'mode': 'pro',
                 'image_type': 'street',
                 'final_score': 8.5,
+                'score_version': 'score-v2-strict',
                 'summary': 'Test summary',
                 'owner_username': 'tester',
                 'like_count': 7,
                 'liked_by_viewer': True,
+                'recommended': True,
+                'score_percentile': 92.5,
                 'gallery_added_at': row_review.gallery_added_at,
                 'created_at': row_review.gallery_added_at,
             },
@@ -65,6 +95,9 @@ class PublicGalleryRouteTests(unittest.TestCase):
         self.assertEqual(len(payload.items), 1)
         self.assertEqual(payload.items[0].like_count, 7)
         self.assertTrue(payload.items[0].liked_by_viewer)
+        self.assertEqual(payload.items[0].score_version, 'score-v2-strict')
+        self.assertTrue(payload.items[0].recommended)
+        self.assertEqual(payload.items[0].score_percentile, 92.5)
         self.assertIsNone(payload.next_cursor)
         db.commit.assert_called_once()
 

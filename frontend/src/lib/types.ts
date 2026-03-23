@@ -103,6 +103,7 @@ export interface ReviewScores {
 export interface ReviewResult {
   schema_version: string;
   prompt_version: string;
+  score_version: string;
   model_name: string;
   model_version: string;
   scores: ReviewScores;
@@ -299,10 +300,13 @@ export interface PublicGalleryItem {
   mode: ReviewMode;
   image_type: ImageType;
   final_score: number;
+  score_version: string;
   summary: string;
   owner_username: string;
   like_count: number;
   liked_by_viewer: boolean;
+  recommended: boolean;
+  score_percentile?: number | null;
   gallery_added_at: string;
   created_at: string;
 }

@@ -87,6 +87,7 @@ def _normalize_review_result_payload(
     return {
         'schema_version': str(raw_payload.get('schema_version') or '1.0'),
         'prompt_version': str(raw_payload.get('prompt_version') or prompt_version),
+        'score_version': str(raw_payload.get('score_version') or 'legacy'),
         'model_name': str(raw_payload.get('model_name') or model_name),
         'model_version': str(raw_payload.get('model_version') or model_version),
         'scores': scores,

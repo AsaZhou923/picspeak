@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { AlertCircle, ChevronLeft, ChevronRight, Heart, LayoutGrid, Star, X } from 'lucide-react';
+import { AlertCircle, ChevronLeft, ChevronRight, Heart, Info, LayoutGrid, Star, X } from 'lucide-react';
 import ClerkSignInTrigger from '@/components/auth/ClerkSignInTrigger';
 import { getPublicGallery, likeGalleryReview, unlikeGalleryReview } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
@@ -378,6 +378,14 @@ export default function GalleryPage() {
               </p>
               <h1 className="font-display text-4xl text-ink sm:text-5xl">{t('gallery_headline')}</h1>
               <p className="mt-3 max-w-2xl text-sm leading-7 text-ink-muted">{t('gallery_intro')}</p>
+              <div className="mt-4 rounded-2xl border border-gold/20 bg-gold/10 px-4 py-3 text-sm leading-7 text-ink-muted">
+                <p className="inline-flex items-center gap-2 font-medium text-gold">
+                  <Info size={14} />
+                  {t('gallery_score_upgrade_badge')}
+                </p>
+                <p className="mt-2">{t('gallery_score_upgrade_body')}</p>
+                <p className="mt-1 text-ink-subtle">{t('gallery_score_upgrade_detail')}</p>
+              </div>
             </div>
 
             <div className="rounded-2xl border border-border-subtle bg-void/55 px-5 py-4 backdrop-blur-sm">
@@ -440,11 +448,18 @@ export default function GalleryPage() {
                       <GalleryCardImage item={item} alt={t('photo_thumbnail_alt')} />
 
                       <div className="absolute inset-x-3 top-3 flex items-start justify-between gap-2">
-                        <span
-                          className={`rounded-full border px-2.5 py-1 text-xs font-medium shadow-[0_8px_30px_rgba(0,0,0,0.22)] backdrop-blur-sm ${scoreTone(item.final_score)}`}
-                        >
-                          {item.final_score.toFixed(1)}
-                        </span>
+                        <div className="flex flex-col items-start gap-2">
+                          <span
+                            className={`rounded-full border px-2.5 py-1 text-xs font-medium shadow-[0_8px_30px_rgba(0,0,0,0.22)] backdrop-blur-sm ${scoreTone(item.final_score)}`}
+                          >
+                            {item.final_score.toFixed(1)}
+                          </span>
+                          {item.recommended && (
+                            <span className="rounded-full border border-gold/40 bg-gold/15 px-2.5 py-1 text-[11px] font-medium tracking-[0.12em] text-gold">
+                              {t('gallery_recommended')}
+                            </span>
+                          )}
+                        </div>
                         <span className="rounded-full border border-border-subtle bg-void/80 px-2.5 py-1 text-[11px] uppercase tracking-[0.16em] text-ink-subtle">
                           {item.mode}
                         </span>

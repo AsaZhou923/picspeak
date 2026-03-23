@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from pydantic import ValidationError
+
 from app.core.config import settings
 from app.schemas import ReviewResult
 
@@ -27,7 +29,16 @@ class AIReviewResponse:
     latency_ms: int | None = None
 
 
-PROMPT_VERSION = 'photo-review-v4-strict'
+@dataclass
+class AIJSONResponse:
+    parsed: dict
+    model_name: str
+    usage: dict
+    latency_ms: int
+
+
+PROMPT_VERSION = 'photo-review-v5-split-score-lock'
+SCORE_VERSION = 'score-v2-strict'
 
 
 ALLOWED_IMAGE_TYPES = {'default', 'landscape', 'portrait', 'street', 'still_life', 'architecture'}
@@ -65,6 +76,13 @@ def _is_multimodal_model(model_name: str) -> bool:
     normalized = (model_name or '').strip().lower()
     if not normalized:
         return False
+
+    explicit_multimodal_models = (
+        'qwen3.5-plus',
+        'qwen3.5-flash',
+    )
+    if any(normalized == name or normalized.startswith(f'{name}-') for name in explicit_multimodal_models):
+        return True
 
     multimodal_markers = (
         '-vl',
@@ -465,9 +483,217 @@ def _extract_content(message_content: object) -> str:
     raise AIReviewError('Unsupported message content format')
 
 
+def _normalize_numbered_text_field(value: object) -> object:
+    if isinstance(value, str):
+        return value.strip()
+    if not isinstance(value, list):
+        return value
+
+    points: list[str] = []
+    for item in value:
+        if item is None:
+            continue
+        text = str(item).strip()
+        if not text:
+            continue
+        if re.match(r'^\d+\.\s+', text):
+            points.append(text)
+            continue
+        points.append(f'{len(points) + 1}. {text}')
+    return '\n'.join(points)
+
+
+def _normalize_review_result_fields(parsed: dict, *, image_type: str) -> dict:
+    normalized = dict(parsed)
+    for field_name in ('advantage', 'critique', 'suggestions'):
+        normalized[field_name] = _normalize_numbered_text_field(normalized.get(field_name, ''))
+    normalized['image_type'] = image_type if image_type in ALLOWED_IMAGE_TYPES else 'default'
+    return normalized
+
+
+def _format_validation_error(exc: ValidationError) -> str:
+    first_error = exc.errors()[0] if exc.errors() else None
+    if not first_error:
+        return str(exc)
+    location = '.'.join(str(part) for part in first_error.get('loc', ())) or 'unknown'
+    message = str(first_error.get('msg') or 'validation error')
+    return f'{location}: {message}'
+
+
+def _review_language_name(locale: str) -> str:
+    normalized = (locale or '').strip().lower()
+    return {
+        'zh': 'Chinese',
+        'ja': 'Japanese',
+    }.get(normalized, 'English')
+
+
+def _score_prompt(exif_data: dict | None = None, image_type: str = 'default') -> str:
+    normalized_image_type = image_type if image_type in ALLOWED_IMAGE_TYPES else 'default'
+    type_guide = IMAGE_TYPE_DIMENSION_GUIDE_EN[normalized_image_type]
+    exif_context = _format_exif_context(exif_data)
+    exif_note = f' Use EXIF as secondary evidence only: {exif_context}.' if exif_context else ''
+    return (
+        'You are a strict photography scoring engine. '
+        f'The image genre is {normalized_image_type}. Use this interpretation guide: {type_guide}.{exif_note} '
+        'Evaluate the photo in exactly five dimensions: composition, lighting, color, impact, technical. '
+        'Scoring baseline: 10 means top master-level work within the same genre. '
+        'Scores must be strict and clearly differentiated. Most ordinary photos should fall in the 3-6 range. '
+        'A 7 requires multiple clear strengths across dimensions, 8 requires portfolio-level execution with no obvious weak dimension, '
+        'and 9-10 should be extremely rare. '
+        'Do not increase scores simply because the subject is attractive, the image feels cinematic, or the style is trendy. '
+        'If the photo has a visible flaw in subject separation, composition, exposure or color control, or technical clarity, '
+        'the affected dimension should usually stay at 6 or below. '
+        'Return exactly one JSON object and nothing else: '
+        '{"scores":{"composition":0-10,"lighting":0-10,"color":0-10,"impact":0-10,"technical":0-10}}. '
+        'All score values must be integers.'
+    )
+
+
+def _writing_prompt(mode: str, locale: str, scores: dict[str, int], exif_data: dict | None = None, image_type: str = 'default') -> str:
+    normalized_mode = (mode or '').strip().lower()
+    if normalized_mode not in {'flash', 'pro'}:
+        normalized_mode = 'flash'
+
+    normalized_image_type = image_type if image_type in ALLOWED_IMAGE_TYPES else 'default'
+    type_guide = IMAGE_TYPE_DIMENSION_GUIDE_EN[normalized_image_type]
+    exif_context = _format_exif_context(exif_data)
+    exif_note = f' EXIF reference: {exif_context}.' if exif_context else ''
+    mode_note = (
+        'Current mode is flash. Keep advantage and critique concise, direct, and high-signal. '
+        'Prefer 1-3 short numbered points and avoid long breakdowns. '
+        if normalized_mode == 'flash'
+        else 'Current mode is pro. Make advantage and critique noticeably more developed than flash. '
+        'Prefer 2-3 numbered points when the image evidence supports it, and make each point include visible observation, '
+        'professional judgment, and effect on the final image. '
+    )
+    return (
+        'You are a photography critic. '
+        f'The image genre is {normalized_image_type}. Use this interpretation guide: {type_guide}.{exif_note} '
+        f'All output text fields must be written in {_review_language_name(locale)}. '
+        f'The numeric scores are already locked and must not be changed: {json.dumps(scores, ensure_ascii=False, separators=(",", ":"))}. '
+        'Do not recompute scores, do not output different numeric ratings, and do not mention alternative numbers. '
+        f'{mode_note}'
+        'Return exactly one JSON object and nothing else: '
+        '{"advantage":"...","critique":"...","suggestions":"..."}. '
+        'advantage, critique, and suggestions must each be a numbered string using the format "1. ...\\n2. ...". '
+        'Do not output arrays. '
+        'Do not force 3 points when the image evidence only supports 1 or 2 strong points. '
+        'Every point must be grounded in visible evidence from the photo, logically justified, and not generic. '
+        'Suggestions must be practical and, when appropriate, include concrete parameters or ranges. '
+        'Each suggestion must follow Observation + Reason + Action.'
+    )
+
+
+def _request_multimodal_json(*, model_name: str, prompt: str, image_url: str, temperature: float) -> AIJSONResponse:
+    endpoint = settings.ai_api_base_url.rstrip('/') + '/chat/completions'
+    payload = {
+        'model': model_name,
+        'temperature': temperature,
+        'response_format': {'type': 'json_object'},
+        'messages': [
+            {
+                'role': 'user',
+                'content': [
+                    {'type': 'text', 'text': prompt},
+                    {'type': 'image_url', 'image_url': {'url': image_url}},
+                ],
+            },
+        ],
+    }
+
+    req = Request(
+        endpoint,
+        data=json.dumps(payload).encode('utf-8'),
+        headers={
+            'Authorization': f'Bearer {settings.ai_api_key}',
+            'Content-Type': 'application/json',
+        },
+        method='POST',
+    )
+
+    start = time.perf_counter()
+    try:
+        with urlopen(req, timeout=settings.ai_timeout_seconds) as resp:
+            body = json.loads(resp.read().decode('utf-8'))
+    except HTTPError as exc:
+        err_body = exc.read().decode('utf-8', errors='ignore') if hasattr(exc, 'read') else str(exc)
+        raise AIReviewError(f'AI provider HTTP {exc.code}: {err_body[:300]}') from exc
+    except URLError as exc:
+        raise AIReviewError(f'AI provider request failed: {exc.reason}') from exc
+
+    latency_ms = int((time.perf_counter() - start) * 1000)
+    try:
+        choice = body['choices'][0]
+        message = choice['message']
+        content = _extract_content(message.get('content'))
+        parsed = _extract_json_object(content)
+    except (KeyError, IndexError, TypeError) as exc:
+        raise AIReviewError('Invalid AI provider response envelope') from exc
+
+    return AIJSONResponse(
+        parsed=parsed,
+        model_name=str(body.get('model') or model_name),
+        usage=body.get('usage') or {},
+        latency_ms=latency_ms,
+    )
+
+
 def run_ai_review(mode: str, image_url: str, locale: str = 'zh', exif_data: dict | None = None, image_type: str = 'default') -> AIReviewResponse:
     if not settings.ai_api_key:
         raise AIReviewError('AI_API_KEY is not configured')
+
+    scoring_model_name = model_name_for_mode('flash')
+    writing_model_name = model_name_for_mode(mode)
+    scoring_response = _request_multimodal_json(
+        model_name=scoring_model_name,
+        prompt=_score_prompt(exif_data, image_type=image_type),
+        image_url=image_url,
+        temperature=0,
+    )
+
+    try:
+        raw_scoring_payload = scoring_response.parsed
+        scores = raw_scoring_payload.get('scores') if isinstance(raw_scoring_payload.get('scores'), dict) else raw_scoring_payload
+        if not isinstance(scores, dict):
+            raise AIReviewError('Model response missing scores object')
+        locked_scores = {key: int(scores[key]) for key in ('composition', 'lighting', 'color', 'impact', 'technical')}
+    except AIReviewError:
+        raise
+    except (KeyError, TypeError, ValueError) as exc:
+        raise AIReviewError(f'Invalid AI provider response structure: scoring.scores: {exc}') from exc
+
+    final_score = _compute_final_score(locked_scores)
+    writing_response = _request_multimodal_json(
+        model_name=writing_model_name,
+        prompt=_writing_prompt(mode, locale, locked_scores, exif_data, image_type=image_type),
+        image_url=image_url,
+        temperature=0.2,
+    )
+
+    try:
+        parsed = _normalize_review_result_fields(writing_response.parsed, image_type=image_type)
+        parsed['score_version'] = SCORE_VERSION
+        parsed['scores'] = locked_scores
+        parsed['final_score'] = final_score
+        result = ReviewResult.model_validate(parsed)
+    except ValidationError as exc:
+        raise AIReviewError(f'Invalid AI provider response structure: {_format_validation_error(exc)}') from exc
+    except ValueError as exc:
+        raise AIReviewError(f'Invalid AI provider response structure: {exc}') from exc
+
+    scoring_usage = scoring_response.usage
+    writing_usage = writing_response.usage
+    return AIReviewResponse(
+        result=result,
+        model_name=writing_response.model_name,
+        model_version=model_version_for_name(writing_response.model_name),
+        prompt_version=PROMPT_VERSION,
+        input_tokens=(scoring_usage.get('prompt_tokens') or 0) + (writing_usage.get('prompt_tokens') or 0),
+        output_tokens=(scoring_usage.get('completion_tokens') or 0) + (writing_usage.get('completion_tokens') or 0),
+        cost_usd=None,
+        latency_ms=scoring_response.latency_ms + writing_response.latency_ms,
+    )
 
     model_name = model_name_for_mode(mode)
     endpoint = settings.ai_api_base_url.rstrip('/') + '/chat/completions'
@@ -514,14 +740,22 @@ def run_ai_review(mode: str, image_url: str, locale: str = 'zh', exif_data: dict
         message = choice['message']
         content = _extract_content(message.get('content'))
         parsed = _extract_json_object(content)
+    except (KeyError, IndexError, TypeError) as exc:
+        raise AIReviewError('Invalid AI provider response envelope') from exc
+
+    try:
         scores = parsed.get('scores')
         if not isinstance(scores, dict):
             raise AIReviewError('Model response missing scores object')
+        parsed = _normalize_review_result_fields(parsed, image_type=image_type)
         parsed['final_score'] = _compute_final_score(scores)
-        parsed['image_type'] = image_type if image_type in ALLOWED_IMAGE_TYPES else 'default'
         result = ReviewResult.model_validate(parsed)
-    except (KeyError, IndexError, TypeError, ValueError) as exc:
-        raise AIReviewError('Invalid AI provider response structure') from exc
+    except AIReviewError:
+        raise
+    except ValidationError as exc:
+        raise AIReviewError(f'Invalid AI provider response structure: {_format_validation_error(exc)}') from exc
+    except ValueError as exc:
+        raise AIReviewError(f'Invalid AI provider response structure: {exc}') from exc
 
     usage = body.get('usage') or {}
     resolved_model_name = body.get('model', model_name)

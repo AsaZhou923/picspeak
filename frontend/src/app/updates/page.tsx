@@ -8,46 +8,46 @@ function getUpdatesCopy(locale: 'zh' | 'en' | 'ja') {
   if (locale === 'ja') {
     return {
       label: 'Update Log',
-      title: 'ギャラリーに「いいね」を追加',
+      title: '採点基準の統一とギャラリー表示を更新',
       intro:
-        '今回の更新では、公開ギャラリーに永続化された「いいね」機能を追加し、あわせて metadata・robots・sitemap を含む SEO 調整もまとめて行いました。',
-      date: '2026-03-22',
+        '2026年3月24日から、新しい評価ではより厳格な採点基準を使い、flash と pro は同じ採点パスを共有します。公開ギャラリーには新しい「おすすめ」表示も追加されました。',
+      date: '2026-03-24',
       sections: [
         {
-          title: 'ギャラリーの反応',
+          title: '採点ロジック',
           items: [
-            '公開ギャラリーカードに「いいね」ボタンと件数表示を追加',
-            '「いいね」はフロントの一時状態ではなく、バックエンドに永続保存',
-            'ログイン済みユーザーはギャラリー上でそのまま「いいね」と解除を切り替え可能',
+            '採点リクエストの temperature を 0 に下げ、スコアのぶれを抑制',
+            'まずスコアを確定し、その後で mode ごとの文章を生成する二段階フローに変更',
+            'flash と pro は同じ採点結果を共有し、違いは説明の深さに限定',
           ],
         },
         {
-          title: '権限ルール',
+          title: 'Mode ごとの出力',
           items: [
-            'ゲストはこれまでどおり公開ギャラリーを閲覧可能',
-            'ゲストが「いいね」を押した場合は、サインインが必要であることを案内',
-            'バックエンドもゲストの「いいね」リクエストを `403` で拒否',
+            'flash は短い要約と実行しやすい改善提案を返す',
+            'pro はより詳しい分析と背景説明を返す',
+            '文量は分かれても、最終スコアは同一基準で固定される',
           ],
         },
         {
-          title: 'SEO 調整',
+          title: 'ギャラリー表示',
           items: [
-            '公開ページ向け metadata と canonical を整理',
-            'アカウント、ワークスペース、タスク、共有系ページには `noindex` を適用',
-            'sitemap を公開導線中心に見直し、affiliate ページの本文も強化',
+            '公開ギャラリーは引き続き絶対スコアの足切りを使わない',
+            '新しく「おすすめ」ラベルを追加し、相対的に上位の作品を表示',
+            '同じ image_type の標本が少ない場合は、全体分布で補正して判定',
           ],
         },
         {
-          title: 'データと API',
+          title: 'バージョン管理',
           items: [
-            '`review_likes` テーブルを追加して作品とユーザーの「いいね」関係を保存',
-            '`/gallery` レスポンスに `like_count` と `liked_by_viewer` を追加',
-            'ギャラリー作品向けの「いいね」/解除 API を追加',
+            '新しい評価結果には `score_version` を保存し、現行は `score-v2-strict`',
+            '旧データは `legacy` として扱い、既存結果はそのまま保持',
+            'ギャラリー上部に、2026年3月24日から採点基準が変わったことを常時表示',
           ],
         },
       ],
       docLabel: 'Doc path',
-      docPath: 'docs/changelog/update-log-2026-03-22-gallery-likes.md',
+      docPath: 'docs/changelog/update-log-2026-03-24-score-upgrade.md',
       backHome: 'Back home',
     };
   }
@@ -55,92 +55,92 @@ function getUpdatesCopy(locale: 'zh' | 'en' | 'ja') {
   if (locale === 'en') {
     return {
       label: 'Update Log',
-      title: 'Gallery Likes Added',
+      title: 'Scoring Standard and Gallery Ranking Updated',
       intro:
-        'This release adds persistent likes to the public gallery and also ships a round of SEO updates across metadata, robots, sitemap, and landing-page content.',
-      date: '2026-03-22',
+        'Starting March 24, 2026, new critiques use a stricter shared scoring pass for both flash and pro. The public gallery also adds a relative recommendation badge without reintroducing a hard score gate.',
+      date: '2026-03-24',
       sections: [
         {
-          title: 'Gallery Interaction',
+          title: 'Scoring Flow',
           items: [
-            'Added a like button and visible like count to public gallery cards',
-            'Likes are now stored on the backend instead of living only in frontend state',
-            'Signed-in users can like and unlike directly from the gallery view',
+            'Lowered the scoring request temperature to `0` to reduce score variance',
+            'Split critique generation into two passes: locked scoring first, writing second',
+            'Flash and pro now share the same scoring result instead of drifting apart with different writing depth',
           ],
         },
         {
-          title: 'Guest Restriction',
+          title: 'Mode Output',
           items: [
-            'Guests can still browse the public gallery normally',
-            'Guest like attempts now show a sign-in requirement in the UI',
-            'The backend also rejects guest like requests with `403`',
+            'Flash now returns a shorter summary-style critique',
+            'Pro returns a more expanded analysis with the same locked score',
+            'Writing depth differs by mode, but scoring standards stay aligned',
           ],
         },
         {
-          title: 'SEO Updates',
+          title: 'Gallery Recommendation',
           items: [
-            'Refined metadata and canonical coverage for public-facing pages',
-            'Applied `noindex` rules to account, workspace, task, and other private flows',
-            'Adjusted the sitemap toward public discovery pages and strengthened affiliate landing-page copy',
+            'The public gallery still has no hard minimum-score requirement',
+            'Added a new recommended badge based on relative percentile instead of an absolute cutoff',
+            'Recommendation uses same-image-type distribution first and falls back to the global gallery distribution when needed',
           ],
         },
         {
-          title: 'Data and API',
+          title: 'Versioning and UX',
           items: [
-            'Added a `review_likes` table to persist user-to-review likes',
-            'Extended `/gallery` items with `like_count` and `liked_by_viewer`',
-            'Added like and unlike endpoints for public gallery reviews',
+            'New review results now include `score_version`, currently `score-v2-strict`',
+            'Legacy reviews remain preserved and are treated as `legacy`',
+            'The gallery now shows a persistent notice explaining that the scoring standard changed on March 24, 2026',
           ],
         },
       ],
       docLabel: 'Doc path',
-      docPath: 'docs/changelog/update-log-2026-03-22-gallery-likes.md',
+      docPath: 'docs/changelog/update-log-2026-03-24-score-upgrade.md',
       backHome: 'Back home',
     };
   }
 
   return {
     label: 'Update Log',
-    title: '公开长廊新增点赞功能',
+    title: '评分标准与长廊推荐逻辑升级',
     intro:
-      '这次更新除了给公开影像长廊加入可持久化点赞能力，也同步补了一轮 SEO 优化，统一了 metadata、robots 与 sitemap 策略。',
-    date: '2026-03-22',
+      '从 2026 年 3 月 24 日开始，新评图会使用更严格的新评分标准，并且 flash 与 pro 共用同一轮锁定分数。公开长廊也新增了基于相对分位的推荐标记。',
+    date: '2026-03-24',
     sections: [
       {
-        title: '长廊互动',
+        title: '评分流程',
         items: [
-          '公开长廊卡片新增点赞按钮与点赞数展示',
-          '点赞改为后端持久化存储，不再只是前端临时状态',
-          '已登录用户可以直接在长廊页完成点赞与取消点赞',
+          '评分请求温度下调到 `0`，降低同图重复评测时的随机波动',
+          '评图流程拆成“先评分、后写文案”两步，先锁定分数再生成点评',
+          'flash 与 pro 共用同一轮评分结果，不再因为文案深度不同而直接拉开分差',
         ],
       },
       {
-        title: '游客权限',
+        title: '模式输出',
         items: [
-          '游客仍然可以正常浏览公开影像长廊',
-          '游客点击点赞时，前端会提示需要登录',
-          '后端也会对游客点赞请求返回 `403`，避免绕过前端限制',
+          'flash 现在输出更短的摘要式短评',
+          'pro 输出更完整、更展开的分析',
+          '两种模式的差异主要保留在文案深度，不再体现在评分口径上',
         ],
       },
       {
-        title: 'SEO 优化',
+        title: '长廊展示',
         items: [
-          '公开页面补充更完整的 metadata 与 canonical',
-          '账户、工作台、任务、分享等私有页面统一加 `noindex`',
-          '调整 sitemap 公开页面权重，并补强 affiliate 落地页内容',
+          '公开长廊继续不设置硬性分数门槛',
+          '新增“推荐”标记，基于相对分位而不是绝对分数筛出当前更靠前的作品',
+          '推荐优先按同 `image_type` 分布计算，样本不足时回退到全局长廊分布',
         ],
       },
       {
-        title: '数据与接口',
+        title: '版本与提示',
         items: [
-          '新增 `review_likes` 表保存用户与作品的点赞关系',
-          '`/gallery` 返回新增 `like_count` 和 `liked_by_viewer`',
-          '新增公开长廊点赞与取消点赞接口',
+          '新评图结果新增 `score_version`，当前版本为 `score-v2-strict`',
+          '旧作品继续保留原结果，并按 `legacy` 版本处理',
+          '公开长廊增加常驻说明，明确告知用户 2026 年 3 月 24 日起评分标准已经升级',
         ],
       },
     ],
     docLabel: '文档路径',
-    docPath: 'docs/changelog/update-log-2026-03-22-gallery-likes.md',
+    docPath: 'docs/changelog/update-log-2026-03-24-score-upgrade.md',
     backHome: '返回首页',
   };
 }
