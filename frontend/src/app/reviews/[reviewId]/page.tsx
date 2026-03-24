@@ -712,7 +712,7 @@ function detectSuggestionTags(title: string, detail: string): TagKey[] {
 
 function parsePoints(body: string): string[] {
   const numbered = body.split(/(?=\d+\.\s)/).map((s) => s.trim()).filter(Boolean);
-  if (numbered.length > 1) return numbered;
+  if (numbered.length >= 1 && /^\d+\.\s/.test(numbered[0])) return numbered;
   const byLine = body.split(/[\n；;]+/).map((s) => s.trim()).filter(Boolean);
   if (byLine.length > 1) return byLine;
   return [body.trim()].filter(Boolean);
@@ -737,6 +737,27 @@ function parsePointWithTitle(raw: string): { title: string; detail: string } {
   return { title: '', detail: text.trim() };
 }
 
+function hasStructuredSuggestionLabel(text: string, labels: readonly string[]): boolean {
+  return labels.some((label) => {
+    const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`(?:^|\\d+\\.\\s*|[；;，,\\n]\\s*)${escaped}[：:]`, 'i').test(text);
+  });
+}
+
+function getSuggestionStructureState(text: string): 'complete' | 'partial' | 'none' {
+  const observationLabels = ['观察', '觀察', 'Observation', '観察'] as const;
+  const reasonLabels = ['原因', 'Reason', '理由'] as const;
+  const actionLabels = ['建议', '行动', '行動', '处理方法', '可执行动作', 'Action', '提案'] as const;
+
+  const hasObservation = hasStructuredSuggestionLabel(text, observationLabels);
+  const hasReason = hasStructuredSuggestionLabel(text, reasonLabels);
+  const hasAction = hasStructuredSuggestionLabel(text, actionLabels);
+
+  if (hasObservation && hasReason && hasAction) return 'complete';
+  if (hasObservation || hasReason || hasAction) return 'partial';
+  return 'none';
+}
+
 // ─── Score dimension → suggestion tag mapping ─────────────────────────────────
 // Each dimension maps to an ordered list of tag candidates to try.
 // The first tag whose corresponding card exists in the DOM is used.
@@ -755,9 +776,15 @@ const DIM_TO_TAGS: Partial<Record<string, TagKey[]>> = {
 
 function parsePointWithShortActionTitle(raw: string): { title: string; detail: string } {
   const text = raw.replace(/^\d+[.、．]\s*/, '').trim();
-  const actionMatch = text.match(/(?:处理方法|可执行动作|Action)[：:]\s*(.+)/is);
+  const structureState = getSuggestionStructureState(text);
 
-  if (actionMatch) {
+  if (structureState === 'partial') {
+    return { title: '', detail: text };
+  }
+
+  const actionMatch = text.match(/(?:建议|行动|处理方法|可执行动作|Action)[：:]\s*(.+)/is);
+
+  if (structureState === 'complete' && actionMatch) {
     const actionText = actionMatch[1].trim();
     const firstClause = actionText.split(/[，,]/)[0]?.trim() ?? '';
     const fallbackSentence = actionText

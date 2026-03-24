@@ -397,6 +397,7 @@ def _process_task(db: Session, task: ReviewTask) -> None:
             locale=payload_locale,
             exif_data=photo.exif_data or None,
             image_type=payload_image_type,
+            enforce_suggestion_structure=task.attempt_count < task.max_attempts,
         )
     except AIReviewError as exc:
         _handle_failure(db, task, error_code='AI_CALL_FAILED', error_message=str(exc), retryable=True)

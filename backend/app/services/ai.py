@@ -503,10 +503,65 @@ def _normalize_numbered_text_field(value: object) -> object:
     return '\n'.join(points)
 
 
-def _normalize_review_result_fields(parsed: dict, *, image_type: str) -> dict:
+def _split_numbered_text_field(value: str) -> list[str]:
+    text = value.strip()
+    if not text:
+        return []
+    matches = re.findall(r'^\s*\d+\.\s.*?(?=^\s*\d+\.\s|\Z)', text, flags=re.MULTILINE | re.DOTALL)
+    if matches:
+        return [match.strip() for match in matches if match.strip()]
+    return [text]
+
+
+def _has_structured_label(text: str, labels: tuple[str, ...]) -> bool:
+    return any(
+        re.search(
+            rf'(?:^|\d+\.\s*|[\uFF1B;\uFF0C,\n]\s*){re.escape(label)}[\uFF1A:]',
+            text,
+            flags=re.IGNORECASE,
+        )
+        for label in labels
+    )
+
+
+def _validate_suggestions_structure(value: object) -> None:
+    if not isinstance(value, str):
+        raise ValueError('suggestions must be a string')
+
+    points = _split_numbered_text_field(value)
+    if not points:
+        return
+
+    observation_labels = ('\u89c2\u5bdf', '\u89c0\u5bdf', 'Observation', '\u89b3\u5bdf')
+    reason_labels = ('\u539f\u56e0', 'Reason', '\u7406\u7531')
+    action_labels = (
+        '\u53ef\u6267\u884c\u52a8\u4f5c',
+        '\u53ef\u57f7\u884c\u52d5\u4f5c',
+        '\u5904\u7406\u65b9\u6cd5',
+        '\u884c\u52d5',
+        '\u884c\u52a8',
+        '\u52a8\u4f5c',
+        '\u5efa\u8bae',
+        'Action',
+        '\u5b9f\u884c\u30a2\u30af\u30b7\u30e7\u30f3',
+        '\u63d0\u6848',
+    )
+
+    for index, point in enumerate(points, start=1):
+        if not _has_structured_label(point, observation_labels):
+            raise ValueError(f'suggestions point {index} must include Observation label')
+        if not _has_structured_label(point, reason_labels):
+            raise ValueError(f'suggestions point {index} must include Reason label')
+        if not _has_structured_label(point, action_labels):
+            raise ValueError(f'suggestions point {index} must include Action label')
+
+
+def _normalize_review_result_fields(parsed: dict, *, image_type: str, enforce_suggestion_structure: bool = True) -> dict:
     normalized = dict(parsed)
     for field_name in ('advantage', 'critique', 'suggestions'):
         normalized[field_name] = _normalize_numbered_text_field(normalized.get(field_name, ''))
+    if enforce_suggestion_structure:
+        _validate_suggestions_structure(normalized.get('suggestions', ''))
     normalized['image_type'] = image_type if image_type in ALLOWED_IMAGE_TYPES else 'default'
     return normalized
 
@@ -581,7 +636,8 @@ def _writing_prompt(mode: str, locale: str, scores: dict[str, int], exif_data: d
         'Do not force 3 points when the image evidence only supports 1 or 2 strong points. '
         'Every point must be grounded in visible evidence from the photo, logically justified, and not generic. '
         'Suggestions must be practical and, when appropriate, include concrete parameters or ranges. '
-        'Each suggestion must follow Observation + Reason + Action.'
+        'Each suggestion must follow Observation + Reason + Action. '
+        'Use explicit labels inside every suggestion point, exactly like: "观察：...；原因：...；可执行动作：...".'
     )
 
 
@@ -639,7 +695,14 @@ def _request_multimodal_json(*, model_name: str, prompt: str, image_url: str, te
     )
 
 
-def run_ai_review(mode: str, image_url: str, locale: str = 'zh', exif_data: dict | None = None, image_type: str = 'default') -> AIReviewResponse:
+def run_ai_review(
+    mode: str,
+    image_url: str,
+    locale: str = 'zh',
+    exif_data: dict | None = None,
+    image_type: str = 'default',
+    enforce_suggestion_structure: bool = True,
+) -> AIReviewResponse:
     if not settings.ai_api_key:
         raise AIReviewError('AI_API_KEY is not configured')
 
@@ -672,7 +735,11 @@ def run_ai_review(mode: str, image_url: str, locale: str = 'zh', exif_data: dict
     )
 
     try:
-        parsed = _normalize_review_result_fields(writing_response.parsed, image_type=image_type)
+        parsed = _normalize_review_result_fields(
+            writing_response.parsed,
+            image_type=image_type,
+            enforce_suggestion_structure=enforce_suggestion_structure,
+        )
         parsed['score_version'] = SCORE_VERSION
         parsed['scores'] = locked_scores
         parsed['final_score'] = final_score
