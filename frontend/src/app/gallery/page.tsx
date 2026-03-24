@@ -155,36 +155,79 @@ function GalleryCardImage({
   const fallbackSrc = item.photo_thumbnail_url || '';
   const [src, setSrc] = useState(primarySrc);
   const [broken, setBroken] = useState(!primarySrc);
+  const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
 
   useEffect(() => {
     setSrc(primarySrc);
     setBroken(!primarySrc);
+    setOrientation('portrait');
   }, [primarySrc]);
 
   return (
-    <div className="relative aspect-[4/5] w-full overflow-hidden bg-[radial-gradient(circle_at_top,rgba(239,225,198,0.24),transparent_38%),linear-gradient(180deg,rgba(20,18,16,0.08),rgba(11,10,9,0.26))]">
+    <div className="relative aspect-[4/5] w-full overflow-hidden rounded-[22px] border border-border-subtle bg-[radial-gradient(circle_at_top,rgba(200,162,104,0.14),transparent_40%),linear-gradient(180deg,rgba(248,244,237,0.92),rgba(228,221,211,0.82))] shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] dark:border-[rgba(208,186,146,0.14)] dark:bg-[radial-gradient(circle_at_top,rgba(239,225,198,0.24),transparent_38%),linear-gradient(180deg,rgba(20,18,16,0.08),rgba(11,10,9,0.26))] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
       {!broken && src ? (
-        <img
-          src={src}
-          alt={alt}
-          loading="lazy"
-          decoding="async"
-          sizes="(min-width: 1280px) 22vw, (min-width: 1024px) 30vw, (min-width: 640px) 45vw, 92vw"
-          className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.02]"
-          onError={() => {
-            if (fallbackSrc && src !== fallbackSrc) {
-              setSrc(fallbackSrc);
-              return;
-            }
-            setBroken(true);
-          }}
-        />
+        <>
+          {orientation === 'landscape' ? (
+            <>
+              <img
+                src={src}
+                alt=""
+                aria-hidden="true"
+                loading="lazy"
+                decoding="async"
+                sizes="(min-width: 1280px) 22vw, (min-width: 1024px) 30vw, (min-width: 640px) 45vw, 92vw"
+                className="absolute inset-0 h-full w-full scale-110 object-cover opacity-30 blur-[26px] saturate-[0.85] transition-transform duration-700 group-hover:scale-[1.14] dark:opacity-45"
+              />
+              <div className="absolute inset-x-4 top-4 bottom-6 flex items-center justify-center overflow-hidden rounded-[28px] border border-border bg-[linear-gradient(180deg,rgba(255,255,255,0.54),rgba(244,238,229,0.24))] shadow-[0_18px_44px_rgba(120,96,68,0.14)] backdrop-blur-[3px] dark:border-[rgba(208,186,146,0.12)] dark:bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.015))] dark:shadow-[0_20px_54px_rgba(0,0,0,0.34)]">
+                <img
+                  src={src}
+                  alt={alt}
+                  loading="lazy"
+                  decoding="async"
+                  sizes="(min-width: 1280px) 22vw, (min-width: 1024px) 30vw, (min-width: 640px) 45vw, 92vw"
+                  className="h-full w-full object-contain px-3 py-4 transition-transform duration-700 group-hover:scale-[1.02]"
+                  onLoad={(event) => {
+                    const { naturalWidth, naturalHeight } = event.currentTarget;
+                    setOrientation(naturalWidth > naturalHeight ? 'landscape' : 'portrait');
+                  }}
+                  onError={() => {
+                    if (fallbackSrc && src !== fallbackSrc) {
+                      setSrc(fallbackSrc);
+                      return;
+                    }
+                    setBroken(true);
+                  }}
+                />
+              </div>
+            </>
+          ) : (
+            <img
+              src={src}
+              alt={alt}
+              loading="lazy"
+              decoding="async"
+              sizes="(min-width: 1280px) 22vw, (min-width: 1024px) 30vw, (min-width: 640px) 45vw, 92vw"
+              className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.03]"
+              onLoad={(event) => {
+                const { naturalWidth, naturalHeight } = event.currentTarget;
+                setOrientation(naturalWidth > naturalHeight ? 'landscape' : 'portrait');
+              }}
+              onError={() => {
+                if (fallbackSrc && src !== fallbackSrc) {
+                  setSrc(fallbackSrc);
+                  return;
+                }
+                setBroken(true);
+              }}
+            />
+          )}
+        </>
       ) : (
-        <div className="flex h-full w-full items-center justify-center bg-[linear-gradient(145deg,rgba(33,30,26,0.92),rgba(17,15,13,0.96))] px-6 text-center text-sm leading-6 text-ink-subtle">
+        <div className="flex h-full w-full items-center justify-center bg-[linear-gradient(145deg,rgba(244,239,231,0.96),rgba(227,219,208,0.94))] px-6 text-center text-sm leading-6 text-ink-subtle dark:bg-[linear-gradient(145deg,rgba(33,30,26,0.92),rgba(17,15,13,0.96))]">
           {alt}
         </div>
       )}
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[rgba(11,10,9,0.92)] via-[rgba(11,10,9,0.08)] to-transparent" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.32),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0)_56%,rgba(250,248,244,0.86))] dark:bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_32%),linear-gradient(180deg,rgba(12,11,10,0.04),rgba(12,11,10,0.16)_55%,rgba(12,11,10,0.88))]" />
     </div>
   );
 }
@@ -464,33 +507,33 @@ export default function GalleryPage() {
                 return (
                   <article
                     key={item.review_id}
-                    className="group overflow-hidden rounded-[24px] border border-border-subtle bg-raised/60 transition-all duration-300 hover:-translate-y-1 hover:border-gold/30"
+                    className="group flex h-full flex-col overflow-hidden rounded-[26px] border border-border-subtle bg-[linear-gradient(180deg,rgba(248,244,238,0.96),rgba(236,230,221,0.98))] shadow-[0_18px_48px_rgba(146,120,88,0.12)] transition-all duration-300 hover:-translate-y-1 hover:border-gold/20 hover:shadow-[0_24px_64px_rgba(146,120,88,0.18)] dark:border-[rgba(208,186,146,0.12)] dark:bg-[linear-gradient(180deg,rgba(31,28,24,0.94),rgba(18,17,15,0.98))] dark:shadow-[0_18px_48px_rgba(0,0,0,0.18)] dark:hover:shadow-[0_28px_72px_rgba(0,0,0,0.28)]"
                   >
-                    <div className="relative overflow-hidden">
+                    <div className="relative overflow-hidden px-3 pt-3">
                       <GalleryCardImage item={item} alt={t('photo_thumbnail_alt')} />
 
-                      <div className="absolute inset-x-3 top-3 flex items-start justify-between gap-2">
+                      <div className="absolute inset-x-6 top-6 flex items-start justify-between gap-2">
                         <div className="flex flex-col items-start gap-2">
                           <span
-                            className={`rounded-full border px-2.5 py-1 text-xs font-medium shadow-[0_8px_30px_rgba(0,0,0,0.22)] backdrop-blur-sm ${scoreTone(item.final_score)}`}
+                            className={`rounded-full border px-2.5 py-1 text-xs font-medium shadow-[0_8px_30px_rgba(0,0,0,0.22)] backdrop-blur-md ${scoreTone(item.final_score)}`}
                           >
                             {item.final_score.toFixed(1)}
                           </span>
                           {item.recommended && (
-                            <span className="rounded-full border border-gold/40 bg-gold/15 px-2.5 py-1 text-[11px] font-medium tracking-[0.12em] text-gold">
+                            <span className="rounded-full border border-gold/40 bg-gold/15 px-2.5 py-1 text-[11px] font-medium tracking-[0.12em] text-gold shadow-[0_10px_26px_rgba(200,162,104,0.14)]">
                               {t('gallery_recommended')}
                             </span>
                           )}
                         </div>
                         <span
-                          className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.16em] backdrop-blur-sm ${modeBadge.className}`}
+                          className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.16em] backdrop-blur-md ${modeBadge.className}`}
                         >
                           <ModeIcon size={11} strokeWidth={1.8} className={modeBadge.iconClassName} />
                           {modeBadge.label}
                         </span>
                       </div>
 
-                      <div className="absolute bottom-3 right-3 flex items-center gap-2 rounded-full border border-white/10 bg-[rgba(241,237,230,0.88)] px-2.5 py-1.5 shadow-[0_12px_36px_rgba(0,0,0,0.18)]">
+                      <div className="absolute bottom-6 right-6 flex items-center gap-2 rounded-full border border-border bg-[rgba(250,248,244,0.92)] px-2.5 py-1.5 shadow-[0_12px_30px_rgba(120,96,68,0.14)] backdrop-blur-md dark:border-white/10 dark:bg-[rgba(241,237,230,0.9)] dark:shadow-[0_12px_36px_rgba(0,0,0,0.2)]">
                         {item.owner_avatar_url ? (
                           <img
                             src={item.owner_avatar_url}
@@ -500,36 +543,41 @@ export default function GalleryPage() {
                             className="h-7 w-7 rounded-full border border-white/45 object-cover"
                           />
                         ) : (
-                          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[linear-gradient(135deg,rgba(224,186,136,0.95),rgba(138,110,67,0.95))] text-[11px] font-semibold text-void">
+                          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[linear-gradient(135deg,rgba(224,186,136,0.95),rgba(138,110,67,0.95))] text-[11px] font-semibold text-white dark:text-void">
                             {author.initial}
                           </span>
                         )}
-                        <span className="max-w-[96px] truncate text-xs text-void">{author.label}</span>
+                        <span className="max-w-[96px] truncate text-xs text-ink dark:text-void">{author.label}</span>
                       </div>
                     </div>
 
-                    <div className="space-y-3 px-4 py-4">
-                      <p className="text-[11px] uppercase tracking-[0.2em] text-ink-subtle">{t('gallery_saved_at')}</p>
-                      <p className="text-sm text-ink">
-                        {new Date(item.gallery_added_at).toLocaleDateString(dateLocale, {
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric',
-                        })}
-                      </p>
-                      <p
-                        className="text-xs leading-6 text-ink-muted"
-                        style={{
-                          display: '-webkit-box',
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical',
-                          overflow: 'hidden',
-                        }}
-                      >
-                        {trimSummary(item.summary || t('gallery_summary_fallback'))}
-                      </p>
+                    <div className="flex flex-1 flex-col px-4 pb-4 pt-4">
+                      <div className="rounded-[20px] border border-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.45),rgba(245,239,231,0.2))] px-3.5 py-3 dark:border-[rgba(208,186,146,0.12)] dark:bg-[linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01))]">
+                        <p className="text-[11px] uppercase tracking-[0.22em] text-ink-subtle">{t('gallery_saved_at')}</p>
+                        <p className="mt-2 text-sm font-medium text-ink">
+                          {new Date(item.gallery_added_at).toLocaleDateString(dateLocale, {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                          })}
+                        </p>
+                      </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="mt-3 rounded-[20px] border border-[rgba(200,162,104,0.16)] bg-[linear-gradient(180deg,rgba(200,162,104,0.08),rgba(255,255,255,0.14))] px-3.5 py-3.5 dark:border-[rgba(200,162,104,0.1)] dark:bg-[linear-gradient(180deg,rgba(200,162,104,0.05),rgba(255,255,255,0.02))]">
+                        <p
+                          className="text-xs leading-6 text-ink-muted"
+                          style={{
+                            display: '-webkit-box',
+                            WebkitLineClamp: 3,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                          }}
+                        >
+                          {trimSummary(item.summary || t('gallery_summary_fallback'))}
+                        </p>
+                      </div>
+
+                      <div className="mt-auto flex items-center gap-2 pt-4">
                         <button
                           type="button"
                           onClick={() => void handleLikeToggle(item)}
