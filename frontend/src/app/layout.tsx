@@ -1,15 +1,12 @@
 import type { Metadata } from 'next';
 import { Cormorant_Garamond, DM_Sans, JetBrains_Mono } from 'next/font/google';
 import Script from 'next/script';
-import { ClerkProvider } from '@clerk/nextjs';
 import './globals.css';
-import { AuthProvider } from '@/lib/auth-context';
-import { ThemeProvider } from '@/lib/theme-context';
-import { I18nProvider } from '@/lib/i18n';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/next';  
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
+import AppProviders from '@/components/providers/AppProviders';
 import BackgroundEffect from '@/components/ui/BackgroundEffect';
 import { siteConfig } from '@/lib/site';
 
@@ -114,24 +111,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className="text-ink min-h-screen">
-        <ClerkProvider>
+        <AppProviders>
           <Analytics />
           <SpeedInsights />
           <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
             <BackgroundEffect />
           </div>
           <div className="relative z-10 min-h-screen flex flex-col">
-            <I18nProvider>
-              <ThemeProvider>
-                <AuthProvider>
-                  <Header />
-                  <main className="flex-1 pt-12 md:pt-0">{children}</main>
-                  <Footer />
-                </AuthProvider>
-              </ThemeProvider>
-            </I18nProvider>
+            <Header />
+            <main className="flex-1 pt-12 md:pt-0">{children}</main>
+            <Footer />
           </div>
-        </ClerkProvider>
+        </AppProviders>
       </body>
     </html>
   );
