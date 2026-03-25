@@ -13,6 +13,7 @@ import {
   getUsage,
 } from '@/lib/api';
 import ClerkSignInTrigger from '@/components/auth/ClerkSignInTrigger';
+import ProPromoCard from '@/components/marketing/ProPromoCard';
 import { useAuth } from '@/lib/auth-context';
 import { planLabel, planColor } from '@/lib/auth-context';
 import {
@@ -145,6 +146,7 @@ function getEffectiveQuota(
   );
 }
 
+
 function isImageType(value: string | null): value is ImageType {
   return value === 'default' ||
     value === 'landscape' ||
@@ -189,6 +191,7 @@ function WorkspacePageContent() {
   const { userInfo, ensureToken, isLoading: authLoading, syncPlan } = useAuth();
   const { t, locale } = useI18n();
   const replayCopy = getReplayCopy(locale);
+  const promoModeBadge = '25% off';
 
   const initialSourceReviewId = searchParams.get('source_review_id');
   const initialPhotoId = searchParams.get('photo_id');
@@ -197,7 +200,8 @@ function WorkspacePageContent() {
 
   const [usage, setUsage] = useState<UsageResponse | null>(null);
   const [usageError, setUsageError] = useState(false);
-  const isGuest = (userInfo?.plan ?? usage?.plan) === 'guest';
+  const currentPlan = (userInfo?.plan ?? usage?.plan ?? 'guest') as 'guest' | 'free' | 'pro';
+  const isGuest = currentPlan === 'guest';
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -628,6 +632,11 @@ function WorkspacePageContent() {
                                 <div>
                                   <p className={`text-sm font-medium ${reviewMode === modeOption.id ? 'text-gold' : 'text-ink'}`}>
                                     {modeOption.title}
+                                    {modeOption.id === 'pro' && (
+                                      <span className="ml-2 rounded-full border border-gold/25 bg-gold/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] text-gold/80">
+                                        {promoModeBadge}
+                                      </span>
+                                    )}
                                   </p>
                                   <p className="mt-0.5 text-xs text-ink-muted">
                                     {disabled ? t('mode_pro_guest') : modeOption.desc}
@@ -817,6 +826,11 @@ function WorkspacePageContent() {
                               }`}
                             >
                               {m.title}
+                              {m.id === 'pro' && (
+                                <span className="ml-2 rounded-full border border-gold/25 bg-gold/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] text-gold/80">
+                                  {promoModeBadge}
+                                </span>
+                              )}
                             </p>
                             <p className="text-xs text-ink-muted mt-0.5">
                               {disabled ? t('mode_pro_guest') : m.desc}
@@ -856,6 +870,12 @@ function WorkspacePageContent() {
               )}
             </div>
           )}
+        <ProPromoCard
+          plan={currentPlan}
+          scene="workspace"
+          fallbackRedirectUrl="/workspace"
+          className="mt-12 animate-slide-up anim-fill-both delay-150"
+        />
         </div>
       </div>
     </div>

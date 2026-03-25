@@ -8,46 +8,46 @@ function getUpdatesCopy(locale: 'zh' | 'en' | 'ja') {
   if (locale === 'ja') {
     return {
       label: 'Update Log',
-      title: '採点基準の統一とギャラリー表示を更新',
+      title: 'Pro 初回キャンペーンと直接チェックアウトを公開',
       intro:
-        '2026年3月24日から、新しい評価ではより厳格な採点基準を使い、flash と pro は同じ採点パスを共有します。公開ギャラリーには新しい「おすすめ」表示も追加されました。',
-      date: '2026-03-24',
+        '今回の更新では、Pro の初回価格を $2.99 / 月に統一し、ワークスペース、結果ページ、ギャラリー、使用状況ページ、トップページの導線をまとめて強化しました。さらに、購入ボタンは使用状況ページを経由せず、そのまま checkout に進むようになりました。',
+      date: '2026-03-25',
       sections: [
         {
-          title: '採点ロジック',
+          title: 'Pro オファー統一',
           items: [
-            '採点リクエストの temperature を 0 に下げ、スコアのぶれを抑制',
-            'まずスコアを確定し、その後で mode ごとの文章を生成する二段階フローに変更',
-            'flash と pro は同じ採点結果を共有し、違いは説明の深さに限定',
+            'Pro の初回価格を全体で $2.99 / 月に統一',
+            '「サイト初期運営 25% OFF」の表現で全体をそろえた',
+            'Pro 利用中ユーザー向け文案も自然な表現へ調整した',
           ],
         },
         {
-          title: 'Mode ごとの出力',
+          title: '導線強化',
           items: [
-            'flash は短い要約と実行しやすい改善提案を返す',
-            'pro はより詳しい分析と背景説明を返す',
-            '文量は分かれても、最終スコアは同一基準で固定される',
+            'ワークスペース、結果ページ、ギャラリー、使用状況ページで Pro 入口を強化',
+            'トップページの料金カードも同じ初回キャンペーン表現に更新',
+            '促進カードは主導線を邪魔しにくい位置へ移動した',
           ],
         },
         {
-          title: 'ギャラリー表示',
+          title: '購入フロー',
           items: [
-            '公開ギャラリーは引き続き絶対スコアの足切りを使わない',
-            '新しく「おすすめ」ラベルを追加し、相対的に上位の作品を表示',
-            '同じ image_type の標本が少ない場合は、全体分布で補正して判定',
+            'すべての Pro 購入入口を checkout_url 直行に変更',
+            '使用状況ページを経由せず、そのまま決済へ進めるようにした',
+            '入口ごとの挙動差をなくすため、共通 checkout helper を追加した',
           ],
         },
         {
-          title: 'バージョン管理',
+          title: '中国語ユーザー向け案内',
           items: [
-            '新しい評価結果には `score_version` を保存し、現行は `score-v2-strict`',
-            '旧データは `legacy` として扱い、既存結果はそのまま保持',
-            'ギャラリー上部に、2026年3月24日から採点基準が変わったことを常時表示',
+            '中国語表示時のみ、checkout ボタン下に支払い案内を追加',
+            '国内ユーザー向けに WeChat `Asa-180` での購入案内を追記',
+            '今回の更新内容を changelog とトップページの更新記録に反映した',
           ],
         },
       ],
       docLabel: 'Doc path',
-      docPath: 'docs/changelog/update-log-2026-03-24-score-upgrade.md',
+      docPath: 'docs/changelog/update-log-2026-03-25-pro-launch-checkout.md',
       backHome: 'Back home',
     };
   }
@@ -55,92 +55,92 @@ function getUpdatesCopy(locale: 'zh' | 'en' | 'ja') {
   if (locale === 'en') {
     return {
       label: 'Update Log',
-      title: 'Scoring Standard and Gallery Ranking Updated',
+      title: 'Pro Launch Offer and Direct Checkout Updated',
       intro:
-        'Starting March 24, 2026, new critiques use a stricter shared scoring pass for both flash and pro. The public gallery also adds a relative recommendation badge without reintroducing a hard score gate.',
-      date: '2026-03-24',
+        'This release tightens the entire Pro conversion flow. The launch offer is now consistently presented as $2.99/month, new Pro entry points were added across the workspace, result page, gallery, usage page, and homepage, and purchase buttons now go straight to checkout instead of detouring through the usage page.',
+      date: '2026-03-25',
       sections: [
         {
-          title: 'Scoring Flow',
+          title: 'Offer Consistency',
           items: [
-            'Lowered the scoring request temperature to `0` to reduce score variance',
-            'Split critique generation into two passes: locked scoring first, writing second',
-            'Flash and pro now share the same scoring result instead of drifting apart with different writing depth',
+            'Standardized the Pro launch price to $2.99/month across the site, with the original $3.99 shown as a strike-through reference',
+            'Unified the promotion framing around an early-launch 25% off offer',
+            'Rewrote the Pro-user copy so it confirms value and subscription status instead of exposing internal review language',
           ],
         },
         {
-          title: 'Mode Output',
+          title: 'Entry Points',
           items: [
-            'Flash now returns a shorter summary-style critique',
-            'Pro returns a more expanded analysis with the same locked score',
-            'Writing depth differs by mode, but scoring standards stay aligned',
+            'Added or strengthened Pro conversion cards in the workspace, result page, gallery, and usage page',
+            'Updated the homepage pricing card to match the same launch-offer messaging',
+            'Shifted conversion cards lower on the page so the main workflow stays primary',
           ],
         },
         {
-          title: 'Gallery Recommendation',
+          title: 'Checkout Flow',
           items: [
-            'The public gallery still has no hard minimum-score requirement',
-            'Added a new recommended badge based on relative percentile instead of an absolute cutoff',
-            'Recommendation uses same-image-type distribution first and falls back to the global gallery distribution when needed',
+            'All Pro promo cards and the homepage pricing CTA now request checkout_url and redirect directly to checkout',
+            'Users no longer need to pass through /account/usage before starting payment',
+            'Added a shared frontend checkout helper so every promo entry follows the same path',
           ],
         },
         {
-          title: 'Versioning and UX',
+          title: 'Chinese Payment Note',
           items: [
-            'New review results now include `score_version`, currently `score-v2-strict`',
-            'Legacy reviews remain preserved and are treated as `legacy`',
-            'The gallery now shows a persistent notice explaining that the scoring standard changed on March 24, 2026',
+            'When the interface language is Chinese, checkout CTAs now show an extra payment note below the button',
+            'The note explains that domestic payment channels are not connected yet and offers WeChat purchase via `Asa-180`',
+            'This release is also documented in the changelog and linked from the homepage updates record',
           ],
         },
       ],
       docLabel: 'Doc path',
-      docPath: 'docs/changelog/update-log-2026-03-24-score-upgrade.md',
+      docPath: 'docs/changelog/update-log-2026-03-25-pro-launch-checkout.md',
       backHome: 'Back home',
     };
   }
 
   return {
     label: 'Update Log',
-    title: '评分标准与长廊推荐逻辑升级',
+    title: 'Pro 首发优惠与直达购买已上线',
     intro:
-      '从 2026 年 3 月 24 日开始，新评图会使用更严格的新评分标准，并且 flash 与 pro 共用同一轮锁定分数。公开长廊也新增了基于相对分位的推荐标记。',
-    date: '2026-03-24',
+      '这次更新主要围绕 Pro 首发优惠和购买流程做了统一，重点是价格表达更清晰、入口更多、购买更直接。',
+    date: '2026-03-25',
     sections: [
       {
-        title: '评分流程',
+        title: 'Pro 优惠统一',
         items: [
-          '评分请求温度下调到 `0`，降低同图重复评测时的随机波动',
-          '评图流程拆成“先评分、后写文案”两步，先锁定分数再生成点评',
-          'flash 与 pro 共用同一轮评分结果，不再因为文案深度不同而直接拉开分差',
+          '全站统一 Pro 首发优惠价为 $2.99/月',
+          '优惠表达统一为“网站运营初期 25% OFF”',
+          'Pro 用户文案同步改成更自然的用户视角',
         ],
       },
       {
-        title: '模式输出',
+        title: '入口增强',
         items: [
-          'flash 现在输出更短的摘要式短评',
-          'pro 输出更完整、更展开的分析',
-          '两种模式的差异主要保留在文案深度，不再体现在评分口径上',
+          '工作台、结果页、影像长廊、额度页都补了 Pro 入口',
+          '首页定价区同步切到首发优惠表达',
+          '促销卡整体下移，减少对主流程的打断',
         ],
       },
       {
-        title: '长廊展示',
+        title: '购买链路',
         items: [
-          '公开长廊继续不设置硬性分数门槛',
-          '新增“推荐”标记，基于相对分位而不是绝对分数筛出当前更靠前的作品',
-          '推荐优先按同 `image_type` 分布计算，样本不足时回退到全局长廊分布',
+          '所有领取 Pro 首发价的入口都改成直接进入 checkout',
+          '不再先跳到额度页再购买',
+          '不同入口的购买行为已经统一',
         ],
       },
       {
-        title: '版本与提示',
+        title: '中文支付提示',
         items: [
-          '新评图结果新增 `score_version`，当前版本为 `score-v2-strict`',
-          '旧作品继续保留原结果，并按 `legacy` 版本处理',
-          '公开长廊增加常驻说明，明确告知用户 2026 年 3 月 24 日起评分标准已经升级',
+          '中文环境下补充了国内支付提示',
+          '国内用户可通过微信 `Asa-180` 联系购买',
+          '首页更新记录和 changelog 已同步更新',
         ],
       },
     ],
     docLabel: '文档路径',
-    docPath: 'docs/changelog/update-log-2026-03-24-score-upgrade.md',
+    docPath: 'docs/changelog/update-log-2026-03-25-pro-launch-checkout.md',
     backHome: '返回首页',
   };
 }
@@ -172,7 +172,7 @@ export default function UpdatesPage() {
           </div>
 
           <div className="px-6 py-6">
-            <div className="grid gap-5 md:grid-cols-3">
+            <div className="grid gap-5 md:grid-cols-2">
               {copy.sections.map((section) => (
                 <article
                   key={section.title}

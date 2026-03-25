@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { AlertCircle, ChevronLeft, ChevronRight, Heart, Info, LayoutGrid, Star, X, Zap } from 'lucide-react';
 import ClerkSignInTrigger from '@/components/auth/ClerkSignInTrigger';
+import ProPromoCard from '@/components/marketing/ProPromoCard';
 import { getPublicGallery, likeGalleryReview, unlikeGalleryReview } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { formatUserFacingError } from '@/lib/error-utils';
@@ -250,6 +251,7 @@ export default function GalleryPage() {
   const dateLocale = locale === 'zh' ? 'zh-CN' : locale === 'ja' ? 'ja-JP' : 'en-US';
   const paginationCopy = useMemo(() => getPaginationCopy(locale), [locale]);
   const viewerToken = userInfo?.plan && userInfo.plan !== 'guest' ? token ?? undefined : undefined;
+  const currentPlan = (userInfo?.plan ?? 'guest') as 'guest' | 'free' | 'pro';
 
   const loadPage = useCallback(async (cursor?: string | null) => {
     const response = await getPublicGallery({ cursor: cursor ?? undefined, limit: PAGE_SIZE }, viewerToken);
@@ -654,6 +656,13 @@ export default function GalleryPage() {
             ))}
           </div>
         </section>
+        <ProPromoCard
+          plan={currentPlan}
+          scene="gallery"
+          fallbackRedirectUrl="/gallery"
+          className="mt-12"
+        />
+
       </div>
     </div>
   );

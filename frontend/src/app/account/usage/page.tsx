@@ -6,12 +6,14 @@ import { useRouter } from 'next/navigation';
 import { AlertCircle, ArrowRight, Mail, X } from 'lucide-react';
 import { createBillingCheckout, getBillingPortal, getUsage } from '@/lib/api';
 import ClerkSignInTrigger from '@/components/auth/ClerkSignInTrigger';
+import ProPromoCard from '@/components/marketing/ProPromoCard';
 import { useAuth } from '@/lib/auth-context';
 import { planColor, planLabel } from '@/lib/auth-context';
 import { BillingCheckoutResponse, BillingPortalResponse, UsageResponse } from '@/lib/types';
 import { SkeletonBlock } from '@/components/ui/LoadingSpinner';
 import { useI18n } from '@/lib/i18n';
 import { formatUserFacingError } from '@/lib/error-utils';
+import { CN_PRO_CHECKOUT_TIP } from '@/lib/pro-checkout';
 
 function UsageBar({
   label,
@@ -185,15 +187,22 @@ export default function UsagePage() {
                     <ArrowRight size={11} />
                   </ClerkSignInTrigger>
                 ) : usage.plan === 'free' ? (
-                  <button
-                    type="button"
-                    onClick={handleCheckout}
-                    disabled={checkoutLoading}
-                    className="flex items-center gap-1.5 text-xs text-gold border border-gold/30 rounded px-3 py-1.5 hover:bg-gold/10 transition-colors disabled:opacity-60"
-                  >
-                    {checkoutLoading ? t('usage_checkout_loading') : t('usage_checkout_pro')}
-                    <ArrowRight size={11} />
-                  </button>
+                  <div className="flex flex-col items-end gap-2">
+                    <button
+                      type="button"
+                      onClick={handleCheckout}
+                      disabled={checkoutLoading}
+                      className="flex items-center gap-1.5 text-xs text-gold border border-gold/30 rounded px-3 py-1.5 hover:bg-gold/10 transition-colors disabled:opacity-60"
+                    >
+                      {checkoutLoading ? t('usage_checkout_loading') : t('usage_checkout_pro')}
+                      <ArrowRight size={11} />
+                    </button>
+                    {locale === 'zh' && (
+                      <p className="max-w-[240px] text-right text-[11px] leading-5 text-ink-subtle">
+                        {CN_PRO_CHECKOUT_TIP}
+                      </p>
+                    )}
+                  </div>
                 ) : usage.plan === 'pro' ? (
                   <button
                     type="button"
@@ -302,6 +311,14 @@ export default function UsagePage() {
             )}
           </div>
         ) : null}
+        {usage && (
+          <ProPromoCard
+            plan={usage.plan}
+            scene="usage"
+            fallbackRedirectUrl="/account/usage"
+            className="mt-8"
+          />
+        )}
 
         <div className="mt-10">
           <Link

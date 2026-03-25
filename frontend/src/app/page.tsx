@@ -7,8 +7,10 @@ import { ArrowRight, Aperture, Zap, Star, BarChart2, Mail, ChevronDown } from 'l
 import { useState } from 'react';
 import ScoreRing from '@/components/ui/ScoreRing';
 import ClerkSignInTrigger from '@/components/auth/ClerkSignInTrigger';
+import { useAuth } from '@/lib/auth-context';
 import { DEMO_IMAGE_URL, DEMO_REVIEW_ID } from '@/lib/demo-review';
 import { useI18n } from '@/lib/i18n';
+import { CN_PRO_CHECKOUT_TIP, startProCheckout } from '@/lib/pro-checkout';
 import { siteConfig } from '@/lib/site';
 
 const DEMO_SCORES_KEYS = [
@@ -21,7 +23,29 @@ const DEMO_SCORES_KEYS = [
 
 export default function HomePage() {
   const { t, locale } = useI18n();
+  const { ensureToken } = useAuth();
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const proOfferCopy = locale === 'ja'
+    ? {
+        priceLabel: '$2.99 / month',
+        originalPriceLabel: '$3.99',
+        offerLabel: '運営初期 25% off',
+        highlightLabel: 'Launch Offer',
+      }
+    : locale === 'en'
+      ? {
+          priceLabel: '$2.99 / month',
+          originalPriceLabel: '$3.99',
+          offerLabel: 'Early launch 25% off',
+          highlightLabel: 'Launch Offer',
+        }
+      : {
+          priceLabel: '$2.99 / 月',
+          originalPriceLabel: '$3.99',
+          offerLabel: '网站运营初期 25% off',
+          highlightLabel: '首发促销',
+        };
   const updatesCopy = locale === 'ja'
     ? { label: '更新記録', hint: '最近の変更を見る' }
     : locale === 'en'
@@ -35,10 +59,10 @@ export default function HomePage() {
       : { label: '更新记录', hint: '查看公开长廊更新' };
 
   const latestUpdatesCopy = locale === 'ja'
-    ? { label: 'Updates', hint: '採点基準とギャラリー表示の更新を見る' }
+    ? { label: 'Updates', hint: 'Pro 初回キャンペーンと直接チェックアウトの更新を見る' }
     : locale === 'en'
-      ? { label: 'Updates', hint: 'See the scoring standard and gallery recommendation update' }
-      : { label: 'Updates', hint: '查看评分标准与长廊推荐升级' };
+      ? { label: 'Updates', hint: 'See the Pro launch offer and direct checkout update' }
+      : { label: '更新记录', hint: '查看 Pro 首发优惠与直达购买更新' };
 
   const softwareJsonLd = {
     '@context': 'https://schema.org',
@@ -87,6 +111,21 @@ export default function HomePage() {
     { icon: Star, title: t('feature_pro_title'), body: t('feature_pro_body') },
     { icon: BarChart2, title: t('feature_history_title'), body: t('feature_history_body') },
   ];
+
+  async function handleCheckout() {
+    if (checkoutLoading) {
+      return;
+    }
+
+    setCheckoutLoading(true);
+    try {
+      await startProCheckout(ensureToken);
+    } catch {
+      window.alert(t('usage_checkout_unavailable'));
+    } finally {
+      setCheckoutLoading(false);
+    }
+  }
 
   const TIERS = [
     {
@@ -264,7 +303,7 @@ export default function HomePage() {
 	                <div className="p-8 h-full min-h-[22rem] flex flex-col">
 	                  {tier.highlight && (
 	                    <span className="inline-block mb-3 text-xs text-void bg-gold rounded-full px-2.5 py-0.5 font-medium tracking-wide">
-	                      Most Popular
+	                      {proOfferCopy.highlightLabel}
 	                    </span>
 	                  )}
 	                  <p
@@ -275,9 +314,23 @@ export default function HomePage() {
 	                    {tier.plan}
 	                  </p>
 	                  {tier.priceLabel && (
-	                    <p className="text-xs font-mono tracking-wide text-gold/75 mb-2">
-	                      {tier.priceLabel}
-	                    </p>
+                      <div className="mb-3 space-y-2">
+                        <div className="flex items-end gap-2">
+                          <p className="text-xs font-mono tracking-wide text-gold/85">
+                            {tier.highlight ? proOfferCopy.priceLabel : tier.priceLabel}
+                          </p>
+                          {tier.highlight && (
+                            <p className="text-[11px] font-mono text-ink-subtle line-through">
+                              {proOfferCopy.originalPriceLabel}
+                            </p>
+                          )}
+                        </div>
+                        {tier.highlight && (
+                          <p className="inline-flex rounded-full border border-gold/25 bg-gold/10 px-2.5 py-1 text-[11px] uppercase tracking-[0.22em] text-gold/80">
+                            {proOfferCopy.offerLabel}
+                          </p>
+                        )}
+                      </div>
 	                  )}
 	                  <p className={`text-3xl font-display mb-6 ${tier.highlight ? 'text-ink' : 'text-ink-muted'}`}>
 	                    {tier.quotaLabel}
@@ -292,13 +345,20 @@ export default function HomePage() {
 	                  </ul>
 	                  {tier.highlight && (
 	                    <div className="mt-8 pt-2">
-	                      <Link
-	                        href="/account/usage"
-	                        className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-gold px-4 py-3 text-sm font-medium text-void transition-all duration-200 hover:bg-gold-light hover:shadow-[0_0_24px_rgba(200,162,104,0.35)]"
+	                      <button
+	                        type="button"
+	                        onClick={() => void handleCheckout()}
+	                        disabled={checkoutLoading}
+	                        className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-gold px-4 py-3 text-sm font-medium text-void transition-all duration-200 hover:bg-gold-light hover:shadow-[0_0_24px_rgba(200,162,104,0.35)] disabled:cursor-wait disabled:opacity-70"
 	                      >
-	                        {t('usage_checkout_pro')}
+	                        {checkoutLoading ? t('usage_checkout_loading') : t('usage_checkout_pro')}
 	                        <ArrowRight size={14} />
-	                      </Link>
+	                      </button>
+                        {locale === 'zh' && (
+                          <p className="mt-3 text-xs leading-6 text-ink-subtle">
+                            {CN_PRO_CHECKOUT_TIP}
+                          </p>
+                        )}
 	                    </div>
 	                  )}
 	                </div>

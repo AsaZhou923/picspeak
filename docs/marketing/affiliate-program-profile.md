@@ -47,13 +47,13 @@ Pricing and plan structure:
 
 - Guest: 3 reviews per day, 30 reviews per month, Flash mode only, no saved history
 - Free: 5 reviews per day, 60 reviews per month, up to 10 Pro reviews per month, 30-day history
-- Pro: $3.99/month, unlimited reviews, permanent history, priority queue
+- Pro: launch offer $2.99/month (about 25% off regular pricing), unlimited reviews, permanent history, priority queue
 
 Why affiliates like promoting PicSpeak:
 
 - Easy-to-understand value proposition
 - Free entry point reduces friction and supports higher click-to-signup intent
-- Affordable subscription price point at $3.99/month
+- Affordable launch subscription price point at $2.99/month, framed as an early-site 25% off offer
 - Useful for evergreen creator, photography, camera, editing, and learning-focused audiences
 - Strong fit for tutorial, gear, creator productivity, and skill-building content
 
@@ -97,7 +97,7 @@ Recommended partner messaging angles:
 
 ## Safer short version
 
-PicSpeak is an AI photography critique platform that gives creators instant feedback on composition, lighting, color, impact, and technique. Users can start in guest mode with no signup, upgrade to a free account for more usage, and move to Pro for unlimited reviews, permanent history, and priority processing. Pro is priced at $3.99/month.
+PicSpeak is an AI photography critique platform that gives creators instant feedback on composition, lighting, color, impact, and technique. Users can start in guest mode with no signup, upgrade to a free account for more usage, and move to Pro for unlimited reviews, permanent history, and priority processing. Pro is currently offered at a launch price of $2.99/month as an early-site promotion.
 
 Website: https://picspeak.art
 X / Twitter: https://x.com/Zzw_Prime
@@ -118,7 +118,7 @@ The product facts above are based on the current project source:
 - Main site URL is set to `https://picspeak.art`
 - Public social links include X / Twitter and GitHub
 - Public contact email is `xavierzhou23@gmail.com`
-- Pro pricing is shown as `$3.99 / month`
+- Pro pricing is shown as a launch offer at `$2.99 / month`, framed as an early-site 25% off promotion
 - Guest, Free, and Pro quota details are defined in the frontend and backend plan logic
 
 The conversion, EPC, refund, and commission figures are not present in the repository, so they should be replaced with your real business numbers before submission.

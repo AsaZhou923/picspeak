@@ -4,9 +4,9 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowLeft, History, RotateCcw, AlertCircle, ThumbsUp, ThumbsDown, AlertTriangle, Lightbulb, Upload, TrendingDown, ZoomIn, X, Copy, Check, LogIn, Sparkles, Share2, Download, LayoutGrid, BookmarkPlus, BookmarkCheck, Heart } from 'lucide-react';
+import { ArrowLeft, History, RotateCcw, AlertCircle, ThumbsUp, ThumbsDown, AlertTriangle, Lightbulb, Upload, TrendingDown, ZoomIn, X, Copy, Check, Share2, Download, LayoutGrid, BookmarkPlus, BookmarkCheck, Heart } from 'lucide-react';
 import { createReviewShare, exportReview, getReview, getUsage, updateReviewMeta } from '@/lib/api';
-import ClerkSignInTrigger from '@/components/auth/ClerkSignInTrigger';
+import ProPromoCard from '@/components/marketing/ProPromoCard';
 import { useAuth } from '@/lib/auth-context';
 import { ReviewGetResponse, ReviewScores, UsageResponse } from '@/lib/types';
 import { FinalScoreRing } from '@/components/ui/ScoreRing';
@@ -1147,6 +1147,95 @@ export default function ReviewPage() {
   const showGalleryCta = showOwnerActions;
   const gallerySaved = Boolean(review.gallery_visible);
   const isLowScore = r.final_score < 5.0;
+  const reviewPromoCopy = (() => {
+    if (locale === 'ja') {
+      if (plan === 'guest') {
+        return {
+          title: 'ログインして、この一枚をもっと深く見直す',
+          body: isLowQuota
+            ? `本日の残り回数は ${quotaRemaining ?? 0} 回です。まずログインして Free 枠を解放し、そのまま Pro の深い分析へ進めます。現在の初回価格は $2.99/月です。`
+            : 'ログインするとこの結果を保存しつつ、そのまま Pro の深い分析へ進めます。現在の初回価格は $2.99/月です。',
+        };
+      }
+
+      if (isLowQuota) {
+        return {
+          title: `残り ${quotaRemaining ?? 0} 回です。次の比較は Pro が向いています`,
+          body: 'このまま複数の写真を見比べるなら、Pro のほうが止まらず進められます。現在の初回価格は $2.99/月です。',
+        };
+      }
+
+      if (isLowScore) {
+        return {
+          title: 'この一枚は Pro で深掘りする価値があります',
+          body: '点数が伸び悩んだ写真ほど、短い総評より深い分解が効きます。今なら $2.99/月の初回価格で始められます。',
+        };
+      }
+
+      return {
+        title: 'この結果を次の改善につなげるなら Pro が早いです',
+        body: 'より深い分析と長期履歴があれば、次の調整まで一気に進めやすくなります。現在の初回価格は $2.99/月です。',
+      };
+    }
+
+    if (locale === 'en') {
+      if (plan === 'guest') {
+        return {
+          title: 'Sign in to take this result further',
+          body: isLowQuota
+            ? `You only have ${quotaRemaining ?? 0} critiques left today. Sign in first to unlock Free usage, then move straight into deeper Pro critique at the current $2.99/month launch price.`
+            : 'Sign in to save this result and move straight into deeper Pro critique. The current launch price is $2.99/month.',
+        };
+      }
+
+      if (isLowQuota) {
+        return {
+          title: `Only ${quotaRemaining ?? 0} critiques left. Pro fits the next round better`,
+          body: 'If you are about to compare more shots, Pro lets you keep going without rationing each upload. The current launch price is $2.99/month.',
+        };
+      }
+
+      if (isLowScore) {
+        return {
+          title: 'This photo is a good candidate for a deeper Pro breakdown',
+          body: 'Lower-scoring images usually need more than a quick summary. Pro gives a fuller diagnosis, and the current launch price is $2.99/month.',
+        };
+      }
+
+      return {
+        title: 'If you want the next improvement step faster, switch this flow to Pro',
+        body: 'Deeper critique plus permanent history makes iteration easier, and Pro is currently available at $2.99/month.',
+      };
+    }
+
+    if (plan === 'guest') {
+      return {
+        title: '登录后，把这张结果继续往下深挖',
+        body: isLowQuota
+          ? `你今天只剩 ${quotaRemaining ?? 0} 次评图了。先登录解锁 Free，再直接切到 Pro 深度分析。当前首发优惠价为 $2.99/月。`
+          : '登录后不仅能保存这次结果，还能直接继续看更深入的 Pro 分析。当前首发优惠价为 $2.99/月。',
+      };
+    }
+
+    if (isLowQuota) {
+      return {
+        title: `当前只剩 ${quotaRemaining ?? 0} 次额度，下一轮更适合直接用 Pro`,
+        body: '如果你准备继续比较更多照片，Pro 会比反复计算额度更顺手。当前首发优惠价为 $2.99/月。',
+      };
+    }
+
+    if (isLowScore) {
+      return {
+        title: '这张照片更适合用 Pro 做一次深挖',
+        body: '分数偏低时，更需要完整拆解和明确修改方向，而不只是简短总结。当前首发优惠价为 $2.99/月。',
+      };
+    }
+
+    return {
+      title: '想把这次结果真正转成下一轮提升，可以直接升级 Pro',
+      body: '更深入的分析加上永久历史记录，更适合连续复盘和稳定提升。当前首发优惠价为 $2.99/月。',
+    };
+  })();
 
   async function handleGalleryToggle() {
     if (!review || actionBusy) return;
@@ -1751,81 +1840,15 @@ export default function ReviewPage() {
               {t('review_ai_disclaimer')}
             </p>
 
-            {/* Quota-low conversion banner (shown when remaining quota is low) */}
-            {showPersonalActions && plan !== 'pro' && isLowQuota && (
-              <div className="mt-2 rounded-lg border border-gold/40 bg-gold/5 px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gold/90">
-                    {t('review_quota_low_remaining').replace('{n}', String(quotaRemaining ?? 0))}
-                  </p>
-                  {plan === 'guest' ? (
-                    <p className="text-xs text-ink-subtle mt-0.5">{t('guest_login_banner_body')}</p>
-                  ) : (
-                    <p className="text-xs text-ink-subtle mt-0.5">{t('review_free_upgrade_body')}</p>
-                  )}
-                </div>
-                {plan === 'guest' ? (
-                  <ClerkSignInTrigger
-                    className="shrink-0 flex items-center gap-2 px-4 py-2 bg-gold text-void text-xs font-medium rounded hover:bg-gold-light transition-colors"
-                    signedInClassName="shrink-0 inline-flex items-center"
-                  >
-                    <LogIn size={12} />
-                    {t('guest_login_cta')}
-                  </ClerkSignInTrigger>
-                ) : (
-                  <Link
-                    href="/account/usage"
-                    className="shrink-0 flex items-center gap-2 px-4 py-2 bg-gold text-void text-xs font-medium rounded hover:bg-gold-light transition-colors"
-                  >
-                    <Sparkles size={12} />
-                    {t('review_free_upgrade_cta')}
-                  </Link>
-                )}
-              </div>
-            )}
-
-            {/* Guest login banner (shown when quota is not low, to encourage sign-in) */}
-            {showPersonalActions && plan === 'guest' && !isLowQuota && (
-              <div className="mt-2 rounded-lg border border-gold/25 bg-gold/5 px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gold/90">{t('guest_login_banner_title')}</p>
-                  <p className="text-xs text-ink-subtle mt-0.5">{t('guest_login_banner_body')}</p>
-                </div>
-                <ClerkSignInTrigger
-                  className="shrink-0 flex items-center gap-2 px-4 py-2 bg-gold text-void text-xs font-medium rounded hover:bg-gold-light transition-colors"
-                  signedInClassName="shrink-0 inline-flex items-center"
-                >
-                  <LogIn size={12} />
-                  {t('guest_login_cta')}
-                </ClerkSignInTrigger>
-              </div>
-            )}
-
-            {/* Free → Pro lightweight upgrade entry (low-score variant when score < 5) */}
-            {showPersonalActions && plan === 'free' && !isLowQuota && (
-              <div className={`mt-2 rounded-lg border px-5 py-3 flex items-center justify-between gap-3 ${
-                isLowScore ? 'border-rust/30 bg-rust/5' : 'border-border-subtle bg-raised/30'
-              }`}>
-                <div className="min-w-0">
-                  <p className={`text-xs font-medium ${isLowScore ? 'text-rust/80' : 'text-ink-muted'}`}>
-                    {isLowScore ? t('review_low_score_title') : t('review_free_upgrade_title')}
-                  </p>
-                  <p className="text-[11px] text-ink-subtle mt-0.5">
-                    {isLowScore ? t('review_low_score_body') : t('review_free_upgrade_body')}
-                  </p>
-                </div>
-                <Link
-                  href="/account/usage"
-                  className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 border text-xs font-medium rounded transition-colors ${
-                    isLowScore
-                      ? 'border-rust/40 text-rust/80 hover:bg-rust/10'
-                      : 'border-gold/30 text-gold hover:bg-gold/10'
-                  }`}
-                >
-                  <Sparkles size={11} />
-                  {isLowScore ? t('review_low_score_cta') : t('review_free_upgrade_cta')}
-                </Link>
-              </div>
+            {showPersonalActions && (
+              <ProPromoCard
+                plan={plan === 'guest' ? 'guest' : plan === 'pro' ? 'pro' : 'free'}
+                scene="review"
+                title={plan === 'pro' ? undefined : reviewPromoCopy.title}
+                body={plan === 'pro' ? undefined : reviewPromoCopy.body}
+                fallbackRedirectUrl={`/reviews/${review.review_id}`}
+                className="mt-2"
+              />
             )}
 
           </div>
