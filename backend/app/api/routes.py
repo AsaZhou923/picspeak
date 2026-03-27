@@ -208,6 +208,25 @@ def _emit_structured_log(*, severity: str = 'INFO', event: str, message: str, **
     sys.stdout.flush()
 
 
+def _with_derived_upload_totals(upload_metrics: dict[str, Any], *, confirm_processing_ms: int) -> dict[str, Any]:
+    metrics = dict(upload_metrics)
+    if metrics.get('confirm_request_ms') is None:
+        metrics['confirm_request_ms'] = confirm_processing_ms
+
+    if metrics.get('total_upload_flow_ms') is None:
+        total = 0
+        used = False
+        for key in ('frontend_preprocess_ms', 'presign_request_ms', 'object_upload_ms'):
+            value = _coerce_int_metric(metrics.get(key))
+            if value is not None:
+                total += value
+                used = True
+        total += confirm_processing_ms
+        metrics['total_upload_flow_ms'] = total if used else confirm_processing_ms
+        metrics['total_upload_flow_ms_source'] = 'backend_derived'
+    return metrics
+
+
 def _build_storage_photo_url(bucket: str, object_key: str) -> str:
     _ = bucket
     base = settings.object_base_url.rstrip('/')
@@ -1126,6 +1145,7 @@ def confirm_photo_upload(
         )
         if existing_photo is not None:
             db.commit()
+            confirm_processing_ms = _duration_ms(started_at)
             _emit_structured_log(
                 severity='INFO',
                 event='photo_upload_cache_reused',
@@ -1136,8 +1156,8 @@ def confirm_photo_upload(
                 photo_public_id=existing_photo.public_id,
                 photo_status=existing_photo.status.value,
                 object_key=existing_photo.object_key,
-                confirm_processing_ms=_duration_ms(started_at),
-                **upload_metrics,
+                confirm_processing_ms=confirm_processing_ms,
+                **_with_derived_upload_totals(upload_metrics, confirm_processing_ms=confirm_processing_ms),
             )
             return PhotoCreateResponse(
                 photo_id=existing_photo.public_id,
@@ -1170,6 +1190,7 @@ def confirm_photo_upload(
         db.rollback()
         raise api_error(status.HTTP_409_CONFLICT, 'PHOTO_ALREADY_EXISTS', 'Photo already exists') from exc
     db.refresh(photo)
+    confirm_processing_ms = _duration_ms(started_at)
 
     _emit_structured_log(
         severity='INFO',
@@ -1184,8 +1205,8 @@ def confirm_photo_upload(
         size_bytes=photo.size_bytes,
         width=photo.width,
         height=photo.height,
-        confirm_processing_ms=_duration_ms(started_at),
-        **upload_metrics,
+        confirm_processing_ms=confirm_processing_ms,
+        **_with_derived_upload_totals(upload_metrics, confirm_processing_ms=confirm_processing_ms),
     )
 
     return PhotoCreateResponse(
