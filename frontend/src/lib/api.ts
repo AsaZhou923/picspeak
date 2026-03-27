@@ -9,6 +9,7 @@ import {
   PhotoReviewsResponse,
   PresignRequest,
   PresignResponse,
+  PublicGalleryQuery,
   PublicGalleryResponse,
   ReviewCreateRequest,
   ReviewCreateResponse,
@@ -365,11 +366,16 @@ export async function getMyReviews(
 }
 
 export async function getPublicGallery(
-  query: { cursor?: string; limit?: number } = {},
+  query: PublicGalleryQuery = {},
   token?: string
 ): Promise<PublicGalleryResponse> {
   const params = new URLSearchParams({ limit: String(query.limit ?? 24) });
   if (query.cursor) params.set('cursor', query.cursor);
+  if (query.created_from) params.set('created_from', query.created_from);
+  if (query.created_to) params.set('created_to', query.created_to);
+  if (typeof query.min_score === 'number') params.set('min_score', String(query.min_score));
+  if (typeof query.max_score === 'number') params.set('max_score', String(query.max_score));
+  if (query.image_type) params.set('image_type', query.image_type);
   return request<PublicGalleryResponse>(`/gallery?${params.toString()}`, { token });
 }
 

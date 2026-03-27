@@ -1359,6 +1359,7 @@ def _apply_review_history_visibility(query, plan: UserPlan):
 def _apply_review_history_filters(
     query,
     *,
+    date_field=None,
     created_from: datetime | None = None,
     created_to: datetime | None = None,
     min_score: float | None = None,
@@ -1366,11 +1367,12 @@ def _apply_review_history_filters(
     image_type: str | None = None,
     favorite_only: bool = False,
 ):
+    active_date_field = Review.created_at if date_field is None else date_field
     query = query.filter(Review.deleted_at.is_(None))
     if created_from is not None:
-        query = query.filter(Review.created_at >= created_from)
+        query = query.filter(active_date_field >= created_from)
     if created_to is not None:
-        query = query.filter(Review.created_at <= created_to)
+        query = query.filter(active_date_field <= created_to)
     if min_score is not None:
         query = query.filter(Review.final_score >= min_score)
     if max_score is not None:
@@ -1789,18 +1791,47 @@ def list_public_gallery(
     request: Request,
     limit: int = Query(default=24, ge=1, le=60),
     cursor: str | None = Query(default=None),
+    created_from: datetime | None = Query(default=None),
+    created_to: datetime | None = Query(default=None),
+    min_score: float | None = Query(default=None, ge=0, le=10),
+    max_score: float | None = Query(default=None, ge=0, le=10),
+    image_type: str | None = Query(default=None, pattern='^(default|landscape|portrait|street|still_life|architecture)$'),
     authorization: str | None = Header(default=None),
     db: Session = Depends(get_db),
 ):
+    if created_from is not None and created_to is not None and created_from > created_to:
+        raise api_error(status.HTTP_400_BAD_REQUEST, 'GALLERY_FILTER_INVALID', 'created_from cannot be later than created_to')
+    if min_score is not None and max_score is not None and min_score > max_score:
+        raise api_error(status.HTTP_400_BAD_REQUEST, 'GALLERY_FILTER_INVALID', 'min_score cannot be greater than max_score')
+
     viewer = _optional_gallery_viewer(authorization, db)
     gallery_filters = _public_gallery_filters()
-    total_count = db.query(func.count(Review.id)).filter(*gallery_filters).scalar() or 0
+    count_query = db.query(func.count(Review.id)).filter(*gallery_filters)
+    count_query = _apply_review_history_filters(
+        count_query,
+        date_field=Review.gallery_added_at,
+        created_from=created_from,
+        created_to=created_to,
+        min_score=min_score,
+        max_score=max_score,
+        image_type=image_type,
+    )
+    total_count = count_query.scalar() or 0
     query = (
         db.query(Review, Photo, User)
         .join(Photo, Photo.id == Review.photo_id)
         .join(User, User.id == Review.owner_user_id)
         .filter(*gallery_filters)
         .order_by(Review.gallery_added_at.desc(), Review.id.desc())
+    )
+    query = _apply_review_history_filters(
+        query,
+        date_field=Review.gallery_added_at,
+        created_from=created_from,
+        created_to=created_to,
+        min_score=min_score,
+        max_score=max_score,
+        image_type=image_type,
     )
 
     if cursor:

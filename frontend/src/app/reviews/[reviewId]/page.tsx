@@ -964,14 +964,28 @@ export default function ReviewPage() {
 
   const reviewId = params.reviewId as string;
   const backHref = searchParams.get('back') ?? '/workspace';
+  const isGalleryBackHref = backHref.startsWith('/gallery');
   const favoritesNavLabel = locale === 'ja' ? 'お気に入り' : locale === 'en' ? 'Favorites' : '我的收藏';
   const backLabel =
-    backHref === '/account/reviews'
+    isGalleryBackHref
+      ? t('nav_gallery')
+      : backHref === '/account/reviews'
       ? t('review_back_history')
       : backHref === '/account/favorites'
         ? favoritesNavLabel
         : t('review_back_workspace');
   const { ensureToken, userInfo } = useAuth();
+
+  function handleBackNavigation() {
+    if (isGalleryBackHref) {
+      if (window.history.length > 1) {
+        router.back();
+        return;
+      }
+    }
+
+    router.push(backHref);
+  }
 
   const [review, setReview] = useState<ReviewGetResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1100,7 +1114,7 @@ export default function ReviewPage() {
           <AlertCircle size={40} className="text-rust mx-auto" />
           <p className="text-rust text-sm">{error}</p>
           <button
-            onClick={() => router.back()}
+            onClick={handleBackNavigation}
             className="flex items-center gap-1 text-xs text-ink-subtle hover:text-ink-muted mx-auto"
           >
             <ArrowLeft size={11} /> {t('back_btn')}
@@ -1140,7 +1154,7 @@ export default function ReviewPage() {
     quotaTotal > 0 &&
     (quotaRemaining <= 2 || quotaRemaining / quotaTotal <= 0.2);
   const plan = userInfo?.plan ?? 'guest';
-  const isPublicGalleryContext = backHref === '/gallery';
+  const isPublicGalleryContext = isGalleryBackHref;
   const canManageReview = Boolean(review.viewer_is_owner);
   const showPersonalActions = !isPublicGalleryContext;
   const showOwnerActions = canManageReview && !isPublicGalleryContext;
@@ -1503,7 +1517,7 @@ export default function ReviewPage() {
 
         {/* Back */}
         <button
-          onClick={() => router.push(backHref)}
+          onClick={handleBackNavigation}
           className="flex items-center gap-1.5 text-xs text-ink-subtle hover:text-ink-muted transition-colors mb-6"
         >
           <ArrowLeft size={12} />

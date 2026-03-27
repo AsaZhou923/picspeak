@@ -236,6 +236,16 @@ export interface ReviewHistoryQuery {
   favorite_only?: boolean;
 }
 
+export interface PublicGalleryQuery {
+  cursor?: string;
+  limit?: number;
+  created_from?: string;
+  created_to?: string;
+  min_score?: number;
+  max_score?: number;
+  image_type?: ImageType;
+}
+
 export interface ReviewShareResponse {
   review_id: string;
   share_token: string;

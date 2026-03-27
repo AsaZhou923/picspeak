@@ -59,10 +59,10 @@ export default function HomePage() {
       : { label: '更新记录', hint: '查看公开长廊更新' };
 
   const latestUpdatesCopy = locale === 'ja'
-    ? { label: 'Updates', hint: 'Pro 初回キャンペーンと直接チェックアウトの更新を見る' }
+    ? { label: 'Updates', hint: '公開ギャラリーの復元と絞り込み更新を見る' }
     : locale === 'en'
-      ? { label: 'Updates', hint: 'See the Pro launch offer and direct checkout update' }
-      : { label: '更新记录', hint: '查看 Pro 首发优惠与直达购买更新' };
+      ? { label: 'Updates', hint: 'See the public gallery recovery and filters update' }
+      : { label: '更新记录', hint: '查看公开长廊返回恢复与筛选更新' };
 
   const softwareJsonLd = {
     '@context': 'https://schema.org',

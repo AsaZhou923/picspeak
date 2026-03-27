@@ -1,15 +1,17 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { AlertCircle, ChevronLeft, ChevronRight, Heart, Info, LayoutGrid, Star, X, Zap } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { AlertCircle, CalendarDays, ChevronLeft, ChevronRight, Heart, Info, LayoutGrid, RefreshCw, SlidersHorizontal, Star, X, Zap } from 'lucide-react';
 import ClerkSignInTrigger from '@/components/auth/ClerkSignInTrigger';
 import ProPromoCard from '@/components/marketing/ProPromoCard';
 import { getPublicGallery, likeGalleryReview, unlikeGalleryReview } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { formatUserFacingError } from '@/lib/error-utils';
+import { buildGalleryRestoreKey, GalleryRestoreState, readGalleryRestoreState, saveGalleryRestoreState } from '@/lib/gallery-navigation';
 import { useI18n } from '@/lib/i18n';
-import { PublicGalleryItem } from '@/lib/types';
+import { ImageType, PublicGalleryItem, PublicGalleryQuery } from '@/lib/types';
 
 const PAGE_SIZE = 12;
 
@@ -145,6 +147,242 @@ function getPaginationCopy(locale: string) {
   };
 }
 
+type FilterDraft = {
+  createdFrom: string;
+  createdTo: string;
+  minScore: string;
+  maxScore: string;
+  imageType: '' | ImageType;
+};
+
+const EMPTY_FILTERS: FilterDraft = {
+  createdFrom: '',
+  createdTo: '',
+  minScore: '',
+  maxScore: '',
+  imageType: '',
+};
+
+function normalizeDateDisplay(raw: string): string {
+  const digits = raw.replace(/\D/g, '').slice(0, 8);
+  const year = digits.slice(0, 4);
+  const month = digits.slice(4, 6);
+  const day = digits.slice(6, 8);
+
+  if (digits.length <= 4) return year;
+  if (digits.length <= 6) return `${year}/${month}`;
+  return `${year}/${month}/${day}`;
+}
+
+function displayDateToIso(value: string): string | null {
+  const match = value.match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
+  if (!match) return null;
+
+  const [, year, month, day] = match;
+  const isoDate = `${year}-${month}-${day}`;
+  const parsed = new Date(`${isoDate}T00:00:00`);
+
+  if (Number.isNaN(parsed.getTime())) return null;
+  if (
+    parsed.getFullYear() !== Number(year) ||
+    parsed.getMonth() + 1 !== Number(month) ||
+    parsed.getDate() !== Number(day)
+  ) {
+    return null;
+  }
+
+  return isoDate;
+}
+
+function isoDateToDisplay(value: string): string {
+  return value.replace(/-/g, '/');
+}
+
+function isInvalidCompletedDate(value: string): boolean {
+  return value.length === 10 && displayDateToIso(value) === null;
+}
+
+function getImageTypeLabel(locale: 'zh' | 'en' | 'ja', imageType?: ImageType) {
+  const normalized = imageType ?? 'default';
+  const zh: Record<ImageType, string> = {
+    default: '默认',
+    landscape: '风景',
+    portrait: '人像',
+    street: '街拍',
+    still_life: '静物',
+    architecture: '建筑',
+  };
+  const en: Record<ImageType, string> = {
+    default: 'Default',
+    landscape: 'Landscape',
+    portrait: 'Portrait',
+    street: 'Street',
+    still_life: 'Still Life',
+    architecture: 'Architecture',
+  };
+  const ja: Record<ImageType, string> = {
+    default: '標準',
+    landscape: '風景',
+    portrait: 'ポートレート',
+    street: 'ストリート',
+    still_life: '静物',
+    architecture: '建築',
+  };
+
+  if (locale === 'ja') return ja[normalized];
+  if (locale === 'en') return en[normalized];
+  return zh[normalized];
+}
+
+function getGalleryFilterCopy(locale: 'zh' | 'en' | 'ja') {
+  if (locale === 'ja') {
+    return {
+      filtersLabel: 'フィルター',
+      from: '開始日',
+      to: '終了日',
+      minScore: '最低スコア',
+      maxScore: '最高スコア',
+      imageType: '写真タイプ',
+      allTypes: 'すべて',
+      apply: '適用',
+      reset: 'リセット',
+    };
+  }
+
+  if (locale === 'en') {
+    return {
+      filtersLabel: 'Filters',
+      from: 'From',
+      to: 'To',
+      minScore: 'Min score',
+      maxScore: 'Max score',
+      imageType: 'Image type',
+      allTypes: 'All types',
+      apply: 'Apply',
+      reset: 'Reset',
+    };
+  }
+
+  return {
+    filtersLabel: '筛选条件',
+    from: '开始时间',
+    to: '结束时间',
+    minScore: '最低评分',
+    maxScore: '最高评分',
+    imageType: '图片类型',
+    allTypes: '全部类型',
+    apply: '应用筛选',
+    reset: '重置',
+  };
+}
+
+function galleryFiltersFromSearchParams(searchParams: URLSearchParams): FilterDraft {
+  return {
+    createdFrom: searchParams.get('created_from') ? isoDateToDisplay(searchParams.get('created_from') as string) : '',
+    createdTo: searchParams.get('created_to') ? isoDateToDisplay(searchParams.get('created_to') as string) : '',
+    minScore: searchParams.get('min_score') ?? '',
+    maxScore: searchParams.get('max_score') ?? '',
+    imageType: (searchParams.get('image_type') as '' | ImageType | null) ?? '',
+  };
+}
+
+function buildGallerySearchParams(filters: FilterDraft, options?: { restore?: boolean }): URLSearchParams {
+  const params = new URLSearchParams();
+  const createdFromIso = displayDateToIso(filters.createdFrom);
+  const createdToIso = displayDateToIso(filters.createdTo);
+
+  if (createdFromIso) params.set('created_from', createdFromIso);
+  if (createdToIso) params.set('created_to', createdToIso);
+  if (filters.minScore !== '') params.set('min_score', filters.minScore);
+  if (filters.maxScore !== '') params.set('max_score', filters.maxScore);
+  if (filters.imageType) params.set('image_type', filters.imageType);
+  if (options?.restore) params.set('restore', '1');
+
+  return params;
+}
+
+function toGalleryQuery(filters: FilterDraft): PublicGalleryQuery {
+  const query: PublicGalleryQuery = { limit: PAGE_SIZE };
+  const createdFromIso = displayDateToIso(filters.createdFrom);
+  const createdToIso = displayDateToIso(filters.createdTo);
+
+  if (createdFromIso) {
+    query.created_from = new Date(`${createdFromIso}T00:00:00`).toISOString();
+  }
+  if (createdToIso) {
+    query.created_to = new Date(`${createdToIso}T23:59:59.999`).toISOString();
+  }
+  if (filters.minScore !== '') {
+    query.min_score = Number(filters.minScore);
+  }
+  if (filters.maxScore !== '') {
+    query.max_score = Number(filters.maxScore);
+  }
+  if (filters.imageType) {
+    query.image_type = filters.imageType;
+  }
+
+  return query;
+}
+
+function DateFilterField({
+  label,
+  value,
+  error,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  error?: string;
+  onChange: (value: string) => void;
+}) {
+  const nativeInputRef = useRef<HTMLInputElement>(null);
+  const nativeValue = displayDateToIso(value) ?? '';
+
+  return (
+    <label className="min-w-0 space-y-2 text-xs text-ink-muted">
+      <span>{label}</span>
+      <div className="relative">
+        <input
+          type="text"
+          inputMode="numeric"
+          placeholder="yyyy/mm/dd"
+          value={value}
+          onChange={(event) => onChange(normalizeDateDisplay(event.target.value))}
+          aria-invalid={Boolean(error)}
+          className={`w-full min-w-0 rounded-xl border bg-void/60 px-3 py-2.5 pr-10 text-[13px] text-ink [font-variant-numeric:tabular-nums] outline-none transition-colors placeholder:text-ink-subtle ${
+            error ? 'border-rust/60 focus:border-rust' : 'border-border focus:border-gold/40'
+          }`}
+        />
+        <button
+          type="button"
+          aria-label={`${label} calendar`}
+          onClick={() => {
+            const input = nativeInputRef.current;
+            if (!input) return;
+            input.showPicker?.();
+            input.focus();
+            input.click();
+          }}
+          className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-ink-subtle transition-colors hover:text-gold"
+        >
+          <CalendarDays size={14} />
+        </button>
+        <input
+          ref={nativeInputRef}
+          type="date"
+          tabIndex={-1}
+          aria-hidden="true"
+          value={nativeValue}
+          onChange={(event) => onChange(isoDateToDisplay(event.target.value))}
+          className="pointer-events-none absolute bottom-0 right-0 h-0 w-0 opacity-0"
+        />
+      </div>
+      {error && <p className="text-[11px] leading-5 text-rust">{error}</p>}
+    </label>
+  );
+}
+
 function GalleryCardImage({
   item,
   alt,
@@ -152,8 +390,7 @@ function GalleryCardImage({
   item: PublicGalleryItem;
   alt: string;
 }) {
-  const primarySrc = item.photo_url || item.photo_thumbnail_url || '';
-  const fallbackSrc = item.photo_thumbnail_url || '';
+  const primarySrc = item.photo_thumbnail_url || '';
   const [src, setSrc] = useState(primarySrc);
   const [broken, setBroken] = useState(!primarySrc);
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
@@ -191,13 +428,7 @@ function GalleryCardImage({
                     const { naturalWidth, naturalHeight } = event.currentTarget;
                     setOrientation(naturalWidth > naturalHeight ? 'landscape' : 'portrait');
                   }}
-                  onError={() => {
-                    if (fallbackSrc && src !== fallbackSrc) {
-                      setSrc(fallbackSrc);
-                      return;
-                    }
-                    setBroken(true);
-                  }}
+                  onError={() => setBroken(true)}
                 />
               </div>
             </>
@@ -213,13 +444,7 @@ function GalleryCardImage({
                 const { naturalWidth, naturalHeight } = event.currentTarget;
                 setOrientation(naturalWidth > naturalHeight ? 'landscape' : 'portrait');
               }}
-              onError={() => {
-                if (fallbackSrc && src !== fallbackSrc) {
-                  setSrc(fallbackSrc);
-                  return;
-                }
-                setBroken(true);
-              }}
+              onError={() => setBroken(true)}
             />
           )}
         </>
@@ -234,9 +459,12 @@ function GalleryCardImage({
 }
 
 export default function GalleryPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { t, locale } = useI18n();
   const seoCopy = useMemo(() => getGallerySeoCopy(locale), [locale]);
   const { token, userInfo, ensureToken, isLoading: authLoading } = useAuth();
+  const pendingRestoreRef = useRef<GalleryRestoreState | null>(null);
   const [pages, setPages] = useState<PublicGalleryItem[][]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -250,24 +478,81 @@ export default function GalleryPage() {
 
   const dateLocale = locale === 'zh' ? 'zh-CN' : locale === 'ja' ? 'ja-JP' : 'en-US';
   const paginationCopy = useMemo(() => getPaginationCopy(locale), [locale]);
+  const filterCopy = useMemo(() => getGalleryFilterCopy(locale), [locale]);
   const viewerToken = userInfo?.plan && userInfo.plan !== 'guest' ? token ?? undefined : undefined;
   const currentPlan = (userInfo?.plan ?? 'guest') as 'guest' | 'free' | 'pro';
+  const invalidDateCopy =
+    locale === 'ja'
+      ? '有効な日付を yyyy/mm/dd 形式で入力してください'
+      : locale === 'en'
+        ? 'Enter a valid date in yyyy/mm/dd format'
+        : '请输入有效日期，格式为 yyyy/mm/dd';
+  const searchParamsKey = searchParams.toString();
+  const filterSearch = useMemo(() => {
+    const next = new URLSearchParams(searchParamsKey);
+    next.delete('restore');
+    return next;
+  }, [searchParamsKey]);
+  const filterSignature = filterSearch.toString();
+  const appliedFilters = useMemo(() => galleryFiltersFromSearchParams(filterSearch), [filterSignature, filterSearch]);
+  const restoreKey = useMemo(() => buildGalleryRestoreKey(filterSignature), [filterSignature]);
+  const backHref = useMemo(() => {
+    const params = buildGallerySearchParams(appliedFilters, { restore: true });
+    const query = params.toString();
+    return query ? `/gallery?${query}` : '/gallery';
+  }, [appliedFilters]);
+  const [draftFilters, setDraftFilters] = useState<FilterDraft>(appliedFilters);
+  const createdFromInvalid = isInvalidCompletedDate(draftFilters.createdFrom);
+  const createdToInvalid = isInvalidCompletedDate(draftFilters.createdTo);
+  const hasInvalidDate = createdFromInvalid || createdToInvalid;
+
+  useEffect(() => {
+    setDraftFilters(appliedFilters);
+  }, [appliedFilters]);
+
+  const persistGalleryState = useCallback((reviewId: string | null = null) => {
+    if (pages.length === 0) return;
+
+    const normalizedPageIndex = Math.min(Math.max(0, pageIndex), pages.length - 1);
+    saveGalleryRestoreState(restoreKey, {
+      pages,
+      totalCount,
+      nextCursor,
+      pageIndex: normalizedPageIndex,
+      scrollY: window.scrollY,
+      reviewId,
+    });
+  }, [nextCursor, pageIndex, pages, restoreKey, totalCount]);
 
   const loadPage = useCallback(async (cursor?: string | null) => {
-    const response = await getPublicGallery({ cursor: cursor ?? undefined, limit: PAGE_SIZE }, viewerToken);
+    const response = await getPublicGallery({ ...toGalleryQuery(appliedFilters), cursor: cursor ?? undefined }, viewerToken);
     return {
       items: response.items,
       totalCount: response.total_count,
       nextCursor: response.next_cursor,
     };
-  }, [viewerToken]);
+  }, [appliedFilters, viewerToken]);
 
   useEffect(() => {
     let cancelled = false;
 
-    setLoading(true);
     setError('');
     setActionError('');
+
+    const restoredState = readGalleryRestoreState(restoreKey);
+    if (restoredState) {
+      pendingRestoreRef.current = restoredState;
+      setPages(restoredState.pages);
+      setTotalCount(restoredState.totalCount);
+      setNextCursor(restoredState.nextCursor);
+      setPageIndex(restoredState.pageIndex);
+      setLoading(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setLoading(true);
     setPages([]);
     setPageIndex(0);
     setTotalCount(0);
@@ -293,7 +578,73 @@ export default function GalleryPage() {
     return () => {
       cancelled = true;
     };
-  }, [loadPage, t]);
+  }, [loadPage, restoreKey, t]);
+
+  useEffect(() => {
+    const restoreState = pendingRestoreRef.current;
+    if (loading || !restoreState) return;
+
+    let timeoutId = 0;
+    let frameA = 0;
+    let frameB = 0;
+
+    timeoutId = window.setTimeout(() => {
+      frameA = window.requestAnimationFrame(() => {
+        frameB = window.requestAnimationFrame(() => {
+          window.scrollTo({ top: restoreState.scrollY, behavior: 'auto' });
+
+          if (restoreState.reviewId) {
+            const targetCard = document.querySelector<HTMLElement>(`[data-review-id="${restoreState.reviewId}"]`);
+            if (targetCard) {
+              const rect = targetCard.getBoundingClientRect();
+              const isReasonablePosition = rect.top >= 96 && rect.bottom <= window.innerHeight - 24;
+              if (!isReasonablePosition) {
+                targetCard.scrollIntoView({ block: 'center', behavior: 'auto' });
+              }
+            }
+          }
+
+          pendingRestoreRef.current = null;
+        });
+      });
+    }, 120);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      window.cancelAnimationFrame(frameA);
+      window.cancelAnimationFrame(frameB);
+    };
+  }, [loading, pageIndex, pages]);
+
+  useEffect(() => {
+    if (loading || pages.length === 0) return;
+    persistGalleryState();
+  }, [loading, pages, pageIndex, totalCount, nextCursor, persistGalleryState]);
+
+  useEffect(() => {
+    if (loading || pages.length === 0) return;
+
+    let frameId = 0;
+    const handlePersist = () => {
+      window.cancelAnimationFrame(frameId);
+      frameId = window.requestAnimationFrame(() => persistGalleryState());
+    };
+
+    window.addEventListener('scroll', handlePersist, { passive: true });
+    window.addEventListener('pagehide', handlePersist);
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.removeEventListener('scroll', handlePersist);
+      window.removeEventListener('pagehide', handlePersist);
+    };
+  }, [loading, pages.length, persistGalleryState]);
+
+  const pushFilterState = useCallback((filters: FilterDraft) => {
+    const params = buildGallerySearchParams(filters);
+    const query = params.toString();
+    router.push(query ? `/gallery?${query}` : '/gallery');
+  }, [router]);
 
   useEffect(() => {
     if (!guestLikePromptOpen) return;
@@ -341,6 +692,16 @@ export default function GalleryPage() {
     } finally {
       setPaging(false);
     }
+  };
+
+  const handleApplyFilters = () => {
+    if (hasInvalidDate) return;
+    pushFilterState(draftFilters);
+  };
+
+  const handleResetFilters = () => {
+    setDraftFilters(EMPTY_FILTERS);
+    pushFilterState(EMPTY_FILTERS);
   };
 
   const handleLikeToggle = useCallback(
@@ -460,6 +821,102 @@ export default function GalleryPage() {
           </div>
         </section>
 
+        <section className="mt-6 rounded-[24px] border border-border-subtle bg-[radial-gradient(circle_at_top_left,rgba(200,171,90,0.14),transparent_35%),rgba(18,16,13,0.72)] p-5">
+          <div className="mb-4 flex items-center gap-2 text-sm text-ink">
+            <SlidersHorizontal size={15} className="text-gold" />
+            <span>{filterCopy.filtersLabel}</span>
+          </div>
+
+          <div className="grid gap-3 xl:grid-cols-2 2xl:grid-cols-[minmax(0,1.28fr)_minmax(0,1.28fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.05fr)]">
+            <DateFilterField
+              label={filterCopy.from}
+              value={draftFilters.createdFrom}
+              error={createdFromInvalid ? invalidDateCopy : undefined}
+              onChange={(value) =>
+                setDraftFilters((prev) => ({ ...prev, createdFrom: value }))
+              }
+            />
+
+            <DateFilterField
+              label={filterCopy.to}
+              value={draftFilters.createdTo}
+              error={createdToInvalid ? invalidDateCopy : undefined}
+              onChange={(value) =>
+                setDraftFilters((prev) => ({ ...prev, createdTo: value }))
+              }
+            />
+
+            <label className="min-w-0 space-y-2 text-xs text-ink-muted">
+              <span>{filterCopy.minScore}</span>
+              <input
+                type="number"
+                min="0"
+                max="10"
+                step="0.1"
+                value={draftFilters.minScore}
+                onChange={(event) =>
+                  setDraftFilters((prev) => ({ ...prev, minScore: event.target.value }))
+                }
+                className="w-full min-w-0 rounded-xl border border-border bg-void/60 px-3 py-2.5 text-sm text-ink outline-none transition-colors focus:border-gold/40"
+              />
+            </label>
+
+            <label className="min-w-0 space-y-2 text-xs text-ink-muted">
+              <span>{filterCopy.maxScore}</span>
+              <input
+                type="number"
+                min="0"
+                max="10"
+                step="0.1"
+                value={draftFilters.maxScore}
+                onChange={(event) =>
+                  setDraftFilters((prev) => ({ ...prev, maxScore: event.target.value }))
+                }
+                className="w-full min-w-0 rounded-xl border border-border bg-void/60 px-3 py-2.5 text-sm text-ink outline-none transition-colors focus:border-gold/40"
+              />
+            </label>
+
+            <label className="min-w-0 space-y-2 text-xs text-ink-muted">
+              <span>{filterCopy.imageType}</span>
+              <select
+                value={draftFilters.imageType}
+                onChange={(event) =>
+                  setDraftFilters((prev) => ({
+                    ...prev,
+                    imageType: event.target.value as '' | ImageType,
+                  }))
+                }
+                className="w-full min-w-0 rounded-xl border border-border bg-void/60 px-3 py-2.5 text-sm text-ink outline-none transition-colors focus:border-gold/40"
+              >
+                <option value="">{filterCopy.allTypes}</option>
+                {(['default', 'landscape', 'portrait', 'street', 'still_life', 'architecture'] as ImageType[]).map((type) => (
+                  <option key={type} value={type}>
+                    {getImageTypeLabel(locale, type)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={handleApplyFilters}
+              disabled={hasInvalidDate}
+              className="rounded-full bg-gold px-4 py-2 text-sm font-medium text-void transition-colors hover:bg-gold-light disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {filterCopy.apply}
+            </button>
+            <button
+              type="button"
+              onClick={handleResetFilters}
+              className="rounded-full border border-border px-4 py-2 text-sm text-ink-muted transition-colors hover:border-gold/30 hover:text-ink"
+            >
+              {filterCopy.reset}
+            </button>
+          </div>
+        </section>
+
         {error && (
           <div className="mt-6 flex items-center gap-2 rounded-lg border border-rust/20 bg-rust/5 px-4 py-3 text-sm text-rust">
             <AlertCircle size={14} />
@@ -509,6 +966,7 @@ export default function GalleryPage() {
                 return (
                   <article
                     key={item.review_id}
+                    data-review-id={item.review_id}
                     className="group flex h-full flex-col overflow-hidden rounded-[26px] border border-border-subtle bg-[linear-gradient(180deg,rgba(248,244,238,0.96),rgba(236,230,221,0.98))] shadow-[0_18px_48px_rgba(146,120,88,0.12)] transition-all duration-300 hover:-translate-y-1 hover:border-gold/20 hover:shadow-[0_24px_64px_rgba(146,120,88,0.18)] dark:border-[rgba(208,186,146,0.12)] dark:bg-[linear-gradient(180deg,rgba(31,28,24,0.94),rgba(18,17,15,0.98))] dark:shadow-[0_18px_48px_rgba(0,0,0,0.18)] dark:hover:shadow-[0_28px_72px_rgba(0,0,0,0.28)]"
                   >
                     <div className="relative overflow-hidden px-3 pt-3">
@@ -597,7 +1055,8 @@ export default function GalleryPage() {
                         </button>
 
                         <Link
-                          href={`/reviews/${item.review_id}?back=/gallery`}
+                          href={`/reviews/${item.review_id}?back=${encodeURIComponent(backHref)}`}
+                          onClick={() => persistGalleryState(item.review_id)}
                           className="inline-flex flex-1 items-center justify-center gap-2 rounded-full border border-gold/30 px-3 py-2 text-sm text-gold transition-colors hover:bg-gold/10"
                         >
                           {t('gallery_open_review')}

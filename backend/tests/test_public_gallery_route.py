@@ -3,6 +3,7 @@ from __future__ import annotations
 import sys
 import unittest
 from datetime import datetime, timezone
+from fastapi import HTTPException
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -11,7 +12,7 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-from app.api.routes import _gallery_recommendation_map, list_public_gallery
+from app.api.routes import Review, _gallery_recommendation_map, list_public_gallery
 
 
 class PublicGalleryRouteTests(unittest.TestCase):
@@ -90,7 +91,18 @@ class PublicGalleryRouteTests(unittest.TestCase):
                 'created_at': row_review.gallery_added_at,
             },
         ):
-            payload = list_public_gallery(request=request, limit=12, cursor=None, authorization=None, db=db)
+            payload = list_public_gallery(
+                request=request,
+                limit=12,
+                cursor=None,
+                created_from=None,
+                created_to=None,
+                min_score=None,
+                max_score=None,
+                image_type=None,
+                authorization=None,
+                db=db,
+            )
 
         self.assertEqual(payload.total_count, 19)
         self.assertEqual(len(payload.items), 1)
@@ -102,6 +114,66 @@ class PublicGalleryRouteTests(unittest.TestCase):
         self.assertEqual(payload.items[0].score_percentile, 92.5)
         self.assertIsNone(payload.next_cursor)
         db.commit.assert_called_once()
+
+    def test_list_public_gallery_applies_filters_to_count_and_list_queries(self) -> None:
+        request = SimpleNamespace()
+        db = MagicMock()
+
+        count_query = MagicMock()
+        count_query.filter.return_value = count_query
+        count_query.scalar.return_value = 0
+
+        list_query = MagicMock()
+        list_query.join.return_value = list_query
+        list_query.filter.return_value = list_query
+        list_query.order_by.return_value = list_query
+        list_query.limit.return_value = list_query
+        list_query.all.return_value = []
+
+        db.query.side_effect = [count_query, list_query]
+        created_from = datetime(2026, 3, 1, tzinfo=timezone.utc)
+        created_to = datetime(2026, 3, 20, tzinfo=timezone.utc)
+
+        with patch('app.api.routes._apply_review_history_filters', side_effect=lambda query, **kwargs: query) as apply_filters:
+            payload = list_public_gallery(
+                request=request,
+                limit=12,
+                cursor=None,
+                created_from=created_from,
+                created_to=created_to,
+                min_score=6.2,
+                max_score=8.8,
+                image_type='street',
+                authorization=None,
+                db=db,
+            )
+
+        self.assertEqual(payload.total_count, 0)
+        self.assertEqual(apply_filters.call_count, 2)
+        first_kwargs = apply_filters.call_args_list[0].kwargs
+        self.assertIs(first_kwargs['date_field'], Review.gallery_added_at)
+        self.assertEqual(first_kwargs['created_from'], created_from)
+        self.assertEqual(first_kwargs['created_to'], created_to)
+        self.assertEqual(first_kwargs['min_score'], 6.2)
+        self.assertEqual(first_kwargs['max_score'], 8.8)
+        self.assertEqual(first_kwargs['image_type'], 'street')
+
+    def test_list_public_gallery_rejects_invalid_score_range(self) -> None:
+        with self.assertRaises(HTTPException) as ctx:
+            list_public_gallery(
+                request=SimpleNamespace(),
+                limit=12,
+                cursor=None,
+                created_from=None,
+                created_to=None,
+                min_score=8.5,
+                max_score=7.0,
+                image_type=None,
+                authorization=None,
+                db=MagicMock(),
+            )
+
+        self.assertEqual(ctx.exception.status_code, 400)
 
 
 if __name__ == '__main__':
