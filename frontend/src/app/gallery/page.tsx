@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AlertCircle, CalendarDays, ChevronLeft, ChevronRight, Heart, Info, LayoutGrid, RefreshCw, SlidersHorizontal, Star, X, Zap } from 'lucide-react';
@@ -458,7 +458,7 @@ function GalleryCardImage({
   );
 }
 
-export default function GalleryPage() {
+function GalleryPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { t, locale } = useI18n();
@@ -1124,5 +1124,23 @@ export default function GalleryPage() {
 
       </div>
     </div>
+  );
+}
+
+function GalleryPageFallback() {
+  return (
+    <div className="min-h-screen pt-14">
+      <div className="mx-auto max-w-7xl px-6 py-12">
+        <div className="h-40 animate-pulse rounded-[28px] border border-border-subtle bg-void/40" />
+      </div>
+    </div>
+  );
+}
+
+export default function GalleryPage() {
+  return (
+    <Suspense fallback={<GalleryPageFallback />}>
+      <GalleryPageContent />
+    </Suspense>
   );
 }
