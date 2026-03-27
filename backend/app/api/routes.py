@@ -16,6 +16,7 @@ from typing import Any
 from urllib.parse import quote, urlsplit, urlunsplit
 
 from fastapi import APIRouter, Cookie, Depends, Header, HTTPException, Query, Request, Response, WebSocket, WebSocketDisconnect, status
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import RedirectResponse, StreamingResponse
 from PIL import Image, ImageOps, UnidentifiedImageError
 from urllib import error as urllib_error
@@ -2676,9 +2677,10 @@ async def stream_task_status(websocket: WebSocket, task_id: str):
                     'created_at': latest_event.created_at.isoformat(),
                 } if latest_event else None,
             }
-            payload_json = json.dumps(payload, sort_keys=True, default=str)
+            encoded_payload = jsonable_encoder(payload)
+            payload_json = json.dumps(encoded_payload, sort_keys=True, default=str)
             if payload_json != last_payload:
-                await websocket.send_json(payload)
+                await websocket.send_json(encoded_payload)
                 last_payload = payload_json
 
             if task.status in {TaskStatus.SUCCEEDED, TaskStatus.FAILED, TaskStatus.EXPIRED, TaskStatus.DEAD_LETTER}:
