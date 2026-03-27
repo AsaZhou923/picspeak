@@ -7,6 +7,7 @@ import hashlib
 import logging
 import re
 import secrets
+import sys
 import time
 from datetime import datetime, timedelta, timezone
 from io import BytesIO
@@ -36,6 +37,7 @@ from app.api.deps import (
 )
 from app.core.config import settings
 from app.core.errors import api_error
+from app.core.network import client_ip_from_request
 from app.core.security import create_access_token, sign_payload, sign_payload_with_exp, verify_payload
 from app.db.models import (
     BillingSubscription,
@@ -128,6 +130,21 @@ router = APIRouter(prefix='/api/v1', tags=['v1'])
 webhook_router = APIRouter(prefix='/api', tags=['webhooks'])
 ALLOWED_CONTENT_TYPES = {'image/jpeg', 'image/png', 'image/webp'}
 logger = logging.getLogger(__name__)
+UPLOAD_METRIC_KEYS = (
+    'exif_extract_ms',
+    'compression_ms',
+    'file_read_ms',
+    'preprocess_total_ms',
+    'bitmap_decode_ms',
+    'sha256_ms',
+    'frontend_preprocess_ms',
+    'presign_request_ms',
+    'object_upload_ms',
+    'confirm_request_ms',
+    'total_upload_flow_ms',
+    'original_size_bytes',
+    'final_size_bytes',
+)
 GOOGLE_OAUTH_STATE_COOKIE = 'ps_google_oauth_state'
 GOOGLE_OAUTH_STATE_TTL_SECONDS = 600
 USERNAME_SANITIZE_RE = re.compile(r'[^a-z0-9_]+')
@@ -147,6 +164,47 @@ GALLERY_AUDIT_REJECTED = 'rejected'
 GALLERY_AUDIT_VALUES = {GALLERY_AUDIT_NONE, GALLERY_AUDIT_APPROVED, GALLERY_AUDIT_REJECTED}
 GALLERY_RECOMMEND_PERCENTILE_THRESHOLD = 80.0
 GALLERY_RECOMMEND_MIN_IMAGE_TYPE_SAMPLE = 8
+
+
+def _duration_ms(started_at: float) -> int:
+    return int(round((time.perf_counter() - started_at) * 1000))
+
+
+def _coerce_int_metric(value: Any) -> int | None:
+    try:
+        metric = int(value)
+    except (TypeError, ValueError):
+        return None
+    return metric if metric >= 0 else None
+
+
+def _extract_upload_metrics(client_meta: dict[str, Any]) -> dict[str, Any]:
+    raw_metrics = client_meta.get('upload_metrics')
+    if not isinstance(raw_metrics, dict):
+        return {}
+
+    metrics: dict[str, Any] = {}
+    for key in UPLOAD_METRIC_KEYS:
+        value = _coerce_int_metric(raw_metrics.get(key))
+        if value is not None:
+            metrics[key] = value
+
+    compressed = raw_metrics.get('compressed')
+    if isinstance(compressed, bool):
+        metrics['compressed'] = compressed
+
+    return metrics
+
+
+def _emit_structured_log(*, severity: str = 'INFO', event: str, message: str, **fields: Any) -> None:
+    payload = {
+        'severity': severity,
+        'event': event,
+        'message': message,
+        **fields,
+    }
+    sys.stdout.write(json.dumps(payload, ensure_ascii=False, separators=(',', ':'), default=str) + '\n')
+    sys.stdout.flush()
 
 
 def _build_storage_photo_url(bucket: str, object_key: str) -> str:
@@ -971,6 +1029,7 @@ def create_upload_presign(
     db: Session = Depends(get_db),
     actor: CurrentActor = Depends(get_current_actor),
 ):
+    started_at = time.perf_counter()
     if payload.content_type not in ALLOWED_CONTENT_TYPES:
         raise api_error(status.HTTP_400_BAD_REQUEST, 'CONTENT_TYPE_UNSUPPORTED', 'Unsupported content_type')
     if payload.size_bytes > settings.max_upload_bytes:
@@ -1008,6 +1067,20 @@ def create_upload_presign(
 
     db.commit()
 
+    duration_ms = _duration_ms(started_at)
+    _emit_structured_log(
+        severity='INFO',
+        event='upload_presign_generated',
+        message='Upload presign generated',
+        request_id=getattr(request.state, 'request_id', None),
+        user_public_id=actor.user.public_id,
+        client_ip=client_ip_from_request(request),
+        content_type=payload.content_type,
+        size_bytes=payload.size_bytes,
+        object_key=object_key,
+        presign_duration_ms=duration_ms,
+    )
+
     return PresignResponse(
         upload_id=upload_id,
         object_key=object_key,
@@ -1024,6 +1097,9 @@ def confirm_photo_upload(
     db: Session = Depends(get_db),
     actor: CurrentActor = Depends(get_current_actor),
 ):
+    started_at = time.perf_counter()
+    client_ip = client_ip_from_request(request)
+    upload_metrics = _extract_upload_metrics(payload.client_meta)
     token = verify_payload(payload.upload_id)
     if token.get('uid') != actor.user.public_id:
         raise api_error(status.HTTP_403_FORBIDDEN, 'UPLOAD_OWNER_MISMATCH', 'Upload owner mismatch')
@@ -1049,6 +1125,19 @@ def confirm_photo_upload(
         )
         if existing_photo is not None:
             db.commit()
+            _emit_structured_log(
+                severity='INFO',
+                event='photo_upload_cache_reused',
+                message='Photo upload reused from checksum cache',
+                request_id=getattr(request.state, 'request_id', None),
+                user_public_id=actor.user.public_id,
+                client_ip=client_ip,
+                photo_public_id=existing_photo.public_id,
+                photo_status=existing_photo.status.value,
+                object_key=existing_photo.object_key,
+                confirm_processing_ms=_duration_ms(started_at),
+                **upload_metrics,
+            )
             return PhotoCreateResponse(
                 photo_id=existing_photo.public_id,
                 photo_url=_build_photo_proxy_url(request, existing_photo.public_id, actor.user.public_id),
@@ -1080,6 +1169,23 @@ def confirm_photo_upload(
         db.rollback()
         raise api_error(status.HTTP_409_CONFLICT, 'PHOTO_ALREADY_EXISTS', 'Photo already exists') from exc
     db.refresh(photo)
+
+    _emit_structured_log(
+        severity='INFO',
+        event='photo_upload_confirmed',
+        message='Photo upload confirmed',
+        request_id=getattr(request.state, 'request_id', None),
+        user_public_id=actor.user.public_id,
+        client_ip=client_ip,
+        photo_public_id=photo.public_id,
+        photo_status=photo.status.value,
+        object_key=photo.object_key,
+        size_bytes=photo.size_bytes,
+        width=photo.width,
+        height=photo.height,
+        confirm_processing_ms=_duration_ms(started_at),
+        **upload_metrics,
+    )
 
     return PhotoCreateResponse(
         photo_id=photo.public_id,

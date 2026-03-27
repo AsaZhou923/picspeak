@@ -1,11 +1,13 @@
 from contextlib import asynccontextmanager
 import logging
 import time
+from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
+from sqlalchemy.exc import IntegrityError
 
 from app.api.routes import router, webhook_router
 from app.core.config import settings
@@ -136,7 +138,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 async def request_audit_middleware(request: Request, call_next):
     started_at = time.perf_counter()
     request_body = await request.body()
-    request_id = f'req_{time.time_ns()}'
+    request_id = f'req_{uuid4().hex}'
     request.state.request_id = request_id
 
     async def receive() -> dict:
@@ -175,6 +177,12 @@ async def request_audit_middleware(request: Request, call_next):
                 duration_ms=duration_ms,
             )
             db.commit()
+        except IntegrityError as exc:
+            db.rollback()
+            logger.warning(
+                'Skipped duplicate API audit log',
+                extra={'request_id': request_id, 'request_path': request.url.path, 'http_method': request.method},
+            )
         except Exception:
             db.rollback()
             logger.exception(

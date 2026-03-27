@@ -6,8 +6,23 @@ import { compressImage, formatBytes, compressionRatio, CompressionResult } from 
 import { extractExif, ExifData } from '@/lib/exif';
 import { useI18n } from '@/lib/i18n';
 
+export interface UploadPreprocessMetrics {
+  exif_extract_ms: number;
+  compression_ms: number;
+  file_read_ms: number;
+  preprocess_total_ms: number;
+  compressed: boolean;
+  original_size_bytes: number;
+  final_size_bytes: number;
+}
+
 interface ImageUploaderProps {
-  onFileSelected: (file: File, preview: string, exifData?: ExifData) => void;
+  onFileSelected: (
+    file: File,
+    preview: string,
+    exifData?: ExifData,
+    preprocessMetrics?: UploadPreprocessMetrics
+  ) => void;
   disabled?: boolean;
   maxBytes?: number;
 }
@@ -44,6 +59,7 @@ export default function ImageUploader({
 
   const process = useCallback(
     async (file: File) => {
+      const preprocessStartedAt = performance.now();
       const err = validate(file);
       if (err) {
         setError(err);
@@ -55,13 +71,16 @@ export default function ImageUploader({
 
       // Extract EXIF from the original file before compression strips metadata
       let exifData: ExifData = {};
+      const exifStartedAt = performance.now();
       try {
         exifData = await extractExif(file);
       } catch {
         // non-critical
       }
+      const exifElapsedMs = Math.round(performance.now() - exifStartedAt);
 
       let result: CompressionResult;
+      const compressionStartedAt = performance.now();
       try {
         result = await compressImage(file);
       } catch {
@@ -77,14 +96,25 @@ export default function ImageUploader({
           compressed: false,
         };
       }
+      const compressionElapsedMs = Math.round(performance.now() - compressionStartedAt);
 
       setCompressing(false);
       setCompressionInfo(result);
 
       const reader = new FileReader();
       reader.onload = (e) => {
-        onFileSelected(result.file, e.target?.result as string, exifData);
+        const fileReadElapsedMs = Math.round(performance.now() - fileReadStartedAt);
+        onFileSelected(result.file, e.target?.result as string, exifData, {
+          exif_extract_ms: exifElapsedMs,
+          compression_ms: compressionElapsedMs,
+          file_read_ms: fileReadElapsedMs,
+          preprocess_total_ms: Math.round(performance.now() - preprocessStartedAt),
+          compressed: result.compressed,
+          original_size_bytes: result.originalSize,
+          final_size_bytes: result.compressedSize,
+        });
       };
+      const fileReadStartedAt = performance.now();
       reader.readAsDataURL(result.file);
     },
     [validate, onFileSelected]

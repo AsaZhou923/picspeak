@@ -24,7 +24,7 @@ import {
   ReviewCreateSyncResponse,
   ImageType,
 } from '@/lib/types';
-import ImageUploader from '@/components/upload/ImageUploader';
+import ImageUploader, { type UploadPreprocessMetrics } from '@/components/upload/ImageUploader';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Badge from '@/components/ui/Badge';
 import { useI18n } from '@/lib/i18n';
@@ -47,6 +47,16 @@ type CachedPhotoEntry = {
   cached_at: number;
 };
 
+type UploadFlowMetrics = UploadPreprocessMetrics & {
+  bitmap_decode_ms?: number;
+  sha256_ms?: number;
+  frontend_preprocess_ms?: number;
+  presign_request_ms?: number;
+  object_upload_ms?: number;
+  confirm_request_ms?: number;
+  total_upload_flow_ms?: number;
+};
+
 const PHOTO_UPLOAD_CACHE_KEY = 'ps_uploaded_photos_v1';
 const PHOTO_UPLOAD_CACHE_LIMIT = 20;
 
@@ -54,7 +64,7 @@ const PHOTO_UPLOAD_CACHE_LIMIT = 20;
 
 function extractClientMeta(
   file: File,
-  extra?: { width?: number; height?: number; original_size?: number }
+  extra?: { width?: number; height?: number; original_size?: number; upload_metrics?: UploadFlowMetrics }
 ): Record<string, unknown> {
   return {
     original_filename: file.name,
@@ -64,7 +74,12 @@ function extractClientMeta(
     ...(extra?.width ? { width: extra.width } : {}),
     ...(extra?.height ? { height: extra.height } : {}),
     ...(extra?.original_size ? { original_size: extra.original_size } : {}),
+    ...(extra?.upload_metrics ? { upload_metrics: extra.upload_metrics } : {}),
   };
+}
+
+function logUploadMetrics(stage: string, metrics: Record<string, unknown>): void {
+  console.info(`[upload-metrics] ${stage}`, metrics);
 }
 
 async function computeFileSha256(file: File): Promise<string> {
@@ -283,7 +298,13 @@ function WorkspacePageContent() {
   // ── File selected → upload flow ────────────────────────────────────────────
 
   const handleFileSelected = useCallback(
-    async (file: File, dataUrl: string, exif: ExifData = {}) => {
+    async (
+      file: File,
+      dataUrl: string,
+      exif: ExifData = {},
+      preprocessMetrics?: UploadPreprocessMetrics
+    ) => {
+      const uploadFlowStartedAt = performance.now();
       setSourceReviewId(null);
       setReplayPhotoId(null);
       setReplayPhotoUrl(null);
@@ -298,6 +319,16 @@ function WorkspacePageContent() {
       let imgWidth = 0;
       let imgHeight = 0;
       let checksumSha256: string | null = null;
+      const uploadMetrics: UploadFlowMetrics = {
+        exif_extract_ms: preprocessMetrics?.exif_extract_ms ?? 0,
+        compression_ms: preprocessMetrics?.compression_ms ?? 0,
+        file_read_ms: preprocessMetrics?.file_read_ms ?? 0,
+        preprocess_total_ms: preprocessMetrics?.preprocess_total_ms ?? 0,
+        compressed: preprocessMetrics?.compressed ?? false,
+        original_size_bytes: preprocessMetrics?.original_size_bytes ?? file.size,
+        final_size_bytes: preprocessMetrics?.final_size_bytes ?? file.size,
+      };
+      const bitmapDecodeStartedAt = performance.now();
       try {
         const bmp = await createImageBitmap(file);
         imgWidth = bmp.width;
@@ -306,12 +337,22 @@ function WorkspacePageContent() {
       } catch {
         // non-critical
       }
+      uploadMetrics.bitmap_decode_ms = Math.round(performance.now() - bitmapDecodeStartedAt);
 
+      const sha256StartedAt = performance.now();
       try {
         checksumSha256 = await computeFileSha256(file);
       } catch {
         checksumSha256 = null;
       }
+      uploadMetrics.sha256_ms = Math.round(performance.now() - sha256StartedAt);
+      uploadMetrics.frontend_preprocess_ms =
+        uploadMetrics.preprocess_total_ms + uploadMetrics.bitmap_decode_ms + uploadMetrics.sha256_ms;
+      logUploadMetrics('preprocess', {
+        file_name: file.name,
+        file_size_bytes: file.size,
+        ...uploadMetrics,
+      });
 
       try {
         const token = await ensureToken();
@@ -330,11 +371,19 @@ function WorkspacePageContent() {
               setStage('error');
               setErrMessage(t('status_photo_error') + cachedPhoto.status);
             }
+            logUploadMetrics('cache-hit', {
+              checksum_sha256: checksumSha256,
+              frontend_preprocess_ms: uploadMetrics.frontend_preprocess_ms,
+              compressed: uploadMetrics.compressed,
+              original_size_bytes: uploadMetrics.original_size_bytes,
+              final_size_bytes: uploadMetrics.final_size_bytes,
+            });
             return;
           }
         }
 
         // 1. Presign
+        const presignStartedAt = performance.now();
         const presign = await createPresign(
           {
             filename: file.name,
@@ -344,20 +393,41 @@ function WorkspacePageContent() {
           },
           token
         );
+        uploadMetrics.presign_request_ms = Math.round(performance.now() - presignStartedAt);
+        logUploadMetrics('presign', {
+          file_name: file.name,
+          file_size_bytes: file.size,
+          presign_request_ms: uploadMetrics.presign_request_ms,
+        });
 
         // 2. PUT to object storage
+        const objectUploadStartedAt = performance.now();
         await putObjectStorage(presign.put_url, file, presign.headers, (pct) => {
           setUploadProgress(pct);
+        });
+        uploadMetrics.object_upload_ms = Math.round(performance.now() - objectUploadStartedAt);
+        logUploadMetrics('object-upload', {
+          file_name: file.name,
+          file_size_bytes: file.size,
+          object_upload_ms: uploadMetrics.object_upload_ms,
         });
 
         // 3. Confirm photo
         setStage('confirming');
+        const confirmStartedAt = performance.now();
         const photoData = await confirmPhoto(
           presign.upload_id,
           exif as Record<string, unknown>,
-          extractClientMeta(file, { width: imgWidth, height: imgHeight }),
+          extractClientMeta(file, {
+            width: imgWidth,
+            height: imgHeight,
+            original_size: preprocessMetrics?.original_size_bytes,
+            upload_metrics: uploadMetrics,
+          }),
           token
         );
+        uploadMetrics.confirm_request_ms = Math.round(performance.now() - confirmStartedAt);
+        uploadMetrics.total_upload_flow_ms = Math.round(performance.now() - uploadFlowStartedAt);
 
         setPhoto(photoData);
         if (checksumSha256) {
@@ -374,7 +444,21 @@ function WorkspacePageContent() {
           setStage('error');
           setErrMessage(t('status_photo_error') + photoData.status);
         }
+        logUploadMetrics('completed', {
+          file_name: file.name,
+          file_size_bytes: file.size,
+          photo_id: photoData.photo_id,
+          photo_status: photoData.status,
+          ...uploadMetrics,
+        });
       } catch (err) {
+        uploadMetrics.total_upload_flow_ms = Math.round(performance.now() - uploadFlowStartedAt);
+        logUploadMetrics('failed', {
+          file_name: file.name,
+          file_size_bytes: file.size,
+          error: err instanceof Error ? err.message : String(err),
+          ...uploadMetrics,
+        });
         setStage('error');
         if (err instanceof ApiException) {
           if (err.status === 429) {
