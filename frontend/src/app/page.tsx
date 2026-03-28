@@ -1,17 +1,33 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import Link from 'next/link';
 import Script from 'next/script';
-import { ArrowRight, Aperture, Zap, Star, BarChart2, Mail, ChevronDown } from 'lucide-react';
-import { useState } from 'react';
+import { ArrowRight, Aperture, Zap, Star, BarChart2, Mail } from 'lucide-react';
 import ScoreRing from '@/components/ui/ScoreRing';
-import ClerkSignInTrigger from '@/components/auth/ClerkSignInTrigger';
-import { useAuth } from '@/lib/auth-context';
 import { DEMO_IMAGE_URL, DEMO_REVIEW_ID } from '@/lib/demo-review';
 import { useI18n } from '@/lib/i18n';
-import { CN_PRO_CHECKOUT_TIP, startProCheckout } from '@/lib/pro-checkout';
 import { siteConfig } from '@/lib/site';
+
+const HomeAuthWidgets = dynamic(() => import('@/components/home/HomeAuthWidgets'), {
+  ssr: false,
+  loading: () => null,
+});
+
+const HomeFaq = dynamic(() => import('@/components/home/HomeFaq'), {
+  ssr: false,
+  loading: () => (
+    <div className="space-y-2">
+      {Array.from({ length: 4 }, (_, index) => (
+        <div
+          key={index}
+          className="h-[74px] rounded-lg border border-border-subtle bg-raised/20"
+        />
+      ))}
+    </div>
+  ),
+});
 
 const DEMO_SCORES_KEYS = [
   { labelKey: 'score_composition' as const, score: 7 },
@@ -23,9 +39,6 @@ const DEMO_SCORES_KEYS = [
 
 export default function HomePage() {
   const { t, locale } = useI18n();
-  const { ensureToken } = useAuth();
-  const [openFaq, setOpenFaq] = useState<number | null>(null);
-  const [checkoutLoading, setCheckoutLoading] = useState(false);
   const proOfferCopy = locale === 'ja'
     ? {
         priceLabel: '$2.99 / month',
@@ -59,10 +72,10 @@ export default function HomePage() {
       : { label: '更新记录', hint: '查看公开长廊更新' };
 
   const latestUpdatesCopy = locale === 'ja'
-    ? { label: 'Updates', hint: '公開ギャラリーの復元と絞り込み更新を見る' }
+    ? { label: 'Updates', hint: 'ホーム・レビュー・ギャラリーの最新整理を見る' }
     : locale === 'en'
-      ? { label: 'Updates', hint: 'See the public gallery recovery and filters update' }
-      : { label: '更新记录', hint: '查看公开长廊返回恢复与筛选更新' };
+      ? { label: 'Updates', hint: 'See the latest home, review, and gallery refresh' }
+      : { label: '更新记录', hint: '查看首页、评图与长廊的最新整理' };
 
   const softwareJsonLd = {
     '@context': 'https://schema.org',
@@ -112,21 +125,6 @@ export default function HomePage() {
     { icon: BarChart2, title: t('feature_history_title'), body: t('feature_history_body') },
   ];
 
-  async function handleCheckout() {
-    if (checkoutLoading) {
-      return;
-    }
-
-    setCheckoutLoading(true);
-    try {
-      await startProCheckout(ensureToken);
-    } catch {
-      window.alert(t('usage_checkout_unavailable'));
-    } finally {
-      setCheckoutLoading(false);
-    }
-  }
-
   const TIERS = [
     {
       plan: t('plan_guest_name'),
@@ -159,6 +157,7 @@ export default function HomePage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
       />
+      <HomeAuthWidgets />
       <section className="relative min-h-screen flex flex-col items-center justify-center px-6 pt-24 pb-20 overflow-hidden">
         <div
           className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/4 w-[700px] h-[700px] rounded-full pointer-events-none"
@@ -191,9 +190,16 @@ export default function HomePage() {
             {t('hero_cta_start')}
             <ArrowRight size={14} />
           </Link>
-          <ClerkSignInTrigger className="flex items-center gap-2 px-7 py-3 border border-border text-ink-muted text-sm rounded hover:border-gold/40 hover:text-gold active:scale-[0.98] transition-all duration-200">
-            {t('usage_login_now')}
-          </ClerkSignInTrigger>
+          <div
+            id="home-signin-slot"
+            className="flex min-h-[46px] items-center justify-center"
+            aria-hidden="true"
+          />
+          <div
+            id="home-signup-slot"
+            className="flex min-h-[46px] items-center justify-center"
+            aria-hidden="true"
+          />
         </div>
 
         <div className="relative mt-20 w-full max-w-2xl animate-slide-up anim-fill-both delay-400">
@@ -345,20 +351,11 @@ export default function HomePage() {
 	                  </ul>
 	                  {tier.highlight && (
 	                    <div className="mt-8 pt-2">
-	                      <button
-	                        type="button"
-	                        onClick={() => void handleCheckout()}
-	                        disabled={checkoutLoading}
-	                        className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-gold px-4 py-3 text-sm font-medium text-void transition-all duration-200 hover:bg-gold-light hover:shadow-[0_0_24px_rgba(200,162,104,0.35)] disabled:cursor-wait disabled:opacity-70"
-	                      >
-	                        {checkoutLoading ? t('usage_checkout_loading') : t('usage_checkout_pro')}
-	                        <ArrowRight size={14} />
-	                      </button>
-                        {locale === 'zh' && (
-                          <p className="mt-3 text-xs leading-6 text-ink-subtle">
-                            {CN_PRO_CHECKOUT_TIP}
-                          </p>
-                        )}
+                        <div
+                          id="home-checkout-slot"
+                          className="w-full min-h-[46px]"
+                          aria-hidden="true"
+                        />
 	                    </div>
 	                  )}
 	                </div>
@@ -388,36 +385,7 @@ export default function HomePage() {
           </p>
           <h2 className="font-display text-3xl sm:text-4xl mb-12">{t('faq_headline')}</h2>
 
-          <div className="space-y-2">
-            {FAQ_KEYS.map(({ q, a }, index) => {
-              const isOpen = openFaq === index;
-              return (
-                <div
-                  key={q}
-                  className={`border rounded-lg overflow-hidden transition-colors duration-200 ${
-                    isOpen ? 'border-gold/40 bg-raised/50' : 'border-border-subtle bg-raised/20 hover:border-border'
-                  }`}
-                >
-                  <button
-                    className="w-full flex items-center justify-between gap-4 px-6 py-4 text-left"
-                    onClick={() => setOpenFaq(isOpen ? null : index)}
-                    aria-expanded={isOpen}
-                  >
-                    <span className="text-sm font-medium text-ink leading-snug">{t(q)}</span>
-                    <ChevronDown
-                      size={16}
-                      className={`text-gold shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
-                    />
-                  </button>
-                  {isOpen && (
-                    <div className="px-6 pb-5 text-sm text-ink-muted leading-relaxed border-t border-border-subtle pt-4">
-                      {t(a)}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          <HomeFaq />
         </div>
       </section>
 

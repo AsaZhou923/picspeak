@@ -155,6 +155,7 @@ PHOTO_THUMBNAIL_MAX_SIZE = 512
 PHOTO_THUMBNAIL_TTL_SECONDS = 24 * 3600
 PHOTO_THUMBNAIL_STABLE_WINDOW_SECONDS = 3600
 PHOTO_THUMBNAIL_CACHE_CONTROL = 'private, max-age=86400, stale-while-revalidate=604800'
+GALLERY_THUMBNAIL_CACHE_CONTROL = 'public, max-age=31536000, immutable'
 IMAGE_RESAMPLING = getattr(Image, 'Resampling', Image).LANCZOS
 REVIEW_TAG_LIMIT = 8
 REVIEW_TAG_MAX_LENGTH = 32
@@ -231,6 +232,60 @@ def _build_storage_photo_url(bucket: str, object_key: str) -> str:
     _ = bucket
     base = settings.object_base_url.rstrip('/')
     return f'{base}/{quote(object_key)}'
+
+
+def _photo_client_meta(photo: Photo) -> dict[str, Any]:
+    return dict(photo.client_meta) if isinstance(photo.client_meta, dict) else {}
+
+
+def _gallery_thumbnail_object_key(photo: Photo, *, size: int = PHOTO_THUMBNAIL_MAX_SIZE) -> str:
+    return f'gallery-thumbnails/{photo.public_id}/{size}.webp'
+
+
+def _gallery_thumbnail_url(photo: Photo) -> str | None:
+    object_key = _photo_client_meta(photo).get('gallery_thumbnail_key')
+    if not isinstance(object_key, str) or not object_key.strip():
+        return None
+    return _build_storage_photo_url(photo.bucket, object_key.strip())
+
+
+def _ensure_gallery_thumbnail(photo: Photo, *, size: int = PHOTO_THUMBNAIL_MAX_SIZE) -> str:
+    existing_url = _gallery_thumbnail_url(photo)
+    if existing_url:
+        return existing_url
+
+    _, source_bytes = _get_photo_object(photo)
+    thumbnail_bytes, media_type = _build_thumbnail_bytes(source_bytes, size)
+    if media_type != 'image/webp' or not thumbnail_bytes:
+        raise api_error(
+            status.HTTP_502_BAD_GATEWAY,
+            'GALLERY_THUMBNAIL_BUILD_FAILED',
+            'Failed to build gallery thumbnail',
+        )
+
+    object_key = _gallery_thumbnail_object_key(photo, size=size)
+    try:
+        storage = get_object_storage_client()
+        storage.put_object(
+            Bucket=photo.bucket,
+            Key=object_key,
+            Body=thumbnail_bytes,
+            ContentType='image/webp',
+            CacheControl=GALLERY_THUMBNAIL_CACHE_CONTROL,
+        )
+    except Exception as exc:
+        raise api_error(
+            status.HTTP_502_BAD_GATEWAY,
+            'GALLERY_THUMBNAIL_UPLOAD_FAILED',
+            f'Failed to upload gallery thumbnail: {exc}',
+        ) from exc
+
+    client_meta = _photo_client_meta(photo)
+    client_meta['gallery_thumbnail_key'] = object_key
+    client_meta['gallery_thumbnail_size'] = size
+    client_meta['gallery_thumbnail_content_type'] = 'image/webp'
+    photo.client_meta = client_meta
+    return _build_storage_photo_url(photo.bucket, object_key)
 
 
 def _build_photo_proxy_url(
@@ -1548,11 +1603,17 @@ def _public_gallery_item(
     liked_by_viewer: bool = False,
     recommendation: dict[str, float | bool | None] | None = None,
 ) -> PublicGalleryItem:
+    gallery_thumbnail_url = _gallery_thumbnail_url(photo)
     return PublicGalleryItem(
         review_id=review.public_id,
         photo_id=photo.public_id,
         photo_url=_build_photo_proxy_url(request, photo.public_id, owner.public_id),
-        photo_thumbnail_url=_build_photo_proxy_url(request, photo.public_id, owner.public_id, size=PHOTO_THUMBNAIL_MAX_SIZE),
+        photo_thumbnail_url=gallery_thumbnail_url or _build_photo_proxy_url(
+            request,
+            photo.public_id,
+            owner.public_id,
+            size=PHOTO_THUMBNAIL_MAX_SIZE,
+        ),
         mode=review.mode.value,
         image_type=_review_image_type(review),
         final_score=float(review.final_score),
@@ -2307,9 +2368,11 @@ def update_review_meta(
             review.gallery_visible = True
             review.gallery_added_at = datetime.now(timezone.utc)
             if audit_result.safe:
+                _ensure_gallery_thumbnail(photo)
                 review.gallery_audit_status = GALLERY_AUDIT_APPROVED
                 review.gallery_rejected_reason = None
                 review.is_public = True
+                db.add(photo)
             else:
                 review.gallery_audit_status = GALLERY_AUDIT_REJECTED
                 review.gallery_rejected_reason = audit_result.reason or 'Image content did not pass gallery audit'

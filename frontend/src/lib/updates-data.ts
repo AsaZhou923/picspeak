@@ -18,6 +18,38 @@ export function getProductUpdates(locale: UpdateLocale): ProductUpdateEntry[] {
   if (locale === 'ja') {
     return [
       {
+        id: '2026-03-28-home-review-gallery-refresh',
+        date: '2026-03-28',
+        title: 'ホーム・レビュー・ギャラリー体験を一括で調整',
+        summary:
+          'ホームのヘッダー統一、サインアップ導線の追加、レビュー詳細の表示修正、公開ギャラリーのページングとサムネイル運用をまとめて改善しました。',
+        docPath: 'docs/changelog/update-log-2026-03-28-home-review-gallery-refresh.md',
+        sections: [
+          {
+            title: 'ホーム体験',
+            items: [
+              'ホームのヘッダーをアプリ標準の見た目に統一',
+              'ログインに加えてサインアップ導線を追加し、アバター表示と Pro カードの tips 切れも修正',
+              'FAQ、認証導線、背景演出は引き続き遅延マウントで首屏負荷を抑制',
+            ],
+          },
+          {
+            title: 'レビュー詳細',
+            items: [
+              '1 件の改善提案が記号で複数カードに分裂する問題を修正',
+              'レビュー詳細ではローカルのアップロードプレビューを優先して画像欠落を減少',
+            ],
+          },
+          {
+            title: '公開ギャラリー',
+            items: [
+              '先頭 / 末尾 / ページ番号ジャンプを含むページング UI を追加',
+              '公開ギャラリー用サムネイルの生成・長期キャッシュ・回填スクリプトを追加',
+            ],
+          },
+        ],
+      },
+      {
         id: '2026-03-27-gallery-navigation-and-filters',
         date: '2026-03-27',
         title: '公開ギャラリーの復元と絞り込みを強化',
@@ -105,6 +137,38 @@ export function getProductUpdates(locale: UpdateLocale): ProductUpdateEntry[] {
   if (locale === 'en') {
     return [
       {
+        id: '2026-03-28-home-review-gallery-refresh',
+        date: '2026-03-28',
+        title: 'Home, Review, and Gallery Experience Refresh',
+        summary:
+          'Unified the home header with the app shell, added a sign-up entry, fixed review-detail display issues, and improved public gallery paging and thumbnail delivery.',
+        docPath: 'docs/changelog/update-log-2026-03-28-home-review-gallery-refresh.md',
+        sections: [
+          {
+            title: 'Home Experience',
+            items: [
+              'Aligned the home header with the standard in-app header',
+              'Added a sign-up action beside sign-in and fixed avatar / Pro card tip clipping',
+              'Kept FAQ, auth entry points, and background effects lazily mounted to protect first load',
+            ],
+          },
+          {
+            title: 'Review Detail',
+            items: [
+              'Stopped a single improvement suggestion from being split into multiple cards by punctuation',
+              'Prefer locally cached upload previews on the review page to reduce missing-image cases',
+            ],
+          },
+          {
+            title: 'Public Gallery',
+            items: [
+              'Added first / last / page-number pagination controls with visible range feedback',
+              'Generated dedicated gallery thumbnails with long-lived caching and added a backfill script',
+            ],
+          },
+        ],
+      },
+      {
         id: '2026-03-27-gallery-navigation-and-filters',
         date: '2026-03-27',
         title: 'Public Gallery Navigation and Filters Updated',
@@ -190,6 +254,38 @@ export function getProductUpdates(locale: UpdateLocale): ProductUpdateEntry[] {
   }
 
   return [
+    {
+      id: '2026-03-28-home-review-gallery-refresh',
+      date: '2026-03-28',
+      title: '首页、评图与长廊体验一轮整理',
+      summary:
+        '统一首页顶栏样式，补上注册入口并修复头像与 Pro 卡片展示细节，同时完善评图详情展示和公开长廊分页、缩略图链路。',
+      docPath: 'docs/changelog/update-log-2026-03-28-home-review-gallery-refresh.md',
+      sections: [
+        {
+          title: '首页体验',
+          items: [
+            '首页顶栏已与应用内标准 Header 统一',
+            '新增注册入口，并修复头像显示与 Pro 卡片底部 tips 截断',
+            'FAQ、认证入口和背景特效继续保持延迟挂载，控制首页负载',
+          ],
+        },
+        {
+          title: '评图详情',
+          items: [
+            '修复单条改进建议被分号拆成多张卡片的问题',
+            '评图详情优先读取本地上传预览，减少图片丢失或加载失败',
+          ],
+        },
+        {
+          title: '公开长廊',
+          items: [
+            '新增首页、末页和页码跳转的分页控件，并展示当前区间',
+            '补齐公开长廊缩略图生成、长期缓存和回填脚本链路',
+          ],
+        },
+      ],
+    },
     {
       id: '2026-03-27-gallery-navigation-and-filters',
       date: '2026-03-27',

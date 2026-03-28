@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import Image from 'next/image';
 import { ArrowLeft, History, RotateCcw, AlertCircle, ThumbsUp, ThumbsDown, AlertTriangle, Lightbulb, Upload, TrendingDown, ZoomIn, X, Copy, Check, Share2, Download, LayoutGrid, BookmarkPlus, BookmarkCheck, Heart } from 'lucide-react';
 import { createReviewShare, exportReview, getReview, getUsage, updateReviewMeta } from '@/lib/api';
 import ProPromoCard from '@/components/marketing/ProPromoCard';
@@ -14,6 +13,7 @@ import { SkeletonBlock } from '@/components/ui/LoadingSpinner';
 import { isDemoReviewId } from '@/lib/demo-review';
 import { useI18n } from '@/lib/i18n';
 import { formatUserFacingError } from '@/lib/error-utils';
+import { getUploadedPhotoPreviewSrc } from '@/lib/photo-preview-cache';
 
 // ─── Score helpers ────────────────────────────────────────────────────────────
 
@@ -713,9 +713,14 @@ function detectSuggestionTags(title: string, detail: string): TagKey[] {
 function parsePoints(body: string): string[] {
   const numbered = body.split(/(?=\d+\.\s)/).map((s) => s.trim()).filter(Boolean);
   if (numbered.length >= 1 && /^\d+\.\s/.test(numbered[0])) return numbered;
-  const byLine = body.split(/[\n；;]+/).map((s) => s.trim()).filter(Boolean);
-  if (byLine.length > 1) return byLine;
-  return [body.trim()].filter(Boolean);
+  const trimmed = body.trim();
+  if (!trimmed) return [];
+  const byNewline = trimmed.split(/\n+/).map((s) => s.trim()).filter(Boolean);
+  if (byNewline.length > 1) return byNewline;
+  if (getSuggestionStructureState(trimmed) === 'complete') return [trimmed];
+  const bySemicolon = trimmed.split(/[；;]+/).map((s) => s.trim()).filter(Boolean);
+  if (bySemicolon.length > 1) return bySemicolon;
+  return [trimmed];
 }
 
 function parsePointWithTitle(raw: string): { title: string; detail: string } {
@@ -1032,19 +1037,27 @@ export default function ReviewPage() {
   }, [galleryConfirmOpen]);
 
   useEffect(() => {
+    let cancelled = false;
+
     ensureToken()
       .then((token) => getReview(reviewId, token))
-      .then((data) => {
+      .then(async (data) => {
+        const localPhotoUrl = await getUploadedPhotoPreviewSrc(data.photo_id);
+        if (cancelled) return;
         setReview(data);
-        if (data.photo_url) {
-          setPhotoUrl(data.photo_url);
-        }
+        setPhotoError(false);
+        setPhotoUrl(localPhotoUrl || data.photo_url || null);
         setLoading(false);
       })
       .catch((err) => {
+        if (cancelled) return;
         setLoading(false);
         setError(formatUserFacingError(t, err, t('review_err_fetch')));
       });
+
+    return () => {
+      cancelled = true;
+    };
   }, [reviewId, ensureToken, t]);
 
   // Fetch usage info for quota-low conversion banner and record failures explicitly.
@@ -1561,18 +1574,17 @@ export default function ReviewPage() {
                   }}
                   title={t('img_zoom_label')}
                 >
-                  <Image
+                  <img
                     src={photoUrl}
                     alt={t('review_photo_alt')}
-                    width={1200}
-                    height={900}
                     className="w-full max-w-full h-auto object-contain max-h-[65vh]"
                     onError={() => setPhotoError(true)}
                     onLoad={(e) => {
                       const img = e.currentTarget;
                       setImgNaturalSize({ w: img.naturalWidth, h: img.naturalHeight });
                     }}
-                    unoptimized
+                    loading="eager"
+                    decoding="async"
                   />
                   <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-void/30">
                     <ZoomIn size={32} className="text-white drop-shadow-lg" />
@@ -1887,13 +1899,12 @@ export default function ReviewPage() {
             className="relative max-w-[90vw] max-h-[90vh]"
             onClick={(e) => e.stopPropagation()}
           >
-            <Image
+            <img
               src={photoUrl}
               alt={t('review_photo_zoom_alt')}
-              width={2400}
-              height={1800}
               className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl"
-              unoptimized
+              loading="eager"
+              decoding="async"
             />
           </div>
         </div>

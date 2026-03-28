@@ -127,6 +127,11 @@ function getPaginationCopy(locale: string) {
     return {
       page: 'ページ',
       current: (value: number) => `${value} ページ`,
+      total: (value: number) => `全 ${value} ページ`,
+      showing: (from: number, to: number, total: number) =>
+        total <= 0 ? '表示できる作品はまだありません' : `${from}-${to} 件目 / 全 ${total} 件`,
+      first: '最初',
+      last: '最後',
       previous: '前のページ',
       next: '次のページ',
     };
@@ -135,6 +140,11 @@ function getPaginationCopy(locale: string) {
     return {
       page: 'Page',
       current: (value: number) => `Page ${value}`,
+      total: (value: number) => `${value} pages total`,
+      showing: (from: number, to: number, total: number) =>
+        total <= 0 ? 'No works available yet' : `Showing ${from}-${to} of ${total}`,
+      first: 'First',
+      last: 'Last',
       previous: 'Previous',
       next: 'Next',
     };
@@ -142,9 +152,44 @@ function getPaginationCopy(locale: string) {
   return {
     page: '页码',
     current: (value: number) => `第 ${value} 页`,
+    total: (value: number) => `共 ${value} 页`,
+    showing: (from: number, to: number, total: number) =>
+      total <= 0 ? '暂时还没有可显示的作品' : `当前显示 ${from}-${to} / 共 ${total} 项`,
+    first: '第一页',
+    last: '最后页',
     previous: '上一页',
     next: '下一页',
   };
+}
+
+function buildPaginationSlots(currentPage: number, totalPages: number): Array<number | 'ellipsis'> {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, index) => index);
+  }
+
+  const slots = new Set<number>([0, totalPages - 1, currentPage, currentPage - 1, currentPage + 1]);
+  if (currentPage <= 2) {
+    slots.add(1);
+    slots.add(2);
+    slots.add(3);
+  }
+  if (currentPage >= totalPages - 3) {
+    slots.add(totalPages - 2);
+    slots.add(totalPages - 3);
+    slots.add(totalPages - 4);
+  }
+
+  const ordered = Array.from(slots).filter((value) => value >= 0 && value < totalPages).sort((a, b) => a - b);
+  const result: Array<number | 'ellipsis'> = [];
+  for (let index = 0; index < ordered.length; index += 1) {
+    const page = ordered[index];
+    const previous = ordered[index - 1];
+    if (index > 0 && previous !== undefined && page - previous > 1) {
+      result.push('ellipsis');
+    }
+    result.push(page);
+  }
+  return result;
 }
 
 type FilterDraft = {
@@ -465,6 +510,8 @@ function GalleryPageContent() {
   const seoCopy = useMemo(() => getGallerySeoCopy(locale), [locale]);
   const { token, userInfo, ensureToken, isLoading: authLoading } = useAuth();
   const pendingRestoreRef = useRef<GalleryRestoreState | null>(null);
+  const pagesRef = useRef<PublicGalleryItem[][]>([]);
+  const nextCursorRef = useRef<string | null>(null);
   const [pages, setPages] = useState<PublicGalleryItem[][]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -493,6 +540,7 @@ function GalleryPageContent() {
     next.delete('restore');
     return next;
   }, [searchParamsKey]);
+  const shouldRestore = searchParams.get('restore') === '1';
   const filterSignature = filterSearch.toString();
   const appliedFilters = useMemo(() => galleryFiltersFromSearchParams(filterSearch), [filterSignature, filterSearch]);
   const restoreKey = useMemo(() => buildGalleryRestoreKey(filterSignature), [filterSignature]);
@@ -509,6 +557,11 @@ function GalleryPageContent() {
   useEffect(() => {
     setDraftFilters(appliedFilters);
   }, [appliedFilters]);
+
+  useEffect(() => {
+    pagesRef.current = pages;
+    nextCursorRef.current = nextCursor;
+  }, [nextCursor, pages]);
 
   const persistGalleryState = useCallback((reviewId: string | null = null) => {
     if (pages.length === 0) return;
@@ -538,8 +591,9 @@ function GalleryPageContent() {
 
     setError('');
     setActionError('');
+    pendingRestoreRef.current = null;
 
-    const restoredState = readGalleryRestoreState(restoreKey);
+    const restoredState = shouldRestore ? readGalleryRestoreState(restoreKey) : null;
     if (restoredState) {
       pendingRestoreRef.current = restoredState;
       setPages(restoredState.pages);
@@ -578,7 +632,7 @@ function GalleryPageContent() {
     return () => {
       cancelled = true;
     };
-  }, [loadPage, restoreKey, t]);
+  }, [loadPage, restoreKey, shouldRestore, t]);
 
   useEffect(() => {
     const restoreState = pendingRestoreRef.current;
@@ -657,11 +711,6 @@ function GalleryPageContent() {
     return () => window.removeEventListener('keydown', handler);
   }, [guestLikePromptOpen]);
 
-  const handlePrevPage = () => {
-    if (pageIndex === 0 || paging) return;
-    setPageIndex((current) => current - 1);
-  };
-
   const patchGalleryItem = useCallback((reviewId: string, updater: (item: PublicGalleryItem) => PublicGalleryItem) => {
     setPages((current) =>
       current.map((page) =>
@@ -670,28 +719,57 @@ function GalleryPageContent() {
     );
   }, []);
 
-  const handleNextPage = async () => {
+  const totalPages = Math.max(1, Math.ceil(Math.max(totalCount, 1) / PAGE_SIZE));
+
+  const goToPage = useCallback(async (targetIndex: number) => {
     if (paging) return;
 
-    if (pageIndex < pages.length - 1) {
-      setPageIndex((current) => current + 1);
+    const normalizedTarget = Math.min(Math.max(targetIndex, 0), totalPages - 1);
+    if (normalizedTarget === pageIndex) return;
+
+    const currentPages = pagesRef.current;
+    if (normalizedTarget < currentPages.length) {
+      setPageIndex(normalizedTarget);
       return;
     }
 
-    if (!nextCursor) return;
+    let cursor = nextCursorRef.current;
+    if (!cursor) {
+      setPageIndex(Math.max(0, currentPages.length - 1));
+      return;
+    }
 
     setPaging(true);
+    setError('');
     try {
-      const data = await loadPage(nextCursor);
-      setPages((current) => [...current, data.items]);
-      setTotalCount(data.totalCount);
-      setNextCursor(data.nextCursor);
-      setPageIndex((current) => current + 1);
+      let loadedPages = currentPages.slice();
+      let loadedTotalCount = totalCount;
+
+      while (loadedPages.length <= normalizedTarget && cursor) {
+        const data = await loadPage(cursor);
+        loadedPages = [...loadedPages, data.items];
+        loadedTotalCount = data.totalCount;
+        cursor = data.nextCursor;
+      }
+
+      setPages(loadedPages);
+      setTotalCount(loadedTotalCount);
+      setNextCursor(cursor);
+      setPageIndex(Math.min(normalizedTarget, loadedPages.length - 1));
     } catch (err) {
       setError(formatUserFacingError(t, err, t('review_err_fetch')));
     } finally {
       setPaging(false);
     }
+  }, [loadPage, pageIndex, paging, t, totalCount, totalPages]);
+
+  const handlePrevPage = () => {
+    if (pageIndex === 0 || paging) return;
+    setPageIndex((current) => current - 1);
+  };
+
+  const handleNextPage = async () => {
+    await goToPage(pageIndex + 1);
   };
 
   const handleApplyFilters = () => {
@@ -736,8 +814,11 @@ function GalleryPageContent() {
   );
 
   const items = pages[pageIndex] ?? [];
+  const visibleStart = items.length > 0 ? pageIndex * PAGE_SIZE + 1 : 0;
+  const visibleEnd = items.length > 0 ? visibleStart + items.length - 1 : 0;
   const hasPrevPage = pageIndex > 0;
   const hasNextPage = pageIndex < pages.length - 1 || nextCursor !== null;
+  const paginationSlots = useMemo(() => buildPaginationSlots(pageIndex, totalPages), [pageIndex, totalPages]);
 
   return (
     <div className="min-h-screen pt-14">
@@ -1069,29 +1150,86 @@ function GalleryPageContent() {
               })}
             </section>
 
-            <div className="mt-8 flex flex-col items-center gap-3">
-              <p className="text-xs uppercase tracking-[0.18em] text-ink-subtle">
-                {paginationCopy.page} - {paginationCopy.current(pageIndex + 1)}
-              </p>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handlePrevPage}
-                  disabled={!hasPrevPage || paging}
-                  className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm text-ink-muted transition-colors hover:border-gold/40 hover:text-ink disabled:opacity-40"
-                >
-                  <ChevronLeft size={14} />
-                  {paginationCopy.previous}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleNextPage}
-                  disabled={!hasNextPage || paging}
-                  className="inline-flex items-center gap-2 rounded-full border border-gold/30 px-4 py-2 text-sm text-gold transition-colors hover:bg-gold/10 disabled:opacity-40"
-                >
-                  {paging ? t('reviews_loading_more') : paginationCopy.next}
-                  <ChevronRight size={14} />
-                </button>
+            <div className="mt-8 flex flex-col gap-4 rounded-[24px] border border-border-subtle bg-[linear-gradient(180deg,rgba(248,244,238,0.72),rgba(236,230,221,0.92))] px-4 py-4 shadow-[0_14px_34px_rgba(120,96,68,0.08)] sm:flex-row sm:items-center sm:justify-between dark:border-[rgba(208,186,146,0.12)] dark:bg-[linear-gradient(180deg,rgba(31,28,24,0.9),rgba(18,17,15,0.96))] dark:shadow-[0_14px_40px_rgba(0,0,0,0.18)]">
+              <div className="flex flex-col items-center gap-2 text-center sm:items-start sm:text-left">
+                <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+                  <span className="rounded-full border border-gold/25 bg-gold/10 px-3 py-1 text-sm font-medium text-gold">
+                    {paginationCopy.current(pageIndex + 1)}
+                  </span>
+                  <span className="rounded-full border border-border-subtle bg-void/40 px-3 py-1 text-xs text-ink-muted">
+                    {paginationCopy.total(totalPages)}
+                  </span>
+                </div>
+                <p className="text-xs tracking-[0.08em] text-ink-subtle">
+                  {paginationCopy.showing(visibleStart, visibleEnd, totalCount)}
+                </p>
+              </div>
+              <div className="flex flex-col items-center gap-3 sm:items-end">
+                <div className="flex items-center justify-center gap-2 sm:justify-end">
+                  <button
+                    type="button"
+                    onClick={() => void goToPage(0)}
+                    disabled={pageIndex === 0 || paging}
+                    className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm text-ink-muted transition-colors hover:border-gold/40 hover:text-ink disabled:opacity-40"
+                  >
+                    <ChevronLeft size={14} />
+                    {paginationCopy.first}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handlePrevPage}
+                    disabled={!hasPrevPage || paging}
+                    className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm text-ink-muted transition-colors hover:border-gold/40 hover:text-ink disabled:opacity-40"
+                  >
+                    <ChevronLeft size={14} />
+                    {paginationCopy.previous}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleNextPage}
+                    disabled={!hasNextPage || paging}
+                    className="inline-flex items-center gap-2 rounded-full border border-gold/30 px-4 py-2 text-sm text-gold transition-colors hover:bg-gold/10 disabled:opacity-40"
+                  >
+                    {paging ? t('reviews_loading_more') : paginationCopy.next}
+                    <ChevronRight size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void goToPage(totalPages - 1)}
+                    disabled={pageIndex === totalPages - 1 || paging}
+                    className="inline-flex items-center gap-2 rounded-full border border-gold/30 px-4 py-2 text-sm text-gold transition-colors hover:bg-gold/10 disabled:opacity-40"
+                  >
+                    {paginationCopy.last}
+                    <ChevronRight size={14} />
+                  </button>
+                </div>
+                <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-end">
+                  {paginationSlots.map((slot, index) =>
+                    slot === 'ellipsis' ? (
+                      <span
+                        key={`ellipsis-${index}`}
+                        className="inline-flex h-10 min-w-10 items-center justify-center px-2 text-sm text-ink-subtle"
+                      >
+                        ...
+                      </span>
+                    ) : (
+                      <button
+                        key={slot}
+                        type="button"
+                        onClick={() => void goToPage(slot)}
+                        disabled={paging}
+                        aria-current={slot === pageIndex ? 'page' : undefined}
+                        className={`inline-flex h-10 min-w-10 items-center justify-center rounded-full border px-3 text-sm transition-colors disabled:opacity-40 ${
+                          slot === pageIndex
+                            ? 'border-gold/35 bg-gold text-void shadow-[0_10px_24px_rgba(200,162,104,0.22)]'
+                            : 'border-border bg-void/35 text-ink-muted hover:border-gold/35 hover:text-gold'
+                        }`}
+                      >
+                        {slot + 1}
+                      </button>
+                    )
+                  )}
+                </div>
               </div>
             </div>
           </>

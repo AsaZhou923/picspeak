@@ -1,13 +1,10 @@
 import type { Metadata } from 'next';
 import { Cormorant_Garamond, DM_Sans, JetBrains_Mono } from 'next/font/google';
-import Script from 'next/script';
 import './globals.css';
-import { Analytics } from '@vercel/analytics/react';
-import { SpeedInsights } from '@vercel/speed-insights/next';  
-import Header from '@/components/layout/Header';
-import Footer from '@/components/layout/Footer';
+import SiteChrome from '@/components/layout/SiteChrome';
 import AppProviders from '@/components/providers/AppProviders';
-import BackgroundEffect from '@/components/ui/BackgroundEffect';
+import PerformanceTelemetry from '@/components/performance/PerformanceTelemetry';
+import DeferredBackgroundEffect from '@/components/ui/DeferredBackgroundEffect';
 import { siteConfig } from '@/lib/site';
 
 const cormorant = Cormorant_Garamond({
@@ -29,6 +26,7 @@ const jetbrainsMono = JetBrains_Mono({
   weight: ['400', '500'],
   variable: '--font-mono',
   display: 'swap',
+  preload: false,
 });
 
 export const metadata: Metadata = {
@@ -101,27 +99,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             __html: `(function(){try{var s=localStorage.getItem('picspeak-theme');var p=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';if((s||p)==='dark')document.documentElement.classList.add('dark');}catch(e){}})();`,
           }}
         />
-        <Script id="lemonsqueezy-affiliate-config" strategy="beforeInteractive">
-          {`window.lemonSqueezyAffiliateConfig = { store: "picspeak" };`}
-        </Script>
-        <Script
-          id="lemonsqueezy-affiliate-sdk"
-          src="https://lmsqueezy.com/affiliate.js"
-          strategy="afterInteractive"
-        />
       </head>
       <body className="text-ink min-h-screen">
         <AppProviders>
-          <Analytics />
-          <SpeedInsights />
+          {process.env.NODE_ENV === 'production' ? <PerformanceTelemetry /> : null}
           <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
-            <BackgroundEffect />
+            <DeferredBackgroundEffect />
           </div>
-          <div className="relative z-10 min-h-screen flex flex-col">
-            <Header />
-            <main className="flex-1 pt-12 md:pt-0">{children}</main>
-            <Footer />
-          </div>
+          <SiteChrome>{children}</SiteChrome>
         </AppProviders>
       </body>
     </html>

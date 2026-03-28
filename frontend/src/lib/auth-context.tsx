@@ -10,6 +10,7 @@ import React, {
 } from 'react';
 import { useAuth as useClerkAuth } from '@clerk/nextjs';
 import { authClerkExchange, authGuest, clearUsageCache, registerUnauthorizedHandler } from './api';
+import { clearPhotoPreviewCache } from './photo-preview-cache';
 import { clearReviewThumbnailCache } from './review-thumbnail-cache';
 import { AuthToken } from './types';
 
@@ -116,6 +117,7 @@ function clearStoredAuthToken(): void {
     // ignore legacy cookie cleanup
   }
   clearUsageCache();
+  void clearPhotoPreviewCache();
   void clearReviewThumbnailCache();
 }
 

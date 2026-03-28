@@ -30,6 +30,7 @@ import Badge from '@/components/ui/Badge';
 import { useI18n } from '@/lib/i18n';
 import type { ExifData } from '@/lib/exif';
 import { formatUserFacingError } from '@/lib/error-utils';
+import { cacheUploadedPhotoPreview } from '@/lib/photo-preview-cache';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -360,6 +361,7 @@ function WorkspacePageContent() {
         if (checksumSha256) {
           const cachedPhoto = getCachedPhoto(checksumSha256);
           if (cachedPhoto) {
+            void cacheUploadedPhotoPreview(cachedPhoto.photo_id, file);
             setPhoto(cachedPhoto);
             if (cachedPhoto.status === 'READY') {
               setStage('ready');
@@ -433,6 +435,7 @@ function WorkspacePageContent() {
         if (checksumSha256) {
           cachePhoto(checksumSha256, photoData);
         }
+        void cacheUploadedPhotoPreview(photoData.photo_id, file);
 
         if (photoData.status === 'READY') {
           setStage('ready');

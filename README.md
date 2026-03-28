@@ -14,11 +14,11 @@
 
 | 主页 | 点评结果 |
 |------|---------|
-| ![主页](docs/assets/screenshots/home.png) | ![点评结果](docs/assets/screenshots/review.png) |
+| ![主页](https://pub-7ae066210514433e84a850bc95c5f1a2.r2.dev/screenshots/home.jpg) | ![点评结果](https://pub-7ae066210514433e84a850bc95c5f1a2.r2.dev/screenshots/review.jpg) |
 
 | 影像长廊 | 移动端 |
 |---------|---------|
-| ![影像长廊](docs/assets/screenshots/gallery.png) | ![移动端](docs/assets/screenshots/mobile.png) |
+| ![影像长廊](https://pub-7ae066210514433e84a850bc95c5f1a2.r2.dev/screenshots/gallery.jpg) | ![移动端](https://pub-7ae066210514433e84a850bc95c5f1a2.r2.dev/screenshots/mobile.jpg) |
 
 
 ---
