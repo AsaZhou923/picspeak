@@ -72,10 +72,10 @@ export default function HomePage() {
       : { label: '更新记录', hint: '查看公开长廊更新' };
 
   const latestUpdatesCopy = locale === 'ja'
-    ? { label: 'Updates', hint: 'ホーム・レビュー・ギャラリーの最新整理を見る' }
+    ? { label: 'Updates', hint: '審査基準・スコア表現・ギャラリー表示の最新更新を見る' }
     : locale === 'en'
-      ? { label: 'Updates', hint: 'See the latest home, review, and gallery refresh' }
-      : { label: '更新记录', hint: '查看首页、评图与长廊的最新整理' };
+      ? { label: 'Updates', hint: 'See the latest moderation, score-label, and gallery updates' }
+      : { label: '更新记录', hint: '查看审核、评分文案与长廊展示的最新更新' };
 
   const softwareJsonLd = {
     '@context': 'https://schema.org',

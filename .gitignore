@@ -27,3 +27,6 @@ pnpm-debug.log*
 
 # Local helper scripts
 start-dev.bat
+
+.vercel
+.env*.local

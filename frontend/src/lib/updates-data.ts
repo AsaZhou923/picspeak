@@ -18,6 +18,38 @@ export function getProductUpdates(locale: UpdateLocale): ProductUpdateEntry[] {
   if (locale === 'ja') {
     return [
       {
+        id: '2026-04-01-audit-score-gallery-polish',
+        date: '2026-04-01',
+        title: '審査基準・スコア表現・ギャラリー表示を調整',
+        summary:
+          '公開ギャラリーの審査を過度に厳しくしすぎないよう見直し、レビュー結果のスコア文言を 10 段階に細分化し、ギャラリーカードの横写真表示を安定化しました。',
+        docPath: 'docs/changelog/update-log-2026-04-01-audit-score-gallery-polish.md',
+        sections: [
+          {
+            title: '公開ギャラリー審査',
+            items: [
+              '審査 prompt を「明確な違反のみ unsafe」とする方針に更新',
+              '水着、ファッション、非露点の密着衣装、芸術的な人体表現などは通常 safe 扱いに調整',
+              '判断が曖昧な場合は safe 寄りに倒し、公開ギャラリーでの誤ブロックを減らした',
+            ],
+          },
+          {
+            title: 'レビュー結果の表現',
+            items: [
+              '最終スコアを 1 から 10 の整数帯に丸めて専用ラベルへマッピング',
+              '日本語・英語・中国語で 10 段階のスコア文言を追加',
+            ],
+          },
+          {
+            title: 'ギャラリー表示',
+            items: [
+              'ギャラリーカードを `object-contain` ベースに統一し、横写真の切り抜きを回避',
+              '審査 prompt の回帰テストと `.vercel` / ローカル環境ファイルの ignore も追加',
+            ],
+          },
+        ],
+      },
+      {
         id: '2026-03-28-home-review-gallery-refresh',
         date: '2026-03-28',
         title: 'ホーム・レビュー・ギャラリー体験を一括で調整',
@@ -137,6 +169,38 @@ export function getProductUpdates(locale: UpdateLocale): ProductUpdateEntry[] {
   if (locale === 'en') {
     return [
       {
+        id: '2026-04-01-audit-score-gallery-polish',
+        date: '2026-04-01',
+        title: 'Moderation, Score Labels, and Gallery Cards Refined',
+        summary:
+          'Relaxed public-gallery moderation for clearly allowed borderline content, expanded review score labels to 10 localized tiers, and stabilized gallery cards for landscape images.',
+        docPath: 'docs/changelog/update-log-2026-04-01-audit-score-gallery-polish.md',
+        sections: [
+          {
+            title: 'Public Gallery Moderation',
+            items: [
+              'Updated the audit prompt so only clearly disallowed content is marked unsafe',
+              'Treat swimwear, fashion shoots, non-explicit tight clothing, and artistic body expression as safe by default',
+              'Bias uncertain cases toward safe to reduce over-blocking in the public gallery',
+            ],
+          },
+          {
+            title: 'Review Score Labels',
+            items: [
+              'Round final scores into 1 to 10 buckets and map them to dedicated labels',
+              'Added full 10-tier score copy across Chinese, English, and Japanese',
+            ],
+          },
+          {
+            title: 'Gallery Cards',
+            items: [
+              'Unified gallery cards around an `object-contain` image treatment so landscape photos are not cropped away',
+              'Added prompt regression coverage and ignored `.vercel` plus local env files in Git',
+            ],
+          },
+        ],
+      },
+      {
         id: '2026-03-28-home-review-gallery-refresh',
         date: '2026-03-28',
         title: 'Home, Review, and Gallery Experience Refresh',
@@ -254,6 +318,38 @@ export function getProductUpdates(locale: UpdateLocale): ProductUpdateEntry[] {
   }
 
   return [
+    {
+      id: '2026-04-01-audit-score-gallery-polish',
+      date: '2026-04-01',
+      title: '公开长廊审核、评分文案与卡片展示同步细化',
+      summary:
+        '放宽公开长廊对边界安全内容的误杀，补齐评图结果 10 档本地化标签，并让长廊横图在卡片里稳定完整展示。',
+      docPath: 'docs/changelog/update-log-2026-04-01-audit-score-gallery-polish.md',
+      sections: [
+        {
+          title: '公开长廊审核',
+          items: [
+            '审核 prompt 改为只拦截明确违规内容，减少误判',
+            '泳装、时尚摄影、非露点贴身服装和艺术化人体表达默认倾向 safe',
+            '判断不明确时优先放行，降低公开长廊误杀',
+          ],
+        },
+        {
+          title: '评图结果文案',
+          items: [
+            '最终得分按 1 到 10 的整数档位映射到专属标签',
+            '中文、英文、日文都补齐了 10 档评分总结语',
+          ],
+        },
+        {
+          title: '长廊卡片展示',
+          items: [
+            '长廊卡片统一改为 `object-contain`，横图不再被直接裁切',
+            '同时补上审核 prompt 测试，并忽略 `.vercel` 与本地环境文件',
+          ],
+        },
+      ],
+    },
     {
       id: '2026-03-28-home-review-gallery-refresh',
       date: '2026-03-28',

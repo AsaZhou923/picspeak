@@ -12,6 +12,7 @@ import { FinalScoreRing } from '@/components/ui/ScoreRing';
 import { SkeletonBlock } from '@/components/ui/LoadingSpinner';
 import { isDemoReviewId } from '@/lib/demo-review';
 import { useI18n } from '@/lib/i18n';
+import type { TranslationKey } from '@/lib/i18n-zh';
 import { formatUserFacingError } from '@/lib/error-utils';
 import { getUploadedPhotoPreviewSrc } from '@/lib/photo-preview-cache';
 
@@ -33,6 +34,11 @@ function getScoreLabelColor(score: number): string {
   if (score >= 7.5) return 'text-sage';
   if (score >= 5.5) return 'text-gold';
   return 'text-rust';
+}
+
+function getScoreLabelKey(score: number): TranslationKey {
+  const bucket = Math.max(1, Math.min(10, Math.round(score)));
+  return `score_label_${bucket}` as TranslationKey;
 }
 
 function getEffectiveQuota(
@@ -1148,12 +1154,7 @@ export default function ReviewPage() {
   const weakestKey = getWeakestDimKey(r.scores);
   const weakestDim = SCORE_DIMS.find((d) => d.key === weakestKey) ?? SCORE_DIMS[0];
   const scoreLabelColor = getScoreLabelColor(r.final_score);
-  const scoreLabel =
-    r.final_score >= 9.0 ? t('score_label_excellent')
-    : r.final_score >= 7.5 ? t('score_label_good')
-    : r.final_score >= 6.0 ? t('score_label_above_avg')
-    : r.final_score >= 4.0 ? t('score_label_average')
-    : t('score_label_weak');
+  const scoreLabel = t(getScoreLabelKey(r.final_score));
   const scoreSummary = generateScoreSummary(r.scores, SCORE_DIMS, locale);
 
   // Determine if quota is low for conversion banner

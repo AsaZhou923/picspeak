@@ -89,6 +89,18 @@ def _normalize_result(parsed: dict) -> ContentAuditResult:
     return ContentAuditResult(safe=safe, nsfw_score=score, label=label, reason=reason, latency_ms=0)
 
 
+def _build_content_audit_prompt() -> str:
+    return (
+        '你是公开图库的图片内容审查助手，只拦截明确违规内容，不要过度保守。'
+        '只在以下情况判定为 unsafe：明确裸露生殖器、明确露点、明确性行为或露骨性暗示、未成年人性相关内容、血腥重口暴力、仇恨或恐怖主义宣传、明显违法内容。'
+        '以下内容通常应判定为 safe：正常人像、时尚摄影、泳装、健身、舞蹈、孕妇照、非露点内衣或贴身服装、深V、露背、露肩、露腿、露腰、接吻、情侣亲密姿态、艺术化人体表达、雕塑或绘画中的裸体、非血腥医疗场景、轻微伤痕。'
+        '如果画面只有性感氛围、姿势撩人、身材展示或衣着较少，但没有明确露点或露骨性行为，应倾向 safe，并给较低 nsfw_score。'
+        '如果无法确定，默认倾向 safe，只有高置信度时才判 unsafe。'
+        '必须只输出 JSON：{"safe":true/false,"nsfw_score":0-1,"label":"safe|sexual|violence|illegal|other","reason":"..."}。'
+        '其中 nsfw_score 越高表示越不安全。'
+    )
+
+
 def run_content_audit(image_url: str) -> ContentAuditResult:
     if not settings.image_audit_enabled:
         return ContentAuditResult(safe=True, nsfw_score=0.0, label='disabled', reason='audit disabled', latency_ms=0)
@@ -97,21 +109,16 @@ def run_content_audit(image_url: str) -> ContentAuditResult:
         raise ContentAuditError('AI_API_KEY is not configured')
 
     endpoint = settings.ai_api_base_url.rstrip('/') + '/chat/completions'
-    prompt = (
-        '你是图片内容审核器。请判断图片是否含有明显涉黄、性暗示、裸露、血腥暴力、仇恨或违法内容。'
-        '必须只输出 JSON：{"safe":true/false,"nsfw_score":0-1,"label":"safe|sexual|violence|illegal|other","reason":"..."}。'
-        '其中 nsfw_score 越高表示越不安全。'
-    )
     payload = {
         'model': settings.ai_model_name,
         'temperature': 0,
         'response_format': {'type': 'json_object'},
         'messages': [
-            {'role': 'system', 'content': '你是严格返回 JSON 的图片安全审核助手。'},
+            {'role': 'system', 'content': '你是只返回 JSON 的图片安全审查助手。'},
             {
                 'role': 'user',
                 'content': [
-                    {'type': 'text', 'text': prompt},
+                    {'type': 'text', 'text': _build_content_audit_prompt()},
                     {'type': 'image_url', 'image_url': {'url': image_url}},
                 ],
             },
