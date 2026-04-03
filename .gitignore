@@ -30,3 +30,6 @@ start-dev.bat
 
 .vercel
 .env*.local
+.omx/
+.omc/
+deploy/

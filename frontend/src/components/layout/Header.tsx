@@ -10,6 +10,7 @@ import { planLabel, planColor } from '@/lib/auth-context';
 import { useTheme } from '@/lib/theme-context';
 import { useI18n, LOCALE_LABELS, Locale } from '@/lib/i18n';
 import { useState, useRef, useEffect } from 'react';
+import useOnClickOutside from '@/lib/hooks/useOnClickOutside';
 
 const AUTH_LABELS: Record<Locale, { signIn: string; signUp: string }> = {
   zh: { signIn: '登录', signUp: '注册' },
@@ -22,15 +23,7 @@ function LanguageSwitcher() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  useOnClickOutside(ref, () => setOpen(false));
 
   return (
     <div ref={ref} className="relative">
@@ -65,15 +58,7 @@ function QuickLinksMenu() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  useOnClickOutside(ref, () => setOpen(false));
 
   useEffect(() => {
     setOpen(false);
