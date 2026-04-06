@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, History, RotateCcw, AlertCircle, ThumbsUp, ThumbsDown, AlertTriangle, Lightbulb, Upload, TrendingDown, ZoomIn, X, Copy, Check, Share2, Download, LayoutGrid, BookmarkPlus, BookmarkCheck, Heart } from 'lucide-react';
@@ -14,7 +14,7 @@ import { isDemoReviewId } from '@/lib/demo-review';
 import { useI18n } from '@/lib/i18n';
 import type { TranslationKey } from '@/lib/i18n-zh';
 import { formatUserFacingError } from '@/lib/error-utils';
-import { getUploadedPhotoPreviewSrc } from '@/lib/photo-preview-cache';
+import { getUploadedPhotoPreviewSrc, refreshUploadedPhotoPreviewSrc } from '@/lib/photo-preview-cache';
 
 // ─── Score helpers ────────────────────────────────────────────────────────────
 
@@ -1003,6 +1003,8 @@ export default function ReviewPage() {
   const [error, setError] = useState('');
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [photoError, setPhotoError] = useState(false);
+  const [photoRecovering, setPhotoRecovering] = useState(false);
+  const [photoRecoveryAttempted, setPhotoRecoveryAttempted] = useState(false);
   const [zoomOpen, setZoomOpen] = useState(false);
   const [zoomMounted, setZoomMounted] = useState(false);
   const [activeDim, setActiveDim] = useState<string | null>(null);
@@ -1015,6 +1017,64 @@ export default function ReviewPage() {
   const [actionBusy, setActionBusy] = useState<'share' | 'export' | 'replay' | 'favorite' | 'gallery' | null>(null);
   const [actionFeedback, setActionFeedback] = useState('');
   const [actionError, setActionError] = useState('');
+
+  const applyResolvedPhotoUrl = useCallback((nextPhotoUrl: string | null) => {
+    setPhotoError(false);
+    setPhotoRecovering(false);
+    setPhotoRecoveryAttempted(false);
+    setPhotoUrl(nextPhotoUrl);
+  }, []);
+
+  const recoverPhotoUrl = useCallback(async (): Promise<boolean> => {
+    if (!review) {
+      return false;
+    }
+
+    const refreshedLocalPhotoUrl = await refreshUploadedPhotoPreviewSrc(review.photo_id);
+    if (refreshedLocalPhotoUrl) {
+      applyResolvedPhotoUrl(refreshedLocalPhotoUrl);
+      return true;
+    }
+
+    try {
+      const token = await ensureToken();
+      const latestReview = await getReview(review.review_id, token);
+      const refreshedRemotePhotoUrl = latestReview.photo_url
+        ? `${latestReview.photo_url}${latestReview.photo_url.includes('?') ? '&' : '?'}retry=${Date.now()}`
+        : null;
+
+      if (!refreshedRemotePhotoUrl) {
+        return false;
+      }
+
+      setReview(latestReview);
+      applyResolvedPhotoUrl(refreshedRemotePhotoUrl);
+      return true;
+    } catch (err) {
+      console.error('Failed to recover review photo after image error', err);
+      return false;
+    }
+  }, [applyResolvedPhotoUrl, ensureToken, review]);
+
+  const handlePhotoError = useCallback(async () => {
+    if (!review || photoRecovering) {
+      return;
+    }
+
+    if (photoRecoveryAttempted) {
+      setPhotoRecovering(false);
+      setPhotoError(true);
+      return;
+    }
+
+    setPhotoRecovering(true);
+    setPhotoRecoveryAttempted(true);
+    const recovered = await recoverPhotoUrl();
+    if (!recovered) {
+      setPhotoRecovering(false);
+      setPhotoError(true);
+    }
+  }, [photoRecovering, photoRecoveryAttempted, recoverPhotoUrl, review]);
 
   const resultImageType = review?.result?.image_type ?? 'default';
   const SCORE_DIMS = [
@@ -1051,8 +1111,7 @@ export default function ReviewPage() {
         const localPhotoUrl = await getUploadedPhotoPreviewSrc(data.photo_id);
         if (cancelled) return;
         setReview(data);
-        setPhotoError(false);
-        setPhotoUrl(localPhotoUrl || data.photo_url || null);
+        applyResolvedPhotoUrl(localPhotoUrl || data.photo_url || null);
         setLoading(false);
       })
       .catch((err) => {
@@ -1064,7 +1123,7 @@ export default function ReviewPage() {
     return () => {
       cancelled = true;
     };
-  }, [reviewId, ensureToken, t]);
+  }, [applyResolvedPhotoUrl, reviewId, ensureToken, t]);
 
   // Fetch usage info for quota-low conversion banner and record failures explicitly.
   useEffect(() => {
@@ -1579,7 +1638,9 @@ export default function ReviewPage() {
                     src={photoUrl}
                     alt={t('review_photo_alt')}
                     className="w-full max-w-full h-auto object-contain max-h-[65vh]"
-                    onError={() => setPhotoError(true)}
+                    onError={() => {
+                      void handlePhotoError();
+                    }}
                     onLoad={(e) => {
                       const img = e.currentTarget;
                       setImgNaturalSize({ w: img.naturalWidth, h: img.naturalHeight });

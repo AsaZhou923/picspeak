@@ -28,6 +28,16 @@ function rememberObjectUrl(photoId: string, blob: Blob): string {
   return nextUrl;
 }
 
+function forgetObjectUrl(photoId: string): void {
+  const existingUrl = objectUrlCache.get(photoId);
+  if (!existingUrl) {
+    return;
+  }
+
+  URL.revokeObjectURL(existingUrl);
+  objectUrlCache.delete(photoId);
+}
+
 async function readCachedBlob(photoId: string): Promise<Blob | null> {
   const cache = await openPhotoPreviewCache();
   if (!cache) {
@@ -79,6 +89,21 @@ export async function getUploadedPhotoPreviewSrc(photoId: string): Promise<strin
   if (memoryUrl) {
     return memoryUrl;
   }
+
+  const cachedBlob = await readCachedBlob(photoId);
+  if (!cachedBlob) {
+    return null;
+  }
+
+  return rememberObjectUrl(photoId, cachedBlob);
+}
+
+export async function refreshUploadedPhotoPreviewSrc(photoId: string): Promise<string | null> {
+  if (!photoId) {
+    return null;
+  }
+
+  forgetObjectUrl(photoId);
 
   const cachedBlob = await readCachedBlob(photoId);
   if (!cachedBlob) {
