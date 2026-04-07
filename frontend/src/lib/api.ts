@@ -1,5 +1,6 @@
 import {
   ApiException,
+  ActivationCodeRedeemResponse,
   AuthToken,
   BillingCheckoutResponse,
   BillingPortalResponse,
@@ -237,6 +238,17 @@ export async function getBillingPortal(token: string): Promise<BillingPortalResp
     token,
     unauthorizedRecovery: 'guest',
   });
+}
+
+export async function redeemActivationCode(token: string, code: string): Promise<ActivationCodeRedeemResponse> {
+  const response = await request<ActivationCodeRedeemResponse>('/billing/activation-code/redeem', {
+    method: 'POST',
+    body: JSON.stringify({ code }),
+    token,
+    unauthorizedRecovery: 'guest',
+  });
+  clearUsageCache(token);
+  return response;
 }
 
 // ─── Upload ──────────────────────────────────────────────────────────────────

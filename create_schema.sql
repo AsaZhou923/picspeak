@@ -410,6 +410,48 @@ create index idx_billing_subscriptions_user_provider
 create index idx_billing_subscriptions_status_updated
     on billing_subscriptions (status asc, updated_at desc);
 
+create table billing_activation_codes
+(
+    id                  bigserial
+        primary key,
+    code_hash           text                                         not null,
+    code_prefix         text                                         not null,
+    duration_days       integer                  default 30          not null
+        constraint chk_billing_activation_codes_duration_days
+            check (duration_days > 0),
+    source              text                     default 'ifdian'::text not null,
+    batch_id            text,
+    note                text,
+    redeemed_by_user_id bigint
+        references users,
+    redeemed_at         timestamp with time zone,
+    expires_at          timestamp with time zone,
+    disabled_at         timestamp with time zone,
+    metadata_json       jsonb                    default '{}'::jsonb not null,
+    created_at          timestamp with time zone default now()       not null,
+    updated_at          timestamp with time zone default now()       not null,
+    constraint uq_billing_activation_codes_hash
+        unique (code_hash)
+);
+
+alter table billing_activation_codes
+    owner to pic;
+
+create index idx_billing_activation_codes_prefix
+    on billing_activation_codes (code_prefix asc);
+
+create index idx_billing_activation_codes_batch_created
+    on billing_activation_codes (batch_id asc, created_at desc);
+
+create index idx_billing_activation_codes_redeemed
+    on billing_activation_codes (redeemed_at desc);
+
+create trigger trg_billing_activation_codes_updated_at
+    before update
+    on billing_activation_codes
+    for each row
+execute procedure set_updated_at();
+
 create table billing_webhook_events
 (
     id             bigserial

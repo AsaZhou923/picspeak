@@ -282,6 +282,32 @@ class BillingSubscription(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
+class BillingActivationCode(Base):
+    __tablename__ = 'billing_activation_codes'
+    __table_args__ = (
+        UniqueConstraint('code_hash', name='uq_billing_activation_codes_hash'),
+        CheckConstraint('duration_days > 0', name='chk_billing_activation_codes_duration_days'),
+        Index('idx_billing_activation_codes_prefix', 'code_prefix'),
+        Index('idx_billing_activation_codes_batch_created', 'batch_id', 'created_at'),
+        Index('idx_billing_activation_codes_redeemed', 'redeemed_at'),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    code_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    code_prefix: Mapped[str] = mapped_column(Text, nullable=False)
+    duration_days: Mapped[int] = mapped_column(Integer, nullable=False, default=30, server_default='30')
+    source: Mapped[str] = mapped_column(Text, nullable=False, default='ifdian', server_default='ifdian')
+    batch_id: Mapped[str | None] = mapped_column(Text)
+    note: Mapped[str | None] = mapped_column(Text)
+    redeemed_by_user_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey('users.id'))
+    redeemed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    disabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    metadata_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
 class BillingWebhookEvent(Base):
     __tablename__ = 'billing_webhook_events'
     __table_args__ = (

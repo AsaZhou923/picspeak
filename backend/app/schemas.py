@@ -302,6 +302,7 @@ class UsageFeatures(BaseModel):
 
 
 class UsageSubscription(BaseModel):
+    provider: str | None = None
     status: str
     cancelled: bool = False
     renews_at: datetime | None = None
@@ -332,6 +333,18 @@ class BillingPortalResponse(BaseModel):
     status: str
     portal_url: str | None = None
     message: str
+
+
+class ActivationCodeRedeemRequest(BaseModel):
+    code: str = Field(min_length=6, max_length=128)
+
+
+class ActivationCodeRedeemResponse(BaseModel):
+    status: str
+    plan: str
+    provider: str
+    message: str
+    activated_until: datetime
 
 
 class AuthGoogleLoginRequest(BaseModel):

@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight, Settings2, Sparkles, Ticket } from 'lucide-react';
+import { useState } from 'react';
+import ActivationCodeModal from '@/components/billing/ActivationCodeModal';
 import { useAuth } from '@/lib/auth-context';
 import { useI18n } from '@/lib/i18n';
 import { CN_PRO_CHECKOUT_TIP, startProCheckout } from '@/lib/pro-checkout';
@@ -26,6 +27,8 @@ type LocalePromoCopy = {
   freeCta: string;
   proCta: string;
   proStatus: string;
+  activationCta: string;
+  activationRenewCta: string;
   scenes: Record<PromoScene, { default: SceneCopy; pro: SceneCopy }>;
 };
 
@@ -40,64 +43,66 @@ type ProPromoCardProps = {
 };
 
 function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
-  if (locale === 'ja') {
+  if (locale === 'zh') {
     return {
-      badge: '初回キャンペーン',
-      discount: 'サイト初期運営 25% OFF',
-      price: '$2.99 / 月',
-      oldPrice: '$3.99',
-      footnote: '現在はサイト立ち上げ初期の期間限定価格です。今後は通常価格に戻る可能性があります。',
-      features: ['より深い Pro 分析', 'レビュー回数ほぼ無制限', '履歴を長期保存', '優先分析キュー'],
-      guestCta: '初回価格で Pro を始める',
-      freeCta: '今すぐ Pro を始める',
-      proCta: '購読を管理',
-      proStatus: '現在の購読には Pro の初回価格が適用中です',
+      badge: '国内支付',
+      discount: '爱发电开通',
+      price: '30 天 Pro',
+      oldPrice: '激活码兑换',
+      footnote: CN_PRO_CHECKOUT_TIP,
+      features: ['更深入的 Pro 评图', '近乎不限量评图', '永久保留历史记录', '优先进入分析队列'],
+      guestCta: '前往爱发电开通',
+      freeCta: '购买 30 天 Pro',
+      proCta: '查看账户页',
+      proStatus: '你当前已是 Pro，可继续通过激活码续期。',
+      activationCta: '输入激活码',
+      activationRenewCta: '输入新激活码',
       scenes: {
         workspace: {
           default: {
-            title: 'アップロード後、そのまま Pro の深い分析へ',
-            body: 'より細かい原因分析と具体的な改善方向まで見たいなら、ここからそのまま Pro に進めます。現在は月額 $2.99 です。',
+            title: '中文用户可通过爱发电购买并开通 Pro',
+            body: '下单后我会把激活码发给你。你登录账号并输入激活码后，就能立即开通 30 天 Pro。',
           },
           pro: {
-            title: 'あなたの Pro は今も初回価格で利用中です',
-            body: '現在の購読は月額 $2.99 のまま継続中です。深い分析、長期履歴、優先分析キューをこのまま使い続けられます。',
+            title: '继续通过激活码续费你的 Pro',
+            body: '如果你已经在使用激活码 Pro，可以继续购买并输入新的激活码，把当前到期时间顺延 30 天。',
           },
         },
         gallery: {
           default: {
-            title: '作例を見たあと、そのまま自分の写真を Pro で深掘り',
-            body: 'ギャラリーで参考を見つけたら、次の一枚をより深く分析できます。現在の初回価格は月額 $2.99 です。',
+            title: '看完案例后，直接开通 Pro 深入评图',
+            body: '国内用户可直接走爱发电购买，收到激活码后在站内兑换即可。',
           },
           pro: {
-            title: 'あなたの Pro は現在も初回価格で継続中です',
-            body: '今の購読価格は月額 $2.99 のままです。無制限に近いレビュー、長期履歴、優先分析を引き続き利用できます。',
+            title: '你的 Pro 已开通，可继续用激活码续期',
+            body: '再次购买后输入新的激活码，就能把当前 Pro 到期时间继续顺延。',
           },
         },
         usage: {
           default: {
-            title: '今なら Pro は $2.99 / 月で始められます',
-            body: '深い分析、長期履歴、優先分析をまとめて解放できます。継続的に写真を見直すなら、ここからのアップグレードが最短です。',
+            title: '购买后输入激活码，立即开通 30 天 Pro',
+            body: '这条路径只面向中文用户，不影响现有国际订阅流。',
           },
           pro: {
-            title: 'あなたは Pro の初回価格をすでに確保しています',
-            body: '現在の購読は月額 $2.99 で適用中です。プラン状況や更新情報は購読管理からいつでも確認できます。',
+            title: '当前账号已是 Pro，可继续续期',
+            body: '通过新的激活码续期后，站内会立即刷新会员状态和到期时间。',
           },
         },
         review: {
           default: {
-            title: 'この結果から、そのまま Pro の深い分析へ進めます',
-            body: '次の改善までつなげたいなら、ここで Pro に切り替えるのが最短です。現在の初回価格は月額 $2.99 です。',
+            title: '这次评图想更深入，可以直接开通 Pro',
+            body: '下单后把收到的激活码填进弹窗里，当前账号就会立即升级为 Pro。',
           },
           pro: {
-            title: 'この結果は Pro でさらに深く見直せます',
-            body: '現在の購読は月額 $2.99 の初回価格で継続中です。深い分析、長期履歴、優先分析をそのまま使えます。',
+            title: '继续用激活码延长你的 Pro',
+            body: '兑换新的激活码后，当前 Pro 时长会继续顺延，无需跳去别的页面。',
           },
         },
       },
     };
   }
 
-  if (locale === 'en') {
+  if (locale === 'ja') {
     return {
       badge: 'Launch Offer',
       discount: '25% off during early launch',
@@ -109,45 +114,47 @@ function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
       freeCta: 'Upgrade to Pro now',
       proCta: 'Manage subscription',
       proStatus: 'Your subscription is already on the launch-price Pro plan',
+      activationCta: '',
+      activationRenewCta: '',
       scenes: {
         workspace: {
           default: {
             title: 'Go straight from upload to deeper Pro critique',
-            body: 'If you want fuller diagnosis and clearer next-step direction, you can switch into Pro right here. The current launch price is $2.99/month.',
+            body: 'If you want fuller diagnosis and clearer next-step direction, you can switch into Pro right here.',
           },
           pro: {
             title: 'Your Pro plan is still active at the launch price',
-            body: 'Your current subscription is still billed at $2.99/month. You can keep using deeper critique, permanent history, and priority processing as usual.',
+            body: 'Your current subscription keeps permanent history and priority processing active as usual.',
           },
         },
         gallery: {
           default: {
             title: 'See a strong example, then deepen your own photo with Pro',
-            body: 'Use the gallery for reference, then move straight into deeper critique on your next upload. The current launch price is $2.99/month.',
+            body: 'Use the gallery for reference, then move straight into deeper critique on your next upload.',
           },
           pro: {
-            title: 'Your Pro plan is still locked in at the launch price',
-            body: 'Your subscription is currently billed at $2.99/month. Unlimited-style review flow, permanent history, and priority processing remain available.',
+            title: 'Your Pro plan is still locked in',
+            body: 'Unlimited-style review flow, permanent history, and priority processing remain available.',
           },
         },
         usage: {
           default: {
             title: 'Pro is currently available for $2.99/month',
-            body: 'Unlock deeper critique, permanent history, and priority processing in one step. If you review often, this is the shortest upgrade path.',
+            body: 'Unlock deeper critique, permanent history, and priority processing in one step.',
           },
           pro: {
             title: 'You have already locked in the Pro launch price',
-            body: 'Your subscription is currently active at $2.99/month. You can check plan status, billing, and renewal details anytime from subscription management.',
+            body: 'You can check plan status, billing, and renewal details anytime from subscription management.',
           },
         },
         review: {
           default: {
             title: 'Take this result one step further with Pro',
-            body: 'If you want a deeper breakdown and clearer improvement direction from this critique, upgrading here is the fastest path. The current launch price is $2.99/month.',
+            body: 'If you want a deeper breakdown and clearer improvement direction from this critique, upgrading here is the fastest path.',
           },
           pro: {
             title: 'This result can still be explored more deeply with Pro',
-            body: 'Your current subscription is already on the $2.99/month launch price, so you can keep using deeper critique, permanent history, and priority processing.',
+            body: 'Your current subscription remains active, so you can keep using deeper critique and permanent history.',
           },
         },
       },
@@ -155,55 +162,57 @@ function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
   }
 
   return {
-    badge: '首发优惠',
-    discount: '网站运营初期 25% OFF',
-    price: '$2.99 / 月',
+    badge: 'Launch Offer',
+    discount: '25% off during early launch',
+    price: '$2.99 / month',
     oldPrice: '$3.99',
-    footnote: '当前为网站运营初期限时价，后续可能恢复原价。',
-    features: ['更深入的 Pro 评图', '近乎不限量评图', '永久历史记录', '优先分析队列'],
-    guestCta: '领取 Pro 首发价',
-    freeCta: '立即升级 Pro',
-    proCta: '管理订阅',
-    proStatus: '你当前订阅已享受 Pro 首发优惠价',
+    footnote: 'This is the current launch-period price and may return to the regular rate later.',
+    features: ['Deeper Pro critique', 'Near-unlimited reviews', 'Permanent history', 'Priority queue'],
+    guestCta: 'Claim the launch price',
+    freeCta: 'Upgrade to Pro now',
+    proCta: 'Manage subscription',
+    proStatus: 'Your subscription is already on the launch-price Pro plan',
+    activationCta: '',
+    activationRenewCta: '',
     scenes: {
       workspace: {
         default: {
-          title: '上传之后，直接进入 Pro 深度分析',
-          body: '如果你想马上看到更完整的拆解、问题优先级和修改方向，现在就可以直接升级到 Pro。当前首发优惠价为 $2.99/月。',
+          title: 'Go straight from upload to deeper Pro critique',
+          body: 'If you want fuller diagnosis and clearer next-step direction, you can switch into Pro right here.',
         },
         pro: {
-          title: '你的 Pro 当前仍在享受首发优惠价',
-          body: '当前订阅仍按 $2.99/月生效，你可以继续使用更深入的分析、永久历史记录和优先分析队列。',
+          title: 'Your Pro plan is still active at the launch price',
+          body: 'Your current subscription is still billed at the launch price and keeps deeper critique available.',
         },
       },
       gallery: {
         default: {
-          title: '看完案例，下一张直接用 Pro 深挖',
-          body: '从影像长廊找到参考后，可以直接切到更深入的评图流程。当前网站运营初期，Pro 首发优惠价为 $2.99/月。',
+          title: 'See a strong example, then deepen your own photo with Pro',
+          body: 'Use the gallery for reference, then move straight into deeper critique on your next upload.',
         },
         pro: {
-          title: '你的 Pro 当前仍按首发优惠价生效',
-          body: '当前订阅价格为 $2.99/月，你可以继续使用更深入的分析、永久历史记录和优先分析队列。',
+          title: 'Your Pro plan is still locked in at the launch price',
+          body: 'Unlimited-style review flow, permanent history, and priority processing remain available.',
         },
       },
       usage: {
         default: {
-          title: '现在升级 Pro，首发期仅 $2.99/月',
-          body: '更深入的分析、永久历史记录和优先分析都已包含在内，适合高频复盘和持续提升。',
+          title: 'Pro is currently available for $2.99/month',
+          body: 'Unlock deeper critique, permanent history, and priority processing in one step.',
         },
         pro: {
-          title: '你已锁定 Pro 首发优惠价',
-          body: '当前订阅仍按 $2.99/月生效。你可以在订阅管理中随时查看套餐状态、账单和续费信息。',
+          title: 'You have already locked in the Pro launch price',
+          body: 'You can check plan status, billing, and renewal details anytime from subscription management.',
         },
       },
       review: {
         default: {
-          title: '这张照片值得一次更深入的 Pro 分析',
-          body: '如果你想把这次结果真正转成下一轮提升，Pro 会给你更完整的拆解和更清晰的修改方向。当前首发优惠价为 $2.99/月。',
+          title: 'Take this result one step further with Pro',
+          body: 'If you want a deeper breakdown and clearer improvement direction from this critique, upgrading here is the fastest path.',
         },
         pro: {
-          title: '这张结果可以继续用 Pro 深挖',
-          body: '你当前已享受 $2.99/月首发优惠价，可以继续使用更深入的分析、永久历史记录和优先分析队列。',
+          title: 'This result can still be explored more deeply with Pro',
+          body: 'Your current subscription is active, so you can keep using deeper critique and permanent history.',
         },
       },
     },
@@ -222,6 +231,7 @@ export default function ProPromoCard({
   const { ensureToken } = useAuth();
   const { locale, t } = useI18n();
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [activationOpen, setActivationOpen] = useState(false);
   const copy = getPromoCopy(locale);
   const sceneCopy = copy.scenes[scene][plan === 'pro' ? 'pro' : 'default'];
   const resolvedTitle = title ?? sceneCopy.title;
@@ -234,7 +244,7 @@ export default function ProPromoCard({
 
     setCheckoutLoading(true);
     try {
-      await startProCheckout(ensureToken);
+      await startProCheckout(ensureToken, locale);
     } catch {
       window.alert(t('usage_checkout_unavailable'));
     } finally {
@@ -295,6 +305,15 @@ export default function ProPromoCard({
                 {copy.proCta}
                 <ArrowRight size={14} />
               </Link>
+              {locale === 'zh' && (
+                <button
+                  type="button"
+                  onClick={() => setActivationOpen(true)}
+                  className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm font-medium text-ink transition-colors hover:border-gold/30 hover:text-gold"
+                >
+                  {copy.activationRenewCta}
+                </button>
+              )}
             </>
           ) : (
             <div className="mt-5">
@@ -309,6 +328,15 @@ export default function ProPromoCard({
                 <ArrowRight size={14} />
               </button>
               {locale === 'zh' && (
+                <button
+                  type="button"
+                  onClick={() => setActivationOpen(true)}
+                  className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm font-medium text-ink transition-colors hover:border-gold/30 hover:text-gold"
+                >
+                  {copy.activationCta}
+                </button>
+              )}
+              {locale === 'zh' && (
                 <p className="mt-3 text-xs leading-6 text-ink-subtle">
                   {CN_PRO_CHECKOUT_TIP}
                 </p>
@@ -317,6 +345,8 @@ export default function ProPromoCard({
           )}
         </div>
       </div>
+
+      <ActivationCodeModal open={activationOpen} onClose={() => setActivationOpen(false)} />
     </section>
   );
 }

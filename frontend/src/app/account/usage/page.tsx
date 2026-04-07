@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AlertCircle, ArrowRight, Mail, X } from 'lucide-react';
+import ActivationCodeModal from '@/components/billing/ActivationCodeModal';
 import { createBillingCheckout, getBillingPortal, getUsage } from '@/lib/api';
 import ClerkSignInTrigger from '@/components/auth/ClerkSignInTrigger';
 import ProPromoCard from '@/components/marketing/ProPromoCard';
@@ -13,7 +14,7 @@ import { BillingCheckoutResponse, BillingPortalResponse, UsageResponse } from '@
 import { SkeletonBlock } from '@/components/ui/LoadingSpinner';
 import { useI18n } from '@/lib/i18n';
 import { formatUserFacingError } from '@/lib/error-utils';
-import { CN_PRO_CHECKOUT_TIP } from '@/lib/pro-checkout';
+import { CN_PRO_CHECKOUT_TIP, openChinaProPurchase } from '@/lib/pro-checkout';
 
 function UsageBar({
   label,
@@ -56,6 +57,7 @@ export default function UsagePage() {
   const [billingModalOpen, setBillingModalOpen] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
+  const [activationModalOpen, setActivationModalOpen] = useState(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('checkout') === 'success') {
@@ -85,6 +87,11 @@ export default function UsagePage() {
   }, [ensureToken, syncPlan, userInfo?.access_token, t]);
 
   async function handleCheckout() {
+    if (locale === 'zh') {
+      openChinaProPurchase();
+      return;
+    }
+
     setCheckoutLoading(true);
     setBillingMessage('');
     try {
@@ -102,6 +109,13 @@ export default function UsagePage() {
     } finally {
       setCheckoutLoading(false);
     }
+  }
+
+  async function refreshUsage(token: string) {
+    const data = await getUsage(token, { force: true });
+    syncPlan(data.plan);
+    setUsage(data);
+    return data;
   }
 
   async function handleManageSubscription() {
@@ -132,7 +146,9 @@ export default function UsagePage() {
         : `${usage?.features.history_retention_days} ${t('usage_history_days')}`;
   const reviewModesText =
     usage?.features.review_modes.includes('pro') ? t('plan_free_feature') : t('plan_guest_feature');
-  const subscriptionEndText = formatSubscriptionDate(usage?.subscription?.current_period_ends_at, locale) ?? subscriptionCopy[locale].pending;
+  const subscriptionEndText = formatSubscriptionDate(usage?.subscription?.current_period_ends_at, locale) ?? fixedSubscriptionCopy[locale].pending;
+  const isZhLocale = locale === 'zh';
+  const isActivationCodeSubscription = usage?.subscription?.provider === 'activation_code';
 
   return (
     <div className="pt-14 min-h-screen">
@@ -170,10 +186,13 @@ export default function UsagePage() {
                   )}
                   {usage.plan === 'pro' && (
                     <div className="mt-3 space-y-1">
-                      <p className="text-xs text-ink-muted">{subscriptionCopy[locale].label}</p>
+                      <p className="text-xs text-ink-muted">{fixedSubscriptionCopy[locale].label}</p>
                       <p className="text-sm text-ink">{subscriptionEndText}</p>
+                      {isZhLocale && isActivationCodeSubscription && (
+                        <p className="text-xs text-gold/80">{activationUiCopy.zh.subscriptionHint}</p>
+                      )}
                       {usage.subscription?.cancelled && (
-                        <p className="text-xs text-gold/80">{subscriptionCopy[locale].cancelledHint}</p>
+                        <p className="text-xs text-gold/80">{fixedSubscriptionCopy[locale].cancelledHint}</p>
                       )}
                     </div>
                   )}
@@ -194,25 +213,40 @@ export default function UsagePage() {
                       disabled={checkoutLoading}
                       className="flex items-center gap-1.5 text-xs text-gold border border-gold/30 rounded px-3 py-1.5 hover:bg-gold/10 transition-colors disabled:opacity-60"
                     >
-                      {checkoutLoading ? t('usage_checkout_loading') : t('usage_checkout_pro')}
+                      {checkoutLoading
+                        ? t('usage_checkout_loading')
+                        : isZhLocale
+                          ? activationUiCopy.zh.purchaseCta
+                          : t('usage_checkout_pro')}
                       <ArrowRight size={11} />
                     </button>
-                    {locale === 'zh' && (
+                    {isZhLocale && (
                       <p className="max-w-[240px] text-right text-[11px] leading-5 text-ink-subtle">
                         {CN_PRO_CHECKOUT_TIP}
                       </p>
                     )}
                   </div>
                 ) : usage.plan === 'pro' ? (
-                  <button
-                    type="button"
-                    onClick={handleManageSubscription}
-                    disabled={portalLoading}
-                    className="flex items-center gap-1.5 text-xs text-gold border border-gold/30 rounded px-3 py-1.5 hover:bg-gold/10 transition-colors disabled:opacity-60"
-                  >
-                    {portalLoading ? t('usage_manage_loading') : t('usage_manage_subscription')}
-                    <ArrowRight size={11} />
-                  </button>
+                  isZhLocale && isActivationCodeSubscription ? (
+                    <button
+                      type="button"
+                      onClick={handleCheckout}
+                      className="flex items-center gap-1.5 text-xs text-gold border border-gold/30 rounded px-3 py-1.5 hover:bg-gold/10 transition-colors"
+                    >
+                      {activationUiCopy.zh.renewCta}
+                      <ArrowRight size={11} />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleManageSubscription}
+                      disabled={portalLoading}
+                      className="flex items-center gap-1.5 text-xs text-gold border border-gold/30 rounded px-3 py-1.5 hover:bg-gold/10 transition-colors disabled:opacity-60"
+                    >
+                      {portalLoading ? t('usage_manage_loading') : t('usage_manage_subscription')}
+                      <ArrowRight size={11} />
+                    </button>
+                  )
                 ) : null}
               </div>
             </div>
@@ -309,6 +343,61 @@ export default function UsagePage() {
                 </ClerkSignInTrigger>
               </div>
             )}
+
+            {isZhLocale && (
+              <div
+                id="activation-code"
+                className="border border-gold/15 rounded-lg bg-gold/5 p-5 space-y-4"
+              >
+                <div className="space-y-2">
+                  <p className="text-sm text-gold font-medium">{activationUiCopy.zh.title}</p>
+                  <p className="text-xs text-ink-muted leading-relaxed">{activationUiCopy.zh.body}</p>
+                </div>
+                <div className="grid gap-2 text-xs text-ink-muted sm:grid-cols-3">
+                  <div className="rounded-md border border-border-subtle px-3 py-3">
+                    1. {activationUiCopy.zh.stepBuy}
+                  </div>
+                  <div className="rounded-md border border-border-subtle px-3 py-3">
+                    2. {activationUiCopy.zh.stepReceive}
+                  </div>
+                  <div className="rounded-md border border-border-subtle px-3 py-3">
+                    3. {activationUiCopy.zh.stepRedeem}
+                  </div>
+                </div>
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <button
+                    type="button"
+                    onClick={handleCheckout}
+                    className="inline-flex items-center justify-center gap-2 rounded-full bg-gold px-5 py-3 text-sm font-medium text-void transition-colors hover:bg-gold-light"
+                  >
+                    {usage.plan === 'pro' && isActivationCodeSubscription
+                      ? activationUiCopy.zh.renewCta
+                      : activationUiCopy.zh.purchaseCta}
+                    <ArrowRight size={14} />
+                  </button>
+                  {usage.plan === 'guest' ? (
+                    <ClerkSignInTrigger
+                      className="inline-flex items-center justify-center gap-2 rounded-full border border-gold/30 px-5 py-3 text-sm font-medium text-gold transition-colors hover:bg-gold/10"
+                      signedInClassName="inline-flex items-center justify-center gap-2 rounded-full border border-gold/30 px-5 py-3 text-sm font-medium text-gold transition-colors hover:bg-gold/10"
+                    >
+                      {activationUiCopy.zh.signInFirst}
+                      <ArrowRight size={14} />
+                    </ClerkSignInTrigger>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActivationModalOpen(true);
+                      }}
+                      className="inline-flex items-center justify-center gap-2 rounded-full border border-gold/30 px-5 py-3 text-sm font-medium text-gold transition-colors hover:bg-gold/10"
+                    >
+                      {activationUiCopy.zh.redeemCta}
+                    </button>
+                  )}
+                </div>
+                <p className="text-[11px] leading-5 text-ink-subtle">{CN_PRO_CHECKOUT_TIP}</p>
+              </div>
+            )}
           </div>
         ) : null}
         {usage && (
@@ -329,6 +418,15 @@ export default function UsagePage() {
           </Link>
         </div>
       </div>
+
+      <ActivationCodeModal
+        open={activationModalOpen}
+        onClose={() => setActivationModalOpen(false)}
+        onRedeemed={async () => {
+          const token = await ensureToken();
+          await refreshUsage(token);
+        }}
+      />
 
       {billingModalOpen && (
         <div
@@ -411,6 +509,56 @@ const subscriptionCopy = {
     label: 'Pro の終了日時',
     pending: '同期中',
     cancelledHint: '自動更新は停止済みで、期間終了後にダウングレードされます。',
+  },
+} as const;
+
+const fixedSubscriptionCopy = {
+  zh: {
+    label: 'Pro 到期时间',
+    pending: '等待同步',
+    cancelledHint: '已关闭自动续费，到期后将降级。',
+  },
+  en: {
+    label: 'Pro expires on',
+    pending: 'Syncing…',
+    cancelledHint: 'Auto-renew is off and the plan will downgrade at the end of the term.',
+  },
+  ja: {
+    label: 'Pro の終了日時',
+    pending: '同期中',
+    cancelledHint: '自動更新は停止中で、期間終了後にダウングレードされます。',
+  },
+} as const;
+
+const activationUiCopy = {
+  zh: {
+    title: '国内支付与激活码开通',
+    body: '中文用户可通过爱发电购买 30 天 Pro。我会在下单后发送激活码，你登录账号后输入激活码即可立即开通或续期。',
+    stepBuy: '前往爱发电完成下单',
+    stepReceive: '等待我发送激活码',
+    stepRedeem: '登录账号后输入激活码',
+    purchaseCta: '前往爱发电开通',
+    renewCta: '续费 30 天 Pro',
+    redeemCta: '输入激活码',
+    signInFirst: '先登录再兑换',
+    subscriptionHint: '当前账号通过激活码开通，无自动续费。',
+    modalEyebrow: 'Activation',
+    modalTitle: '兑换激活码',
+    modalBody: '请输入我发送给你的激活码。兑换成功后，当前账号会立即获得或延长 30 天 Pro 会员。',
+    codeLabel: '激活码',
+    codePlaceholder: '例如 PSCN-ABCD-EFGH-JKLM',
+    redeemSubmit: '立即兑换',
+    redeeming: '正在兑换…',
+    close: '关闭',
+    success: '兑换成功，Pro 已开通至 {date}。',
+    error: '暂时无法兑换激活码，请稍后再试。',
+    pending: '已开通',
+  },
+  en: {
+    pending: 'Activated',
+  },
+  ja: {
+    pending: '有効化済み',
   },
 } as const;
 

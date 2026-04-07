@@ -14,6 +14,7 @@ def ensure_runtime_schema() -> None:
     Base.metadata.create_all(
         bind=engine,
         tables=[
+            models.BillingActivationCode.__table__,
             models.BillingSubscription.__table__,
             models.BillingWebhookEvent.__table__,
             models.ReviewLike.__table__,

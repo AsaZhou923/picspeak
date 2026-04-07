@@ -1,9 +1,31 @@
 import { createBillingCheckout } from './api';
+import { Locale } from './i18n';
 
 export const CN_PRO_CHECKOUT_TIP =
-  'Tips：当前暂未接入国内支付渠道，国内用户可添加微信 Asa-180 购买，另有优惠价。';
+  '国内用户可前往爱发电下单；下单后请输入我发送的激活码，即可开通 30 天 Pro 会员。';
 
-export async function startProCheckout(ensureToken: () => Promise<string>): Promise<void> {
+export const CN_PRO_PAYMENT_URL = 'https://www.ifdian.net/item/3c9d0270327011f19cb452540025c377';
+
+export function openChinaProPurchase(): void {
+  const link = document.createElement('a');
+  link.href = CN_PRO_PAYMENT_URL;
+  link.target = '_blank';
+  link.rel = 'noopener noreferrer';
+  link.style.display = 'none';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+export async function startProCheckout(
+  ensureToken: () => Promise<string>,
+  locale?: Locale
+): Promise<void> {
+  if (locale === 'zh') {
+    openChinaProPurchase();
+    return;
+  }
+
   const token = await ensureToken();
   const response = await createBillingCheckout(token, 'pro');
 

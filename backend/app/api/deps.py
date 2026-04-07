@@ -12,6 +12,7 @@ from app.core.errors import api_error
 from app.core.security import JWTValidationError, create_access_token, validate_access_token
 from app.db.models import User, UserPlan, UserStatus
 from app.db.session import get_db
+from app.services.billing_access import sync_user_billing_plan
 from app.services.guard import daily_quota_for_plan, enforce_guest_api_rate_limit, guest_rate_limit_scope_key
 
 GUEST_TOKEN_COOKIE = 'ps_guest_token'
@@ -131,6 +132,7 @@ def get_current_actor(
 
     if token:
         user = _fetch_user_by_token(token, db)
+        sync_user_billing_plan(db, user)
         request.state.current_user_public_id = user.public_id
         actor = CurrentActor(user)
         enforce_guest_api_rate_limit(db, actor, endpoint, guest_rate_limit_scope_key(request, user))

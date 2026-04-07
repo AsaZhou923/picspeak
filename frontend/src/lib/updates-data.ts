@@ -18,6 +18,40 @@ export function getProductUpdates(locale: UpdateLocale): ProductUpdateEntry[] {
   if (locale === 'ja') {
     return [
       {
+        id: '2026-04-07-activation-code-billing',
+        date: '2026-04-07',
+        title: 'アクティベーションコード開通と中国向け購入導線を追加',
+        summary:
+          '中国語ユーザー向けに愛発電とアクティベーションコードによる Pro 開通フローを追加し、期限同期と失効時のプラン反映も補強しました。',
+        docPath: 'docs/changelog/update-log-2026-04-07-activation-code-billing.md',
+        sections: [
+          {
+            title: 'アクティベーションコード基盤',
+            items: [
+              'アクティベーションコード用テーブル、redeem API、30 日 Pro 付与ロジックを追加',
+              '有効期限が残っている手動 Pro は、その末尾に 30 日を加算して延長',
+              '認証時と webhook 時で同じ購読判定を使い、期限切れプランを正しく free / guest に戻すようにした',
+            ],
+          },
+          {
+            title: '中国語向け購入とアカウント表示',
+            items: [
+              '中国語環境の購入ボタンを愛発電導線に切り替え、購入後はサイト内でコードを入力して開通できるようにした',
+              '利用状況ページにアクティベーションコード案内、入力モーダル、無自動更新の表示を追加',
+              'アクティベーションコード由来の Pro では、購読管理の代わりに更新導線を表示',
+            ],
+          },
+          {
+            title: 'ページ導線と補足整備',
+            items: [
+              'ホーム定価区、Pro 訴求カード、レビュー詳細、利用状況ページにコード入力導線を追加',
+              'アクティベーションコード生成スクリプトとバックエンドテストを追加',
+              'レビュー詳細の補助ロジックを別モジュールへ分離し、本番ビルドはメモリキャッシュを使用するように調整',
+            ],
+          },
+        ],
+      },
+      {
         id: '2026-04-01-audit-score-gallery-polish',
         date: '2026-04-01',
         title: '審査基準・スコア表現・ギャラリー表示を調整',
@@ -169,6 +203,40 @@ export function getProductUpdates(locale: UpdateLocale): ProductUpdateEntry[] {
   if (locale === 'en') {
     return [
       {
+        id: '2026-04-07-activation-code-billing',
+        date: '2026-04-07',
+        title: 'Activation Codes and China Purchase Flow Added',
+        summary:
+          'Added an Afdian plus activation-code path for Chinese Pro purchases, tightened expiry-aware billing sync, and exposed redeem entry points across the home, review, promo, and account surfaces.',
+        docPath: 'docs/changelog/update-log-2026-04-07-activation-code-billing.md',
+        sections: [
+          {
+            title: 'Activation-Code Billing',
+            items: [
+              'Added the activation-code table, redeem API, and 30-day Pro grant flow',
+              'Redeeming on an already active manual Pro term now extends from the current expiry instead of overwriting it',
+              'Auth-time and webhook-time plan sync now share the same access rules so expired paid plans fall back correctly',
+            ],
+          },
+          {
+            title: 'Chinese Purchase and Account UX',
+            items: [
+              'Chinese checkout buttons now open the Afdian purchase page and guide users back to redeem in-app',
+              'The usage page now includes an activation-code explainer, redeem modal, and no-auto-renew messaging',
+              'Activation-code subscriptions surface renewal entry points instead of the regular billing portal flow',
+            ],
+          },
+          {
+            title: 'Entry Points and Engineering',
+            items: [
+              'Added redeem CTAs to the home pricing block, shared Pro promo card, review detail, and usage page',
+              'Added an activation-code generation script plus backend test coverage',
+              'Moved review-page helper copy into its own module and switched production webpack caching to memory',
+            ],
+          },
+        ],
+      },
+      {
         id: '2026-04-01-audit-score-gallery-polish',
         date: '2026-04-01',
         title: 'Moderation, Score Labels, and Gallery Cards Refined',
@@ -318,6 +386,40 @@ export function getProductUpdates(locale: UpdateLocale): ProductUpdateEntry[] {
   }
 
   return [
+    {
+      id: '2026-04-07-activation-code-billing',
+      date: '2026-04-07',
+      title: '激活码开通、国内支付入口与 Pro 同步补齐',
+      summary:
+        '为中文用户补上爱发电购买加激活码开通链路，后台同步完善订阅到期回落逻辑，并把兑换入口接到首页、评图页、营销卡片和账户页。',
+      docPath: 'docs/changelog/update-log-2026-04-07-activation-code-billing.md',
+      sections: [
+        {
+          title: '激活码订阅链路',
+          items: [
+            '新增激活码表、兑换接口和 30 天 Pro 开通逻辑',
+            '已有激活码 Pro 未到期时，新兑换会从当前到期时间继续顺延',
+            '鉴权请求与 webhook 现在共用同一套订阅判断，过期会员会正确降回 free 或 guest',
+          ],
+        },
+        {
+          title: '中文购买与账户页',
+          items: [
+            '中文环境购买按钮改为前往爱发电，下单后回站内输入激活码开通',
+            '额度页新增激活码说明区、兑换弹窗和无自动续费提示',
+            '激活码来源的 Pro 不再显示订阅管理，而是展示续费入口和到期时间',
+          ],
+        },
+        {
+          title: '入口与工程补充',
+          items: [
+            '首页定价区、Pro 转化卡、评图详情和额度页都补上“输入激活码”入口',
+            '新增激活码生成脚本和后端测试覆盖',
+            '评图详情辅助逻辑抽到独立模块，生产构建切换为内存缓存',
+          ],
+        },
+      ],
+    },
     {
       id: '2026-04-01-audit-score-gallery-polish',
       date: '2026-04-01',

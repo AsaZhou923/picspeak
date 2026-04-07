@@ -32,6 +32,7 @@ export interface UsageResponse {
     priority_queue: boolean;
   };
   subscription: {
+    provider: string | null;
     status: string;
     cancelled: boolean;
     renews_at: string | null;
@@ -56,6 +57,14 @@ export interface BillingPortalResponse {
   status: string;
   portal_url: string | null;
   message: string;
+}
+
+export interface ActivationCodeRedeemResponse {
+  status: string;
+  plan: 'guest' | 'free' | 'pro';
+  provider: string;
+  message: string;
+  activated_until: string;
 }
 
 // ─── Upload ──────────────────────────────────────────────────────────────────

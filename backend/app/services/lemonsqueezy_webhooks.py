@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.errors import api_error
 from app.db.models import BillingSubscription, BillingWebhookEvent, User, UserPlan
+from app.services.billing_access import subscription_grants_pro_access, sync_user_billing_plan
 from app.services.lemonsqueezy import (
     LemonSqueezyAPIError,
     LemonSqueezyConfigurationError,
@@ -259,30 +260,11 @@ def _variant_matches_pro_plan(variant_id: str | None) -> bool:
 
 
 def _subscription_grants_pro_access(subscription: BillingSubscription, *, now: datetime | None = None) -> bool:
-    current = now or _utc_now()
-    status = (subscription.status or '').strip().lower()
-    if status in {'active', 'on_trial'}:
-        return True
-    if status == 'cancelled' and subscription.ends_at and subscription.ends_at > current:
-        return True
-    return False
+    return subscription_grants_pro_access(subscription, now=now)
 
 
 def _sync_user_plan(db: Session, user: User) -> None:
-    active_subscription = None
-    for item in (
-        db.query(BillingSubscription)
-        .filter(BillingSubscription.user_id == user.id, BillingSubscription.provider == 'lemonsqueezy')
-        .order_by(BillingSubscription.updated_at.desc(), BillingSubscription.id.desc())
-    ):
-        if _subscription_grants_pro_access(item):
-            active_subscription = item
-            break
-
-    target_plan = UserPlan.pro if active_subscription is not None else UserPlan.free
-    if user.plan != target_plan:
-        user.plan = target_plan
-    db.add(user)
+    sync_user_billing_plan(db, user)
 
 
 def _upsert_subscription_from_resource(

@@ -58,6 +58,8 @@ from app.db.models import (
 )
 from app.db.session import SessionLocal, get_db
 from app.schemas import (
+    ActivationCodeRedeemRequest,
+    ActivationCodeRedeemResponse,
     BillingCheckoutRequest,
     BillingCheckoutResponse,
     BillingPortalResponse,
@@ -92,6 +94,13 @@ from app.schemas import (
     GuestReviewMigrateResponse,
 )
 from app.services.ai import AIReviewError, run_ai_review
+from app.services.billing_access import (
+    ACTIVATION_CODE_PROVIDER,
+    active_subscription_for_user as resolve_active_subscription_for_user,
+    current_period_ends_at as resolve_current_period_ends_at,
+    redeem_activation_code_for_user,
+    subscription_grants_pro_access as billing_subscription_grants_pro_access,
+)
 from app.services.clerk_auth import ClerkIdentity, verify_clerk_session_token
 from app.services.clerk_webhooks import ClerkWebhookEvent, verify_clerk_webhook
 from app.services.content_audit import ContentAuditError, run_content_audit
@@ -2512,6 +2521,7 @@ def get_usage(request: Request, db: Session = Depends(get_db), actor: CurrentAct
         active_subscription = _active_subscription_for_user(db, actor.user)
         if active_subscription is not None:
             subscription = {
+                'provider': active_subscription.provider,
                 'status': active_subscription.status,
                 'cancelled': active_subscription.cancelled,
                 'renews_at': active_subscription.renews_at,
@@ -2601,31 +2611,15 @@ def _refresh_subscription_portal_urls(db: Session, subscription: BillingSubscrip
 
 
 def _subscription_grants_pro_access(subscription: BillingSubscription, *, now: datetime | None = None) -> bool:
-    current = now or datetime.now(timezone.utc)
-    status = (subscription.status or '').strip().lower()
-    if status in {'active', 'on_trial'}:
-        return True
-    if status == 'cancelled' and subscription.ends_at and subscription.ends_at > current:
-        return True
-    return False
+    return billing_subscription_grants_pro_access(subscription, now=now)
 
 
 def _current_period_ends_at(subscription: BillingSubscription) -> datetime | None:
-    status = (subscription.status or '').strip().lower()
-    if status == 'cancelled' and subscription.ends_at is not None:
-        return subscription.ends_at
-    return subscription.renews_at or subscription.ends_at or subscription.trial_ends_at
+    return resolve_current_period_ends_at(subscription)
 
 
 def _active_subscription_for_user(db: Session, user: User) -> BillingSubscription | None:
-    for item in (
-        db.query(BillingSubscription)
-        .filter(BillingSubscription.user_id == user.id, BillingSubscription.provider == 'lemonsqueezy')
-        .order_by(BillingSubscription.updated_at.desc(), BillingSubscription.id.desc())
-    ):
-        if _subscription_grants_pro_access(item):
-            return item
-    return None
+    return resolve_active_subscription_for_user(db, user)
 
 
 def _best_subscription_for_portal(subscriptions: list[BillingSubscription]) -> BillingSubscription | None:
@@ -2676,6 +2670,32 @@ def create_billing_checkout(
         plan=payload.plan,
         message='Checkout created successfully.',
         checkout_url=checkout.checkout_url,
+    )
+
+
+@router.post('/billing/activation-code/redeem', response_model=ActivationCodeRedeemResponse)
+def redeem_activation_code(
+    payload: ActivationCodeRedeemRequest,
+    db: Session = Depends(get_db),
+    actor: CurrentActor = Depends(get_current_actor),
+):
+    if actor.plan == UserPlan.guest:
+        raise api_error(status.HTTP_403_FORBIDDEN, 'BILLING_SIGNIN_REQUIRED', 'Please sign in before redeeming an activation code')
+
+    _, subscription = redeem_activation_code_for_user(db, user=actor.user, raw_code=payload.code)
+    db.commit()
+    db.refresh(actor.user)
+    db.refresh(subscription)
+    activated_until = resolve_current_period_ends_at(subscription)
+    if activated_until is None:
+        raise api_error(status.HTTP_500_INTERNAL_SERVER_ERROR, 'ACTIVATION_CODE_STATE_INVALID', 'Activation did not produce an expiry time')
+
+    return ActivationCodeRedeemResponse(
+        status='activated',
+        plan=actor.user.plan.value,
+        provider=subscription.provider,
+        message='Activation code redeemed successfully.',
+        activated_until=activated_until,
     )
 
 
