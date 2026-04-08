@@ -6,7 +6,7 @@ import { useState } from 'react';
 import ActivationCodeModal from '@/components/billing/ActivationCodeModal';
 import { useAuth } from '@/lib/auth-context';
 import { useI18n } from '@/lib/i18n';
-import { CN_PRO_CHECKOUT_TIP, startProCheckout } from '@/lib/pro-checkout';
+import { CN_PRO_CHECKOUT_TIP, openChinaProPurchase, startProCheckout } from '@/lib/pro-checkout';
 
 export type PromoPlan = 'guest' | 'free' | 'pro';
 export type PromoScene = 'workspace' | 'gallery' | 'usage' | 'review';
@@ -25,6 +25,8 @@ type LocalePromoCopy = {
   features: string[];
   guestCta: string;
   freeCta: string;
+  chinaCta: string;
+  chinaHint: string;
   proCta: string;
   proStatus: string;
   activationCta: string;
@@ -45,14 +47,16 @@ type ProPromoCardProps = {
 function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
   if (locale === 'zh') {
     return {
-      badge: '国内支付',
-      discount: '爱发电开通',
-      price: '30 天 Pro',
-      oldPrice: '激活码兑换',
+      badge: '首发促销',
+      discount: '网站运营初期 25% OFF',
+      price: '$2.99 / 月',
+      oldPrice: '$3.99',
       footnote: CN_PRO_CHECKOUT_TIP,
       features: ['更深入的 Pro 评图', '近乎不限量评图', '永久保留历史记录', '优先进入分析队列'],
-      guestCta: '前往爱发电开通',
-      freeCta: '购买 30 天 Pro',
+      guestCta: '使用 Lemon Squeezy 开通',
+      freeCta: '使用 Lemon Squeezy 开通',
+      chinaCta: '中文用户可选：前往爱发电开通',
+      chinaHint: '爱发电通常会有更多优惠，下单后用激活码开通。',
       proCta: '查看账户页',
       proStatus: '你当前已是 Pro，可继续通过激活码续期。',
       activationCta: '输入激活码',
@@ -60,42 +64,42 @@ function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
       scenes: {
         workspace: {
           default: {
-            title: '中文用户可通过爱发电购买并开通 Pro',
-            body: '下单后我会把激活码发给你。你登录账号并输入激活码后，就能立即开通 30 天 Pro。',
+            title: '主支付入口为 Lemon Squeezy，中文用户也可选爱发电',
+            body: '如果你想直接开通 Pro，可以先走 Lemon Squeezy；如果你在国内支付更方便，也可以选择爱发电，下单后再输入激活码。',
           },
           pro: {
             title: '继续通过激活码续费你的 Pro',
-            body: '如果你已经在使用激活码 Pro，可以继续购买并输入新的激活码，把当前到期时间顺延 30 天。',
+            body: '你已经是 Pro。再次购买后输入新的激活码，就能把当前到期时间继续顺延。',
           },
         },
         gallery: {
           default: {
             title: '看完案例后，直接开通 Pro 深入评图',
-            body: '国内用户可直接走爱发电购买，收到激活码后在站内兑换即可。',
+            body: '主支付入口还是 Lemon Squeezy。中文用户如果更在意优惠，也可以选择爱发电后再兑换激活码。',
           },
           pro: {
-            title: '你的 Pro 已开通，可继续用激活码续期',
-            body: '再次购买后输入新的激活码，就能把当前 Pro 到期时间继续顺延。',
+            title: '你的 Pro 已开通，可继续续期',
+            body: '如果你继续购买中文优惠通道，输入新激活码即可顺延当前 Pro 时长。',
           },
         },
         usage: {
           default: {
-            title: '购买后输入激活码，立即开通 30 天 Pro',
-            body: '这条路径只面向中文用户，不影响现有国际订阅流。',
+            title: '优先使用 Lemon Squeezy，也支持中文优惠通道',
+            body: '默认支付入口仍是 Lemon Squeezy。中文用户可额外选择爱发电，通常会有更多优惠。',
           },
           pro: {
             title: '当前账号已是 Pro，可继续续期',
-            body: '通过新的激活码续期后，站内会立即刷新会员状态和到期时间。',
+            body: '你可以继续用 Lemon Squeezy 管理订阅，或使用中文优惠通道购买后输入激活码续期。',
           },
         },
         review: {
           default: {
             title: '这次评图想更深入，可以直接开通 Pro',
-            body: '下单后把收到的激活码填进弹窗里，当前账号就会立即升级为 Pro。',
+            body: '主支付入口仍是 Lemon Squeezy；如果你是中文用户，也可以走爱发电优惠通道，收到激活码后在站内兑换。',
           },
           pro: {
-            title: '继续用激活码延长你的 Pro',
-            body: '兑换新的激活码后，当前 Pro 时长会继续顺延，无需跳去别的页面。',
+            title: '继续延长你的 Pro 时长',
+            body: '再次购买后输入新的激活码，就能把当前 Pro 时长继续顺延。',
           },
         },
       },
@@ -112,6 +116,8 @@ function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
       features: ['Deeper Pro critique', 'Near-unlimited reviews', 'Permanent history', 'Priority queue'],
       guestCta: 'Claim the launch price',
       freeCta: 'Upgrade to Pro now',
+      chinaCta: '',
+      chinaHint: '',
       proCta: 'Manage subscription',
       proStatus: 'Your subscription is already on the launch-price Pro plan',
       activationCta: '',
@@ -170,6 +176,8 @@ function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
     features: ['Deeper Pro critique', 'Near-unlimited reviews', 'Permanent history', 'Priority queue'],
     guestCta: 'Claim the launch price',
     freeCta: 'Upgrade to Pro now',
+    chinaCta: '',
+    chinaHint: '',
     proCta: 'Manage subscription',
     proStatus: 'Your subscription is already on the launch-price Pro plan',
     activationCta: '',
@@ -225,12 +233,12 @@ export default function ProPromoCard({
   title,
   body,
   ctaHref = '/account/usage',
-  fallbackRedirectUrl = '/workspace',
   className = '',
 }: ProPromoCardProps) {
   const { ensureToken } = useAuth();
   const { locale, t } = useI18n();
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [chinaCheckoutLoading, setChinaCheckoutLoading] = useState(false);
   const [activationOpen, setActivationOpen] = useState(false);
   const copy = getPromoCopy(locale);
   const sceneCopy = copy.scenes[scene][plan === 'pro' ? 'pro' : 'default'];
@@ -249,6 +257,19 @@ export default function ProPromoCard({
       window.alert(t('usage_checkout_unavailable'));
     } finally {
       setCheckoutLoading(false);
+    }
+  }
+
+  function handleChinaCheckout() {
+    if (chinaCheckoutLoading) {
+      return;
+    }
+
+    setChinaCheckoutLoading(true);
+    try {
+      openChinaProPurchase();
+    } finally {
+      setChinaCheckoutLoading(false);
     }
   }
 
@@ -306,13 +327,25 @@ export default function ProPromoCard({
                 <ArrowRight size={14} />
               </Link>
               {locale === 'zh' && (
-                <button
-                  type="button"
-                  onClick={() => setActivationOpen(true)}
-                  className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm font-medium text-ink transition-colors hover:border-gold/30 hover:text-gold"
-                >
-                  {copy.activationRenewCta}
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={handleChinaCheckout}
+                    disabled={chinaCheckoutLoading}
+                    className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border border-gold/30 bg-gold/10 px-5 py-3 text-sm font-medium text-gold transition-colors hover:bg-gold/15 disabled:opacity-70"
+                  >
+                    {chinaCheckoutLoading ? '正在打开爱发电…' : copy.chinaCta}
+                    <ArrowRight size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActivationOpen(true)}
+                    className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm font-medium text-ink transition-colors hover:border-gold/30 hover:text-gold"
+                  >
+                    {copy.activationRenewCta}
+                  </button>
+                  <p className="mt-3 text-xs leading-6 text-ink-subtle">{copy.chinaHint}</p>
+                </>
               )}
             </>
           ) : (
@@ -328,18 +361,27 @@ export default function ProPromoCard({
                 <ArrowRight size={14} />
               </button>
               {locale === 'zh' && (
-                <button
-                  type="button"
-                  onClick={() => setActivationOpen(true)}
-                  className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm font-medium text-ink transition-colors hover:border-gold/30 hover:text-gold"
-                >
-                  {copy.activationCta}
-                </button>
-              )}
-              {locale === 'zh' && (
-                <p className="mt-3 text-xs leading-6 text-ink-subtle">
-                  {CN_PRO_CHECKOUT_TIP}
-                </p>
+                <>
+                  <button
+                    type="button"
+                    onClick={handleChinaCheckout}
+                    disabled={chinaCheckoutLoading}
+                    className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border border-gold/30 bg-gold/10 px-5 py-3 text-sm font-medium text-gold transition-colors hover:bg-gold/15 disabled:opacity-70"
+                  >
+                    {chinaCheckoutLoading ? '正在打开爱发电…' : copy.chinaCta}
+                    <ArrowRight size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActivationOpen(true)}
+                    className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm font-medium text-ink transition-colors hover:border-gold/30 hover:text-gold"
+                  >
+                    {copy.activationCta}
+                  </button>
+                  <p className="mt-3 text-xs leading-6 text-ink-subtle">
+                    {copy.chinaHint}
+                  </p>
+                </>
               )}
             </div>
           )}

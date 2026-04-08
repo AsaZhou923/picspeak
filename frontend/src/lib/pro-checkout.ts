@@ -2,7 +2,7 @@ import { createBillingCheckout } from './api';
 import { Locale } from './i18n';
 
 export const CN_PRO_CHECKOUT_TIP =
-  '国内用户可前往爱发电下单；下单后请输入我发送的激活码，即可开通 30 天 Pro 会员。';
+  '主支付入口仍为 Lemon Squeezy。中文用户也可以选择爱发电，通常会有更优惠的价格；下单后请输入我发送的激活码，即可开通 30 天 Pro。';
 
 export const CN_PRO_PAYMENT_URL = 'https://www.ifdian.net/item/3c9d0270327011f19cb452540025c377';
 
@@ -19,13 +19,8 @@ export function openChinaProPurchase(): void {
 
 export async function startProCheckout(
   ensureToken: () => Promise<string>,
-  locale?: Locale
+  _locale?: Locale
 ): Promise<void> {
-  if (locale === 'zh') {
-    openChinaProPurchase();
-    return;
-  }
-
   const token = await ensureToken();
   const response = await createBillingCheckout(token, 'pro');
 

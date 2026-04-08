@@ -87,11 +87,6 @@ export default function UsagePage() {
   }, [ensureToken, syncPlan, userInfo?.access_token, t]);
 
   async function handleCheckout() {
-    if (locale === 'zh') {
-      openChinaProPurchase();
-      return;
-    }
-
     setCheckoutLoading(true);
     setBillingMessage('');
     try {
@@ -215,27 +210,45 @@ export default function UsagePage() {
                     >
                       {checkoutLoading
                         ? t('usage_checkout_loading')
-                        : isZhLocale
-                          ? activationUiCopy.zh.purchaseCta
-                          : t('usage_checkout_pro')}
+                        : t('usage_checkout_pro')}
                       <ArrowRight size={11} />
                     </button>
                     {isZhLocale && (
-                      <p className="max-w-[240px] text-right text-[11px] leading-5 text-ink-subtle">
-                        {CN_PRO_CHECKOUT_TIP}
-                      </p>
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => openChinaProPurchase()}
+                          className="flex items-center gap-1.5 text-xs text-gold border border-gold/20 rounded px-3 py-1.5 hover:bg-gold/10 transition-colors"
+                        >
+                          中文用户可选：爱发电开通
+                          <ArrowRight size={11} />
+                        </button>
+                        <p className="max-w-[260px] text-right text-[11px] leading-5 text-ink-subtle">
+                          {CN_PRO_CHECKOUT_TIP}
+                        </p>
+                      </>
                     )}
                   </div>
                 ) : usage.plan === 'pro' ? (
                   isZhLocale && isActivationCodeSubscription ? (
-                    <button
-                      type="button"
-                      onClick={handleCheckout}
-                      className="flex items-center gap-1.5 text-xs text-gold border border-gold/30 rounded px-3 py-1.5 hover:bg-gold/10 transition-colors"
-                    >
-                      {activationUiCopy.zh.renewCta}
-                      <ArrowRight size={11} />
-                    </button>
+                    <div className="flex flex-col items-end gap-2">
+                      <button
+                        type="button"
+                        onClick={handleCheckout}
+                        className="flex items-center gap-1.5 text-xs text-gold border border-gold/30 rounded px-3 py-1.5 hover:bg-gold/10 transition-colors"
+                      >
+                        使用 Lemon Squeezy 开通
+                        <ArrowRight size={11} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openChinaProPurchase()}
+                        className="flex items-center gap-1.5 text-xs text-gold border border-gold/20 rounded px-3 py-1.5 hover:bg-gold/10 transition-colors"
+                      >
+                        中文用户可选：爱发电开通
+                        <ArrowRight size={11} />
+                      </button>
+                    </div>
                   ) : (
                     <button
                       type="button"
@@ -370,11 +383,20 @@ export default function UsagePage() {
                     onClick={handleCheckout}
                     className="inline-flex items-center justify-center gap-2 rounded-full bg-gold px-5 py-3 text-sm font-medium text-void transition-colors hover:bg-gold-light"
                   >
-                    {usage.plan === 'pro' && isActivationCodeSubscription
-                      ? activationUiCopy.zh.renewCta
-                      : activationUiCopy.zh.purchaseCta}
+                    使用 Lemon Squeezy 开通
                     <ArrowRight size={14} />
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => openChinaProPurchase()}
+                    className="inline-flex items-center justify-center gap-2 rounded-full border border-gold/30 bg-gold/10 px-5 py-3 text-sm font-medium text-gold transition-colors hover:bg-gold/15"
+                  >
+                    中文用户可选：爱发电开通
+                    <ArrowRight size={14} />
+                  </button>
+                </div>
+                <p className="text-[11px] leading-5 text-ink-subtle">{CN_PRO_CHECKOUT_TIP}</p>
+                <div className="flex flex-col gap-3 sm:flex-row">
                   {usage.plan === 'guest' ? (
                     <ClerkSignInTrigger
                       className="inline-flex items-center justify-center gap-2 rounded-full border border-gold/30 px-5 py-3 text-sm font-medium text-gold transition-colors hover:bg-gold/10"
@@ -395,7 +417,6 @@ export default function UsagePage() {
                     </button>
                   )}
                 </div>
-                <p className="text-[11px] leading-5 text-ink-subtle">{CN_PRO_CHECKOUT_TIP}</p>
               </div>
             )}
           </div>
