@@ -21,7 +21,7 @@ from fastapi.responses import RedirectResponse, StreamingResponse
 from PIL import Image, ImageOps, UnidentifiedImageError
 from urllib import error as urllib_error
 from urllib import parse, request as urllib_request
-from sqlalchemy import func
+from sqlalchemy import and_, func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -175,10 +175,59 @@ GALLERY_AUDIT_REJECTED = 'rejected'
 GALLERY_AUDIT_VALUES = {GALLERY_AUDIT_NONE, GALLERY_AUDIT_APPROVED, GALLERY_AUDIT_REJECTED}
 GALLERY_RECOMMEND_PERCENTILE_THRESHOLD = 80.0
 GALLERY_RECOMMEND_MIN_IMAGE_TYPE_SAMPLE = 8
+GALLERY_SCORE_WEIGHT = 0.6
+GALLERY_FRESHNESS_WEIGHT = 0.4
+GALLERY_FRESHNESS_HALF_LIFE_DAYS = 45
+GALLERY_FRESHNESS_HALF_LIFE_SECONDS = GALLERY_FRESHNESS_HALF_LIFE_DAYS * 24 * 3600
+GALLERY_CURSOR_SCORE_EPSILON = 1e-9
 
 
 def _duration_ms(started_at: float) -> int:
     return int(round((time.perf_counter() - started_at) * 1000))
+
+
+def _as_utc_datetime(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def _gallery_rank_score_value(
+    final_score: float,
+    gallery_added_at: datetime,
+    *,
+    now: datetime | None = None,
+) -> float:
+    reference_now = _as_utc_datetime(now or datetime.now(timezone.utc))
+    published_at = _as_utc_datetime(gallery_added_at)
+    age_seconds = max((reference_now - published_at).total_seconds(), 0.0)
+    freshness_score = 10.0 * (0.5 ** (age_seconds / GALLERY_FRESHNESS_HALF_LIFE_SECONDS))
+    return (float(final_score) * GALLERY_SCORE_WEIGHT) + (freshness_score * GALLERY_FRESHNESS_WEIGHT)
+
+
+def _gallery_rank_score_expr():
+    age_seconds = func.extract('epoch', func.now() - Review.gallery_added_at)
+    freshness_score = 10.0 * func.power(0.5, age_seconds / GALLERY_FRESHNESS_HALF_LIFE_SECONDS)
+    return (Review.final_score * GALLERY_SCORE_WEIGHT) + (freshness_score * GALLERY_FRESHNESS_WEIGHT)
+
+
+def _encode_public_gallery_cursor(rank_score: float, gallery_added_at: datetime, review_id: int) -> str:
+    return f'{float(rank_score):.12f}|{_as_utc_datetime(gallery_added_at).isoformat()}|{review_id}'
+
+
+def _decode_public_gallery_cursor(cursor: str) -> tuple[float | None, datetime, int | None]:
+    parts = cursor.split('|', 2)
+    if len(parts) != 3:
+        try:
+            return None, datetime.fromisoformat(cursor), None
+        except ValueError as exc:
+            raise api_error(status.HTTP_400_BAD_REQUEST, 'CURSOR_INVALID', 'Invalid cursor') from exc
+
+    raw_score, raw_dt, raw_id = parts
+    try:
+        return float(raw_score), datetime.fromisoformat(raw_dt), int(raw_id)
+    except ValueError as exc:
+        raise api_error(status.HTTP_400_BAD_REQUEST, 'CURSOR_INVALID', 'Invalid cursor') from exc
 
 
 def _coerce_int_metric(value: Any) -> int | None:
@@ -2004,6 +2053,7 @@ def list_public_gallery(
 
     viewer = _optional_gallery_viewer(authorization, db)
     gallery_filters = _public_gallery_filters()
+    rank_score = _gallery_rank_score_expr().label('gallery_rank_score')
     count_query = db.query(func.count(Review.id)).filter(*gallery_filters)
     count_query = _apply_review_history_filters(
         count_query,
@@ -2016,11 +2066,11 @@ def list_public_gallery(
     )
     total_count = count_query.scalar() or 0
     query = (
-        db.query(Review, Photo, User)
+        db.query(Review, Photo, User, rank_score)
         .join(Photo, Photo.id == Review.photo_id)
         .join(User, User.id == Review.owner_user_id)
         .filter(*gallery_filters)
-        .order_by(Review.gallery_added_at.desc(), Review.id.desc())
+        .order_by(rank_score.desc(), Review.gallery_added_at.desc(), Review.id.desc())
     )
     query = _apply_review_history_filters(
         query,
@@ -2033,16 +2083,23 @@ def list_public_gallery(
     )
 
     if cursor:
-        try:
-            cursor_dt = datetime.fromisoformat(cursor)
-        except ValueError as exc:
-            raise api_error(status.HTTP_400_BAD_REQUEST, 'CURSOR_INVALID', 'Invalid cursor') from exc
-        query = query.filter(Review.gallery_added_at < cursor_dt)
+        cursor_score, cursor_dt, cursor_review_id = _decode_public_gallery_cursor(cursor)
+        if cursor_score is None or cursor_review_id is None:
+            query = query.filter(Review.gallery_added_at < cursor_dt)
+        else:
+            same_rank = func.abs(rank_score - cursor_score) <= GALLERY_CURSOR_SCORE_EPSILON
+            query = query.filter(
+                or_(
+                    rank_score < cursor_score - GALLERY_CURSOR_SCORE_EPSILON,
+                    and_(same_rank, Review.gallery_added_at < cursor_dt),
+                    and_(same_rank, Review.gallery_added_at == cursor_dt, Review.id < cursor_review_id),
+                )
+            )
 
     rows = query.limit(limit + 1).all()
     has_next = len(rows) > limit
     rows = rows[:limit]
-    review_ids = [review.id for review, _photo, _owner in rows]
+    review_ids = [review.id for review, _photo, _owner, _rank_score in rows]
     like_counts = _gallery_like_counts(db, review_ids)
     viewer_likes = _gallery_viewer_likes(db, review_ids, None if viewer is None else viewer.id)
     recommendations = _gallery_recommendation_map(db, review_ids)
@@ -2056,9 +2113,16 @@ def list_public_gallery(
             liked_by_viewer=review.id in viewer_likes,
             recommendation=recommendations.get(review.id),
         )
-        for review, photo, owner in rows
+        for review, photo, owner, _rank_score in rows
     ]
-    next_cursor = rows[-1][0].gallery_added_at.isoformat() if has_next and rows and rows[-1][0].gallery_added_at else None
+    next_cursor = None
+    if has_next and rows and rows[-1][0].gallery_added_at:
+        last_review, _last_photo, _last_owner, last_rank_score = rows[-1]
+        next_cursor = _encode_public_gallery_cursor(
+            rank_score=float(last_rank_score),
+            gallery_added_at=last_review.gallery_added_at,
+            review_id=last_review.id,
+        )
 
     db.commit()
     return PublicGalleryResponse(items=items, total_count=total_count, next_cursor=next_cursor)

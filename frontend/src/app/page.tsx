@@ -77,6 +77,14 @@ export default function HomePage() {
       ? { label: 'Updates', hint: 'See the latest activation-code access and China purchase-flow updates' }
       : { label: '更新记录', hint: '查看激活码开通、国内支付入口与订阅同步更新' };
 
+  if (locale === 'ja') {
+    latestUpdatesCopy.hint = '公開ギャラリー順位付けと画像表示まわりの最新更新を見る';
+  } else if (locale === 'en') {
+    latestUpdatesCopy.hint = 'See the latest gallery ranking, image rendering, and quality-gate updates';
+  } else {
+    latestUpdatesCopy.hint = '查看公开长廊排序、图片渲染与前端质量门更新';
+  }
+
   const softwareJsonLd = {
     '@context': 'https://schema.org',
     '@type': 'SoftwareApplication',

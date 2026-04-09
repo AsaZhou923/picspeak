@@ -1,4 +1,5 @@
 'use client';
+/* eslint-disable @next/next/no-img-element -- Gallery cards use the raw thumbnail URL directly; native img is the most reliable renderer here. */
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
@@ -518,7 +519,7 @@ function GalleryPageContent() {
   }, [searchParamsKey]);
   const shouldRestore = searchParams.get('restore') === '1';
   const filterSignature = filterSearch.toString();
-  const appliedFilters = useMemo(() => galleryFiltersFromSearchParams(filterSearch), [filterSignature, filterSearch]);
+  const appliedFilters = useMemo(() => galleryFiltersFromSearchParams(filterSearch), [filterSearch]);
   const restoreKey = useMemo(() => buildGalleryRestoreKey(filterSignature), [filterSignature]);
   const backHref = useMemo(() => {
     const params = buildGallerySearchParams(appliedFilters, { restore: true });

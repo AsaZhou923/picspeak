@@ -8,7 +8,7 @@
     "dev:clean": "npm run clean && next dev",
     "build": "npm run clean && next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
     "typecheck": "tsc -p tsconfig.typecheck.json --noEmit"
   },
   "dependencies": {

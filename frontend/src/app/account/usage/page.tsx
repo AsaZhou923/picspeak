@@ -50,6 +50,7 @@ export default function UsagePage() {
   const router = useRouter();
   const { ensureToken, userInfo, syncPlan } = useAuth();
   const { locale, t } = useI18n();
+  const hasUserInfo = Boolean(userInfo);
   const [usage, setUsage] = useState<UsageResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -66,7 +67,7 @@ export default function UsagePage() {
   }, [router]);
 
   useEffect(() => {
-    if (!userInfo) {
+    if (!hasUserInfo) {
       setUsage(null);
       setError('');
       setLoading(true);
@@ -84,7 +85,7 @@ export default function UsagePage() {
         setLoading(false);
         setError(formatUserFacingError(t, err, t('usage_error')));
       });
-  }, [ensureToken, syncPlan, userInfo?.access_token, t]);
+  }, [ensureToken, hasUserInfo, syncPlan, t, userInfo?.access_token]);
 
   async function handleCheckout() {
     setCheckoutLoading(true);

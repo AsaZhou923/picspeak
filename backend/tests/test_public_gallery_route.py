@@ -12,10 +12,41 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-from app.api.routes import Review, _gallery_recommendation_map, list_public_gallery
+from app.api.routes import (
+    Review,
+    _decode_public_gallery_cursor,
+    _encode_public_gallery_cursor,
+    _gallery_rank_score_value,
+    _gallery_recommendation_map,
+    list_public_gallery,
+)
 
 
 class PublicGalleryRouteTests(unittest.TestCase):
+    def test_gallery_rank_score_gives_score_slightly_more_weight_than_time(self) -> None:
+        now = datetime(2026, 4, 9, 12, 0, tzinfo=timezone.utc)
+        higher_score_recent = _gallery_rank_score_value(9.3, now.replace(day=6), now=now)
+        lower_score_newest = _gallery_rank_score_value(8.7, now, now=now)
+
+        self.assertGreater(higher_score_recent, lower_score_newest)
+
+    def test_gallery_rank_score_still_rewards_recency_for_close_scores(self) -> None:
+        now = datetime(2026, 4, 9, 12, 0, tzinfo=timezone.utc)
+        slightly_lower_newer = _gallery_rank_score_value(8.8, now, now=now)
+        slightly_higher_older = _gallery_rank_score_value(9.1, datetime(2026, 2, 1, 12, 0, tzinfo=timezone.utc), now=now)
+
+        self.assertGreater(slightly_lower_newer, slightly_higher_older)
+
+    def test_public_gallery_cursor_round_trip_preserves_rank_components(self) -> None:
+        published_at = datetime(2026, 4, 8, 18, 30, tzinfo=timezone.utc)
+        cursor = _encode_public_gallery_cursor(8.765432198765, published_at, 321)
+
+        rank_score, cursor_dt, review_id = _decode_public_gallery_cursor(cursor)
+
+        self.assertAlmostEqual(rank_score, 8.765432198765)
+        self.assertEqual(cursor_dt, published_at)
+        self.assertEqual(review_id, 321)
+
     def test_gallery_recommendation_map_marks_top_percentile_with_sufficient_type_sample(self) -> None:
         db = MagicMock()
         query = MagicMock()
@@ -49,7 +80,7 @@ class PublicGalleryRouteTests(unittest.TestCase):
         count_query.scalar.return_value = 19
 
         row_review = SimpleNamespace(id=101, gallery_added_at=datetime(2026, 3, 21, 12, 0, tzinfo=timezone.utc))
-        rows = [(row_review, object(), object())]
+        rows = [(row_review, object(), object(), 8.812345678901)]
 
         list_query = MagicMock()
         list_query.join.return_value = list_query

@@ -18,6 +18,32 @@ export function getProductUpdates(locale: UpdateLocale): ProductUpdateEntry[] {
   if (locale === 'ja') {
     return [
       {
+        id: '2026-04-09-gallery-ranking-and-quality-gates',
+        date: '2026-04-09',
+        title: '公開ギャラリー順位付け、画像表示、Lint 基盤を調整',
+        summary:
+          '公開ギャラリーをスコア優先かつ新しさも加味する順位付けに更新し、安定したページングカーソルへ切り替えました。あわせてギャラリー画像表示の不具合を修正し、フロントエンドの lint 実行基盤を整備しました。',
+        docPath: 'docs/changelog/update-log-2026-04-09-gallery-ranking-and-quality-gates.md',
+        sections: [
+          {
+            title: '公開ギャラリー順位付け',
+            items: [
+              'ギャラリーを公開日時のみではなく、スコアをやや強めに重視した複合順位で並べ替えるように変更',
+              'スコアが近い作品では新しい公開作品が前に出やすくなるよう時間減衰を導入',
+              '複合順位でも崩れないよう、次ページカーソルを順位スコア・公開日時・ID の組み合わせへ更新',
+            ],
+          },
+          {
+            title: '表示安定性と品質ゲート',
+            items: [
+              '開発環境の `localhost:8000` 画像ソースを許可し、`next/image` のホスト未設定エラーを解消',
+              'ギャラリーカード画像は表示安定性を優先してネイティブ `img` に戻し、縮略画像が出ない問題を修正',
+              'ESLint 設定を追加し、`npm run lint` が対話モードに入らず継続実行できるようにした',
+            ],
+          },
+        ],
+      },
+      {
         id: '2026-04-07-activation-code-billing',
         date: '2026-04-07',
         title: 'アクティベーションコード開通と中国向け購入導線を追加',
@@ -203,6 +229,32 @@ export function getProductUpdates(locale: UpdateLocale): ProductUpdateEntry[] {
   if (locale === 'en') {
     return [
       {
+        id: '2026-04-09-gallery-ranking-and-quality-gates',
+        date: '2026-04-09',
+        title: 'Gallery Ranking, Image Rendering, and Lint Gates Updated',
+        summary:
+          'The public gallery now ranks work with score-weighted freshness, uses stable paging cursors for that combined order, restores reliable gallery card image rendering, and ships a real frontend lint baseline.',
+        docPath: 'docs/changelog/update-log-2026-04-09-gallery-ranking-and-quality-gates.md',
+        sections: [
+          {
+            title: 'Public Gallery Ranking',
+            items: [
+              'Changed gallery ordering from pure publish time to a combined score that favors higher-rated work while still rewarding recency',
+              'Weighted score slightly above time so clearly stronger work stays ahead, while close scores let newer posts surface first',
+              'Upgraded the gallery cursor format so paging stays stable under the new combined ordering',
+            ],
+          },
+          {
+            title: 'Rendering and Quality Gates',
+            items: [
+              'Allowed local backend image hosts in Next config so development thumbnails no longer fail host validation',
+              'Moved gallery cards back to native `img` rendering after the `next/image` migration caused visible load regressions',
+              'Added ESLint config and switched the lint script to the ESLint CLI so `npm run lint` is now a real non-interactive quality gate',
+            ],
+          },
+        ],
+      },
+      {
         id: '2026-04-07-activation-code-billing',
         date: '2026-04-07',
         title: 'Activation Codes and China Purchase Flow Added',
@@ -386,6 +438,32 @@ export function getProductUpdates(locale: UpdateLocale): ProductUpdateEntry[] {
   }
 
   return [
+    {
+      id: '2026-04-09-gallery-ranking-and-quality-gates',
+      date: '2026-04-09',
+      title: '公开长廊排序、图片渲染与前端质量门更新',
+      summary:
+        '公开影像长廊已切换为分数权重略高于时间的新排序逻辑，并配套升级了稳定分页游标；同时修复了长廊图片显示问题，补齐了可持续运行的前端 lint 基线。',
+      docPath: 'docs/changelog/update-log-2026-04-09-gallery-ranking-and-quality-gates.md',
+      sections: [
+        {
+          title: '公开长廊排序',
+          items: [
+            '长廊不再只按发布时间倒序，而是按“分数优先、时间次优先”的组合热度排序',
+            '当作品分数接近时，更新发布的作品会获得更高的新鲜度加成，更容易排在前面',
+            '分页游标同步升级为组合分、发布时间和记录 ID 的稳定游标，避免翻页重复或漏项',
+          ],
+        },
+        {
+          title: '图片显示与质量门',
+          items: [
+            'Next 配置补齐本地后端图片源，解决开发环境里 `next/image` 主机未配置报错',
+            '长廊卡片图片恢复为更稳定的原生 `img` 渲染路径，修复缩略图能请求但不显示的问题',
+            '前端补齐 ESLint 配置并切换到 CLI lint 脚本，`npm run lint` 现在可以稳定执行',
+          ],
+        },
+      ],
+    },
     {
       id: '2026-04-07-activation-code-billing',
       date: '2026-04-07',

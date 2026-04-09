@@ -1,5 +1,6 @@
 ﻿'use client';
 
+/* eslint-disable @next/next/no-img-element -- Review previews are client-side cached object URLs and zoomable raw images. */
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
