@@ -18,6 +18,32 @@ export function getProductUpdates(locale: UpdateLocale): ProductUpdateEntry[] {
   if (locale === 'ja') {
     return [
       {
+        id: '2026-04-10-locale-seo-and-gallery-refactor',
+        date: '2026-04-10',
+        title: '多言語ホーム導線、SEO ルーティング、ギャラリー構成を刷新',
+        summary:
+          '/zh・/en・/ja の言語固定ホームを追加し、hreflang・JSON-LD・sitemap を整備しました。あわせてギャラリー、ホーム、レビュー、ワークスペースの文言を i18n に集約し、ギャラリー画面を部品化して保守しやすくしました。',
+        docPath: 'docs/changelog/update-log-2026-04-10-locale-seo-and-gallery-refactor.md',
+        sections: [
+          {
+            title: '言語固定ホームと SEO',
+            items: [
+              '/zh・/en・/ja を追加し、URL から表示言語を固定したホームを直接開けるようにした',
+              '各言語ホームに個別 metadata、keywords、JSON-LD、hreflang を付与',
+              'sitemap と公開ページ metadata に alternate languages を追加し、検索エンジン向けの言語シグナルを補強',
+            ],
+          },
+          {
+            title: '画面文言と UI 整理',
+            items: [
+              'ホームの価格表示・更新履歴・連絡先文言を翻訳辞書へ移し、最新アップデート導線も今週の更新内容に差し替え',
+              'ワークスペースの再分析カード、レビューの favorites 導線、Pro 訴求カードを三言語共通の i18n キーへ統一',
+              'ギャラリーページのフィルター、カード、ページネーションを分割コンポーネント化し、既存 UI を維持したまま保守しやすくした',
+            ],
+          },
+        ],
+      },
+      {
         id: '2026-04-09-gallery-ranking-and-quality-gates',
         date: '2026-04-09',
         title: '公開ギャラリー順位付け、画像表示、Lint 基盤を調整',
@@ -229,6 +255,32 @@ export function getProductUpdates(locale: UpdateLocale): ProductUpdateEntry[] {
   if (locale === 'en') {
     return [
       {
+        id: '2026-04-10-locale-seo-and-gallery-refactor',
+        date: '2026-04-10',
+        title: 'Locale-Pinned Home Routes, SEO Signals, and Gallery UI Refactor',
+        summary:
+          'Added /zh, /en, and /ja locale-pinned home pages, wired hreflang and JSON-LD signals across public routes, and moved scattered home, gallery, review, and workspace copy into shared i18n keys while splitting the gallery UI into focused components.',
+        docPath: 'docs/changelog/update-log-2026-04-10-locale-seo-and-gallery-refactor.md',
+        sections: [
+          {
+            title: 'Locale Homes and SEO',
+            items: [
+              'Added direct /zh, /en, and /ja home routes that pin the active locale from the URL',
+              'Gave each locale home its own metadata, keywords, Open Graph fields, and JSON-LD',
+              'Expanded sitemap and public-page alternates so search engines can map the language variants correctly',
+            ],
+          },
+          {
+            title: 'Copy and UI Restructure',
+            items: [
+              'Moved home pricing, updates, and contact copy into the translation dictionaries and repointed the latest update hint to this release',
+              'Unified workspace replay copy, review favorites labels, promo-card copy, and gallery SEO copy under shared zh/en/ja i18n keys',
+              'Split the gallery page into dedicated filter, card, and pagination components without changing the public browsing flow',
+            ],
+          },
+        ],
+      },
+      {
         id: '2026-04-09-gallery-ranking-and-quality-gates',
         date: '2026-04-09',
         title: 'Gallery Ranking, Image Rendering, and Lint Gates Updated',
@@ -438,6 +490,32 @@ export function getProductUpdates(locale: UpdateLocale): ProductUpdateEntry[] {
   }
 
   return [
+    {
+      id: '2026-04-10-locale-seo-and-gallery-refactor',
+      date: '2026-04-10',
+      title: '多语言首页直达、SEO 路由与长廊页面重构',
+      summary:
+        '新增 /zh、/en、/ja 语言固定首页，补齐 hreflang、JSON-LD 与 sitemap 多语入口；同时把首页、长廊、评图页和工作台的零散文案收拢进 i18n，并把公开长廊页面拆成独立组件，便于继续迭代。',
+      docPath: 'docs/changelog/update-log-2026-04-10-locale-seo-and-gallery-refactor.md',
+      sections: [
+        {
+          title: '多语言首页与 SEO',
+          items: [
+            '新增 /zh、/en、/ja 直达首页，打开后会固定当前语言并写回本地偏好',
+            '各语种首页补齐独立 metadata、关键词、JSON-LD 与 canonical / alternate languages',
+            'sitemap 与 affiliate、gallery、updates、公开示例页也同步带上多语 alternate 信息，便于搜索引擎识别语言版本',
+          ],
+        },
+        {
+          title: '前端文案与页面结构整理',
+          items: [
+            '首页价格、更新记录、联系方式等文案改由翻译字典驱动，首页底部最新更新提示同步改指向本次更新主题',
+            '工作台“复用上一张照片”、评图页 favorites 返回文案、Pro 转化卡和长廊 SEO 文案统一收拢到 zh/en/ja i18n',
+            '公开长廊的筛选、卡片、分页拆成独立组件，保留现有交互的同时降低后续改动成本',
+          ],
+        },
+      ],
+    },
     {
       id: '2026-04-09-gallery-ranking-and-quality-gates',
       date: '2026-04-09',

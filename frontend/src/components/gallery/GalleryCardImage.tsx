@@ -30,17 +30,19 @@ export default function GalleryCardImage({
             aria-hidden="true"
             sizes="(min-width: 1280px) 22vw, (min-width: 1024px) 30vw, (min-width: 640px) 45vw, 92vw"
             fill
-            className="absolute inset-0 h-full w-full scale-110 object-cover opacity-30 blur-[26px] saturate-[0.85] transition-transform duration-700 group-hover:scale-[1.14] dark:opacity-45"
+            className="absolute inset-0 h-full w-full scale-110 object-cover opacity-30 blur-[26px] saturate-[0.85] transition-transform duration-1000 group-hover:scale-[1.2] dark:opacity-45"
           />
           <div className="absolute inset-x-4 top-4 bottom-6 flex items-center justify-center overflow-hidden rounded-[28px] border border-border bg-[linear-gradient(180deg,rgba(255,255,255,0.54),rgba(244,238,229,0.24))] shadow-[0_18px_44px_rgba(120,96,68,0.14)] backdrop-blur-[3px] dark:border-[rgba(208,186,146,0.12)] dark:bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.015))] dark:shadow-[0_20px_54px_rgba(0,0,0,0.34)]">
-            <Image
-              src={src}
-              alt={alt}
-              sizes="(min-width: 1280px) 22vw, (min-width: 1024px) 30vw, (min-width: 640px) 45vw, 92vw"
-              fill
-              className="h-full w-full object-contain px-3 py-4 transition-transform duration-700 group-hover:scale-[1.02]"
-              onError={() => setBroken(true)}
-            />
+            <div className="relative h-full w-full">
+              <Image
+                src={src}
+                alt={alt}
+                sizes="(min-width: 1280px) 22vw, (min-width: 1024px) 30vw, (min-width: 640px) 45vw, 92vw"
+                fill
+                className="object-contain px-3 py-4 transition-transform duration-700 group-hover:scale-[1.05]"
+                onError={() => setBroken(true)}
+              />
+            </div>
           </div>
         </>
       ) : (

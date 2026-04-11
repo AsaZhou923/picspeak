@@ -198,14 +198,13 @@ export default function ReviewPage() {
   const reviewId = params.reviewId as string;
   const backHref = searchParams.get('back') ?? '/workspace';
   const isGalleryBackHref = backHref.startsWith('/gallery');
-  const favoritesNavLabel = locale === 'ja' ? 'お気に入り' : locale === 'en' ? 'Favorites' : '我的收藏';
   const backLabel =
     isGalleryBackHref
       ? t('nav_gallery')
       : backHref === '/account/reviews'
       ? t('review_back_history')
       : backHref === '/account/favorites'
-        ? favoritesNavLabel
+        ? t('review_nav_favorites')
         : t('review_back_workspace');
   const { ensureToken, userInfo } = useAuth();
 

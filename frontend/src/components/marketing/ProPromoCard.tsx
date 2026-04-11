@@ -108,59 +108,59 @@ function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
 
   if (locale === 'ja') {
     return {
-      badge: 'Launch Offer',
-      discount: '25% off during early launch',
-      price: '$2.99 / month',
+      badge: 'ローンチ特典',
+      discount: '早期ローンチ限定 25% OFF',
+      price: '$2.99 / 月',
       oldPrice: '$3.99',
-      footnote: 'This is the current launch-period price and may return to the regular rate later.',
-      features: ['Deeper Pro critique', 'Near-unlimited reviews', 'Permanent history', 'Priority queue'],
-      guestCta: 'Claim the launch price',
-      freeCta: 'Upgrade to Pro now',
+      footnote: '現在はローンチ期間中の価格です。今後は通常料金に戻る場合があります。',
+      features: ['より深い Pro 分析', 'ほぼ無制限のレビュー', '履歴を永久保存', '優先キュー'],
+      guestCta: 'ローンチ価格で始める',
+      freeCta: '今すぐ Pro にアップグレード',
       chinaCta: '',
       chinaHint: '',
-      proCta: 'Manage subscription',
-      proStatus: 'Your subscription is already on the launch-price Pro plan',
+      proCta: 'サブスクリプションを管理',
+      proStatus: '現在の契約はローンチ価格の Pro プランです',
       activationCta: '',
       activationRenewCta: '',
       scenes: {
         workspace: {
           default: {
-            title: 'Go straight from upload to deeper Pro critique',
-            body: 'If you want fuller diagnosis and clearer next-step direction, you can switch into Pro right here.',
+            title: 'アップロード直後に Pro の深い分析へ進む',
+            body: 'より詳しい診断と次の一手が必要なら、ここからすぐ Pro に切り替えられます。',
           },
           pro: {
-            title: 'Your Pro plan is still active at the launch price',
-            body: 'Your current subscription keeps permanent history and priority processing active as usual.',
+            title: '現在の Pro プランはローンチ価格のまま有効です',
+            body: '永久履歴と優先処理を含む Pro 特典を、そのまま使い続けられます。',
           },
         },
         gallery: {
           default: {
-            title: 'See a strong example, then deepen your own photo with Pro',
-            body: 'Use the gallery for reference, then move straight into deeper critique on your next upload.',
+            title: 'ギャラリーで参考を見たら、次は自分の写真を Pro で深掘り',
+            body: '良い作例を参考にしたあと、そのまま次のアップロードを Pro の深い分析につなげられます。',
           },
           pro: {
-            title: 'Your Pro plan is still locked in',
-            body: 'Unlimited-style review flow, permanent history, and priority processing remain available.',
+            title: 'Pro のローンチ価格はそのまま維持されています',
+            body: '深い分析、永久履歴、優先処理を引き続き利用できます。',
           },
         },
         usage: {
           default: {
-            title: 'Pro is currently available for $2.99/month',
-            body: 'Unlock deeper critique, permanent history, and priority processing in one step.',
+            title: 'Pro は現在 $2.99/月 のローンチ価格です',
+            body: '深い分析、永久履歴、優先処理をまとめてすぐ解放できます。',
           },
           pro: {
-            title: 'You have already locked in the Pro launch price',
-            body: 'You can check plan status, billing, and renewal details anytime from subscription management.',
+            title: 'すでに Pro のローンチ価格を確保しています',
+            body: 'プラン状況、請求、更新情報はサブスクリプション管理からいつでも確認できます。',
           },
         },
         review: {
           default: {
-            title: 'Take this result one step further with Pro',
-            body: 'If you want a deeper breakdown and clearer improvement direction from this critique, upgrading here is the fastest path.',
+            title: 'この結果をもう一段深く見るなら Pro が最短です',
+            body: '今回の講評をさらに深く掘り下げ、改善の方向を明確にしたいなら、ここからのアップグレードが最短です。',
           },
           pro: {
-            title: 'This result can still be explored more deeply with Pro',
-            body: 'Your current subscription remains active, so you can keep using deeper critique and permanent history.',
+            title: 'この結果も Pro でさらに深く掘り下げられます',
+            body: '現在の契約は有効なので、深い分析と永久履歴をそのまま使い続けられます。',
           },
         },
       },

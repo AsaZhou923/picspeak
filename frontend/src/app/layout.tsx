@@ -44,6 +44,12 @@ export const metadata: Metadata = {
   category: 'photography',
   alternates: {
     canonical: '/',
+    languages: {
+      'zh-CN': '/zh',
+      en: '/',
+      ja: '/ja',
+      'x-default': '/',
+    },
   },
   verification: {
     google: siteConfig.googleSiteVerification,

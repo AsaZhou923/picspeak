@@ -10,14 +10,33 @@ export async function generateMetadata(
 
   return {
     title: isDemoReview
-      ? 'AI Photo Critique Example with Scores, Feedback, and Suggestions'
+      ? 'AI Photo Critique Example | AI摄影点评示例 | AI写真批評例 — PicSpeak'
       : 'Private AI Photo Critique Result with Detailed Feedback',
     description: isDemoReview
-      ? 'Review a public PicSpeak example critique with category scores, written analysis, and practical suggestions for improving a photograph.'
+      ? 'Public PicSpeak example: composition, lighting, color, impact & technique scores with suggestions. 公开评图示例：构图、光线、色彩、表达与技术评分与改进建议。AI写真批評の公開例 — 構図・光・色彩の採点と改善提案。'
       : 'Open your PicSpeak critique result to inspect scores, strengths, weaknesses, and concrete next-step suggestions for the photo.',
+    keywords: isDemoReview
+      ? [
+          'AI photo critique example',
+          'photo review sample',
+          'composition scoring',
+          'AI摄影点评示例',
+          '照片评分示例',
+          '构图评分',
+          'AI写真批評例',
+          '写真採点サンプル',
+          '構図採点',
+        ]
+      : undefined,
     alternates: isDemoReview
       ? {
           canonical: `/reviews/${DEMO_REVIEW_ID}`,
+          languages: {
+            'zh-CN': '/zh',
+            en: `/reviews/${DEMO_REVIEW_ID}`,
+            ja: '/ja',
+            'x-default': `/reviews/${DEMO_REVIEW_ID}`,
+          },
         }
       : undefined,
     robots: isDemoReview ? INDEXABLE_ROBOTS : NO_INDEX_ROBOTS,

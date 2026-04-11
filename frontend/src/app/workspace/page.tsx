@@ -172,33 +172,6 @@ function isImageType(value: string | null): value is ImageType {
     value === 'architecture';
 }
 
-function getReplayCopy(locale: 'zh' | 'en' | 'ja') {
-  if (locale === 'ja') {
-    return {
-      title: '前回の分析を引き継いで再分析',
-      body: '同じ写真を再アップロードせず、そのまま新しい分析を開始できます。必要なら別の写真に切り替えてください。',
-      currentPhoto: '前回の写真を使用',
-      uploadNew: '別の写真をアップロード',
-    };
-  }
-
-  if (locale === 'en') {
-    return {
-      title: 'Replay from the previous analysis',
-      body: 'You can launch a new run from the same photo without uploading again, or switch to a different image if needed.',
-      currentPhoto: 'Use previous photo',
-      uploadNew: 'Upload a different photo',
-    };
-  }
-
-  return {
-    title: '基于上一条分析再次发起评图',
-    body: '可以直接复用上一张照片继续分析，无需重新上传；如果要换图，也可以随时切回上传流程。',
-    currentPhoto: '复用上一张照片',
-    uploadNew: '改为上传新照片',
-  };
-}
-
 // ─── Component ────────────────────────────────────────────────────────────────
 
 function WorkspacePageContent() {
@@ -206,7 +179,6 @@ function WorkspacePageContent() {
   const searchParams = useSearchParams();
   const { userInfo, ensureToken, isLoading: authLoading, syncPlan } = useAuth();
   const { t, locale } = useI18n();
-  const replayCopy = getReplayCopy(locale);
   const promoModeBadge = '25% off';
 
   const initialSourceReviewId = searchParams.get('source_review_id');
@@ -316,7 +288,6 @@ function WorkspacePageContent() {
       setUploadProgress(0);
       setErrMessage('');
 
-      // Decode image dimensions from the preview dataUrl
       let imgWidth = 0;
       let imgHeight = 0;
       let checksumSha256: string | null = null;
@@ -373,19 +344,10 @@ function WorkspacePageContent() {
               setStage('error');
               setErrMessage(t('status_photo_error') + cachedPhoto.status);
             }
-            logUploadMetrics('cache-hit', {
-              checksum_sha256: checksumSha256,
-              frontend_preprocess_ms: uploadMetrics.frontend_preprocess_ms,
-              compressed: uploadMetrics.compressed,
-              original_size_bytes: uploadMetrics.original_size_bytes,
-              final_size_bytes: uploadMetrics.final_size_bytes,
-            });
             return;
           }
         }
 
-        // 1. Presign
-        const presignStartedAt = performance.now();
         const presign = await createPresign(
           {
             filename: file.name,
@@ -395,28 +357,12 @@ function WorkspacePageContent() {
           },
           token
         );
-        uploadMetrics.presign_request_ms = Math.round(performance.now() - presignStartedAt);
-        logUploadMetrics('presign', {
-          file_name: file.name,
-          file_size_bytes: file.size,
-          presign_request_ms: uploadMetrics.presign_request_ms,
-        });
 
-        // 2. PUT to object storage
-        const objectUploadStartedAt = performance.now();
         await putObjectStorage(presign.put_url, file, presign.headers, (pct) => {
           setUploadProgress(pct);
         });
-        uploadMetrics.object_upload_ms = Math.round(performance.now() - objectUploadStartedAt);
-        logUploadMetrics('object-upload', {
-          file_name: file.name,
-          file_size_bytes: file.size,
-          object_upload_ms: uploadMetrics.object_upload_ms,
-        });
 
-        // 3. Confirm photo
         setStage('confirming');
-        const confirmStartedAt = performance.now();
         const photoData = await confirmPhoto(
           presign.upload_id,
           exif as Record<string, unknown>,
@@ -428,8 +374,6 @@ function WorkspacePageContent() {
           }),
           token
         );
-        uploadMetrics.confirm_request_ms = Math.round(performance.now() - confirmStartedAt);
-        uploadMetrics.total_upload_flow_ms = Math.round(performance.now() - uploadFlowStartedAt);
 
         setPhoto(photoData);
         if (checksumSha256) {
@@ -447,21 +391,7 @@ function WorkspacePageContent() {
           setStage('error');
           setErrMessage(t('status_photo_error') + photoData.status);
         }
-        logUploadMetrics('completed', {
-          file_name: file.name,
-          file_size_bytes: file.size,
-          photo_id: photoData.photo_id,
-          photo_status: photoData.status,
-          ...uploadMetrics,
-        });
       } catch (err) {
-        uploadMetrics.total_upload_flow_ms = Math.round(performance.now() - uploadFlowStartedAt);
-        logUploadMetrics('failed', {
-          file_name: file.name,
-          file_size_bytes: file.size,
-          error: err instanceof Error ? err.message : String(err),
-          ...uploadMetrics,
-        });
         setStage('error');
         if (err instanceof ApiException) {
           if (err.status === 429) {
@@ -484,7 +414,6 @@ function WorkspacePageContent() {
   const handleReview = useCallback(async () => {
     const activePhotoId = photo?.photo_id ?? replayPhotoId;
     if (!activePhotoId) return;
-    // Guard: check quota before making any API call
     if (usage && remainingQuota !== null && remainingQuota <= 0) {
       setShowQuotaModal(true);
       return;
@@ -544,7 +473,6 @@ function WorkspacePageContent() {
 
   return (
     <div className="pt-14 min-h-screen">
-      {/* ── Quota exhausted modal ──────────────────────────────────────────── */}
       {showQuotaModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center px-6"
@@ -595,14 +523,12 @@ function WorkspacePageContent() {
         </div>
       )}
       <div className="max-w-3xl mx-auto px-6 py-12">
-        {/* Header */}
         <div className="mb-10 animate-fade-in">
           <p className="text-xs text-gold/70 font-mono mb-3 tracking-widest uppercase">
             — {t('workspace_label')}
           </p>
           <h1 className="font-display text-4xl sm:text-5xl mb-4">{t('workspace_headline')}</h1>
 
-          {/* Usage bar */}
           {usage && (
             <div className="flex items-center gap-3 mt-4 flex-wrap">
               <span className="flex items-center gap-1.5 text-xs">
@@ -631,38 +557,37 @@ function WorkspacePageContent() {
           )}
         </div>
 
-        {/* Upload zone or preview */}
         <div className="animate-slide-up anim-fill-both delay-100">
           {!preview ? (
             <div className="space-y-5">
               {canReplayWithoutUpload && (
-                <div className="overflow-hidden rounded-[24px] border border-border-subtle bg-[radial-gradient(circle_at_top_left,rgba(200,171,90,0.16),transparent_34%),rgba(18,16,13,0.82)] p-5">
+                <div className="overflow-hidden rounded-[24px] border border-border-subtle bg-[radial-gradient(circle_at_top_left,rgba(200,171,90,0.16),transparent_34%),rgba(18,16,13,0.82)] p-5 animate-fade-in">
                   <div className="grid gap-5 md:grid-cols-[180px_1fr]">
                     <div className="space-y-3">
                       <div className="relative aspect-[4/3] overflow-hidden rounded-xl border border-border bg-raised">
                         {replayPhotoUrl ? (
                           <Image
                             src={replayPhotoUrl}
-                            alt={replayCopy.currentPhoto}
+                            alt={t('replay_current_photo')}
                             fill
                             className="object-cover"
                             unoptimized
                           />
                         ) : (
                           <div className="flex h-full items-center justify-center px-4 text-center text-xs text-ink-subtle">
-                            {replayCopy.currentPhoto}
+                            {t('replay_current_photo')}
                           </div>
                         )}
                       </div>
                       <div className="rounded-full border border-gold/30 bg-gold/10 px-3 py-1 text-center text-[11px] uppercase tracking-[0.22em] text-gold/85">
-                        {replayCopy.currentPhoto}
+                        {t('replay_current_photo')}
                       </div>
                     </div>
 
                     <div className="space-y-5">
                       <div className="space-y-2">
-                        <h2 className="font-display text-2xl text-ink">{replayCopy.title}</h2>
-                        <p className="text-sm leading-7 text-ink-muted">{replayCopy.body}</p>
+                        <h2 className="font-display text-2xl text-ink">{t('replay_title')}</h2>
+                        <p className="text-sm leading-7 text-ink-muted">{t('replay_body')}</p>
                       </div>
 
                       <div>
@@ -754,7 +679,7 @@ function WorkspacePageContent() {
                           }}
                           className="rounded border border-border px-4 py-3 text-sm text-ink-muted transition-all duration-200 hover:border-gold/40 hover:text-ink active:scale-[0.98]"
                         >
-                          {replayCopy.uploadNew}
+                          {t('replay_upload_new')}
                         </button>
                       </div>
                     </div>
@@ -777,97 +702,91 @@ function WorkspacePageContent() {
               )}
             </div>
           ) : (
-            <div className="space-y-5">
-              {/* Image preview */}
-              <div className="photo-frame relative aspect-[4/3] rounded-lg overflow-hidden border border-border bg-raised">
+            <div className="space-y-5 animate-fade-in">
+              <div className="photo-frame relative aspect-[4/3] rounded-lg overflow-hidden border border-border bg-raised group">
                 <Image
                   src={preview}
                   alt="Preview"
                   fill
-                  className="object-contain"
+                  className="object-contain transition-transform duration-500 group-hover:scale-[1.02]"
                   unoptimized
                 />
 
-                {/* Progress overlay */}
                 {stage === 'uploading' && (
-                  <div className="absolute inset-0 bg-void/75 backdrop-blur-[2px] flex flex-col items-center justify-center gap-3">
+                  <div className="absolute inset-0 bg-void/75 backdrop-blur-[2px] flex flex-col items-center justify-center gap-4 transition-all animate-fade-in">
                     <LoadingSpinner size={32} />
-                    <p className="text-sm text-ink-muted">{t('stage_uploading')} {uploadProgress}%</p>
-                    <div className="w-40 h-0.5 bg-border rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-gold rounded-full transition-all duration-300 shadow-[0_0_8px_rgba(200,162,104,0.6)]"
-                        style={{ width: `${uploadProgress}%` }}
-                      />
+                    <div className="flex flex-col items-center gap-2">
+                      <p className="text-sm font-medium text-gold drop-shadow-md">{t('stage_uploading')} {uploadProgress}%</p>
+                      <div className="w-48 h-1 bg-white/10 rounded-full overflow-hidden border border-white/5 shadow-inner">
+                        <div
+                          className="h-full bg-[linear-gradient(90deg,rgba(200,162,104,0.8),rgba(200,162,104,1))] rounded-full transition-all duration-300 shadow-[0_0_12px_rgba(200,162,104,0.8)]"
+                          style={{ width: `${uploadProgress}%` }}
+                        />
+                      </div>
                     </div>
                   </div>
                 )}
 
                 {stage === 'confirming' && (
-                  <div className="absolute inset-0 bg-void/70 flex flex-col items-center justify-center gap-3">
+                  <div className="absolute inset-0 bg-void/70 backdrop-blur-[1px] flex flex-col items-center justify-center gap-3 animate-fade-in">
                     <LoadingSpinner size={32} label={t('stage_confirming')} />
                   </div>
                 )}
 
                 {stage === 'reviewing' && (
-                  <div className="absolute inset-0 bg-void/70 flex flex-col items-center justify-center gap-3">
+                  <div className="absolute inset-0 bg-void/75 backdrop-blur-[2px] flex flex-col items-center justify-center gap-3 animate-fade-in">
                     <LoadingSpinner size={32} label={t('stage_reviewing')} />
                   </div>
                 )}
               </div>
 
-              {/* File info */}
               {selectedFile && (
-                <div className="flex items-center justify-between text-xs text-ink-subtle font-mono">
-                  <span className="truncate max-w-[200px]">{selectedFile.name}</span>
-                  <span>{(selectedFile.size / 1024 / 1024).toFixed(1)} MB</span>
+                <div className="flex items-center justify-between text-[11px] text-ink-subtle font-mono tracking-tight px-1">
+                  <span className="truncate max-w-[240px] opacity-70 italic">{selectedFile.name}</span>
+                  <span className="bg-void/40 px-2 py-0.5 rounded border border-border-subtle">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</span>
                 </div>
               )}
 
-              {/* Status messages */}
               {stage === 'ready' && photo && (
-                <div className="flex items-center gap-2 text-sage text-sm animate-scale-in">
-                  <CheckCircle size={14} />
-                  <span>{t('photo_ready_msg')}</span>
+                <div className="flex items-center gap-2 text-sage text-sm animate-scale-in bg-sage/5 border border-sage/20 px-4 py-2.5 rounded-lg">
+                  <CheckCircle size={14} className="animate-pulse" />
+                  <span className="font-medium">{t('photo_ready_msg')}</span>
                 </div>
               )}
 
               {(stage === 'rejected' || stage === 'error') && (
-                <div className="flex items-center gap-2 text-rust text-sm bg-rust/5 border border-rust/20 rounded px-3 py-2 animate-scale-in">
+                <div className="flex items-center gap-2 text-rust text-sm bg-rust/5 border border-rust/20 rounded-lg px-4 py-3 animate-scale-in">
                   <AlertCircle size={14} className="shrink-0" />
                   <span>{errMessage}</span>
                 </div>
               )}
 
-              {/* Image type selector */}
               {stage === 'ready' && photo && (
-                <div>
-                  <p className="text-xs text-ink-muted mb-3">{t('select_image_type')}</p>
-                  <div className="grid grid-cols-3 gap-2">
-                    {([
-                      ['default', t('image_type_default')],
-                      ['landscape', t('image_type_landscape')],
-                      ['portrait', t('image_type_portrait')],
-                      ['street', t('image_type_street')],
-                      ['still_life', t('image_type_still_life')],
-                      ['architecture', t('image_type_architecture')],
-                    ] as const).map(([id, label]) => (
-                      <button
-                        key={id}
-                        onClick={() => setImageType(id)}
-                        className={`px-3 py-2 rounded border text-xs transition-colors ${imageType === id ? 'border-gold/60 text-gold bg-gold/5' : 'border-border text-ink-muted hover:text-ink hover:border-gold/30'}`}
-                      >
-                        {label}
-                      </button>
-                    ))}
+                <div className="space-y-6 pt-2 animate-slide-up">
+                  <div className="space-y-3">
+                    <p className="text-xs font-mono uppercase tracking-[0.2em] text-ink-subtle">{t('select_image_type')}</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {([
+                        ['default', t('image_type_default')],
+                        ['landscape', t('image_type_landscape')],
+                        ['portrait', t('image_type_portrait')],
+                        ['street', t('image_type_street')],
+                        ['still_life', t('image_type_still_life')],
+                        ['architecture', t('image_type_architecture')],
+                      ] as const).map(([id, label]) => (
+                        <button
+                          key={id}
+                          onClick={() => setImageType(id)}
+                          className={`px-3 py-2.5 rounded-lg border text-xs font-medium transition-all duration-200 active:scale-95 ${imageType === id ? 'border-gold/60 text-gold bg-gold/10 shadow-[0_4px_16px_rgba(200,162,104,0.12)]' : 'border-border text-ink-muted hover:text-ink hover:border-gold/30 hover:bg-raised/40'}`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
 
-              {/* Review mode selector */}
-              {stage === 'ready' && photo && (
-                <>
-                  <div>
-                    <p className="text-xs text-ink-muted mb-3">{t('select_mode')}</p>
+                  <div className="space-y-3">
+                    <p className="text-xs font-mono uppercase tracking-[0.2em] text-ink-subtle">{t('select_mode')}</p>
                     <div className="grid grid-cols-2 gap-3">
                       {(
                         [
@@ -892,12 +811,12 @@ function WorkspacePageContent() {
                           onClick={() => !disabled && setReviewMode(m.id)}
                           disabled={disabled}
                           className={`
-                            flex items-start gap-3 p-4 rounded-lg border text-left transition-all duration-200
+                            flex items-start gap-3 p-4 rounded-xl border text-left transition-all duration-300
                             ${
                               disabled
                                 ? 'opacity-40 cursor-not-allowed border-border'
                                 : reviewMode === m.id
-                                ? 'border-gold/60 bg-gold/5 shadow-[0_0_16px_rgba(200,162,104,0.12)]'
+                                ? 'border-gold/60 bg-gold/10 shadow-[0_8px_32px_rgba(200,162,104,0.14)] scale-[1.02] z-10'
                                 : 'border-border hover:border-gold/30 hover:bg-raised/60 active:scale-[0.98]'
                             }
                           `}
@@ -908,18 +827,18 @@ function WorkspacePageContent() {
                           />
                           <div>
                             <p
-                              className={`text-sm font-medium ${
+                              className={`text-sm font-bold ${
                                 reviewMode === m.id ? 'text-gold' : 'text-ink'
                               }`}
                             >
                               {m.title}
                               {m.id === 'pro' && (
-                                <span className="ml-2 rounded-full border border-gold/25 bg-gold/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] text-gold/80">
+                                <span className="ml-2 rounded-full border border-gold/25 bg-gold/15 px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] text-gold/90 font-mono">
                                   {promoModeBadge}
                                 </span>
                               )}
                             </p>
-                            <p className="text-xs text-ink-muted mt-0.5">
+                            <p className="text-[11px] leading-relaxed text-ink-muted mt-1 font-medium">
                               {disabled ? t('mode_pro_guest') : m.desc}
                             </p>
                           </div>
@@ -929,28 +848,27 @@ function WorkspacePageContent() {
                     </div>
                   </div>
 
-                  <div className="flex gap-3">
+                  <div className="flex gap-3 pt-4">
                     <button
                       onClick={handleReview}
-                      className="btn-gold flex-1 px-6 py-3 bg-gold text-void text-sm font-medium rounded hover:bg-gold-light active:scale-[0.98] transition-all duration-200 hover:shadow-[0_0_24px_rgba(200,162,104,0.35)]"
+                      className="btn-gold flex-1 px-6 py-4 bg-gold text-void text-sm font-bold rounded-full hover:bg-gold-light active:scale-[0.97] transition-all duration-300 hover:shadow-[0_12px_40px_rgba(200,162,104,0.4)] shadow-[0_8px_24px_rgba(200,162,104,0.2)]"
                     >
                       {t('btn_start_review')} {reviewMode === 'pro' ? 'Pro' : 'Flash'} {t('btn_review_suffix')}
                     </button>
                     <button
                       onClick={handleReset}
-                      className="px-4 py-3 border border-border text-ink-muted text-sm rounded hover:border-gold/40 hover:text-ink active:scale-[0.98] transition-all duration-200"
+                      className="px-6 py-4 border border-border text-ink-muted text-sm font-medium rounded-full hover:border-gold/40 hover:text-ink active:scale-[0.97] transition-all duration-300"
                     >
                       {t('btn_change_photo')}
                     </button>
                   </div>
-                </>
+                </div>
               )}
 
-              {/* Error reset */}
               {(stage === 'rejected' || stage === 'error') && (
                 <button
                   onClick={handleReset}
-                  className="w-full px-6 py-3 border border-border text-ink-muted text-sm rounded hover:border-gold/40 hover:text-ink active:scale-[0.98] transition-all duration-200"
+                  className="w-full px-6 py-4 border border-border text-ink-muted text-sm font-medium rounded-full hover:border-gold/40 hover:text-ink active:scale-[0.97] transition-all duration-300"
                 >
                   {t('btn_reupload')}
                 </button>

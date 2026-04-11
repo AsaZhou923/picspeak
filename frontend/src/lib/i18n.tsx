@@ -56,11 +56,29 @@ async function loadTranslations(locale: Locale): Promise<TranslationDictionary> 
   }
 }
 
-export function I18nProvider({ children }: { children: React.ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>('zh');
+export function I18nProvider({
+  children,
+  initialLocale,
+}: {
+  children: React.ReactNode;
+  /** When set, skips localStorage / browser-detection and pins this locale. */
+  initialLocale?: Locale;
+}) {
+  const [locale, setLocaleState] = useState<Locale>(initialLocale ?? 'zh');
   const [messages, setMessages] = useState<TranslationDictionary>(zhTranslations);
 
   useEffect(() => {
+    // If a locale was pinned by the URL route, honour it and persist it.
+    if (initialLocale) {
+      setLocaleState(initialLocale);
+      try {
+        localStorage.setItem(STORAGE_KEY, initialLocale);
+      } catch {
+        // ignore
+      }
+      return;
+    }
+
     try {
       const saved = localStorage.getItem(STORAGE_KEY) as Locale | null;
       if (saved && saved in LOCALE_LABELS) {
@@ -72,6 +90,8 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     }
 
     setLocaleState(detectBrowserLocale());
+    // initialLocale is intentionally excluded — it only applies on first mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
