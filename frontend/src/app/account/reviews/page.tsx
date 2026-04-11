@@ -402,7 +402,7 @@ export default function ReviewHistoryPage() {
           <h1 className="font-display text-4xl sm:text-5xl">{t('account_reviews_headline')}</h1>
         </div>
 
-        <section className="mb-6 rounded-[24px] border border-border-subtle bg-[radial-gradient(circle_at_top_left,rgba(200,171,90,0.14),transparent_35%),rgba(18,16,13,0.72)] p-5">
+        <section className="mb-6 rounded-[24px] border border-border-subtle bg-[radial-gradient(circle_at_top_left,rgba(200,171,90,0.14),transparent_35%),rgb(var(--color-surface)/0.72)] p-5">
           <div className="mb-4 flex items-center gap-2 text-sm text-ink">
             <SlidersHorizontal size={15} className="text-gold" />
             <span>{copy.filtersLabel}</span>

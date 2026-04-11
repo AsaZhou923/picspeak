@@ -61,7 +61,7 @@ export default function UpdatesPage() {
           <p className="mt-4 text-sm leading-7 text-ink-muted">{copy.intro}</p>
         </div>
 
-        <section className="overflow-hidden rounded-[28px] border border-border-subtle bg-[radial-gradient(circle_at_top_left,rgba(200,171,90,0.14),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(149,113,87,0.1),transparent_38%),rgba(18,16,13,0.8)]">
+        <section className="overflow-hidden rounded-[28px] border border-border-subtle bg-[radial-gradient(circle_at_top_left,rgba(200,171,90,0.14),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(149,113,87,0.1),transparent_38%),rgb(var(--color-surface)/0.8)]">
           <div className="border-b border-border-subtle px-6 py-5">
             <div className="flex flex-wrap items-center justify-between gap-4 text-sm text-ink">
               <div className="flex items-center gap-3">

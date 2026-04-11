@@ -14,6 +14,7 @@ if str(BACKEND_ROOT) not in sys.path:
 
 from app.api.routes import (
     Review,
+    _build_photo_proxy_url,
     _decode_public_gallery_cursor,
     _encode_public_gallery_cursor,
     _gallery_rank_score_value,
@@ -70,6 +71,25 @@ class PublicGalleryRouteTests(unittest.TestCase):
         self.assertEqual(recommendations[1]['score_percentile'], 0.0)
         self.assertTrue(recommendations[8]['recommended'])
         self.assertEqual(recommendations[8]['score_percentile'], 100.0)
+
+    def test_build_photo_proxy_url_prefers_https_for_forwarded_requests(self) -> None:
+        request = SimpleNamespace(
+            base_url='http://internal/',
+            headers={
+                'host': 'internal',
+                'x-forwarded-host': 'api.picspeak.art',
+                'x-forwarded-proto': 'https',
+            },
+            url_for=lambda _route_name, photo_id: f'http://internal/api/v1/photos/{photo_id}/image',
+        )
+
+        with patch('app.api.routes.sign_payload', return_value='signed-token'):
+            url = _build_photo_proxy_url(request, 'pho_123', 'usr_456')
+
+        self.assertEqual(
+            url,
+            'https://api.picspeak.art/api/v1/photos/pho_123/image?photo_token=signed-token',
+        )
 
     def test_list_public_gallery_returns_total_count(self) -> None:
         request = SimpleNamespace()

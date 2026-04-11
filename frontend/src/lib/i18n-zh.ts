@@ -56,7 +56,7 @@ export const zhTranslations = {
     pro_offer_highlight: '首发促销',
     updates_label: '更新记录',
     updates_hint_home: '查看公开长廊更新',
-    updates_hint_latest: '查看多语言首页、SEO 路由与长廊重构更新',
+    updates_hint_latest: '查看博客上线、画廊排序与深色主题优化',
     contact_label: '联系方式',
     contact_headline: '保持联系',
 
@@ -210,6 +210,10 @@ export const zhTranslations = {
     filter_all_types: '全部类型',
     filter_apply: '应用筛选',
     filter_reset: '重置',
+  gallery_sort_default: '推荐',
+  gallery_sort_latest: '最新',
+  gallery_sort_score: '最高分',
+  gallery_sort_likes: '最多赞',
     filter_date_placeholder: 'yyyy/mm/dd',
     filter_calendar_label: '{label} 日历',
 

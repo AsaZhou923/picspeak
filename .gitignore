@@ -32,4 +32,5 @@ start-dev.bat
 .env*.local
 .omx/
 .omc/
+.claude/
 deploy/

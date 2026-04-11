@@ -21,7 +21,7 @@ from fastapi.responses import RedirectResponse, StreamingResponse
 from PIL import Image, ImageOps, UnidentifiedImageError
 from urllib import error as urllib_error
 from urllib import parse, request as urllib_request
-from sqlalchemy import and_, func, or_
+from sqlalchemy import and_, func, or_, cast, Float, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -292,6 +292,25 @@ def _build_storage_photo_url(bucket: str, object_key: str) -> str:
     return f'{base}/{quote(object_key)}'
 
 
+def _request_origin(request: Request) -> tuple[str, str]:
+    base = urlsplit(str(request.base_url))
+    forwarded_proto = request.headers.get('x-forwarded-proto', '').split(',', 1)[0].strip()
+    forwarded_host = request.headers.get('x-forwarded-host', '').split(',', 1)[0].strip()
+    host = forwarded_host or request.headers.get('host', '').strip() or base.netloc
+    scheme = forwarded_proto or base.scheme
+
+    if scheme == 'http' and host and not host.startswith('localhost') and not host.startswith('127.0.0.1'):
+        scheme = 'https'
+
+    return scheme or base.scheme, host or base.netloc
+
+
+def _request_url_for(request: Request, route_name: str, **path_params: str | int) -> str:
+    resolved = urlsplit(str(request.url_for(route_name, **path_params)).rstrip('?'))
+    scheme, host = _request_origin(request)
+    return urlunsplit((scheme, host, resolved.path, resolved.query, resolved.fragment))
+
+
 def _photo_client_meta(photo: Photo) -> dict[str, Any]:
     return dict(photo.client_meta) if isinstance(photo.client_meta, dict) else {}
 
@@ -370,7 +389,7 @@ def _build_photo_proxy_url(
         photo_token = sign_payload(payload, ttl_seconds=PHOTO_PROXY_TTL_SECONDS)
 
     query_parts.append(f'photo_token={quote(photo_token)}')
-    return str(request.url_for(route_name, photo_id=photo_public_id)).rstrip('?') + '?' + '&'.join(query_parts)
+    return _request_url_for(request, route_name, photo_id=photo_public_id) + '?' + '&'.join(query_parts)
 
 
 def _find_photo_from_token(db: Session, photo_id: str, photo_token: str, size: int | None = None) -> Photo:
@@ -2043,6 +2062,7 @@ def list_public_gallery(
     min_score: float | None = Query(default=None, ge=0, le=10),
     max_score: float | None = Query(default=None, ge=0, le=10),
     image_type: str | None = Query(default=None, pattern='^(default|landscape|portrait|street|still_life|architecture)$'),
+    sort: str = Query(default='default', pattern='^(default|latest|score|likes)$'),
     authorization: str | None = Header(default=None),
     db: Session = Depends(get_db),
 ):
@@ -2053,7 +2073,21 @@ def list_public_gallery(
 
     viewer = _optional_gallery_viewer(authorization, db)
     gallery_filters = _public_gallery_filters()
-    rank_score = _gallery_rank_score_expr().label('gallery_rank_score')
+
+    if sort == 'latest':
+        primary_expr = cast(func.extract('epoch', Review.gallery_added_at), Float).label('gallery_primary_val')
+    elif sort == 'score':
+        primary_expr = cast(Review.final_score, Float).label('gallery_primary_val')
+    elif sort == 'likes':
+        primary_expr = (
+            select(func.count(ReviewLike.id))
+            .where(ReviewLike.review_id == Review.id)
+            .scalar_subquery()
+            .label('gallery_primary_val')
+        )
+    else:
+        primary_expr = _gallery_rank_score_expr().label('gallery_primary_val')
+
     count_query = db.query(func.count(Review.id)).filter(*gallery_filters)
     count_query = _apply_review_history_filters(
         count_query,
@@ -2066,11 +2100,11 @@ def list_public_gallery(
     )
     total_count = count_query.scalar() or 0
     query = (
-        db.query(Review, Photo, User, rank_score)
+        db.query(Review, Photo, User, primary_expr)
         .join(Photo, Photo.id == Review.photo_id)
         .join(User, User.id == Review.owner_user_id)
         .filter(*gallery_filters)
-        .order_by(rank_score.desc(), Review.gallery_added_at.desc(), Review.id.desc())
+        .order_by(primary_expr.desc(), Review.gallery_added_at.desc(), Review.id.desc())
     )
     query = _apply_review_history_filters(
         query,
@@ -2083,23 +2117,24 @@ def list_public_gallery(
     )
 
     if cursor:
-        cursor_score, cursor_dt, cursor_review_id = _decode_public_gallery_cursor(cursor)
-        if cursor_score is None or cursor_review_id is None:
+        cursor_val, cursor_dt, cursor_review_id = _decode_public_gallery_cursor(cursor)
+        if cursor_val is None or cursor_review_id is None:
             query = query.filter(Review.gallery_added_at < cursor_dt)
         else:
-            same_rank = func.abs(rank_score - cursor_score) <= GALLERY_CURSOR_SCORE_EPSILON
+            # Using 1e-9 epsilon for stable comparison across all sort types.
+            same_val = func.abs(primary_expr - cursor_val) <= 1e-9
             query = query.filter(
                 or_(
-                    rank_score < cursor_score - GALLERY_CURSOR_SCORE_EPSILON,
-                    and_(same_rank, Review.gallery_added_at < cursor_dt),
-                    and_(same_rank, Review.gallery_added_at == cursor_dt, Review.id < cursor_review_id),
+                    primary_expr < cursor_val - 1e-9,
+                    and_(same_val, Review.gallery_added_at < cursor_dt),
+                    and_(same_val, Review.gallery_added_at == cursor_dt, Review.id < cursor_review_id),
                 )
             )
 
     rows = query.limit(limit + 1).all()
     has_next = len(rows) > limit
     rows = rows[:limit]
-    review_ids = [review.id for review, _photo, _owner, _rank_score in rows]
+    review_ids = [review.id for review, _photo, _owner, _primary_val in rows]
     like_counts = _gallery_like_counts(db, review_ids)
     viewer_likes = _gallery_viewer_likes(db, review_ids, None if viewer is None else viewer.id)
     recommendations = _gallery_recommendation_map(db, review_ids)
@@ -2113,13 +2148,13 @@ def list_public_gallery(
             liked_by_viewer=review.id in viewer_likes,
             recommendation=recommendations.get(review.id),
         )
-        for review, photo, owner, _rank_score in rows
+        for review, photo, owner, _primary_val in rows
     ]
     next_cursor = None
     if has_next and rows and rows[-1][0].gallery_added_at:
-        last_review, _last_photo, _last_owner, last_rank_score = rows[-1]
+        last_review, _last_photo, _last_owner, last_primary_val = rows[-1]
         next_cursor = _encode_public_gallery_cursor(
-            rank_score=float(last_rank_score),
+            rank_score=float(last_primary_val),
             gallery_added_at=last_review.gallery_added_at,
             review_id=last_review.id,
         )

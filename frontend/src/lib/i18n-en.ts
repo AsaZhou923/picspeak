@@ -58,7 +58,7 @@ export const enTranslations = {
     pro_offer_highlight: 'Launch Offer',
     updates_label: 'Updates',
     updates_hint_home: 'See the public gallery update',
-    updates_hint_latest: 'See the latest locale-pinned home, SEO routing, and gallery refactor update',
+    updates_hint_latest: 'See the latest blog launch, gallery sort, and dark theme update',
     contact_label: 'Contact',
     contact_headline: 'Get in Touch',
 
@@ -211,6 +211,10 @@ export const enTranslations = {
     filter_all_types: 'All types',
     filter_apply: 'Apply',
     filter_reset: 'Reset',
+  gallery_sort_default: 'Recommended',
+  gallery_sort_latest: 'Latest',
+  gallery_sort_score: 'Top Score',
+  gallery_sort_likes: 'Most Likes',
     filter_date_placeholder: 'yyyy/mm/dd',
     filter_calendar_label: '{label} calendar',
 

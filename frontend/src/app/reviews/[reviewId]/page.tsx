@@ -756,9 +756,9 @@ export default function ReviewPage() {
           className="fixed inset-0 z-50 flex items-center justify-center px-6"
           onClick={() => setGalleryConfirmOpen(false)}
         >
-          <div className="absolute inset-0 bg-[#050505]/98" />
+          <div className="absolute inset-0 bg-void/95" />
           <div
-            className="relative w-full max-w-lg overflow-hidden rounded-[24px] border border-[#2b2722] bg-[#11100e] p-6 shadow-[0_32px_96px_rgba(0,0,0,0.72)] animate-fade-in"
+            className="relative w-full max-w-lg overflow-hidden rounded-[24px] border border-border bg-surface p-6 shadow-[0_32px_96px_rgba(0,0,0,0.72)] animate-fade-in"
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"
@@ -782,7 +782,7 @@ export default function ReviewPage() {
                 {galleryActionCopy.dialogTitle}
               </h2>
               <p className="mt-3 text-sm leading-7 text-ink-muted">{galleryActionCopy.dialogBody}</p>
-              <div className="mt-4 rounded-2xl border border-[#26231f] bg-[#161412] px-4 py-3 text-xs leading-6 text-ink-muted">
+              <div className="mt-4 rounded-2xl border border-border-subtle bg-raised px-4 py-3 text-xs leading-6 text-ink-muted">
                 {galleryActionCopy.dialogFootnote}
               </div>
             </div>
@@ -1106,7 +1106,7 @@ export default function ReviewPage() {
             </div>
 
             {showGalleryCta && (
-              <section className="relative overflow-hidden rounded-[24px] border border-border-subtle bg-[radial-gradient(circle_at_top_left,rgba(200,171,90,0.16),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(149,113,87,0.14),transparent_36%),rgba(18,16,13,0.76)] px-5 py-5">
+              <section className="relative overflow-hidden rounded-[24px] border border-border-subtle bg-[radial-gradient(circle_at_top_left,rgba(200,171,90,0.16),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(149,113,87,0.14),transparent_36%),rgb(var(--color-surface)/0.76)] px-5 py-5">
                 <div className="absolute inset-0 opacity-25 [background-image:linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] [background-size:20px_20px]" />
                 <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div className="max-w-xl">

@@ -224,7 +224,7 @@ export default function FavoritesPage() {
         {loading ? (
           <SkeletonList />
         ) : items.length === 0 ? (
-          <div className="overflow-hidden rounded-[24px] border border-border-subtle bg-[radial-gradient(circle_at_top_left,rgba(200,171,90,0.18),transparent_34%),rgba(18,16,13,0.8)] px-6 py-12 text-center">
+          <div className="overflow-hidden rounded-[24px] border border-border-subtle bg-[radial-gradient(circle_at_top_left,rgba(200,171,90,0.18),transparent_34%),rgb(var(--color-surface)/0.8)] px-6 py-12 text-center">
             <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full border border-rust/25 bg-rust/10 text-rust">
               <Heart size={20} />
             </div>

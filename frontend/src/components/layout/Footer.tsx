@@ -3,10 +3,12 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { Github, Twitter } from 'lucide-react';
+import { getBlogUi } from '@/lib/blog-data';
 import { useI18n } from '@/lib/i18n';
 
 export default function Footer() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const blogUi = getBlogUi(locale);
 
   return (
     <footer className="border-t border-border-subtle py-10 mt-auto">
@@ -28,6 +30,9 @@ export default function Footer() {
           </Link>
           <Link href="/workspace" className="hover:text-ink transition-colors">
             {t('footer_workspace')}
+          </Link>
+          <Link href={`/${locale}/blog`} className="hover:text-ink transition-colors">
+            {blogUi.footerLabel}
           </Link>
           <Link href="/affiliate" className="hover:text-ink transition-colors">
             {t('footer_affiliate')}

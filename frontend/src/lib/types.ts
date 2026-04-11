@@ -253,6 +253,7 @@ export interface PublicGalleryQuery {
   min_score?: number;
   max_score?: number;
   image_type?: ImageType;
+  sort?: string;
 }
 
 export interface ReviewShareResponse {

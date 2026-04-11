@@ -4,13 +4,18 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { Moon, Sun } from 'lucide-react';
+import { getBlogUi } from '@/lib/blog-data';
 import { useTheme } from '@/lib/theme-context';
 import { LOCALE_LABELS, Locale, useI18n } from '@/lib/i18n';
 
-const MARKETING_LINKS: Array<{ href: string; key: 'nav_home' | 'nav_workspace' | 'nav_gallery' | 'nav_affiliate' }> = [
+const MARKETING_LINKS: Array<
+  | { href: string; key: 'nav_home' | 'nav_workspace' | 'nav_gallery' | 'nav_affiliate' }
+  | { href: string; label: string }
+> = [
   { href: '/', key: 'nav_home' },
   { href: '/workspace', key: 'nav_workspace' },
   { href: '/gallery', key: 'nav_gallery' },
+  { href: '/blog', label: 'Blog' },
   { href: '/affiliate', key: 'nav_affiliate' },
 ];
 
@@ -18,9 +23,12 @@ export default function MarketingHeader() {
   const pathname = usePathname();
   const { theme, toggleTheme } = useTheme();
   const { t, locale, setLocale } = useI18n();
+  const blogUi = getBlogUi(locale);
 
   const activeClass = (href: string) =>
-    pathname === href ? 'text-gold' : 'text-ink-muted hover:text-ink';
+    (href === '/' ? pathname === href : pathname === href || pathname?.startsWith(`${href}/`))
+      ? 'text-gold'
+      : 'text-ink-muted hover:text-ink';
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 border-b border-border-subtle bg-void/90 backdrop-blur-md">
@@ -43,7 +51,7 @@ export default function MarketingHeader() {
         <nav className="hidden md:flex items-center gap-6 text-sm min-w-0">
           {MARKETING_LINKS.map((link) => (
             <Link key={link.href} href={link.href} className={`transition-colors ${activeClass(link.href)}`}>
-              {t(link.key)}
+              {'key' in link ? t(link.key) : blogUi.navLabel}
             </Link>
           ))}
         </nav>

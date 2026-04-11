@@ -135,7 +135,7 @@ export default function ActivationCodeModal({
                 value={code}
                 onChange={(event) => setCode(event.target.value.toUpperCase())}
                 placeholder="例如 PSCN-ABCD-EFGH-JKLM"
-                className="w-full rounded-2xl border border-white/10 bg-[#111111] px-5 py-4 text-xl text-white outline-none transition-colors placeholder:text-white/35 focus:border-gold/40"
+                className="w-full rounded-2xl border border-white/10 bg-surface px-5 py-4 text-xl text-white outline-none transition-colors placeholder:text-white/35 focus:border-gold/40"
                 autoCapitalize="characters"
                 autoCorrect="off"
                 spellCheck={false}

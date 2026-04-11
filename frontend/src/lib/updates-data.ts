@@ -18,6 +18,38 @@ export function getProductUpdates(locale: UpdateLocale): ProductUpdateEntry[] {
   if (locale === 'ja') {
     return [
       {
+        id: '2026-04-11-blog-gallery-sort-theme',
+        date: '2026-04-11',
+        title: 'ブログ・ギャラリーソート・ダークテーマを追加',
+        summary:
+          '6 本の三言語ブログ記事を公開し、ギャラリーに4種ソートを追加。ダークモード配色を暖色系へ調整しました。',
+        docPath: 'docs/changelog/update-log-2026-04-11-blog-gallery-sort-theme.md',
+        sections: [
+          {
+            title: 'ブログモジュール',
+            items: [
+              '中・英・日 6 本の SEO 記事を収録したブログを新設し、ナビ・フッター・ホームに導線を追加',
+              'sitemap に全言語のブログ記事 URL と hreflang を追加',
+              '言語切り替え時、locale 付き URL も正しく遷移するように改善',
+            ],
+          },
+          {
+            title: 'ギャラリーソート',
+            items: [
+              'ギャラリーに推薦・最新・高評価・人気の 4 種ソートを追加',
+              'バックエンドのソート対応とフロントエンドの UI を同時に実装',
+            ],
+          },
+          {
+            title: 'テーマとスタイル統一',
+            items: [
+              'ダークモードを暖色系に調整し、ハードコーディングされた色値を CSS 変数へ統一',
+              'リバースプロキシ環境で画像 URL が正しく HTTPS を返すよう修正',
+            ],
+          },
+        ],
+      },
+      {
         id: '2026-04-10-locale-seo-and-gallery-refactor',
         date: '2026-04-10',
         title: '多言語ホーム導線、SEO ルーティング、ギャラリー構成を刷新',
@@ -255,6 +287,38 @@ export function getProductUpdates(locale: UpdateLocale): ProductUpdateEntry[] {
   if (locale === 'en') {
     return [
       {
+        id: '2026-04-11-blog-gallery-sort-theme',
+        date: '2026-04-11',
+        title: 'Blog Module, Gallery Sort, and Dark Theme Refinement',
+        summary:
+          'Launched a trilingual blog with 6 SEO articles, added gallery sorting (recommended, latest, top score, most likes), and recalibrated the dark theme to a warmer tone.',
+        docPath: 'docs/changelog/update-log-2026-04-11-blog-gallery-sort-theme.md',
+        sections: [
+          {
+            title: 'Blog Module',
+            items: [
+              'Added a /[locale]/blog route with 6 trilingual photography articles and full SSR metadata',
+              'Wired blog links into Header, Footer, MarketingHeader, and home page',
+              'Extended sitemap with per-locale blog index and per-post hreflang entries',
+            ],
+          },
+          {
+            title: 'Gallery Sort',
+            items: [
+              'Gallery now supports recommended, latest, top score, and most likes sort modes',
+              'Backend sort parameter reuses the existing three-part cursor pagination',
+            ],
+          },
+          {
+            title: 'Theme and Style Unification',
+            items: [
+              'Shifted dark-mode palette to warmer tones and replaced hard-coded rgba values with CSS variables',
+              'Photo proxy URLs now respect X-Forwarded-* headers for correct HTTPS generation behind reverse proxies',
+            ],
+          },
+        ],
+      },
+      {
         id: '2026-04-10-locale-seo-and-gallery-refactor',
         date: '2026-04-10',
         title: 'Locale-Pinned Home Routes, SEO Signals, and Gallery UI Refactor',
@@ -490,6 +554,38 @@ export function getProductUpdates(locale: UpdateLocale): ProductUpdateEntry[] {
   }
 
   return [
+    {
+      id: '2026-04-11-blog-gallery-sort-theme',
+      date: '2026-04-11',
+      title: '博客模块、画廊排序与深色主题优化',
+      summary:
+        '上线三语博客（6 篇 SEO 文章），画廊新增推荐/最新/最高分/最多赞排序，深色模式切换到更温暖的色调。',
+      docPath: 'docs/changelog/update-log-2026-04-11-blog-gallery-sort-theme.md',
+      sections: [
+        {
+          title: '博客模块',
+          items: [
+            '新增 /[locale]/blog 路由，包含 6 篇中英日摄影学习文章，带完整 SSR Metadata',
+            '导航栏、页脚和首页均新增博客入口链接',
+            'sitemap 扩展覆盖博客索引和每篇文章的多语 hreflang',
+          ],
+        },
+        {
+          title: '画廊排序',
+          items: [
+            '画廊新增推荐/最新/最高分/最多赞 4 种排序，后端复用已有游标分页机制',
+            '筛选面板新增排序按钮组，当前选中项金色高亮',
+          ],
+        },
+        {
+          title: '主题与样式统一',
+          items: [
+            '深色模式 9 个基础色值改为暖褐色调，多处硬编码色值统一使用 CSS 变量',
+            '后端代理 URL 适配反向代理 X-Forwarded-* 头，非 localhost 自动升级 HTTPS',
+          ],
+        },
+      ],
+    },
     {
       id: '2026-04-10-locale-seo-and-gallery-refactor',
       date: '2026-04-10',

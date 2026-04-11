@@ -7,6 +7,7 @@ import { Sun, Moon, ChevronDown, Camera, Clock, BarChart2, BadgeDollarSign, Layo
 import { Show, SignInButton, SignUpButton, UserButton } from '@clerk/nextjs';
 import { useAuth } from '@/lib/auth-context';
 import { planLabel, planColor } from '@/lib/auth-context';
+import { getBlogUi } from '@/lib/blog-data';
 import { useTheme } from '@/lib/theme-context';
 import { useI18n, LOCALE_LABELS, Locale } from '@/lib/i18n';
 import { useState, useRef, useEffect } from 'react';
@@ -18,12 +19,29 @@ const AUTH_LABELS: Record<Locale, { signIn: string; signUp: string }> = {
   ja: { signIn: 'サインイン', signUp: '新規登録' },
 };
 
+const LOCALE_PREFIXES: readonly string[] = ['zh', 'en', 'ja'];
+
 function LanguageSwitcher() {
   const { locale, setLocale } = useI18n();
+  const pathname = usePathname();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useOnClickOutside(ref, () => setOpen(false));
+
+  const handleSwitch = (l: Locale) => {
+    setLocale(l);
+    setOpen(false);
+
+    // If we're on a locale-prefixed route, navigate to the equivalent URL
+    // under the new locale so the inner I18nProvider picks up the change.
+    const segments = pathname.split('/');
+    if (segments.length >= 2 && LOCALE_PREFIXES.includes(segments[1])) {
+      segments[1] = l;
+      router.push(segments.join('/'));
+    }
+  };
 
   return (
     <div ref={ref} className="relative">
@@ -40,7 +58,7 @@ function LanguageSwitcher() {
           {(Object.keys(LOCALE_LABELS) as Locale[]).map((l) => (
             <button
               key={l}
-              onClick={() => { setLocale(l); setOpen(false); }}
+              onClick={() => handleSwitch(l)}
               className={`w-full text-left px-3 py-2 text-sm transition-colors ${locale === l ? 'text-gold bg-gold/5' : 'text-ink-muted hover:text-ink hover:bg-raised'}`}
             >
               {LOCALE_LABELS[l]}
@@ -52,9 +70,11 @@ function LanguageSwitcher() {
   );
 }
 
+
 function QuickLinksMenu() {
   const pathname = usePathname();
   const { t, locale } = useI18n();
+  const blogUi = getBlogUi(locale);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -69,6 +89,7 @@ function QuickLinksMenu() {
 
   const links = [
     { href: '/account/favorites', label: favoritesLabel, icon: Heart },
+    { href: `/${locale}/blog`, label: blogUi.navLabel, icon: LayoutGrid, className: 'md:hidden' },
     { href: '/affiliate', label: t('nav_affiliate'), icon: BadgeDollarSign },
     { href: '/account/usage', label: t('nav_usage'), icon: BarChart2 },
   ];
@@ -90,13 +111,13 @@ function QuickLinksMenu() {
 
       {open && (
         <div className="absolute right-0 top-full z-50 mt-2 w-48 overflow-hidden rounded-2xl border border-border-subtle bg-void/95 p-1.5 shadow-[0_18px_48px_rgba(0,0,0,0.28)] backdrop-blur-xl">
-          {links.map(({ href, label, icon: Icon }) => {
+          {links.map(({ href, label, icon: Icon, className }) => {
             const active = pathname === href;
             return (
               <Link
                 key={href}
                 href={href}
-                className={`flex items-center gap-3 rounded-[14px] px-3 py-2.5 text-sm transition-colors ${
+                className={`${className ?? ''} flex items-center gap-3 rounded-[14px] px-3 py-2.5 text-sm transition-colors ${
                   active
                     ? 'bg-gold/10 text-gold'
                     : 'text-ink-muted hover:bg-raised hover:text-ink'
@@ -120,13 +141,16 @@ export default function Header() {
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
   const { t, locale } = useI18n();
+  const blogUi = getBlogUi(locale);
   const authLabels = AUTH_LABELS[locale];
   const isLegacyAuthenticated = Boolean(
     userInfo && userInfo.plan !== 'guest' && userInfo.auth_provider !== 'clerk'
   );
 
   const isActive = (href: string) =>
-    pathname === href ? 'text-gold' : 'text-ink-muted hover:text-ink';
+    (href === '/' ? pathname === href : pathname === href || pathname?.startsWith(`${href}/`))
+      ? 'text-gold'
+      : 'text-ink-muted hover:text-ink';
 
   const handleLogout = () => {
     logout();
@@ -162,6 +186,9 @@ export default function Header() {
           </Link>
           <Link href="/gallery" className={`transition-colors ${isActive('/gallery')}`}>
             {t('nav_gallery')}
+          </Link>
+          <Link href={`/${locale}/blog`} className={`transition-colors ${isActive(`/${locale}/blog`)}`}>
+            {blogUi.navLabel}
           </Link>
           {userInfo && (
             <>

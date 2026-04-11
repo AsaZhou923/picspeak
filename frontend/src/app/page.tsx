@@ -4,7 +4,8 @@ import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import Link from 'next/link';
 import Script from 'next/script';
-import { ArrowRight, Aperture, Zap, Star, BarChart2, Mail } from 'lucide-react';
+import { ArrowRight, Aperture, Zap, Star, BarChart2, Mail, BookOpenText } from 'lucide-react';
+import { getBlogUi } from '@/lib/blog-data';
 import ScoreRing from '@/components/ui/ScoreRing';
 import { DEMO_IMAGE_URL, DEMO_REVIEW_ID } from '@/lib/demo-review';
 import { useI18n } from '@/lib/i18n';
@@ -39,6 +40,7 @@ const DEMO_SCORES_KEYS = [
 
 export default function HomePage() {
   const { t, locale } = useI18n();
+  const blogUi = getBlogUi(locale);
 
   const softwareJsonLd = {
     '@context': 'https://schema.org',
@@ -384,14 +386,27 @@ export default function HomePage() {
             </a>
           </div>
           <div className="mt-8 flex justify-end">
-            <Link
-              href="/updates"
-              className="inline-flex items-center gap-2 text-xs text-ink-subtle transition-colors hover:text-gold group"
-            >
-              <span>{t('updates_label')}</span>
-              <span className="hidden sm:inline opacity-60 group-hover:opacity-100 transition-opacity">{t('updates_hint_latest')}</span>
-              <ArrowRight size={11} className="transition-transform group-hover:translate-x-0.5" />
-            </Link>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Link
+                href={`/${locale}/blog`}
+                className="inline-flex items-center gap-2 text-xs text-ink-subtle transition-colors hover:text-gold group"
+              >
+                <BookOpenText size={12} className="text-gold/75 transition-colors group-hover:text-gold" />
+                <span>{blogUi.homeLabel}</span>
+                <span className="hidden sm:inline opacity-60 group-hover:opacity-100 transition-opacity">
+                  {blogUi.homeHint}
+                </span>
+                <ArrowRight size={11} className="transition-transform group-hover:translate-x-0.5" />
+              </Link>
+              <Link
+                href="/updates"
+                className="inline-flex items-center gap-2 text-xs text-ink-subtle transition-colors hover:text-gold group"
+              >
+                <span>{t('updates_label')}</span>
+                <span className="hidden sm:inline opacity-60 group-hover:opacity-100 transition-opacity">{t('updates_hint_latest')}</span>
+                <ArrowRight size={11} className="transition-transform group-hover:translate-x-0.5" />
+              </Link>
+            </div>
           </div>
         </div>
       </section>

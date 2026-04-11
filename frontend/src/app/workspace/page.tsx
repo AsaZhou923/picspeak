@@ -561,7 +561,7 @@ function WorkspacePageContent() {
           {!preview ? (
             <div className="space-y-5">
               {canReplayWithoutUpload && (
-                <div className="overflow-hidden rounded-[24px] border border-border-subtle bg-[radial-gradient(circle_at_top_left,rgba(200,171,90,0.16),transparent_34%),rgba(18,16,13,0.82)] p-5 animate-fade-in">
+                <div className="overflow-hidden rounded-[24px] border border-border-subtle bg-[radial-gradient(circle_at_top_left,rgba(200,171,90,0.16),transparent_34%),rgb(var(--color-surface)/0.82)] p-5 animate-fade-in">
                   <div className="grid gap-5 md:grid-cols-[180px_1fr]">
                     <div className="space-y-3">
                       <div className="relative aspect-[4/3] overflow-hidden rounded-xl border border-border bg-raised">

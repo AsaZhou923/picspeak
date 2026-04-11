@@ -30,15 +30,15 @@
 }
 
 .dark {
-  --color-void:         8   8   8;
-  --color-surface:      15  15  15;
-  --color-raised:       22  22  22;
-  --color-overlay:      30  30  30;
-  --color-ink:          240 236 229;
-  --color-ink-muted:    154 149 144;
-  --color-ink-subtle:   74  71  67;
-  --color-border-subtle:34  34  34;
-  --color-border:       46  46  46;
+  --color-void:         17  16  15;
+  --color-surface:      24  22  20;
+  --color-raised:       31  28  24;
+  --color-overlay:      38  35  31;
+  --color-ink:          238 234 228;
+  --color-ink-muted:    168 160 152;
+  --color-ink-subtle:   116 108 100;
+  --color-border-subtle:44  40  36;
+  --color-border:       64  58  52;
 }
 
 /* ─── Base Reset & Body ───────────────────────────────────────────────────── */
@@ -342,7 +342,7 @@ h3 {
 
 .dark .date-field {
   color-scheme: dark;
-  background-color: rgba(8, 8, 8, 0.72);
+  background-color: rgba(17, 16, 15, 0.72);
 }
 
 .dark .date-field::-webkit-calendar-picker-indicator {

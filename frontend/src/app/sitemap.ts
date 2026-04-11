@@ -1,9 +1,13 @@
 import type { MetadataRoute } from 'next';
 import { DEMO_REVIEW_ID } from '@/lib/demo-review';
+import { getBlogPosts } from '@/lib/blog-data';
 import { siteConfig } from '@/lib/site';
+
+const LOCALES = ['zh', 'en', 'ja'] as const;
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
+  const blogPosts = getBlogPosts('en');
 
   return [
     // Root page (x-default)
@@ -87,6 +91,34 @@ export default function sitemap(): MetadataRoute.Sitemap {
         },
       },
     },
+    // Blog index — one entry per locale
+    ...LOCALES.map((locale) => ({
+      url: `${siteConfig.url}/${locale}/blog`,
+      lastModified: now,
+      changeFrequency: 'weekly' as const,
+      priority: 0.7,
+      alternates: {
+        languages: Object.fromEntries([
+          ...LOCALES.filter((l) => l !== locale).map((l) => [l, `${siteConfig.url}/${l}/blog`]),
+          ['x-default', `${siteConfig.url}/en/blog`],
+        ]),
+      },
+    })),
+    // Blog posts — one entry per locale × slug
+    ...LOCALES.flatMap((locale) =>
+      blogPosts.map((post) => ({
+        url: `${siteConfig.url}/${locale}/blog/${post.slug}`,
+        lastModified: new Date(post.updatedAt),
+        changeFrequency: 'monthly' as const,
+        priority: 0.65,
+        alternates: {
+          languages: Object.fromEntries([
+            ...LOCALES.filter((l) => l !== locale).map((l) => [l, `${siteConfig.url}/${l}/blog/${post.slug}`]),
+            ['x-default', `${siteConfig.url}/en/blog/${post.slug}`],
+          ]),
+        },
+      }))
+    ),
     {
       url: `${siteConfig.url}/updates`,
       lastModified: new Date('2026-03-21'),

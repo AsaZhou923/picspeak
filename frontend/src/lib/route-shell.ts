@@ -9,9 +9,9 @@ export function isMarketingRoute(pathname: string | null | undefined): boolean {
 
   return (
     pathname.startsWith('/affiliate') ||
+    pathname.startsWith('/blog') ||
     pathname.startsWith('/updates') ||
     pathname.startsWith('/share') ||
     pathname.startsWith('/error')
   );
 }
-

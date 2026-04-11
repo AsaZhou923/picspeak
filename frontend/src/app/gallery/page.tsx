@@ -26,6 +26,7 @@ const EMPTY_FILTERS: FilterDraft = {
   minScore: '',
   maxScore: '',
   imageType: '',
+  sort: 'default',
 };
 
 function displayDateToIso(value: string): string | null {
@@ -62,6 +63,7 @@ function galleryFiltersFromSearchParams(searchParams: URLSearchParams): FilterDr
     minScore: searchParams.get('min_score') ?? '',
     maxScore: searchParams.get('max_score') ?? '',
     imageType: (searchParams.get('image_type') as any) ?? '',
+    sort: searchParams.get('sort') ?? 'default',
   };
 }
 
@@ -75,6 +77,7 @@ function buildGallerySearchParams(filters: FilterDraft, options?: { restore?: bo
   if (filters.minScore !== '') params.set('min_score', filters.minScore);
   if (filters.maxScore !== '') params.set('max_score', filters.maxScore);
   if (filters.imageType) params.set('image_type', filters.imageType);
+  if (filters.sort && filters.sort !== 'default') params.set('sort', filters.sort);
   if (options?.restore) params.set('restore', '1');
 
   return params;
@@ -99,6 +102,9 @@ function toGalleryQuery(filters: FilterDraft): PublicGalleryQuery {
   }
   if (filters.imageType) {
     query.image_type = filters.imageType as any;
+  }
+  if (filters.sort) {
+    query.sort = filters.sort;
   }
 
   return query;
@@ -342,6 +348,12 @@ function GalleryPageContent() {
     pushFilterState(EMPTY_FILTERS);
   };
 
+  const handleSortChange = (newSort: string) => {
+    const newFilters = { ...draftFilters, sort: newSort };
+    setDraftFilters(newFilters);
+    pushFilterState(newFilters);
+  };
+
   const handleLikeToggle = useCallback(
     async (item: PublicGalleryItem) => {
       if (likeBusyId || authLoading) return;
@@ -381,9 +393,9 @@ function GalleryPageContent() {
           className="fixed inset-0 z-50 flex items-center justify-center px-6"
           onClick={() => setGuestLikePromptOpen(false)}
         >
-          <div className="absolute inset-0 bg-[#050505]/96" />
+          <div className="absolute inset-0 bg-void/95" />
           <div
-            className="relative w-full max-w-md overflow-hidden rounded-[24px] border border-[#2b2722] bg-[#11100e] p-6 shadow-[0_32px_96px_rgba(0,0,0,0.72)] animate-fade-in"
+            className="relative w-full max-w-md overflow-hidden rounded-[24px] border border-border bg-surface p-6 shadow-[0_32px_96px_rgba(0,0,0,0.72)] animate-fade-in"
             onClick={(event) => event.stopPropagation()}
             role="dialog"
             aria-modal="true"
@@ -424,7 +436,7 @@ function GalleryPageContent() {
       )}
 
       <div className="mx-auto max-w-7xl px-6 py-12 animate-fade-in">
-        <section className="relative overflow-hidden rounded-[28px] border border-border-subtle bg-[radial-gradient(circle_at_top_left,rgba(200,171,90,0.18),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(149,113,87,0.16),transparent_36%),rgba(18,16,13,0.78)] px-6 py-8 sm:px-8 sm:py-10">
+        <section className="relative overflow-hidden rounded-[28px] border border-border-subtle bg-[radial-gradient(circle_at_top_left,rgba(200,171,90,0.18),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(149,113,87,0.16),transparent_36%),rgb(var(--color-surface)/0.78)] px-6 py-8 sm:px-8 sm:py-10">
           <div className="absolute inset-0 opacity-30 [background-image:linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] [background-size:24px_24px]" />
           <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-2xl">
@@ -455,6 +467,7 @@ function GalleryPageContent() {
           setDraftFilters={setDraftFilters}
           onApply={handleApplyFilters}
           onReset={handleResetFilters}
+          onSortChange={handleSortChange}
           hasInvalidDate={hasInvalidDate}
           createdFromInvalid={createdFromInvalid}
           createdToInvalid={createdToInvalid}

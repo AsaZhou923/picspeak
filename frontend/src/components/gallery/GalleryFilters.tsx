@@ -1,6 +1,6 @@
 'use client';
 
-import { CalendarDays, SlidersHorizontal } from 'lucide-react';
+import { CalendarDays, SlidersHorizontal, Clock, Star, Heart, Zap } from 'lucide-react';
 import { useRef } from 'react';
 import { ImageType } from '@/lib/types';
 import { useI18n } from '@/lib/i18n';
@@ -11,6 +11,7 @@ export type FilterDraft = {
   minScore: string;
   maxScore: string;
   imageType: '' | ImageType;
+  sort: string;
 };
 
 interface GalleryFiltersProps {
@@ -18,6 +19,7 @@ interface GalleryFiltersProps {
   setDraftFilters: React.Dispatch<React.SetStateAction<FilterDraft>>;
   onApply: () => void;
   onReset: () => void;
+  onSortChange: (sort: string) => void;
   hasInvalidDate: boolean;
   createdFromInvalid: boolean;
   createdToInvalid: boolean;
@@ -138,19 +140,49 @@ export default function GalleryFilters({
   setDraftFilters,
   onApply,
   onReset,
+  onSortChange,
   hasInvalidDate,
   createdFromInvalid,
   createdToInvalid,
 }: GalleryFiltersProps) {
   const { t } = useI18n();
 
-  const invalidDateCopy = t('err_unknown_body'); // Fallback or specific key
+  const sortOptions = [
+    { id: 'default', label: t('gallery_sort_default'), icon: Zap },
+    { id: 'latest', label: t('gallery_sort_latest'), icon: Clock },
+    { id: 'score', label: t('gallery_sort_score'), icon: Star },
+    { id: 'likes', label: t('gallery_sort_likes'), icon: Heart },
+  ];
 
   return (
-    <section className="mt-6 rounded-[24px] border border-border-subtle bg-[radial-gradient(circle_at_top_left,rgba(200,171,90,0.14),transparent_35%),rgba(18,16,13,0.72)] p-5 transition-all duration-300 hover:border-gold/20">
-      <div className="mb-4 flex items-center gap-2 text-sm text-ink">
-        <SlidersHorizontal size={15} className="text-gold" />
-        <span>{t('filter_label')}</span>
+    <section className="mt-6 rounded-[24px] border border-border-subtle bg-[radial-gradient(circle_at_top_left,rgba(200,171,90,0.14),transparent_35%),rgb(var(--color-surface)/0.72)] p-5 transition-all duration-300 hover:border-gold/20">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-2 text-sm text-ink">
+          <SlidersHorizontal size={15} className="text-gold" />
+          <span>{t('filter_label')}</span>
+        </div>
+
+        <div className="flex flex-wrap gap-1.5 rounded-2xl bg-void/40 p-1.5 border border-border/40">
+          {sortOptions.map((opt) => {
+            const Icon = opt.icon;
+            const active = draftFilters.sort === opt.id;
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => onSortChange(opt.id)}
+                className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium transition-all active:scale-95 ${
+                  active
+                    ? 'bg-gold text-void shadow-lg shadow-gold/10'
+                    : 'text-ink-muted hover:bg-gold/10 hover:text-gold'
+                }`}
+              >
+                <Icon size={13} className={active ? '' : 'text-gold/60'} />
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       <div className="grid gap-3 xl:grid-cols-2 2xl:grid-cols-[minmax(0,1.28fr)_minmax(0,1.28fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.05fr)]">

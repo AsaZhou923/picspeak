@@ -388,6 +388,7 @@ export async function getPublicGallery(
   if (typeof query.min_score === 'number') params.set('min_score', String(query.min_score));
   if (typeof query.max_score === 'number') params.set('max_score', String(query.max_score));
   if (query.image_type) params.set('image_type', query.image_type);
+  if (query.sort) params.set('sort', query.sort);
   return request<PublicGalleryResponse>(`/gallery?${params.toString()}`, { token });
 }
 

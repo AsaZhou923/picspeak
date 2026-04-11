@@ -275,7 +275,7 @@ export default function ProPromoCard({
 
   return (
     <section
-      className={`relative overflow-hidden rounded-[24px] border border-gold/30 bg-[radial-gradient(circle_at_top_left,rgba(200,171,90,0.18),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(149,113,87,0.16),transparent_38%),rgba(18,16,13,0.78)] px-5 py-5 shadow-[0_24px_64px_rgba(0,0,0,0.22)] ${className}`.trim()}
+      className={`relative overflow-hidden rounded-[24px] border border-gold/30 bg-[radial-gradient(circle_at_top_left,rgba(200,171,90,0.18),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(149,113,87,0.16),transparent_38%),rgb(var(--color-surface)/0.78)] px-5 py-5 shadow-[0_24px_64px_rgba(0,0,0,0.22)] ${className}`.trim()}
     >
       <div className="absolute inset-0 opacity-25 [background-image:linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] [background-size:20px_20px]" />
       <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
