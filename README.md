@@ -14,11 +14,11 @@
 
 | Home | Review Result |
 |------|---------------|
-| ![Home](docs\assets\screenshots\home.jpg) | ![Review Result](docs\assets\screenshots\review.jpg) |
+| ![Home](docs/assets/screenshots/home.jpg) | ![Review Result](docs/assets/screenshots/review.jpg) |
 
 | Gallery | Mobile |
 |---------|--------|
-| ![Gallery](docs\assets\screenshots\gallery.jpg) | ![Mobile](docs\assets\screenshots\mobile.jpg) |
+| ![Gallery](docs/assets/screenshots/gallery.jpg) | ![Mobile](docs/assets/screenshots/mobile.jpg) |
 
 ---
 
