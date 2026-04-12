@@ -178,10 +178,10 @@ function BlogIndexContent() {
   );
 }
 
-export default function BlogIndexClient({ locale }: { locale: string }) {
-  const pinnedLocale: Locale = VALID_LOCALES.includes(locale as Locale)
+export default function BlogIndexClient({ locale }: { locale?: string }) {
+  const pinnedLocale = VALID_LOCALES.includes(locale as Locale)
     ? (locale as Locale)
-    : 'en';
+    : undefined;
 
   return (
     <I18nProvider initialLocale={pinnedLocale}>

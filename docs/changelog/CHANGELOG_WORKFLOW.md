@@ -265,23 +265,7 @@ git status --short
 git add -A
 ```
 
-提交信息必须遵守 Lore 格式，例如：
-
-```text
-Document and surface today's product update
-
-Summarize the current workspace changes in a dated changelog entry and
-sync the in-product update entry points so the latest release is visible
-from both /updates and the home page.
-
-Constraint: Update history is maintained in both changelog markdown and frontend update-entry data
-Rejected: Only update docs/changelog | /updates and home entry would point at stale content
-Confidence: high
-Scope-risk: narrow
-Directive: Keep changelog doc, updates-data.ts, and homepage latest hint aligned whenever a new update is published
-Tested: frontend npm run typecheck; frontend npm run build
-Not-tested: Any manual browser review
-```
+提交信息必须遵守 Lore 格式
 
 ### 11. push
 
