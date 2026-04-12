@@ -58,6 +58,7 @@ const config: Config = {
         'shimmer': 'shimmer 2s infinite',
         'glow-pulse': 'glowPulse 2.5s ease-in-out infinite',
         'card-highlight': 'cardHighlight 1.8s ease-out forwards',
+        'marquee': 'marquee 25s linear infinite',
       },
       keyframes: {
         fadeIn: {
@@ -85,6 +86,10 @@ const config: Config = {
           '15%':      { boxShadow: '0 0 0 2px rgba(200,162,104,0.55), 0 0 14px 3px rgba(200,162,104,0.18)' },
           '75%':      { boxShadow: '0 0 0 2px rgba(200,162,104,0.55), 0 0 14px 3px rgba(200,162,104,0.18)' },
           '100%':     { boxShadow: '0 0 0 0 rgba(200,162,104,0)' },
+        },
+        marquee: {
+          '0%': { transform: 'translateX(0%)' },
+          '100%': { transform: 'translateX(-50%)' },
         },
       },
     },
