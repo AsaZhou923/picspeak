@@ -27,5 +27,18 @@ export const siteConfig = {
   ],
   googleSiteVerification: 'uPzmX8kYSDzOWm7iBz-dty4It12mMcIVUOPPwWmLGnM',
   ogImage: '/logo.png',
+  repositoryUrl: 'https://github.com/AsaZhou923/picspeak',
+  social: {
+    x: 'https://x.com/Zzw_Prime',
+    githubProfile: 'https://github.com/AsaZhou923',
+  },
+  author: {
+    id: 'https://picspeak.art/#asa-zhou',
+    name: 'Asa Zhou',
+    alternateName: ['@Zzw_Prime', 'AsaZhou923'],
+    jobTitle: 'Founder and Lens Notes editor',
+    description:
+      'Builds PicSpeak and writes Lens Notes about AI photo critique, composition, lighting, color, and repeatable review workflows.',
+    email: 'xavierzhou23@gmail.com',
+  },
 } as const;
-

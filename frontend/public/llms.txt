@@ -1,0 +1,38 @@
+# PicSpeak
+
+> AI photography critique tool that scores photos across composition, lighting, color, impact, and technique, providing instant feedback to help photographers improve their skills.
+
+## Docs
+
+- [PicSpeak Homepage](https://picspeak.art): Main entry point for the AI photo critique tool, available in English, Chinese, and Japanese. Includes upload functionality and feature overview.
+- [AI Photo Critique Gallery](https://picspeak.art/gallery): Public archive of AI-analyzed photos with scores and detailed feedback across five critique dimensions. Supports sorting by recommended, latest, highest-scored, and most-liked.
+- [Demo Review Example](https://picspeak.art/reviews/rev_8424d4fbde054759): Canonical example of a complete AI photo critique result showing scoring structure and feedback format.
+
+## Products
+
+- [Pro Subscription](https://picspeak.art): Unlimited AI photo critiques for $2.99/month (promotional pricing). Includes full scoring across all five dimensions, detailed improvement suggestions, and gallery features.
+- [Affiliate Program](https://picspeak.art/affiliate): 30% recurring commission on Pro subscription referrals. 30-day tracking window, managed via LemonSqueezy.
+
+## Resources
+
+- [Lens Notes Blog](https://picspeak.art/en/blog): Photography articles covering composition, lighting, color theory, review workflows, and AI critique methods. Six foundational articles with multilingual support.
+- [AI Photo Critique as Daily Practice](https://picspeak.art/en/blog/ai-photo-critique-daily-practice): Guide explaining why frequent AI critique builds better photography habits than occasional deep reviews, with practical tips for building a sustainable review routine.
+- [Five Photo Composition Checks](https://picspeak.art/en/blog/five-photo-composition-checks): Practical checklist for subject clarity, edge distractions, depth, visual balance, and visual flow. Usable during shooting and post-processing.
+- [Product Updates](https://picspeak.art/updates): Changelog documenting new features, improvements, and bug fixes. Covers gallery sorting, dark theme, multi-language routes, activation codes, and scoring refinements.
+
+## Key Facts
+
+- Product: AI photo critique tool for photographers, creators, and students
+- Scoring dimensions: Composition, lighting, color, impact, technique
+- Pricing: Pro subscription at $2.99/month (promotional, 25% off from $3.99)
+- Languages: English, Chinese (中文), Japanese (日本語)
+- Founder: Asa Zhou (@Zzw_Prime)
+- Repository: https://github.com/AsaZhou923/picspeak
+- Affiliate commission: 30% recurring on referrals
+
+## Contact
+
+- Website: https://picspeak.art
+- Email: xavierzhou23@gmail.com
+- Twitter/X: https://x.com/Zzw_Prime
+- GitHub: https://github.com/AsaZhou923

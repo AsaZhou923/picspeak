@@ -119,16 +119,29 @@ export default function sitemap(): MetadataRoute.Sitemap {
         },
       }))
     ),
+    ...LOCALES.map((locale) => ({
+      url: `${siteConfig.url}/${locale}/updates`,
+      lastModified: new Date('2026-04-11'),
+      changeFrequency: 'monthly' as const,
+      priority: 0.6,
+      alternates: {
+        languages: Object.fromEntries([
+          ...LOCALES.filter((l) => l !== locale).map((l) => [l, `${siteConfig.url}/${l}/updates`]),
+          ['x-default', `${siteConfig.url}/updates`],
+        ]),
+      },
+    })),
     {
       url: `${siteConfig.url}/updates`,
-      lastModified: new Date('2026-03-21'),
+      lastModified: new Date('2026-04-11'),
       changeFrequency: 'monthly',
       priority: 0.6,
       alternates: {
         languages: {
-          zh: `${siteConfig.url}/zh`,
-          ja: `${siteConfig.url}/ja`,
-          'x-default': siteConfig.url,
+          zh: `${siteConfig.url}/zh/updates`,
+          en: `${siteConfig.url}/en/updates`,
+          ja: `${siteConfig.url}/ja/updates`,
+          'x-default': `${siteConfig.url}/updates`,
         },
       },
     },

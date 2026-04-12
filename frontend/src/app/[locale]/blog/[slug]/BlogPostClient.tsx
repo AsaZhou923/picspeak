@@ -19,6 +19,18 @@ function BlogPostContent({ slug }: { slug: string }) {
 
   const relatedPosts = getBlogPosts(locale).filter((entry) => entry.slug !== post.slug).slice(0, 2);
 
+  const authorJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Person',
+    '@id': siteConfig.author.id,
+    name: siteConfig.author.name,
+    alternateName: siteConfig.author.alternateName,
+    jobTitle: siteConfig.author.jobTitle,
+    description: siteConfig.author.description,
+    email: siteConfig.author.email,
+    sameAs: [siteConfig.social.x, siteConfig.social.githubProfile],
+  };
+
   const articleJsonLd = {
     '@context': 'https://schema.org',
     '@type': 'BlogPosting',
@@ -26,13 +38,20 @@ function BlogPostContent({ slug }: { slug: string }) {
     description: post.description,
     datePublished: post.publishedAt,
     dateModified: post.updatedAt,
+    inLanguage: locale,
+    url: `${siteConfig.url}/${locale}/blog/${post.slug}`,
+    isPartOf: {
+      '@type': 'Blog',
+      name: ui.name,
+      url: `${siteConfig.url}/${locale}/blog`,
+    },
     author: {
-      '@type': 'Organization',
-      name: siteConfig.name,
+      '@id': siteConfig.author.id,
     },
     publisher: {
       '@type': 'Organization',
       name: siteConfig.name,
+      url: siteConfig.url,
       logo: {
         '@type': 'ImageObject',
         url: `${siteConfig.url}${siteConfig.ogImage}`,
@@ -45,6 +64,7 @@ function BlogPostContent({ slug }: { slug: string }) {
 
   return (
     <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(authorJsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }} />
 
       <article className="min-h-screen pt-14">

@@ -136,6 +136,11 @@ function buildSoftwareJsonLd(locale: Locale) {
     inLanguage: meta.lang,
     description: meta.description,
     image: `${siteConfig.url}${siteConfig.ogImage}`,
+    sameAs: [siteConfig.social.x, siteConfig.repositoryUrl],
+    isAccessibleForFree: true,
+    creator: {
+      '@id': siteConfig.author.id,
+    },
     offers: {
       '@type': 'Offer',
       price: '0',
@@ -423,4 +428,3 @@ export default async function LocaleLayout({ params, children }: Props) {
     </>
   );
 }
-

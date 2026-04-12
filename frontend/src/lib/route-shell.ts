@@ -1,17 +1,21 @@
-/** Supported locale-prefixed home routes (e.g. /zh, /en, /ja). */
-const LOCALE_HOME_ROUTES = new Set(['/zh', '/en', '/ja']);
+const LOCALE_PREFIX = /^\/(zh|en|ja)(?=\/|$)/;
+
+function stripLocalePrefix(pathname: string): string {
+  const stripped = pathname.replace(LOCALE_PREFIX, '');
+  return stripped.length > 0 ? stripped : '/';
+}
 
 export function isMarketingRoute(pathname: string | null | undefined): boolean {
   if (!pathname) return false;
 
-  // Exact locale-prefixed home pages (no trailing content)
-  if (LOCALE_HOME_ROUTES.has(pathname)) return true;
+  const normalized = stripLocalePrefix(pathname);
 
   return (
-    pathname.startsWith('/affiliate') ||
-    pathname.startsWith('/blog') ||
-    pathname.startsWith('/updates') ||
-    pathname.startsWith('/share') ||
-    pathname.startsWith('/error')
+    normalized === '/' ||
+    normalized.startsWith('/affiliate') ||
+    normalized.startsWith('/blog') ||
+    normalized.startsWith('/updates') ||
+    normalized.startsWith('/share') ||
+    normalized.startsWith('/error')
   );
 }

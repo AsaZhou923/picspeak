@@ -18,6 +18,37 @@ export function getProductUpdates(locale: UpdateLocale): ProductUpdateEntry[] {
   if (locale === 'ja') {
     return [
       {
+        id: '2026-04-12-llms-seo-schema',
+        date: '2026-04-12',
+        title: 'llms.txt 導入・Schema.org 拡張・多言語 Updates ページ追加',
+        summary:
+          'AI 検索エンジン向け llms.txt を新設、Person・SoftwareSourceCode 等 の構造化データを補完し、Updates ページも /zh・/en・/ja ルートで公開開始。',
+        docPath: 'docs/changelog/update-log-2026-04-12-llms-seo-schema.md',
+        sections: [
+          {
+            title: 'AI 可視性（llms.txt）',
+            items: [
+              '/llms.txt と /.well-known/llms.txt を新設し、製品概要・価格・ブログ・主要 URL を構造化',
+              'siteConfig に author・social・repositoryUrl を追加し、Schema と llms.txt で共用',
+            ],
+          },
+          {
+            title: 'Schema.org 拡張',
+            items: [
+              'ホーム・ブログ・記事ページに Person（作者）・SoftwareSourceCode スキーマを追加',
+              'Blog・BlogPosting に author（@id 参照）・publisher・isPartOf を付与',
+            ],
+          },
+          {
+            title: '多言語 Updates ページ',
+            items: [
+              '/[locale]/updates ルートを追加し、各言語専用の更新履歴ページを提供',
+              'UpdatesPageContent を共通コンポーネント化し、homeHref で遷移先を制御',
+            ],
+          },
+        ],
+      },
+      {
         id: '2026-04-11-blog-gallery-sort-theme',
         date: '2026-04-11',
         title: 'ブログ・ギャラリーソート・ダークテーマを追加',
@@ -287,6 +318,37 @@ export function getProductUpdates(locale: UpdateLocale): ProductUpdateEntry[] {
   if (locale === 'en') {
     return [
       {
+        id: '2026-04-12-llms-seo-schema',
+        date: '2026-04-12',
+        title: 'llms.txt, Enhanced Schema.org, and Localized Updates Pages',
+        summary:
+          'Added llms.txt for AI search visibility, expanded Person and SoftwareSourceCode structured data, and launched locale-pinned /zh/updates, /en/updates, and /ja/updates routes.',
+        docPath: 'docs/changelog/update-log-2026-04-12-llms-seo-schema.md',
+        sections: [
+          {
+            title: 'AI Visibility (llms.txt)',
+            items: [
+              'Added /llms.txt and /.well-known/llms.txt with structured product summary, pricing, blog topics, and canonical URLs',
+              'Extended siteConfig with author, social links, and repository URL for shared use across Schema and llms.txt',
+            ],
+          },
+          {
+            title: 'Schema.org Expansion',
+            items: [
+              'Added Person and SoftwareSourceCode JSON-LD to home, blog index, and blog post pages',
+              'Blog and BlogPosting schemas now reference author by @id and include publisher, isPartOf, and inLanguage',
+            ],
+          },
+          {
+            title: 'Localized Updates Pages',
+            items: [
+              'Added /[locale]/updates routes with per-locale metadata and hreflang alternates',
+              'Extracted UpdatesPageContent into a shared component that accepts a configurable homeHref',
+            ],
+          },
+        ],
+      },
+      {
         id: '2026-04-11-blog-gallery-sort-theme',
         date: '2026-04-11',
         title: 'Blog Module, Gallery Sort, and Dark Theme Refinement',
@@ -554,6 +616,37 @@ export function getProductUpdates(locale: UpdateLocale): ProductUpdateEntry[] {
   }
 
   return [
+    {
+      id: '2026-04-12-llms-seo-schema',
+      date: '2026-04-12',
+      title: 'llms.txt 上线、Schema.org 扩展与多语言更新记录页',
+      summary:
+        '新增 llms.txt 提升AI搜索可见性，补齐 Person 和 SoftwareSourceCode 结构化数据，并上线 /zh/updates、/en/updates、/ja/updates 多语言路由。',
+      docPath: 'docs/changelog/update-log-2026-04-12-llms-seo-schema.md',
+      sections: [
+        {
+          title: 'AI 可见性（llms.txt）',
+          items: [
+            '新增 /llms.txt 和 /.well-known/llms.txt，结构化展示产品定位、定价、博客主题与关键 URL',
+            'siteConfig 新增 author、social、repositoryUrl 配置，供 Schema 和 llms.txt 共用',
+          ],
+        },
+        {
+          title: 'Schema.org 扩展',
+          items: [
+            '首页、博客索引、文章页新增 Person（作者）与 SoftwareSourceCode 结构化数据',
+            'Blog 与 BlogPosting 增加 author（@id 引用）、publisher、isPartOf、inLanguage 字段',
+          ],
+        },
+        {
+          title: '多语言更新记录页',
+          items: [
+            '新增 /[locale]/updates 路由，提供中英日三语独立的更新记录页面',
+            '提取 UpdatesPageContent 为共享组件，通过 homeHref 参数控制返回路径',
+          ],
+        },
+      ],
+    },
     {
       id: '2026-04-11-blog-gallery-sort-theme',
       date: '2026-04-11',

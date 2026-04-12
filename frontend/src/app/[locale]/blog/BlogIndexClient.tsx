@@ -19,6 +19,14 @@ function BlogIndexContent() {
     name: ui.title,
     description: ui.description,
     url: `${siteConfig.url}/${locale}/blog`,
+    author: {
+      '@id': siteConfig.author.id,
+    },
+    publisher: {
+      '@type': 'Organization',
+      name: siteConfig.name,
+      url: siteConfig.url,
+    },
     hasPart: posts.map((post) => ({
       '@type': 'BlogPosting',
       headline: post.title,
@@ -26,11 +34,30 @@ function BlogIndexContent() {
       datePublished: post.publishedAt,
       dateModified: post.updatedAt,
       keywords: post.keywords.join(', '),
+      author: {
+        '@id': siteConfig.author.id,
+      },
     })),
+  };
+
+  const authorJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Person',
+    '@id': siteConfig.author.id,
+    name: siteConfig.author.name,
+    alternateName: siteConfig.author.alternateName,
+    jobTitle: siteConfig.author.jobTitle,
+    description: siteConfig.author.description,
+    email: siteConfig.author.email,
+    sameAs: [siteConfig.social.x, siteConfig.social.githubProfile],
   };
 
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(authorJsonLd) }}
+      />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(collectionJsonLd) }}

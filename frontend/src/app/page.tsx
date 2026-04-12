@@ -51,10 +51,42 @@ export default function HomePage() {
     url: siteConfig.url,
     description: siteConfig.description,
     image: `${siteConfig.url}${siteConfig.ogImage}`,
+    sameAs: [siteConfig.social.x, siteConfig.repositoryUrl],
+    isAccessibleForFree: true,
     offers: {
       '@type': 'Offer',
       price: '0',
       priceCurrency: 'USD',
+    },
+  };
+
+  const authorJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Person',
+    '@id': siteConfig.author.id,
+    name: siteConfig.author.name,
+    alternateName: siteConfig.author.alternateName,
+    jobTitle: siteConfig.author.jobTitle,
+    description: siteConfig.author.description,
+    email: siteConfig.author.email,
+    sameAs: [siteConfig.social.x, siteConfig.social.githubProfile],
+  };
+
+  const sourceCodeJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'SoftwareSourceCode',
+    name: 'PicSpeak',
+    codeRepository: siteConfig.repositoryUrl,
+    url: siteConfig.repositoryUrl,
+    programmingLanguage: ['TypeScript', 'Python'],
+    runtimePlatform: ['Next.js', 'FastAPI'],
+    author: {
+      '@id': siteConfig.author.id,
+    },
+    publisher: {
+      '@type': 'Organization',
+      name: siteConfig.name,
+      url: siteConfig.url,
     },
   };
 
@@ -121,6 +153,16 @@ export default function HomePage() {
         id="picspeak-faq-structured-data"
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+      />
+      <Script
+        id="picspeak-author-structured-data"
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(authorJsonLd) }}
+      />
+      <Script
+        id="picspeak-source-code-structured-data"
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(sourceCodeJsonLd) }}
       />
       <HomeAuthWidgets />
       <section className="relative min-h-screen flex flex-col items-center justify-center px-6 pt-24 pb-20 overflow-hidden">
@@ -399,7 +441,7 @@ export default function HomePage() {
                 <ArrowRight size={11} className="transition-transform group-hover:translate-x-0.5" />
               </Link>
               <Link
-                href="/updates"
+                href={`/${locale}/updates`}
                 className="inline-flex items-center gap-2 text-xs text-ink-subtle transition-colors hover:text-gold group"
               >
                 <span>{t('updates_label')}</span>

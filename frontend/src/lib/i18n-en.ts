@@ -58,7 +58,7 @@ export const enTranslations = {
     pro_offer_highlight: 'Launch Offer',
     updates_label: 'Updates',
     updates_hint_home: 'See the public gallery update',
-    updates_hint_latest: 'See the latest blog launch, gallery sort, and dark theme update',
+    updates_hint_latest: 'See the new llms.txt, enhanced Schema.org, and localized updates pages',
     contact_label: 'Contact',
     contact_headline: 'Get in Touch',
 
@@ -69,7 +69,7 @@ export const enTranslations = {
     demo_advantage_body: 'Excellent color layering: golden ginkgo leaves against a soft-blue gradient sky create a harmonious high-contrast palette. Backlit leaf-edge glow is sharp, with accurate exposure preserving full highlight detail.',
     demo_suggestion_body: 'Step back 5–8 m and lower the camera to include fallen leaves as a leading-line foreground. Shoot within 20 min of sunrise with a gentle breeze for added depth and narrative.',
     demo_view_example: 'View full critique example',
-    demo_image_alt: 'Sample critique photo: autumn ginkgo trees against a blue sky',
+    demo_image_alt: 'Sample critique photo: golden-hour ginkgo canopy with backlit leaves, blue gradient sky, and roughly 4500K warm-cool color contrast',
     demo_review_advantage: '1. Color: Golden ginkgo leaves against a soft blue-pink gradient sky form a high-contrast yet harmonious palette matching autumn golden-hour color temperature (~4500–5500 K); saturation is well-controlled with no clipping. 2. Lighting: Back/side-backlight produces clean rim lighting on leaf edges with visible vein detail, confirming precise exposure and fully retained highlights. 3. Composition rhythm: Sparse bare branches on the left balance the dense canopy on the right; vertical lines guide the eye upward with a natural cadence.',
     demo_review_critique: '1. Flat depth: The foreground and mid-ground ginkgo trees share nearly the same focal plane; no leading-line foreground element or ground anchor makes the image feel flat and lacking depth. 2. Cluttered right canopy: Dense, tangled branches in the upper right — dark limbs cutting across the golden area — disrupt subject unity. 3. No narrative: The shot conveys only seasonal surface with no temporal cues (falling leaves, footprints, shifting light) or environmental context (path, architecture, terrain), making it a typical “check-in” snapshot.',
     demo_review_suggestions: '1. Camera position: Step back 5–8 m and lower the camera to ~1.2 m; include fallen leaves or a small path as a foreground leading line to add spatial depth. 2. Exposure adjustment: If shooting RAW, pull highlights −15 to −20 (preserve leaf-edge detail) and lift shadows +10 to +15 (reveal branch texture); drop color temperature ~200 K to strengthen the warm-cool contrast. 3. Timing: Shoot within 20 min of sunrise (sun angle < 10°) to lengthen shadows and enhance depth; wait for a light breeze to add subtle motion blur and vitality.',

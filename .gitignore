@@ -34,3 +34,6 @@ start-dev.bat
 .omc/
 .claude/
 deploy/
+
+# GEO audit reports (generated locally)
+GEO-*.md
