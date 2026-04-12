@@ -14,11 +14,11 @@
 
 | Home | Review Result |
 |------|---------------|
-| ![Home](https://pub-7ae066210514433e84a850bc95c5f1a2.r2.dev/screenshots/home.jpg) | ![Review Result](https://pub-7ae066210514433e84a850bc95c5f1a2.r2.dev/screenshots/review.jpg) |
+| ![Home](docs\assets\screenshots\home.jpg) | ![Review Result](docs\assets\screenshots\review.jpg) |
 
 | Gallery | Mobile |
 |---------|--------|
-| ![Gallery](https://pub-7ae066210514433e84a850bc95c5f1a2.r2.dev/screenshots/gallery.jpg) | ![Mobile](https://pub-7ae066210514433e84a850bc95c5f1a2.r2.dev/screenshots/mobile.jpg) |
+| ![Gallery](docs\assets\screenshots\gallery.jpg) | ![Mobile](docs\assets\screenshots\mobile.jpg) |
 
 ---
 
@@ -35,6 +35,7 @@
 - `Re-analysis` — Re-run analysis on a previous photo or upload a new one for another critique
 - `Favorites` — Save preferred critique results and manage them from a dedicated favorites page
 - `Gallery` — Showcase selected outstanding works from the community
+- `Blog` — Access professional photography tutorials, AI analysis insights, and platform updates
 
 ## Tech Stack
 

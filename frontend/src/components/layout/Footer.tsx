@@ -61,6 +61,14 @@ export default function Footer() {
             <Twitter size={14} />
             <span>@Zzw_Prime</span>
           </a>
+          <a
+            href="https://indieai.directory/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-ink-subtle/50 hover:text-ink/80 transition-colors text-xs ml-2"
+          >
+            Listed on IndieAI Directory
+          </a>
           <p className="text-ink-subtle/60">
             Copyright {new Date().getFullYear()} PicSpeak. AI Photography Critique.
           </p>

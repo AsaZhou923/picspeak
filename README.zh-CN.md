@@ -6,7 +6,7 @@
 [![Python](https://img.shields.io/badge/Python-3.11-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**PicSpeak** 是一款基于 AI 的摄影点评 Web 应用。上传一张照片，几秒钟内即可收到来自 AI 的专业构图、光线与色彩分析。无需注册，直接以游客身份开始使用。
+**PicSpeak** 是一款先进的基于 AI 的摄影点评平台，旨在帮助各个水平的摄影爱好者提升拍摄技巧。只需上传一张照片，几秒钟内即可收到来自 AI 对构图、光线、色彩及情感表现等多维度的专业反馈。平台提供轻量与专业两种点评模式、社区影像长廊以及丰富的博客资源，是您的专属 AI 摄影导师。无需注册，即可直接以游客身份开启体验。
 
 ---
 
