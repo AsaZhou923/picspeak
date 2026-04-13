@@ -346,6 +346,20 @@ export interface GalleryLikeResponse {
 
 // ─── Error ───────────────────────────────────────────────────────────────────
 
+export interface BlogPostViewItem {
+  slug: string;
+  view_count: number;
+}
+
+export interface BlogPostViewsResponse {
+  items: BlogPostViewItem[];
+}
+
+export interface BlogPostViewIncrementResponse {
+  slug: string;
+  view_count: number;
+}
+
 export interface ApiError {
   error: {
     code: string;

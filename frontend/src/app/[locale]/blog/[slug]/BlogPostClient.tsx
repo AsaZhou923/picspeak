@@ -1,9 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowLeft, ArrowRight, Clock3 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { ArrowLeft, ArrowRight, Clock3, Eye } from 'lucide-react';
 import { notFound } from 'next/navigation';
+import { getBlogViewCounts, incrementBlogPostView } from '@/lib/api';
 import { getBlogPost, getBlogPosts, getBlogUi } from '@/lib/blog-data';
+import { formatBlogViewCount, shouldTrackBlogView } from '@/lib/blog-view-stats';
 import { I18nProvider, useI18n, type Locale } from '@/lib/i18n';
 import { siteConfig } from '@/lib/site';
 import { VALID_LOCALES } from '../../locales';
@@ -12,12 +15,47 @@ function BlogPostContent({ slug }: { slug: string }) {
   const { locale } = useI18n();
   const ui = getBlogUi(locale);
   const post = getBlogPost(locale, slug);
+  const [viewCounts, setViewCounts] = useState<Record<string, number>>({});
 
   if (!post) {
     notFound();
   }
 
   const relatedPosts = getBlogPosts(locale).filter((entry) => entry.slug !== post.slug).slice(0, 2);
+
+  useEffect(() => {
+    let cancelled = false;
+    const relatedSlugs = getBlogPosts(locale)
+      .filter((entry) => entry.slug !== post.slug)
+      .slice(0, 2)
+      .map((entry) => entry.slug);
+    const pendingRequests: Promise<Record<string, number>>[] = [getBlogViewCounts([post.slug, ...relatedSlugs])];
+
+    if (shouldTrackBlogView(post.slug)) {
+      pendingRequests.push(
+        incrementBlogPostView(post.slug).then((viewCount) => ({ [post.slug]: viewCount }))
+      );
+    }
+
+    void Promise.allSettled(pendingRequests).then((results) => {
+      if (cancelled) {
+        return;
+      }
+
+      const nextCounts = results.reduce<Record<string, number>>((acc, result) => {
+        if (result.status === 'fulfilled') {
+          Object.assign(acc, result.value);
+        }
+        return acc;
+      }, {});
+
+      setViewCounts(nextCounts);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [locale, post.slug]);
 
   const authorJsonLd = {
     '@context': 'https://schema.org',
@@ -80,6 +118,11 @@ function BlogPostContent({ slug }: { slug: string }) {
             <p className="mt-5 text-sm leading-8 text-ink-muted sm:text-base">{post.intro}</p>
             <div className="mt-6 flex flex-wrap items-center gap-4 text-sm text-ink-subtle">
               <span>{post.publishedAt}</span>
+              <span className="h-1 w-1 rounded-full bg-gold/80" />
+              <span className="inline-flex items-center gap-2">
+                <Eye size={14} className="text-gold/85" />
+                {formatBlogViewCount(locale, viewCounts[post.slug] ?? 0)}
+              </span>
               <span className="h-1 w-1 rounded-full bg-gold/80" />
               <span className="inline-flex items-center gap-2">
                 <Clock3 size={14} className="text-gold/85" />
@@ -159,6 +202,10 @@ function BlogPostContent({ slug }: { slug: string }) {
                     <p className="text-xs uppercase tracking-[0.22em] text-ink-subtle">{entry.category}</p>
                     <h3 className="mt-3 font-display text-2xl text-ink">{entry.title}</h3>
                     <p className="mt-3 text-sm leading-7 text-ink-muted">{entry.excerpt}</p>
+                    <div className="mt-4 inline-flex items-center gap-2 text-xs text-ink-subtle">
+                      <Eye size={13} className="text-gold/85" />
+                      {formatBlogViewCount(locale, viewCounts[entry.slug] ?? 0)}
+                    </div>
                     <div className="mt-5">
                       <Link href={`/${locale}/blog/${entry.slug}`} className="inline-flex items-center gap-2 text-sm text-gold transition-colors hover:text-gold-light">
                         {ui.readMoreCta}

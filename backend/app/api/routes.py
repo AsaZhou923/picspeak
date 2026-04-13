@@ -41,6 +41,7 @@ from app.core.errors import api_error
 from app.core.network import client_ip_from_request
 from app.core.security import create_access_token, sign_payload, sign_payload_with_exp, verify_payload
 from app.db.models import (
+    BlogPostView,
     BillingSubscription,
     Photo,
     PhotoStatus,
@@ -58,6 +59,9 @@ from app.db.models import (
 )
 from app.db.session import SessionLocal, get_db
 from app.schemas import (
+    BlogPostViewIncrementResponse,
+    BlogPostViewItem,
+    BlogPostViewsResponse,
     ActivationCodeRedeemRequest,
     ActivationCodeRedeemResponse,
     BillingCheckoutRequest,
@@ -180,6 +184,7 @@ GALLERY_FRESHNESS_WEIGHT = 0.4
 GALLERY_FRESHNESS_HALF_LIFE_DAYS = 45
 GALLERY_FRESHNESS_HALF_LIFE_SECONDS = GALLERY_FRESHNESS_HALF_LIFE_DAYS * 24 * 3600
 GALLERY_CURSOR_SCORE_EPSILON = 1e-9
+BLOG_POST_SLUG_RE = re.compile(r'^[a-z0-9-]{1,120}$')
 
 
 def _duration_ms(started_at: float) -> int:
@@ -236,6 +241,24 @@ def _coerce_int_metric(value: Any) -> int | None:
     except (TypeError, ValueError):
         return None
     return metric if metric >= 0 else None
+
+
+def _normalize_blog_post_view_slugs(slugs: list[str] | None) -> list[str]:
+    normalized: list[str] = []
+    seen: set[str] = set()
+
+    for raw_slug in slugs or []:
+        slug = raw_slug.strip().lower()
+        if not slug:
+            continue
+        if not BLOG_POST_SLUG_RE.fullmatch(slug):
+            raise api_error(status.HTTP_400_BAD_REQUEST, 'BLOG_POST_SLUG_INVALID', 'Invalid blog post slug')
+        if slug in seen:
+            continue
+        seen.add(slug)
+        normalized.append(slug)
+
+    return normalized
 
 
 def _extract_upload_metrics(client_meta: dict[str, Any]) -> dict[str, Any]:
@@ -2050,6 +2073,64 @@ def execute_review_task(payload: InternalTaskExecuteRequest, request: Request):
     if result.get('result') == 'delayed':
         raise api_error(status.HTTP_503_SERVICE_UNAVAILABLE, 'TASK_RETRY_NOT_READY', 'Task is scheduled for a later retry')
     return result
+
+
+@router.get('/blog/views', response_model=BlogPostViewsResponse)
+def list_blog_post_views(
+    slug: list[str] | None = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    normalized_slugs = _normalize_blog_post_view_slugs(slug)
+    if not normalized_slugs:
+        db.commit()
+        return BlogPostViewsResponse(items=[])
+
+    rows = (
+        db.query(BlogPostView)
+        .filter(BlogPostView.slug.in_(normalized_slugs))
+        .all()
+    )
+    counts = {row.slug: row.view_count for row in rows}
+    db.commit()
+    return BlogPostViewsResponse(
+        items=[BlogPostViewItem(slug=item_slug, view_count=counts.get(item_slug, 0)) for item_slug in normalized_slugs]
+    )
+
+
+@router.post('/blog/{slug}/views', response_model=BlogPostViewIncrementResponse)
+def increment_blog_post_view(
+    slug: str,
+    db: Session = Depends(get_db),
+):
+    normalized_slug = _normalize_blog_post_view_slugs([slug])[0]
+    record = (
+        db.query(BlogPostView)
+        .filter(BlogPostView.slug == normalized_slug)
+        .first()
+    )
+
+    if record is None:
+        record = BlogPostView(slug=normalized_slug, view_count=1)
+        db.add(record)
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            record = (
+                db.query(BlogPostView)
+                .filter(BlogPostView.slug == normalized_slug)
+                .first()
+            )
+            if record is None:
+                raise
+            record.view_count += 1
+            db.commit()
+    else:
+        record.view_count += 1
+        db.commit()
+
+    db.refresh(record)
+    return BlogPostViewIncrementResponse(slug=record.slug, view_count=record.view_count)
 
 
 @router.get('/gallery', response_model=PublicGalleryResponse)

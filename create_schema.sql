@@ -211,6 +211,32 @@ create trigger trg_reviews_updated_at
     for each row
 execute procedure set_updated_at();
 
+create table blog_post_views
+(
+    id         bigserial
+        primary key,
+    slug       text                                   not null,
+    view_count integer                  default 0     not null
+        constraint chk_blog_post_views_count_non_negative
+            check (view_count >= 0),
+    created_at timestamp with time zone default now() not null,
+    updated_at timestamp with time zone default now() not null,
+    constraint uq_blog_post_views_slug
+        unique (slug)
+);
+
+alter table blog_post_views
+    owner to pic;
+
+create index idx_blog_post_views_count
+    on blog_post_views (view_count desc);
+
+create trigger trg_blog_post_views_updated_at
+    before update
+    on blog_post_views
+    for each row
+execute procedure set_updated_at();
+
 create table idempotency_keys
 (
     id              bigserial

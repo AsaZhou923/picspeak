@@ -14,6 +14,7 @@ def ensure_runtime_schema() -> None:
     Base.metadata.create_all(
         bind=engine,
         tables=[
+            models.BlogPostView.__table__,
             models.BillingActivationCode.__table__,
             models.BillingSubscription.__table__,
             models.BillingWebhookEvent.__table__,
@@ -62,6 +63,8 @@ def ensure_runtime_schema() -> None:
         "CREATE INDEX IF NOT EXISTS idx_reviews_gallery_public ON reviews (gallery_added_at DESC, id DESC) WHERE gallery_visible = TRUE AND gallery_audit_status = 'approved' AND deleted_at IS NULL",
         'CREATE INDEX IF NOT EXISTS idx_review_likes_review_created ON review_likes (review_id, created_at DESC)',
         'CREATE INDEX IF NOT EXISTS idx_review_likes_user_created ON review_likes (user_id, created_at DESC)',
+        "CREATE TABLE IF NOT EXISTS blog_post_views (id BIGSERIAL PRIMARY KEY, slug TEXT NOT NULL, view_count INTEGER NOT NULL DEFAULT 0, created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now(), CONSTRAINT uq_blog_post_views_slug UNIQUE (slug), CONSTRAINT chk_blog_post_views_count_non_negative CHECK (view_count >= 0))",
+        'CREATE INDEX IF NOT EXISTS idx_blog_post_views_count ON blog_post_views (view_count DESC)',
     ]
 
     with engine.begin() as conn:

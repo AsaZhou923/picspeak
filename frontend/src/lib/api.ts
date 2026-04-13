@@ -2,6 +2,8 @@ import {
   ApiException,
   ActivationCodeRedeemResponse,
   AuthToken,
+  BlogPostViewIncrementResponse,
+  BlogPostViewsResponse,
   BillingCheckoutResponse,
   BillingPortalResponse,
   GalleryLikeResponse,
@@ -375,6 +377,33 @@ export async function getMyReviews(
   if (query.image_type) params.set('image_type', query.image_type);
   if (query.favorite_only) params.set('favorite_only', 'true');
   return request<ReviewHistoryResponse>(`/me/reviews?${params.toString()}`, { token });
+}
+
+export async function getBlogViewCounts(slugs: string[]): Promise<Record<string, number>> {
+  const params = new URLSearchParams();
+  slugs.forEach((slug) => {
+    const normalizedSlug = slug.trim().toLowerCase();
+    if (normalizedSlug) {
+      params.append('slug', normalizedSlug);
+    }
+  });
+
+  if (!params.toString()) {
+    return {};
+  }
+
+  const response = await request<BlogPostViewsResponse>(`/blog/views?${params.toString()}`);
+  return response.items.reduce<Record<string, number>>((acc, item) => {
+    acc[item.slug] = item.view_count;
+    return acc;
+  }, {});
+}
+
+export async function incrementBlogPostView(slug: string): Promise<number> {
+  const response = await request<BlogPostViewIncrementResponse>(`/blog/${encodeURIComponent(slug)}/views`, {
+    method: 'POST',
+  });
+  return response.view_count;
 }
 
 export async function getPublicGallery(

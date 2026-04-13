@@ -56,7 +56,7 @@ export const zhTranslations = {
     pro_offer_highlight: '首发促销',
     updates_label: '更新记录',
     updates_hint_home: '查看公开长廊更新',
-    updates_hint_latest: '查看 llms.txt 上线、Schema.org 扩展与多语言更新记录页',
+    updates_hint_latest: '查看博客浏览次数与文章统计流程更新',
     contact_label: '联系方式',
     contact_headline: '保持联系',
 

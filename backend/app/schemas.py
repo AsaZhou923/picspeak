@@ -252,6 +252,20 @@ class GalleryLikeResponse(BaseModel):
     liked_by_viewer: bool = False
 
 
+class BlogPostViewItem(BaseModel):
+    slug: str
+    view_count: int = 0
+
+
+class BlogPostViewsResponse(BaseModel):
+    items: list[BlogPostViewItem] = Field(default_factory=list)
+
+
+class BlogPostViewIncrementResponse(BaseModel):
+    slug: str
+    view_count: int = 0
+
+
 class ReviewExportPhoto(BaseModel):
     photo_id: str
     photo_url: str | None = None

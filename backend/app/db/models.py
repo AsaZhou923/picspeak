@@ -203,6 +203,21 @@ class ReviewLike(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
+class BlogPostView(Base):
+    __tablename__ = 'blog_post_views'
+    __table_args__ = (
+        CheckConstraint('view_count >= 0', name='chk_blog_post_views_count_non_negative'),
+        UniqueConstraint('slug', name='uq_blog_post_views_slug'),
+        Index('idx_blog_post_views_count', 'view_count'),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    slug: Mapped[str] = mapped_column(Text, nullable=False)
+    view_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default='0')
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+
+
 class ReviewTaskEvent(Base):
     __tablename__ = 'review_task_events'
     __table_args__ = (

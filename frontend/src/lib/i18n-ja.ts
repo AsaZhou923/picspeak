@@ -13,7 +13,7 @@ export const jaTranslations = {
     pro_offer_highlight: 'ローンチ特典',
     updates_label: '更新履歴',
     updates_hint_home: '公開ギャラリー更新を見る',
-    updates_hint_latest: 'llms.txt 新設・Schema.org 拡張・多言語 Updates ページ追加を見る',
+    updates_hint_latest: 'ブログ閲覧数と記事計測フローの更新を見る',
     contact_label: 'コンタクト',
     contact_headline: 'お問い合わせ',
     photo_ready_msg_short: 'アップロード完了',

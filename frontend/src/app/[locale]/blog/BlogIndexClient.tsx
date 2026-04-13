@@ -1,8 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowRight, Clock3, Sparkles } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { ArrowRight, Clock3, Eye, Sparkles } from 'lucide-react';
+import { getBlogViewCounts } from '@/lib/api';
 import { getBlogPosts, getBlogUi } from '@/lib/blog-data';
+import { formatBlogViewCount } from '@/lib/blog-view-stats';
 import { I18nProvider, useI18n, type Locale } from '@/lib/i18n';
 import { siteConfig } from '@/lib/site';
 import { VALID_LOCALES } from '../locales';
@@ -12,6 +15,27 @@ function BlogIndexContent() {
   const ui = getBlogUi(locale);
   const posts = getBlogPosts(locale);
   const featuredPost = posts[0];
+  const [viewCounts, setViewCounts] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void getBlogViewCounts(posts.map((post) => post.slug))
+      .then((counts) => {
+        if (!cancelled) {
+          setViewCounts(counts);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setViewCounts({});
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [posts]);
 
   const collectionJsonLd = {
     '@context': 'https://schema.org',
@@ -97,6 +121,10 @@ function BlogIndexContent() {
                       <span className="rounded-full border border-border-subtle px-3 py-1">{featuredPost.category}</span>
                       <span className="rounded-full border border-border-subtle px-3 py-1">{featuredPost.publishedAt}</span>
                       <span className="rounded-full border border-border-subtle px-3 py-1">{featuredPost.readingTime}</span>
+                      <span className="inline-flex items-center gap-2 rounded-full border border-border-subtle px-3 py-1">
+                        <Eye size={13} className="text-gold/85" />
+                        {formatBlogViewCount(locale, viewCounts[featuredPost.slug] ?? 0)}
+                      </span>
                     </div>
                     <div className="mt-5 flex flex-wrap gap-2">
                       {featuredPost.keywords.map((keyword) => (
@@ -147,11 +175,16 @@ function BlogIndexContent() {
                 <article key={post.slug} className="group rounded-[26px] border border-border-subtle bg-raised/45 p-5 transition-all duration-300 hover:border-gold/30 hover:bg-raised/60">
                   <div className="flex items-center justify-between gap-3 text-xs text-ink-subtle">
                     <span className="rounded-full border border-border-subtle px-2.5 py-1">{post.category}</span>
-                    <span>{post.publishedAt}</span>
+                    <span className="inline-flex items-center gap-2">
+                      <Eye size={13} className="text-gold/85" />
+                      {formatBlogViewCount(locale, viewCounts[post.slug] ?? 0)}
+                    </span>
                   </div>
                   <h3 className="mt-4 font-display text-2xl text-ink">{post.title}</h3>
                   <p className="mt-3 text-sm leading-7 text-ink-muted">{post.excerpt}</p>
-                  <div className="mt-4 flex items-center gap-2 text-xs text-ink-subtle">
+                  <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-ink-subtle">
+                    <span>{post.publishedAt}</span>
+                    <span className="h-1 w-1 rounded-full bg-gold/80" />
                     <Clock3 size={13} className="text-gold/85" />
                     <span>{post.readingTime}</span>
                   </div>

@@ -18,6 +18,30 @@ export function getProductUpdates(locale: UpdateLocale): ProductUpdateEntry[] {
   if (locale === 'ja') {
     return [
       {
+        id: '2026-04-13-blog-view-counts',
+        date: '2026-04-13',
+        title: 'ブログ記事の閲覧回数表示を追加',
+        summary:
+          'ブログ記事ごとの閲覧回数を公開表示し、記事詳細を開いたときに自動で 1 回加算される仕組みを追加しました。',
+        docPath: 'docs/changelog/update-log-2026-04-13-blog-view-counts.md',
+        sections: [
+          {
+            title: '閲覧数の記録',
+            items: [
+              '記事 slug ごとに閲覧数を保存する blog_post_views テーブルと公開 API を追加',
+              '記事詳細ページを開くと閲覧数が自動で増えるように実装',
+            ],
+          },
+          {
+            title: '表示の反映',
+            items: [
+              'ブログ一覧、注目記事、関連記事、記事詳細ヘッダーに閲覧回数を表示',
+              '短時間の連続加算を避けるため、同一セッションでは 5 秒の節流を追加',
+            ],
+          },
+        ],
+      },
+      {
         id: '2026-04-12-llms-seo-schema',
         date: '2026-04-12',
         title: 'llms.txt 導入・Schema.org 拡張・多言語 Updates ページ追加',
@@ -318,6 +342,30 @@ export function getProductUpdates(locale: UpdateLocale): ProductUpdateEntry[] {
   if (locale === 'en') {
     return [
       {
+        id: '2026-04-13-blog-view-counts',
+        date: '2026-04-13',
+        title: 'Blog post view counts are now visible',
+        summary:
+          'Added public view counts for blog posts and wired article detail visits to increment the count automatically.',
+        docPath: 'docs/changelog/update-log-2026-04-13-blog-view-counts.md',
+        sections: [
+          {
+            title: 'Tracking',
+            items: [
+              'Added a dedicated blog_post_views table and public APIs keyed by article slug',
+              'Opening a blog post detail page now records one new view automatically',
+            ],
+          },
+          {
+            title: 'UI',
+            items: [
+              'View counts now appear in the blog index, featured article block, related posts, and article detail header',
+              'A 5-second session throttle prevents accidental rapid duplicate increments',
+            ],
+          },
+        ],
+      },
+      {
         id: '2026-04-12-llms-seo-schema',
         date: '2026-04-12',
         title: 'llms.txt, Enhanced Schema.org, and Localized Updates Pages',
@@ -616,6 +664,30 @@ export function getProductUpdates(locale: UpdateLocale): ProductUpdateEntry[] {
   }
 
   return [
+    {
+      id: '2026-04-13-blog-view-counts',
+      date: '2026-04-13',
+      title: '博客文章现已显示浏览次数',
+      summary:
+        '为每篇博客文章增加了公开浏览次数展示，并在用户进入文章详情页时自动累加一次浏览记录。',
+      docPath: 'docs/changelog/update-log-2026-04-13-blog-view-counts.md',
+      sections: [
+        {
+          title: '浏览统计',
+          items: [
+            '新增按文章 slug 记录浏览量的 blog_post_views 数据表和公开接口',
+            '打开博客详情页时会自动为当前文章增加一次浏览数',
+          ],
+        },
+        {
+          title: '前端展示',
+          items: [
+            '博客列表、精选文章、相关文章和文章详情页头部都开始显示浏览次数',
+            '同一会话内增加 5 秒节流，避免极短时间重复进入造成连续累加',
+          ],
+        },
+      ],
+    },
     {
       id: '2026-04-12-llms-seo-schema',
       date: '2026-04-12',
