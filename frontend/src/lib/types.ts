@@ -360,6 +360,28 @@ export interface BlogPostViewIncrementResponse {
   view_count: number;
 }
 
+export type ProductAnalyticsSource =
+  | 'home_direct'
+  | 'blog'
+  | 'gallery'
+  | 'share'
+  | 'checkout'
+  | 'unknown';
+
+export interface ProductAnalyticsTrackRequest {
+  event_name: string;
+  source?: ProductAnalyticsSource;
+  page_path?: string;
+  locale?: 'zh' | 'en' | 'ja';
+  session_id?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface ProductAnalyticsTrackResponse {
+  status: string;
+  event_name: string;
+}
+
 export interface ApiError {
   error: {
     code: string;

@@ -267,7 +267,7 @@ export default function ProPromoCard({
 
     setChinaCheckoutLoading(true);
     try {
-      openChinaProPurchase();
+      openChinaProPurchase(locale);
     } finally {
       setChinaCheckoutLoading(false);
     }

@@ -218,7 +218,7 @@ export default function UsagePage() {
                       <>
                         <button
                           type="button"
-                          onClick={() => openChinaProPurchase()}
+                          onClick={() => openChinaProPurchase(locale)}
                           className="flex items-center gap-1.5 text-xs text-gold border border-gold/20 rounded px-3 py-1.5 hover:bg-gold/10 transition-colors"
                         >
                           中文用户可选：爱发电开通
@@ -243,7 +243,7 @@ export default function UsagePage() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => openChinaProPurchase()}
+                        onClick={() => openChinaProPurchase(locale)}
                         className="flex items-center gap-1.5 text-xs text-gold border border-gold/20 rounded px-3 py-1.5 hover:bg-gold/10 transition-colors"
                       >
                         中文用户可选：爱发电开通
@@ -389,7 +389,7 @@ export default function UsagePage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => openChinaProPurchase()}
+                    onClick={() => openChinaProPurchase(locale)}
                     className="inline-flex items-center justify-center gap-2 rounded-full border border-gold/30 bg-gold/10 px-5 py-3 text-sm font-medium text-gold transition-colors hover:bg-gold/15"
                   >
                     中文用户可选：爱发电开通

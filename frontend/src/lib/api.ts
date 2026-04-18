@@ -12,6 +12,8 @@ import {
   PhotoReviewsResponse,
   PresignRequest,
   PresignResponse,
+  ProductAnalyticsTrackRequest,
+  ProductAnalyticsTrackResponse,
   PublicGalleryQuery,
   PublicGalleryResponse,
   ReviewCreateRequest,
@@ -404,6 +406,18 @@ export async function incrementBlogPostView(slug: string): Promise<number> {
     method: 'POST',
   });
   return response.view_count;
+}
+
+export async function trackProductAnalyticsEvent(
+  payload: ProductAnalyticsTrackRequest,
+  token?: string
+): Promise<ProductAnalyticsTrackResponse> {
+  return request<ProductAnalyticsTrackResponse>('/analytics/events', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    token,
+    keepalive: true,
+  });
 }
 
 export async function getPublicGallery(

@@ -146,3 +146,24 @@ def get_current_actor(
     actor = CurrentActor(user)
     enforce_guest_api_rate_limit(db, actor, endpoint, guest_rate_limit_scope_key(request, user))
     return actor
+
+
+def get_optional_actor(
+    request: Request,
+    db: Session = Depends(get_db),
+    authorization: str | None = Header(default=None),
+    guest_cookie_token: str | None = Cookie(default=None, alias=GUEST_TOKEN_COOKIE),
+) -> CurrentActor | None:
+    token: str | None = None
+    if authorization:
+        token = _extract_bearer_token(authorization)
+    elif guest_cookie_token:
+        token = guest_cookie_token
+
+    if not token:
+        return None
+
+    user = _fetch_user_by_token(token, db)
+    sync_user_billing_plan(db, user)
+    request.state.current_user_public_id = user.public_id
+    return CurrentActor(user)
