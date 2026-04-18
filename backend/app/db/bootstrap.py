@@ -18,7 +18,6 @@ def ensure_runtime_schema() -> None:
             models.BillingActivationCode.__table__,
             models.BillingSubscription.__table__,
             models.BillingWebhookEvent.__table__,
-            models.ProductAnalyticsEvent.__table__,
             models.ReviewLike.__table__,
         ],
     )
@@ -66,15 +65,6 @@ def ensure_runtime_schema() -> None:
         'CREATE INDEX IF NOT EXISTS idx_review_likes_user_created ON review_likes (user_id, created_at DESC)',
         "CREATE TABLE IF NOT EXISTS blog_post_views (id BIGSERIAL PRIMARY KEY, slug TEXT NOT NULL, view_count INTEGER NOT NULL DEFAULT 0, created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now(), CONSTRAINT uq_blog_post_views_slug UNIQUE (slug), CONSTRAINT chk_blog_post_views_count_non_negative CHECK (view_count >= 0))",
         'CREATE INDEX IF NOT EXISTS idx_blog_post_views_count ON blog_post_views (view_count DESC)',
-        "CREATE TABLE IF NOT EXISTS product_analytics_events (id BIGSERIAL PRIMARY KEY, event_name TEXT NOT NULL, user_public_id TEXT, plan TEXT NOT NULL DEFAULT 'guest', device_id TEXT, session_id TEXT, source TEXT NOT NULL DEFAULT 'unknown', page_path TEXT, locale TEXT, metadata_json JSONB NOT NULL DEFAULT '{}'::jsonb, created_at TIMESTAMPTZ NOT NULL DEFAULT now())",
-        "ALTER TABLE product_analytics_events ALTER COLUMN plan SET DEFAULT 'guest'",
-        "ALTER TABLE product_analytics_events ALTER COLUMN source SET DEFAULT 'unknown'",
-        "ALTER TABLE product_analytics_events ALTER COLUMN metadata_json SET DEFAULT '{}'::jsonb",
-        'CREATE INDEX IF NOT EXISTS idx_product_analytics_events_name_created ON product_analytics_events (event_name, created_at DESC)',
-        'CREATE INDEX IF NOT EXISTS idx_product_analytics_events_source_created ON product_analytics_events (source, created_at DESC)',
-        'CREATE INDEX IF NOT EXISTS idx_product_analytics_events_plan_created ON product_analytics_events (plan, created_at DESC)',
-        'CREATE INDEX IF NOT EXISTS idx_product_analytics_events_user_created ON product_analytics_events (user_public_id, created_at DESC)',
-        'CREATE INDEX IF NOT EXISTS idx_product_analytics_events_device_created ON product_analytics_events (device_id, created_at DESC)',
     ]
 
     with engine.begin() as conn:

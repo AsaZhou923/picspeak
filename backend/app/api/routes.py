@@ -30,7 +30,6 @@ from app.api.deps import (
     bind_guest_token,
     create_guest_user,
     get_current_actor,
-    get_optional_actor,
     get_user_from_token,
     GUEST_TOKEN_COOKIE,
     issue_guest_token,
@@ -97,8 +96,6 @@ from app.schemas import (
     AuthTokenResponse,
     GuestReviewMigrateRequest,
     GuestReviewMigrateResponse,
-    ProductAnalyticsTrackRequest,
-    ProductAnalyticsTrackResponse,
 )
 from app.services.ai import AIReviewError, run_ai_review
 from app.services.billing_access import (
@@ -139,7 +136,6 @@ from app.services.lemonsqueezy_webhooks import (
     verify_lemonsqueezy_webhook,
 )
 from app.services.object_storage import get_object_storage_client
-from app.services.product_analytics import record_product_event
 from app.services.review_task_processor import expire_review_tasks, process_review_task
 from app.services.task_dispatcher import TaskDispatchError, enqueue_review_task
 from app.services.task_events import record_task_event
@@ -292,15 +288,6 @@ def _emit_structured_log(*, severity: str = 'INFO', event: str, message: str, **
     }
     sys.stdout.write(json.dumps(payload, ensure_ascii=False, separators=(',', ':'), default=str) + '\n')
     sys.stdout.flush()
-
-
-def _normalized_optional_header(value: str | None, *, max_length: int = 128) -> str | None:
-    if value is None:
-        return None
-    normalized = str(value).strip()
-    if not normalized:
-        return None
-    return normalized[:max_length]
 
 
 def _with_derived_upload_totals(upload_metrics: dict[str, Any], *, confirm_processing_ms: int) -> dict[str, Any]:
@@ -2088,30 +2075,6 @@ def execute_review_task(payload: InternalTaskExecuteRequest, request: Request):
     return result
 
 
-@router.post('/analytics/events', response_model=ProductAnalyticsTrackResponse, status_code=status.HTTP_202_ACCEPTED)
-def track_product_analytics_event(
-    payload: ProductAnalyticsTrackRequest,
-    request: Request,
-    db: Session = Depends(get_db),
-    actor: CurrentActor | None = Depends(get_optional_actor),
-    device_id: str | None = Header(default=None, alias='X-Device-Id'),
-):
-    record_product_event(
-        db,
-        event_name=payload.event_name,
-        user_public_id=None if actor is None else actor.user.public_id,
-        plan='guest' if actor is None else actor.plan.value,
-        device_id=_normalized_optional_header(device_id),
-        session_id=_normalized_optional_header(payload.session_id),
-        source=payload.source,
-        page_path=payload.page_path or request.url.path,
-        locale=payload.locale,
-        metadata=payload.metadata,
-    )
-    db.commit()
-    return ProductAnalyticsTrackResponse(status='accepted', event_name=payload.event_name)
-
-
 @router.get('/blog/views', response_model=BlogPostViewsResponse)
 def list_blog_post_views(
     slug: list[str] | None = Query(default=None),
@@ -2881,19 +2844,6 @@ def create_billing_checkout(
         raise api_error(status.HTTP_503_SERVICE_UNAVAILABLE, 'LEMONSQUEEZY_NOT_CONFIGURED', str(exc)) from exc
     except LemonSqueezyAPIError as exc:
         raise api_error(status.HTTP_502_BAD_GATEWAY, 'LEMONSQUEEZY_API_FAILED', str(exc)) from exc
-    record_product_event(
-        db,
-        event_name='checkout_started',
-        user_public_id=actor.user.public_id,
-        plan=actor.plan.value,
-        source='checkout',
-        page_path='/billing/checkout',
-        metadata={
-            'plan': payload.plan,
-            'provider': 'lemonsqueezy',
-            'checkout_id': checkout.checkout_id,
-        },
-    )
     db.commit()
     return BillingCheckoutResponse(
         status='created',

@@ -21,7 +21,6 @@ from app.services.lemonsqueezy import (
     retrieve_subscription,
     webhook_signing_secret,
 )
-from app.services.product_analytics import record_product_event
 
 HANDLED_LEMONSQUEEZY_EVENTS = {
     'order_created',
@@ -444,20 +443,6 @@ def _process_subscription_payment_success(db: Session, event: LemonSqueezyWebhoo
     subscription.updated_at = _utc_now()
     db.add(subscription)
     _sync_user_plan(db, resolved_user)
-    record_product_event(
-        db,
-        event_name='paid_success',
-        user_public_id=resolved_user.public_id,
-        plan=resolved_user.plan.value,
-        source='checkout',
-        page_path='/billing/webhooks/lemonsqueezy',
-        metadata={
-            'provider': 'lemonsqueezy',
-            'subscription_id': subscription.provider_subscription_id,
-            'invoice_id': invoice_id,
-            'event_name': event.event_name,
-        },
-    )
     return 'payment_recorded', resolved_user
 
 

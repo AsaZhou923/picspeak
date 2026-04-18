@@ -11,7 +11,6 @@ import { useAuth } from '@/lib/auth-context';
 import { formatUserFacingError } from '@/lib/error-utils';
 import { buildGalleryRestoreKey, readGalleryRestoreState, saveGalleryRestoreState } from '@/lib/gallery-navigation';
 import { useI18n } from '@/lib/i18n';
-import { markProductAttributionSource } from '@/lib/product-analytics';
 import { PublicGalleryItem, PublicGalleryQuery } from '@/lib/types';
 
 // Extracted sub-components
@@ -494,11 +493,7 @@ function GalleryPageContent() {
             </div>
             <h2 className="mt-5 font-display text-3xl text-ink">{t('gallery_empty')}</h2>
             <p className="mx-auto mt-3 max-w-md text-sm leading-7 text-ink-muted">{t('gallery_empty_body')}</p>
-            <Link
-              href="/workspace"
-              onClick={() => markProductAttributionSource('gallery')}
-              className="mt-6 inline-flex items-center gap-2 rounded-full border border-gold/30 px-4 py-2 text-sm text-gold transition-colors hover:bg-gold/10"
-            >
+            <Link href="/workspace" className="mt-6 inline-flex items-center gap-2 rounded-full border border-gold/30 px-4 py-2 text-sm text-gold transition-colors hover:bg-gold/10">
               {t('gallery_empty_cta')}
               <ChevronRight size={14} />
             </Link>

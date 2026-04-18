@@ -36,7 +36,7 @@ export default function HomeCheckoutButton() {
 
     setChinaCheckoutLoading(true);
     try {
-      openChinaProPurchase(locale);
+      openChinaProPurchase();
     } finally {
       setChinaCheckoutLoading(false);
     }

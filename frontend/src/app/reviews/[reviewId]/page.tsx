@@ -15,7 +15,6 @@ import { isDemoReviewId } from '@/lib/demo-review';
 import { useI18n } from '@/lib/i18n';
 import { formatUserFacingError } from '@/lib/error-utils';
 import { getUploadedPhotoPreviewSrc, refreshUploadedPhotoPreviewSrc } from '@/lib/photo-preview-cache';
-import { trackProductEvent } from '@/lib/product-analytics';
 import {
   CARD_HIGHLIGHT_DURATION_MS,
   CritiqueImageType,
@@ -207,7 +206,7 @@ export default function ReviewPage() {
       : backHref === '/account/favorites'
         ? t('review_nav_favorites')
         : t('review_back_workspace');
-  const { ensureToken, token, userInfo } = useAuth();
+  const { ensureToken, userInfo } = useAuth();
 
   function handleBackNavigation() {
     if (isGalleryBackHref) {
@@ -606,15 +605,6 @@ export default function ReviewPage() {
   async function handleBackendShareLink() {
     if (!review || actionBusy || !canManageReview) return;
 
-    void trackProductEvent('share_clicked', {
-      token: token ?? undefined,
-      pagePath: `/reviews/${review.review_id}`,
-      locale,
-      metadata: {
-        review_id: review.review_id,
-        mode: review.mode,
-      },
-    });
     setActionBusy('share');
     setActionError('');
     setActionFeedback(actionCopy.sharePending);
@@ -638,15 +628,6 @@ export default function ReviewPage() {
   async function handleBackendExportSummary() {
     if (!review || actionBusy || !canManageReview) return;
 
-    void trackProductEvent('export_clicked', {
-      token: token ?? undefined,
-      pagePath: `/reviews/${review.review_id}`,
-      locale,
-      metadata: {
-        review_id: review.review_id,
-        mode: review.mode,
-      },
-    });
     setActionBusy('export');
     setActionError('');
     setActionFeedback(actionCopy.exportPending);
@@ -754,16 +735,6 @@ export default function ReviewPage() {
   function handleReplayReview() {
     if (!review || actionBusy || !canManageReview) return;
 
-    void trackProductEvent('reanalysis_clicked', {
-      token: token ?? undefined,
-      pagePath: `/reviews/${review.review_id}`,
-      locale,
-      metadata: {
-        review_id: review.review_id,
-        photo_id: review.photo_id,
-        mode: review.mode,
-      },
-    });
     setActionBusy('replay');
     setActionError('');
     setActionFeedback(actionCopy.replayPending);

@@ -9,7 +9,6 @@ import { getBlogUi } from '@/lib/blog-data';
 import ScoreRing from '@/components/ui/ScoreRing';
 import { DEMO_IMAGE_URL, DEMO_REVIEW_ID } from '@/lib/demo-review';
 import { useI18n } from '@/lib/i18n';
-import { markProductAttributionSource } from '@/lib/product-analytics';
 import { siteConfig } from '@/lib/site';
 
 const HomeAuthWidgets = dynamic(() => import('@/components/home/HomeAuthWidgets'), {
@@ -193,7 +192,6 @@ export default function HomePage() {
         <div className="relative mt-10 flex flex-col sm:flex-row gap-4 items-center animate-fade-in anim-fill-both delay-300">
           <Link
             href="/workspace"
-            onClick={() => markProductAttributionSource('home_direct')}
             className="btn-gold flex items-center gap-2 px-7 py-3 bg-gold text-void text-sm font-medium rounded hover:bg-gold-light active:scale-[0.98] transition-all duration-200 hover:shadow-[0_0_24px_rgba(200,162,104,0.4)]"
           >
             {t('hero_cta_start')}
@@ -378,7 +376,6 @@ export default function HomePage() {
           <h2 className="font-display text-4xl sm:text-5xl">{t('hero_cta_start')}</h2>
           <Link
             href="/workspace"
-            onClick={() => markProductAttributionSource('home_direct')}
             className="inline-flex items-center gap-2 px-8 py-3.5 bg-gold text-void text-sm font-medium rounded hover:bg-gold-light transition-all active:scale-95"
           >
             {t('hero_cta_start')}

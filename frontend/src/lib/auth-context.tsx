@@ -11,13 +11,11 @@ import React, {
 import { useAuth as useClerkAuth } from '@clerk/nextjs';
 import { authClerkExchange, authGuest, clearUsageCache, registerUnauthorizedHandler } from './api';
 import { clearPhotoPreviewCache } from './photo-preview-cache';
-import { trackProductEvent } from './product-analytics';
 import { clearReviewThumbnailCache } from './review-thumbnail-cache';
 import { AuthToken } from './types';
 
 const TOKEN_KEY = 'ps_token';
 const PHOTO_UPLOAD_CACHE_KEY = 'ps_uploaded_photos_v1';
-const SIGN_IN_EVENT_KEY = 'ps_sign_in_event_v1';
 
 interface AuthState {
   token: string | null;
@@ -121,23 +119,6 @@ function clearStoredAuthToken(): void {
   clearUsageCache();
   void clearPhotoPreviewCache();
   void clearReviewThumbnailCache();
-}
-
-function markSignInTracked(clerkUserId: string | null | undefined): boolean {
-  if (!clerkUserId) {
-    return false;
-  }
-
-  try {
-    const lastTracked = window.sessionStorage.getItem(SIGN_IN_EVENT_KEY);
-    if (lastTracked === clerkUserId) {
-      return false;
-    }
-    window.sessionStorage.setItem(SIGN_IN_EVENT_KEY, clerkUserId);
-    return true;
-  } catch {
-    return true;
-  }
 }
 
 function isMatchingClerkSession(userInfo: AuthToken | null, clerkUserId: string | null | undefined): boolean {
@@ -272,16 +253,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const exchanged = await authClerkExchange(sessionToken, guestToken);
       if (!cancelled) {
         login(exchanged);
-        if (markSignInTracked(exchanged.clerk_user_id)) {
-          void trackProductEvent('sign_in_completed', {
-            token: exchanged.access_token,
-            metadata: {
-              previous_plan: parsed?.plan ?? 'guest',
-              migrated_reviews: exchanged.migrated_reviews ?? 0,
-              migrated_photos: exchanged.migrated_photos ?? 0,
-            },
-          });
-        }
         setIsLoading(false);
       }
     };
@@ -341,16 +312,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       const exchanged = await authClerkExchange(sessionToken);
       login(exchanged);
-      if (markSignInTracked(exchanged.clerk_user_id)) {
-        void trackProductEvent('sign_in_completed', {
-          token: exchanged.access_token,
-          metadata: {
-            previous_plan: parsed?.plan ?? 'guest',
-            migrated_reviews: exchanged.migrated_reviews ?? 0,
-            migrated_photos: exchanged.migrated_photos ?? 0,
-          },
-        });
-      }
       return exchanged.access_token;
     }
 
