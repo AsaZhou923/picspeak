@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from sqlalchemy.exc import IntegrityError
 
-from app.api.routes import router, webhook_router
+from app.api.router import router, webhook_router
 from app.core.config import settings
 from app.core.errors import normalize_http_error
 from app.core.network import client_ip_from_request

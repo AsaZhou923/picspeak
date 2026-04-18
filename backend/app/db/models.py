@@ -403,3 +403,26 @@ class ApiRequestLog(Base):
     status_code: Mapped[int] = mapped_column(Integer, nullable=False)
     duration_ms: Mapped[int] = mapped_column(Integer, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class ProductAnalyticsEvent(Base):
+    __tablename__ = 'product_analytics_events'
+    __table_args__ = (
+        Index('idx_product_analytics_events_name_created', 'event_name', 'created_at'),
+        Index('idx_product_analytics_events_source_created', 'source', 'created_at'),
+        Index('idx_product_analytics_events_plan_created', 'plan', 'created_at'),
+        Index('idx_product_analytics_events_user_created', 'user_public_id', 'created_at'),
+        Index('idx_product_analytics_events_device_created', 'device_id', 'created_at'),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    event_name: Mapped[str] = mapped_column(Text, nullable=False)
+    user_public_id: Mapped[str | None] = mapped_column(Text)
+    plan: Mapped[str] = mapped_column(Text, nullable=False, default='guest', server_default='guest')
+    device_id: Mapped[str | None] = mapped_column(Text)
+    session_id: Mapped[str | None] = mapped_column(Text)
+    source: Mapped[str] = mapped_column(Text, nullable=False, default='unknown', server_default='unknown')
+    page_path: Mapped[str | None] = mapped_column(Text)
+    locale: Mapped[str | None] = mapped_column(Text)
+    metadata_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())

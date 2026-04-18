@@ -266,6 +266,20 @@ class BlogPostViewIncrementResponse(BaseModel):
     view_count: int = 0
 
 
+class ProductAnalyticsTrackRequest(BaseModel):
+    event_name: str = Field(min_length=1, max_length=64)
+    source: str | None = Field(default=None, max_length=64)
+    page_path: str | None = Field(default=None, max_length=512)
+    locale: str | None = Field(default=None, max_length=16)
+    session_id: str | None = Field(default=None, max_length=128)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class ProductAnalyticsTrackResponse(BaseModel):
+    status: str
+    event_name: str
+
+
 class ReviewExportPhoto(BaseModel):
     photo_id: str
     photo_url: str | None = None

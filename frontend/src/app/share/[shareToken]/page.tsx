@@ -10,6 +10,7 @@ import type { ReviewGetResponse } from '@/lib/types';
 import { SkeletonBlock } from '@/components/ui/LoadingSpinner';
 import { useI18n } from '@/lib/i18n';
 import { formatUserFacingError } from '@/lib/error-utils';
+import { markProductAttributionSource } from '@/lib/product-analytics';
 
 function getSharePageCopy(locale: 'zh' | 'en' | 'ja') {
   if (locale === 'ja') {
@@ -92,6 +93,7 @@ export default function SharedReviewPage() {
           <p className="text-sm text-rust">{error || t('review_err_fetch')}</p>
           <Link
             href="/workspace"
+            onClick={() => markProductAttributionSource('share')}
             className="inline-flex items-center gap-2 rounded-full bg-gold px-4 py-2 text-sm font-medium text-void transition-colors hover:bg-gold-light"
           >
             {copy.openWorkspace}
@@ -157,6 +159,7 @@ export default function SharedReviewPage() {
             <div className="pt-2">
               <Link
                 href="/workspace"
+                onClick={() => markProductAttributionSource('share')}
                 className="inline-flex items-center gap-2 rounded-full bg-gold px-4 py-2 text-sm font-medium text-void transition-colors hover:bg-gold-light"
               >
                 {copy.openWorkspace}
