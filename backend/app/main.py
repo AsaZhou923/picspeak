@@ -29,7 +29,7 @@ async def lifespan(app: FastAPI):
         worker.stop()
 
 
-app = FastAPI(title='AiPingTu Backend', version='1.0.0', lifespan=lifespan)
+app = FastAPI(title='PicSpeak Backend', version='1.0.0', lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.backend_cors_origins,

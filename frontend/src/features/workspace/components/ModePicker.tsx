@@ -1,4 +1,5 @@
 import { Zap, Star } from 'lucide-react';
+import { type Translator } from '@/lib/i18n';
 
 const MODE_OPTIONS = [
   { id: 'flash' as const, icon: Zap, title: 'Flash', descKey: 'mode_flash_desc' },
@@ -11,7 +12,7 @@ interface ModePickerProps {
   isGuest: boolean;
   promoModeBadge: string;
   variant?: 'compact' | 'full';
-  t: (key: string) => string;
+  t: Translator;
 }
 
 export function ModePicker({ value, onChange, isGuest, promoModeBadge, variant = 'full', t }: ModePickerProps) {

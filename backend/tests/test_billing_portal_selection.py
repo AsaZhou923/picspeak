@@ -4,8 +4,8 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from unittest.mock import Mock, patch
 
-from app.api import routes
-from app.api.routes import _best_subscription_for_portal, _customer_portal_destination, _refresh_subscription_portal_urls
+from app.api.routers import billing as routes
+from app.api.routers.billing import _best_subscription_for_portal, _customer_portal_destination, _refresh_subscription_portal_urls
 from app.db.models import BillingSubscription
 
 
@@ -117,7 +117,7 @@ class BillingPortalSelectionTests(unittest.TestCase):
         db = Mock()
 
         with patch(
-            'app.api.routes.retrieve_subscription',
+            'app.api.routers.billing.retrieve_subscription',
             return_value={
                 'attributes': {
                     'urls': {

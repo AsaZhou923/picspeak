@@ -2,13 +2,14 @@ import { Info } from 'lucide-react';
 import { planLabel, planColor } from '@/lib/auth-context';
 import { UsageResponse } from '@/lib/types';
 import Badge from '@/components/ui/Badge';
+import { type Translator } from '@/lib/i18n';
 
 interface QuotaBannerProps {
   usage: UsageResponse | null;
   usageError: boolean;
   remainingQuota: number | null;
   totalQuota: number | null;
-  t: (key: string) => string;
+  t: Translator;
 }
 
 export function QuotaBanner({ usage, usageError, remainingQuota, totalQuota, t }: QuotaBannerProps) {

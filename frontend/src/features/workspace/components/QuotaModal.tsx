@@ -1,10 +1,11 @@
 import { AlertCircle, ArrowRight, X } from 'lucide-react';
 import ClerkSignInTrigger from '@/components/auth/ClerkSignInTrigger';
+import { type Translator } from '@/lib/i18n';
 
 interface QuotaModalProps {
   plan: string;
   onClose: () => void;
-  t: (key: string) => string;
+  t: Translator;
 }
 
 export function QuotaModal({ plan, onClose, t }: QuotaModalProps) {

@@ -1,4 +1,5 @@
 import { ImageType } from '@/lib/types';
+import { type Translator } from '@/lib/i18n';
 
 const IMAGE_TYPE_IDS = ['default', 'landscape', 'portrait', 'street', 'still_life', 'architecture'] as const;
 
@@ -6,7 +7,7 @@ interface ImageTypePickerProps {
   value: ImageType;
   onChange: (type: ImageType) => void;
   variant?: 'compact' | 'full';
-  t: (key: string) => string;
+  t: Translator;
 }
 
 export function ImageTypePicker({ value, onChange, variant = 'full', t }: ImageTypePickerProps) {

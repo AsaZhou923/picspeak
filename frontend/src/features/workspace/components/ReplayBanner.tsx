@@ -3,6 +3,7 @@ import { ImageType } from '@/lib/types';
 import { Stage } from '../hooks/useUploadFlow';
 import { ImageTypePicker } from './ImageTypePicker';
 import { ModePicker } from './ModePicker';
+import { type Translator } from '@/lib/i18n';
 
 interface ReplayBannerProps {
   replayPhotoUrl: string | null;
@@ -15,7 +16,7 @@ interface ReplayBannerProps {
   onReviewModeChange: (mode: 'flash' | 'pro') => void;
   onStartReview: () => void;
   onUploadNew: () => void;
-  t: (key: string) => string;
+  t: Translator;
 }
 
 export function ReplayBanner({

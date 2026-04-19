@@ -12,9 +12,9 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-from app.api.routes import (
-    Review,
-    _build_photo_proxy_url,
+from app.db.models import Review
+from app.api.routers.photos import _build_photo_proxy_url
+from app.api.routers.gallery import (
     _decode_public_gallery_cursor,
     _encode_public_gallery_cursor,
     _gallery_rank_score_value,
@@ -64,7 +64,7 @@ class PublicGalleryRouteTests(unittest.TestCase):
         ]
         db.query.return_value = query
 
-        with patch('app.api.routes._public_gallery_filters', return_value=()):
+        with patch('app.api.routers.gallery._public_gallery_filters', return_value=()):
             recommendations = _gallery_recommendation_map(db, [1, 8])
 
         self.assertFalse(recommendations[1]['recommended'])
@@ -83,7 +83,7 @@ class PublicGalleryRouteTests(unittest.TestCase):
             url_for=lambda _route_name, photo_id: f'http://internal/api/v1/photos/{photo_id}/image',
         )
 
-        with patch('app.api.routes.sign_payload', return_value='signed-token'):
+        with patch('app.api.routers.photos.sign_payload', return_value='signed-token'):
             url = _build_photo_proxy_url(request, 'pho_123', 'usr_456')
 
         self.assertEqual(
@@ -112,16 +112,16 @@ class PublicGalleryRouteTests(unittest.TestCase):
         db.query.side_effect = [count_query, list_query]
 
         with patch(
-            'app.api.routes._gallery_like_counts',
+            'app.api.routers.gallery._gallery_like_counts',
             return_value={row_review.id: 7},
         ), patch(
-            'app.api.routes._gallery_viewer_likes',
+            'app.api.routers.gallery._gallery_viewer_likes',
             return_value={row_review.id},
         ), patch(
-            'app.api.routes._gallery_recommendation_map',
+            'app.api.routers.gallery._gallery_recommendation_map',
             return_value={row_review.id: {'recommended': True, 'score_percentile': 92.5}},
         ), patch(
-            'app.api.routes._public_gallery_item',
+            'app.api.routers.gallery._public_gallery_item',
             return_value={
                 'review_id': 'rev_123',
                 'photo_id': 'pho_123',
@@ -185,7 +185,7 @@ class PublicGalleryRouteTests(unittest.TestCase):
         created_from = datetime(2026, 3, 1, tzinfo=timezone.utc)
         created_to = datetime(2026, 3, 20, tzinfo=timezone.utc)
 
-        with patch('app.api.routes._apply_review_history_filters', side_effect=lambda query, **kwargs: query) as apply_filters:
+        with patch('app.api.routers.gallery._apply_review_history_filters_gallery', side_effect=lambda query, **kwargs: query) as apply_filters:
             payload = list_public_gallery(
                 request=request,
                 limit=12,

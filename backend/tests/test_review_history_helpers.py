@@ -9,14 +9,14 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-from app.api.routes import (
+from app.api.routers.reviews import (
     _build_review_export_payload,
     _normalize_review_note,
     _normalize_review_tags,
-    _review_gallery_summary,
     _review_meta_payload,
     _review_share_info,
 )
+from app.api.routers.gallery import _review_gallery_summary
 from app.db.models import Review, ReviewMode, ReviewStatus
 
 
