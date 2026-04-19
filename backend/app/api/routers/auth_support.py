@@ -407,6 +407,5 @@ def _login_from_google_claims(claims: dict, db: Session) -> AuthTokenResponse:
         user.daily_quota_total = quota_for_plan(user.plan)
         db.add(user)
 
-    db.commit()
-    db.refresh(user)
+    db.flush()
     return _serialize_auth_response(user, provider='google')

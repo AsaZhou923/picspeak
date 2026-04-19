@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { getReview } from '@/lib/api';
+import { getReview, isAbortError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 
 export function useReplayContext({ preview }: { preview: string | null }) {
@@ -23,17 +23,19 @@ export function useReplayContext({ preview }: { preview: string | null }) {
 
   useEffect(() => {
     if (!sourceReviewId || preview) return;
-    let cancelled = false;
+    const controller = new AbortController();
     ensureToken()
-      .then((tok) => getReview(sourceReviewId, tok))
+      .then((tok) => getReview(sourceReviewId, tok, controller.signal))
       .then((data) => {
-        if (!cancelled) setReplayPhotoUrl(data.photo_url);
+        if (!controller.signal.aborted) setReplayPhotoUrl(data.photo_url);
       })
       .catch((err) => {
-        if (!cancelled) console.error('Failed to hydrate replay photo in workspace', err);
+        if (!isAbortError(err) && !controller.signal.aborted) {
+          console.error('Failed to hydrate replay photo in workspace', err);
+        }
       });
     return () => {
-      cancelled = true;
+      controller.abort();
     };
   }, [sourceReviewId, preview, ensureToken]);
 

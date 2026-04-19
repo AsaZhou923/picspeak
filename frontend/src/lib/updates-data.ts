@@ -18,6 +18,32 @@ export function getProductUpdates(locale: UpdateLocale): ProductUpdateEntry[] {
   if (locale === 'ja') {
     return [
       {
+        id: '2026-04-19-auth-hardening-and-request-stability',
+        date: '2026-04-19',
+        title: '認証強化・タスクリトライ整理・リクエスト安定化',
+        summary:
+          'CORS、Cookie、Webhook、JWKS キャッシュ、タスクエラー公開範囲、フロントエンドのリクエスト中断をまとめて整え、認証まわりと API 呼び出しの安定性を上げました。',
+        docPath: 'docs/changelog/update-log-2026-04-19-auth-hardening-and-request-stability.md',
+        sections: [
+          {
+            title: '認証と API 保護',
+            items: [
+              'CORS の許可メソッドとヘッダーを明示し、X-Device-Id も許可',
+              'guest cookie の SameSite を環境別に整理し、Webhook の 409/401/403 応答を是正',
+              'アクティベーションコード引き換えにユーザー単位のレート制限を追加',
+            ],
+          },
+          {
+            title: '安定性と回帰防止',
+            items: [
+              'JWKS キャッシュにロックを入れて並行更新を抑制',
+              'AI 呼び出し前にクォータを確認し、タスク失敗メッセージを外部向けにサニタイズ',
+              'AbortController で詳細・使用量・タスク polling の取消しを実装',
+            ],
+          },
+        ],
+      },
+      {
         id: '2026-04-19-backend-frontend-module-split',
         date: '2026-04-19',
         title: 'バックエンド・フロントエンドのモジュール分割リファクタリング',
@@ -368,6 +394,32 @@ export function getProductUpdates(locale: UpdateLocale): ProductUpdateEntry[] {
   if (locale === 'en') {
     return [
       {
+        id: '2026-04-19-auth-hardening-and-request-stability',
+        date: '2026-04-19',
+        title: 'Auth hardening, safer task retries, and more stable requests',
+        summary:
+          'Tightened CORS and cookie behavior, corrected webhook error codes, added activation-code rate limiting, locked JWKS cache refreshes, and made frontend requests cancellable.',
+        docPath: 'docs/changelog/update-log-2026-04-19-auth-hardening-and-request-stability.md',
+        sections: [
+          {
+            title: 'Auth and API safety',
+            items: [
+              'CORS methods and headers are now explicit, including X-Device-Id used by the frontend',
+              'Guest cookie SameSite handling is now environment-aware, and Clerk webhook 409/401/403 responses are separated correctly',
+              'Activation-code redemption now has a per-user rate limit',
+            ],
+          },
+          {
+            title: 'Stability and regression protection',
+            items: [
+              'JWKS cache refreshes are locked to avoid concurrent upstream bursts',
+              'Quota checks now happen before AI calls, and task-facing errors are sanitized for users',
+              'AbortController support now cancels review, usage, replay, and task polling requests cleanly',
+            ],
+          },
+        ],
+      },
+      {
         id: '2026-04-19-backend-frontend-module-split',
         date: '2026-04-19',
         title: 'Backend & frontend modular refactor',
@@ -716,6 +768,32 @@ export function getProductUpdates(locale: UpdateLocale): ProductUpdateEntry[] {
   }
 
   return [
+    {
+      id: '2026-04-19-auth-hardening-and-request-stability',
+      date: '2026-04-19',
+      title: '认证加固、任务重试收口与请求稳定性修复',
+      summary:
+        '这次更新集中修复了认证链路与跨域边界，补上激活码限速、JWKS 缓存加锁、任务错误脱敏，并让前端请求在切页和轮询场景下可被正确取消。',
+      docPath: 'docs/changelog/update-log-2026-04-19-auth-hardening-and-request-stability.md',
+      sections: [
+        {
+          title: '认证与接口保护',
+          items: [
+            'CORS 方法和请求头改为显式白名单，并补回前端真实使用的 X-Device-Id',
+            'guest cookie 的 SameSite 按环境处理，Clerk webhook 的 409/401/403 响应码不再混用',
+            '激活码兑换接口新增按用户限速，降低高频猜码风险',
+          ],
+        },
+        {
+          title: '稳定性与回归保护',
+          items: [
+            'JWKS 缓存刷新加锁，避免并发击穿上游',
+            '配额检查前移到 AI 调用前，异步任务错误对外统一脱敏',
+            '前端详情、用量、复用分析和任务轮询请求已接入 AbortController 取消链路',
+          ],
+        },
+      ],
+    },
     {
       id: '2026-04-19-backend-frontend-module-split',
       date: '2026-04-19',

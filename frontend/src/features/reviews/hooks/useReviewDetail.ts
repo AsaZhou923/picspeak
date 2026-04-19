@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getReview } from '@/lib/api';
+import { getReview, isAbortError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { ReviewGetResponse } from '@/lib/types';
 import { useI18n } from '@/lib/i18n';
@@ -15,23 +15,25 @@ export function useReviewDetail(reviewId: string) {
   const [initialPhotoUrl, setInitialPhotoUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    let cancelled = false;
+    const controller = new AbortController();
+    setLoading(true);
+    setError('');
     ensureToken()
-      .then((token) => getReview(reviewId, token))
+      .then((token) => getReview(reviewId, token, controller.signal))
       .then(async (data) => {
         const localPhotoUrl = await getUploadedPhotoPreviewSrc(data.photo_id);
-        if (cancelled) return;
+        if (controller.signal.aborted) return;
         setReview(data);
         setInitialPhotoUrl(localPhotoUrl || data.photo_url || null);
         setLoading(false);
       })
       .catch((err) => {
-        if (cancelled) return;
+        if (isAbortError(err)) return;
         setLoading(false);
         setError(formatUserFacingError(t, err, t('review_err_fetch')));
       });
     return () => {
-      cancelled = true;
+      controller.abort();
     };
   }, [reviewId, ensureToken, t]);
 

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { getUsage } from '@/lib/api';
+import { getUsage, isAbortError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { UsageResponse } from '@/lib/types';
 
@@ -34,14 +34,16 @@ export function useWorkspaceUsage(reviewMode: 'flash' | 'pro') {
   const isGuest = currentPlan === 'guest';
   const { remaining: remainingQuota, total: totalQuota } = getEffectiveQuota(usage, reviewMode);
 
-  const fetchUsage = useCallback(async () => {
+  const fetchUsage = useCallback(async (options: { signal?: AbortSignal; force?: boolean } = {}) => {
     try {
       setUsageError(false);
       const tok = await ensureToken();
-      const data = await getUsage(tok);
+      const data = await getUsage(tok, { force: options.force, signal: options.signal });
+      if (options.signal?.aborted) return;
       syncPlan(data.plan);
       setUsage(data);
     } catch (err) {
+      if (isAbortError(err)) return;
       console.error('Failed to fetch usage in workspace', err);
       setUsageError(true);
     }
@@ -49,8 +51,12 @@ export function useWorkspaceUsage(reviewMode: 'flash' | 'pro') {
 
   useEffect(() => {
     if (authLoading) return;
+    const controller = new AbortController();
     setUsage(null);
-    fetchUsage();
+    void fetchUsage({ signal: controller.signal });
+    return () => {
+      controller.abort();
+    };
   }, [authLoading, userInfo?.access_token, fetchUsage]);
 
   return { usage, usageError, fetchUsage, currentPlan, isGuest, remainingQuota, totalQuota };

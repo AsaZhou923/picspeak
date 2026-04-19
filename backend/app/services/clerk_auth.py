@@ -4,6 +4,7 @@ import base64
 import hashlib
 import json
 import logging
+import threading
 import time
 from dataclasses import dataclass
 from typing import Any
@@ -19,6 +20,7 @@ logger = logging.getLogger(__name__)
 _SHA256_DIGEST_INFO_PREFIX = bytes.fromhex('3031300d060960864801650304020105000420')
 _JWKS_CACHE_TTL_SECONDS = 300
 _jwks_cache: dict[str, Any] = {'expires_at': 0.0, 'keys': []}
+_jwks_cache_lock = threading.Lock()
 _CLERK_BACKEND_USER_AGENT = 'PicSpeak Clerk Backend Adapter'
 
 
@@ -124,11 +126,7 @@ def _clerk_request(method: str, path: str, payload: dict[str, Any] | None = None
     return parsed
 
 
-def _fetch_jwks() -> list[dict[str, Any]]:
-    now = time.time()
-    if _jwks_cache['expires_at'] > now and _jwks_cache['keys']:
-        return list(_jwks_cache['keys'])
-
+def _refresh_jwks(now: float) -> list[dict[str, Any]]:
     payload = _clerk_request('GET', '/v1/jwks')
     keys = payload.get('keys')
     if not isinstance(keys, list):
@@ -138,6 +136,18 @@ def _fetch_jwks() -> list[dict[str, Any]]:
     _jwks_cache['expires_at'] = now + _JWKS_CACHE_TTL_SECONDS
     _jwks_cache['keys'] = normalized_keys
     return list(normalized_keys)
+
+
+def _fetch_jwks(*, force_refresh: bool = False) -> list[dict[str, Any]]:
+    now = time.time()
+    if not force_refresh and _jwks_cache['expires_at'] > now and _jwks_cache['keys']:
+        return list(_jwks_cache['keys'])
+
+    with _jwks_cache_lock:
+        now = time.time()
+        if not force_refresh and _jwks_cache['expires_at'] > now and _jwks_cache['keys']:
+            return list(_jwks_cache['keys'])
+        return _refresh_jwks(now)
 
 
 def _rsa_verify_rs256(signing_input: bytes, signature: bytes, jwk: dict[str, Any]) -> bool:
@@ -207,8 +217,7 @@ def _verify_session_jwt(session_token: str) -> tuple[dict[str, Any], dict[str, A
 
     jwk = next((item for item in _fetch_jwks() if item.get('kid') == key_id), None)
     if jwk is None:
-        _jwks_cache['expires_at'] = 0.0
-        jwk = next((item for item in _fetch_jwks() if item.get('kid') == key_id), None)
+        jwk = next((item for item in _fetch_jwks(force_refresh=True) if item.get('kid') == key_id), None)
     if jwk is None:
         raise api_error(status.HTTP_401_UNAUTHORIZED, 'CLERK_TOKEN_INVALID', 'Unable to verify Clerk session token')
 

@@ -3,10 +3,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { AlertCircle, RotateCcw, ArrowLeft, ShieldCheck, Cpu, CheckCircle2, Clock } from 'lucide-react';
-import { buildTaskWebSocketUrl, getTask } from '@/lib/api';
+import { buildTaskWebSocketUrl, getTask, isAbortError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useI18n } from '@/lib/i18n';
-import { ApiException, TaskStatusResponse, TaskStreamMessage } from '@/lib/types';
+import { ApiException, TaskErrorPayload, TaskStatusResponse, TaskStreamMessage } from '@/lib/types';
 import { formatSupportMessage, formatUserFacingError } from '@/lib/error-utils';
 
 const POLL_INTERVAL = 1000;
@@ -48,6 +48,7 @@ export default function TaskPage() {
   const errorTerminalRef = useRef(false);
   const taskRef = useRef<TaskStatusResponse | null>(null);
   const redirectReviewIdRef = useRef<string | null>(null);
+  const pollRequestControllerRef = useRef<AbortController | null>(null);
 
   const setTransientError = (message: string) => {
     transientErrorCountRef.current += 1;
@@ -110,10 +111,14 @@ export default function TaskPage() {
 
   const poll = async () => {
     if (finalRef.current || errorTerminalRef.current) return;
+    const controller = new AbortController();
+    pollRequestControllerRef.current?.abort();
+    pollRequestControllerRef.current = controller;
 
     try {
       const token = await ensureToken();
-      const data = await getTask(taskId, token);
+      if (controller.signal.aborted) return;
+      const data = await getTask(taskId, token, controller.signal);
       pollCount.current += 1;
       setError('');
       handleTaskUpdate(data);
@@ -125,6 +130,9 @@ export default function TaskPage() {
         return;
       }
     } catch (err) {
+      if (isAbortError(err)) {
+        return;
+      }
       if (err instanceof ApiException) {
         if (err.code === 'TASK_NOT_FOUND') {
           const withinGraceWindow = Date.now() - pageStartedAtRef.current < INITIAL_TASK_LOOKUP_GRACE_MS;
@@ -141,6 +149,9 @@ export default function TaskPage() {
         setTransientError(formatUserFacingError(t, err, t('task_fetch_error')));
       }
     } finally {
+      if (pollRequestControllerRef.current === controller) {
+        pollRequestControllerRef.current = null;
+      }
       if (!finalRef.current && !errorTerminalRef.current && !wsConnectedRef.current) {
         timerRef.current = setTimeout(poll, POLL_INTERVAL);
       }
@@ -221,6 +232,7 @@ export default function TaskPage() {
       cancelled = true;
       if (timerRef.current) clearTimeout(timerRef.current);
       if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
+      pollRequestControllerRef.current?.abort();
       if (wsRef.current) wsRef.current.close();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -239,13 +251,8 @@ export default function TaskPage() {
   const isSuccess = task?.status === 'SUCCEEDED';
   const activeStepIdx = task ? getActiveStep(task.progress, task.status) : 0;
   const activeStep = STEPS[activeStepIdx];
-  const taskErrorMessage =
-    task?.error
-      ? formatSupportMessage(
-          t,
-          String((task.error as Record<string, unknown>).message ?? t('err_unknown_title'))
-        )
-      : '';
+  const taskError: TaskErrorPayload | null = task?.error ?? null;
+  const taskErrorMessage = taskError ? formatSupportMessage(t, taskError.message ?? t('err_unknown_title')) : '';
 
   return (
     <div className="pt-14 min-h-screen flex items-center justify-center px-6">

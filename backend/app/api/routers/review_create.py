@@ -198,7 +198,8 @@ def create_review(
     try:
         ai_response = run_ai_review(payload.mode, image_url=image_url, locale=payload.locale, exif_data=photo.exif_data or None, image_type=payload.image_type)
     except AIReviewError as exc:
-        raise api_error(status.HTTP_502_BAD_GATEWAY, 'AI_REVIEW_FAILED', f'AI review failed: {exc}') from exc
+        logger.warning('AI review failed for photo %s: %s', photo.public_id, exc)
+        raise api_error(status.HTTP_502_BAD_GATEWAY, 'AI_REVIEW_FAILED', 'AI review could not be completed') from exc
 
     result_payload = _review_result_payload(
         ai_response.result.model_dump(),

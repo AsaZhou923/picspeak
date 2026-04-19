@@ -7,10 +7,11 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from fastapi.encoders import jsonable_encoder
 
 from app.api.deps import get_user_from_token
-from app.api.routers.tasks import _load_task_snapshot, _serialize_task_status
+from app.api.routers.tasks import _is_retryable_task_error, _load_task_snapshot, _serialize_task_status
 from app.core.config import settings
 from app.db.models import TaskStatus
 from app.db.session import SessionLocal
+from app.services.review_task_processor import public_task_error_message
 
 router = APIRouter(tags=['realtime'])
 
@@ -57,7 +58,11 @@ async def stream_task_status(websocket: WebSocket, task_id: str):
                 'task': _serialize_task_status(task, review),
                 'event': {
                     'event_type': latest_event.event_type,
-                    'message': latest_event.message,
+                    'message': public_task_error_message(
+                        latest_event.error_code,
+                        retryable=_is_retryable_task_error(task),
+                        fallback=latest_event.message,
+                    ),
                     'created_at': latest_event.created_at.isoformat(),
                 } if latest_event else None,
             }

@@ -15,6 +15,8 @@ class Settings(BaseSettings):
 
     app_env: str = 'dev'
     app_secret: str = 'change-me'
+    # Minimum required length for app_secret in non-dev environments (32 bytes → 64 hex chars).
+    _APP_SECRET_MIN_LENGTH: int = 32
     database_url: str = 'postgresql+psycopg2://postgres:postgres@localhost:5432/aipingtubackend'
 
     object_bucket: str = 'aipingtuphotos'
@@ -57,6 +59,11 @@ class Settings(BaseSettings):
     lemonsqueezy_webhook_test_mode: bool = True
     # Frontend origin used for post-login redirect (e.g. http://localhost:3000)
     frontend_origin: str = 'http://localhost:3000'
+    # SameSite policy for the guest-token cookie.
+    # Use 'lax' (default) for same-domain deployments.
+    # Set to 'none' only when frontend and backend are on different domains AND you've
+    # added explicit CSRF protections; requires secure=True (enforced automatically).
+    cookie_samesite: str = 'lax'
     backend_cors_origins: list[str] = Field(
         default_factory=lambda: ['http://localhost:3000', 'http://127.0.0.1:3000']
     )
@@ -165,8 +172,21 @@ class Settings(BaseSettings):
 
     @model_validator(mode='after')
     def validate_oauth_secret(self) -> 'Settings':
+        is_dev = self.app_env.strip().lower() == 'dev'
+
+        # Validate app_secret strength in non-dev environments.
+        _insecure_app_secrets = {'', 'change-me', 'picspeakt123'}
+        if not is_dev:
+            secret = self.app_secret.strip()
+            if secret in _insecure_app_secrets or len(secret) < 32:
+                raise ValueError(
+                    'APP_SECRET must be set to a cryptographically random value of at least 32 characters outside dev mode. '
+                    'Generate one with: python3 -c "import secrets; print(secrets.token_hex(32))"'
+                )
+
+        # Validate oauth_jwt_secret in non-dev environments.
         insecure_defaults = {'', 'change-me-jwt-secret'}
-        if self.app_env.strip().lower() != 'dev' and self.oauth_jwt_secret.strip() in insecure_defaults:
+        if not is_dev and self.oauth_jwt_secret.strip() in insecure_defaults:
             raise ValueError('OAUTH_JWT_SECRET must be set to a non-default secret outside dev mode')
         if self.cloud_tasks_enabled:
             required_fields = {

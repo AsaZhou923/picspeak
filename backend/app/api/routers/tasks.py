@@ -8,7 +8,7 @@ from app.core.config import settings
 from app.core.errors import api_error
 from app.db.models import Review, ReviewTask, ReviewTaskEvent, TaskStatus
 from app.schemas import InternalTaskExecuteRequest, TaskStatusResponse
-from app.services.review_task_processor import expire_review_tasks, process_review_task
+from app.services.review_task_processor import expire_review_tasks, process_review_task, public_task_error_message
 
 router = APIRouter(tags=['tasks'])
 
@@ -26,10 +26,11 @@ def _is_retryable_task_error(task: ReviewTask) -> bool:
 def _serialize_task_status(task: ReviewTask, review: Review | None = None) -> dict:
     error = None
     if task.error_code or task.error_message:
+        retryable = _is_retryable_task_error(task)
         error = {
             'code': task.error_code,
-            'message': task.error_message,
-            'retryable': _is_retryable_task_error(task),
+            'message': public_task_error_message(task.error_code, retryable=retryable, fallback=task.error_message),
+            'retryable': retryable,
             'timeout': task.error_code in {'TASK_EXPIRED', 'TASK_STALLED'},
             'failure_stage': 'pre_charge',
             'quota_charged': False,
