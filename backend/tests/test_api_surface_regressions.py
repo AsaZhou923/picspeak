@@ -72,6 +72,38 @@ class ApiSurfaceRegressionTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn('Disallowed CORS method', response.text)
 
+    def test_uploads_presign_returns_object_key_in_response(self) -> None:
+        db = MagicMock()
+        actor = SimpleNamespace(user=SimpleNamespace(public_id='usr_upload_test'))
+        storage = MagicMock()
+        storage.generate_presigned_url.return_value = 'https://storage.example.com/presigned-put'
+
+        def override_db():
+            yield db
+
+        def override_actor():
+            return actor
+
+        app.dependency_overrides[get_db] = override_db
+        app.dependency_overrides[get_current_actor] = override_actor
+
+        with patch('app.api.routers.uploads.get_object_storage_client', return_value=storage):
+            with self._client() as client:
+                response = client.post(
+                    '/api/v1/uploads/presign',
+                    json={
+                        'filename': 'sample.jpg',
+                        'content_type': 'image/jpeg',
+                        'size_bytes': 1024,
+                    },
+                )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertIn('object_key', body)
+        self.assertTrue(body['object_key'].startswith('user_usr_upload_test/'))
+        self.assertEqual(body['put_url'], 'https://storage.example.com/presigned-put')
+
     def test_guest_cookie_forces_lax_same_site_in_dev(self) -> None:
         response = Response()
 
