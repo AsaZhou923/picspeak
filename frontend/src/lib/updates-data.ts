@@ -18,6 +18,32 @@ export function getProductUpdates(locale: UpdateLocale): ProductUpdateEntry[] {
   if (locale === 'ja') {
     return [
       {
+        id: '2026-04-19-backend-frontend-module-split',
+        date: '2026-04-19',
+        title: 'バックエンド・フロントエンドのモジュール分割リファクタリング',
+        summary:
+          '肥大化していたバックエンドルーターとフロントエンドページを単一責任の小モジュールに分割し、コードの可読性と保守性を向上させました。ユーザー向けの機能変更はありません。',
+        docPath: 'docs/changelog/update-log-2026-04-19-backend-frontend-module-split.md',
+        sections: [
+          {
+            title: 'バックエンドルーター分割',
+            items: [
+              '3000行超の routes.py モノリスを削除、全ドメインルーターが api/routers/ へ移行完了',
+              'reviews.py（980行）を作成・操作・クエリ・共通支援の4モジュールに分割',
+              'auth.py と gallery.py の補助ロジックをそれぞれ _support ファイルに抽出',
+            ],
+          },
+          {
+            title: 'フロントエンドコンポーネント分割',
+            items: [
+              'レビュー詳細ページを ~390行から ~93行に圧縮、ロジックを features/reviews/ へ移動',
+              '6つの専用コンポーネントと5つのカスタムフックを新設',
+              'useUploadFlow のユーティリティ関数を uploadFlowSupport.ts へ抽出',
+            ],
+          },
+        ],
+      },
+      {
         id: '2026-04-13-blog-view-counts',
         date: '2026-04-13',
         title: 'ブログ記事の閲覧回数表示を追加',
@@ -342,6 +368,32 @@ export function getProductUpdates(locale: UpdateLocale): ProductUpdateEntry[] {
   if (locale === 'en') {
     return [
       {
+        id: '2026-04-19-backend-frontend-module-split',
+        date: '2026-04-19',
+        title: 'Backend & frontend modular refactor',
+        summary:
+          'Split oversized backend routers and the review detail page into single-responsibility modules. No user-facing changes — this is a code organization update that improves maintainability.',
+        docPath: 'docs/changelog/update-log-2026-04-19-backend-frontend-module-split.md',
+        sections: [
+          {
+            title: 'Backend router split',
+            items: [
+              'Removed the 3000+ line routes.py monolith; all domain routers now live in api/routers/',
+              'reviews.py (980 lines) split into four modules: create, actions, queries, support',
+              'auth.py and gallery.py helper logic extracted into dedicated _support files',
+            ],
+          },
+          {
+            title: 'Frontend component split',
+            items: [
+              'Review detail page trimmed from ~390 to ~93 lines; logic moved to features/reviews/',
+              '6 new UI components and 5 custom hooks created for the review page',
+              'useUploadFlow utility functions extracted to uploadFlowSupport.ts',
+            ],
+          },
+        ],
+      },
+      {
         id: '2026-04-13-blog-view-counts',
         date: '2026-04-13',
         title: 'Blog post view counts are now visible',
@@ -664,6 +716,32 @@ export function getProductUpdates(locale: UpdateLocale): ProductUpdateEntry[] {
   }
 
   return [
+    {
+      id: '2026-04-19-backend-frontend-module-split',
+      date: '2026-04-19',
+      title: '后端与前端模块化重构',
+      summary:
+        '将过大的后端路由文件和前端评图详情页拆分为职责单一的子模块，提升代码可读性与可维护性。本次无用户可见功能变化。',
+      docPath: 'docs/changelog/update-log-2026-04-19-backend-frontend-module-split.md',
+      sections: [
+        {
+          title: '后端路由拆分',
+          items: [
+            '删除 3000 余行的 routes.py 单体文件，各域路由完整迁移至 api/routers/',
+            'reviews.py（980 行）拆分为创建、操作、查询、通用支持 4 个子模块',
+            'auth.py 和 gallery.py 辅助逻辑分别提取至 _support 文件',
+          ],
+        },
+        {
+          title: '前端组件拆分',
+          items: [
+            '评图详情页从 ~390 行精简至 ~93 行，逻辑迁入 features/reviews/',
+            '新增 6 个 UI 组件与 5 个自定义 Hook',
+            'useUploadFlow 工具函数提取至 uploadFlowSupport.ts',
+          ],
+        },
+      ],
+    },
     {
       id: '2026-04-13-blog-view-counts',
       date: '2026-04-13',

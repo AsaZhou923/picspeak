@@ -13,7 +13,7 @@ PicSpeak (图言 / AiPingTu) is an AI-powered photo review and critique applicat
 - **Database**: PostgreSQL (via SQLAlchemy)
 - **Object Storage**: Cloudflare R2 (S3-compatible)
 - **AI**: Vision LLM for image analysis (Flash/Pro models)
-- **Task Queue**: Redis-based async processing with embedded worker option
+- **Task Queue**: In-process async worker (no Redis dependency; task state stored in PostgreSQL)
 - **Authentication**: Clerk (Google OAuth + Guest users)
 - **Payments**: Lemon Squeezy
 
@@ -51,7 +51,8 @@ npm run lint     # ESLint check
 
 ### Backend (`/backend/app/`)
 - `main.py` - FastAPI app entry point with lifespan, middleware, exception handlers
-- `api/routes.py` - Main API routes (photos, reviews, tasks, auth, billing)
+- `api/router.py` - Route assembler; `include_router` for all domain routers
+- `api/routers/` - Domain route files: `auth`, `uploads`, `photos`, `reviews`, `tasks`, `gallery`, `billing`, `blog`, `analytics`, `realtime`, `webhooks`
 - `api/deps.py` - Dependency injection (auth, quota, guest tokens)
 - `db/models.py` - SQLAlchemy models (User, Photo, Review, ReviewTask, UsageLedger)
 - `db/session.py` - Database session management
@@ -65,7 +66,9 @@ npm run lint     # ESLint check
 
 ### Frontend (`/frontend/src/`)
 - `app/` - Next.js App Router pages (dynamic routes for reviews, tasks, photos)
-- `components/` - React components (upload, auth, UI elements)
+- `features/workspace/` - Upload hooks (`useUploadFlow`, `useWorkspaceUsage`, `useReplayContext`) + workspace UI components
+- `features/reviews/` - Review hooks (`useReviewDetail`, `useReviewPhoto`, `useReviewActions`) + review UI components
+- `components/` - Shared React components (upload, auth, UI elements)
 - `lib/` - Utilities (API client, auth context, i18n, image compression, EXIF extraction)
 
 ## Key Design Patterns
@@ -94,7 +97,6 @@ npm run lint     # ESLint check
 
 ### Backend (`.env`)
 - Database connection (PostgreSQL)
-- Redis URL for task queue
 - Clerk secret key and webhook secrets
 - R2/S3 credentials
 - Lemon Squeezy API key

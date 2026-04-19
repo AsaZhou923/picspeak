@@ -9,7 +9,7 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-from app.api.routes import GALLERY_AUDIT_APPROVED, _ensure_gallery_thumbnail  # noqa: E402
+from app.api.routers.gallery import GALLERY_AUDIT_APPROVED, _ensure_gallery_thumbnail  # noqa: E402
 from app.db.models import Photo, Review  # noqa: E402
 from app.db.session import SessionLocal  # noqa: E402
 

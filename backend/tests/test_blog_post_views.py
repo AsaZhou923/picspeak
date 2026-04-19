@@ -10,7 +10,7 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-from app.api.routes import increment_blog_post_view, list_blog_post_views
+from app.api.routers.blog import increment_blog_post_view, list_blog_post_views
 
 
 class BlogPostViewRouteTests(unittest.TestCase):

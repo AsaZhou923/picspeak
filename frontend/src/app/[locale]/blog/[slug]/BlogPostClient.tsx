@@ -8,6 +8,7 @@ import { getBlogViewCounts, incrementBlogPostView } from '@/lib/api';
 import { getBlogPost, getBlogPosts, getBlogUi } from '@/lib/blog-data';
 import { formatBlogViewCount, shouldTrackBlogView } from '@/lib/blog-view-stats';
 import { I18nProvider, useI18n, type Locale } from '@/lib/i18n';
+import { markProductAttributionSource } from '@/lib/product-analytics';
 import { siteConfig } from '@/lib/site';
 import { VALID_LOCALES } from '../../locales';
 
@@ -180,7 +181,11 @@ function BlogPostContent({ slug }: { slug: string }) {
             <h2 className="mt-3 font-display text-3xl text-ink">{ui.nextStepTitle}</h2>
             <p className="mt-4 text-sm leading-7 text-ink-muted">{ui.nextStepBody}</p>
             <div className="mt-6 flex flex-wrap gap-3">
-              <Link href="/workspace" className="inline-flex items-center gap-2 rounded-full bg-gold px-5 py-2.5 text-sm font-medium text-void transition-colors hover:bg-gold-light">
+              <Link
+                href="/workspace"
+                onClick={() => markProductAttributionSource('blog')}
+                className="inline-flex items-center gap-2 rounded-full bg-gold px-5 py-2.5 text-sm font-medium text-void transition-colors hover:bg-gold-light"
+              >
                 {ui.nextStepCta}
                 <ArrowRight size={14} />
               </Link>

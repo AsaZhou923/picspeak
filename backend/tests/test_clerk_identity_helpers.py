@@ -8,7 +8,7 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-from app.api.routes import _clerk_identity_from_webhook_user
+from app.api.routers.auth import _clerk_identity_from_webhook_user
 
 
 class ClerkIdentityHelpersTests(unittest.TestCase):

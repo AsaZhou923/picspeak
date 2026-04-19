@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from sqlalchemy.exc import IntegrityError
 
-from app.api.routes import router, webhook_router
+from app.api.router import router, webhook_router
 from app.core.config import settings
 from app.core.errors import normalize_http_error
 from app.core.network import client_ip_from_request
@@ -29,7 +29,7 @@ async def lifespan(app: FastAPI):
         worker.stop()
 
 
-app = FastAPI(title='AiPingTu Backend', version='1.0.0', lifespan=lifespan)
+app = FastAPI(title='PicSpeak Backend', version='1.0.0', lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.backend_cors_origins,

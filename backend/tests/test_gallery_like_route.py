@@ -12,7 +12,7 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-from app.api.routes import like_public_gallery_review
+from app.api.routers.gallery import like_public_gallery_review
 from app.db.models import UserPlan
 
 
@@ -37,8 +37,8 @@ class GalleryLikeRouteTests(unittest.TestCase):
         actor = SimpleNamespace(plan=UserPlan.free, user=SimpleNamespace(id=9))
         review = SimpleNamespace(id=101, public_id='rev_123')
 
-        with patch('app.api.routes._find_public_gallery_review', return_value=review), patch(
-            'app.api.routes._gallery_like_count',
+        with patch('app.api.routers.gallery._find_public_gallery_review', return_value=review), patch(
+            'app.api.routers.gallery._gallery_like_count',
             return_value=4,
         ):
             payload = like_public_gallery_review(review_id='rev_123', db=db, actor=actor)
