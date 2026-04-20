@@ -28,8 +28,10 @@ import { CritiqueSection } from '@/features/reviews/components/CritiqueSection';
 import { GalleryConfirmDialog } from '@/features/reviews/components/GalleryConfirmDialog';
 import { ReviewScorePanel } from '@/features/reviews/components/ReviewScorePanel';
 import { ReviewActionBar } from '@/features/reviews/components/ReviewActionBar';
+import { ReviewGrowthLoopPanel } from '@/features/reviews/components/ReviewGrowthLoopPanel';
 import { ReviewGalleryPanel } from '@/features/reviews/components/ReviewGalleryPanel';
 import { ImageZoomOverlay } from '@/features/reviews/components/ImageZoomOverlay';
+import { buildNextShootChecklist } from '@/lib/review-growth';
 
 export default function ReviewPage() {
   const params = useParams();
@@ -129,8 +131,9 @@ export default function ReviewPage() {
 
   if (!review) return null;
 
-  const r = review.result;
-  const isPro = review.mode === 'pro';
+  const activeReview = review;
+  const r = activeReview.result;
+  const isPro = activeReview.mode === 'pro';
   const isDemoReview = isDemoReviewId(reviewId);
   const displayAdvantage   = isDemoReview ? t('demo_review_advantage') : r.advantage;
   const displayCritique    = isDemoReview ? t('demo_review_critique') : r.critique;
@@ -158,6 +161,15 @@ export default function ReviewPage() {
   const gallerySaved = Boolean(review.gallery_visible);
   const isLowScore = r.final_score < 5.0;
   const reviewGalleryCardCopy = getReviewGalleryCardCopy(locale);
+  const nextShootChecklist = buildNextShootChecklist(displaySuggestions);
+
+  function handleUploadNewRound() {
+    const nextParams = new URLSearchParams({
+      mode: activeReview.mode,
+      image_type: activeReview.image_type ?? activeReview.result.image_type ?? 'default',
+    });
+    router.push(`/workspace?${nextParams.toString()}`);
+  }
 
   const reviewPromoCopy = (() => {
     if (locale === 'ja') {
@@ -188,7 +200,7 @@ export default function ReviewPage() {
           galleryActionCopy={galleryActionCopy}
         />
       )}
-      <div className="max-w-6xl mx-auto px-6 py-12 animate-fade-in">
+      <div className="mx-auto max-w-7xl px-6 py-12 animate-fade-in">
         <button
           onClick={handleBackNavigation}
           className="flex items-center gap-1.5 text-xs text-ink-subtle hover:text-ink-muted transition-colors mb-6"
@@ -217,7 +229,7 @@ export default function ReviewPage() {
           </div>
         </div>
 
-        <div className="grid lg:grid-cols-[360px_1fr] gap-8 items-start">
+        <div className="grid items-start gap-6 lg:grid-cols-[340px_minmax(0,1fr)] xl:gap-8">
           <ReviewScorePanel
             review={review}
             photoUrl={photoUrl}
@@ -230,7 +242,7 @@ export default function ReviewPage() {
             onDimClick={handleDimClick}
           />
 
-          <div className="space-y-6 min-w-0">
+          <div className="min-w-0 space-y-5">
             <div>
               <p className="text-xs text-gold/70 font-mono mb-2 tracking-widest uppercase">— {t('review_page_label')}</p>
               <h1 className="font-display text-3xl sm:text-4xl mb-2">{t('review_page_headline')}</h1>
@@ -246,7 +258,7 @@ export default function ReviewPage() {
               </div>
             </div>
 
-            {showPersonalActions && (
+            {showOwnerActions && (
               <ReviewActionBar
                 review={review}
                 showOwnerActions={showOwnerActions}
@@ -254,7 +266,6 @@ export default function ReviewPage() {
                 linkCopied={linkCopied}
                 actionBusy={actionBusy}
                 favoriteCopy={favoriteCopy}
-                onReplayReview={handleReplayReview}
                 onFavoriteToggle={handleFavoriteToggle}
                 onShareLink={handleBackendShareLink}
                 onExportSummary={handleBackendExportSummary}
@@ -290,6 +301,17 @@ export default function ReviewPage() {
                 highlightTop={2} highlightedId={highlightedCardId}
               />
             </div>
+
+            {showOwnerActions && (
+              <ReviewGrowthLoopPanel
+                locale={locale}
+                checklist={nextShootChecklist}
+                actionBusy={actionBusy}
+                onReplayReview={handleReplayReview}
+                onUploadNew={handleUploadNewRound}
+                t={t}
+              />
+            )}
 
             {showOwnerActions && (
               <ReviewGalleryPanel

@@ -17,6 +17,7 @@ from app.services.ai import (
     _is_multimodal_model,
     _normalize_review_result_fields,
     _prompt_for_mode_v3,
+    _writing_prompt,
     _validate_suggestions_structure,
     model_name_for_mode,
     run_ai_review,
@@ -116,6 +117,40 @@ class AIPromptTests(unittest.TestCase):
         )
 
         self.assertIn('\u5efa\u8bae\uff1a', normalized['suggestions'])
+
+    def test_writing_prompt_flash_requires_single_target_next_shot_actions(self) -> None:
+        prompt = _writing_prompt(
+            mode='flash',
+            locale='en',
+            scores={'composition': 6, 'lighting': 5, 'color': 5, 'impact': 4, 'technical': 7},
+            exif_data=None,
+            image_type='architecture',
+        )
+
+        self.assertIn('Each flash suggestion should focus on one concrete adjustment for the next shot.', prompt)
+        self.assertIn('Lead with the action first so it can double as a short next-shoot checklist item.', prompt)
+
+    def test_writing_prompt_uses_english_action_labels_for_english_locale(self) -> None:
+        prompt = _writing_prompt(
+            mode='flash',
+            locale='en',
+            scores={'composition': 6, 'lighting': 5, 'color': 5, 'impact': 4, 'technical': 7},
+            exif_data=None,
+            image_type='architecture',
+        )
+
+        self.assertIn('"Observation: ...; Reason: ...; Action: ..."', prompt)
+
+    def test_writing_prompt_uses_japanese_action_labels_for_japanese_locale(self) -> None:
+        prompt = _writing_prompt(
+            mode='flash',
+            locale='ja',
+            scores={'composition': 6, 'lighting': 5, 'color': 5, 'impact': 4, 'technical': 7},
+            exif_data=None,
+            image_type='architecture',
+        )
+
+        self.assertIn('「観察：...；理由：...；行動：...」', prompt)
 
     def test_run_ai_review_locks_scores_from_scoring_pass(self) -> None:
         with patch('app.services.ai.settings.ai_api_key', 'test-key'), patch(

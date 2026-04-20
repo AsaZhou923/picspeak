@@ -56,7 +56,7 @@ export const zhTranslations = {
     pro_offer_highlight: '首发促销',
     updates_label: '更新记录',
     updates_hint_home: '查看公开长廊更新',
-    updates_hint_latest: '查看认证加固与请求稳定性修复更新',
+    updates_hint_latest: '查看连续进步与复评重拍更新',
     contact_label: '联系方式',
     contact_headline: '保持联系',
 

@@ -583,6 +583,15 @@ def _review_language_name(locale: str) -> str:
     }.get(normalized, 'English')
 
 
+def _suggestion_label_example(locale: str) -> str:
+    normalized = (locale or '').strip().lower()
+    if normalized == 'ja':
+        return '「観察：...；理由：...；行動：...」'
+    if normalized == 'zh':
+        return '“观察：...；原因：...；可执行动作：...”'
+    return '"Observation: ...; Reason: ...; Action: ..."'
+
+
 def _score_prompt(exif_data: dict | None = None, image_type: str = 'default') -> str:
     normalized_image_type = image_type if image_type in ALLOWED_IMAGE_TYPES else 'default'
     type_guide = IMAGE_TYPE_DIMENSION_GUIDE_EN[normalized_image_type]
@@ -622,6 +631,14 @@ def _writing_prompt(mode: str, locale: str, scores: dict[str, int], exif_data: d
         'Prefer 2-3 numbered points when the image evidence supports it, and make each point include visible observation, '
         'professional judgment, and effect on the final image. '
     )
+    suggestion_note = (
+        'Each flash suggestion should focus on one concrete adjustment for the next shot. '
+        'Lead with the action first so it can double as a short next-shoot checklist item. '
+        'Keep each flash suggestion scoped to one change target instead of bundling multiple edits together. '
+        if normalized_mode == 'flash'
+        else 'In pro mode, suggestions can stay compact, but advantage and critique should carry most of the depth. '
+    )
+    suggestion_example = _suggestion_label_example(locale)
     return (
         'You are a photography critic. '
         f'The image genre is {normalized_image_type}. Use this interpretation guide: {type_guide}.{exif_note} '
@@ -635,8 +652,10 @@ def _writing_prompt(mode: str, locale: str, scores: dict[str, int], exif_data: d
         'Do not output arrays. '
         'Do not force 3 points when the image evidence only supports 1 or 2 strong points. '
         'Every point must be grounded in visible evidence from the photo, logically justified, and not generic. '
+        f'{suggestion_note}'
         'Suggestions must be practical and, when appropriate, include concrete parameters or ranges. '
         'Each suggestion must follow Observation + Reason + Action. '
+        f'Use explicit labels inside every suggestion point, exactly like: {suggestion_example}. '
         'Use explicit labels inside every suggestion point, exactly like: "观察：...；原因：...；可执行动作：...".'
     )
 

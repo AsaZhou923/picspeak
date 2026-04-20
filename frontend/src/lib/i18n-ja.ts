@@ -13,7 +13,7 @@ export const jaTranslations = {
     pro_offer_highlight: 'ローンチ特典',
     updates_label: '更新履歴',
     updates_hint_home: '公開ギャラリー更新を見る',
-    updates_hint_latest: '認証強化とリクエスト安定化の更新を見る',
+    updates_hint_latest: '成長ループと再評価ガイドの更新を見る',
     contact_label: 'コンタクト',
     contact_headline: 'お問い合わせ',
     photo_ready_msg_short: 'アップロード完了',

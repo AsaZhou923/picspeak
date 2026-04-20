@@ -18,6 +18,39 @@ export function getProductUpdates(locale: UpdateLocale): ProductUpdateEntry[] {
   if (locale === 'ja') {
     return [
       {
+        id: '2026-04-20-review-growth-loop-and-replay-guidance',
+        date: '2026-04-20',
+        title: '成長ループ、再評価ガイド、次回チェックリスト',
+        summary:
+          '履歴ページで直近 3 回の伸びを見比べられるようにし、レビュー詳細では「同じ写真で再評価」と「新しく撮り直す」を分けて案内します。Flash の提案も次回の撮影チェックリストにしやすい形へ整理しました。',
+        docPath: 'docs/changelog/update-log-2026-04-20-review-growth-loop-and-replay-guidance.md',
+        sections: [
+          {
+            title: '成長ループ',
+            items: [
+              '履歴ページに直近 3 回とその前 3 回の平均比較、上向き・下振れ・横ばいの傾向を追加',
+              '7 点未満が続く次元をまとめ、どこが繰り返し弱いか先に見えるようにした',
+              '直近 3 件の講評からそのまま詳細へ戻れる',
+            ],
+          },
+          {
+            title: '次の一枚への導線',
+            items: [
+              'レビュー詳細に「同じ写真で修正確認」と「新しい写真で撮り直す」の 2 つの進め方を追加',
+              '提案文から最大 3 つの Next-Shoot Checklist を抽出し、Action / Observation / Reason を表示',
+              'ワークスペースの再評価バナーも、未編集写真なら撮り直しを優先すべきだと明示',
+            ],
+          },
+          {
+            title: '回帰保護',
+            items: [
+              'Header の認証専用ナビは hydration 後まで非表示にして、ログイン状態のチラつきを抑制',
+              'prompt、文言、成長スナップショット、header 可視性のテストを追加',
+            ],
+          },
+        ],
+      },
+      {
         id: '2026-04-19-auth-hardening-and-request-stability',
         date: '2026-04-19',
         title: '認証強化・タスクリトライ整理・リクエスト安定化',
@@ -394,6 +427,39 @@ export function getProductUpdates(locale: UpdateLocale): ProductUpdateEntry[] {
   if (locale === 'en') {
     return [
       {
+        id: '2026-04-20-review-growth-loop-and-replay-guidance',
+        date: '2026-04-20',
+        title: 'Growth loop, replay guidance, and next-shot checklists',
+        summary:
+          'History now surfaces a recent-vs-previous growth loop, review detail separates same-photo verification from new-photo retakes, and Flash suggestions are shaped into cleaner next-shot checklist actions.',
+        docPath: 'docs/changelog/update-log-2026-04-20-review-growth-loop-and-replay-guidance.md',
+        sections: [
+          {
+            title: 'Growth loop',
+            items: [
+              'History compares the most recent 3 critiques against the previous 3 and shows up / down / flat trend states',
+              'Repeated weak dimensions under score 7 are surfaced first so the next practice target is obvious',
+              'The latest three critiques link straight back to their detail pages',
+            ],
+          },
+          {
+            title: 'Next-shot guidance',
+            items: [
+              'Review detail now separates same-photo fix verification from retaking a new photo',
+              'Up to 3 checklist items are extracted from suggestions with Action / Observation / Reason labels',
+              'Workspace replay copy now makes it explicit that rerunning the same photo only makes sense after edits',
+            ],
+          },
+          {
+            title: 'Regression protection',
+            items: [
+              'Header auth-only navigation waits until hydration, avoiding signed-in shell flicker',
+              'Added tests for prompt labels, replay copy, growth snapshots, and header visibility',
+            ],
+          },
+        ],
+      },
+      {
         id: '2026-04-19-auth-hardening-and-request-stability',
         date: '2026-04-19',
         title: 'Auth hardening, safer task retries, and more stable requests',
@@ -768,6 +834,39 @@ export function getProductUpdates(locale: UpdateLocale): ProductUpdateEntry[] {
   }
 
   return [
+    {
+      id: '2026-04-20-review-growth-loop-and-replay-guidance',
+      date: '2026-04-20',
+      title: '连续进步视图、复评重拍分流与下一轮清单',
+      summary:
+        '历史页新增最近 3 次成长视图，评图详情把“同图复评”和“换图重拍”拆成两条更明确的路径，Flash 建议也收紧成可直接执行的下一轮拍摄清单。',
+      docPath: 'docs/changelog/update-log-2026-04-20-review-growth-loop-and-replay-guidance.md',
+      sections: [
+        {
+          title: '连续进步与弱项',
+          items: [
+            '历史页会对比最近 3 次和之前 3 次平均分，并显示上升、下降或持平趋势',
+            '系统会优先标出反复低于 7 分的维度，帮助先盯住最拖后腿的问题',
+            '最近 3 次点评都可以直接点回详情页继续看',
+          ],
+        },
+        {
+          title: '复评与重拍路径',
+          items: [
+            '评图详情新增“同图验证修正”和“换新照片重拍”双路径卡片',
+            '系统会从建议里抽出最多 3 条下一轮清单，并显示动作、观察和原因',
+            '工作台复评横幅也明确提示：只有已经改过这张图时，同图复评才真正有意义',
+          ],
+        },
+        {
+          title: '回归保护',
+          items: [
+            'Header 登录态导航改成 hydration 后再显示，避免首屏先闪出错误的已登录壳',
+            '补上 prompt、文案、成长快照和 header 可见性测试',
+          ],
+        },
+      ],
+    },
     {
       id: '2026-04-19-auth-hardening-and-request-stability',
       date: '2026-04-19',

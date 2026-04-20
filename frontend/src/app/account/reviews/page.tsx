@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { AlertCircle, CalendarDays, ChevronRight, RefreshCw, SlidersHorizontal } from 'lucide-react';
+import { AlertCircle, ArrowUpRight, CalendarDays, ChevronRight, Minus, RefreshCw, SlidersHorizontal, TrendingDown, TrendingUp } from 'lucide-react';
 import { getMyReviews } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { ImageType, ReviewHistoryItem, ReviewHistoryQuery } from '@/lib/types';
@@ -11,6 +11,7 @@ import CachedThumbnail from '@/components/ui/CachedThumbnail';
 import { SkeletonBlock } from '@/components/ui/LoadingSpinner';
 import { useI18n } from '@/lib/i18n';
 import { formatUserFacingError } from '@/lib/error-utils';
+import { buildHistoryGrowthSnapshot } from '@/lib/review-growth';
 
 type FilterDraft = {
   createdFrom: string;
@@ -152,6 +153,58 @@ function getHistoryCopy(locale: 'zh' | 'en' | 'ja') {
     reset: '重置',
     shared: '已分享',
     followUp: '关联复盘',
+  };
+}
+
+function getHistoryGrowthCopy(locale: 'zh' | 'en' | 'ja') {
+  if (locale === 'ja') {
+    return {
+      label: 'Growth Loop',
+      title: '直近 3 回をひとつの流れで見る',
+      body: '平均点が上向いているか、どの次元が繰り返し足を引っ張っているかを先に確認します。',
+      recentAverage: '直近 3 回の平均',
+      previousAverage: 'その前 3 回の平均',
+      recentList: '直近 3 回の講評',
+      commonGaps: '繰り返し弱い次元',
+      trendUp: '前のまとまりより上向き',
+      trendDown: '前のまとまりより下振れ',
+      trendFlat: 'まだ横ばい',
+      averageLabel: '平均',
+      lowCountLabel: (count: number) => `${count} 回で 7 未満`,
+      emptyPrevious: '比較用の 3 回がまだありません',
+    };
+  }
+  if (locale === 'en') {
+    return {
+      label: 'Growth Loop',
+      title: 'Read the last three critiques as one loop',
+      body: 'Check whether the average is moving up first, then which dimensions keep slipping below a good score.',
+      recentAverage: 'Recent 3 average',
+      previousAverage: 'Previous 3 average',
+      recentList: 'Most recent three critiques',
+      commonGaps: 'Dimensions that keep dragging',
+      trendUp: 'Stronger than the previous batch',
+      trendDown: 'Weaker than the previous batch',
+      trendFlat: 'Still flat',
+      averageLabel: 'Avg',
+      lowCountLabel: (count: number) => `${count} reviews under 7`,
+      emptyPrevious: 'Need three more critiques to compare the previous batch',
+    };
+  }
+  return {
+    label: '连续进步',
+    title: '把最近 3 次点评连成一条线看',
+    body: '先看平均分有没有往上走，再看哪些维度在反复拖后腿。',
+    recentAverage: '最近 3 次均分',
+    previousAverage: '之前 3 次均分',
+    recentList: '最近 3 次点评',
+    commonGaps: '反复掉分的维度',
+    trendUp: '比上一轮更稳',
+    trendDown: '比上一轮更弱',
+    trendFlat: '还在平台期',
+    averageLabel: '均分',
+    lowCountLabel: (count: number) => `${count} 次低于 7 分`,
+    emptyPrevious: '还没有足够的上一轮数据可供对比',
   };
 }
 
@@ -323,6 +376,7 @@ export default function ReviewHistoryPage() {
   const { ensureToken, userInfo } = useAuth();
   const { t, locale } = useI18n();
   const copy = useMemo(() => getHistoryCopy(locale), [locale]);
+  const growthCopy = useMemo(() => getHistoryGrowthCopy(locale), [locale]);
   const invalidDateCopy =
     locale === 'ja'
       ? '有効な日付を yyyy/mm/dd 形式で入力してください'
@@ -341,6 +395,17 @@ export default function ReviewHistoryPage() {
   const createdFromInvalid = isInvalidCompletedDate(draftFilters.createdFrom);
   const createdToInvalid = isInvalidCompletedDate(draftFilters.createdTo);
   const hasInvalidDate = createdFromInvalid || createdToInvalid;
+  const growthSnapshot = useMemo(() => buildHistoryGrowthSnapshot(items), [items]);
+  const dimensionLabels = useMemo(
+    () => ({
+      composition: t('score_composition'),
+      lighting: t('score_lighting'),
+      color: t('score_color'),
+      impact: t('score_impact'),
+      technical: t('score_technical'),
+    }),
+    [t]
+  );
 
   const fetchPage = useCallback(
     async (nextCursor?: string, activeFilters: FilterDraft = appliedFilters) => {
@@ -497,6 +562,126 @@ export default function ReviewHistoryPage() {
             </button>
           </div>
         </section>
+
+        {!loading && !error && items.length > 0 && (
+          <section className="mb-6 rounded-[24px] border border-border-subtle bg-[radial-gradient(circle_at_top_left,rgba(104,169,136,0.14),transparent_38%),rgb(var(--color-surface)/0.76)] p-5">
+            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="mb-2 text-[11px] font-mono uppercase tracking-[0.24em] text-sage/80">{growthCopy.label}</p>
+                <h2 className="font-display text-2xl text-ink">{growthCopy.title}</h2>
+                <p className="mt-2 max-w-3xl text-sm leading-7 text-ink-muted">{growthCopy.body}</p>
+              </div>
+              <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium ${
+                growthSnapshot.trend === 'up'
+                  ? 'border-sage/30 bg-sage/10 text-sage'
+                  : growthSnapshot.trend === 'down'
+                    ? 'border-rust/30 bg-rust/10 text-rust'
+                    : 'border-border bg-raised/70 text-ink-muted'
+              }`}>
+                {growthSnapshot.trend === 'up' ? (
+                  <TrendingUp size={13} />
+                ) : growthSnapshot.trend === 'down' ? (
+                  <TrendingDown size={13} />
+                ) : (
+                  <Minus size={13} />
+                )}
+                <span>
+                  {growthSnapshot.trend === 'up'
+                    ? growthCopy.trendUp
+                    : growthSnapshot.trend === 'down'
+                      ? growthCopy.trendDown
+                      : growthCopy.trendFlat}
+                </span>
+              </div>
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-2xl border border-border-subtle bg-raised/80 p-4">
+                  <p className="text-xs uppercase tracking-[0.16em] text-ink-subtle">{growthCopy.recentAverage}</p>
+                  <div className="mt-3 flex items-end gap-2">
+                    <span className="font-display text-4xl text-ink">
+                      {growthSnapshot.recentAverage?.toFixed(1) ?? '—'}
+                    </span>
+                    <span className="pb-1 text-sm text-ink-subtle">{growthCopy.averageLabel}</span>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-border-subtle bg-raised/80 p-4">
+                  <p className="text-xs uppercase tracking-[0.16em] text-ink-subtle">{growthCopy.previousAverage}</p>
+                  <div className="mt-3 flex items-end gap-2">
+                    <span className="font-display text-4xl text-ink">
+                      {growthSnapshot.previousAverage?.toFixed(1) ?? '—'}
+                    </span>
+                    <span className="pb-1 text-sm text-ink-subtle">{growthCopy.averageLabel}</span>
+                  </div>
+                  <p className="mt-3 text-xs text-ink-subtle">
+                    {growthSnapshot.previousAverage === null
+                      ? growthCopy.emptyPrevious
+                      : `${growthSnapshot.averageDelta && growthSnapshot.averageDelta > 0 ? '+' : ''}${growthSnapshot.averageDelta?.toFixed(1) ?? '0.0'}`}
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-border-subtle bg-void/30 p-4">
+                <div className="mb-3 flex items-center gap-2 text-sm text-ink">
+                  <ArrowUpRight size={15} className="text-gold" />
+                  <span>{growthCopy.commonGaps}</span>
+                </div>
+                <div className="space-y-3">
+                  {growthSnapshot.weakDimensions.map((item) => (
+                    <div
+                      key={item.key}
+                      className="flex items-center justify-between gap-3 rounded-2xl border border-border-subtle bg-raised/80 px-4 py-3"
+                    >
+                      <div>
+                        <p className="text-sm font-medium text-ink">{dimensionLabels[item.key]}</p>
+                        <p className="mt-1 text-xs text-ink-subtle">{growthCopy.lowCountLabel(item.lowCount)}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-display text-2xl text-ink">{item.average.toFixed(1)}</p>
+                        <p className="text-[11px] text-ink-subtle">{growthCopy.averageLabel}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-2xl border border-border-subtle bg-void/30 p-4">
+              <p className="mb-3 text-sm text-ink">{growthCopy.recentList}</p>
+              <div className="space-y-2">
+                {growthSnapshot.recentItems.map((item) => (
+                  <Link
+                    key={item.review_id}
+                    href={`/reviews/${item.review_id}?back=/account/reviews`}
+                    prefetch={false}
+                    className="flex items-center justify-between gap-3 rounded-2xl border border-border-subtle bg-raised/80 px-4 py-3 transition-colors hover:border-gold/30"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <ModeBadge mode={item.mode} />
+                        <StatusBadge status={item.status} />
+                      </div>
+                      <p className="mt-2 text-xs text-ink-subtle">
+                        {new Date(item.created_at).toLocaleString(locale === 'zh' ? 'zh-CN' : locale === 'ja' ? 'ja-JP' : 'en-US', {
+                          month: '2-digit',
+                          day: '2-digit',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-display text-2xl text-ink">{item.final_score.toFixed(1)}</p>
+                      <p className="text-[11px] text-ink-subtle">{growthCopy.averageLabel}</p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
 
         {loading ? (
           <SkeletonList />
