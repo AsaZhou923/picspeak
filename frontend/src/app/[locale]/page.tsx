@@ -1,7 +1,7 @@
 'use client';
 
 import { I18nProvider, type Locale } from '@/lib/i18n';
-import HomePage from '@/app/page';
+import { HomePageContent } from '@/app/page';
 import { use } from 'react';
 import { VALID_LOCALES } from './locales';
 
@@ -31,7 +31,7 @@ export default function LocalePage({
 
   return (
     <I18nProvider initialLocale={pinnedLocale}>
-      <HomePage />
+      <HomePageContent structuredDataScope="locale" />
     </I18nProvider>
   );
 }

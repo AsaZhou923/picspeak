@@ -18,6 +18,31 @@ export function getProductUpdates(locale: UpdateLocale): ProductUpdateEntry[] {
   if (locale === 'ja') {
     return [
       {
+        id: '2026-04-22-pro-conversion-and-faq-schema',
+        date: '2026-04-22',
+        title: 'Pro 価値訴求の再設計と FAQPage 重複修正',
+        summary:
+          'Pro を「より深い分析」ではなく、次回撮影ガイド・完全な振り返り・上達追跡として再整理しました。あわせて /zh・/en・/ja ホームの FAQPage 構造化データ重複を修正しました。',
+        docPath: 'docs/changelog/update-log-2026-04-22-pro-conversion-and-faq-schema.md',
+        sections: [
+          {
+            title: 'Pro 価値訴求',
+            items: [
+              'Free / Pro の境界を「素早い診断」と「次回撮影ガイド」に再定義',
+              'レビュー詳細、履歴、Usage ページの Pro 訴求を同じ戦略辞書から生成',
+              'Usage ページにアップグレード後の違いを比較する判断パネルを追加',
+            ],
+          },
+          {
+            title: 'SEO 構造化データ',
+            items: [
+              'locale ホームで HomePage の FAQPage JSON-LD を二重出力しないように変更',
+              '/zh・/en・/ja の FAQPage は locale layout 側の 1 件に統一',
+            ],
+          },
+        ],
+      },
+      {
         id: '2026-04-20-review-growth-loop-and-replay-guidance',
         date: '2026-04-20',
         title: '成長ループ、再評価ガイド、次回チェックリスト',
@@ -427,6 +452,31 @@ export function getProductUpdates(locale: UpdateLocale): ProductUpdateEntry[] {
   if (locale === 'en') {
     return [
       {
+        id: '2026-04-22-pro-conversion-and-faq-schema',
+        date: '2026-04-22',
+        title: 'Pro value repositioning and FAQPage duplicate fix',
+        summary:
+          'Pro is now framed as next-shoot guidance, complete review, and progress tracking instead of just deeper analysis. Locale home pages also no longer emit duplicate FAQPage structured data.',
+        docPath: 'docs/changelog/update-log-2026-04-22-pro-conversion-and-faq-schema.md',
+        sections: [
+          {
+            title: 'Pro value and conversion',
+            items: [
+              'Free / Pro boundaries now distinguish quick diagnosis from next-shoot guidance',
+              'Review detail, history, and Usage promos read from one conversion strategy dictionary',
+              'Usage now includes a decision panel that compares the before-and-after Pro experience',
+            ],
+          },
+          {
+            title: 'SEO structured data',
+            items: [
+              'Locale home pages suppress the nested HomePage FAQPage JSON-LD',
+              '/zh, /en, and /ja keep a single FAQPage source from the locale layout',
+            ],
+          },
+        ],
+      },
+      {
         id: '2026-04-20-review-growth-loop-and-replay-guidance',
         date: '2026-04-20',
         title: 'Growth loop, replay guidance, and next-shot checklists',
@@ -834,6 +884,31 @@ export function getProductUpdates(locale: UpdateLocale): ProductUpdateEntry[] {
   }
 
   return [
+    {
+      id: '2026-04-22-pro-conversion-and-faq-schema',
+      date: '2026-04-22',
+      title: 'Pro 价值表达重做与 FAQPage 重复修复',
+      summary:
+        'Pro 不再只表达为“更深度点评”，而是围绕下一次拍摄指导、完整复盘和进步追踪展开；同时修复 /zh、/en、/ja 首页 FAQPage 结构化数据重复问题。',
+      docPath: 'docs/changelog/update-log-2026-04-22-pro-conversion-and-faq-schema.md',
+      sections: [
+        {
+          title: 'Pro 价值与转化',
+          items: [
+            'Free / Pro 边界改为“快速诊断”和“下一次拍摄指导”的差异',
+            '结果页、历史页和 Usage 页的 Pro 触发位统一读取转化策略字典',
+            'Usage 页面新增付费前后体验差异面板，帮助用户判断是否升级',
+          ],
+        },
+        {
+          title: 'SEO 结构化数据',
+          items: [
+            'locale 首页复用 HomePage 时不再重复输出 FAQPage JSON-LD',
+            '/zh、/en、/ja 首页保留 locale layout 里的唯一 FAQPage 来源',
+          ],
+        },
+      ],
+    },
     {
       id: '2026-04-20-review-growth-loop-and-replay-guidance',
       date: '2026-04-20',

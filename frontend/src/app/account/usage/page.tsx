@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { AlertCircle, ArrowRight, Mail, X } from 'lucide-react';
+import { AlertCircle, ArrowRight, Camera, CheckCircle2, ClipboardCheck, LineChart, Mail, X } from 'lucide-react';
 import ActivationCodeModal from '@/components/billing/ActivationCodeModal';
 import { createBillingCheckout, getBillingPortal, getUsage } from '@/lib/api';
 import ClerkSignInTrigger from '@/components/auth/ClerkSignInTrigger';
@@ -15,6 +15,7 @@ import { SkeletonBlock } from '@/components/ui/LoadingSpinner';
 import { useI18n } from '@/lib/i18n';
 import { formatUserFacingError } from '@/lib/error-utils';
 import { CN_PRO_CHECKOUT_TIP, openChinaProPurchase } from '@/lib/pro-checkout';
+import { getProPlanBoundaryCopy, getUsageDecisionCopy, type ProConversionLocale } from '@/lib/pro-conversion';
 
 function UsageBar({
   label,
@@ -43,6 +44,82 @@ function UsageBar({
         />
       </div>
     </div>
+  );
+}
+
+function UsageDecisionPanel({
+  locale,
+  plan,
+}: {
+  locale: ProConversionLocale;
+  plan: UsageResponse['plan'];
+}) {
+  const decisionCopy = getUsageDecisionCopy(locale);
+  const boundaryCopy = getProPlanBoundaryCopy(locale);
+  const differenceIcons = [Camera, ClipboardCheck, LineChart] as const;
+
+  return (
+    <section className="rounded-[24px] border border-gold/20 bg-[radial-gradient(circle_at_top_left,rgba(200,171,90,0.14),transparent_36%),rgb(var(--color-surface)/0.72)] p-5">
+      <div className="mb-5">
+        <p className="mb-2 text-[11px] font-mono uppercase tracking-[0.22em] text-gold/75">
+          {decisionCopy.label}
+        </p>
+        <h2 className="font-display text-2xl text-ink">
+          {plan === 'pro' ? decisionCopy.proHeadline : decisionCopy.headline}
+        </h2>
+        <p className="mt-2 text-sm leading-7 text-ink-muted">
+          {plan === 'pro' ? decisionCopy.proBody : decisionCopy.body}
+        </p>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="rounded-2xl border border-border-subtle bg-void/30 p-4">
+          <p className="text-xs uppercase tracking-[0.16em] text-ink-subtle">{boundaryCopy.free.title}</p>
+          <p className="mt-2 text-sm leading-6 text-ink-muted">{boundaryCopy.free.body}</p>
+        </div>
+        <div className="rounded-2xl border border-gold/25 bg-gold/10 p-4">
+          <p className="text-xs uppercase tracking-[0.16em] text-gold/80">{boundaryCopy.pro.title}</p>
+          <p className="mt-2 text-sm leading-6 text-ink">{boundaryCopy.pro.body}</p>
+        </div>
+      </div>
+
+      <div className="mt-5">
+        <p className="mb-3 text-sm font-medium text-ink">{decisionCopy.differencesTitle}</p>
+        <div className="space-y-3">
+          {decisionCopy.differences.map((item, index) => {
+            const Icon = differenceIcons[index] ?? CheckCircle2;
+            return (
+              <div
+                key={item.label}
+                className="grid gap-3 rounded-2xl border border-border-subtle bg-raised/70 p-4 md:grid-cols-[minmax(0,0.85fr)_minmax(0,1fr)_minmax(0,1fr)]"
+              >
+                <div className="flex items-center gap-2 text-sm font-medium text-ink">
+                  <Icon size={15} className="shrink-0 text-gold" />
+                  <span>{item.label}</span>
+                </div>
+                <p className="text-xs leading-5 text-ink-subtle">{item.before}</p>
+                <p className="text-xs leading-5 text-gold/90">{item.after}</p>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="mt-5 rounded-2xl border border-border-subtle bg-void/30 p-4">
+        <p className="mb-3 text-sm font-medium text-ink">{decisionCopy.outcomesTitle}</p>
+        <div className="flex flex-wrap gap-2">
+          {decisionCopy.outcomes.map((outcome) => (
+            <span
+              key={outcome}
+              className="inline-flex items-center gap-1.5 rounded-full border border-gold/20 bg-gold/10 px-3 py-1 text-xs text-gold/90"
+            >
+              <CheckCircle2 size={12} />
+              {outcome}
+            </span>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -342,6 +419,8 @@ export default function UsagePage() {
 
 
             </div>
+
+            <UsageDecisionPanel locale={locale} plan={usage.plan} />
 
             {usage.plan === 'guest' && (
               <div className="border border-gold/15 rounded-lg bg-gold/5 p-5 space-y-3">

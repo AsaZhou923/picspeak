@@ -32,6 +32,7 @@ import { ReviewGrowthLoopPanel } from '@/features/reviews/components/ReviewGrowt
 import { ReviewGalleryPanel } from '@/features/reviews/components/ReviewGalleryPanel';
 import { ImageZoomOverlay } from '@/features/reviews/components/ImageZoomOverlay';
 import { buildNextShootChecklist } from '@/lib/review-growth';
+import { getProUpgradeTriggerCopy, type ProUpgradeTrigger } from '@/lib/pro-conversion';
 
 export default function ReviewPage() {
   const params = useParams();
@@ -171,24 +172,17 @@ export default function ReviewPage() {
     router.push(`/workspace?${nextParams.toString()}`);
   }
 
-  const reviewPromoCopy = (() => {
-    if (locale === 'ja') {
-      if (plan === 'guest') return { title: 'ログインして、この一枚をもっと深く見直す', body: isLowQuota ? `本日の残り回数は ${quotaRemaining ?? 0} 回です。まずログインして Free 枠を解放し、そのまま Pro の深い分析へ進めます。現在の初回価格は $2.99/月です。` : 'ログインするとこの結果を保存しつつ、そのまま Pro の深い分析へ進めます。現在の初回価格は $2.99/月です。' };
-      if (isLowQuota) return { title: `残り ${quotaRemaining ?? 0} 回です。次の比較は Pro が向いています`, body: 'このまま複数の写真を見比べるなら、Pro のほうが止まらず進められます。現在の初回価格は $2.99/月です。' };
-      if (isLowScore) return { title: 'この一枚は Pro で深掘りする価値があります', body: '点数が伸び悩んだ写真ほど、短い総評より深い分解が効きます。今なら $2.99/月の初回価格で始められます。' };
-      return { title: 'この結果を次の改善につなげるなら Pro が早いです', body: 'より深い分析と長期履歴があれば、次の調整まで一気に進めやすくなります。現在の初回価格は $2.99/月です。' };
-    }
-    if (locale === 'en') {
-      if (plan === 'guest') return { title: 'Sign in to take this result further', body: isLowQuota ? `You only have ${quotaRemaining ?? 0} critiques left today. Sign in first to unlock Free usage, then move straight into deeper Pro critique at the current $2.99/month launch price.` : 'Sign in to save this result and move straight into deeper Pro critique. The current launch price is $2.99/month.' };
-      if (isLowQuota) return { title: `Only ${quotaRemaining ?? 0} critiques left. Pro fits the next round better`, body: 'If you are about to compare more shots, Pro lets you keep going without rationing each upload. The current launch price is $2.99/month.' };
-      if (isLowScore) return { title: 'This photo is a good candidate for a deeper Pro breakdown', body: 'Lower-scoring images usually need more than a quick summary. Pro gives a fuller diagnosis, and the current launch price is $2.99/month.' };
-      return { title: 'If you want the next improvement step faster, switch this flow to Pro', body: 'Deeper critique plus permanent history makes iteration easier, and Pro is currently available at $2.99/month.' };
-    }
-    if (plan === 'guest') return { title: '登录后，把这张结果继续往下深挖', body: isLowQuota ? `你今天只剩 ${quotaRemaining ?? 0} 次评图了。先登录解锁 Free，再直接切到 Pro 深度分析。当前首发优惠价为 $2.99/月。` : '登录后不仅能保存这次结果，还能直接继续看更深入的 Pro 分析。当前首发优惠价为 $2.99/月。' };
-    if (isLowQuota) return { title: `当前只剩 ${quotaRemaining ?? 0} 次额度，下一轮更适合直接用 Pro`, body: '如果你准备继续比较更多照片，Pro 会比反复计算额度更顺手。当前首发优惠价为 $2.99/月。' };
-    if (isLowScore) return { title: '这张照片更适合用 Pro 做一次深挖', body: '分数偏低时，更需要完整拆解和明确修改方向，而不只是简短总结。当前首发优惠价为 $2.99/月。' };
-    return { title: '想把这次结果真正转成下一轮提升，可以直接升级 Pro', body: '更深入的分析加上永久历史记录，更适合连续复盘和稳定提升。当前首发优惠价为 $2.99/月。' };
-  })();
+  const reviewPromoTrigger: ProUpgradeTrigger =
+    plan === 'guest'
+      ? 'guest_save'
+      : isLowQuota
+        ? 'quota_floor'
+        : isLowScore
+          ? 'deeper_result'
+          : 'retake_compare';
+  const reviewPromoCopy = getProUpgradeTriggerCopy(locale, reviewPromoTrigger, {
+    remaining: quotaRemaining,
+  });
 
   return (
     <div className="pt-14 min-h-screen">

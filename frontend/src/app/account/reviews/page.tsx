@@ -12,6 +12,8 @@ import { SkeletonBlock } from '@/components/ui/LoadingSpinner';
 import { useI18n } from '@/lib/i18n';
 import { formatUserFacingError } from '@/lib/error-utils';
 import { buildHistoryGrowthSnapshot } from '@/lib/review-growth';
+import ProPromoCard from '@/components/marketing/ProPromoCard';
+import { getProUpgradeTriggerCopy } from '@/lib/pro-conversion';
 
 type FilterDraft = {
   createdFrom: string;
@@ -377,6 +379,8 @@ export default function ReviewHistoryPage() {
   const { t, locale } = useI18n();
   const copy = useMemo(() => getHistoryCopy(locale), [locale]);
   const growthCopy = useMemo(() => getHistoryGrowthCopy(locale), [locale]);
+  const plan = userInfo?.plan ?? 'guest';
+  const historyPromoCopy = useMemo(() => getProUpgradeTriggerCopy(locale, 'history_trend'), [locale]);
   const invalidDateCopy =
     locale === 'ja'
       ? '有効な日付を yyyy/mm/dd 形式で入力してください'
@@ -681,6 +685,17 @@ export default function ReviewHistoryPage() {
               </div>
             </div>
           </section>
+        )}
+
+        {!loading && !error && items.length > 0 && plan !== 'pro' && (
+          <ProPromoCard
+            plan={plan === 'guest' ? 'guest' : 'free'}
+            scene="usage"
+            title={historyPromoCopy.title}
+            body={historyPromoCopy.body}
+            fallbackRedirectUrl="/account/reviews"
+            className="mb-6"
+          />
         )}
 
         {loading ? (

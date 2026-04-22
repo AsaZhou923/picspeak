@@ -11,6 +11,10 @@ import { DEMO_IMAGE_URL, DEMO_REVIEW_ID } from '@/lib/demo-review';
 import { useI18n } from '@/lib/i18n';
 import { markProductAttributionSource } from '@/lib/product-analytics';
 import { siteConfig } from '@/lib/site';
+import {
+  shouldRenderHomeFaqJsonLd,
+  type HomeStructuredDataScope,
+} from '@/lib/home-structured-data';
 
 const HomeAuthWidgets = dynamic(() => import('@/components/home/HomeAuthWidgets'), {
   ssr: false,
@@ -39,9 +43,14 @@ const DEMO_SCORES_KEYS = [
   { labelKey: 'score_technical' as const, score: 6 },
 ];
 
-export default function HomePage() {
+type HomePageProps = {
+  structuredDataScope?: HomeStructuredDataScope;
+};
+
+export function HomePageContent({ structuredDataScope = 'root' }: HomePageProps = {}) {
   const { t, locale } = useI18n();
   const blogUi = getBlogUi(locale);
+  const renderFaqJsonLd = shouldRenderHomeFaqJsonLd(structuredDataScope);
 
   const softwareJsonLd = {
     '@context': 'https://schema.org',
@@ -150,11 +159,13 @@ export default function HomePage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareJsonLd) }}
       />
-      <Script
-        id="picspeak-faq-structured-data"
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
-      />
+      {renderFaqJsonLd && (
+        <Script
+          id="picspeak-faq-structured-data"
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+        />
+      )}
       <Script
         id="picspeak-author-structured-data"
         type="application/ld+json"
@@ -457,6 +468,10 @@ export default function HomePage() {
       </section>
     </>
   );
+}
+
+export default function HomePage() {
+  return <HomePageContent />;
 }
 
 function XIcon() {
