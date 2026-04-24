@@ -18,6 +18,32 @@ export function getProductUpdates(locale: UpdateLocale): ProductUpdateEntry[] {
   if (locale === 'ja') {
     return [
       {
+        id: '2026-04-24-stage-d-content-conversion',
+        date: '2026-04-24',
+        title: 'コンテンツ流入から評価ワークスペースへの導線を追加',
+        summary:
+          'Blog、Gallery、ホームから目的別にワークスペースへ戻れる入口を追加し、コンテンツ閲覧からクリック、アップロード、初回評価完了まで追える週次レポート口径を整えました。',
+        docPath: 'docs/changelog/update-log-2026-04-24-stage-d-content-conversion.md',
+        sections: [
+          {
+            title: 'ワークスペース入口',
+            items: [
+              'Blog 記事末尾の CTA が記事テーマに合わせた同種評価とアップロード入口を出すようになった',
+              'Gallery カードに同じ題材で練習する入口と、同じ基準で自分の写真を評価する入口を追加',
+              'ホームに新規ユーザー、再訪ユーザー、記事読者向けの3つの開始入口を追加',
+            ],
+          },
+          {
+            title: '転換計測',
+            items: [
+              '`content_workspace_clicked` イベントで Blog / Gallery からのワークスペースクリックを記録',
+              '週次レポートで閲覧、クリック、ワークスペース到達、アップロード、初回評価完了を Blog / Gallery 別に集計',
+              'API 監査ログはヘルスチェック等を除外し、同期 DB 書き込みでリクエストを塞がないようにした',
+            ],
+          },
+        ],
+      },
+      {
         id: '2026-04-22-pro-conversion-and-faq-schema',
         date: '2026-04-22',
         title: 'Pro 価値訴求の再設計と FAQPage 重複修正',
@@ -452,6 +478,32 @@ export function getProductUpdates(locale: UpdateLocale): ProductUpdateEntry[] {
   if (locale === 'en') {
     return [
       {
+        id: '2026-04-24-stage-d-content-conversion',
+        date: '2026-04-24',
+        title: 'Content-to-workspace conversion paths',
+        summary:
+          'Blog, Gallery, and Home now send readers back to the workspace with intent-specific CTAs, while the analytics snapshot can track content views through clicks, uploads, and first critique completion.',
+        docPath: 'docs/changelog/update-log-2026-04-24-stage-d-content-conversion.md',
+        sections: [
+          {
+            title: 'Workspace entrances',
+            items: [
+              'Blog article CTAs now match the article topic and carry source, entrypoint, content slug, and image type',
+              'Gallery cards now offer same-subject practice and a same-standard critique path for the viewer photo',
+              'Home now separates new-user, returning-user, and content-reader starting paths',
+            ],
+          },
+          {
+            title: 'Conversion reporting',
+            items: [
+              '`content_workspace_clicked` records Blog / Gallery workspace intent before the user reaches the product flow',
+              'Weekly reporting breaks down views, clicks, workspace entries, uploads, review requests, and result views by Blog and Gallery',
+              'API audit logging now skips non-business endpoints and moves synchronous DB writes off the request event loop',
+            ],
+          },
+        ],
+      },
+      {
         id: '2026-04-22-pro-conversion-and-faq-schema',
         date: '2026-04-22',
         title: 'Pro value repositioning and FAQPage duplicate fix',
@@ -884,6 +936,32 @@ export function getProductUpdates(locale: UpdateLocale): ProductUpdateEntry[] {
   }
 
   return [
+    {
+      id: '2026-04-24-stage-d-content-conversion',
+      date: '2026-04-24',
+      title: '内容来源转化与工作台入口打通',
+      summary:
+        'Blog、Gallery 和首页新增按意图回到评图工作台的入口，并补齐内容浏览、点击、上传到首评完成的周报统计口径。',
+      docPath: 'docs/changelog/update-log-2026-04-24-stage-d-content-conversion.md',
+      sections: [
+        {
+          title: '工作台入口',
+          items: [
+            'Blog 文章底部 CTA 会按文章题材生成同类点评和上传入口，并携带来源、入口、文章 slug 和图片类型',
+            'Gallery 卡片新增同题材练习入口，以及用同一套标准点评自己照片的入口',
+            '首页新增新用户、回访用户、内容读者三类开始路径',
+          ],
+        },
+        {
+          title: '转化统计',
+          items: [
+            '`content_workspace_clicked` 记录 Blog / Gallery 用户进入工作台前的点击意图',
+            '周报按 Blog 和 Gallery 拆分浏览、点击、工作台进入、上传、发起点评和查看结果',
+            'API 审计日志跳过非业务端点，并把同步数据库写入移出请求事件循环',
+          ],
+        },
+      ],
+    },
     {
       id: '2026-04-22-pro-conversion-and-faq-schema',
       date: '2026-04-22',

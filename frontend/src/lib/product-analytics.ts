@@ -17,6 +17,7 @@ export type ProductAnalyticsEventName =
   | 'reanalysis_clicked'
   | 'share_clicked'
   | 'export_clicked'
+  | 'content_workspace_clicked'
   | 'upgrade_pro_clicked'
   | 'checkout_started'
   | 'paid_success'

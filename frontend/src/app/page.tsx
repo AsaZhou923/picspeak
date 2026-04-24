@@ -4,12 +4,13 @@ import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import Link from 'next/link';
 import Script from 'next/script';
-import { ArrowRight, Aperture, Zap, Star, BarChart2, Mail, BookOpenText } from 'lucide-react';
+import { ArrowRight, Aperture, Zap, Star, BarChart2, Mail, BookOpenText, Clock3, FileText, UploadCloud } from 'lucide-react';
 import { getBlogUi } from '@/lib/blog-data';
+import { getHomeIntentEntrances, type HomeIntent } from '@/lib/content-conversion';
 import ScoreRing from '@/components/ui/ScoreRing';
 import { DEMO_IMAGE_URL, DEMO_REVIEW_ID } from '@/lib/demo-review';
 import { useI18n } from '@/lib/i18n';
-import { markProductAttributionSource } from '@/lib/product-analytics';
+import { markProductAttributionSource, trackProductEvent } from '@/lib/product-analytics';
 import { siteConfig } from '@/lib/site';
 import {
   shouldRenderHomeFaqJsonLd,
@@ -51,6 +52,12 @@ export function HomePageContent({ structuredDataScope = 'root' }: HomePageProps 
   const { t, locale } = useI18n();
   const blogUi = getBlogUi(locale);
   const renderFaqJsonLd = shouldRenderHomeFaqJsonLd(structuredDataScope);
+  const homeIntentEntrances = getHomeIntentEntrances(locale);
+  const homeIntentIcons: Record<HomeIntent, typeof UploadCloud> = {
+    new_user: UploadCloud,
+    returning_user: Clock3,
+    content_reader: FileText,
+  };
 
   const softwareJsonLd = {
     '@context': 'https://schema.org',
@@ -275,6 +282,55 @@ export function HomePageContent({ structuredDataScope = 'root' }: HomePageProps 
                 </Link>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="px-6 py-20 border-t border-border-subtle">
+        <div className="mx-auto max-w-5xl">
+          <p className="mb-4 text-xs uppercase tracking-[0.28em] text-gold/70">
+            {locale === 'en' ? 'Start by intent' : locale === 'ja' ? '目的別の入口' : '按目的开始'}
+          </p>
+          <h2 className="max-w-2xl font-display text-3xl text-ink sm:text-4xl">
+            {locale === 'en'
+              ? 'Choose the path that matches why you came here'
+              : locale === 'ja'
+                ? '来訪目的に合わせて入口を選ぶ'
+                : '按你这次来的目的进入'}
+          </h2>
+          <div className="mt-8 grid gap-4 md:grid-cols-3">
+            {homeIntentEntrances.map((entry) => {
+              const IntentIcon = homeIntentIcons[entry.intent];
+              return (
+                <Link
+                  key={entry.intent}
+                  href={entry.href}
+                  onClick={() => {
+                    markProductAttributionSource(entry.source);
+                    if (entry.entrypoint) {
+                      void trackProductEvent('content_workspace_clicked', {
+                        source: entry.source,
+                        pagePath: '/',
+                        locale,
+                        metadata: { entrypoint: entry.entrypoint, home_intent: entry.intent },
+                      });
+                    }
+                  }}
+                  className="group rounded-lg border border-border-subtle bg-raised/35 p-5 transition-all duration-300 hover:-translate-y-1 hover:border-gold/30 hover:bg-raised/55"
+                >
+                  <span className="flex h-10 w-10 items-center justify-center rounded border border-gold/25 bg-gold/10 text-gold">
+                    <IntentIcon size={16} />
+                  </span>
+                  <p className="mt-5 text-xs uppercase tracking-[0.22em] text-gold/70">{entry.label}</p>
+                  <h3 className="mt-2 font-display text-2xl text-ink">{entry.title}</h3>
+                  <p className="mt-3 text-sm leading-7 text-ink-muted">{entry.body}</p>
+                  <span className="mt-5 inline-flex items-center gap-2 text-sm text-gold transition-colors group-hover:text-gold-light">
+                    {entry.cta}
+                    <ArrowRight size={14} className="transition-transform group-hover:translate-x-0.5" />
+                  </span>
+                </Link>
+              );
+            })}
           </div>
         </div>
       </section>

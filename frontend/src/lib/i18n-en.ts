@@ -58,7 +58,7 @@ export const enTranslations = {
     pro_offer_highlight: 'Launch Offer',
     updates_label: 'Updates',
     updates_hint_home: 'See the public gallery update',
-    updates_hint_latest: 'See the Pro conversion and FAQPage fix update',
+    updates_hint_latest: 'See the content conversion and workspace entry update',
     contact_label: 'Contact',
     contact_headline: 'Get in Touch',
 
