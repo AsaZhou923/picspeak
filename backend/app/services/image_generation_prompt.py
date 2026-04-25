@@ -88,6 +88,7 @@ _BLOCKED_PROMPT_FRAGMENTS = (
     '证件照',
     'official document',
 )
+_UNSPECIFIED_STYLES = {'', 'none', 'no_style', 'unspecified', 'auto', 'default', 'not_specified'}
 
 
 def get_generation_templates() -> list[dict[str, str]]:
@@ -122,7 +123,7 @@ def build_general_generation_prompt(
         raise PromptSafetyError('Prompt is too short')
 
     template = _TEMPLATE_BY_KEY.get(str(template_key or '').strip()) or _TEMPLATE_BY_KEY['photo_inspiration']
-    normalized_style = str(style or 'realistic').strip().lower() or 'realistic'
+    normalized_style = _normalize_style_direction(style)
     normalized_negative = str(negative_prompt or '').strip()
 
     _validate_prompt_safety(normalized_prompt, normalized_negative)
@@ -131,15 +132,19 @@ def build_general_generation_prompt(
     if normalized_negative:
         negative = f'{negative}; {normalized_negative}'
 
-    return '\n'.join(
+    prompt_parts = [
+        template.prompt_prefix,
+        f'User direction: {normalized_prompt}',
+    ]
+    if normalized_style:
+        prompt_parts.append(f'Style direction: {normalized_style}')
+    prompt_parts.extend(
         [
-            template.prompt_prefix,
-            f'User direction: {normalized_prompt}',
-            f'Style direction: {normalized_style}',
             'Output must be clearly treated as an AI-generated visual reference, not a real user photograph.',
             f'Negative constraints: {negative}',
         ]
     )
+    return '\n'.join(prompt_parts)
 
 
 def build_review_linked_generation_prompt(
@@ -157,7 +162,7 @@ def build_review_linked_generation_prompt(
 
     normalized_intent = str(intent or 'retake_reference').strip().lower() or 'retake_reference'
     normalized_image_type = str(image_type or review_result.get('image_type') or 'default').strip().lower() or 'default'
-    normalized_style = str(style or 'realistic').strip().lower() or 'realistic'
+    normalized_style = _normalize_style_direction(style)
     normalized_negative = str(negative_prompt or '').strip()
 
     advantage = _safe_excerpt(review_result.get('advantage'), 600)
@@ -172,6 +177,11 @@ def build_review_linked_generation_prompt(
     if normalized_negative:
         negative = f'{negative}; {normalized_negative}'
 
+    camera_direction = (
+        f'Camera/style direction: {normalized_style}, realistic photographic reference, educational and actionable.'
+        if normalized_style
+        else 'Camera direction: realistic photographic reference, educational and actionable.'
+    )
     return '\n'.join(
         [
             'Create an AI-generated next-shoot reference image for a photography critique workflow.',
@@ -183,12 +193,19 @@ def build_review_linked_generation_prompt(
             f'Original strengths to preserve: {advantage or "preserve the strongest visual idea from the review"}.',
             f'Problems to improve: {critique or "improve composition, light, color, and subject hierarchy based on the critique"}.',
             f'Concrete next-shoot suggestions: {suggestions or normalized_prompt}.',
-            f'Camera/style direction: {normalized_style}, realistic photographic reference, educational and actionable.',
+            camera_direction,
             'Compose one clear reference image with intentional subject placement, lighting direction, color mood, and background discipline.',
             'Labeling rule: do not render text labels in the image; communicate the direction visually.',
             f'Negative constraints: {negative}',
         ]
     )
+
+
+def _normalize_style_direction(style: str | None) -> str | None:
+    normalized = str(style or '').strip().lower()
+    if normalized in _UNSPECIFIED_STYLES:
+        return None
+    return normalized
 
 
 def _safe_excerpt(value: Any, limit: int) -> str:

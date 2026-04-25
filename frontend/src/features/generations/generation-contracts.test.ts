@@ -3,6 +3,7 @@ import {
   GENERATION_SIZE_OPTIONS,
   type GenerationCreditsTable,
   estimateGenerationCredits,
+  formatGenerationOutputSpec,
 } from './generation-config.ts';
 import type {
   GenerationCreateRequest,
@@ -85,5 +86,17 @@ const _creditsTable: GenerationCreditsTable = {
 const _templateKeys = GENERATION_TEMPLATES.map((template) => template.key);
 const _sizeLabels = GENERATION_SIZE_OPTIONS.map((option) => option.label);
 const _mediumPortraitCredits = estimateGenerationCredits(_creditsTable, 'medium', '1024x1536');
+const _mediumPortraitOutput = formatGenerationOutputSpec('medium', '1024x1536');
+const _highPortraitOutput = formatGenerationOutputSpec('high', '1024x1536');
 
-void [_request, _response, _task, _history, _templateKeys, _sizeLabels, _mediumPortraitCredits];
+void [
+  _request,
+  _response,
+  _task,
+  _history,
+  _templateKeys,
+  _sizeLabels,
+  _mediumPortraitCredits,
+  _mediumPortraitOutput,
+  _highPortraitOutput,
+];

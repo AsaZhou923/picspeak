@@ -21,10 +21,12 @@ import {
   GENERATION_TEMPLATES,
   type GenerationCreditsTable,
   estimateGenerationCredits,
+  formatGenerationOutputSpec,
   getTemplateByKey,
 } from '@/features/generations/generation-config';
 
 const STYLE_OPTIONS = [
+  { value: 'none', labelKey: 'generation_style_none' },
   { value: 'realistic', labelKey: 'generation_style_realistic' },
   { value: 'editorial', labelKey: 'generation_style_editorial' },
   { value: 'cinematic', labelKey: 'generation_style_cinematic' },
@@ -130,6 +132,7 @@ export default function GeneratePage() {
   const selectedTemplateCopy = templateCopyKey(selectedTemplate.key);
   const credits = estimateGenerationCredits(creditsTable, quality, size);
   const creditsReady = creditsTable?.[quality]?.[size] !== undefined;
+  const outputSpec = formatGenerationOutputSpec(quality, size);
 
   useEffect(() => {
     setHasHydrated(true);
@@ -466,7 +469,7 @@ export default function GeneratePage() {
                 </div>
               </div>
               <p className="text-sm leading-6 text-ink-muted">
-                {t(selectedTemplateCopy.label)}{t('generation_summary_separator')}{t(QUALITY_COPY_KEYS[quality].label)}{t('generation_summary_separator')}{size}
+                {t(selectedTemplateCopy.label)}{t('generation_summary_separator')}{t(QUALITY_COPY_KEYS[quality].label)}{t('generation_summary_separator')}{outputSpec}
               </p>
               <p className="mt-2 text-xs leading-5 text-ink-subtle">{t('generation_credits_hint')}</p>
               {isFreeQualityBlocked && (

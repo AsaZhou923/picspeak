@@ -10,6 +10,7 @@ import { GeneratedImageDetailResponse } from '@/lib/types';
 import { useI18n } from '@/lib/i18n';
 import { formatUserFacingError } from '@/lib/error-utils';
 import { trackProductEvent } from '@/lib/product-analytics';
+import { formatGenerationOutputSpec } from '@/features/generations/generation-config';
 
 export default function GenerationDetailPage() {
   const params = useParams();
@@ -218,7 +219,7 @@ export default function GenerationDetailPage() {
                 </div>
                 <div className="rounded-lg border border-border bg-raised/70 p-3">
                   <p className="text-ink-subtle">{t('generation_detail_size')}</p>
-                  <p className="mt-1 text-ink">{generation.size}</p>
+                  <p className="mt-1 text-ink">{formatGenerationOutputSpec(generation.quality, generation.size)}</p>
                 </div>
                 <div className="rounded-lg border border-border bg-raised/70 p-3">
                   <p className="text-ink-subtle">{t('generation_detail_credits')}</p>

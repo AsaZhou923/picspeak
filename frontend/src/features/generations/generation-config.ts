@@ -68,10 +68,32 @@ export const GENERATION_SIZE_OPTIONS = [
 ] as const satisfies ReadonlyArray<{ value: GenerationSize; label: string; detail: string }>;
 
 export const GENERATION_QUALITY_OPTIONS = [
-  { value: 'low', label: 'Low', detail: '1K baseline' },
-  { value: 'medium', label: 'Medium', detail: '2K sharper draft' },
-  { value: 'high', label: 'High', detail: '4K final render' },
+  { value: 'low', label: 'Low', detail: '1K output' },
+  { value: 'medium', label: 'Medium', detail: '2K output' },
+  { value: 'high', label: 'High', detail: '4K portrait/landscape output' },
 ] as const satisfies ReadonlyArray<{ value: GenerationQuality; label: string; detail: string }>;
+
+const GENERATION_OUTPUT_SPECS = {
+  low: {
+    '1024x1024': '1:1 - 1K',
+    '1024x1536': '9:16 - 1K',
+    '1536x1024': '16:9 - 1K',
+  },
+  medium: {
+    '1024x1024': '1:1 - 2K - 2048 x 2048',
+    '1024x1536': '9:16 - 2K - 1152 x 2048',
+    '1536x1024': '16:9 - 2K - 2048 x 1152',
+  },
+  high: {
+    '1024x1024': '1:1 - 2K - 2048 x 2048',
+    '1024x1536': '9:16 - 4K - 2160 x 3840',
+    '1536x1024': '16:9 - 4K - 3840 x 2160',
+  },
+} as const satisfies Record<GenerationQuality, Record<GenerationSize, string>>;
+
+export function formatGenerationOutputSpec(quality: GenerationQuality, size: GenerationSize): string {
+  return GENERATION_OUTPUT_SPECS[quality]?.[size] ?? size;
+}
 
 export function estimateGenerationCredits(
   creditsTable: GenerationCreditsTable | null | undefined,

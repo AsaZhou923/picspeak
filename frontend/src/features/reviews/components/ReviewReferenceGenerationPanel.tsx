@@ -10,7 +10,11 @@ import { formatUserFacingError } from '@/lib/error-utils';
 import { useI18n, type TranslationKey } from '@/lib/i18n';
 import { trackProductEvent } from '@/lib/product-analytics';
 import type { GenerationQuality, GenerationSize, ImageType } from '@/lib/types';
-import { type GenerationCreditsTable, estimateGenerationCredits } from '@/features/generations/generation-config';
+import {
+  type GenerationCreditsTable,
+  estimateGenerationCredits,
+  formatGenerationOutputSpec,
+} from '@/features/generations/generation-config';
 
 type ReferenceIntent = 'retake_reference' | 'composition_sketch' | 'lighting_reference' | 'color_mood_reference';
 
@@ -217,7 +221,7 @@ export function ReviewReferenceGenerationPanel({
               {formatMessage(t('review_reference_quality'), { quality })}
             </span>
             <span className="rounded-full border border-border bg-raised px-3 py-1">
-              {formatMessage(t('review_reference_size'), { size })}
+              {formatMessage(t('review_reference_size'), { size: formatGenerationOutputSpec(quality, size) })}
             </span>
             <span className="rounded-full border border-border bg-raised px-3 py-1">
               {formatMessage(t('review_reference_credits'), { credits })}

@@ -69,6 +69,17 @@ class ImageGenerationPromptTests(unittest.TestCase):
         self.assertIn('AI-generated visual reference', prompt)
         self.assertIn('Negative constraints: no text', prompt)
 
+    def test_general_prompt_omits_style_direction_when_unspecified(self) -> None:
+        prompt = build_general_generation_prompt(
+            user_prompt='rainy street portrait with neon reflections',
+            template_key='photo_inspiration',
+            style='none',
+            negative_prompt='',
+        )
+
+        self.assertIn('rainy street portrait', prompt)
+        self.assertNotIn('Style direction:', prompt)
+
     def test_prompt_safety_rejects_transparent_background_requests(self) -> None:
         with self.assertRaises(PromptSafetyError):
             build_general_generation_prompt(
@@ -97,6 +108,18 @@ class ImageGenerationPromptTests(unittest.TestCase):
         self.assertIn('not a corrected version', prompt)
         self.assertIn('left third', prompt)
         self.assertIn('Weakest critique dimension: composition', prompt)
+
+    def test_review_linked_prompt_omits_style_token_when_unspecified(self) -> None:
+        prompt = build_review_linked_generation_prompt(
+            review_result={'scores': {'composition': 4}},
+            user_prompt='generate a clearer retake reference',
+            intent='retake_reference',
+            image_type='portrait',
+            style='none',
+        )
+
+        self.assertIn('Camera direction: realistic photographic reference', prompt)
+        self.assertNotIn('Camera/style direction:', prompt)
 
 
 if __name__ == '__main__':
