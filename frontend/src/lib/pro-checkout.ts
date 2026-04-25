@@ -1,47 +1,44 @@
 import { createBillingCheckout } from './api';
+import {
+  closeExternalCheckoutWindow,
+  navigateExternalCheckoutWindow,
+  openExternalCheckoutWindow,
+} from './external-checkout-window';
 import { Locale } from './i18n';
 import { trackProductEvent } from './product-analytics';
 
 export const CN_PRO_CHECKOUT_TIP =
-  '主支付入口仍为 Lemon Squeezy。中文用户也可以选择爱发电，通常会有更优惠的价格；下单后请输入我发送的激活码，即可开通 30 天 Pro。';
+  '中文用户使用 Lemon Squeezy 中文专属 checkout，$1.99 一次性开通 30 天 Pro，不会自动续费。已收到激活码的用户仍可在站内兑换。';
 
-export const CN_PRO_PAYMENT_URL = 'https://www.ifdian.net/item/3c9d0270327011f19cb452540025c377';
+export async function startProCheckout(
+  ensureToken: () => Promise<string>,
+  locale?: Locale
+): Promise<void> {
+  const checkoutWindow = openExternalCheckoutWindow(
+    locale === 'zh' ? '正在打开 Pro 支付页面...' : 'Opening Pro checkout...'
+  );
 
-export function openChinaProPurchase(locale?: Locale): void {
   void trackProductEvent('upgrade_pro_clicked', {
     locale,
     pagePath: typeof window === 'undefined' ? '/account/usage' : window.location.pathname,
     metadata: {
-      channel: 'ifdian',
+      channel: locale === 'zh' ? 'lemonsqueezy_zh' : 'lemonsqueezy',
     },
   });
-  const link = document.createElement('a');
-  link.href = CN_PRO_PAYMENT_URL;
-  link.target = '_blank';
-  link.rel = 'noopener noreferrer';
-  link.style.display = 'none';
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-}
 
-export async function startProCheckout(
-  ensureToken: () => Promise<string>,
-  _locale?: Locale
-): Promise<void> {
-  void trackProductEvent('upgrade_pro_clicked', {
-    locale: _locale,
-    pagePath: typeof window === 'undefined' ? '/account/usage' : window.location.pathname,
-    metadata: {
-      channel: 'lemonsqueezy',
-    },
-  });
-  const token = await ensureToken();
-  const response = await createBillingCheckout(token, 'pro');
+  try {
+    const token = await ensureToken();
+    const response = await createBillingCheckout(token, 'pro', locale);
 
-  if (!response.checkout_url) {
-    throw new Error('Checkout URL is missing');
+    if (!response.checkout_url) {
+      throw new Error('Checkout URL is missing');
+    }
+
+    if (!navigateExternalCheckoutWindow(checkoutWindow, response.checkout_url)) {
+      throw new Error('Checkout window was blocked');
+    }
+  } catch (error) {
+    closeExternalCheckoutWindow(checkoutWindow);
+    throw error;
   }
-
-  window.location.assign(response.checkout_url);
 }

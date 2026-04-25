@@ -51,7 +51,10 @@ class Settings(BaseSettings):
     lemonsqueezy_api_key: str = ''
     lemonsqueezy_store_id: str = ''
     lemonsqueezy_pro_variant_id: str = ''
+    lemonsqueezy_zh_pro_variant_id: str = ''
     lemonsqueezy_pro_checkout_url: str = ''
+    lemonsqueezy_zh_pro_checkout_url: str = ''
+    lemonsqueezy_image_credit_pack_checkout_url: str = ''
     lemonsqueezy_webhook_signing_secret: str = ''
     lemonsqueezy_webhook_url: str = ''
     lemonsqueezy_checkout_success_url: str = ''
@@ -101,6 +104,22 @@ class Settings(BaseSettings):
     image_audit_enabled: bool = True
     image_audit_reject_threshold: float = 0.78
 
+    openai_api_key: str = ''
+    image_generation_api_url: str = Field(
+        default='https://api.openai.com/v1/images/generations',
+    )
+    image_generation_model: str = 'gpt-image-2'
+    image_generation_model_snapshot: str = 'gpt-image-2-2026-04-21'
+    image_generation_default_quality: str = 'low'
+    image_generation_pro_default_quality: str = 'medium'
+    image_generation_max_outputs_per_request: int = 1
+    image_generation_timeout_seconds: int = 180
+    image_generation_worker_concurrency: int = 1
+    image_generation_daily_ipm_limit: int = 5
+    image_generation_enable_streaming: bool = False
+    image_generation_free_monthly_credits: int = 3
+    image_generation_pro_monthly_credits: int = 199
+
     @field_validator('backend_cors_origins', mode='before')
     @classmethod
     def parse_backend_cors_origins(cls, value: Any) -> list[str]:
@@ -144,8 +163,15 @@ class Settings(BaseSettings):
         'lemonsqueezy_api_key',
         'lemonsqueezy_store_id',
         'lemonsqueezy_pro_variant_id',
+        'lemonsqueezy_zh_pro_variant_id',
         'lemonsqueezy_pro_checkout_url',
+        'lemonsqueezy_zh_pro_checkout_url',
+        'lemonsqueezy_image_credit_pack_checkout_url',
         'lemonsqueezy_webhook_signing_secret',
+        'openai_api_key',
+        'image_generation_model_snapshot',
+        'image_generation_default_quality',
+        'image_generation_pro_default_quality',
         mode='before',
     )
     @classmethod
@@ -160,8 +186,11 @@ class Settings(BaseSettings):
         'cloud_tasks_oidc_audience',
         'clerk_api_url',
         'lemonsqueezy_pro_checkout_url',
+        'lemonsqueezy_zh_pro_checkout_url',
         'lemonsqueezy_webhook_url',
         'lemonsqueezy_checkout_success_url',
+        'image_generation_api_url',
+        'image_generation_model',
         mode='before',
     )
     @classmethod

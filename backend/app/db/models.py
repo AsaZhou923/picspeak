@@ -61,6 +61,11 @@ class ReviewStatus(str, enum.Enum):
     FAILED = 'FAILED'
 
 
+class GenerationMode(str, enum.Enum):
+    general = 'general'
+    review_linked = 'review_linked'
+
+
 class User(Base):
     __tablename__ = 'users'
 
@@ -237,6 +242,81 @@ class ReviewTaskEvent(Base):
     message: Mapped[str | None] = mapped_column(Text)
     payload_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class ImageGenerationTask(Base):
+    __tablename__ = 'image_generation_tasks'
+    __table_args__ = (
+        UniqueConstraint('owner_user_id', 'idempotency_key', name='uq_image_generation_tasks_user_idempotency'),
+        Index('idx_image_generation_tasks_status_created', 'status', 'created_at'),
+        Index('idx_image_generation_tasks_owner_created', 'owner_user_id', 'created_at'),
+        Index('idx_image_generation_tasks_review_created', 'source_review_id', 'created_at'),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    public_id: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
+    owner_user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('users.id'), nullable=False)
+    source_photo_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey('photos.id'))
+    source_review_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey('reviews.id'))
+    status: Mapped[TaskStatus] = mapped_column(Enum(TaskStatus, name='task_status', create_type=False), nullable=False, default=TaskStatus.PENDING)
+    generation_mode: Mapped[str] = mapped_column(Text, nullable=False, default='general', server_default='general')
+    intent: Mapped[str] = mapped_column(Text, nullable=False)
+    prompt: Mapped[str] = mapped_column(Text, nullable=False)
+    prompt_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    idempotency_key: Mapped[str | None] = mapped_column(Text)
+    request_payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default='0')
+    max_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=2, server_default='2')
+    progress: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default='0')
+    error_code: Mapped[str | None] = mapped_column(Text)
+    error_message: Mapped[str | None] = mapped_column(Text)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    claimed_by: Mapped[str | None] = mapped_column(Text)
+    last_heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class GeneratedImage(Base):
+    __tablename__ = 'generated_images'
+    __table_args__ = (
+        Index('idx_generated_images_owner_created', 'owner_user_id', 'created_at'),
+        Index('idx_generated_images_task', 'task_id'),
+        Index('idx_generated_images_review_created', 'source_review_id', 'created_at'),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    public_id: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
+    task_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey('image_generation_tasks.id'))
+    owner_user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('users.id'), nullable=False)
+    source_photo_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey('photos.id'))
+    source_review_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey('reviews.id'))
+    object_bucket: Mapped[str] = mapped_column(Text, nullable=False)
+    object_key: Mapped[str] = mapped_column(Text, nullable=False)
+    content_type: Mapped[str] = mapped_column(Text, nullable=False, default='image/webp', server_default='image/webp')
+    width: Mapped[int | None] = mapped_column(Integer)
+    height: Mapped[int | None] = mapped_column(Integer)
+    intent: Mapped[str] = mapped_column(Text, nullable=False)
+    generation_mode: Mapped[str] = mapped_column(Text, nullable=False, default='general', server_default='general')
+    prompt: Mapped[str] = mapped_column(Text, nullable=False)
+    revised_prompt: Mapped[str | None] = mapped_column(Text)
+    model_name: Mapped[str] = mapped_column(Text, nullable=False)
+    model_snapshot: Mapped[str | None] = mapped_column(Text)
+    quality: Mapped[str] = mapped_column(Text, nullable=False)
+    size: Mapped[str] = mapped_column(Text, nullable=False)
+    output_format: Mapped[str] = mapped_column(Text, nullable=False)
+    input_text_tokens: Mapped[int | None] = mapped_column(Integer)
+    input_image_tokens: Mapped[int | None] = mapped_column(Integer)
+    output_image_tokens: Mapped[int | None] = mapped_column(Integer)
+    cost_usd: Mapped[float | None] = mapped_column(Numeric(12, 6))
+    credits_charged: Mapped[int] = mapped_column(Integer, nullable=False)
+    template_key: Mapped[str | None] = mapped_column(Text)
+    metadata_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
 class UsageLedger(Base):

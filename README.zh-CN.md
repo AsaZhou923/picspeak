@@ -28,6 +28,10 @@
 - `Google 登录` — 一键授权，解锁更高额度
 - `图片直传` — 前端直接上传至对象存储，极速不经后端中转
 - `AI 分类点评` — 对不同种类的作品围绕构图、光线、色彩、情绪冲击与技术完成度进行分维度打分与建议，支持轻量（Flash）与深度（Pro）两种模式
+- `AI 创作` — 基于模板、提示词、质量、画幅和风格生成视觉参考图，支持 OpenAI 兼容生图接口
+- `复拍参考` — 在点评详情里把改进建议转成构图、光线、色彩或复拍方向的 AI 参考图
+- `生成历史` — 查看生成结果、下载图片、复制提示词、再次生成，并可带回工作台作为复拍灵感
+- `生图额度` — 展示每月 AI 生图点数，支持兑换码加点和购买额外点数包
 - `使用额度` — 按日 / 按月控额，游客与注册用户独立计量
 - `点评历史` — 随时查看过去的所有点评记录，支持分页、时间范围、评分区间、图片类型筛选
 - `实时推送` — WebSocket 订阅任务进度，无需手动刷新
@@ -54,6 +58,7 @@
 - PostgreSQL 14+
 - S3 兼容对象存储（如 Cloudflare R2、MinIO）
 - AI API Key（兼容 OpenAI 协议）
+- 可选：OpenAI 兼容生图端点，以及 Lemon Squeezy Pro 和生图点数包结账链接
 
 ### 1. 克隆仓库
 
@@ -72,7 +77,7 @@ psql "$DATABASE_URL" -f create_schema.sql
 
 ```bash
 cp backend/.env.example backend/.env
-# 编辑 backend/.env，填入数据库、对象存储、AI API 等配置
+# 编辑 backend/.env，按需填入数据库、对象存储、AI API、生图和计费配置
 ```
 
 ### 4. 启动后端
@@ -112,7 +117,7 @@ cd frontend && npm run build && npm run start
 
 ## 文档
 
-- [更新日志](docs/changelog/update-log-2026-03-21-strict-scoring.md)
+- [更新日志](docs/changelog/update-log-2026-04-25-ai-image-generation-and-credits.md)
 - [后端接口文档](docs/api/后端接口文档_v1.md)
 - [系统架构说明](docs/architecture/系统架构.md)
 - [Google 登录接入指南](docs/guides/Google登录接入指南.md)

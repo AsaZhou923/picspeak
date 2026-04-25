@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Camera, ChevronRight, Gauge, Heart, Star, Zap } from 'lucide-react';
+import { Camera, ChevronRight, Gauge, Heart, Sparkles, Star, Zap } from 'lucide-react';
 import { PublicGalleryItem } from '@/lib/types';
 import { useI18n } from '@/lib/i18n';
 import { getGalleryWorkspaceCtas, type ContentConversionEntrypoint } from '@/lib/content-conversion';
@@ -73,6 +73,7 @@ export default function GalleryCard({
   const modeBadge = getModeBadgeConfig(item.mode);
   const ModeIcon = modeBadge.icon;
   const workspaceCtas = getGalleryWorkspaceCtas(locale, item);
+  const generateHref = `/generate?source=gallery&entrypoint=gallery_reference_generation&gallery_review_id=${encodeURIComponent(item.review_id)}&image_type=${encodeURIComponent(item.image_type)}`;
 
   const handleWorkspaceCtaClick = (entrypoint: ContentConversionEntrypoint) => {
     markProductAttributionSource('gallery');
@@ -190,6 +191,26 @@ export default function GalleryCard({
           >
             <Gauge size={13} />
             {workspaceCtas.standard.cta}
+          </Link>
+          <Link
+            href={generateHref}
+            onClick={() => {
+              markProductAttributionSource('gallery');
+              void trackProductEvent('generation_prompt_opened', {
+                source: 'gallery',
+                pagePath: '/gallery',
+                locale,
+                metadata: {
+                  entrypoint: 'gallery_reference_generation',
+                  gallery_review_id: item.review_id,
+                  image_type: item.image_type,
+                },
+              });
+            }}
+            className="inline-flex items-center justify-center gap-2 rounded-full border border-sage/30 px-3 py-2 text-xs font-medium text-sage transition-all hover:bg-sage/10 active:scale-[0.98]"
+          >
+            <Sparkles size={13} />
+            {locale === 'zh' ? '生成同题材练习参考' : locale === 'ja' ? '同じ題材の参考を生成' : 'Generate practice reference'}
           </Link>
         </div>
 

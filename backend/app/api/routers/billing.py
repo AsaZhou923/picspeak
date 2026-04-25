@@ -10,13 +10,17 @@ from sqlalchemy.orm import Session
 from app.api.deps import CurrentActor, get_current_actor, get_db
 from app.core.config import settings
 from app.core.errors import api_error
-from app.db.models import BillingSubscription, User, UserPlan
+from app.db.models import BillingSubscription, UsageLedger, User, UserPlan
 from app.schemas import (
     ActivationCodeRedeemRequest,
     ActivationCodeRedeemResponse,
     BillingCheckoutRequest,
     BillingCheckoutResponse,
     BillingPortalResponse,
+    CreditPackCheckoutRequest,
+    CreditPackCheckoutResponse,
+    ImageCreditCodeRedeemRequest,
+    ImageCreditCodeRedeemResponse,
     UsageResponse,
 )
 from app.services.billing_access import (
@@ -34,16 +38,31 @@ from app.services.guard import (
     plan_review_modes,
     user_usage_snapshot,
 )
+from app.services.image_generation_task_processor import (
+    count_monthly_generation_credit_consumed,
+    count_monthly_generation_credit_grants,
+    count_monthly_generation_credits,
+    monthly_generation_credit_limit_for_plan,
+)
 from app.services.lemonsqueezy import (
     LemonSqueezyAPIError,
     LemonSqueezyConfigurationError,
     create_checkout_for_user,
+    create_image_credit_pack_checkout_for_user,
     retrieve_subscription,
 )
 from app.services.product_analytics import record_product_event
 
 router = APIRouter(tags=['billing'])
 logger = logging.getLogger(__name__)
+
+IMAGE_CREDIT_PROMO_CODE = 'PICSPEAKART'
+IMAGE_CREDIT_PROMO_CREDITS = 30
+IMAGE_CREDIT_PACK_KEY = 'image_credits_300'
+IMAGE_CREDIT_PACK_CREDITS = 300
+IMAGE_CREDIT_PACK_PRICES = {
+    'usd': '$3.99',
+}
 
 
 def _subscription_portal_url(subscription: BillingSubscription) -> str | None:
@@ -146,6 +165,45 @@ def _best_subscription_for_portal(subscriptions: list[BillingSubscription]) -> B
     return active_with_portal or active_without_portal or latest_with_portal or (subscriptions[0] if subscriptions else None)
 
 
+def _generation_credit_usage_snapshot(db: Session, user: User, plan: UserPlan) -> dict[str, int | None]:
+    if plan == UserPlan.guest:
+        return {
+            'monthly_total': 0,
+            'monthly_used': 0,
+            'monthly_remaining': 0,
+        }
+
+    base_monthly_total = monthly_generation_credit_limit_for_plan(plan)
+    monthly_granted = count_monthly_generation_credit_grants(db, user)
+    monthly_total = base_monthly_total + monthly_granted
+    monthly_used = count_monthly_generation_credit_consumed(db, user)
+    return {
+        'monthly_total': monthly_total,
+        'monthly_used': max(monthly_used, 0),
+        'monthly_remaining': max(monthly_total - monthly_used, 0),
+    }
+
+
+def _normalize_image_credit_code(raw_code: str) -> str:
+    return ''.join(str(raw_code or '').strip().upper().split())
+
+
+def _has_redeemed_image_credit_code(db: Session, user: User, code: str) -> bool:
+    grants = (
+        db.query(UsageLedger)
+        .filter(
+            UsageLedger.user_id == user.id,
+            UsageLedger.usage_type == 'image_generation_credit',
+        )
+        .all()
+    )
+    for grant in grants:
+        metadata = getattr(grant, 'metadata_json', None) or {}
+        if metadata.get('grant_type') == 'promo_code' and metadata.get('grant_code') == code:
+            return True
+    return False
+
+
 @router.get('/me/usage', response_model=UsageResponse)
 def get_usage(request: Request, db: Session = Depends(get_db), actor: CurrentActor = Depends(get_current_actor)):
     quota = (
@@ -169,6 +227,7 @@ def get_usage(request: Request, db: Session = Depends(get_db), actor: CurrentAct
     return UsageResponse(
         plan=actor.plan.value,
         quota=quota,
+        generation_credits=_generation_credit_usage_snapshot(db, actor.user, actor.plan),
         features={
             'review_modes': plan_review_modes(actor.plan),
             'history_retention_days': history_retention_days_for_plan(actor.plan),
@@ -196,7 +255,7 @@ def create_billing_checkout(
             checkout_url=None,
         )
     try:
-        checkout = create_checkout_for_user(actor.user)
+        checkout = create_checkout_for_user(actor.user, locale=payload.locale)
     except LemonSqueezyConfigurationError as exc:
         raise api_error(status.HTTP_503_SERVICE_UNAVAILABLE, 'LEMONSQUEEZY_NOT_CONFIGURED', str(exc)) from exc
     except LemonSqueezyAPIError as exc:
@@ -220,6 +279,68 @@ def create_billing_checkout(
         plan=payload.plan,
         message='Checkout created successfully.',
         checkout_url=checkout.checkout_url,
+    )
+
+
+@router.post('/billing/image-credit-pack/checkout', response_model=CreditPackCheckoutResponse)
+def create_image_credit_pack_checkout(
+    payload: CreditPackCheckoutRequest,
+    db: Session = Depends(get_db),
+    actor: CurrentActor = Depends(get_current_actor),
+):
+    if actor.plan == UserPlan.guest:
+        raise api_error(status.HTTP_403_FORBIDDEN, 'BILLING_SIGNIN_REQUIRED', 'Please sign in before buying image credits')
+
+    currency = str(payload.currency or 'usd').lower()
+    if currency != 'usd':
+        raise api_error(status.HTTP_400_BAD_REQUEST, 'CREDIT_PACK_CURRENCY_UNSUPPORTED', 'Only USD credit pack checkout is available')
+
+    price = IMAGE_CREDIT_PACK_PRICES[currency]
+    checkout_url: str | None = None
+    checkout_id: str | None = None
+    response_status = 'placeholder'
+    message = 'Credit pack checkout is reserved but not connected yet.'
+    if currency == 'usd':
+        try:
+            checkout = create_image_credit_pack_checkout_for_user(
+                actor.user,
+                pack=IMAGE_CREDIT_PACK_KEY,
+                credits=IMAGE_CREDIT_PACK_CREDITS,
+            )
+        except LemonSqueezyConfigurationError as exc:
+            raise api_error(status.HTTP_503_SERVICE_UNAVAILABLE, 'LEMONSQUEEZY_NOT_CONFIGURED', str(exc)) from exc
+        checkout_url = checkout.checkout_url
+        checkout_id = checkout.checkout_id
+        response_status = 'created'
+        message = 'Credit pack checkout created successfully.'
+
+    record_product_event(
+        db,
+        event_name='credit_pack_checkout_started',
+        user_public_id=actor.user.public_id,
+        plan=actor.plan.value,
+        source='checkout',
+        page_path='/billing/image-credit-pack/checkout',
+        metadata={
+            'pack': payload.pack,
+            'credits': IMAGE_CREDIT_PACK_CREDITS,
+            'currency': currency,
+            'price': price,
+            'placeholder': response_status == 'placeholder',
+            'locale': payload.locale,
+            'provider': 'lemonsqueezy' if checkout_url else None,
+            'checkout_id': checkout_id,
+        },
+    )
+    db.commit()
+    return CreditPackCheckoutResponse(
+        status=response_status,
+        pack=IMAGE_CREDIT_PACK_KEY,
+        credits=IMAGE_CREDIT_PACK_CREDITS,
+        currency=currency,
+        price=price,
+        message=message,
+        checkout_url=checkout_url,
     )
 
 
@@ -249,6 +370,51 @@ def redeem_activation_code(
         provider=subscription.provider,
         message='Activation code redeemed successfully.',
         activated_until=activated_until,
+    )
+
+
+@router.post('/billing/image-credit-code/redeem', response_model=ImageCreditCodeRedeemResponse)
+def redeem_image_credit_code(
+    payload: ImageCreditCodeRedeemRequest,
+    db: Session = Depends(get_db),
+    actor: CurrentActor = Depends(get_current_actor),
+):
+    if actor.plan == UserPlan.guest:
+        raise api_error(status.HTTP_403_FORBIDDEN, 'BILLING_SIGNIN_REQUIRED', 'Please sign in before redeeming a credit code')
+
+    code = _normalize_image_credit_code(payload.code)
+    if code != IMAGE_CREDIT_PROMO_CODE:
+        raise api_error(status.HTTP_404_NOT_FOUND, 'IMAGE_CREDIT_CODE_INVALID', 'This credit code is not valid')
+
+    if _has_redeemed_image_credit_code(db, actor.user, code):
+        raise api_error(status.HTTP_409_CONFLICT, 'IMAGE_CREDIT_CODE_ALREADY_REDEEMED', 'This credit code has already been redeemed')
+
+    db.add(
+        UsageLedger(
+            user_id=actor.user.id,
+            review_id=None,
+            task_id=None,
+            usage_type='image_generation_credit',
+            amount=-IMAGE_CREDIT_PROMO_CREDITS,
+            unit='credits',
+            bill_date=datetime.now(timezone.utc).date(),
+            metadata_json={
+                'grant_type': 'promo_code',
+                'grant_code': code,
+                'credits_granted': IMAGE_CREDIT_PROMO_CREDITS,
+            },
+        )
+    )
+    db.commit()
+    snapshot = _generation_credit_usage_snapshot(db, actor.user, actor.plan)
+    return ImageCreditCodeRedeemResponse(
+        status='redeemed',
+        code=code,
+        credits_granted=IMAGE_CREDIT_PROMO_CREDITS,
+        message='Credit code redeemed successfully.',
+        monthly_total=snapshot['monthly_total'],
+        monthly_used=snapshot['monthly_used'],
+        monthly_remaining=snapshot['monthly_remaining'],
     )
 
 

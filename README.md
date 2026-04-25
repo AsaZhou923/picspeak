@@ -28,6 +28,10 @@
 - `Google Sign-In` — One-click authorization for higher usage limits
 - `Direct Image Upload` — Upload files directly from the frontend to object storage without routing through the backend
 - `AI Critique by Category` — Receive scoring and suggestions across composition, lighting, color, emotional impact, and technical execution for different types of photography, with both lightweight (`Flash`) and in-depth (`Pro`) modes
+- `AI Create` — Generate visual references from templates, prompts, quality, ratio, and style controls using an OpenAI-compatible image generation API
+- `Retake References` — Turn critique suggestions into AI-generated composition, lighting, color, or retake reference images from a review
+- `Generation History` — Browse generated images, download results, copy prompts, generate again, or send an image back to the workspace as retake inspiration
+- `Image Generation Credits` — Track monthly generation credits, redeem promo credits, and purchase extra credit packs
 - `Usage Quotas` — Daily and monthly limits with separate tracking for guests and registered users
 - `Review History` — Browse all past critiques with pagination and filters for time range, score range, and image type
 - `Real-Time Updates` — Subscribe to task progress through WebSocket without manual refresh
@@ -55,6 +59,7 @@
 - PostgreSQL 14+
 - S3-compatible object storage such as Cloudflare R2 or MinIO
 - An AI API key compatible with the OpenAI API format
+- Optional: an OpenAI-compatible image generation endpoint and Lemon Squeezy checkout URLs for Pro and credit-pack billing
 
 ### 1. Clone the repository
 
@@ -73,7 +78,8 @@ psql "$DATABASE_URL" -f create_schema.sql
 
 ```bash
 cp backend/.env.example backend/.env
-# Edit backend/.env and fill in the database, object storage, AI API, and related settings
+# Edit backend/.env and fill in the database, object storage, AI API,
+# image generation, and billing settings as needed
 ```
 
 ### 4. Start the backend
@@ -113,7 +119,7 @@ cd frontend && npm run build && npm run start
 
 ## Documentation
 
-- [Changelog](docs/changelog/update-log-2026-03-21-strict-scoring.md)
+- [Changelog](docs/changelog/update-log-2026-04-25-ai-image-generation-and-credits.md)
 - [Backend API Documentation](docs/api/后端接口文档_v1.md)
 - [System Architecture](docs/architecture/系统架构.md)
 - [Google Sign-In Integration Guide](docs/guides/Google登录接入指南.md)

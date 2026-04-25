@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
-import { Sun, Moon, ChevronDown, Camera, Clock, BarChart2, BadgeDollarSign, LayoutGrid, ChevronRight, Heart, BookOpen } from 'lucide-react';
+import { Sun, Moon, ChevronDown, Camera, Clock, BarChart2, BadgeDollarSign, LayoutGrid, ChevronRight, Heart, BookOpen, Wand2 } from 'lucide-react';
 import { Show, SignInButton, SignUpButton, UserButton } from '@clerk/nextjs';
 import { useAuth } from '@/lib/auth-context';
 import { planLabel, planColor } from '@/lib/auth-context';
@@ -87,10 +87,10 @@ function QuickLinksMenu() {
 
   const favoritesLabel =
     locale === 'ja' ? 'お気に入り' : locale === 'en' ? 'Favorites' : '我的收藏';
-
   const links = [
     { href: '/account/favorites', label: favoritesLabel, icon: Heart },
     ...(userInfo && userInfo.plan !== 'guest' ? [{ href: '/account/reviews', label: t('nav_history'), icon: Clock }] : []),
+    ...(userInfo && userInfo.plan !== 'guest' ? [{ href: '/account/generations', label: t('generation_history_nav'), icon: Wand2 }] : []),
     { href: '/affiliate', label: t('nav_affiliate'), icon: BadgeDollarSign },
   ] as Array<{
     href: string;
@@ -211,6 +211,9 @@ export default function Header() {
           </Link>
           <Link href="/workspace" className={`transition-colors ${isActive('/workspace')}`}>
             {t('nav_workspace')}
+          </Link>
+          <Link href="/generate" className={`transition-colors ${isActive('/generate')}`}>
+            {t('nav_generate')}
           </Link>
           <Link href="/gallery" className={`transition-colors ${isActive('/gallery')}`}>
             {t('nav_gallery')}
@@ -339,6 +342,17 @@ export default function Header() {
             >
               <LayoutGrid size={14} />
               <span className="tracking-wide">{t('nav_gallery')}</span>
+            </Link>
+            <Link
+              href="/generate"
+              className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-[10px] text-[10px] font-medium transition-all duration-200 ${
+                pathname === '/generate'
+                  ? 'bg-void shadow-sm text-gold'
+                  : 'text-ink-subtle hover:text-ink-muted active:scale-95'
+              }`}
+            >
+              <Wand2 size={14} />
+              <span className="tracking-wide">{t('nav_generate_short')}</span>
             </Link>
             <Link
               href="/account/usage"

@@ -4,7 +4,7 @@ import hashlib
 import hmac
 import json
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import Request, status
@@ -12,9 +12,10 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.errors import api_error
-from app.db.models import BillingSubscription, BillingWebhookEvent, User, UserPlan
-from app.services.billing_access import subscription_grants_pro_access, sync_user_billing_plan
+from app.core.errors import ApiHTTPException, api_error
+from app.core.security import verify_payload
+from app.db.models import BillingSubscription, BillingWebhookEvent, UsageLedger, User, UserPlan
+from app.services.billing_access import current_period_ends_at, subscription_grants_pro_access, sync_user_billing_plan
 from app.services.lemonsqueezy import (
     LemonSqueezyAPIError,
     LemonSqueezyConfigurationError,
@@ -30,6 +31,12 @@ HANDLED_LEMONSQUEEZY_EVENTS = {
     'subscription_cancelled',
     'subscription_payment_success',
 }
+
+IMAGE_CREDIT_PACK_KEY = 'image_credits_300'
+IMAGE_CREDIT_PACK_CREDITS = 300
+ONE_TIME_PRO_BILLING_MODE = 'one_time_pro'
+ONE_TIME_PRO_DURATION_DAYS = 30
+ONE_TIME_PRO_GRANT_PURPOSE = 'lemonsqueezy_one_time_pro'
 
 
 @dataclass(slots=True)
@@ -260,6 +267,208 @@ def _variant_matches_pro_plan(variant_id: str | None) -> bool:
     return configured == variant_id
 
 
+def _variant_matches_one_time_pro_plan(variant_id: str | None) -> bool:
+    configured = settings.lemonsqueezy_zh_pro_variant_id.strip()
+    if configured:
+        return variant_id == configured
+    return _variant_matches_pro_plan(variant_id)
+
+
+def _is_image_credit_pack_order(event: LemonSqueezyWebhookEvent) -> bool:
+    custom = _custom_data(event.meta)
+    return (
+        str(custom.get('kind') or '').strip() == 'image_credit_pack'
+        or str(custom.get('pack') or '').strip() == IMAGE_CREDIT_PACK_KEY
+    )
+
+
+def _is_one_time_pro_order(event: LemonSqueezyWebhookEvent) -> bool:
+    custom = _custom_data(event.meta)
+    return (
+        str(custom.get('billing_mode') or '').strip().lower() == ONE_TIME_PRO_BILLING_MODE
+        and str(custom.get('plan') or '').strip().lower() == 'pro'
+    )
+
+
+def _verified_one_time_pro_payload(event: LemonSqueezyWebhookEvent, user: User) -> dict[str, Any] | None:
+    custom = _custom_data(event.meta)
+    token = str(custom.get('grant_token') or '').strip()
+    if not token:
+        return None
+    try:
+        payload = verify_payload(token)
+    except (ApiHTTPException, ValueError, TypeError, UnicodeDecodeError):
+        return None
+
+    if payload.get('purpose') != ONE_TIME_PRO_GRANT_PURPOSE:
+        return None
+    if payload.get('user_id') != user.public_id:
+        return None
+    if payload.get('plan') != 'pro':
+        return None
+    if payload.get('billing_mode') != ONE_TIME_PRO_BILLING_MODE:
+        return None
+    try:
+        duration_days = int(payload.get('duration_days'))
+    except (TypeError, ValueError):
+        return None
+    if duration_days != ONE_TIME_PRO_DURATION_DAYS:
+        return None
+    return payload
+
+
+def _image_credit_pack_order_id(event: LemonSqueezyWebhookEvent) -> str | None:
+    attributes = _payload_attributes(event.data)
+    return (
+        str(event.resource_id or '').strip()
+        or str(attributes.get('order_id') or '').strip()
+        or str(attributes.get('identifier') or '').strip()
+        or None
+    )
+
+
+def _order_resource_id(event: LemonSqueezyWebhookEvent) -> str | None:
+    attributes = _payload_attributes(event.data)
+    return (
+        str(event.resource_id or '').strip()
+        or str(attributes.get('order_id') or '').strip()
+        or str(attributes.get('identifier') or '').strip()
+        or str(event.data.get('id') or '').strip()
+        or None
+    )
+
+
+def _one_time_pro_already_granted(subscription: BillingSubscription | None) -> bool:
+    if subscription is None:
+        return False
+    payload = subscription.raw_payload if isinstance(subscription.raw_payload, dict) else {}
+    access = payload.get('billing_access')
+    return isinstance(access, dict) and access.get('billing_mode') == ONE_TIME_PRO_BILLING_MODE
+
+
+def _grant_one_time_pro_access(
+    db: Session,
+    *,
+    user: User,
+    subscription: BillingSubscription,
+    event: LemonSqueezyWebhookEvent,
+) -> BillingSubscription:
+    current = _utc_now()
+    current_end = current_period_ends_at(subscription)
+    start_at = current_end if current_end is not None and current_end > current else current
+    ends_at = start_at + timedelta(days=ONE_TIME_PRO_DURATION_DAYS)
+
+    subscription.status = 'active'
+    subscription.cancelled = True
+    subscription.renews_at = None
+    subscription.ends_at = ends_at
+    subscription.trial_ends_at = None
+    subscription.product_name = subscription.product_name or 'PicSpeak Pro'
+    subscription.variant_name = subscription.variant_name or f'{ONE_TIME_PRO_DURATION_DAYS}-day one-time Pro'
+    subscription.last_event_name = event.event_name
+    subscription.last_event_at = current
+    subscription.updated_at = current
+    subscription.raw_payload = {
+        **(event.data if isinstance(event.data, dict) else {}),
+        'billing_access': {
+            'billing_mode': ONE_TIME_PRO_BILLING_MODE,
+            'duration_days': ONE_TIME_PRO_DURATION_DAYS,
+            'activated_at': current.isoformat(),
+            'activated_until': ends_at.isoformat(),
+            'renews': False,
+        },
+    }
+    db.add(subscription)
+    _sync_user_plan(db, user)
+    record_product_event(
+        db,
+        event_name='paid_success',
+        user_public_id=user.public_id,
+        plan=user.plan.value,
+        source='checkout',
+        page_path='/billing/webhooks/lemonsqueezy',
+        metadata={
+            'provider': 'lemonsqueezy',
+            'kind': ONE_TIME_PRO_BILLING_MODE,
+            'order_id': subscription.provider_order_id or _order_resource_id(event),
+            'duration_days': ONE_TIME_PRO_DURATION_DAYS,
+            'renews': False,
+        },
+    )
+    return subscription
+
+
+def _has_granted_image_credit_pack(db: Session, user: User, order_id: str | None) -> bool:
+    if not order_id:
+        return False
+    grants = (
+        db.query(UsageLedger)
+        .filter(
+            UsageLedger.user_id == user.id,
+            UsageLedger.usage_type == 'image_generation_credit',
+        )
+        .all()
+    )
+    for grant in grants:
+        metadata = getattr(grant, 'metadata_json', None) or {}
+        if metadata.get('grant_type') == 'lemonsqueezy_credit_pack' and str(metadata.get('order_id') or '') == order_id:
+            return True
+    return False
+
+
+def _process_image_credit_pack_order(db: Session, event: LemonSqueezyWebhookEvent, user: User | None) -> tuple[str, User | None]:
+    if user is None:
+        return 'ignored_user_not_found', None
+
+    order_id = _image_credit_pack_order_id(event)
+    if _has_granted_image_credit_pack(db, user, order_id):
+        return 'credit_pack_already_granted', user
+
+    custom = _custom_data(event.meta)
+    try:
+        credits = int(str(custom.get('credits') or IMAGE_CREDIT_PACK_CREDITS).strip())
+    except ValueError:
+        credits = IMAGE_CREDIT_PACK_CREDITS
+    if credits != IMAGE_CREDIT_PACK_CREDITS:
+        credits = IMAGE_CREDIT_PACK_CREDITS
+
+    db.add(
+        UsageLedger(
+            user_id=user.id,
+            review_id=None,
+            task_id=None,
+            usage_type='image_generation_credit',
+            amount=-credits,
+            unit='credits',
+            bill_date=_utc_now().date(),
+            metadata_json={
+                'grant_type': 'lemonsqueezy_credit_pack',
+                'pack': IMAGE_CREDIT_PACK_KEY,
+                'order_id': order_id,
+                'credits_granted': credits,
+                'event_name': event.event_name,
+            },
+        )
+    )
+    record_product_event(
+        db,
+        event_name='paid_success',
+        user_public_id=user.public_id,
+        plan=user.plan.value,
+        source='checkout',
+        page_path='/billing/webhooks/lemonsqueezy',
+        metadata={
+            'provider': 'lemonsqueezy',
+            'kind': 'image_credit_pack',
+            'pack': IMAGE_CREDIT_PACK_KEY,
+            'credits_granted': credits,
+            'order_id': order_id,
+            'event_name': event.event_name,
+        },
+    )
+    return 'credit_pack_granted', user
+
+
 def _subscription_grants_pro_access(subscription: BillingSubscription, *, now: datetime | None = None) -> bool:
     return subscription_grants_pro_access(subscription, now=now)
 
@@ -377,15 +586,29 @@ def _match_user_for_event(db: Session, event: LemonSqueezyWebhookEvent) -> User 
 
 
 def _process_order_created(db: Session, event: LemonSqueezyWebhookEvent, user: User | None) -> tuple[str, User | None]:
+    if _is_image_credit_pack_order(event):
+        return _process_image_credit_pack_order(db, event, user)
     if user is None:
         return 'ignored_user_not_found', None
+    order_id = _order_resource_id(event)
+    if _is_one_time_pro_order(event):
+        if _verified_one_time_pro_payload(event, user) is None:
+            return 'ignored_one_time_pro_grant_invalid', user
+        existing_subscription = _lookup_subscription(db, provider_order_id=order_id, user_id=user.id)
+        if _one_time_pro_already_granted(existing_subscription):
+            return 'one_time_pro_already_granted', user
     subscription = _upsert_subscription_from_resource(
         db,
         event_name=event.event_name,
         data=event.data,
         user=user,
-        fallback_order_id=event.resource_id,
+        fallback_order_id=order_id,
     )
+    if _is_one_time_pro_order(event):
+        if not _variant_matches_one_time_pro_plan(subscription.variant_id):
+            return 'ignored_non_pro_variant', user
+        _grant_one_time_pro_access(db, user=user, subscription=subscription, event=event)
+        return 'one_time_pro_granted', user
     if not _variant_matches_pro_plan(subscription.variant_id):
         return 'ignored_non_pro_variant', user
     return 'order_recorded', user

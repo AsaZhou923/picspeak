@@ -40,6 +40,14 @@ class ProductAnalyticsServiceTests(unittest.TestCase):
             'gallery_viewed',
             'share_viewed',
             'content_workspace_clicked',
+            'generation_page_viewed',
+            'generation_template_selected',
+            'generation_requested',
+            'generation_succeeded',
+            'generation_failed',
+            'generation_viewed',
+            'generation_credit_exhausted',
+            'generation_upgrade_clicked',
         }
 
         self.assertTrue(required_events.issubset(STAGE_A_EVENT_CATALOG.keys()))

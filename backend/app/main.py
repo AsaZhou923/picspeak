@@ -21,6 +21,14 @@ from app.services.worker import worker
 logger = logging.getLogger(__name__)
 
 
+def _dev_cors_origin_regex() -> str | None:
+    if settings.backend_cors_origin_regex:
+        return settings.backend_cors_origin_regex
+    if settings.app_env.strip().lower() == 'dev':
+        return r'https?://(localhost|127\.0\.0\.1):\d+'
+    return None
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     if settings.run_embedded_worker:
@@ -34,7 +42,7 @@ app = FastAPI(title='PicSpeak Backend', version='1.0.0', lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.backend_cors_origins,
-    allow_origin_regex=settings.backend_cors_origin_regex or None,
+    allow_origin_regex=_dev_cors_origin_regex(),
     allow_credentials=True,
     allow_methods=['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allow_headers=[
@@ -45,6 +53,8 @@ app.add_middleware(
         'Idempotency-Key',
         'X-Guest-Access-Token',
         'X-Device-Id',
+        'Cache-Control',
+        'Pragma',
     ],
     expose_headers=['X-Request-Id', 'X-Guest-Access-Token'],
 )

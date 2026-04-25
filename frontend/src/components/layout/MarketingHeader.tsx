@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
-import { BookOpen, Camera, ChevronDown, LayoutGrid, BadgeDollarSign, Moon, Sun } from 'lucide-react';
+import { BadgeDollarSign, BookOpen, Camera, ChevronDown, LayoutGrid, Moon, Sun, Wand2 } from 'lucide-react';
 import { getBlogUi } from '@/lib/blog-data';
 import { useTheme } from '@/lib/theme-context';
 import { LOCALE_LABELS, Locale, useI18n } from '@/lib/i18n';
@@ -11,11 +11,12 @@ import { useRef, useState } from 'react';
 import useOnClickOutside from '@/lib/hooks/useOnClickOutside';
 
 const MARKETING_LINKS: Array<
-  | { href: string; key: 'nav_home' | 'nav_workspace' | 'nav_gallery' | 'nav_affiliate' }
+  | { href: string; key: 'nav_home' | 'nav_workspace' | 'nav_generate' | 'nav_gallery' | 'nav_affiliate' }
   | { href: string; label: string }
 > = [
   { href: '/', key: 'nav_home' },
   { href: '/workspace', key: 'nav_workspace' },
+  { href: '/generate', key: 'nav_generate' },
   { href: '/gallery', key: 'nav_gallery' },
   { href: '/blog', label: 'Blog' },
   { href: '/affiliate', key: 'nav_affiliate' },
@@ -23,10 +24,11 @@ const MARKETING_LINKS: Array<
 
 const MOBILE_MARKETING_LINKS: Array<{
   href: string;
-  key: 'nav_workspace' | 'nav_gallery' | 'nav_affiliate';
+  key: 'nav_workspace' | 'nav_generate_short' | 'nav_gallery' | 'nav_affiliate';
   icon: typeof Camera;
 }> = [
   { href: '/workspace', key: 'nav_workspace', icon: Camera },
+  { href: '/generate', key: 'nav_generate_short', icon: Wand2 },
   { href: '/gallery', key: 'nav_gallery', icon: LayoutGrid },
   { href: '/affiliate', key: 'nav_affiliate', icon: BadgeDollarSign },
 ];
@@ -103,7 +105,7 @@ export default function MarketingHeader() {
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 border-b border-border-subtle bg-void/90 backdrop-blur-md">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link
             href="/"
@@ -131,7 +133,7 @@ export default function MarketingHeader() {
           </Link>
         </div>
 
-        <nav className="hidden md:flex items-center gap-6 text-sm min-w-0">
+        <nav className="hidden md:flex items-center gap-6 text-sm">
           {MARKETING_LINKS.map((link) => (
             <Link key={link.href} href={link.href} className={`transition-colors ${activeClass(link.href)}`}>
               {'key' in link ? t(link.key) : blogUi.navLabel}

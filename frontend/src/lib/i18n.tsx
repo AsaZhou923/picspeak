@@ -3,6 +3,8 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { zhTranslations, type TranslationDictionary, type TranslationKey } from './i18n-zh';
 
+export type { TranslationKey } from './i18n-zh';
+
 export type Locale = 'zh' | 'en' | 'ja';
 
 export const LOCALE_LABELS: Record<Locale, string> = {

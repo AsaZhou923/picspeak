@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
-import { AlertCircle, RotateCcw, ArrowLeft, ShieldCheck, Cpu, CheckCircle2, Clock } from 'lucide-react';
+import { AlertCircle, RotateCcw, ArrowLeft, ShieldCheck, Cpu, CheckCircle2, Clock, Aperture } from 'lucide-react';
 import { buildTaskWebSocketUrl, getTask, isAbortError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useI18n } from '@/lib/i18n';
@@ -12,6 +12,19 @@ import { formatSupportMessage, formatUserFacingError } from '@/lib/error-utils';
 const POLL_INTERVAL = 1000;
 const HEARTBEAT_STALE_MS = 3 * 60 * 1000;
 const INITIAL_TASK_LOOKUP_GRACE_MS = 5000;
+const WAIT_NOTES = [
+  { title: 'task_wait_note_queue_title', body: 'task_wait_note_queue_body' },
+  { title: 'task_wait_note_audit_title', body: 'task_wait_note_audit_body' },
+  { title: 'task_wait_note_ai_title', body: 'task_wait_note_ai_body' },
+  { title: 'task_wait_note_done_title', body: 'task_wait_note_done_body' },
+] as const;
+const REVIEW_DIMENSIONS = [
+  'task_wait_dimension_composition',
+  'task_wait_dimension_light',
+  'task_wait_dimension_color',
+  'task_wait_dimension_impact',
+  'task_wait_dimension_technique',
+] as const;
 
 export default function TaskPage() {
   const router = useRouter();
@@ -251,6 +264,11 @@ export default function TaskPage() {
   const isSuccess = task?.status === 'SUCCEEDED';
   const activeStepIdx = task ? getActiveStep(task.progress, task.status) : 0;
   const activeStep = STEPS[activeStepIdx];
+  const waitNote = WAIT_NOTES[Math.min(activeStepIdx, WAIT_NOTES.length - 1)];
+  const dimensionActiveIdx = Math.min(
+    Math.max(Math.floor(((task?.progress ?? 0) / 100) * REVIEW_DIMENSIONS.length), 0),
+    REVIEW_DIMENSIONS.length - 1
+  );
   const taskError: TaskErrorPayload | null = task?.error ?? null;
   const taskErrorMessage = taskError ? formatSupportMessage(t, taskError.message ?? t('err_unknown_title')) : '';
 
@@ -325,6 +343,36 @@ export default function TaskPage() {
               </div>
             )}
           </>
+        )}
+
+        {!isFinal && !error && (
+          <section className="rounded-lg border border-border-subtle bg-surface/70 p-4 text-left shadow-[0_18px_50px_rgba(0,0,0,0.12)]">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-gold/80">{t('task_wait_label')}</p>
+                <h2 className="mt-1 text-sm font-medium text-ink">{t(waitNote.title)}</h2>
+              </div>
+              <Aperture size={18} className="shrink-0 animate-spin-slow text-gold/80" />
+            </div>
+            <p className="text-xs leading-6 text-ink-muted">{t(waitNote.body)}</p>
+            <div className="mt-4 grid grid-cols-5 gap-1.5">
+              {REVIEW_DIMENSIONS.map((dimension, index) => (
+                <div
+                  key={dimension}
+                  className={`rounded-md border px-2 py-2 text-center text-[10px] transition-all ${
+                    index <= dimensionActiveIdx
+                      ? 'border-gold/35 bg-gold/10 text-gold'
+                      : 'border-border bg-raised/45 text-ink-subtle'
+                  }`}
+                >
+                  {t(dimension)}
+                </div>
+              ))}
+            </div>
+            <p className="mt-4 rounded-md border border-sage/20 bg-sage/5 px-3 py-2 text-xs leading-5 text-sage">
+              {t('task_wait_prompt')}
+            </p>
+          </section>
         )}
 
         {eventMessage && !isFinal && <p className="text-xs text-ink-muted font-mono">{eventMessage}</p>}

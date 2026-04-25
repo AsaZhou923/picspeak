@@ -29,6 +29,7 @@ import { GalleryConfirmDialog } from '@/features/reviews/components/GalleryConfi
 import { ReviewScorePanel } from '@/features/reviews/components/ReviewScorePanel';
 import { ReviewActionBar } from '@/features/reviews/components/ReviewActionBar';
 import { ReviewGrowthLoopPanel } from '@/features/reviews/components/ReviewGrowthLoopPanel';
+import { ReviewReferenceGenerationPanel } from '@/features/reviews/components/ReviewReferenceGenerationPanel';
 import { ReviewGalleryPanel } from '@/features/reviews/components/ReviewGalleryPanel';
 import { ImageZoomOverlay } from '@/features/reviews/components/ImageZoomOverlay';
 import { buildNextShootChecklist } from '@/lib/review-growth';
@@ -275,19 +276,32 @@ export default function ReviewPage() {
 
             <div className="border-t border-border-subtle" />
 
-            <div className="space-y-6 max-w-2xl">
-              <CritiqueSection
-                accent="text-sage" borderColor="border-sage" bgColor="bg-sage/5"
-                icon={<ThumbsUp size={13} />} title={t('review_advantage')}
-                body={displayAdvantage} isPro={isPro}
-              />
-              <div className="border-t border-border-subtle" />
-              <CritiqueSection
-                accent="text-rust" borderColor="border-rust" bgColor="bg-rust/5"
-                icon={<ThumbsDown size={13} />} title={t('review_critique')}
-                body={displayCritique} isPro={isPro}
-              />
-              <div className="border-t border-border-subtle" />
+            <div className="space-y-5">
+              <div className="grid gap-5 xl:grid-cols-2">
+                <CritiqueSection
+                  accent="text-sage" borderColor="border-sage" bgColor="bg-sage/5"
+                  icon={<ThumbsUp size={13} />} title={t('review_advantage')}
+                  body={displayAdvantage} isPro={isPro}
+                />
+                <CritiqueSection
+                  accent="text-rust" borderColor="border-rust" bgColor="bg-rust/5"
+                  icon={<ThumbsDown size={13} />} title={t('review_critique')}
+                  body={displayCritique} isPro={isPro}
+                />
+              </div>
+
+              {showOwnerActions && (
+                <ReviewReferenceGenerationPanel
+                  reviewId={activeReview.review_id}
+                  photoId={activeReview.photo_id}
+                  imageType={activeReview.image_type ?? activeReview.result.image_type ?? 'default'}
+                  suggestions={displaySuggestions}
+                  plan={plan}
+                  locale={locale}
+                  sourceAspect={imgNaturalSize}
+                />
+              )}
+
               <CritiqueSection
                 accent="text-gold" borderColor="border-gold" bgColor="bg-gold/5"
                 icon={<Lightbulb size={13} />} title={t('review_suggestions')}

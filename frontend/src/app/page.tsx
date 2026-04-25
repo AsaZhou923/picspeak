@@ -4,10 +4,10 @@ import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import Link from 'next/link';
 import Script from 'next/script';
-import { ArrowRight, Aperture, Zap, Star, BarChart2, Mail, BookOpenText, Clock3, FileText, UploadCloud } from 'lucide-react';
-import { getBlogUi } from '@/lib/blog-data';
+import { ArrowRight, Aperture, Zap, Star, BarChart2, Mail, BookOpenText, Clock3, FileText, UploadCloud, Wand2, Coins } from 'lucide-react';
 import { getHomeIntentEntrances, type HomeIntent } from '@/lib/content-conversion';
 import ScoreRing from '@/components/ui/ScoreRing';
+import HomeImageCreditRedeem from '@/components/home/HomeImageCreditRedeem';
 import { DEMO_IMAGE_URL, DEMO_REVIEW_ID } from '@/lib/demo-review';
 import { useI18n } from '@/lib/i18n';
 import { markProductAttributionSource, trackProductEvent } from '@/lib/product-analytics';
@@ -50,9 +50,9 @@ type HomePageProps = {
 
 export function HomePageContent({ structuredDataScope = 'root' }: HomePageProps = {}) {
   const { t, locale } = useI18n();
-  const blogUi = getBlogUi(locale);
   const renderFaqJsonLd = shouldRenderHomeFaqJsonLd(structuredDataScope);
   const homeIntentEntrances = getHomeIntentEntrances(locale);
+  const blogHomeCopy = HOME_BLOG_LINK_COPY[locale] ?? HOME_BLOG_LINK_COPY.zh;
   const homeIntentIcons: Record<HomeIntent, typeof UploadCloud> = {
     new_user: UploadCloud,
     returning_user: Clock3,
@@ -159,6 +159,25 @@ export function HomePageContent({ structuredDataScope = 'root' }: HomePageProps 
     },
   ];
 
+  const GENERATION_PRICING = [
+    {
+      title: t('home_generation_pricing_low_title'),
+      cost: t('home_generation_pricing_low_cost'),
+      body: t('home_generation_pricing_low_body'),
+    },
+    {
+      title: t('home_generation_pricing_medium_title'),
+      cost: t('home_generation_pricing_medium_cost'),
+      body: t('home_generation_pricing_medium_body'),
+      featured: true,
+    },
+    {
+      title: t('home_generation_pricing_high_title'),
+      cost: t('home_generation_pricing_high_cost'),
+      body: t('home_generation_pricing_high_body'),
+    },
+  ];
+
   return (
     <>
       <Script
@@ -228,6 +247,34 @@ export function HomePageContent({ structuredDataScope = 'root' }: HomePageProps 
             aria-hidden="true"
           />
         </div>
+
+        <Link
+          href="/generate"
+          className="relative mt-8 flex w-full max-w-2xl flex-col gap-4 rounded-lg border border-gold/25 bg-[linear-gradient(135deg,rgba(200,162,104,0.16),transparent_46%),rgb(var(--color-raised)/0.58)] px-5 py-4 text-left transition-all duration-300 hover:-translate-y-0.5 hover:border-gold/45 hover:bg-raised/70 sm:flex-row sm:items-center sm:justify-between animate-fade-in anim-fill-both delay-300"
+        >
+          <span className="flex min-w-0 items-start gap-3">
+            <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded border border-gold/30 bg-gold/10 text-gold">
+              <Wand2 size={16} />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-[11px] font-mono uppercase tracking-[0.22em] text-gold/80">
+                {t('home_gpt_image_badge')}
+              </span>
+              <span className="mt-1 block font-display text-xl text-ink">
+                {t('home_gpt_image_title')}
+              </span>
+              <span className="mt-1 block text-sm leading-6 text-ink-muted">
+                {t('home_gpt_image_body')}
+              </span>
+            </span>
+          </span>
+          <span className="inline-flex shrink-0 items-center gap-2 text-sm text-gold">
+            {t('home_gpt_image_cta')}
+            <ArrowRight size={14} />
+          </span>
+        </Link>
+
+        <HomeImageCreditRedeem />
 
         <div className="relative mt-20 w-full max-w-2xl animate-slide-up anim-fill-both delay-400">
           <div className="border border-border-subtle rounded-lg bg-raised/60 backdrop-blur-sm overflow-hidden hover:border-gold/30 hover:shadow-[0_24px_64px_rgba(0,0,0,0.2)] transition-all duration-500 group">
@@ -400,13 +447,13 @@ export function HomePageContent({ structuredDataScope = 'root' }: HomePageProps 
                           <p className="text-xs font-mono tracking-wide text-gold/85">
                             {tier.priceLabel}
                           </p>
-                          {tier.highlight && (
+                          {tier.highlight && t('pro_offer_original_price_label') && (
                             <p className="text-[11px] font-mono text-ink-subtle line-through">
                               {t('pro_offer_original_price_label')}
                             </p>
                           )}
                         </div>
-                        {tier.highlight && (
+                        {tier.highlight && t('pro_offer_label') && (
                           <p className="inline-flex rounded-full border border-gold/25 bg-gold/10 px-2.5 py-1 text-[11px] uppercase tracking-[0.22em] text-gold/80">
                             {t('pro_offer_label')}
                           </p>
@@ -438,7 +485,58 @@ export function HomePageContent({ structuredDataScope = 'root' }: HomePageProps 
 	            ))}
 	          </div>
 	        </div>
-	      </section>
+      </section>
+
+      <section className="px-6 py-24 border-t border-border-subtle">
+        <div className="max-w-5xl mx-auto">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-xs text-gold/70 font-mono mb-4 tracking-widest uppercase">
+                {t('home_generation_pricing_label')}
+              </p>
+              <h2 className="font-display text-3xl sm:text-4xl">{t('home_generation_pricing_headline')}</h2>
+              <p className="mt-4 max-w-2xl text-sm leading-7 text-ink-muted">
+                {t('home_generation_pricing_body')}
+              </p>
+            </div>
+            <Link
+              href="/generate"
+              className="inline-flex w-fit items-center gap-2 rounded border border-gold/35 px-4 py-2 text-sm text-gold transition-colors hover:bg-gold/10"
+            >
+              {t('home_gpt_image_cta')}
+              <ArrowRight size={14} />
+            </Link>
+          </div>
+
+          <div className="mt-10 grid gap-4 md:grid-cols-3">
+            {GENERATION_PRICING.map((item) => (
+              <div
+                key={item.title}
+                className={`rounded-lg border p-6 transition-all duration-300 ${
+                  item.featured
+                    ? 'border-gold/45 bg-raised shadow-[0_20px_54px_rgba(200,162,104,0.14)]'
+                    : 'border-border-subtle bg-raised/35 hover:border-gold/25'
+                }`}
+              >
+                <div className="mb-5 flex items-center justify-between gap-3">
+                  <p className={`font-display text-2xl ${item.featured ? 'text-gold' : 'text-ink'}`}>
+                    {item.title}
+                  </p>
+                  <span className="flex h-9 w-9 items-center justify-center rounded border border-gold/25 bg-gold/10 text-gold">
+                    <Coins size={15} />
+                  </span>
+                </div>
+                <p className="text-sm font-medium leading-6 text-ink">{item.cost}</p>
+                <p className="mt-4 text-sm leading-7 text-ink-muted">{item.body}</p>
+              </div>
+            ))}
+          </div>
+
+          <p className="mt-6 rounded-lg border border-border-subtle bg-void/25 px-4 py-3 text-xs leading-6 text-ink-muted">
+            {t('home_generation_pricing_model_note')}
+          </p>
+        </div>
+      </section>
 
       <section className="px-6 py-24 border-t border-border-subtle">
         <div className="max-w-2xl mx-auto text-center space-y-8 animate-fade-in">
@@ -504,9 +602,9 @@ export function HomePageContent({ structuredDataScope = 'root' }: HomePageProps 
                 className="inline-flex items-center gap-2 text-xs text-ink-subtle transition-colors hover:text-gold group"
               >
                 <BookOpenText size={12} className="text-gold/75 transition-colors group-hover:text-gold" />
-                <span>{blogUi.homeLabel}</span>
+                <span>{blogHomeCopy.label}</span>
                 <span className="hidden sm:inline opacity-60 group-hover:opacity-100 transition-opacity">
-                  {blogUi.homeHint}
+                  {blogHomeCopy.hint}
                 </span>
                 <ArrowRight size={11} className="transition-transform group-hover:translate-x-0.5" />
               </Link>
@@ -529,6 +627,21 @@ export function HomePageContent({ structuredDataScope = 'root' }: HomePageProps 
 export default function HomePage() {
   return <HomePageContent />;
 }
+
+const HOME_BLOG_LINK_COPY = {
+  zh: {
+    label: '摄影学习文章',
+    hint: '从方法直接进入练习',
+  },
+  en: {
+    label: 'Photography guides',
+    hint: 'Move from reading to practice',
+  },
+  ja: {
+    label: '写真ガイド',
+    hint: '記事から練習へ',
+  },
+} as const;
 
 function XIcon() {
   return (

@@ -22,7 +22,20 @@ export type ProductAnalyticsEventName =
   | 'checkout_started'
   | 'paid_success'
   | 'payment_success_viewed'
-  | 'sign_in_completed';
+  | 'sign_in_completed'
+  | 'generation_page_viewed'
+  | 'generation_template_selected'
+  | 'generation_prompt_opened'
+  | 'generation_intent_selected'
+  | 'generation_requested'
+  | 'generation_succeeded'
+  | 'generation_failed'
+  | 'generation_viewed'
+  | 'generation_download_clicked'
+  | 'generation_used_for_retake'
+  | 'generation_credit_exhausted'
+  | 'generation_upgrade_clicked'
+  | 'credit_pack_checkout_started';
 
 const ANALYTICS_SOURCE_KEY = 'ps_product_source_v1';
 const ANALYTICS_SESSION_KEY = 'ps_product_session_v1';
@@ -104,6 +117,9 @@ export function derivePageEvent(pathname: string): ProductAnalyticsEventName | n
   if (pathname === '/workspace') {
     return 'workspace_viewed';
   }
+  if (pathname === '/generate') {
+    return 'generation_page_viewed';
+  }
   if (pathname === '/gallery') {
     return 'gallery_viewed';
   }
@@ -112,6 +128,9 @@ export function derivePageEvent(pathname: string): ProductAnalyticsEventName | n
   }
   if (/^\/reviews\/[^/]+$/.test(pathname)) {
     return 'review_result_viewed';
+  }
+  if (/^\/generations\/[^/]+$/.test(pathname)) {
+    return 'generation_viewed';
   }
   if (/^\/share\/[^/]+$/.test(pathname)) {
     return 'share_viewed';

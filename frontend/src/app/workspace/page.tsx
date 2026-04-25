@@ -30,7 +30,7 @@ function WorkspacePageContent() {
   const router = useRouter();
   const { token, ensureToken } = useAuth();
   const { t, locale } = useI18n();
-  const promoModeBadge = '25% off';
+  const promoModeBadge = '$3.99/mo';
 
   const [reviewMode, setReviewMode] = useState<'flash' | 'pro'>('flash');
   const [imageType, setImageType] = useState<ImageType>('default');

@@ -102,6 +102,71 @@ STAGE_A_EVENT_CATALOG: dict[str, dict[str, Any]] = {
         'stage': 'A',
         'description': 'A guest or anonymous device completed account sign-in.',
     },
+    'generation_page_viewed': {
+        'label': '进入 AI 创作',
+        'stage': 'A',
+        'description': 'Standalone image generation page entry.',
+    },
+    'generation_template_selected': {
+        'label': '选择生图模板',
+        'stage': 'A',
+        'description': 'The user selected a general image generation template.',
+    },
+    'generation_prompt_opened': {
+        'label': '打开生图模块',
+        'stage': 'A',
+        'description': 'The user opened an image generation prompt surface.',
+    },
+    'generation_intent_selected': {
+        'label': '选择参考图意图',
+        'stage': 'A',
+        'description': 'The user selected a review-linked generation intent.',
+    },
+    'generation_requested': {
+        'label': '发起生图',
+        'stage': 'A',
+        'description': 'The backend accepted an image generation task.',
+    },
+    'generation_succeeded': {
+        'label': '生图成功',
+        'stage': 'A',
+        'description': 'A generated image was saved successfully.',
+    },
+    'generation_failed': {
+        'label': '生图失败',
+        'stage': 'A',
+        'description': 'An image generation task failed before charging credits.',
+    },
+    'generation_viewed': {
+        'label': '查看生图详情',
+        'stage': 'A',
+        'description': 'The user opened a generated image detail page.',
+    },
+    'generation_download_clicked': {
+        'label': '下载生图',
+        'stage': 'A',
+        'description': 'The user downloaded a generated image.',
+    },
+    'generation_used_for_retake': {
+        'label': '生图用于复拍',
+        'stage': 'A',
+        'description': 'The user sent a generated image back to the workspace as retake inspiration.',
+    },
+    'generation_credit_exhausted': {
+        'label': '生图额度耗尽',
+        'stage': 'A',
+        'description': 'A generation request was blocked because credits were exhausted.',
+    },
+    'generation_upgrade_clicked': {
+        'label': '生图场景点击升级',
+        'stage': 'A',
+        'description': 'The user clicked upgrade from an image generation surface.',
+    },
+    'credit_pack_checkout_started': {
+        'label': '生图额度包结算',
+        'stage': 'A',
+        'description': 'A generation credit pack checkout was started.',
+    },
 }
 
 KNOWN_SOURCES = {

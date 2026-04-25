@@ -6,8 +6,16 @@ import {
   BlogPostViewsResponse,
   BillingCheckoutResponse,
   BillingPortalResponse,
+  CreditPackCheckoutResponse,
   GalleryLikeResponse,
+  GeneratedImageDetailResponse,
+  GeneratedImageHistoryResponse,
+  GenerationCreateRequest,
+  GenerationCreateResponse,
+  GenerationTaskStatusResponse,
+  GenerationTemplatesResponse,
   GuestMigrateResponse,
+  ImageCreditCodeRedeemResponse,
   PhotoCreateResponse,
   PhotoReviewsResponse,
   PresignRequest,
@@ -284,10 +292,26 @@ export async function getUsage(token: string, options: UsageOptions = {}): Promi
   return raceWithAbort(usagePromise, options.signal);
 }
 
-export async function createBillingCheckout(token: string, plan: 'pro'): Promise<BillingCheckoutResponse> {
+export async function createBillingCheckout(token: string, plan: 'pro', locale?: 'zh' | 'en' | 'ja'): Promise<BillingCheckoutResponse> {
   return request<BillingCheckoutResponse>('/billing/checkout', {
     method: 'POST',
-    body: JSON.stringify({ plan }),
+    body: JSON.stringify({ plan, locale }),
+    token,
+    unauthorizedRecovery: 'guest',
+  });
+}
+
+export async function createImageCreditPackCheckout(
+  token: string,
+  payload: { pack?: 'image_credits_300'; currency: 'usd'; locale?: 'zh' | 'en' | 'ja' }
+): Promise<CreditPackCheckoutResponse> {
+  return request<CreditPackCheckoutResponse>('/billing/image-credit-pack/checkout', {
+    method: 'POST',
+    body: JSON.stringify({
+      pack: payload.pack ?? 'image_credits_300',
+      currency: payload.currency,
+      locale: payload.locale,
+    }),
     token,
     unauthorizedRecovery: 'guest',
   });
@@ -302,6 +326,17 @@ export async function getBillingPortal(token: string): Promise<BillingPortalResp
 
 export async function redeemActivationCode(token: string, code: string): Promise<ActivationCodeRedeemResponse> {
   const response = await request<ActivationCodeRedeemResponse>('/billing/activation-code/redeem', {
+    method: 'POST',
+    body: JSON.stringify({ code }),
+    token,
+    unauthorizedRecovery: 'guest',
+  });
+  clearUsageCache(token);
+  return response;
+}
+
+export async function redeemImageCreditCode(token: string, code: string): Promise<ImageCreditCodeRedeemResponse> {
+  const response = await request<ImageCreditCodeRedeemResponse>('/billing/image-credit-code/redeem', {
     method: 'POST',
     body: JSON.stringify({ code }),
     token,
@@ -396,11 +431,100 @@ export async function getTask(taskId: string, token: string, signal?: AbortSigna
     token,
     cache: 'no-store',
     signal,
+  });
+}
+
+export async function getGenerationTemplates(): Promise<GenerationTemplatesResponse> {
+  return request<GenerationTemplatesResponse>('/generations/templates');
+}
+
+export async function createGeneration(
+  payload: GenerationCreateRequest,
+  token: string
+): Promise<GenerationCreateResponse> {
+  const response = await request<GenerationCreateResponse>('/generations', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    token,
+    unauthorizedRecovery: 'guest',
+  });
+  clearUsageCache(token);
+  return response;
+}
+
+export async function getGenerationTask(
+  taskId: string,
+  token: string,
+  signal?: AbortSignal
+): Promise<GenerationTaskStatusResponse> {
+  return request<GenerationTaskStatusResponse>(`/generation-tasks/${taskId}?_ts=${Date.now()}`, {
+    token,
+    cache: 'no-store',
+    signal,
+  });
+}
+
+export async function getGeneration(
+  generationId: string,
+  token: string,
+  signal?: AbortSignal
+): Promise<GeneratedImageDetailResponse> {
+  return request<GeneratedImageDetailResponse>(`/generations/${generationId}`, { token, signal });
+}
+
+export async function getMyGenerations(
+  token: string,
+  query: { cursor?: string; limit?: number } = {}
+): Promise<GeneratedImageHistoryResponse> {
+  const params = new URLSearchParams({ limit: String(query.limit ?? 20) });
+  if (query.cursor) params.set('cursor', query.cursor);
+  return request<GeneratedImageHistoryResponse>(`/me/generations?${params.toString()}`, { token });
+}
+
+export async function reuseGeneration(
+  generationId: string,
+  token: string
+): Promise<GenerationCreateResponse> {
+  return request<GenerationCreateResponse>(`/generations/${generationId}/reuse`, {
+    method: 'POST',
+    token,
+    unauthorizedRecovery: 'guest',
+  });
+}
+
+export async function deleteGeneration(generationId: string, token: string): Promise<void> {
+  return request<void>(`/generations/${generationId}`, {
+    method: 'DELETE',
+    token,
+  });
+}
+
+export async function downloadGeneration(
+  generationId: string,
+  token: string
+): Promise<{ blob: Blob; filename: string }> {
+  const res = await fetch(`${API_BASE}/api/v1/generations/${encodeURIComponent(generationId)}/download`, {
+    credentials: 'include',
     headers: {
-      'Cache-Control': 'no-cache',
-      Pragma: 'no-cache',
+      Authorization: `Bearer ${token}`,
     },
   });
+  if (!res.ok) {
+    throw new ApiException(res.status, 'GENERATION_DOWNLOAD_FAILED', `HTTP ${res.status}`);
+  }
+  const disposition = res.headers.get('Content-Disposition') ?? '';
+  const filename = parseContentDispositionFilename(disposition) ?? `${generationId}.png`;
+  return { blob: await res.blob(), filename };
+}
+
+function parseContentDispositionFilename(disposition: string): string | null {
+  const match = /filename\*?=(?:UTF-8''|")?([^";]+)/i.exec(disposition);
+  if (!match?.[1]) return null;
+  try {
+    return decodeURIComponent(match[1].trim().replace(/^"|"$/g, ''));
+  } catch {
+    return match[1].trim().replace(/^"|"$/g, '');
+  }
 }
 
 export function buildTaskWebSocketUrl(taskId: string): string {

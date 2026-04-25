@@ -18,6 +18,32 @@ export function getProductUpdates(locale: UpdateLocale): ProductUpdateEntry[] {
   if (locale === 'ja') {
     return [
       {
+        id: '2026-04-25-ai-image-generation-and-credits',
+        date: '2026-04-25',
+        title: 'AI 作成、画像クレジット、再撮影用リファレンスを追加',
+        summary:
+          '独立した AI 作成ページ、レビューからの再撮影リファレンス生成、生成履歴、ダウンロード、再生成を追加しました。あわせて画像生成クレジット、30 クレジット引き換えコード、300 クレジット購入パックを整えました。',
+        docPath: 'docs/changelog/update-log-2026-04-25-ai-image-generation-and-credits.md',
+        sections: [
+          {
+            title: 'AI 作成体験',
+            items: [
+              '/generate でテンプレート、プロンプト、品質、比率、スタイルを選んで画像を生成できる',
+              'レビュー詳細から構図、光、色、再撮影意図に合わせた参考画像を生成できる',
+              '生成タスク、結果詳細、履歴、ダウンロード、プロンプトコピー、再生成を追加',
+            ],
+          },
+          {
+            title: 'クレジットと課金',
+            items: [
+              '生成品質と比率に応じたクレジット表をバックエンドから取得',
+              'Usage に今月の画像生成クレジット残高を表示',
+              '30 クレジットの引き換えコードと 300 クレジット購入パックを追加',
+            ],
+          },
+        ],
+      },
+      {
         id: '2026-04-24-stage-d-content-conversion',
         date: '2026-04-24',
         title: 'コンテンツ流入から評価ワークスペースへの導線を追加',
@@ -478,6 +504,32 @@ export function getProductUpdates(locale: UpdateLocale): ProductUpdateEntry[] {
   if (locale === 'en') {
     return [
       {
+        id: '2026-04-25-ai-image-generation-and-credits',
+        date: '2026-04-25',
+        title: 'AI Create, image credits, and retake references',
+        summary:
+          'PicSpeak now includes a standalone AI Create page, review-linked retake reference generation, generation history, downloads, and reuse. Image generation credits, a 30-credit redeem code, and a 300-credit checkout pack are wired into billing and usage.',
+        docPath: 'docs/changelog/update-log-2026-04-25-ai-image-generation-and-credits.md',
+        sections: [
+          {
+            title: 'AI Create workflow',
+            items: [
+              'Generate from templates with prompt, quality, ratio, and style controls on /generate',
+              'Create composition, lighting, color, or retake references directly from a review',
+              'Track generation tasks, open result pages, download images, copy prompts, and generate again',
+            ],
+          },
+          {
+            title: 'Credits and checkout',
+            items: [
+              'The frontend reads the generation credit table from the backend',
+              'Usage now shows monthly image generation credits used and remaining',
+              'A 30-credit redeem code and 300-credit checkout pack are available for signed-in users',
+            ],
+          },
+        ],
+      },
+      {
         id: '2026-04-24-stage-d-content-conversion',
         date: '2026-04-24',
         title: 'Content-to-workspace conversion paths',
@@ -936,6 +988,32 @@ export function getProductUpdates(locale: UpdateLocale): ProductUpdateEntry[] {
   }
 
   return [
+    {
+      id: '2026-04-25-ai-image-generation-and-credits',
+      date: '2026-04-25',
+      title: 'AI 创作、生图额度与复拍参考上线',
+      summary:
+        'PicSpeak 新增独立 AI 创作页、点评详情里的复拍参考生成、生成历史、下载、复制提示词和再次生成；同时接入生图点数、30 点兑换码与 300 点额度包购买。',
+      docPath: 'docs/changelog/update-log-2026-04-25-ai-image-generation-and-credits.md',
+      sections: [
+        {
+          title: 'AI 创作工作流',
+          items: [
+            '/generate 支持模板、提示词、质量、画幅和风格选择',
+            '评图详情可根据原图建议生成复拍、构图、光线或色彩参考',
+            '生成任务、结果详情、历史、下载、复制提示词和再次生成链路已补齐',
+          ],
+        },
+        {
+          title: '额度与购买',
+          items: [
+            '前端从后端读取真实生图点数表，避免本地计价漂移',
+            'Usage 页面展示本月 AI 生图额度总量、已用和剩余',
+            '已登录用户可兑换 30 点 promo code，并可购买 300 点生图额度包',
+          ],
+        },
+      ],
+    },
     {
       id: '2026-04-24-stage-d-content-conversion',
       date: '2026-04-24',

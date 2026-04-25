@@ -18,6 +18,8 @@ def ensure_runtime_schema() -> None:
             models.BillingActivationCode.__table__,
             models.BillingSubscription.__table__,
             models.BillingWebhookEvent.__table__,
+            models.ImageGenerationTask.__table__,
+            models.GeneratedImage.__table__,
             models.ProductAnalyticsEvent.__table__,
             models.ReviewLike.__table__,
         ],
@@ -75,6 +77,14 @@ def ensure_runtime_schema() -> None:
         'CREATE INDEX IF NOT EXISTS idx_product_analytics_events_plan_created ON product_analytics_events (plan, created_at DESC)',
         'CREATE INDEX IF NOT EXISTS idx_product_analytics_events_user_created ON product_analytics_events (user_public_id, created_at DESC)',
         'CREATE INDEX IF NOT EXISTS idx_product_analytics_events_device_created ON product_analytics_events (device_id, created_at DESC)',
+        "CREATE TABLE IF NOT EXISTS image_generation_tasks (id BIGSERIAL PRIMARY KEY, public_id TEXT NOT NULL UNIQUE, owner_user_id BIGINT NOT NULL REFERENCES users(id), source_photo_id BIGINT REFERENCES photos(id), source_review_id BIGINT REFERENCES reviews(id), status task_status NOT NULL DEFAULT 'PENDING'::task_status, generation_mode TEXT NOT NULL DEFAULT 'general', intent TEXT NOT NULL, prompt TEXT NOT NULL, prompt_hash TEXT NOT NULL, idempotency_key TEXT, request_payload JSONB NOT NULL DEFAULT '{}'::jsonb, attempt_count INTEGER NOT NULL DEFAULT 0, max_attempts INTEGER NOT NULL DEFAULT 2, progress INTEGER NOT NULL DEFAULT 0, error_code TEXT, error_message TEXT, started_at TIMESTAMPTZ, finished_at TIMESTAMPTZ, next_attempt_at TIMESTAMPTZ, claimed_by TEXT, last_heartbeat_at TIMESTAMPTZ, created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now(), CONSTRAINT uq_image_generation_tasks_user_idempotency UNIQUE (owner_user_id, idempotency_key))",
+        'CREATE INDEX IF NOT EXISTS idx_image_generation_tasks_status_created ON image_generation_tasks (status, created_at DESC)',
+        'CREATE INDEX IF NOT EXISTS idx_image_generation_tasks_owner_created ON image_generation_tasks (owner_user_id, created_at DESC)',
+        'CREATE INDEX IF NOT EXISTS idx_image_generation_tasks_review_created ON image_generation_tasks (source_review_id, created_at DESC)',
+        "CREATE TABLE IF NOT EXISTS generated_images (id BIGSERIAL PRIMARY KEY, public_id TEXT NOT NULL UNIQUE, task_id BIGINT REFERENCES image_generation_tasks(id), owner_user_id BIGINT NOT NULL REFERENCES users(id), source_photo_id BIGINT REFERENCES photos(id), source_review_id BIGINT REFERENCES reviews(id), object_bucket TEXT NOT NULL, object_key TEXT NOT NULL, content_type TEXT NOT NULL DEFAULT 'image/webp', width INTEGER, height INTEGER, intent TEXT NOT NULL, generation_mode TEXT NOT NULL DEFAULT 'general', prompt TEXT NOT NULL, revised_prompt TEXT, model_name TEXT NOT NULL, model_snapshot TEXT, quality TEXT NOT NULL, size TEXT NOT NULL, output_format TEXT NOT NULL, input_text_tokens INTEGER, input_image_tokens INTEGER, output_image_tokens INTEGER, cost_usd NUMERIC(12,6), credits_charged INTEGER NOT NULL, template_key TEXT, metadata_json JSONB NOT NULL DEFAULT '{}'::jsonb, deleted_at TIMESTAMPTZ, created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now())",
+        'CREATE INDEX IF NOT EXISTS idx_generated_images_owner_created ON generated_images (owner_user_id, created_at DESC)',
+        'CREATE INDEX IF NOT EXISTS idx_generated_images_task ON generated_images (task_id)',
+        'CREATE INDEX IF NOT EXISTS idx_generated_images_review_created ON generated_images (source_review_id, created_at DESC)',
     ]
 
     with engine.begin() as conn:

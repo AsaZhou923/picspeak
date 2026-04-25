@@ -24,7 +24,7 @@ export function getLlmsText(): string {
 ## Pricing and plans
 - Guest: 3 critiques per day, 30 per month, flash only, no saved history
 - Free account: 60 critiques per month, up to 5 per day, up to 10 Pro critiques per month, 30-day history
-- Pro: $2.99/month launch offer, unlimited critiques, permanent history, priority processing
+- Pro: $3.99/month, unlimited critiques, permanent history, priority processing
 
 ## Key public URLs
 - Home: ${siteConfig.url}/en

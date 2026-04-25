@@ -1,11 +1,11 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { AlertCircle, ArrowRight, Camera, CheckCircle2, ClipboardCheck, LineChart, Mail, X } from 'lucide-react';
+import { AlertCircle, ArrowRight, Camera, CheckCircle2, ClipboardCheck, Coins, LineChart, Mail, X } from 'lucide-react';
 import ActivationCodeModal from '@/components/billing/ActivationCodeModal';
-import { createBillingCheckout, getBillingPortal, getUsage } from '@/lib/api';
+import { createBillingCheckout, createImageCreditPackCheckout, getBillingPortal, getUsage } from '@/lib/api';
 import ClerkSignInTrigger from '@/components/auth/ClerkSignInTrigger';
 import ProPromoCard from '@/components/marketing/ProPromoCard';
 import { useAuth } from '@/lib/auth-context';
@@ -14,7 +14,11 @@ import { BillingCheckoutResponse, BillingPortalResponse, UsageResponse } from '@
 import { SkeletonBlock } from '@/components/ui/LoadingSpinner';
 import { useI18n } from '@/lib/i18n';
 import { formatUserFacingError } from '@/lib/error-utils';
-import { CN_PRO_CHECKOUT_TIP, openChinaProPurchase } from '@/lib/pro-checkout';
+import {
+  closeExternalCheckoutWindow,
+  navigateExternalCheckoutWindow,
+  openExternalCheckoutWindow,
+} from '@/lib/external-checkout-window';
 import { getProPlanBoundaryCopy, getUsageDecisionCopy, type ProConversionLocale } from '@/lib/pro-conversion';
 
 function UsageBar({
@@ -134,6 +138,7 @@ export default function UsagePage() {
   const [billingMessage, setBillingMessage] = useState('');
   const [billingModalOpen, setBillingModalOpen] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [creditPackLoading, setCreditPackLoading] = useState<'usd' | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
   const [activationModalOpen, setActivationModalOpen] = useState(false);
 
@@ -165,18 +170,29 @@ export default function UsagePage() {
   }, [ensureToken, hasUserInfo, syncPlan, t, userInfo?.access_token]);
 
   async function handleCheckout() {
+    if (usage?.plan === 'guest') {
+      setBillingMessage(t('usage_login_unlock_title'));
+      setBillingModalOpen(true);
+      return;
+    }
+
+    const checkoutWindow = openExternalCheckoutWindow(t('usage_checkout_loading'));
     setCheckoutLoading(true);
     setBillingMessage('');
     try {
       const token = await ensureToken();
-      const response: BillingCheckoutResponse = await createBillingCheckout(token, 'pro');
+      const response: BillingCheckoutResponse = await createBillingCheckout(token, 'pro', locale);
       if (response.checkout_url) {
-        window.location.assign(response.checkout_url);
+        if (!navigateExternalCheckoutWindow(checkoutWindow, response.checkout_url)) {
+          throw new Error('Checkout window was blocked');
+        }
         return;
       }
+      closeExternalCheckoutWindow(checkoutWindow);
       setBillingMessage(response.message);
       setBillingModalOpen(true);
     } catch (err) {
+      closeExternalCheckoutWindow(checkoutWindow);
       setBillingMessage(formatUserFacingError(t, err, t('usage_checkout_unavailable')));
       setBillingModalOpen(true);
     } finally {
@@ -192,22 +208,52 @@ export default function UsagePage() {
   }
 
   async function handleManageSubscription() {
+    const portalWindow = openExternalCheckoutWindow(t('usage_manage_loading'));
     setPortalLoading(true);
     setBillingMessage('');
     try {
       const token = await ensureToken();
       const response: BillingPortalResponse = await getBillingPortal(token);
       if (response.portal_url) {
-        window.location.assign(response.portal_url);
+        if (!navigateExternalCheckoutWindow(portalWindow, response.portal_url)) {
+          throw new Error('Billing portal window was blocked');
+        }
         return;
       }
+      closeExternalCheckoutWindow(portalWindow);
       setBillingMessage(response.message);
       setBillingModalOpen(true);
     } catch (err) {
+      closeExternalCheckoutWindow(portalWindow);
       setBillingMessage(formatUserFacingError(t, err, t('usage_manage_unavailable')));
       setBillingModalOpen(true);
     } finally {
       setPortalLoading(false);
+    }
+  }
+
+  async function handleCreditPackCheckout(currency: 'usd') {
+    const checkoutWindow = openExternalCheckoutWindow(t('usage_checkout_loading'));
+    setCreditPackLoading(currency);
+    setBillingMessage('');
+    try {
+      const token = await ensureToken();
+      const response = await createImageCreditPackCheckout(token, { currency, locale });
+      if (response.checkout_url) {
+        if (!navigateExternalCheckoutWindow(checkoutWindow, response.checkout_url)) {
+          throw new Error('Checkout window was blocked');
+        }
+        return;
+      }
+      closeExternalCheckoutWindow(checkoutWindow);
+      setBillingMessage(`${response.credits} credits / ${response.price} checkout is unavailable.`);
+      setBillingModalOpen(true);
+    } catch (err) {
+      closeExternalCheckoutWindow(checkoutWindow);
+      setBillingMessage(formatUserFacingError(t, err, t('usage_checkout_unavailable')));
+      setBillingModalOpen(true);
+    } finally {
+      setCreditPackLoading(null);
     }
   }
 
@@ -222,6 +268,11 @@ export default function UsagePage() {
   const subscriptionEndText = formatSubscriptionDate(usage?.subscription?.current_period_ends_at, locale) ?? fixedSubscriptionCopy[locale].pending;
   const isZhLocale = locale === 'zh';
   const isActivationCodeSubscription = usage?.subscription?.provider === 'activation_code';
+  const generationCredits = usage?.generation_credits ?? {
+    monthly_total: 0,
+    monthly_used: 0,
+    monthly_remaining: 0,
+  };
 
   return (
     <div className="pt-14 min-h-screen">
@@ -291,21 +342,6 @@ export default function UsagePage() {
                         : t('usage_checkout_pro')}
                       <ArrowRight size={11} />
                     </button>
-                    {isZhLocale && (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => openChinaProPurchase(locale)}
-                          className="flex items-center gap-1.5 text-xs text-gold border border-gold/20 rounded px-3 py-1.5 hover:bg-gold/10 transition-colors"
-                        >
-                          中文用户可选：爱发电开通
-                          <ArrowRight size={11} />
-                        </button>
-                        <p className="max-w-[260px] text-right text-[11px] leading-5 text-ink-subtle">
-                          {CN_PRO_CHECKOUT_TIP}
-                        </p>
-                      </>
-                    )}
                   </div>
                 ) : usage.plan === 'pro' ? (
                   isZhLocale && isActivationCodeSubscription ? (
@@ -315,15 +351,7 @@ export default function UsagePage() {
                         onClick={handleCheckout}
                         className="flex items-center gap-1.5 text-xs text-gold border border-gold/30 rounded px-3 py-1.5 hover:bg-gold/10 transition-colors"
                       >
-                        使用 Lemon Squeezy 开通
-                        <ArrowRight size={11} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => openChinaProPurchase(locale)}
-                        className="flex items-center gap-1.5 text-xs text-gold border border-gold/20 rounded px-3 py-1.5 hover:bg-gold/10 transition-colors"
-                      >
-                        中文用户可选：爱发电开通
+                        {t('usage_checkout_pro')}
                         <ArrowRight size={11} />
                       </button>
                     </div>
@@ -340,6 +368,74 @@ export default function UsagePage() {
                   )
                 ) : null}
               </div>
+            </div>
+
+            <div className="overflow-hidden rounded-lg border border-gold/25 bg-[linear-gradient(135deg,rgba(200,162,104,0.16),transparent_44%),rgb(var(--color-raised)/0.78)] p-6">
+              <div className="flex flex-wrap items-start justify-between gap-5">
+                <div className="flex max-w-md items-start gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-gold/30 bg-gold/10 text-gold">
+                    <Coins size={18} />
+                  </span>
+                  <div>
+                    <p className="text-sm font-medium text-ink">{t('usage_generation_credits_title')}</p>
+                    <p className="mt-1 text-xs leading-5 text-ink-muted">{t('usage_generation_credits_body')}</p>
+                  </div>
+                </div>
+                <div className="min-w-[150px] text-left sm:text-right">
+                  <p className="font-display text-4xl text-gold">
+                    {generationCredits.monthly_remaining ?? 0}
+                  </p>
+                  <p className="mt-1 text-xs text-ink-muted">
+                    {t('usage_generation_credits_monthly_remaining').replace(
+                      '{total}',
+                      String(generationCredits.monthly_total ?? 0)
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              {generationCredits.monthly_total !== null &&
+                generationCredits.monthly_total > 0 &&
+                generationCredits.monthly_used !== null && (
+                  <div className="mt-5">
+                    <UsageBar
+                      label={t('usage_generation_credits_monthly_used')}
+                      used={generationCredits.monthly_used}
+                      total={generationCredits.monthly_total}
+                    />
+                  </div>
+                )}
+
+              <p className="mt-4 rounded-md border border-border-subtle bg-void/25 px-3 py-2 text-xs leading-5 text-ink-muted">
+                {usage.plan === 'guest'
+                  ? t('usage_generation_credits_guest_hint')
+                  : t('usage_generation_credits_pricing_hint')}
+              </p>
+              {usage.plan !== 'guest' && (
+                <div className="mt-4 rounded-lg border border-border-subtle bg-void/25 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-ink">
+                        {t('usage_credit_pack_title')}
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-ink-muted">
+                        {t('usage_credit_pack_body')}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void handleCreditPackCheckout('usd')}
+                        disabled={creditPackLoading !== null}
+                        className="rounded-full border border-gold/30 px-4 py-2 text-xs font-medium text-gold transition-colors hover:bg-gold/10 disabled:opacity-60"
+                      >
+                        {creditPackLoading === 'usd' ? t('usage_checkout_loading') : t('usage_credit_pack_button')}
+                      </button>
+                      <span className="self-center text-xs text-ink-subtle">{t('usage_credit_pack_payment_hint')}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="border border-border-subtle rounded-lg bg-raised p-6 space-y-5">
@@ -458,24 +554,26 @@ export default function UsagePage() {
                   </div>
                 </div>
                 <div className="flex flex-col gap-3 sm:flex-row">
-                  <button
-                    type="button"
-                    onClick={handleCheckout}
-                    className="inline-flex items-center justify-center gap-2 rounded-full bg-gold px-5 py-3 text-sm font-medium text-void transition-colors hover:bg-gold-light"
-                  >
-                    使用 Lemon Squeezy 开通
-                    <ArrowRight size={14} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => openChinaProPurchase(locale)}
-                    className="inline-flex items-center justify-center gap-2 rounded-full border border-gold/30 bg-gold/10 px-5 py-3 text-sm font-medium text-gold transition-colors hover:bg-gold/15"
-                  >
-                    中文用户可选：爱发电开通
-                    <ArrowRight size={14} />
-                  </button>
+                  {usage.plan === 'guest' ? (
+                    <ClerkSignInTrigger
+                      fallbackRedirectUrl="/account/usage"
+                      className="inline-flex items-center justify-center gap-2 rounded-full bg-gold px-5 py-3 text-sm font-medium text-void transition-colors hover:bg-gold-light"
+                      signedInClassName="hidden"
+                    >
+                      {t('usage_login_now')}
+                      <ArrowRight size={14} />
+                    </ClerkSignInTrigger>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleCheckout}
+                      className="inline-flex items-center justify-center gap-2 rounded-full bg-gold px-5 py-3 text-sm font-medium text-void transition-colors hover:bg-gold-light"
+                    >
+                      {t('usage_checkout_pro')}
+                      <ArrowRight size={14} />
+                    </button>
+                  )}
                 </div>
-                <p className="text-[11px] leading-5 text-ink-subtle">{CN_PRO_CHECKOUT_TIP}</p>
                 <div className="flex flex-col gap-3 sm:flex-row">
                   {usage.plan === 'guest' ? (
                     <ClerkSignInTrigger
@@ -515,8 +613,7 @@ export default function UsagePage() {
             href="/workspace"
             className="text-sm text-ink-muted hover:text-ink transition-colors flex items-center gap-1.5"
           >
-            {t('usage_goto_workspace')} →
-          </Link>
+            {t('usage_goto_workspace')} 鈫?          </Link>
         </div>
       </div>
 
@@ -603,13 +700,13 @@ const subscriptionCopy = {
   },
   en: {
     label: 'Pro expires on',
-    pending: 'Syncing…',
+    pending: 'Syncing',
     cancelledHint: 'Auto-renew is off and the plan will downgrade at the end of the term.',
   },
   ja: {
     label: 'Pro の終了日時',
     pending: '同期中',
-    cancelledHint: '自動更新は停止済みで、期間終了後にダウングレードされます。',
+    cancelledHint: '自動更新は停止済みです。期間終了後にダウングレードされます。',
   },
 } as const;
 
@@ -621,25 +718,25 @@ const fixedSubscriptionCopy = {
   },
   en: {
     label: 'Pro expires on',
-    pending: 'Syncing…',
+    pending: 'Syncing',
     cancelledHint: 'Auto-renew is off and the plan will downgrade at the end of the term.',
   },
   ja: {
     label: 'Pro の終了日時',
     pending: '同期中',
-    cancelledHint: '自動更新は停止中で、期間終了後にダウングレードされます。',
+    cancelledHint: '自動更新は停止中です。期間終了後にダウングレードされます。',
   },
 } as const;
 
 const activationUiCopy = {
   zh: {
     title: '国内支付与激活码开通',
-    body: '中文用户可通过爱发电购买 30 天 Pro。我会在下单后发送激活码，你登录账号后输入激活码即可立即开通或续期。',
-    stepBuy: '前往爱发电完成下单',
-    stepReceive: '等待我发送激活码',
-    stepRedeem: '登录账号后输入激活码',
-    purchaseCta: '前往爱发电开通',
-    renewCta: '续费 30 天 Pro',
+    body: '中文用户可通过 Lemon Squeezy 中文专属 checkout 以 $1.99 一次性开通 30 天 Pro，不会自动续费。已收到激活码的用户仍可在站内兑换。',
+    stepBuy: '完成 Lemon Squeezy checkout',
+    stepReceive: '支付成功后等待同步',
+    stepRedeem: '如有激活码，也可登录后兑换',
+    purchaseCta: '开通 Pro',
+    renewCta: '再开通 30 天 Pro',
     redeemCta: '输入激活码',
     signInFirst: '先登录再兑换',
     subscriptionHint: '当前账号通过激活码开通，无自动续费。',
@@ -649,7 +746,7 @@ const activationUiCopy = {
     codeLabel: '激活码',
     codePlaceholder: '例如 PSCN-ABCD-EFGH-JKLM',
     redeemSubmit: '立即兑换',
-    redeeming: '正在兑换…',
+    redeeming: '正在兑换...',
     close: '关闭',
     success: '兑换成功，Pro 已开通至 {date}。',
     error: '暂时无法兑换激活码，请稍后再试。',

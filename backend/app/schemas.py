@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from datetime import datetime
 from typing import Any
@@ -133,6 +133,93 @@ class TaskStatusResponse(BaseModel):
     started_at: datetime | None = None
     finished_at: datetime | None = None
     error: dict[str, Any] | None = None
+
+
+class GenerationTemplateItem(BaseModel):
+    key: str
+    label_zh: str
+    label_en: str
+    description: str
+    default_negative: str
+
+
+class GenerationTemplatesResponse(BaseModel):
+    items: list[GenerationTemplateItem]
+    credits_table: dict[str, dict[str, int]]
+
+
+class GenerationCreateRequest(BaseModel):
+    generation_mode: str = Field(default='general', pattern='^(general|review_linked)$')
+    intent: str = Field(default='photo_inspiration', max_length=64)
+    prompt: str = Field(min_length=3, max_length=4000)
+    template_key: str | None = Field(default=None, max_length=64)
+    source_photo_id: str | None = None
+    source_review_id: str | None = None
+    image_type: str = Field(default='default', pattern='^(default|landscape|portrait|street|still_life|architecture)$')
+    quality: str = Field(default='low', pattern='^(low|medium|high)$')
+    size: str = Field(default='1024x1024', max_length=32)
+    style: str = Field(default='realistic', max_length=64)
+    negative_prompt: str | None = Field(default=None, max_length=1000)
+    output_format: str = Field(default='webp', pattern='^(webp|png|jpeg)$')
+    async_mode: bool = Field(default=True, alias='async')
+    idempotency_key: str | None = None
+
+
+class GenerationCreateResponse(BaseModel):
+    task_id: str
+    status: str
+    estimated_seconds: int
+    credits_reserved: int
+
+
+class GenerationTaskStatusResponse(BaseModel):
+    task_id: str
+    status: str
+    progress: int
+    generation_id: str | None = None
+    generation_mode: str = 'general'
+    intent: str | None = None
+    source_review_id: str | None = None
+    attempt_count: int = 0
+    max_attempts: int = 0
+    next_attempt_at: datetime | None = None
+    last_heartbeat_at: datetime | None = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    error: dict[str, Any] | None = None
+
+
+class GeneratedImageItem(BaseModel):
+    generation_id: str
+    task_id: str | None = None
+    image_url: str
+    generation_mode: str
+    intent: str
+    prompt: str
+    revised_prompt: str | None = None
+    model_name: str
+    model_snapshot: str | None = None
+    quality: str
+    size: str
+    output_format: str
+    credits_charged: int
+    template_key: str | None = None
+    source_photo_id: str | None = None
+    source_review_id: str | None = None
+    created_at: datetime
+
+
+class GeneratedImageDetailResponse(GeneratedImageItem):
+    cost_usd: float | None = None
+    input_text_tokens: int | None = None
+    input_image_tokens: int | None = None
+    output_image_tokens: int | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class GeneratedImageHistoryResponse(BaseModel):
+    items: list[GeneratedImageItem]
+    next_cursor: str | None = None
 
 
 class ReviewGetResponse(BaseModel):
@@ -338,9 +425,16 @@ class UsageSubscription(BaseModel):
     current_period_ends_at: datetime | None = None
 
 
+class UsageGenerationCredits(BaseModel):
+    monthly_total: int | None = None
+    monthly_used: int | None = None
+    monthly_remaining: int | None = None
+
+
 class UsageResponse(BaseModel):
     plan: str
     quota: UsageQuota
+    generation_credits: UsageGenerationCredits
     features: UsageFeatures
     subscription: UsageSubscription | None = None
     rate_limit: dict[str, Any]
@@ -348,11 +442,28 @@ class UsageResponse(BaseModel):
 
 class BillingCheckoutRequest(BaseModel):
     plan: str = Field(pattern='^(pro)$')
+    locale: str | None = Field(default=None, max_length=16)
 
 
 class BillingCheckoutResponse(BaseModel):
     status: str
     plan: str
+    message: str
+    checkout_url: str | None = None
+
+
+class CreditPackCheckoutRequest(BaseModel):
+    pack: str = Field(default='image_credits_300', pattern='^(image_credits_300)$')
+    currency: str = Field(default='usd', pattern='^(usd|rmb)$')
+    locale: str | None = Field(default=None, max_length=16)
+
+
+class CreditPackCheckoutResponse(BaseModel):
+    status: str
+    pack: str
+    credits: int
+    currency: str
+    price: str
     message: str
     checkout_url: str | None = None
 
@@ -373,6 +484,20 @@ class ActivationCodeRedeemResponse(BaseModel):
     provider: str
     message: str
     activated_until: datetime
+
+
+class ImageCreditCodeRedeemRequest(BaseModel):
+    code: str = Field(min_length=3, max_length=64)
+
+
+class ImageCreditCodeRedeemResponse(BaseModel):
+    status: str
+    code: str
+    credits_granted: int
+    message: str
+    monthly_total: int | None
+    monthly_used: int | None
+    monthly_remaining: int | None
 
 
 class AuthGoogleLoginRequest(BaseModel):
