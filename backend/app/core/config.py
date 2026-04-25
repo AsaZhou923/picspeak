@@ -55,6 +55,7 @@ class Settings(BaseSettings):
     lemonsqueezy_pro_checkout_url: str = ''
     lemonsqueezy_zh_pro_checkout_url: str = ''
     lemonsqueezy_image_credit_pack_checkout_url: str = ''
+    lemonsqueezy_image_credit_pack_variant_id: str = ''
     lemonsqueezy_webhook_signing_secret: str = ''
     lemonsqueezy_webhook_url: str = ''
     lemonsqueezy_checkout_success_url: str = ''
@@ -167,6 +168,7 @@ class Settings(BaseSettings):
         'lemonsqueezy_pro_checkout_url',
         'lemonsqueezy_zh_pro_checkout_url',
         'lemonsqueezy_image_credit_pack_checkout_url',
+        'lemonsqueezy_image_credit_pack_variant_id',
         'lemonsqueezy_webhook_signing_secret',
         'openai_api_key',
         'image_generation_model_snapshot',

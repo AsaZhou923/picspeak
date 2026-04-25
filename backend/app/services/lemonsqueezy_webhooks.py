@@ -274,6 +274,13 @@ def _variant_matches_one_time_pro_plan(variant_id: str | None) -> bool:
     return _variant_matches_pro_plan(variant_id)
 
 
+def _variant_matches_image_credit_pack(variant_id: str | None) -> bool:
+    configured = settings.lemonsqueezy_image_credit_pack_variant_id.strip()
+    if not configured:
+        return True
+    return str(variant_id or '').strip() == configured
+
+
 def _is_image_credit_pack_order(event: LemonSqueezyWebhookEvent) -> bool:
     custom = _custom_data(event.meta)
     return (
@@ -419,6 +426,12 @@ def _has_granted_image_credit_pack(db: Session, user: User, order_id: str | None
 def _process_image_credit_pack_order(db: Session, event: LemonSqueezyWebhookEvent, user: User | None) -> tuple[str, User | None]:
     if user is None:
         return 'ignored_user_not_found', None
+
+    attributes = _payload_attributes(event.data)
+    order_item_attributes = _order_item_attributes(attributes)
+    variant_id = _attribute_text(attributes, 'variant_id') or _attribute_text(order_item_attributes, 'variant_id')
+    if not _variant_matches_image_credit_pack(variant_id):
+        return 'ignored_non_credit_pack_variant', user
 
     order_id = _image_credit_pack_order_id(event)
     if _has_granted_image_credit_pack(db, user, order_id):

@@ -434,6 +434,9 @@ export default function UsagePage() {
                       <span className="self-center text-xs text-ink-subtle">{t('usage_credit_pack_payment_hint')}</span>
                     </div>
                   </div>
+                  <p className="mt-3 text-xs leading-5 text-ink-subtle">
+                    {t('usage_credit_pack_refresh_hint')}
+                  </p>
                 </div>
               )}
             </div>
@@ -613,7 +616,9 @@ export default function UsagePage() {
             href="/workspace"
             className="text-sm text-ink-muted hover:text-ink transition-colors flex items-center gap-1.5"
           >
-            {t('usage_goto_workspace')} 鈫?          </Link>
+            {t('usage_goto_workspace')}
+            <ArrowRight size={13} />
+          </Link>
         </div>
       </div>
 

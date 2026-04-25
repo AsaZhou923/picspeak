@@ -15,7 +15,7 @@ from app.core.security import sign_payload
 from app.services.lemonsqueezy_webhooks import LemonSqueezyWebhookEvent, process_lemonsqueezy_webhook_event
 
 
-def _credit_pack_event() -> LemonSqueezyWebhookEvent:
+def _credit_pack_event(*, variant_id: str = '1574509') -> LemonSqueezyWebhookEvent:
     return LemonSqueezyWebhookEvent(
         event_name='order_created',
         payload={},
@@ -27,7 +27,16 @@ def _credit_pack_event() -> LemonSqueezyWebhookEvent:
                 'credits': '300',
             }
         },
-        data={'type': 'orders', 'id': 'ord_300'},
+        data={
+            'type': 'orders',
+            'id': 'ord_300',
+            'attributes': {
+                'first_order_item': {
+                    'variant_id': variant_id,
+                    'product_name': 'PicSpeak 300 Credit',
+                },
+            },
+        },
         event_hash='hash_credit_pack',
         test_mode=False,
         resource_type='orders',
@@ -98,7 +107,9 @@ class LemonSqueezyCreditPackWebhookTests(unittest.TestCase):
         )
         db.query.return_value.filter.return_value.all.return_value = []
 
-        with patch('app.services.lemonsqueezy_webhooks.record_product_event') as record_product_event:
+        with patch('app.services.lemonsqueezy_webhooks.settings.lemonsqueezy_image_credit_pack_variant_id', '1574509'), patch(
+            'app.services.lemonsqueezy_webhooks.record_product_event'
+        ) as record_product_event:
             outcome, user_public_id = process_lemonsqueezy_webhook_event(db, _credit_pack_event())
 
         self.assertEqual(outcome, 'credit_pack_granted')
@@ -134,6 +145,32 @@ class LemonSqueezyCreditPackWebhookTests(unittest.TestCase):
 
         self.assertEqual(outcome, 'credit_pack_already_granted')
         self.assertEqual(user_public_id, 'usr_credit_pack_duplicate')
+        db.add.assert_not_called()
+        record_product_event.assert_not_called()
+
+    def test_order_created_rejects_image_credit_pack_wrong_variant(self) -> None:
+        db = MagicMock()
+        db.query.return_value.filter.return_value.first.return_value = User(
+            id=56,
+            public_id='usr_credit_pack_paid',
+            email='wrong-credit@example.com',
+            username='wrong_credit',
+            plan=UserPlan.free,
+            daily_quota_total=0,
+            daily_quota_used=0,
+            status=UserStatus.active,
+        )
+
+        with patch('app.services.lemonsqueezy_webhooks.settings.lemonsqueezy_image_credit_pack_variant_id', '1574509'), patch(
+            'app.services.lemonsqueezy_webhooks.record_product_event'
+        ) as record_product_event:
+            outcome, user_public_id = process_lemonsqueezy_webhook_event(
+                db,
+                _credit_pack_event(variant_id='1418094'),
+            )
+
+        self.assertEqual(outcome, 'ignored_non_credit_pack_variant')
+        self.assertEqual(user_public_id, 'usr_credit_pack_paid')
         db.add.assert_not_called()
         record_product_event.assert_not_called()
 

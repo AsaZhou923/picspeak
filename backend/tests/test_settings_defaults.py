@@ -16,6 +16,10 @@ class SettingsDefaultsTestCase(unittest.TestCase):
         settings = Settings(_env_file=None)
         self.assertEqual(settings.lemonsqueezy_image_credit_pack_checkout_url, '')
 
+    def test_image_credit_pack_variant_id_defaults_to_blank(self):
+        settings = Settings(_env_file=None)
+        self.assertEqual(settings.lemonsqueezy_image_credit_pack_variant_id, '')
+
     def test_zh_pro_checkout_url_defaults_to_blank(self):
         settings = Settings(_env_file=None)
         self.assertEqual(settings.lemonsqueezy_zh_pro_checkout_url, '')
