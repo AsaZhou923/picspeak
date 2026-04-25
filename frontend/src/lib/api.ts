@@ -38,6 +38,7 @@ type UnauthorizedHandler = (failedToken: string) => Promise<string | null>;
 type UnauthorizedRecoveryMode = 'disabled' | 'guest';
 type UsageOptions = {
   force?: boolean;
+  signal?: AbortSignal;
 };
 type UsageCacheEntry = {
   token: string;
@@ -45,9 +46,49 @@ type UsageCacheEntry = {
   data?: UsageResponse;
   promise?: Promise<UsageResponse>;
 };
+type ApiRequestOptions = RequestInit & {
+  token?: string;
+  _retried?: boolean;
+  unauthorizedRecovery?: UnauthorizedRecoveryMode;
+};
 
 let unauthorizedHandler: UnauthorizedHandler | null = null;
 let usageCache: UsageCacheEntry | null = null;
+
+function createAbortError(): Error {
+  if (typeof DOMException === 'function') {
+    return new DOMException('The operation was aborted.', 'AbortError');
+  }
+  const error = new Error('The operation was aborted.');
+  error.name = 'AbortError';
+  return error;
+}
+
+function raceWithAbort<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) {
+    return promise;
+  }
+  if (signal.aborted) {
+    return Promise.reject(createAbortError());
+  }
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => {
+      signal.removeEventListener('abort', onAbort);
+      reject(createAbortError());
+    };
+    signal.addEventListener('abort', onAbort, { once: true });
+    promise.then(
+      (value) => {
+        signal.removeEventListener('abort', onAbort);
+        resolve(value);
+      },
+      (error) => {
+        signal.removeEventListener('abort', onAbort);
+        reject(error);
+      }
+    );
+  });
+}
 
 function getClientDeviceId(): string | null {
   if (typeof window === 'undefined') {
@@ -82,22 +123,29 @@ export function clearUsageCache(token?: string): void {
   }
 }
 
+export function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === 'AbortError';
+}
+
 async function request<T>(
   path: string,
-  options: RequestInit & { token?: string; _retried?: boolean; unauthorizedRecovery?: UnauthorizedRecoveryMode } = {}
+  options: ApiRequestOptions = {}
 ): Promise<T> {
   const {
     token,
     headers = {},
     _retried = false,
     unauthorizedRecovery = 'disabled',
+    signal,
     ...rest
   } = options;
 
   const allHeaders: Record<string, string> = {
-    'Content-Type': 'application/json',
     ...(headers as Record<string, string>),
   };
+  if (rest.body !== undefined && !Object.keys(allHeaders).some((key) => key.toLowerCase() === 'content-type')) {
+    allHeaders['Content-Type'] = 'application/json';
+  }
 
   if (token) {
     allHeaders['Authorization'] = `Bearer ${token}`;
@@ -112,10 +160,18 @@ async function request<T>(
     ...rest,
     credentials: 'include',
     headers: allHeaders,
+    signal,
   });
+
+  if (signal?.aborted) {
+    throw createAbortError();
+  }
 
   if (res.status === 401 && token && !_retried && unauthorizedRecovery === 'guest' && unauthorizedHandler) {
     const recoveredToken = await unauthorizedHandler(token);
+    if (signal?.aborted) {
+      throw createAbortError();
+    }
     if (recoveredToken && recoveredToken !== token) {
       return request<T>(path, { ...options, token: recoveredToken, _retried: true });
     }
@@ -225,7 +281,7 @@ export async function getUsage(token: string, options: UsageOptions = {}): Promi
     promise: usagePromise,
   };
 
-  return usagePromise;
+  return raceWithAbort(usagePromise, options.signal);
 }
 
 export async function createBillingCheckout(token: string, plan: 'pro'): Promise<BillingCheckoutResponse> {
@@ -335,10 +391,11 @@ export async function createReview(
   return response;
 }
 
-export async function getTask(taskId: string, token: string): Promise<TaskStatusResponse> {
+export async function getTask(taskId: string, token: string, signal?: AbortSignal): Promise<TaskStatusResponse> {
   return request<TaskStatusResponse>(`/tasks/${taskId}?_ts=${Date.now()}`, {
     token,
     cache: 'no-store',
+    signal,
     headers: {
       'Cache-Control': 'no-cache',
       Pragma: 'no-cache',
@@ -353,8 +410,8 @@ export function buildTaskWebSocketUrl(taskId: string): string {
   return url.toString();
 }
 
-export async function getReview(reviewId: string, token: string): Promise<ReviewGetResponse> {
-  return request<ReviewGetResponse>(`/reviews/${reviewId}`, { token });
+export async function getReview(reviewId: string, token: string, signal?: AbortSignal): Promise<ReviewGetResponse> {
+  return request<ReviewGetResponse>(`/reviews/${reviewId}`, { token, signal });
 }
 
 export async function getPhotoReviews(

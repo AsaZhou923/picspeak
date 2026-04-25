@@ -3,7 +3,8 @@ import { ImageType } from '@/lib/types';
 import { Stage } from '../hooks/useUploadFlow';
 import { ImageTypePicker } from './ImageTypePicker';
 import { ModePicker } from './ModePicker';
-import { type Translator } from '@/lib/i18n';
+import { type Translator, useI18n } from '@/lib/i18n';
+import { getReplayIntentCopy } from '@/lib/replay-intent-copy';
 
 interface ReplayBannerProps {
   replayPhotoUrl: string | null;
@@ -32,6 +33,9 @@ export function ReplayBanner({
   onUploadNew,
   t,
 }: ReplayBannerProps) {
+  const { locale } = useI18n();
+  const copy = getReplayIntentCopy(locale);
+
   return (
     <div className="overflow-hidden rounded-[24px] border border-border-subtle bg-[radial-gradient(circle_at_top_left,rgba(200,171,90,0.16),transparent_34%),rgb(var(--color-surface)/0.82)] p-5 animate-fade-in">
       <div className="grid gap-5 md:grid-cols-[180px_1fr]">
@@ -47,19 +51,22 @@ export function ReplayBanner({
               />
             ) : (
               <div className="flex h-full items-center justify-center px-4 text-center text-xs text-ink-subtle">
-                {t('replay_current_photo')}
+                {copy.currentPhotoLabel}
               </div>
             )}
           </div>
           <div className="rounded-full border border-gold/30 bg-gold/10 px-3 py-1 text-center text-[11px] uppercase tracking-[0.22em] text-gold/85">
-            {t('replay_current_photo')}
+            {copy.currentPhotoLabel}
           </div>
         </div>
 
         <div className="space-y-5">
           <div className="space-y-2">
-            <h2 className="font-display text-2xl text-ink">{t('replay_title')}</h2>
-            <p className="text-sm leading-7 text-ink-muted">{t('replay_body')}</p>
+            <h2 className="font-display text-2xl text-ink">{copy.workspaceTitle}</h2>
+            <p className="text-sm leading-7 text-ink-muted">{copy.workspaceBody}</p>
+            <div className="inline-flex rounded-full border border-gold/25 bg-gold/8 px-3 py-1 text-[11px] text-gold/85">
+              {copy.verificationHint}
+            </div>
           </div>
 
           <div>
@@ -93,7 +100,7 @@ export function ReplayBanner({
               onClick={onUploadNew}
               className="rounded border border-border px-4 py-3 text-sm text-ink-muted transition-all duration-200 hover:border-gold/40 hover:text-ink active:scale-[0.98]"
             >
-              {t('replay_upload_new')}
+              {copy.uploadNewLabel}
             </button>
           </div>
         </div>

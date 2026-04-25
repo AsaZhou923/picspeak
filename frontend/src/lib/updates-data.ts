@@ -18,6 +18,116 @@ export function getProductUpdates(locale: UpdateLocale): ProductUpdateEntry[] {
   if (locale === 'ja') {
     return [
       {
+        id: '2026-04-24-stage-d-content-conversion',
+        date: '2026-04-24',
+        title: 'コンテンツ流入から評価ワークスペースへの導線を追加',
+        summary:
+          'Blog、Gallery、ホームから目的別にワークスペースへ戻れる入口を追加し、コンテンツ閲覧からクリック、アップロード、初回評価完了まで追える週次レポート口径を整えました。',
+        docPath: 'docs/changelog/update-log-2026-04-24-stage-d-content-conversion.md',
+        sections: [
+          {
+            title: 'ワークスペース入口',
+            items: [
+              'Blog 記事末尾の CTA が記事テーマに合わせた同種評価とアップロード入口を出すようになった',
+              'Gallery カードに同じ題材で練習する入口と、同じ基準で自分の写真を評価する入口を追加',
+              'ホームに新規ユーザー、再訪ユーザー、記事読者向けの3つの開始入口を追加',
+            ],
+          },
+          {
+            title: '転換計測',
+            items: [
+              '`content_workspace_clicked` イベントで Blog / Gallery からのワークスペースクリックを記録',
+              '週次レポートで閲覧、クリック、ワークスペース到達、アップロード、初回評価完了を Blog / Gallery 別に集計',
+              'API 監査ログはヘルスチェック等を除外し、同期 DB 書き込みでリクエストを塞がないようにした',
+            ],
+          },
+        ],
+      },
+      {
+        id: '2026-04-22-pro-conversion-and-faq-schema',
+        date: '2026-04-22',
+        title: 'Pro 価値訴求の再設計と FAQPage 重複修正',
+        summary:
+          'Pro を「より深い分析」ではなく、次回撮影ガイド・完全な振り返り・上達追跡として再整理しました。あわせて /zh・/en・/ja ホームの FAQPage 構造化データ重複を修正しました。',
+        docPath: 'docs/changelog/update-log-2026-04-22-pro-conversion-and-faq-schema.md',
+        sections: [
+          {
+            title: 'Pro 価値訴求',
+            items: [
+              'Free / Pro の境界を「素早い診断」と「次回撮影ガイド」に再定義',
+              'レビュー詳細、履歴、Usage ページの Pro 訴求を同じ戦略辞書から生成',
+              'Usage ページにアップグレード後の違いを比較する判断パネルを追加',
+            ],
+          },
+          {
+            title: 'SEO 構造化データ',
+            items: [
+              'locale ホームで HomePage の FAQPage JSON-LD を二重出力しないように変更',
+              '/zh・/en・/ja の FAQPage は locale layout 側の 1 件に統一',
+            ],
+          },
+        ],
+      },
+      {
+        id: '2026-04-20-review-growth-loop-and-replay-guidance',
+        date: '2026-04-20',
+        title: '成長ループ、再評価ガイド、次回チェックリスト',
+        summary:
+          '履歴ページで直近 3 回の伸びを見比べられるようにし、レビュー詳細では「同じ写真で再評価」と「新しく撮り直す」を分けて案内します。Flash の提案も次回の撮影チェックリストにしやすい形へ整理しました。',
+        docPath: 'docs/changelog/update-log-2026-04-20-review-growth-loop-and-replay-guidance.md',
+        sections: [
+          {
+            title: '成長ループ',
+            items: [
+              '履歴ページに直近 3 回とその前 3 回の平均比較、上向き・下振れ・横ばいの傾向を追加',
+              '7 点未満が続く次元をまとめ、どこが繰り返し弱いか先に見えるようにした',
+              '直近 3 件の講評からそのまま詳細へ戻れる',
+            ],
+          },
+          {
+            title: '次の一枚への導線',
+            items: [
+              'レビュー詳細に「同じ写真で修正確認」と「新しい写真で撮り直す」の 2 つの進め方を追加',
+              '提案文から最大 3 つの Next-Shoot Checklist を抽出し、Action / Observation / Reason を表示',
+              'ワークスペースの再評価バナーも、未編集写真なら撮り直しを優先すべきだと明示',
+            ],
+          },
+          {
+            title: '回帰保護',
+            items: [
+              'Header の認証専用ナビは hydration 後まで非表示にして、ログイン状態のチラつきを抑制',
+              'prompt、文言、成長スナップショット、header 可視性のテストを追加',
+            ],
+          },
+        ],
+      },
+      {
+        id: '2026-04-19-auth-hardening-and-request-stability',
+        date: '2026-04-19',
+        title: '認証強化・タスクリトライ整理・リクエスト安定化',
+        summary:
+          'CORS、Cookie、Webhook、JWKS キャッシュ、タスクエラー公開範囲、フロントエンドのリクエスト中断をまとめて整え、認証まわりと API 呼び出しの安定性を上げました。',
+        docPath: 'docs/changelog/update-log-2026-04-19-auth-hardening-and-request-stability.md',
+        sections: [
+          {
+            title: '認証と API 保護',
+            items: [
+              'CORS の許可メソッドとヘッダーを明示し、X-Device-Id も許可',
+              'guest cookie の SameSite を環境別に整理し、Webhook の 409/401/403 応答を是正',
+              'アクティベーションコード引き換えにユーザー単位のレート制限を追加',
+            ],
+          },
+          {
+            title: '安定性と回帰防止',
+            items: [
+              'JWKS キャッシュにロックを入れて並行更新を抑制',
+              'AI 呼び出し前にクォータを確認し、タスク失敗メッセージを外部向けにサニタイズ',
+              'AbortController で詳細・使用量・タスク polling の取消しを実装',
+            ],
+          },
+        ],
+      },
+      {
         id: '2026-04-19-backend-frontend-module-split',
         date: '2026-04-19',
         title: 'バックエンド・フロントエンドのモジュール分割リファクタリング',
@@ -368,6 +478,116 @@ export function getProductUpdates(locale: UpdateLocale): ProductUpdateEntry[] {
   if (locale === 'en') {
     return [
       {
+        id: '2026-04-24-stage-d-content-conversion',
+        date: '2026-04-24',
+        title: 'Content-to-workspace conversion paths',
+        summary:
+          'Blog, Gallery, and Home now send readers back to the workspace with intent-specific CTAs, while the analytics snapshot can track content views through clicks, uploads, and first critique completion.',
+        docPath: 'docs/changelog/update-log-2026-04-24-stage-d-content-conversion.md',
+        sections: [
+          {
+            title: 'Workspace entrances',
+            items: [
+              'Blog article CTAs now match the article topic and carry source, entrypoint, content slug, and image type',
+              'Gallery cards now offer same-subject practice and a same-standard critique path for the viewer photo',
+              'Home now separates new-user, returning-user, and content-reader starting paths',
+            ],
+          },
+          {
+            title: 'Conversion reporting',
+            items: [
+              '`content_workspace_clicked` records Blog / Gallery workspace intent before the user reaches the product flow',
+              'Weekly reporting breaks down views, clicks, workspace entries, uploads, review requests, and result views by Blog and Gallery',
+              'API audit logging now skips non-business endpoints and moves synchronous DB writes off the request event loop',
+            ],
+          },
+        ],
+      },
+      {
+        id: '2026-04-22-pro-conversion-and-faq-schema',
+        date: '2026-04-22',
+        title: 'Pro value repositioning and FAQPage duplicate fix',
+        summary:
+          'Pro is now framed as next-shoot guidance, complete review, and progress tracking instead of just deeper analysis. Locale home pages also no longer emit duplicate FAQPage structured data.',
+        docPath: 'docs/changelog/update-log-2026-04-22-pro-conversion-and-faq-schema.md',
+        sections: [
+          {
+            title: 'Pro value and conversion',
+            items: [
+              'Free / Pro boundaries now distinguish quick diagnosis from next-shoot guidance',
+              'Review detail, history, and Usage promos read from one conversion strategy dictionary',
+              'Usage now includes a decision panel that compares the before-and-after Pro experience',
+            ],
+          },
+          {
+            title: 'SEO structured data',
+            items: [
+              'Locale home pages suppress the nested HomePage FAQPage JSON-LD',
+              '/zh, /en, and /ja keep a single FAQPage source from the locale layout',
+            ],
+          },
+        ],
+      },
+      {
+        id: '2026-04-20-review-growth-loop-and-replay-guidance',
+        date: '2026-04-20',
+        title: 'Growth loop, replay guidance, and next-shot checklists',
+        summary:
+          'History now surfaces a recent-vs-previous growth loop, review detail separates same-photo verification from new-photo retakes, and Flash suggestions are shaped into cleaner next-shot checklist actions.',
+        docPath: 'docs/changelog/update-log-2026-04-20-review-growth-loop-and-replay-guidance.md',
+        sections: [
+          {
+            title: 'Growth loop',
+            items: [
+              'History compares the most recent 3 critiques against the previous 3 and shows up / down / flat trend states',
+              'Repeated weak dimensions under score 7 are surfaced first so the next practice target is obvious',
+              'The latest three critiques link straight back to their detail pages',
+            ],
+          },
+          {
+            title: 'Next-shot guidance',
+            items: [
+              'Review detail now separates same-photo fix verification from retaking a new photo',
+              'Up to 3 checklist items are extracted from suggestions with Action / Observation / Reason labels',
+              'Workspace replay copy now makes it explicit that rerunning the same photo only makes sense after edits',
+            ],
+          },
+          {
+            title: 'Regression protection',
+            items: [
+              'Header auth-only navigation waits until hydration, avoiding signed-in shell flicker',
+              'Added tests for prompt labels, replay copy, growth snapshots, and header visibility',
+            ],
+          },
+        ],
+      },
+      {
+        id: '2026-04-19-auth-hardening-and-request-stability',
+        date: '2026-04-19',
+        title: 'Auth hardening, safer task retries, and more stable requests',
+        summary:
+          'Tightened CORS and cookie behavior, corrected webhook error codes, added activation-code rate limiting, locked JWKS cache refreshes, and made frontend requests cancellable.',
+        docPath: 'docs/changelog/update-log-2026-04-19-auth-hardening-and-request-stability.md',
+        sections: [
+          {
+            title: 'Auth and API safety',
+            items: [
+              'CORS methods and headers are now explicit, including X-Device-Id used by the frontend',
+              'Guest cookie SameSite handling is now environment-aware, and Clerk webhook 409/401/403 responses are separated correctly',
+              'Activation-code redemption now has a per-user rate limit',
+            ],
+          },
+          {
+            title: 'Stability and regression protection',
+            items: [
+              'JWKS cache refreshes are locked to avoid concurrent upstream bursts',
+              'Quota checks now happen before AI calls, and task-facing errors are sanitized for users',
+              'AbortController support now cancels review, usage, replay, and task polling requests cleanly',
+            ],
+          },
+        ],
+      },
+      {
         id: '2026-04-19-backend-frontend-module-split',
         date: '2026-04-19',
         title: 'Backend & frontend modular refactor',
@@ -716,6 +936,116 @@ export function getProductUpdates(locale: UpdateLocale): ProductUpdateEntry[] {
   }
 
   return [
+    {
+      id: '2026-04-24-stage-d-content-conversion',
+      date: '2026-04-24',
+      title: '内容来源转化与工作台入口打通',
+      summary:
+        'Blog、Gallery 和首页新增按意图回到评图工作台的入口，并补齐内容浏览、点击、上传到首评完成的周报统计口径。',
+      docPath: 'docs/changelog/update-log-2026-04-24-stage-d-content-conversion.md',
+      sections: [
+        {
+          title: '工作台入口',
+          items: [
+            'Blog 文章底部 CTA 会按文章题材生成同类点评和上传入口，并携带来源、入口、文章 slug 和图片类型',
+            'Gallery 卡片新增同题材练习入口，以及用同一套标准点评自己照片的入口',
+            '首页新增新用户、回访用户、内容读者三类开始路径',
+          ],
+        },
+        {
+          title: '转化统计',
+          items: [
+            '`content_workspace_clicked` 记录 Blog / Gallery 用户进入工作台前的点击意图',
+            '周报按 Blog 和 Gallery 拆分浏览、点击、工作台进入、上传、发起点评和查看结果',
+            'API 审计日志跳过非业务端点，并把同步数据库写入移出请求事件循环',
+          ],
+        },
+      ],
+    },
+    {
+      id: '2026-04-22-pro-conversion-and-faq-schema',
+      date: '2026-04-22',
+      title: 'Pro 价值表达重做与 FAQPage 重复修复',
+      summary:
+        'Pro 不再只表达为“更深度点评”，而是围绕下一次拍摄指导、完整复盘和进步追踪展开；同时修复 /zh、/en、/ja 首页 FAQPage 结构化数据重复问题。',
+      docPath: 'docs/changelog/update-log-2026-04-22-pro-conversion-and-faq-schema.md',
+      sections: [
+        {
+          title: 'Pro 价值与转化',
+          items: [
+            'Free / Pro 边界改为“快速诊断”和“下一次拍摄指导”的差异',
+            '结果页、历史页和 Usage 页的 Pro 触发位统一读取转化策略字典',
+            'Usage 页面新增付费前后体验差异面板，帮助用户判断是否升级',
+          ],
+        },
+        {
+          title: 'SEO 结构化数据',
+          items: [
+            'locale 首页复用 HomePage 时不再重复输出 FAQPage JSON-LD',
+            '/zh、/en、/ja 首页保留 locale layout 里的唯一 FAQPage 来源',
+          ],
+        },
+      ],
+    },
+    {
+      id: '2026-04-20-review-growth-loop-and-replay-guidance',
+      date: '2026-04-20',
+      title: '连续进步视图、复评重拍分流与下一轮清单',
+      summary:
+        '历史页新增最近 3 次成长视图，评图详情把“同图复评”和“换图重拍”拆成两条更明确的路径，Flash 建议也收紧成可直接执行的下一轮拍摄清单。',
+      docPath: 'docs/changelog/update-log-2026-04-20-review-growth-loop-and-replay-guidance.md',
+      sections: [
+        {
+          title: '连续进步与弱项',
+          items: [
+            '历史页会对比最近 3 次和之前 3 次平均分，并显示上升、下降或持平趋势',
+            '系统会优先标出反复低于 7 分的维度，帮助先盯住最拖后腿的问题',
+            '最近 3 次点评都可以直接点回详情页继续看',
+          ],
+        },
+        {
+          title: '复评与重拍路径',
+          items: [
+            '评图详情新增“同图验证修正”和“换新照片重拍”双路径卡片',
+            '系统会从建议里抽出最多 3 条下一轮清单，并显示动作、观察和原因',
+            '工作台复评横幅也明确提示：只有已经改过这张图时，同图复评才真正有意义',
+          ],
+        },
+        {
+          title: '回归保护',
+          items: [
+            'Header 登录态导航改成 hydration 后再显示，避免首屏先闪出错误的已登录壳',
+            '补上 prompt、文案、成长快照和 header 可见性测试',
+          ],
+        },
+      ],
+    },
+    {
+      id: '2026-04-19-auth-hardening-and-request-stability',
+      date: '2026-04-19',
+      title: '认证加固、任务重试收口与请求稳定性修复',
+      summary:
+        '这次更新集中修复了认证链路与跨域边界，补上激活码限速、JWKS 缓存加锁、任务错误脱敏，并让前端请求在切页和轮询场景下可被正确取消。',
+      docPath: 'docs/changelog/update-log-2026-04-19-auth-hardening-and-request-stability.md',
+      sections: [
+        {
+          title: '认证与接口保护',
+          items: [
+            'CORS 方法和请求头改为显式白名单，并补回前端真实使用的 X-Device-Id',
+            'guest cookie 的 SameSite 按环境处理，Clerk webhook 的 409/401/403 响应码不再混用',
+            '激活码兑换接口新增按用户限速，降低高频猜码风险',
+          ],
+        },
+        {
+          title: '稳定性与回归保护',
+          items: [
+            'JWKS 缓存刷新加锁，避免并发击穿上游',
+            '配额检查前移到 AI 调用前，异步任务错误对外统一脱敏',
+            '前端详情、用量、复用分析和任务轮询请求已接入 AbortController 取消链路',
+          ],
+        },
+      ],
+    },
     {
       id: '2026-04-19-backend-frontend-module-split',
       date: '2026-04-19',

@@ -7,8 +7,9 @@ import { notFound } from 'next/navigation';
 import { getBlogViewCounts, incrementBlogPostView } from '@/lib/api';
 import { getBlogPost, getBlogPosts, getBlogUi } from '@/lib/blog-data';
 import { formatBlogViewCount, shouldTrackBlogView } from '@/lib/blog-view-stats';
+import { getBlogWorkspaceCta, type ContentConversionEntrypoint } from '@/lib/content-conversion';
 import { I18nProvider, useI18n, type Locale } from '@/lib/i18n';
-import { markProductAttributionSource } from '@/lib/product-analytics';
+import { markProductAttributionSource, trackProductEvent } from '@/lib/product-analytics';
 import { siteConfig } from '@/lib/site';
 import { VALID_LOCALES } from '../../locales';
 
@@ -23,6 +24,22 @@ function BlogPostContent({ slug }: { slug: string }) {
   }
 
   const relatedPosts = getBlogPosts(locale).filter((entry) => entry.slug !== post.slug).slice(0, 2);
+  const workspaceCta = getBlogWorkspaceCta(locale, post);
+
+  const handleWorkspaceCtaClick = (entrypoint: ContentConversionEntrypoint = workspaceCta.entrypoint) => {
+    markProductAttributionSource('blog');
+    void trackProductEvent('content_workspace_clicked', {
+      source: 'blog',
+      pagePath: `/${locale}/blog/${post.slug}`,
+      locale,
+      metadata: {
+        entrypoint,
+        content_slug: post.slug,
+        image_type: workspaceCta.imageType,
+        category: post.category,
+      },
+    });
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -177,17 +194,24 @@ function BlogPostContent({ slug }: { slug: string }) {
           </div>
 
           <section className="mt-10 rounded-[30px] border border-border-subtle bg-[linear-gradient(135deg,rgba(200,162,104,0.12),transparent_42%),rgb(var(--color-surface)/0.78)] p-6 sm:p-7">
-            <p className="text-xs uppercase tracking-[0.22em] text-gold/70">{ui.nextStepLabel}</p>
-            <h2 className="mt-3 font-display text-3xl text-ink">{ui.nextStepTitle}</h2>
-            <p className="mt-4 text-sm leading-7 text-ink-muted">{ui.nextStepBody}</p>
+            <p className="text-xs uppercase tracking-[0.22em] text-gold/70">{workspaceCta.label}</p>
+            <h2 className="mt-3 font-display text-3xl text-ink">{workspaceCta.title}</h2>
+            <p className="mt-4 text-sm leading-7 text-ink-muted">{workspaceCta.body}</p>
             <div className="mt-6 flex flex-wrap gap-3">
               <Link
-                href="/workspace"
-                onClick={() => markProductAttributionSource('blog')}
+                href={workspaceCta.href}
+                onClick={() => handleWorkspaceCtaClick('blog_same_critique')}
                 className="inline-flex items-center gap-2 rounded-full bg-gold px-5 py-2.5 text-sm font-medium text-void transition-colors hover:bg-gold-light"
               >
-                {ui.nextStepCta}
+                {workspaceCta.primaryCta}
                 <ArrowRight size={14} />
+              </Link>
+              <Link
+                href={workspaceCta.href.replace('blog_same_critique', 'blog_topic_upload')}
+                onClick={() => handleWorkspaceCtaClick('blog_topic_upload')}
+                className="inline-flex items-center gap-2 rounded-full border border-gold/25 px-5 py-2.5 text-sm text-gold transition-colors hover:bg-gold/10"
+              >
+                {workspaceCta.secondaryCta}
               </Link>
               <Link href={`/${locale}/blog`} className="inline-flex items-center gap-2 rounded-full border border-border-subtle px-5 py-2.5 text-sm text-ink-muted transition-colors hover:border-gold/30 hover:text-gold">
                 {ui.moreArticlesCta}

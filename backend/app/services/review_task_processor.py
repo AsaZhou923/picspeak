@@ -19,6 +19,17 @@ from app.services.task_events import record_task_event
 
 logger = logging.getLogger(__name__)
 
+_PUBLIC_TASK_ERROR_MESSAGES: dict[str, tuple[str, str]] = {
+    'AI_CALL_FAILED': (
+        'AI review is temporarily unavailable; retry scheduled',
+        'AI review could not be completed',
+    ),
+    'TASK_PROCESSING_FAILED': (
+        'Review task failed unexpectedly; retry scheduled',
+        'Review task could not be completed',
+    ),
+}
+
 
 def _default_visual_analysis_payload() -> dict:
     return {
@@ -38,6 +49,20 @@ def _default_tonal_analysis_payload() -> dict:
         'color_balance': None,
         'saturation': None,
     }
+
+
+def public_task_error_message(
+    error_code: str | None,
+    *,
+    retryable: bool,
+    fallback: str | None = None,
+) -> str | None:
+    if not error_code:
+        return fallback
+    mapped = _PUBLIC_TASK_ERROR_MESSAGES.get(error_code)
+    if not mapped:
+        return fallback
+    return mapped[0] if retryable else mapped[1]
 
 
 def _normalize_review_result_payload(
@@ -267,6 +292,7 @@ def _claim_task(db: Session, task_id: int, worker_name: str) -> bool:
                 ReviewTask.status: TaskStatus.RUNNING,
                 # Keep claimed tasks in the queue stage until a concrete processing step starts.
                 ReviewTask.progress: 10,
+                ReviewTask.attempt_count: ReviewTask.attempt_count + 1,
                 ReviewTask.started_at: now,
                 ReviewTask.claimed_by: worker_name,
                 ReviewTask.last_heartbeat_at: now,
@@ -353,8 +379,20 @@ def _schedule_retry(db: Session, task: ReviewTask, *, error_code: str, error_mes
 
 
 def _handle_failure(db: Session, task: ReviewTask, *, error_code: str, error_message: str, retryable: bool) -> None:
-    if retryable and task.attempt_count < task.max_attempts:
-        _schedule_retry(db, task, error_code=error_code, error_message=error_message[:500])
+    retry_scheduled = retryable and task.attempt_count < task.max_attempts
+    public_error = public_task_error_message(
+        error_code,
+        retryable=retry_scheduled,
+        fallback=error_message[:500],
+    )
+    if public_error != error_message[:500]:
+        logger.warning(
+            'Review task %s failed with internal detail hidden from clients: %s',
+            task.public_id,
+            error_message,
+        )
+    if retry_scheduled:
+        _schedule_retry(db, task, error_code=error_code, error_message=public_error or 'Task retry scheduled')
         return
     if retryable:
         _complete_task(
@@ -362,15 +400,20 @@ def _handle_failure(db: Session, task: ReviewTask, *, error_code: str, error_mes
             task,
             status=TaskStatus.DEAD_LETTER,
             error_code=error_code,
-            error_message=error_message[:500],
+            error_message=public_task_error_message(error_code, retryable=False, fallback=public_error or error_message[:500]),
             dead_letter=True,
         )
         return
-    _complete_task(db, task, status=TaskStatus.FAILED, error_code=error_code, error_message=error_message[:500])
+    _complete_task(
+        db,
+        task,
+        status=TaskStatus.FAILED,
+        error_code=error_code,
+        error_message=public_task_error_message(error_code, retryable=False, fallback=public_error or error_message[:500]),
+    )
 
 
 def _process_task(db: Session, task: ReviewTask) -> None:
-    task.attempt_count += 1
     task.next_attempt_at = None
     task.last_heartbeat_at = datetime.now(timezone.utc)
     task.progress = 10
@@ -382,6 +425,29 @@ def _process_task(db: Session, task: ReviewTask) -> None:
     if photo is None:
         _handle_failure(db, task, error_code='PHOTO_NOT_FOUND', error_message='Photo record not found for task', retryable=False)
         return
+
+    # Fetch owner and enforce quota BEFORE calling the AI, so we don't burn tokens
+    # on a request that would be rejected anyway.
+    owner = db.query(User).filter(User.id == task.owner_user_id).first()
+    if owner is None:
+        _handle_failure(db, task, error_code='USER_NOT_FOUND', error_message='Task owner not found', retryable=False)
+        return
+
+    if owner.plan != UserPlan.guest:
+        try:
+            enforce_user_quota(db, owner, mode=task.mode if isinstance(task.mode, ReviewMode) else ReviewMode(task.mode))
+        except ApiHTTPException as exc:
+            db.rollback()
+            task = db.query(ReviewTask).filter(ReviewTask.id == task.id).first() or task
+            detail = exc.detail if isinstance(exc.detail, dict) else {'message': str(exc.detail)}
+            _handle_failure(
+                db,
+                task,
+                error_code=str(detail.get('code') or 'QUOTA_EXCEEDED'),
+                error_message=str(detail.get('message') or 'Plan quota exceeded'),
+                retryable=False,
+            )
+            return
 
     image_url = f'{settings.object_base_url.rstrip("/")}/{quote(photo.object_key)}'
     payload_locale = (task.request_payload or {}).get('locale', 'zh')
@@ -400,6 +466,7 @@ def _process_task(db: Session, task: ReviewTask) -> None:
             enforce_suggestion_structure=task.attempt_count < task.max_attempts,
         )
     except AIReviewError as exc:
+        logger.warning('AI review failed for task %s: %s', task.public_id, exc)
         _handle_failure(db, task, error_code='AI_CALL_FAILED', error_message=str(exc), retryable=True)
         return
 
@@ -411,26 +478,6 @@ def _process_task(db: Session, task: ReviewTask) -> None:
         model_version=ai_response.model_version,
         exif_info=photo.exif_data or None,
     )
-    owner = db.query(User).filter(User.id == task.owner_user_id).first()
-    if owner is None:
-        _handle_failure(db, task, error_code='USER_NOT_FOUND', error_message='Task owner not found', retryable=False)
-        return
-
-    if owner.plan != UserPlan.guest:
-        try:
-            enforce_user_quota(db, owner, mode=task.mode if isinstance(task.mode, ReviewMode) else ReviewMode(task.mode))
-        except ApiHTTPException as exc:
-            db.rollback()
-            task = db.query(ReviewTask).filter(ReviewTask.id == task.id).first() or task
-            detail = exc.detail if isinstance(exc.detail, dict) else {'message': str(exc.detail)}
-            _handle_failure(
-                db,
-                task,
-                    error_code=str(detail.get('code') or 'QUOTA_EXCEEDED'),
-                    error_message=str(detail.get('message') or 'Plan quota exceeded'),
-                    retryable=False,
-                )
-            return
 
     review = Review(
         public_id=new_public_id('rev'),

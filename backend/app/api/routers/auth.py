@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import secrets
 from urllib import error as urllib_error
 from urllib import parse
@@ -49,6 +50,7 @@ from .auth_support import (
 
 router = APIRouter(prefix='/auth', tags=['auth'])
 webhooks_router = APIRouter(prefix='/webhooks', tags=['auth-webhooks'])
+_logger = logging.getLogger(__name__)
 
 
 @router.get('/google/start')
@@ -91,6 +93,7 @@ def auth_guest(
     if user is None:
         user = create_guest_user(db)
 
+    db.commit()
     token = issue_guest_token(user)
     bind_guest_token(response, token)
     return AuthGuestResponse(
@@ -109,7 +112,9 @@ def auth_google_login(payload: AuthGoogleLoginRequest, db: Session = Depends(get
     except urllib_error.URLError as exc:
         raise api_error(status.HTTP_502_BAD_GATEWAY, 'GOOGLE_TOKEN_VERIFY_FAILED', 'Google token verification failed') from exc
 
-    return _login_from_google_claims(claims, db)
+    auth_data = _login_from_google_claims(claims, db)
+    db.commit()
+    return auth_data
 
 
 @router.post('/clerk/exchange', response_model=AuthTokenResponse)
@@ -210,6 +215,7 @@ def auth_google_callback(
         response = RedirectResponse(f'{frontend_callback}?error={error_msg}', status_code=302)
         _clear_google_oauth_state(response)
         return response
+    db.commit()
 
     params = parse.urlencode({
         'access_token': auth_data.access_token,
@@ -225,21 +231,28 @@ def auth_google_callback(
 
 @webhooks_router.post('/clerk')
 async def clerk_webhook(request: Request, db: Session = Depends(get_db)):
-    import logging
-    _logger = logging.getLogger(__name__)
     event = await verify_clerk_webhook(request)
     try:
         outcome, user_public_id = _process_clerk_webhook_event(db, event)
         db.commit()
     except HTTPException as exc:
         db.rollback()
-        if exc.status_code in {
-            status.HTTP_401_UNAUTHORIZED,
-            status.HTTP_403_FORBIDDEN,
-            status.HTTP_409_CONFLICT,
-        }:
-            _logger.warning('Clerk webhook %s ignored: %s', event.type, exc.detail)
-            return {'ok': True, 'event_type': event.type, 'outcome': 'ignored_conflict'}
+        if exc.status_code == status.HTTP_409_CONFLICT:
+            # Truly idempotent: this event was already processed (e.g. duplicate user creation).
+            # Return 200 so Clerk does not retry an event we've already handled correctly.
+            _logger.warning('Clerk webhook %s skipped (duplicate): %s', event.type, exc.detail)
+            return {'ok': True, 'event_type': event.type, 'outcome': 'ignored_duplicate'}
+        if exc.status_code in {status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN}:
+            # Unexpected auth/permission failure processing the event — log and return 400 so
+            # Clerk marks the delivery as failed (and can retry or alert), not silently succeeds.
+            _logger.error(
+                'Clerk webhook %s processing error (status=%s): %s',
+                event.type, exc.status_code, exc.detail,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={'code': 'WEBHOOK_PROCESSING_ERROR', 'message': 'Event could not be processed'},
+            ) from exc
         raise
     except Exception:
         db.rollback()

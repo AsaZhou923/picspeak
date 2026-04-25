@@ -12,6 +12,7 @@ import { useTheme } from '@/lib/theme-context';
 import { useI18n, LOCALE_LABELS, Locale } from '@/lib/i18n';
 import { useState, useRef, useEffect } from 'react';
 import useOnClickOutside from '@/lib/hooks/useOnClickOutside';
+import { getHeaderVisibilityState } from './header-auth-visibility';
 
 const AUTH_LABELS: Record<Locale, { signIn: string; signUp: string }> = {
   zh: { signIn: '登录', signUp: '注册' },
@@ -147,8 +148,19 @@ export default function Header() {
   const { t, locale } = useI18n();
   const blogUi = getBlogUi(locale);
   const authLabels = AUTH_LABELS[locale];
+  const [hasHydrated, setHasHydrated] = useState(false);
+
+  useEffect(() => {
+    setHasHydrated(true);
+  }, []);
+
+  const headerVisibility = getHeaderVisibilityState({
+    hasHydrated,
+    userInfo,
+  });
+  const visibleUserInfo = headerVisibility.userInfo;
   const isLegacyAuthenticated = Boolean(
-    userInfo && userInfo.plan !== 'guest' && userInfo.auth_provider !== 'clerk'
+    visibleUserInfo && visibleUserInfo.plan !== 'guest' && visibleUserInfo.auth_provider !== 'clerk'
   );
 
   const isActive = (href: string) =>
@@ -206,7 +218,7 @@ export default function Header() {
           <Link href={`/${locale}/blog`} className={`transition-colors ${isActive(`/${locale}/blog`)}`}>
             {blogUi.navLabel}
           </Link>
-          {userInfo && (
+          {headerVisibility.showUsageNav && (
             <Link href="/account/usage" className={`transition-colors ${isActive('/account/usage')}`}>
               {t('nav_usage')}
             </Link>
@@ -227,11 +239,11 @@ export default function Header() {
             {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
           </button>
 
-          {userInfo ? (
+          {headerVisibility.showAuthenticatedControls ? (
             <div className="flex items-center gap-3">
               <span className="hidden sm:flex items-center gap-1.5 text-sm">
-                <span className={`font-medium ${planColor(userInfo.plan)}`}>
-                  {userInfo.plan === 'guest' ? t('plan_guest_label') : planLabel(userInfo.plan)}
+                <span className={`font-medium ${planColor(visibleUserInfo!.plan)}`}>
+                  {visibleUserInfo!.plan === 'guest' ? t('plan_guest_label') : planLabel(visibleUserInfo!.plan)}
                 </span>
               </span>
               <QuickLinksMenu />
@@ -303,7 +315,7 @@ export default function Header() {
         </div>
       </div>
 
-      {userInfo && (
+      {headerVisibility.showMobileTabs && (
         <div className="md:hidden border-t border-border-subtle/40 px-3 py-2">
           <nav className="flex items-stretch bg-surface/70 rounded-xl p-1 gap-0.5">
             <Link

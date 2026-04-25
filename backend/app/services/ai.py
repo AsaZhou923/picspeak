@@ -583,6 +583,15 @@ def _review_language_name(locale: str) -> str:
     }.get(normalized, 'English')
 
 
+def _suggestion_label_example(locale: str) -> str:
+    normalized = (locale or '').strip().lower()
+    if normalized == 'ja':
+        return '「観察：...；理由：...；行動：...」'
+    if normalized == 'zh':
+        return '“观察：...；原因：...；可执行动作：...”'
+    return '"Observation: ...; Reason: ...; Action: ..."'
+
+
 def _score_prompt(exif_data: dict | None = None, image_type: str = 'default') -> str:
     normalized_image_type = image_type if image_type in ALLOWED_IMAGE_TYPES else 'default'
     type_guide = IMAGE_TYPE_DIMENSION_GUIDE_EN[normalized_image_type]
@@ -622,6 +631,14 @@ def _writing_prompt(mode: str, locale: str, scores: dict[str, int], exif_data: d
         'Prefer 2-3 numbered points when the image evidence supports it, and make each point include visible observation, '
         'professional judgment, and effect on the final image. '
     )
+    suggestion_note = (
+        'Each flash suggestion should focus on one concrete adjustment for the next shot. '
+        'Lead with the action first so it can double as a short next-shoot checklist item. '
+        'Keep each flash suggestion scoped to one change target instead of bundling multiple edits together. '
+        if normalized_mode == 'flash'
+        else 'In pro mode, suggestions can stay compact, but advantage and critique should carry most of the depth. '
+    )
+    suggestion_example = _suggestion_label_example(locale)
     return (
         'You are a photography critic. '
         f'The image genre is {normalized_image_type}. Use this interpretation guide: {type_guide}.{exif_note} '
@@ -635,8 +652,10 @@ def _writing_prompt(mode: str, locale: str, scores: dict[str, int], exif_data: d
         'Do not output arrays. '
         'Do not force 3 points when the image evidence only supports 1 or 2 strong points. '
         'Every point must be grounded in visible evidence from the photo, logically justified, and not generic. '
+        f'{suggestion_note}'
         'Suggestions must be practical and, when appropriate, include concrete parameters or ranges. '
         'Each suggestion must follow Observation + Reason + Action. '
+        f'Use explicit labels inside every suggestion point, exactly like: {suggestion_example}. '
         'Use explicit labels inside every suggestion point, exactly like: "观察：...；原因：...；可执行动作：...".'
     )
 
@@ -760,79 +779,4 @@ def run_ai_review(
         output_tokens=(scoring_usage.get('completion_tokens') or 0) + (writing_usage.get('completion_tokens') or 0),
         cost_usd=None,
         latency_ms=scoring_response.latency_ms + writing_response.latency_ms,
-    )
-
-    model_name = model_name_for_mode(mode)
-    endpoint = settings.ai_api_base_url.rstrip('/') + '/chat/completions'
-    payload = {
-        'model': model_name,
-        'temperature': 0.2,
-        'response_format': {'type': 'json_object'},
-        'messages': [
-            {'role': 'system', 'content': '你是一个只返回 JSON 的严格摄影点评助手。审美标准高，默认从严打分，普通照片不得轻易进入高分段；只有当画面证据能清楚证明优秀执行时才给高分，不因题材讨喜、情绪感或风格化而放宽标准。'},
-            {
-                'role': 'user',
-                'content': [
-                    {'type': 'text', 'text': _prompt_for_mode_v3(mode, locale, exif_data, image_type=image_type)},
-                    {'type': 'image_url', 'image_url': {'url': image_url}},
-                ],
-            },
-        ],
-    }
-
-    req = Request(
-        endpoint,
-        data=json.dumps(payload).encode('utf-8'),
-        headers={
-            'Authorization': f'Bearer {settings.ai_api_key}',
-            'Content-Type': 'application/json',
-        },
-        method='POST',
-    )
-
-    timeout = settings.pro_ai_timeout_seconds if (mode or '').strip().lower() == 'pro' else settings.ai_timeout_seconds
-    start = time.perf_counter()
-    try:
-        with urlopen(req, timeout=timeout) as resp:
-            body = json.loads(resp.read().decode('utf-8'))
-    except HTTPError as exc:
-        err_body = exc.read().decode('utf-8', errors='ignore') if hasattr(exc, 'read') else str(exc)
-        raise AIReviewError(f'AI provider HTTP {exc.code}: {err_body[:300]}') from exc
-    except URLError as exc:
-        raise AIReviewError(f'AI provider request failed: {exc.reason}') from exc
-    latency_ms = int((time.perf_counter() - start) * 1000)
-
-    try:
-        choice = body['choices'][0]
-        message = choice['message']
-        content = _extract_content(message.get('content'))
-        parsed = _extract_json_object(content)
-    except (KeyError, IndexError, TypeError) as exc:
-        raise AIReviewError('Invalid AI provider response envelope') from exc
-
-    try:
-        scores = parsed.get('scores')
-        if not isinstance(scores, dict):
-            raise AIReviewError('Model response missing scores object')
-        parsed = _normalize_review_result_fields(parsed, image_type=image_type)
-        parsed['final_score'] = _compute_final_score(scores)
-        result = ReviewResult.model_validate(parsed)
-    except AIReviewError:
-        raise
-    except ValidationError as exc:
-        raise AIReviewError(f'Invalid AI provider response structure: {_format_validation_error(exc)}') from exc
-    except ValueError as exc:
-        raise AIReviewError(f'Invalid AI provider response structure: {exc}') from exc
-
-    usage = body.get('usage') or {}
-    resolved_model_name = body.get('model', model_name)
-    return AIReviewResponse(
-        result=result,
-        model_name=resolved_model_name,
-        model_version=model_version_for_name(resolved_model_name),
-        prompt_version=PROMPT_VERSION,
-        input_tokens=usage.get('prompt_tokens'),
-        output_tokens=usage.get('completion_tokens'),
-        cost_usd=None,
-        latency_ms=latency_ms,
     )

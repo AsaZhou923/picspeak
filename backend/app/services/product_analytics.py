@@ -72,6 +72,11 @@ STAGE_A_EVENT_CATALOG: dict[str, dict[str, Any]] = {
         'stage': 'A',
         'description': 'The export CTA was used on a review result.',
     },
+    'content_workspace_clicked': {
+        'label': '内容入口点击工作台',
+        'stage': 'D',
+        'description': 'A Blog, Gallery, or content-oriented CTA sent the user toward the workspace.',
+    },
     'upgrade_pro_clicked': {
         'label': '点击升级 Pro',
         'stage': 'A',
@@ -114,6 +119,8 @@ VISITOR_EVENT_BY_SOURCE = {
     'gallery': 'gallery_viewed',
     'share': 'share_viewed',
 }
+
+CONTENT_CONVERSION_SOURCES = ('blog', 'gallery')
 
 
 @dataclass(slots=True)
@@ -235,6 +242,72 @@ def _daily_reviews_with_second_use(reviews: list[ReviewSample]) -> dict[str, dic
             metric['users'] += 1
 
     return rows
+
+
+def _build_content_conversion_weekly(period_events: list[AnalyticsEventSample]) -> dict[str, dict[str, Any]]:
+    report: dict[str, dict[str, Any]] = {}
+
+    for source in CONTENT_CONVERSION_SOURCES:
+        visitor_event_name = VISITOR_EVENT_BY_SOURCE[source]
+        visitors = _count_distinct(
+            period_events,
+            event_names={visitor_event_name},
+            key_builder=_guest_conversion_key,
+        )
+        workspace_clicks = _count_distinct(
+            period_events,
+            event_names={'content_workspace_clicked'},
+            source=source,
+            key_builder=_guest_conversion_key,
+        )
+        workspace_entries = _count_distinct(
+            period_events,
+            event_names={'workspace_viewed'},
+            source=source,
+            key_builder=_guest_conversion_key,
+        )
+        uploads = _count_distinct(
+            period_events,
+            event_names={'upload_succeeded'},
+            source=source,
+            key_builder=_guest_conversion_key,
+        )
+        review_requests = _count_distinct(
+            period_events,
+            event_names={'review_requested'},
+            source=source,
+            key_builder=_guest_conversion_key,
+        )
+        review_results = _count_distinct(
+            period_events,
+            event_names={'review_result_viewed'},
+            source=source,
+            key_builder=_guest_conversion_key,
+        )
+
+        row = {
+            'visitors': visitors,
+            'workspace_clicks': workspace_clicks,
+            'workspace_entries': workspace_entries,
+            'uploads': uploads,
+            'review_requests': review_requests,
+            'review_results': review_results,
+            'workspace_click_rate': _safe_rate(workspace_clicks, visitors),
+            'workspace_entry_rate': _safe_rate(workspace_entries, visitors),
+            'upload_conversion_rate': _safe_rate(uploads, visitors),
+            'first_review_completion_rate': _safe_rate(review_results, review_requests),
+        }
+
+        if source == 'blog':
+            row['article_to_workspace_click_rate'] = row['workspace_click_rate']
+            row['article_source_first_review_completion_rate'] = row['first_review_completion_rate']
+        elif source == 'gallery':
+            row['gallery_to_workspace_click_rate'] = row['workspace_click_rate']
+            row['gallery_to_upload_conversion_rate'] = row['upload_conversion_rate']
+
+        report[source] = row
+
+    return report
 
 
 def build_stage_a_snapshot(
@@ -386,6 +459,18 @@ def build_stage_a_snapshot(
             source=source,
             key_builder=_guest_conversion_key,
         )
+        workspace_clicks = _count_distinct(
+            period_events,
+            event_names={'content_workspace_clicked'},
+            source=source,
+            key_builder=_guest_conversion_key,
+        )
+        uploads = _count_distinct(
+            period_events,
+            event_names={'upload_succeeded'},
+            source=source,
+            key_builder=_guest_conversion_key,
+        )
         review_requests = _count_distinct(
             period_events,
             event_names={'review_requested'},
@@ -400,10 +485,14 @@ def build_stage_a_snapshot(
         )
         source_breakdown[source] = {
             'visitors': visitors,
+            'workspace_clicks': workspace_clicks,
             'workspace_entries': workspace_entries,
+            'uploads': uploads,
             'review_requests': review_requests,
             'review_results': review_results,
+            'workspace_click_rate': _safe_rate(workspace_clicks, visitors),
             'workspace_entry_rate': _safe_rate(workspace_entries, visitors),
+            'upload_conversion_rate': _safe_rate(uploads, visitors),
             'review_completion_rate': _safe_rate(review_results, review_requests),
         }
 
@@ -441,6 +530,7 @@ def build_stage_a_snapshot(
         'event_catalog': STAGE_A_EVENT_CATALOG,
         'daily_rows': daily_rows,
         'source_breakdown': source_breakdown,
+        'content_conversion_weekly': _build_content_conversion_weekly(period_events),
         'plan_breakdown': plan_breakdown,
     }
 
@@ -517,6 +607,50 @@ def render_stage_a_snapshot_markdown(snapshot: dict[str, Any]) -> str:
                 paid_success=row['paid_success'],
             )
         )
+
+    return '\n'.join(lines) + '\n'
+
+
+def render_content_conversion_weekly_markdown(snapshot: dict[str, Any]) -> str:
+    lines = [
+        '# PicSpeak 内容来源转化周报',
+        '',
+        f"- 时间窗口：{snapshot['window_start']} -> {snapshot['window_end']}",
+        '',
+        '## 内容来源漏斗',
+        '',
+        '| 来源 | 浏览访客 | 工作台点击 | 工作台进入 | 上传成功 | 发起点评 | 查看结果 | 点击率 | 上传转化率 | 首评完成率 |',
+        '| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |',
+    ]
+
+    for source in CONTENT_CONVERSION_SOURCES:
+        row = snapshot['content_conversion_weekly'].get(source, {})
+        lines.append(
+            '| {source} | {visitors} | {workspace_clicks} | {workspace_entries} | {uploads} | {review_requests} | {review_results} | {workspace_click_rate} | {upload_conversion_rate} | {first_review_completion_rate} |'.format(
+                source=source,
+                visitors=row.get('visitors', 0),
+                workspace_clicks=row.get('workspace_clicks', 0),
+                workspace_entries=row.get('workspace_entries', 0),
+                uploads=row.get('uploads', 0),
+                review_requests=row.get('review_requests', 0),
+                review_results=row.get('review_results', 0),
+                workspace_click_rate=_format_percent(row.get('workspace_click_rate', 0.0)),
+                upload_conversion_rate=_format_percent(row.get('upload_conversion_rate', 0.0)),
+                first_review_completion_rate=_format_percent(row.get('first_review_completion_rate', 0.0)),
+            )
+        )
+
+    lines.extend(
+        [
+            '',
+            '## 读数口径',
+            '',
+            '- Blog 点击率：`content_workspace_clicked(source=blog) / blog_post_viewed`。',
+            '- Blog 首评完成率：`review_result_viewed(source=blog) / review_requested(source=blog)`。',
+            '- Gallery 上传转化率：`upload_succeeded(source=gallery) / gallery_viewed`。',
+            '- 工作台进入和上传成功都继承前端会话级来源，点击事件用来确认具体入口位。',
+        ]
+    )
 
     return '\n'.join(lines) + '\n'
 

@@ -88,8 +88,7 @@ def create_guest_user(db: Session) -> User:
         last_login_at=datetime.now(timezone.utc),
     )
     db.add(user)
-    db.commit()
-    db.refresh(user)
+    db.flush()
     return user
 
 
@@ -102,14 +101,23 @@ def issue_guest_token(user: User) -> str:
 
 def bind_guest_token(response: Response, token: str) -> None:
     is_dev = settings.app_env.strip().lower() == 'dev'
+    # SameSite policy is configurable via COOKIE_SAMESITE setting (default: 'lax').
+    # Set COOKIE_SAMESITE=none only when frontend and backend are on different domains;
+    # that also requires secure=True (enforced automatically in non-dev mode).
+    samesite = settings.cookie_samesite.strip().lower() if not is_dev else 'lax'
+    if samesite not in {'strict', 'lax', 'none'}:
+        samesite = 'lax'
+    # SameSite=none requires Secure; fall back to lax in dev to avoid accidentally
+    # setting an insecure SameSite=none cookie.
+    secure = not is_dev
+    if samesite == 'none' and not secure:
+        samesite = 'lax'
     response.set_cookie(
         key=GUEST_TOKEN_COOKIE,
         value=token,
         httponly=True,
-        secure=not is_dev,
-        # In production use SameSite=None so cross-site frontend -> backend API requests
-        # (common in separate-domain deployments and iOS WebKit browsers) can persist guest identity.
-        samesite='lax' if is_dev else 'none',
+        secure=secure,
+        samesite=samesite,
         max_age=GUEST_TOKEN_TTL_SECONDS,
         path='/',
     )

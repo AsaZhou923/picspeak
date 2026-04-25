@@ -169,6 +169,7 @@ def create_upload_presign(
 
     return PresignResponse(
         upload_id=upload_id,
+        object_key=object_key,
         put_url=put_url,
         headers={'Content-Type': payload.content_type},
         expires_at=now + timedelta(minutes=10),

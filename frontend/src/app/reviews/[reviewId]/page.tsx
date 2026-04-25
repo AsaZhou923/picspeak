@@ -28,8 +28,11 @@ import { CritiqueSection } from '@/features/reviews/components/CritiqueSection';
 import { GalleryConfirmDialog } from '@/features/reviews/components/GalleryConfirmDialog';
 import { ReviewScorePanel } from '@/features/reviews/components/ReviewScorePanel';
 import { ReviewActionBar } from '@/features/reviews/components/ReviewActionBar';
+import { ReviewGrowthLoopPanel } from '@/features/reviews/components/ReviewGrowthLoopPanel';
 import { ReviewGalleryPanel } from '@/features/reviews/components/ReviewGalleryPanel';
 import { ImageZoomOverlay } from '@/features/reviews/components/ImageZoomOverlay';
+import { buildNextShootChecklist } from '@/lib/review-growth';
+import { getProUpgradeTriggerCopy, type ProUpgradeTrigger } from '@/lib/pro-conversion';
 
 export default function ReviewPage() {
   const params = useParams();
@@ -129,8 +132,9 @@ export default function ReviewPage() {
 
   if (!review) return null;
 
-  const r = review.result;
-  const isPro = review.mode === 'pro';
+  const activeReview = review;
+  const r = activeReview.result;
+  const isPro = activeReview.mode === 'pro';
   const isDemoReview = isDemoReviewId(reviewId);
   const displayAdvantage   = isDemoReview ? t('demo_review_advantage') : r.advantage;
   const displayCritique    = isDemoReview ? t('demo_review_critique') : r.critique;
@@ -158,25 +162,27 @@ export default function ReviewPage() {
   const gallerySaved = Boolean(review.gallery_visible);
   const isLowScore = r.final_score < 5.0;
   const reviewGalleryCardCopy = getReviewGalleryCardCopy(locale);
+  const nextShootChecklist = buildNextShootChecklist(displaySuggestions);
 
-  const reviewPromoCopy = (() => {
-    if (locale === 'ja') {
-      if (plan === 'guest') return { title: 'ログインして、この一枚をもっと深く見直す', body: isLowQuota ? `本日の残り回数は ${quotaRemaining ?? 0} 回です。まずログインして Free 枠を解放し、そのまま Pro の深い分析へ進めます。現在の初回価格は $2.99/月です。` : 'ログインするとこの結果を保存しつつ、そのまま Pro の深い分析へ進めます。現在の初回価格は $2.99/月です。' };
-      if (isLowQuota) return { title: `残り ${quotaRemaining ?? 0} 回です。次の比較は Pro が向いています`, body: 'このまま複数の写真を見比べるなら、Pro のほうが止まらず進められます。現在の初回価格は $2.99/月です。' };
-      if (isLowScore) return { title: 'この一枚は Pro で深掘りする価値があります', body: '点数が伸び悩んだ写真ほど、短い総評より深い分解が効きます。今なら $2.99/月の初回価格で始められます。' };
-      return { title: 'この結果を次の改善につなげるなら Pro が早いです', body: 'より深い分析と長期履歴があれば、次の調整まで一気に進めやすくなります。現在の初回価格は $2.99/月です。' };
-    }
-    if (locale === 'en') {
-      if (plan === 'guest') return { title: 'Sign in to take this result further', body: isLowQuota ? `You only have ${quotaRemaining ?? 0} critiques left today. Sign in first to unlock Free usage, then move straight into deeper Pro critique at the current $2.99/month launch price.` : 'Sign in to save this result and move straight into deeper Pro critique. The current launch price is $2.99/month.' };
-      if (isLowQuota) return { title: `Only ${quotaRemaining ?? 0} critiques left. Pro fits the next round better`, body: 'If you are about to compare more shots, Pro lets you keep going without rationing each upload. The current launch price is $2.99/month.' };
-      if (isLowScore) return { title: 'This photo is a good candidate for a deeper Pro breakdown', body: 'Lower-scoring images usually need more than a quick summary. Pro gives a fuller diagnosis, and the current launch price is $2.99/month.' };
-      return { title: 'If you want the next improvement step faster, switch this flow to Pro', body: 'Deeper critique plus permanent history makes iteration easier, and Pro is currently available at $2.99/month.' };
-    }
-    if (plan === 'guest') return { title: '登录后，把这张结果继续往下深挖', body: isLowQuota ? `你今天只剩 ${quotaRemaining ?? 0} 次评图了。先登录解锁 Free，再直接切到 Pro 深度分析。当前首发优惠价为 $2.99/月。` : '登录后不仅能保存这次结果，还能直接继续看更深入的 Pro 分析。当前首发优惠价为 $2.99/月。' };
-    if (isLowQuota) return { title: `当前只剩 ${quotaRemaining ?? 0} 次额度，下一轮更适合直接用 Pro`, body: '如果你准备继续比较更多照片，Pro 会比反复计算额度更顺手。当前首发优惠价为 $2.99/月。' };
-    if (isLowScore) return { title: '这张照片更适合用 Pro 做一次深挖', body: '分数偏低时，更需要完整拆解和明确修改方向，而不只是简短总结。当前首发优惠价为 $2.99/月。' };
-    return { title: '想把这次结果真正转成下一轮提升，可以直接升级 Pro', body: '更深入的分析加上永久历史记录，更适合连续复盘和稳定提升。当前首发优惠价为 $2.99/月。' };
-  })();
+  function handleUploadNewRound() {
+    const nextParams = new URLSearchParams({
+      mode: activeReview.mode,
+      image_type: activeReview.image_type ?? activeReview.result.image_type ?? 'default',
+    });
+    router.push(`/workspace?${nextParams.toString()}`);
+  }
+
+  const reviewPromoTrigger: ProUpgradeTrigger =
+    plan === 'guest'
+      ? 'guest_save'
+      : isLowQuota
+        ? 'quota_floor'
+        : isLowScore
+          ? 'deeper_result'
+          : 'retake_compare';
+  const reviewPromoCopy = getProUpgradeTriggerCopy(locale, reviewPromoTrigger, {
+    remaining: quotaRemaining,
+  });
 
   return (
     <div className="pt-14 min-h-screen">
@@ -188,7 +194,7 @@ export default function ReviewPage() {
           galleryActionCopy={galleryActionCopy}
         />
       )}
-      <div className="max-w-6xl mx-auto px-6 py-12 animate-fade-in">
+      <div className="mx-auto max-w-7xl px-6 py-12 animate-fade-in">
         <button
           onClick={handleBackNavigation}
           className="flex items-center gap-1.5 text-xs text-ink-subtle hover:text-ink-muted transition-colors mb-6"
@@ -217,7 +223,7 @@ export default function ReviewPage() {
           </div>
         </div>
 
-        <div className="grid lg:grid-cols-[360px_1fr] gap-8 items-start">
+        <div className="grid items-start gap-6 lg:grid-cols-[340px_minmax(0,1fr)] xl:gap-8">
           <ReviewScorePanel
             review={review}
             photoUrl={photoUrl}
@@ -230,7 +236,7 @@ export default function ReviewPage() {
             onDimClick={handleDimClick}
           />
 
-          <div className="space-y-6 min-w-0">
+          <div className="min-w-0 space-y-5">
             <div>
               <p className="text-xs text-gold/70 font-mono mb-2 tracking-widest uppercase">— {t('review_page_label')}</p>
               <h1 className="font-display text-3xl sm:text-4xl mb-2">{t('review_page_headline')}</h1>
@@ -246,7 +252,7 @@ export default function ReviewPage() {
               </div>
             </div>
 
-            {showPersonalActions && (
+            {showOwnerActions && (
               <ReviewActionBar
                 review={review}
                 showOwnerActions={showOwnerActions}
@@ -254,7 +260,6 @@ export default function ReviewPage() {
                 linkCopied={linkCopied}
                 actionBusy={actionBusy}
                 favoriteCopy={favoriteCopy}
-                onReplayReview={handleReplayReview}
                 onFavoriteToggle={handleFavoriteToggle}
                 onShareLink={handleBackendShareLink}
                 onExportSummary={handleBackendExportSummary}
@@ -290,6 +295,17 @@ export default function ReviewPage() {
                 highlightTop={2} highlightedId={highlightedCardId}
               />
             </div>
+
+            {showOwnerActions && (
+              <ReviewGrowthLoopPanel
+                locale={locale}
+                checklist={nextShootChecklist}
+                actionBusy={actionBusy}
+                onReplayReview={handleReplayReview}
+                onUploadNew={handleUploadNewRound}
+                t={t}
+              />
+            )}
 
             {showOwnerActions && (
               <ReviewGalleryPanel

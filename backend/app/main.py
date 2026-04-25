@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 import logging
 import time
@@ -35,8 +36,16 @@ app.add_middleware(
     allow_origins=settings.backend_cors_origins,
     allow_origin_regex=settings.backend_cors_origin_regex or None,
     allow_credentials=True,
-    allow_methods=['*'],
-    allow_headers=['*'],
+    allow_methods=['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allow_headers=[
+        'Authorization',
+        'Content-Type',
+        'Accept',
+        'X-Requested-With',
+        'Idempotency-Key',
+        'X-Guest-Access-Token',
+        'X-Device-Id',
+    ],
     expose_headers=['X-Request-Id', 'X-Guest-Access-Token'],
 )
 app.include_router(router)
@@ -132,6 +141,62 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
     )
 
 
+# Paths excluded from audit logging (high-frequency / non-business endpoints).
+_AUDIT_SKIP_PATHS = {'/healthz', '/docs', '/openapi.json', '/redoc'}
+
+
+def _persist_audit_log(
+    *,
+    request_id: str,
+    method: str,
+    path: str,
+    query_string: str | None,
+    endpoint: str | None,
+    client_ip: str | None,
+    user_public_id: str | None,
+    user_agent: str | None,
+    request_body: bytes,
+    status_code: int,
+    duration_ms: int,
+) -> None:
+    """Persist a single audit log row.
+
+    Designed to run in a **thread-pool** so that the synchronous DB
+    session never blocks the async event loop.
+    """
+    db = SessionLocal()
+    try:
+        log_api_request(
+            db,
+            request_id=request_id,
+            method=method,
+            path=path,
+            query_string=query_string,
+            endpoint=endpoint,
+            client_ip=client_ip,
+            user_public_id=user_public_id,
+            user_agent=user_agent,
+            request_body=request_body,
+            status_code=status_code,
+            duration_ms=duration_ms,
+        )
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        logger.warning(
+            'Skipped duplicate API audit log',
+            extra={'request_id': request_id, 'request_path': path, 'http_method': method},
+        )
+    except Exception:
+        db.rollback()
+        logger.exception(
+            'Failed to persist API audit log',
+            extra={'request_id': request_id, 'request_path': path, 'http_method': method},
+        )
+    finally:
+        db.close()
+
+
 @app.middleware('http')
 async def request_audit_middleware(request: Request, call_next):
     started_at = time.perf_counter()
@@ -151,44 +216,27 @@ async def request_audit_middleware(request: Request, call_next):
         response.headers['X-Request-Id'] = request_id
         return response
     finally:
-        duration_ms = int((time.perf_counter() - started_at) * 1000)
-        endpoint = request.scope.get('path')
-        query_string = request.url.query or None
-        user_public_id = getattr(request.state, 'current_user_public_id', None)
-
-        client_ip = client_ip_from_request(request)
-
-        db = SessionLocal()
-        try:
-            log_api_request(
-                db,
-                request_id=request_id,
-                method=request.method,
-                path=request.url.path,
-                query_string=query_string,
-                endpoint=endpoint,
-                client_ip=client_ip,
-                user_public_id=user_public_id,
-                user_agent=request.headers.get('user-agent'),
-                request_body=request_body,
-                status_code=status_code,
-                duration_ms=duration_ms,
+        # Skip audit for non-business endpoints.
+        if request.url.path not in _AUDIT_SKIP_PATHS:
+            duration_ms = int((time.perf_counter() - started_at) * 1000)
+            # Fire-and-forget: run the synchronous DB write in the
+            # default thread-pool so the event loop stays unblocked.
+            asyncio.create_task(
+                asyncio.to_thread(
+                    _persist_audit_log,
+                    request_id=request_id,
+                    method=request.method,
+                    path=request.url.path,
+                    query_string=request.url.query or None,
+                    endpoint=request.scope.get('path'),
+                    client_ip=client_ip_from_request(request),
+                    user_public_id=getattr(request.state, 'current_user_public_id', None),
+                    user_agent=request.headers.get('user-agent'),
+                    request_body=request_body,
+                    status_code=status_code,
+                    duration_ms=duration_ms,
+                )
             )
-            db.commit()
-        except IntegrityError as exc:
-            db.rollback()
-            logger.warning(
-                'Skipped duplicate API audit log',
-                extra={'request_id': request_id, 'request_path': request.url.path, 'http_method': request.method},
-            )
-        except Exception:
-            db.rollback()
-            logger.exception(
-                'Failed to persist API audit log',
-                extra={'request_id': request_id, 'request_path': request.url.path, 'http_method': request.method},
-            )
-        finally:
-            db.close()
 
 
 @app.get('/healthz')

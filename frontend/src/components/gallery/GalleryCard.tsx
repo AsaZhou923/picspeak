@@ -1,9 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { ChevronRight, Heart, Star, Zap } from 'lucide-react';
+import { Camera, ChevronRight, Gauge, Heart, Star, Zap } from 'lucide-react';
 import { PublicGalleryItem } from '@/lib/types';
 import { useI18n } from '@/lib/i18n';
+import { getGalleryWorkspaceCtas, type ContentConversionEntrypoint } from '@/lib/content-conversion';
+import { markProductAttributionSource, trackProductEvent } from '@/lib/product-analytics';
 import GalleryCardImage from './GalleryCardImage';
 
 interface GalleryCardProps {
@@ -66,10 +68,26 @@ export default function GalleryCard({
   backHref,
   dateLocale,
 }: GalleryCardProps) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const author = getAuthorBadge(item.owner_username);
   const modeBadge = getModeBadgeConfig(item.mode);
   const ModeIcon = modeBadge.icon;
+  const workspaceCtas = getGalleryWorkspaceCtas(locale, item);
+
+  const handleWorkspaceCtaClick = (entrypoint: ContentConversionEntrypoint) => {
+    markProductAttributionSource('gallery');
+    void trackProductEvent('content_workspace_clicked', {
+      source: 'gallery',
+      pagePath: '/gallery',
+      locale,
+      metadata: {
+        entrypoint,
+        gallery_review_id: item.review_id,
+        image_type: item.image_type,
+        final_score: item.final_score,
+      },
+    });
+  };
 
   return (
     <article
@@ -149,6 +167,30 @@ export default function GalleryCard({
           >
             {trimSummary(item.summary || t('gallery_summary_fallback'))}
           </p>
+        </div>
+
+        <div className="mt-3 grid gap-2">
+          <Link
+            href={workspaceCtas.practice.href}
+            onClick={() => handleWorkspaceCtaClick(workspaceCtas.practice.entrypoint)}
+            className="group/practice rounded-[18px] border border-border-subtle bg-void/20 px-3.5 py-3 transition-colors hover:border-gold/30 hover:bg-gold/5"
+          >
+            <span className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.18em] text-gold/80">
+              <Camera size={12} />
+              {workspaceCtas.practice.title}
+            </span>
+            <span className="mt-1.5 block text-xs leading-5 text-ink-muted">
+              {workspaceCtas.practice.body}
+            </span>
+          </Link>
+          <Link
+            href={workspaceCtas.standard.href}
+            onClick={() => handleWorkspaceCtaClick(workspaceCtas.standard.entrypoint)}
+            className="inline-flex items-center justify-center gap-2 rounded-full border border-gold/30 px-3 py-2 text-xs font-medium text-gold transition-all hover:bg-gold/10 active:scale-[0.98]"
+          >
+            <Gauge size={13} />
+            {workspaceCtas.standard.cta}
+          </Link>
         </div>
 
         <div className="mt-auto flex items-center gap-2 pt-4">

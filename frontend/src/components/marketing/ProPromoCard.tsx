@@ -7,6 +7,7 @@ import ActivationCodeModal from '@/components/billing/ActivationCodeModal';
 import { useAuth } from '@/lib/auth-context';
 import { useI18n } from '@/lib/i18n';
 import { CN_PRO_CHECKOUT_TIP, openChinaProPurchase, startProCheckout } from '@/lib/pro-checkout';
+import { getProPlanBoundaryCopy, getProUpgradeTriggerCopy } from '@/lib/pro-conversion';
 
 export type PromoPlan = 'guest' | 'free' | 'pro';
 export type PromoScene = 'workspace' | 'gallery' | 'usage' | 'review';
@@ -45,6 +46,11 @@ type ProPromoCardProps = {
 };
 
 function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
+  const proFeatures = getProPlanBoundaryCopy(locale).pro.features;
+  const workspaceTrigger = getProUpgradeTriggerCopy(locale, 'retake_compare');
+  const reviewTrigger = getProUpgradeTriggerCopy(locale, 'deeper_result');
+  const usageTrigger = getProUpgradeTriggerCopy(locale, 'standard');
+
   if (locale === 'zh') {
     return {
       badge: '首发促销',
@@ -52,7 +58,7 @@ function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
       price: '$2.99 / 月',
       oldPrice: '$3.99',
       footnote: CN_PRO_CHECKOUT_TIP,
-      features: ['更深入的 Pro 评图', '近乎不限量评图', '永久保留历史记录', '优先进入分析队列'],
+      features: proFeatures,
       guestCta: '使用 Lemon Squeezy 开通',
       freeCta: '使用 Lemon Squeezy 开通',
       chinaCta: '中文用户可选：前往爱发电开通',
@@ -64,8 +70,8 @@ function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
       scenes: {
         workspace: {
           default: {
-            title: '主支付入口为 Lemon Squeezy，中文用户也可选爱发电',
-            body: '如果你想直接开通 Pro，可以先走 Lemon Squeezy；如果你在国内支付更方便，也可以选择爱发电，下单后再输入激活码。',
+            title: workspaceTrigger.title,
+            body: `${workspaceTrigger.body} 主支付入口为 Lemon Squeezy，中文用户也可选爱发电。`,
           },
           pro: {
             title: '继续通过激活码续费你的 Pro',
@@ -74,8 +80,8 @@ function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
         },
         gallery: {
           default: {
-            title: '看完案例后，直接开通 Pro 深入评图',
-            body: '主支付入口还是 Lemon Squeezy。中文用户如果更在意优惠，也可以选择爱发电后再兑换激活码。',
+            title: usageTrigger.title,
+            body: `${usageTrigger.body} 看完案例后，可以直接把下一次上传切到 Pro 成长闭环。`,
           },
           pro: {
             title: '你的 Pro 已开通，可继续续期',
@@ -84,8 +90,8 @@ function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
         },
         usage: {
           default: {
-            title: '优先使用 Lemon Squeezy，也支持中文优惠通道',
-            body: '默认支付入口仍是 Lemon Squeezy。中文用户可额外选择爱发电，通常会有更多优惠。',
+            title: usageTrigger.title,
+            body: `${usageTrigger.body} 默认支付入口仍是 Lemon Squeezy，中文用户可额外选择爱发电。`,
           },
           pro: {
             title: '当前账号已是 Pro，可继续续期',
@@ -94,8 +100,8 @@ function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
         },
         review: {
           default: {
-            title: '这次评图想更深入，可以直接开通 Pro',
-            body: '主支付入口仍是 Lemon Squeezy；如果你是中文用户，也可以走爱发电优惠通道，收到激活码后在站内兑换。',
+            title: reviewTrigger.title,
+            body: `${reviewTrigger.body} 主支付入口仍是 Lemon Squeezy；中文用户也可以走爱发电优惠通道。`,
           },
           pro: {
             title: '继续延长你的 Pro 时长',
@@ -113,7 +119,7 @@ function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
       price: '$2.99 / 月',
       oldPrice: '$3.99',
       footnote: '現在はローンチ期間中の価格です。今後は通常料金に戻る場合があります。',
-      features: ['より深い Pro 分析', 'ほぼ無制限のレビュー', '履歴を永久保存', '優先キュー'],
+      features: proFeatures,
       guestCta: 'ローンチ価格で始める',
       freeCta: '今すぐ Pro にアップグレード',
       chinaCta: '',
@@ -125,8 +131,8 @@ function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
       scenes: {
         workspace: {
           default: {
-            title: 'アップロード直後に Pro の深い分析へ進む',
-            body: 'より詳しい診断と次の一手が必要なら、ここからすぐ Pro に切り替えられます。',
+            title: workspaceTrigger.title,
+            body: workspaceTrigger.body,
           },
           pro: {
             title: '現在の Pro プランはローンチ価格のまま有効です',
@@ -135,8 +141,8 @@ function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
         },
         gallery: {
           default: {
-            title: 'ギャラリーで参考を見たら、次は自分の写真を Pro で深掘り',
-            body: '良い作例を参考にしたあと、そのまま次のアップロードを Pro の深い分析につなげられます。',
+            title: usageTrigger.title,
+            body: 'ギャラリーで参考を見たあと、次のアップロードを Pro の成長ループにつなげられます。',
           },
           pro: {
             title: 'Pro のローンチ価格はそのまま維持されています',
@@ -145,8 +151,8 @@ function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
         },
         usage: {
           default: {
-            title: 'Pro は現在 $2.99/月 のローンチ価格です',
-            body: '深い分析、永久履歴、優先処理をまとめてすぐ解放できます。',
+            title: usageTrigger.title,
+            body: usageTrigger.body,
           },
           pro: {
             title: 'すでに Pro のローンチ価格を確保しています',
@@ -155,8 +161,8 @@ function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
         },
         review: {
           default: {
-            title: 'この結果をもう一段深く見るなら Pro が最短です',
-            body: '今回の講評をさらに深く掘り下げ、改善の方向を明確にしたいなら、ここからのアップグレードが最短です。',
+            title: reviewTrigger.title,
+            body: reviewTrigger.body,
           },
           pro: {
             title: 'この結果も Pro でさらに深く掘り下げられます',
@@ -173,7 +179,7 @@ function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
     price: '$2.99 / month',
     oldPrice: '$3.99',
     footnote: 'This is the current launch-period price and may return to the regular rate later.',
-    features: ['Deeper Pro critique', 'Near-unlimited reviews', 'Permanent history', 'Priority queue'],
+    features: proFeatures,
     guestCta: 'Claim the launch price',
     freeCta: 'Upgrade to Pro now',
     chinaCta: '',
@@ -185,8 +191,8 @@ function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
     scenes: {
       workspace: {
         default: {
-          title: 'Go straight from upload to deeper Pro critique',
-          body: 'If you want fuller diagnosis and clearer next-step direction, you can switch into Pro right here.',
+          title: workspaceTrigger.title,
+          body: workspaceTrigger.body,
         },
         pro: {
           title: 'Your Pro plan is still active at the launch price',
@@ -195,8 +201,8 @@ function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
       },
       gallery: {
         default: {
-          title: 'See a strong example, then deepen your own photo with Pro',
-          body: 'Use the gallery for reference, then move straight into deeper critique on your next upload.',
+          title: usageTrigger.title,
+          body: 'Use the gallery for reference, then move your next upload into the Pro growth loop.',
         },
         pro: {
           title: 'Your Pro plan is still locked in at the launch price',
@@ -205,8 +211,8 @@ function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
       },
       usage: {
         default: {
-          title: 'Pro is currently available for $2.99/month',
-          body: 'Unlock deeper critique, permanent history, and priority processing in one step.',
+          title: usageTrigger.title,
+          body: usageTrigger.body,
         },
         pro: {
           title: 'You have already locked in the Pro launch price',
@@ -215,8 +221,8 @@ function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
       },
       review: {
         default: {
-          title: 'Take this result one step further with Pro',
-          body: 'If you want a deeper breakdown and clearer improvement direction from this critique, upgrading here is the fastest path.',
+          title: reviewTrigger.title,
+          body: reviewTrigger.body,
         },
         pro: {
           title: 'This result can still be explored more deeply with Pro',

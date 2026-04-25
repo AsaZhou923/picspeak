@@ -171,7 +171,16 @@ export interface TaskStatusResponse {
   last_heartbeat_at: string | null;
   started_at: string | null;
   finished_at: string | null;
-  error: Record<string, unknown> | null;
+  error: TaskErrorPayload | null;
+}
+
+export interface TaskErrorPayload {
+  code: string | null;
+  message: string | null;
+  retryable: boolean;
+  timeout: boolean;
+  failure_stage: string;
+  quota_charged: boolean;
 }
 
 export interface ReviewGetResponse {
@@ -180,7 +189,7 @@ export interface ReviewGetResponse {
   photo_url: string | null;
   mode: ReviewMode;
   status: ReviewStatus;
-  image_type?: ImageType;
+  image_type: ImageType;
   source_review_id?: string | null;
   viewer_is_owner?: boolean;
   favorite?: boolean;
@@ -213,12 +222,12 @@ export interface ReviewHistoryItem {
   photo_thumbnail_url?: string | null;
   mode: ReviewMode;
   status: ReviewStatus;
-  image_type?: ImageType;
+  image_type: ImageType;
   source_review_id?: string | null;
   final_score: number;
-  scores?: ReviewScores;
-  model_name?: string;
-  model_version?: string;
+  scores: ReviewScores;
+  model_name: string;
+  model_version: string;
   favorite?: boolean;
   gallery_visible?: boolean;
   gallery_audit_status?: 'none' | 'approved' | 'rejected';

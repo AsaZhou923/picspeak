@@ -14,6 +14,7 @@ from app.services.product_analytics import (  # noqa: E402
     AnalyticsEventSample,
     ReviewSample,
     build_stage_a_snapshot,
+    render_content_conversion_weekly_markdown,
     render_stage_a_snapshot_markdown,
 )
 
@@ -38,6 +39,7 @@ class ProductAnalyticsServiceTests(unittest.TestCase):
             'blog_post_viewed',
             'gallery_viewed',
             'share_viewed',
+            'content_workspace_clicked',
         }
 
         self.assertTrue(required_events.issubset(STAGE_A_EVENT_CATALOG.keys()))
@@ -216,12 +218,124 @@ class ProductAnalyticsServiceTests(unittest.TestCase):
         self.assertEqual(source_breakdown['blog']['workspace_entries'], 1)
         self.assertEqual(source_breakdown['blog']['review_requests'], 1)
         self.assertEqual(source_breakdown['blog']['review_results'], 1)
+        self.assertEqual(source_breakdown['blog']['workspace_clicks'], 0)
+        self.assertEqual(source_breakdown['blog']['uploads'], 0)
 
         plan_breakdown = snapshot['plan_breakdown']
         self.assertEqual(plan_breakdown['guest']['active_users'], 2)
         self.assertEqual(plan_breakdown['guest']['review_requests'], 2)
         self.assertEqual(plan_breakdown['free']['checkout_started'], 1)
         self.assertEqual(plan_breakdown['pro']['paid_success'], 1)
+
+    def test_build_stage_a_snapshot_calculates_content_conversion_weekly_report(self) -> None:
+        events = [
+            AnalyticsEventSample(
+                event_name='blog_post_viewed',
+                occurred_at=datetime(2026, 4, 20, 9, 0, tzinfo=timezone.utc),
+                device_id='blog-dev',
+                session_id='blog-session',
+                plan='guest',
+                source='blog',
+                page_path='/zh/blog/five-photo-composition-checks',
+                metadata={'content_slug': 'five-photo-composition-checks'},
+            ),
+            AnalyticsEventSample(
+                event_name='content_workspace_clicked',
+                occurred_at=datetime(2026, 4, 20, 9, 2, tzinfo=timezone.utc),
+                device_id='blog-dev',
+                session_id='blog-session',
+                plan='guest',
+                source='blog',
+                page_path='/zh/blog/five-photo-composition-checks',
+                metadata={'entrypoint': 'blog_same_critique'},
+            ),
+            AnalyticsEventSample(
+                event_name='workspace_viewed',
+                occurred_at=datetime(2026, 4, 20, 9, 3, tzinfo=timezone.utc),
+                device_id='blog-dev',
+                session_id='blog-session',
+                plan='guest',
+                source='blog',
+            ),
+            AnalyticsEventSample(
+                event_name='upload_succeeded',
+                occurred_at=datetime(2026, 4, 20, 9, 4, tzinfo=timezone.utc),
+                device_id='blog-dev',
+                session_id='blog-session',
+                plan='guest',
+                source='blog',
+            ),
+            AnalyticsEventSample(
+                event_name='review_requested',
+                occurred_at=datetime(2026, 4, 20, 9, 5, tzinfo=timezone.utc),
+                device_id='blog-dev',
+                session_id='blog-session',
+                plan='guest',
+                source='blog',
+            ),
+            AnalyticsEventSample(
+                event_name='review_result_viewed',
+                occurred_at=datetime(2026, 4, 20, 9, 8, tzinfo=timezone.utc),
+                device_id='blog-dev',
+                session_id='blog-session',
+                plan='guest',
+                source='blog',
+            ),
+            AnalyticsEventSample(
+                event_name='gallery_viewed',
+                occurred_at=datetime(2026, 4, 20, 10, 0, tzinfo=timezone.utc),
+                device_id='gallery-dev',
+                session_id='gallery-session',
+                plan='guest',
+                source='gallery',
+                page_path='/gallery',
+            ),
+            AnalyticsEventSample(
+                event_name='content_workspace_clicked',
+                occurred_at=datetime(2026, 4, 20, 10, 1, tzinfo=timezone.utc),
+                device_id='gallery-dev',
+                session_id='gallery-session',
+                plan='guest',
+                source='gallery',
+                page_path='/gallery',
+                metadata={'entrypoint': 'gallery_score_standard'},
+            ),
+            AnalyticsEventSample(
+                event_name='workspace_viewed',
+                occurred_at=datetime(2026, 4, 20, 10, 3, tzinfo=timezone.utc),
+                device_id='gallery-dev',
+                session_id='gallery-session',
+                plan='guest',
+                source='gallery',
+            ),
+            AnalyticsEventSample(
+                event_name='upload_succeeded',
+                occurred_at=datetime(2026, 4, 20, 10, 4, tzinfo=timezone.utc),
+                device_id='gallery-dev',
+                session_id='gallery-session',
+                plan='guest',
+                source='gallery',
+            ),
+        ]
+
+        snapshot = build_stage_a_snapshot(
+            events=events,
+            reviews=[],
+            start_date=date(2026, 4, 20),
+            end_date=date(2026, 4, 26),
+        )
+
+        content_report = snapshot['content_conversion_weekly']
+        self.assertEqual(content_report['blog']['visitors'], 1)
+        self.assertEqual(content_report['blog']['workspace_clicks'], 1)
+        self.assertEqual(content_report['blog']['workspace_entries'], 1)
+        self.assertEqual(content_report['blog']['uploads'], 1)
+        self.assertEqual(content_report['blog']['article_to_workspace_click_rate'], 1.0)
+        self.assertEqual(content_report['blog']['first_review_completion_rate'], 1.0)
+        self.assertEqual(content_report['gallery']['visitors'], 1)
+        self.assertEqual(content_report['gallery']['workspace_clicks'], 1)
+        self.assertEqual(content_report['gallery']['uploads'], 1)
+        self.assertEqual(content_report['gallery']['gallery_to_upload_conversion_rate'], 1.0)
 
     def test_render_stage_a_snapshot_markdown_outputs_a_daily_table(self) -> None:
         snapshot = build_stage_a_snapshot(
@@ -245,6 +359,37 @@ class ProductAnalyticsServiceTests(unittest.TestCase):
         self.assertIn('# PicSpeak 阶段 A 基线快照', markdown)
         self.assertIn('| 日期 | DAU | WAU | 首评完成率 | 7 日二次使用率 |', markdown)
         self.assertIn('| 2026-04-10 | 1 | 1 | 0.0% | 0.0% |', markdown)
+
+    def test_render_content_conversion_weekly_markdown_outputs_stage_d_table(self) -> None:
+        snapshot = build_stage_a_snapshot(
+            events=[
+                AnalyticsEventSample(
+                    event_name='blog_post_viewed',
+                    occurred_at=datetime(2026, 4, 20, 9, 0, tzinfo=timezone.utc),
+                    device_id='dev-1',
+                    session_id='sess-1',
+                    plan='guest',
+                    source='blog',
+                ),
+                AnalyticsEventSample(
+                    event_name='content_workspace_clicked',
+                    occurred_at=datetime(2026, 4, 20, 9, 1, tzinfo=timezone.utc),
+                    device_id='dev-1',
+                    session_id='sess-1',
+                    plan='guest',
+                    source='blog',
+                ),
+            ],
+            reviews=[],
+            start_date=date(2026, 4, 20),
+            end_date=date(2026, 4, 26),
+        )
+
+        markdown = render_content_conversion_weekly_markdown(snapshot)
+
+        self.assertIn('# PicSpeak 内容来源转化周报', markdown)
+        self.assertIn('| 来源 | 浏览访客 | 工作台点击 | 工作台进入 | 上传成功 | 发起点评 | 查看结果 | 点击率 | 上传转化率 | 首评完成率 |', markdown)
+        self.assertIn('| blog | 1 | 1 | 0 | 0 | 0 | 0 | 100.0% | 0.0% | 0.0% |', markdown)
 
 
 if __name__ == '__main__':

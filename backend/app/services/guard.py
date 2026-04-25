@@ -429,3 +429,30 @@ def save_idempotency_record(
         expire_at=utc_now() + timedelta(hours=ttl_hours),
     )
     db.add(record)
+
+
+# ---------------------------------------------------------------------------
+# Activation-code specific rate limiting
+# ---------------------------------------------------------------------------
+
+# Maximum activation-code redemption attempts per user per hour.
+ACTIVATION_CODE_RATE_LIMIT_PER_HOUR = 10
+
+
+def enforce_activation_code_rate_limit(db: Session, user: User) -> None:
+    """Raise 429 if the user has exceeded the activation-code redemption rate limit.
+
+    Limit: ``ACTIVATION_CODE_RATE_LIMIT_PER_HOUR`` attempts per rolling hour per user.
+    The counter is NOT incremented on success — only on attempt — so failed guesses consume quota.
+    """
+    now = utc_now()
+    window_start = now.replace(minute=0, second=0, microsecond=0)
+    _enforce_scope_rate_limit(
+        db,
+        scope='activation_code_redeem',
+        scope_key=f'user:{user.public_id}',
+        endpoint='activation_code_redeem',
+        per_minute_limit=ACTIVATION_CODE_RATE_LIMIT_PER_HOUR,
+        window_start=window_start,
+        window_seconds=3600,
+    )

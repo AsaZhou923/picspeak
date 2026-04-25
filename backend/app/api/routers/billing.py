@@ -26,6 +26,7 @@ from app.services.billing_access import (
     subscription_grants_pro_access as billing_subscription_grants_pro_access,
 )
 from app.services.guard import (
+    enforce_activation_code_rate_limit,
     guest_quota_scope_key,
     guest_usage_snapshot,
     has_priority_queue,
@@ -230,6 +231,9 @@ def redeem_activation_code(
 ):
     if actor.plan == UserPlan.guest:
         raise api_error(status.HTTP_403_FORBIDDEN, 'BILLING_SIGNIN_REQUIRED', 'Please sign in before redeeming an activation code')
+
+    # Enforce per-user rate limit before attempting redemption to prevent brute-force.
+    enforce_activation_code_rate_limit(db, actor.user)
 
     _, subscription = redeem_activation_code_for_user(db, user=actor.user, raw_code=payload.code)
     db.commit()
