@@ -1,0 +1,455 @@
+{
+  "ui": {
+    "name": "Lens Notes",
+    "label": "Lens Notes",
+    "navLabel": "Blog",
+    "footerLabel": "Blog",
+    "homeLabel": "Lens Notes",
+    "homeHint": "AI critique guides, composition tips, and post-shoot workflows",
+    "title": "Lens Notes | PicSpeak Photography Blog",
+    "description": "PicSpeak's content hub for AI photo critique, composition tips, lighting guides, color theory, and shooting review workflows.",
+    "keywords": [
+      "AI photo critique blog",
+      "photo composition tips",
+      "photography feedback",
+      "photo review workflow",
+      "photography lighting",
+      "photo color theory"
+    ],
+    "introPrimary": "This is not a product changelog. It is PicSpeak's content hub for AI photo critique, composition, lighting, color principles, post-shoot review, and repeatable photography practice.",
+    "introSecondary": "Articles cover daily critique practice, common composition checks, lighting mistakes, core color principles, and how to turn feedback into a shooting checklist.",
+    "starterPostsLabel": "Starter posts",
+    "primaryTopicsLabel": "Primary topics",
+    "seoDirectionLabel": "SEO direction",
+    "primaryTopicsText": "critique workflow, composition fixes, lighting, color, shooting review",
+    "seoDirectionText": "AI photo critique / composition / lighting / color / workflow",
+    "startTitle": "Start here",
+    "startIntro": "If this is your first visit, start with these articles. They are built to be searchable and immediately useful in the field.",
+    "featuredLabel": "Featured Article",
+    "allPostsLabel": "All Posts",
+    "allPostsHeading": "All articles",
+    "readFeaturedCta": "Read this first",
+    "readMoreCta": "Read article",
+    "backToBlog": "Back to Lens Notes",
+    "nextStepLabel": "Next Step",
+    "nextStepTitle": "Take these ideas into your next shoot",
+    "nextStepBody": "Return to the PicSpeak workspace, upload a real frame, and use the critique result to see whether these checks improved the image.",
+    "nextStepCta": "Try a photo",
+    "moreArticlesCta": "Read more articles",
+    "relatedLabel": "Related",
+    "relatedHeading": "Keep reading"
+  },
+  "posts": [
+    {
+      "slug": "ai-photo-critique-daily-practice",
+      "title": "Why AI photo critique works best as daily practice, not just emergency repair",
+      "description": "AI critique becomes more useful when it is part of a repeatable training loop. This article explores the psychology of deliberate practice and how high-frequency review accelerates growth.",
+      "excerpt": "The bigger gains usually come from consistent post-shoot review. When AI critique becomes part of your routine, repeated weaknesses show up much faster — and you start fixing them before they become permanent habits.",
+      "category": "AI Critique",
+      "readingTime": "5 min read",
+      "publishedAt": "2026-04-11",
+      "updatedAt": "2026-04-11",
+      "keywords": [
+        "AI photo critique",
+        "post-shoot review",
+        "photography practice",
+        "deliberate practice photography",
+        "photo improvement routine"
+      ],
+      "intro": "If you use critique only after obvious failures, you miss most of its value. The harder problem is usually repeating the same visual mistake for weeks without noticing it. This article explains — from a training psychology perspective — why daily critique beats occasional deep review.",
+      "takeawayTitle": "Core takeaway",
+      "takeawayItems": [
+        "High-frequency review beats low-frequency deep review.",
+        "Feedback matters only when it turns into an actionable task.",
+        "Repeated issues should become your next training target, not be ignored.",
+        "Focus on only 1–2 improvements per session — don't overload."
+      ],
+      "sections": [
+        {
+          "title": "1. AI critique is good at exposing repeated patterns",
+          "paragraphs": [
+            "A single image can look acceptable, but a week of work may reveal the same weakness over and over: loose framing, messy edges, flat light, or weak storytelling.",
+            "The real value is not just one score. It is the repeated signal telling you the same issue is still there. This kind of persistent reminder is something human mentors rarely provide — they usually only see the few photos you choose to share, not the patterns across hundreds of images in your library.",
+            "So the core advantage of AI critique is not being smarter than a human — it's being more patient. It checks the same five dimensions every single time, never skipping something because \"we talked about that last time.\""
+          ]
+        },
+        {
+          "title": "2. Daily practice needs a short loop",
+          "paragraphs": [
+            "After each shoot, spend ten minutes choosing one to three representative frames. Review them, then reduce the result to one or two actions for the next session. The shorter and more frequent this loop, the more stable your progress.",
+            "The real pain point for most learners is not lack of knowledge — it's lack of feedback frequency. You might read 100 composition tutorials, but if you only shoot 5 times in two months and never compare results to previous feedback, that knowledge never becomes internalized."
+          ],
+          "bullets": [
+            "Pick representative frames, not every similar miss — the act of selecting is itself training.",
+            "Keep only one or two corrections for next time to prevent memory overload.",
+            "Use the next shoot to test whether the old problem improved before chasing new goals."
+          ]
+        },
+        {
+          "title": "3. From \"knowing\" to \"doing\" — a deliberate practice perspective",
+          "paragraphs": [
+            "Sports science has a concept called \"deliberate practice\": not repeating what you already do well, but repeatedly challenging yourself in the zone where you barely manage. AI critique can help you locate this zone precisely — the dimension where you consistently score lowest is the one most worth training.",
+            "For example, if your \"composition\" has hovered around 6/10 for three weeks while \"color\" already sits at 8, your next training phase should focus on composition, not more color grading. This precise targeting can significantly shorten the improvement cycle."
+          ]
+        },
+        {
+          "title": "4. How to build your daily critique routine",
+          "paragraphs": [
+            "Step 1: Right after the shoot, start culling while importing. Don't wait until you \"have time\" — by then you'll have forgotten your on-site decisions.",
+            "Step 2: Select 1–3 most representative photos and upload them for critique. If you shot the same scene, choosing one best and one worst frame for comparison is the most valuable approach.",
+            "Step 3: After reviewing the critique, write one sentence: \"Next time I need to pay attention to ______.\" That sentence becomes your next training goal."
+          ],
+          "bullets": [
+            "Tool: phone notes, Notion, even paper — what matters is consistency.",
+            "Frequency: at least 2–3 times per week; casual phone photos count too.",
+            "Monthly review: spend 15 minutes looking at past critiques to track your progress trend."
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "five-photo-composition-checks",
+      "title": "Composition still feels \"off\"? Check these 5 common problems first",
+      "description": "Subject clarity, edge distractions, depth, balance, and visual flow are the five most useful composition checks. A walkthrough-style checklist for field and post-processing use.",
+      "excerpt": "Most \"almost there\" photos do not fail because the photographer doesn't understand composition. They fail because nobody makes the final check. This article gives you an executable five-step process.",
+      "category": "Composition",
+      "readingTime": "6 min read",
+      "publishedAt": "2026-04-11",
+      "updatedAt": "2026-04-11",
+      "keywords": [
+        "photo composition tips",
+        "composition checklist",
+        "subject clarity",
+        "edge distractions",
+        "visual flow photography"
+      ],
+      "intro": "Many photographers know the rule of thirds and leading lines, but still leave with a frame that feels close rather than complete. This article is not another composition theory overview — it's a five-step checklist you can use on-site, in post, and during critique.",
+      "takeawayTitle": "Keep these 5 checks in mind",
+      "takeawayItems": [
+        "Can the subject be read immediately — check size, brightness, and color advantage.",
+        "Are the edges carrying useless distractions — power lines, half-cropped heads, bright debris.",
+        "Is there depth in the frame — foreground, midground, background: at least two layers.",
+        "Is visual weight balanced — left/right, top/bottom distribution of brightness and mass.",
+        "Does the eye move naturally toward the subject — leading lines, tonal contrast, or color focus."
+      ],
+      "sections": [
+        {
+          "title": "1. Subject clarity: seen in one glance",
+          "paragraphs": [
+            "If a viewer needs several seconds to understand the frame, the subject is usually too weak. Give it a clear advantage in size, brightness, color, or sharpness over every other element in the frame.",
+            "A common misconception: \"My subject is centered, so it should be clear enough.\" But if the centered subject has similar brightness and color to the background, it drowns. Try using contrast: make the subject one stop brighter, slightly more saturated, or separate it with shallow depth of field.",
+            "A practical test: shrink the photo to phone-thumbnail size. If the subject is still identifiable at that scale, it's clear enough."
+          ]
+        },
+        {
+          "title": "2. Edge distractions: the problem is usually at the border",
+          "paragraphs": [
+            "Many photos break not in the center, but at the border — half a street sign, a bright fragment, or a chaotic tangle of lines stealing attention from the subject.",
+            "The fix is simple: before pressing the shutter, spend 2 seconds scanning all four edges and corners. If anything shouldn't be there — a branch, a streetlight, half of someone's arm — adjust your position or focal length to cut it out.",
+            "Post-crop is a last resort, not the primary plan, because cropping changes the aspect ratio and can shift the subject position. Building the habit of cleaning edges on-site is far more efficient."
+          ],
+          "bullets": [
+            "Check corners: they're the first place attention leaks.",
+            "Half-objects: either include fully or remove completely — never leave half.",
+            "Bright-color traps: white or saturated patches at the edge pull the eye away from the subject."
+          ]
+        },
+        {
+          "title": "3. Depth: making the frame three-dimensional",
+          "paragraphs": [
+            "Without a foreground or spatial relationships, photos feel flat. Even a simple foreground element — ground texture, a line, a fallen leaf — can add depth to the scene.",
+            "Depth doesn't require a massive foreground. In street and portrait photography, separation via bokeh also creates spatial depth. The key is to give the frame \"pull-through\" energy — the viewer should feel they can walk into the scene."
+          ],
+          "bullets": [
+            "Landscape: look for foreground anchors (rocks, flowers, water reflections).",
+            "Street: use framing devices (doorways, windows, tunnels) to create layers.",
+            "Portrait: control subject-to-background distance and use bokeh for separation."
+          ]
+        },
+        {
+          "title": "4. Visual balance: matching the visual weight",
+          "paragraphs": [
+            "When visual weight is lopsided, the eye drifts even if the subject is technically well-placed. Visual weight depends on brightness, saturation, size, and texture complexity.",
+            "\"Balance\" does not mean symmetry — the rule of thirds is inherently asymmetric. But the heavier side needs an element on the opposite side to anchor the frame; otherwise it feels like it's about to tip over."
+          ]
+        },
+        {
+          "title": "5. Visual flow: guiding the viewer's eye",
+          "paragraphs": [
+            "Confirm there is some path — explicit (roads, railings, architectural lines) or implicit (brightness gradients, color transitions, gaze direction) — leading the eye to the subject instead of drifting aimlessly through the frame.",
+            "A practical exercise: imagine seeing this photo for the first time. Where does your eye land first? Follow it. Does it eventually reach the subject? If the eye wanders in circles with nowhere to rest, the image lacks effective visual flow."
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "turn-photo-feedback-into-shooting-checklist",
+      "title": "Turn photo feedback into a checklist for your next shoot",
+      "description": "Feedback becomes useful when translated into concrete actions you can test on the next session. Includes genre-specific checklist templates.",
+      "excerpt": "Understanding feedback and actually fixing the problem are different skills. Once feedback becomes a short checklist, critique turns into practice.",
+      "category": "Workflow",
+      "readingTime": "5 min read",
+      "publishedAt": "2026-04-11",
+      "updatedAt": "2026-04-11",
+      "keywords": [
+        "photo feedback checklist",
+        "photography workflow",
+        "shooting checklist",
+        "photo improvement method",
+        "critique to action"
+      ],
+      "intro": "A lot of learning stops at \"I understand the issue now.\" The real shift happens when that issue becomes something you can execute in the field. This article provides a methodology for translating abstract critiques into on-site actions, plus genre-specific checklist templates.",
+      "takeawayTitle": "Rules for turning feedback into action",
+      "takeawayItems": [
+        "Abstract comments need to become field decisions — \"cluttered\" isn't an action; \"crop the sign at the edge\" is.",
+        "Short checklists are easier to execute — three items max per session.",
+        "One checklist should support one kind of shoot.",
+        "After each shoot, verify whether last session's checklist was actually followed."
+      ],
+      "sections": [
+        {
+          "title": "1. Replace abstract comments with field actions",
+          "paragraphs": [
+            "\"Too cluttered\" is not an action. \"Cut the bright sign at the edge\" is. \"Lacks depth\" is not an action. \"Add a foreground layer and increase subject-background distance\" is.",
+            "Most AI critiques and human mentors give descriptive feedback — they tell you \"what\" but rarely \"how.\" The key to translation is converting every descriptive comment into a specific operation you can perform on location."
+          ],
+          "bullets": [
+            "\"Cluttered\" → Next time scout the background first, move to avoid distractions, or use a longer focal length to compress.",
+            "\"Exposure is off\" → Meter on highlights instead of average, or enable highlight alert.",
+            "\"Colors are flat\" → Try shooting during golden hour or blue hour, or add local contrast in post.",
+            "\"Subject doesn't stand out\" → Use a wider aperture, foreground/background separation, or find color contrast to emphasize the subject."
+          ]
+        },
+        {
+          "title": "2. Build a short checklist and verify it",
+          "paragraphs": [
+            "Compress the last review into three reminders or fewer, look at them before you leave, and check after the shoot whether you actually used them. That is how feedback becomes a training loop.",
+            "Why three or fewer? Because on location you're already processing light, scene, subject state, composition, and camera settings simultaneously. Working memory is limited. If you carry 10 items out the door, you'll likely remember zero."
+          ]
+        },
+        {
+          "title": "3. Genre-specific checklist templates",
+          "paragraphs": [
+            "Different genres have very different priorities. Here are some starting templates you can customize based on your weaknesses:"
+          ],
+          "bullets": [
+            "Street: ① Clean background ② Clear subject hierarchy ③ Decisive moment timing.",
+            "Portrait: ① Catchlight and face lighting direction ② Subject-background separation ③ Pose and expression guidance.",
+            "Landscape: ① Foreground structure ② Timing window (golden/blue hour) ③ Sky-to-ground ratio.",
+            "Food: ① Light angle (top or side) ② Props shouldn't upstage the dish ③ Warm, appetizing color palette.",
+            "Architecture: ① Perspective correction and verticals ② Light emphasizing form ③ Simplify surroundings."
+          ]
+        },
+        {
+          "title": "4. Case study: a complete feedback loop in practice",
+          "paragraphs": [
+            "Suppose your last street shoot received: \"Composition 6/10. Main issue: background too cluttered, subject lost in the environment.\" Translation into an action checklist: ① Next time find cleaner backgrounds (solid-color walls, sky) ② Use 50mm+ to compress the background ③ Wait until the subject passes through a clean zone before pressing the shutter.",
+            "On the next shoot, go out with those 3 items. Then upload the new results and check whether those specific points improved. If composition rises to 7.5+, the direction is right; if it stays flat, adjust the strategy.",
+            "This \"feedback → translate → execute → verify\" cycle is the key to turning AI critique into a real training system."
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "lighting-mistakes-ai-catches",
+      "title": "5 lighting mistakes AI catches most often — and how to avoid them on location",
+      "description": "Backlight blowout, mixed color temperatures, crushed shadows, harsh top-light, and directionless flat lighting are the five lighting issues AI reviews flag most frequently.",
+      "excerpt": "Lighting is the most underrated dimension in photography. Many people pour energy into composition while treating light as luck. This article lists the 5 most-flagged lighting issues and on-location fixes.",
+      "category": "Lighting",
+      "readingTime": "6 min read",
+      "publishedAt": "2026-04-11",
+      "updatedAt": "2026-04-11",
+      "keywords": [
+        "photography lighting",
+        "lighting mistakes",
+        "AI photo analysis",
+        "exposure control",
+        "color temperature",
+        "natural light tips"
+      ],
+      "intro": "Among PicSpeak's five scoring dimensions, lighting is the one where users score lowest on average. Not because it's the hardest to learn, but because most people focus on composition and subject while treating light as \"something you can't control.\" In reality, light is entirely manageable through timing, position, and angle — even without any studio equipment.",
+      "takeawayTitle": "5 lighting mistakes to avoid",
+      "takeawayItems": [
+        "Backlight blowout: subject becomes a silhouette or face goes black.",
+        "Mixed color temperatures: daylight and indoor light clash, causing unnatural color casts.",
+        "Crushed shadows: dark areas turn pure black with no texture or detail.",
+        "Harsh top-light: midday sun creates raccoon-eye shadows under brows and nose.",
+        "Directionless flat light: no visible light source, image feels flat and dimensionless."
+      ],
+      "sections": [
+        {
+          "title": "1. Backlight blowout",
+          "paragraphs": [
+            "Backlight itself isn't the problem — it can create beautiful flare and atmosphere. The issue is exposure control. When the camera meters against a strong light source, it drastically underexposes, turning the subject into a black silhouette.",
+            "Fix: if you want subject detail, switch to spot metering aimed at the subject's face or midtones, accepting some background overexposure. With a flash or reflector, fill-light the subject from the front. On a phone, tap-hold on the subject to lock focus, then slide exposure up."
+          ],
+          "bullets": [
+            "Without fill tools, rotate the subject 45° toward the light to catch scattered light on the face.",
+            "Use buildings or large light-colored surfaces as natural reflectors.",
+            "If silhouette is your intention, commit fully — let the subject go pure black against a clean background. Don't try to have it both ways."
+          ]
+        },
+        {
+          "title": "2. Mixed color temperatures",
+          "paragraphs": [
+            "When warm indoor light and cool daylight appear in the same frame, no white-balance setting can fix both sides. This is extremely common in cafés, malls, and indoor events.",
+            "The most effective approach is choosing a position dominated by a single light source — near a window for natural light, or deep indoors away from windows. If mixed sources are unavoidable, consider selective color correction in post, or convert to black-and-white to sidestep the problem entirely."
+          ]
+        },
+        {
+          "title": "3. Crushed shadows",
+          "paragraphs": [
+            "When the dynamic range of a scene (the brightness difference between highlights and shadows) exceeds your camera's capability, dark areas collapse into pure black. This is most common in scenes with strong light next to deep shadow.",
+            "While shooting, check if shadow areas still show texture. If the scene's contrast is too extreme, use exposure bracketing and merge to HDR afterward, or use a graduated ND filter to balance bright and dark. Most phone HDR modes also help in these situations."
+          ]
+        },
+        {
+          "title": "4. Harsh top-light shadows",
+          "paragraphs": [
+            "The midday sun casts straight down, creating dark shadows under eye sockets, the nose, and the chin — the dreaded \"raccoon eyes.\" This is perhaps the single most common lighting issue in outdoor portraiture.",
+            "The simplest fix is timing — shoot before 10 AM or after 3 PM. If you must shoot at noon, move the subject into open shade (under a tree, beside a building) where scattered light provides even, soft illumination. Another trick: have the subject look slightly upward so reflected ground light fills the face shadows."
+          ]
+        },
+        {
+          "title": "5. Directionless flat light",
+          "paragraphs": [
+            "Some photos have light that's \"not bad\" but \"not good\" — no obvious over- or under-exposure, yet the overall image feels flat and lifeless. This usually means there's no directional quality to the light: no discernible key, fill, or rim light relationship.",
+            "To create directionality in natural light, look for side-light — let light hit the subject from one side, casting a shadow on the other, which sculpts three-dimensionality. Window light is one of the best sources of natural side-light.",
+            "Observe the direction and length of shadows on the ground. Short, faint shadows mean the light lacks direction (common on overcast days or at noon) — good for soft, high-key looks, but not for chasing dimensionality."
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "color-grading-photography-guide",
+      "title": "Why your photo colors feel \"off\"? 4 core principles of color in photography",
+      "description": "Color temperature consistency, color relationships, saturation restraint, and tone-mood matching are the four keys to elevating photo color from \"okay\" to \"compelling.\"",
+      "excerpt": "Color is not just a post-processing concern. From white-balance choices at capture to the colors of clothing and background in the scene, a photo's color quality is largely decided before the shutter clicks.",
+      "category": "Color",
+      "readingTime": "7 min read",
+      "publishedAt": "2026-04-11",
+      "updatedAt": "2026-04-11",
+      "keywords": [
+        "photography color theory",
+        "photo color grading",
+        "color temperature",
+        "color palette photography",
+        "AI color scoring"
+      ],
+      "intro": "Among PicSpeak's five dimensions, color and lighting are the most often overlooked. Many treat color as a post issue — \"I'll slap a filter when I'm done.\" But a photo's color quality is largely locked in before the shutter fires. This article covers four core color principles from a practical photography standpoint.",
+      "takeawayTitle": "4 core color principles",
+      "takeawayItems": [
+        "Temperature consistency: all elements in frame should share a unified or intentionally contrasting color temperature.",
+        "Color relationships: complementary colors create tension, analogous colors create harmony, monochrome creates mood.",
+        "Saturation restraint: more saturated ≠ better color; over-saturation looks cheap.",
+        "Tone-mood matching: warm tones convey warmth and energy; cool tones convey calm and distance."
+      ],
+      "sections": [
+        {
+          "title": "1. Color temperature consistency — unity is harmony",
+          "paragraphs": [
+            "Messy color temperature is one of the most common reasons a photo looks \"amateur.\" When warm indoor light (yellowish) and cool daylight (bluish) coexist in a frame, no white-balance setting satisfies both sides.",
+            "Being deliberate about color-temperature unity during capture saves massive correction work in post. If you can't control the ambient sources, choose one temperature as the baseline and let the other become the \"anomaly\" — intentional temperature contrast can be a design element, but accidental mixing just looks muddy."
+          ]
+        },
+        {
+          "title": "2. Color relationships — complementary, analogous, and monochrome",
+          "paragraphs": [
+            "Color relationships describe the logic between different hues in a frame. The three most common schemes are: complementary (opposite on the color wheel, e.g. blue + orange), analogous (adjacent, e.g. yellow + green + teal), and monochrome (various brightness and saturation of a single hue).",
+            "Complementary pairs produce the strongest visual tension — think of the teal-and-orange look dominating movie posters. Analogous schemes feel gentler and more harmonious, perfect for a soft aesthetic. Monochrome delivers the strongest mood and unity; black-and-white is the ultimate monochrome.",
+            "In practice, you can control color relationships by choosing backgrounds, guiding wardrobe colors, or selecting specific environments for your shoot."
+          ],
+          "bullets": [
+            "Complementary: golden-hour warmth + blue sky, red figure + green foliage.",
+            "Analogous: autumn's red-yellow-orange gradient, spring's pink-white-green mix.",
+            "Monochrome: foggy grays and whites, deep-blue nighttime layers."
+          ]
+        },
+        {
+          "title": "3. Saturation restraint — less is more",
+          "paragraphs": [
+            "Many people's first post-processing move is cranking saturation, assuming \"more vivid = more beautiful.\" But over-saturation kills subtlety and looks wildly different across devices — what seems \"just right\" on a calibrated monitor may be eye-scorching on a phone.",
+            "Professionals often lower overall saturation while selectively boosting specific colors — this is \"selective color emphasis.\" For portraits, you might desaturate the background while keeping warm skin tones and vivid lip color.",
+            "A good rule of thumb: if more than three colors in the frame are highly saturated simultaneously, something probably needs to be dialed back. Let 1–2 hero colors pop; let the rest recede."
+          ]
+        },
+        {
+          "title": "4. Tone-mood matching",
+          "paragraphs": [
+            "Warm tones (yellow, orange, red) naturally convey closeness, energy, and intimacy. Cool tones (blue, green, purple) convey calm, mystery, and distance. This isn't aesthetic preference — it's basic human visual psychology.",
+            "Many photos feel \"off\" not because of a technical color problem but because the tone clashes with the content's emotion. A cozy family portrait graded cold-blue, or a lonely nightscape pushed warm-yellow — technically fine, emotionally discordant.",
+            "Before grading in post, ask yourself one question: \"What emotion should this image convey?\" Then choose the tonal direction that matches. This is more effective than blindly applying preset filters."
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "street-photography-ai-review-workflow",
+      "title": "Street photography × AI critique: a complete shoot-review-improve workflow",
+      "description": "Street photography progress depends on fast iteration, yet most shooters lack a systematic review process. This article provides a full workflow combining AI critique.",
+      "excerpt": "Street photography looks intuition-driven, but lasting improvement comes from systems. Use AI critique for a quick post-walk debrief and turn chance encounters into deliberate practice.",
+      "category": "Field",
+      "readingTime": "6 min read",
+      "publishedAt": "2026-04-11",
+      "updatedAt": "2026-04-11",
+      "keywords": [
+        "street photography",
+        "street photo tips",
+        "AI photography workflow",
+        "photo review process",
+        "street photography improvement"
+      ],
+      "intro": "The thrill of street photography lies in its unpredictability — you never know what's around the next corner. But that very unpredictability makes improvement slow: it's hard to tell whether you got better or just found a better scene today. This article builds a systematic workflow around AI critique to shift from \"luck mode\" to \"deliberate practice mode.\"",
+      "takeawayTitle": "Street workflow essentials",
+      "takeawayItems": [
+        "Don't wait to get home — spend 15 minutes on initial culling while the walk is still fresh.",
+        "Select only 3–5 representative frames per session; don't batch-upload everything.",
+        "Focus on composition and impact — these two dimensions separate street shooters the most.",
+        "Build a \"same-scene comparison\" habit: shoot one scene multiple ways and compare scores."
+      ],
+      "sections": [
+        {
+          "title": "1. Before heading out: carry last session's issues",
+          "paragraphs": [
+            "Open your previous critique log and revisit the lowest-scoring dimension and the specific issues flagged. Write the 1–2 most critical items in your phone notes.",
+            "For instance, if last time's feedback was \"background too cluttered,\" today's walk should intentionally hunt for clean-background opportunities — solid-color walls, under-bridge shadow zones, telephoto-compressed backdrops. Going out with a concrete problem in mind is fundamentally different from aimless shooting."
+          ]
+        },
+        {
+          "title": "2. While shooting: anticipate light and scene",
+          "paragraphs": [
+            "Street photography is not random shutter-pressing. Experienced street shooters \"anticipate\" good positions and light, then wait for the right person and moment to arrive. This is \"fishing-style\" shooting — you pick your spot first and wait for the catch.",
+            "Find a location with directional light, a clean background, and potential leading lines, then stand there and wait. Wait for someone to walk through a beam of light, for an interesting gesture, for a story-worthy moment. This is more efficient than running around with the camera, and composition stability improves dramatically.",
+            "Every shooting decision is part of the training: Why this position and not that one? Why this focal length? Why this exact fraction of a second? The answers form your shooting intuition, and AI critique can validate whether that intuition is correct."
+          ]
+        },
+        {
+          "title": "3. After the walk: 15-minute quick debrief",
+          "paragraphs": [
+            "After finishing the walk, sit down in a café and do a quick cull while memory is fresh. From all of today's photos, pick 3–5 of the most representative and upload them to PicSpeak.",
+            "Selection criteria: not the \"best\" images, but the most \"representative\" ones — including your strongest frame, one you're uncertain about, and one that feels close but not quite there. This mix gives AI critique the most valuable comparison material."
+          ],
+          "bullets": [
+            "Best 1 image: validate your own judgment; see if the AI agrees.",
+            "1–2 uncertain images: let the AI reveal what you might have missed.",
+            "1 \"almost there\" image: identify exactly what's missing — often the biggest learning moment."
+          ]
+        },
+        {
+          "title": "4. Analyzing results: build your weakness profile",
+          "paragraphs": [
+            "Log each critique session simply: date, genre, per-dimension scores, main issues. After a month, clear patterns emerge — perhaps your composition consistently scores 7+ while lighting is stuck at 5–6, meaning your next phase should focus on lighting rather than grinding more composition work.",
+            "This \"weakness profile\" is one of the most valuable self-improvement tools available. Professional athletes have coaching teams for data analysis and weakness identification; AI critique + simple logging can give you a similar system for photography."
+          ]
+        },
+        {
+          "title": "5. Advanced: same-scene A/B comparison",
+          "paragraphs": [
+            "Once you find a promising scene, try shooting it multiple ways — different focal lengths, angles, timing, and exposures. Then upload several versions together and compare which approach scores higher.",
+            "This A/B-testing style of practice rapidly teaches you why one angle works better than another, or why waiting for that person to step into the light matters more than shooting too early. It is one of the most efficient photography training methods available."
+          ]
+        }
+      ]
+    }
+  ]
+}

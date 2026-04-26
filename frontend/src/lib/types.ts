@@ -469,7 +469,7 @@ export interface GalleryLikeResponse {
   liked_by_viewer: boolean;
 }
 
-// ─── Error ───────────────────────────────────────────────────────────────────
+// ─── Blog Views ──────────────────────────────────────────────────────────────
 
 export interface BlogPostViewItem {
   slug: string;

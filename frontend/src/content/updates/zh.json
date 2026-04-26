@@ -1,0 +1,487 @@
+[
+  {
+    "id": "2026-04-26-content-bundles-and-home-ssr",
+    "date": "2026-04-26",
+    "title": "内容数据外置、首页 SSR 翻译与任务稳定性更新",
+    "summary": "首页、博客、更新记录和评图说明被整理成更清晰的组件与 JSON bundle；根路由和多语言首页带初始翻译渲染，导航控制区复用，后端也修复了生图任务状态读取的多余提交。",
+    "docPath": "docs/changelog/update-log-2026-04-26-content-bundles-and-home-ssr.md",
+    "sections": [
+      {
+        "title": "前端内容与首页渲染",
+        "items": [
+          "Blog、Updates 和评图维度说明迁入 src/content JSON bundle",
+          "根首页和 /zh、/en、/ja 首页都会带对应初始翻译内容渲染",
+          "Header 与 MarketingHeader 复用语言、主题、登录态和快捷入口控制区"
+        ]
+      },
+      {
+        "title": "稳定性与后端收口",
+        "items": [
+          "AppProviders 增加客户端错误边界与三语重试界面",
+          "AI 评图 prompt 抽到 ai_prompts.py，减少服务主文件体积",
+          "生图任务状态读取不再 commit，新建 pending 任务可立即等待 worker 认领"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "2026-04-25-ai-image-generation-and-credits",
+    "date": "2026-04-25",
+    "title": "AI 创作、生图额度与复拍参考上线",
+    "summary": "PicSpeak 新增独立 AI 创作页、点评详情里的复拍参考生成、生成历史、下载、复制提示词和再次生成；同时接入生图点数、30 点兑换码与 300 点额度包购买。",
+    "docPath": "docs/changelog/update-log-2026-04-25-ai-image-generation-and-credits.md",
+    "sections": [
+      {
+        "title": "AI 创作工作流",
+        "items": [
+          "/generate 支持模板、提示词、质量、画幅和风格选择",
+          "评图详情可根据原图建议生成复拍、构图、光线或色彩参考",
+          "生成任务、结果详情、历史、下载、复制提示词和再次生成链路已补齐"
+        ]
+      },
+      {
+        "title": "额度与购买",
+        "items": [
+          "前端从后端读取真实生图点数表，避免本地计价漂移",
+          "Usage 页面展示本月 AI 生图额度总量、已用和剩余",
+          "已登录用户可兑换 30 点 promo code，并可购买 300 点生图额度包"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "2026-04-24-stage-d-content-conversion",
+    "date": "2026-04-24",
+    "title": "内容来源转化与工作台入口打通",
+    "summary": "Blog、Gallery 和首页新增按意图回到评图工作台的入口，并补齐内容浏览、点击、上传到首评完成的周报统计口径。",
+    "docPath": "docs/changelog/update-log-2026-04-24-stage-d-content-conversion.md",
+    "sections": [
+      {
+        "title": "工作台入口",
+        "items": [
+          "Blog 文章底部 CTA 会按文章题材生成同类点评和上传入口，并携带来源、入口、文章 slug 和图片类型",
+          "Gallery 卡片新增同题材练习入口，以及用同一套标准点评自己照片的入口",
+          "首页新增新用户、回访用户、内容读者三类开始路径"
+        ]
+      },
+      {
+        "title": "转化统计",
+        "items": [
+          "`content_workspace_clicked` 记录 Blog / Gallery 用户进入工作台前的点击意图",
+          "周报按 Blog 和 Gallery 拆分浏览、点击、工作台进入、上传、发起点评和查看结果",
+          "API 审计日志跳过非业务端点，并把同步数据库写入移出请求事件循环"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "2026-04-22-pro-conversion-and-faq-schema",
+    "date": "2026-04-22",
+    "title": "Pro 价值表达重做与 FAQPage 重复修复",
+    "summary": "Pro 不再只表达为“更深度点评”，而是围绕下一次拍摄指导、完整复盘和进步追踪展开；同时修复 /zh、/en、/ja 首页 FAQPage 结构化数据重复问题。",
+    "docPath": "docs/changelog/update-log-2026-04-22-pro-conversion-and-faq-schema.md",
+    "sections": [
+      {
+        "title": "Pro 价值与转化",
+        "items": [
+          "Free / Pro 边界改为“快速诊断”和“下一次拍摄指导”的差异",
+          "结果页、历史页和 Usage 页的 Pro 触发位统一读取转化策略字典",
+          "Usage 页面新增付费前后体验差异面板，帮助用户判断是否升级"
+        ]
+      },
+      {
+        "title": "SEO 结构化数据",
+        "items": [
+          "locale 首页复用 HomePage 时不再重复输出 FAQPage JSON-LD",
+          "/zh、/en、/ja 首页保留 locale layout 里的唯一 FAQPage 来源"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "2026-04-20-review-growth-loop-and-replay-guidance",
+    "date": "2026-04-20",
+    "title": "连续进步视图、复评重拍分流与下一轮清单",
+    "summary": "历史页新增最近 3 次成长视图，评图详情把“同图复评”和“换图重拍”拆成两条更明确的路径，Flash 建议也收紧成可直接执行的下一轮拍摄清单。",
+    "docPath": "docs/changelog/update-log-2026-04-20-review-growth-loop-and-replay-guidance.md",
+    "sections": [
+      {
+        "title": "连续进步与弱项",
+        "items": [
+          "历史页会对比最近 3 次和之前 3 次平均分，并显示上升、下降或持平趋势",
+          "系统会优先标出反复低于 7 分的维度，帮助先盯住最拖后腿的问题",
+          "最近 3 次点评都可以直接点回详情页继续看"
+        ]
+      },
+      {
+        "title": "复评与重拍路径",
+        "items": [
+          "评图详情新增“同图验证修正”和“换新照片重拍”双路径卡片",
+          "系统会从建议里抽出最多 3 条下一轮清单，并显示动作、观察和原因",
+          "工作台复评横幅也明确提示：只有已经改过这张图时，同图复评才真正有意义"
+        ]
+      },
+      {
+        "title": "回归保护",
+        "items": [
+          "Header 登录态导航改成 hydration 后再显示，避免首屏先闪出错误的已登录壳",
+          "补上 prompt、文案、成长快照和 header 可见性测试"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "2026-04-19-auth-hardening-and-request-stability",
+    "date": "2026-04-19",
+    "title": "认证加固、任务重试收口与请求稳定性修复",
+    "summary": "这次更新集中修复了认证链路与跨域边界，补上激活码限速、JWKS 缓存加锁、任务错误脱敏，并让前端请求在切页和轮询场景下可被正确取消。",
+    "docPath": "docs/changelog/update-log-2026-04-19-auth-hardening-and-request-stability.md",
+    "sections": [
+      {
+        "title": "认证与接口保护",
+        "items": [
+          "CORS 方法和请求头改为显式白名单，并补回前端真实使用的 X-Device-Id",
+          "guest cookie 的 SameSite 按环境处理，Clerk webhook 的 409/401/403 响应码不再混用",
+          "激活码兑换接口新增按用户限速，降低高频猜码风险"
+        ]
+      },
+      {
+        "title": "稳定性与回归保护",
+        "items": [
+          "JWKS 缓存刷新加锁，避免并发击穿上游",
+          "配额检查前移到 AI 调用前，异步任务错误对外统一脱敏",
+          "前端详情、用量、复用分析和任务轮询请求已接入 AbortController 取消链路"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "2026-04-19-backend-frontend-module-split",
+    "date": "2026-04-19",
+    "title": "后端与前端模块化重构",
+    "summary": "将过大的后端路由文件和前端评图详情页拆分为职责单一的子模块，提升代码可读性与可维护性。本次无用户可见功能变化。",
+    "docPath": "docs/changelog/update-log-2026-04-19-backend-frontend-module-split.md",
+    "sections": [
+      {
+        "title": "后端路由拆分",
+        "items": [
+          "删除 3000 余行的 routes.py 单体文件，各域路由完整迁移至 api/routers/",
+          "reviews.py（980 行）拆分为创建、操作、查询、通用支持 4 个子模块",
+          "auth.py 和 gallery.py 辅助逻辑分别提取至 _support 文件"
+        ]
+      },
+      {
+        "title": "前端组件拆分",
+        "items": [
+          "评图详情页从 ~390 行精简至 ~93 行，逻辑迁入 features/reviews/",
+          "新增 6 个 UI 组件与 5 个自定义 Hook",
+          "useUploadFlow 工具函数提取至 uploadFlowSupport.ts"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "2026-04-13-blog-view-counts",
+    "date": "2026-04-13",
+    "title": "博客文章现已显示浏览次数",
+    "summary": "为每篇博客文章增加了公开浏览次数展示，并在用户进入文章详情页时自动累加一次浏览记录。",
+    "docPath": "docs/changelog/update-log-2026-04-13-blog-view-counts.md",
+    "sections": [
+      {
+        "title": "浏览统计",
+        "items": [
+          "新增按文章 slug 记录浏览量的 blog_post_views 数据表和公开接口",
+          "打开博客详情页时会自动为当前文章增加一次浏览数"
+        ]
+      },
+      {
+        "title": "前端展示",
+        "items": [
+          "博客列表、精选文章、相关文章和文章详情页头部都开始显示浏览次数",
+          "同一会话内增加 5 秒节流，避免极短时间重复进入造成连续累加"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "2026-04-12-llms-seo-schema",
+    "date": "2026-04-12",
+    "title": "llms.txt 上线、Schema.org 扩展与多语言更新记录页",
+    "summary": "新增 llms.txt 提升AI搜索可见性，补齐 Person 和 SoftwareSourceCode 结构化数据，并上线 /zh/updates、/en/updates、/ja/updates 多语言路由。",
+    "docPath": "docs/changelog/update-log-2026-04-12-llms-seo-schema.md",
+    "sections": [
+      {
+        "title": "AI 可见性（llms.txt）",
+        "items": [
+          "新增 /llms.txt 和 /.well-known/llms.txt，结构化展示产品定位、定价、博客主题与关键 URL",
+          "siteConfig 新增 author、social、repositoryUrl 配置，供 Schema 和 llms.txt 共用"
+        ]
+      },
+      {
+        "title": "Schema.org 扩展",
+        "items": [
+          "首页、博客索引、文章页新增 Person（作者）与 SoftwareSourceCode 结构化数据",
+          "Blog 与 BlogPosting 增加 author（@id 引用）、publisher、isPartOf、inLanguage 字段"
+        ]
+      },
+      {
+        "title": "多语言更新记录页",
+        "items": [
+          "新增 /[locale]/updates 路由，提供中英日三语独立的更新记录页面",
+          "提取 UpdatesPageContent 为共享组件，通过 homeHref 参数控制返回路径"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "2026-04-11-blog-gallery-sort-theme",
+    "date": "2026-04-11",
+    "title": "博客模块、画廊排序与深色主题优化",
+    "summary": "上线三语博客（6 篇 SEO 文章），画廊新增推荐/最新/最高分/最多赞排序，深色模式切换到更温暖的色调。",
+    "docPath": "docs/changelog/update-log-2026-04-11-blog-gallery-sort-theme.md",
+    "sections": [
+      {
+        "title": "博客模块",
+        "items": [
+          "新增 /[locale]/blog 路由，包含 6 篇中英日摄影学习文章，带完整 SSR Metadata",
+          "导航栏、页脚和首页均新增博客入口链接",
+          "sitemap 扩展覆盖博客索引和每篇文章的多语 hreflang"
+        ]
+      },
+      {
+        "title": "画廊排序",
+        "items": [
+          "画廊新增推荐/最新/最高分/最多赞 4 种排序，后端复用已有游标分页机制",
+          "筛选面板新增排序按钮组，当前选中项金色高亮"
+        ]
+      },
+      {
+        "title": "主题与样式统一",
+        "items": [
+          "深色模式 9 个基础色值改为暖褐色调，多处硬编码色值统一使用 CSS 变量",
+          "后端代理 URL 适配反向代理 X-Forwarded-* 头，非 localhost 自动升级 HTTPS"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "2026-04-10-locale-seo-and-gallery-refactor",
+    "date": "2026-04-10",
+    "title": "多语言首页直达、SEO 路由与长廊页面重构",
+    "summary": "新增 /zh、/en、/ja 语言固定首页，补齐 hreflang、JSON-LD 与 sitemap 多语入口；同时把首页、长廊、评图页和工作台的零散文案收拢进 i18n，并把公开长廊页面拆成独立组件，便于继续迭代。",
+    "docPath": "docs/changelog/update-log-2026-04-10-locale-seo-and-gallery-refactor.md",
+    "sections": [
+      {
+        "title": "多语言首页与 SEO",
+        "items": [
+          "新增 /zh、/en、/ja 直达首页，打开后会固定当前语言并写回本地偏好",
+          "各语种首页补齐独立 metadata、关键词、JSON-LD 与 canonical / alternate languages",
+          "sitemap 与 affiliate、gallery、updates、公开示例页也同步带上多语 alternate 信息，便于搜索引擎识别语言版本"
+        ]
+      },
+      {
+        "title": "前端文案与页面结构整理",
+        "items": [
+          "首页价格、更新记录、联系方式等文案改由翻译字典驱动，首页底部最新更新提示同步改指向本次更新主题",
+          "工作台“复用上一张照片”、评图页 favorites 返回文案、Pro 转化卡和长廊 SEO 文案统一收拢到 zh/en/ja i18n",
+          "公开长廊的筛选、卡片、分页拆成独立组件，保留现有交互的同时降低后续改动成本"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "2026-04-09-gallery-ranking-and-quality-gates",
+    "date": "2026-04-09",
+    "title": "公开长廊排序、图片渲染与前端质量门更新",
+    "summary": "公开影像长廊已切换为分数权重略高于时间的新排序逻辑，并配套升级了稳定分页游标；同时修复了长廊图片显示问题，补齐了可持续运行的前端 lint 基线。",
+    "docPath": "docs/changelog/update-log-2026-04-09-gallery-ranking-and-quality-gates.md",
+    "sections": [
+      {
+        "title": "公开长廊排序",
+        "items": [
+          "长廊不再只按发布时间倒序，而是按“分数优先、时间次优先”的组合热度排序",
+          "当作品分数接近时，更新发布的作品会获得更高的新鲜度加成，更容易排在前面",
+          "分页游标同步升级为组合分、发布时间和记录 ID 的稳定游标，避免翻页重复或漏项"
+        ]
+      },
+      {
+        "title": "图片显示与质量门",
+        "items": [
+          "Next 配置补齐本地后端图片源，解决开发环境里 `next/image` 主机未配置报错",
+          "长廊卡片图片恢复为更稳定的原生 `img` 渲染路径，修复缩略图能请求但不显示的问题",
+          "前端补齐 ESLint 配置并切换到 CLI lint 脚本，`npm run lint` 现在可以稳定执行"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "2026-04-07-activation-code-billing",
+    "date": "2026-04-07",
+    "title": "激活码开通、国内支付入口与 Pro 同步补齐",
+    "summary": "为中文用户补上爱发电购买加激活码开通链路，后台同步完善订阅到期回落逻辑，并把兑换入口接到首页、评图页、营销卡片和账户页。",
+    "docPath": "docs/changelog/update-log-2026-04-07-activation-code-billing.md",
+    "sections": [
+      {
+        "title": "激活码订阅链路",
+        "items": [
+          "新增激活码表、兑换接口和 30 天 Pro 开通逻辑",
+          "已有激活码 Pro 未到期时，新兑换会从当前到期时间继续顺延",
+          "鉴权请求与 webhook 现在共用同一套订阅判断，过期会员会正确降回 free 或 guest"
+        ]
+      },
+      {
+        "title": "中文购买与账户页",
+        "items": [
+          "中文环境购买按钮改为前往爱发电，下单后回站内输入激活码开通",
+          "额度页新增激活码说明区、兑换弹窗和无自动续费提示",
+          "激活码来源的 Pro 不再显示订阅管理，而是展示续费入口和到期时间"
+        ]
+      },
+      {
+        "title": "入口与工程补充",
+        "items": [
+          "首页定价区、Pro 转化卡、评图详情和额度页都补上“输入激活码”入口",
+          "新增激活码生成脚本和后端测试覆盖",
+          "评图详情辅助逻辑抽到独立模块，生产构建切换为内存缓存"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "2026-04-01-audit-score-gallery-polish",
+    "date": "2026-04-01",
+    "title": "公开长廊审核、评分文案与卡片展示同步细化",
+    "summary": "放宽公开长廊对边界安全内容的误杀，补齐评图结果 10 档本地化标签，并让长廊横图在卡片里稳定完整展示。",
+    "docPath": "docs/changelog/update-log-2026-04-01-audit-score-gallery-polish.md",
+    "sections": [
+      {
+        "title": "公开长廊审核",
+        "items": [
+          "审核 prompt 改为只拦截明确违规内容，减少误判",
+          "泳装、时尚摄影、非露点贴身服装和艺术化人体表达默认倾向 safe",
+          "判断不明确时优先放行，降低公开长廊误杀"
+        ]
+      },
+      {
+        "title": "评图结果文案",
+        "items": [
+          "最终得分按 1 到 10 的整数档位映射到专属标签",
+          "中文、英文、日文都补齐了 10 档评分总结语"
+        ]
+      },
+      {
+        "title": "长廊卡片展示",
+        "items": [
+          "长廊卡片统一改为 `object-contain`，横图不再被直接裁切",
+          "同时补上审核 prompt 测试，并忽略 `.vercel` 与本地环境文件"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "2026-03-28-home-review-gallery-refresh",
+    "date": "2026-03-28",
+    "title": "首页、评图与长廊体验一轮整理",
+    "summary": "统一首页顶栏样式，补上注册入口并修复头像与 Pro 卡片展示细节，同时完善评图详情展示和公开长廊分页、缩略图链路。",
+    "docPath": "docs/changelog/update-log-2026-03-28-home-review-gallery-refresh.md",
+    "sections": [
+      {
+        "title": "首页体验",
+        "items": [
+          "首页顶栏已与应用内标准 Header 统一",
+          "新增注册入口，并修复头像显示与 Pro 卡片底部 tips 截断",
+          "FAQ、认证入口和背景特效继续保持延迟挂载，控制首页负载"
+        ]
+      },
+      {
+        "title": "评图详情",
+        "items": [
+          "修复单条改进建议被分号拆成多张卡片的问题",
+          "评图详情优先读取本地上传预览，减少图片丢失或加载失败"
+        ]
+      },
+      {
+        "title": "公开长廊",
+        "items": [
+          "新增首页、末页和页码跳转的分页控件，并展示当前区间",
+          "补齐公开长廊缩略图生成、长期缓存和回填脚本链路"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "2026-03-27-gallery-navigation-and-filters",
+    "date": "2026-03-27",
+    "title": "公开影像长廊的返回恢复与筛选已补齐",
+    "summary": "公开长廊现在支持和历史页一致的筛选条件，筛选状态会进入 URL，从详情返回时也能恢复原来的分页和滚动位置。",
+    "docPath": "docs/changelog/update-log-2026-03-27-gallery-navigation-and-filters.md",
+    "sections": [
+      {
+        "title": "长廊筛选",
+        "items": [
+          "公开长廊新增开始时间、结束时间、最低评分、最高评分、图片类型筛选",
+          "筛选交互与“我的历史”统一，降低切换成本",
+          "后端 `/gallery` 会按当前筛选返回列表和总数"
+        ]
+      },
+      {
+        "title": "返回恢复",
+        "items": [
+          "从长廊点进详情前，会保存当前筛选结果下的分页、滚动位置和点击卡片",
+          "返回按钮与浏览器前进/后退键都会恢复原来的长廊状态",
+          "恢复状态按筛选条件分开保存，不会互相串位"
+        ]
+      },
+      {
+        "title": "图片加载",
+        "items": [
+          "长廊卡片改为只使用 `photo_thumbnail_url`",
+          "不再为了列表卡片优先请求原图",
+          "在保持清晰度的前提下减少不必要的图片带宽消耗"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "2026-03-25-pro-launch-checkout",
+    "date": "2026-03-25",
+    "title": "Pro 首发优惠与直达购买链路上线",
+    "summary": "统一了 Pro 的首发优惠表达，补强多个页面入口，并把购买按钮改成直达 checkout。",
+    "docPath": "docs/changelog/update-log-2026-03-25-pro-launch-checkout.md"
+  },
+  {
+    "id": "2026-03-24-score-upgrade",
+    "date": "2026-03-24",
+    "title": "评分口径升级与长廊推荐逻辑更新",
+    "summary": "统一 flash 与 pro 的评分口径，并为公开长廊加入 score version 和推荐标记逻辑。",
+    "docPath": "docs/changelog/update-log-2026-03-24-score-upgrade.md"
+  },
+  {
+    "id": "2026-03-22-gallery-likes",
+    "date": "2026-03-22",
+    "title": "公开长廊点赞与 SEO 优化上线",
+    "summary": "公开长廊新增持久化点赞，同时补齐公开页面的 SEO metadata、robots 与 sitemap 策略。",
+    "docPath": "docs/changelog/update-log-2026-03-22-gallery-likes.md"
+  },
+  {
+    "id": "2026-03-21-strict-scoring",
+    "date": "2026-03-21",
+    "title": "更严格的评分 prompt 与长廊总数修复",
+    "summary": "收紧了 AI 评图评分标准，并修复影像长廊头部“已收录”数字在第一页显示不正确的问题。",
+    "docPath": "docs/changelog/update-log-2026-03-21-strict-scoring.md"
+  },
+  {
+    "id": "2026-03-20-gallery",
+    "date": "2026-03-20",
+    "title": "公开影像长廊浏览、审核与分页体验打通",
+    "summary": "补齐了公开长廊的浏览、审核、游客只读、卡片展示和分页体验。",
+    "docPath": "docs/changelog/update-log-2026-03-20-gallery.md"
+  },
+  {
+    "id": "2026-03-20-history-and-favorites",
+    "date": "2026-03-20",
+    "title": "历史记录、分享、再分析与收藏能力接通",
+    "summary": "把历史筛选、分享导出、再次分析和收藏能力从后端真正接到了前端。",
+    "docPath": "docs/changelog/update-log-2026-03-20.md"
+  }
+]

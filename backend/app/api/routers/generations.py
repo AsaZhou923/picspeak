@@ -198,7 +198,6 @@ def get_generation_task_status(
     if task is None:
         raise api_error(status.HTTP_404_NOT_FOUND, 'GENERATION_TASK_NOT_FOUND', 'Generation task not found')
     image = db.query(GeneratedImage).filter(GeneratedImage.task_id == task.id, GeneratedImage.deleted_at.is_(None)).first()
-    db.commit()
     return GenerationTaskStatusResponse(**_serialize_generation_task_status(task, image))
 
 

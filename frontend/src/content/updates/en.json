@@ -1,0 +1,487 @@
+[
+  {
+    "id": "2026-04-26-content-bundles-and-home-ssr",
+    "date": "2026-04-26",
+    "title": "Content bundles, homepage SSR translations, and task stability",
+    "summary": "Homepage, blog, updates, and review copy now sit behind clearer component and JSON bundle boundaries. Root and locale homepages render with initial translations, header controls are shared, and generation task status reads no longer commit the database session.",
+    "docPath": "docs/changelog/update-log-2026-04-26-content-bundles-and-home-ssr.md",
+    "sections": [
+      {
+        "title": "Content and homepage rendering",
+        "items": [
+          "Blog, Updates, and review dimension descriptions moved into src/content JSON bundles",
+          "Root and /zh, /en, /ja homepages render with the right initial translation bundle",
+          "Header and MarketingHeader now share language, theme, auth, and quick-link controls"
+        ]
+      },
+      {
+        "title": "Stability and backend cleanup",
+        "items": [
+          "AppProviders now wraps the app in a client error boundary with localized retry copy",
+          "AI review prompts moved into ai_prompts.py to keep the service file focused",
+          "Generation task status reads avoid commit, and new pending tasks can be claimed immediately"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "2026-04-25-ai-image-generation-and-credits",
+    "date": "2026-04-25",
+    "title": "AI Create, image credits, and retake references",
+    "summary": "PicSpeak now includes a standalone AI Create page, review-linked retake reference generation, generation history, downloads, and reuse. Image generation credits, a 30-credit redeem code, and a 300-credit checkout pack are wired into billing and usage.",
+    "docPath": "docs/changelog/update-log-2026-04-25-ai-image-generation-and-credits.md",
+    "sections": [
+      {
+        "title": "AI Create workflow",
+        "items": [
+          "Generate from templates with prompt, quality, ratio, and style controls on /generate",
+          "Create composition, lighting, color, or retake references directly from a review",
+          "Track generation tasks, open result pages, download images, copy prompts, and generate again"
+        ]
+      },
+      {
+        "title": "Credits and checkout",
+        "items": [
+          "The frontend reads the generation credit table from the backend",
+          "Usage now shows monthly image generation credits used and remaining",
+          "A 30-credit redeem code and 300-credit checkout pack are available for signed-in users"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "2026-04-24-stage-d-content-conversion",
+    "date": "2026-04-24",
+    "title": "Content-to-workspace conversion paths",
+    "summary": "Blog, Gallery, and Home now send readers back to the workspace with intent-specific CTAs, while the analytics snapshot can track content views through clicks, uploads, and first critique completion.",
+    "docPath": "docs/changelog/update-log-2026-04-24-stage-d-content-conversion.md",
+    "sections": [
+      {
+        "title": "Workspace entrances",
+        "items": [
+          "Blog article CTAs now match the article topic and carry source, entrypoint, content slug, and image type",
+          "Gallery cards now offer same-subject practice and a same-standard critique path for the viewer photo",
+          "Home now separates new-user, returning-user, and content-reader starting paths"
+        ]
+      },
+      {
+        "title": "Conversion reporting",
+        "items": [
+          "`content_workspace_clicked` records Blog / Gallery workspace intent before the user reaches the product flow",
+          "Weekly reporting breaks down views, clicks, workspace entries, uploads, review requests, and result views by Blog and Gallery",
+          "API audit logging now skips non-business endpoints and moves synchronous DB writes off the request event loop"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "2026-04-22-pro-conversion-and-faq-schema",
+    "date": "2026-04-22",
+    "title": "Pro value repositioning and FAQPage duplicate fix",
+    "summary": "Pro is now framed as next-shoot guidance, complete review, and progress tracking instead of just deeper analysis. Locale home pages also no longer emit duplicate FAQPage structured data.",
+    "docPath": "docs/changelog/update-log-2026-04-22-pro-conversion-and-faq-schema.md",
+    "sections": [
+      {
+        "title": "Pro value and conversion",
+        "items": [
+          "Free / Pro boundaries now distinguish quick diagnosis from next-shoot guidance",
+          "Review detail, history, and Usage promos read from one conversion strategy dictionary",
+          "Usage now includes a decision panel that compares the before-and-after Pro experience"
+        ]
+      },
+      {
+        "title": "SEO structured data",
+        "items": [
+          "Locale home pages suppress the nested HomePage FAQPage JSON-LD",
+          "/zh, /en, and /ja keep a single FAQPage source from the locale layout"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "2026-04-20-review-growth-loop-and-replay-guidance",
+    "date": "2026-04-20",
+    "title": "Growth loop, replay guidance, and next-shot checklists",
+    "summary": "History now surfaces a recent-vs-previous growth loop, review detail separates same-photo verification from new-photo retakes, and Flash suggestions are shaped into cleaner next-shot checklist actions.",
+    "docPath": "docs/changelog/update-log-2026-04-20-review-growth-loop-and-replay-guidance.md",
+    "sections": [
+      {
+        "title": "Growth loop",
+        "items": [
+          "History compares the most recent 3 critiques against the previous 3 and shows up / down / flat trend states",
+          "Repeated weak dimensions under score 7 are surfaced first so the next practice target is obvious",
+          "The latest three critiques link straight back to their detail pages"
+        ]
+      },
+      {
+        "title": "Next-shot guidance",
+        "items": [
+          "Review detail now separates same-photo fix verification from retaking a new photo",
+          "Up to 3 checklist items are extracted from suggestions with Action / Observation / Reason labels",
+          "Workspace replay copy now makes it explicit that rerunning the same photo only makes sense after edits"
+        ]
+      },
+      {
+        "title": "Regression protection",
+        "items": [
+          "Header auth-only navigation waits until hydration, avoiding signed-in shell flicker",
+          "Added tests for prompt labels, replay copy, growth snapshots, and header visibility"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "2026-04-19-auth-hardening-and-request-stability",
+    "date": "2026-04-19",
+    "title": "Auth hardening, safer task retries, and more stable requests",
+    "summary": "Tightened CORS and cookie behavior, corrected webhook error codes, added activation-code rate limiting, locked JWKS cache refreshes, and made frontend requests cancellable.",
+    "docPath": "docs/changelog/update-log-2026-04-19-auth-hardening-and-request-stability.md",
+    "sections": [
+      {
+        "title": "Auth and API safety",
+        "items": [
+          "CORS methods and headers are now explicit, including X-Device-Id used by the frontend",
+          "Guest cookie SameSite handling is now environment-aware, and Clerk webhook 409/401/403 responses are separated correctly",
+          "Activation-code redemption now has a per-user rate limit"
+        ]
+      },
+      {
+        "title": "Stability and regression protection",
+        "items": [
+          "JWKS cache refreshes are locked to avoid concurrent upstream bursts",
+          "Quota checks now happen before AI calls, and task-facing errors are sanitized for users",
+          "AbortController support now cancels review, usage, replay, and task polling requests cleanly"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "2026-04-19-backend-frontend-module-split",
+    "date": "2026-04-19",
+    "title": "Backend & frontend modular refactor",
+    "summary": "Split oversized backend routers and the review detail page into single-responsibility modules. No user-facing changes — this is a code organization update that improves maintainability.",
+    "docPath": "docs/changelog/update-log-2026-04-19-backend-frontend-module-split.md",
+    "sections": [
+      {
+        "title": "Backend router split",
+        "items": [
+          "Removed the 3000+ line routes.py monolith; all domain routers now live in api/routers/",
+          "reviews.py (980 lines) split into four modules: create, actions, queries, support",
+          "auth.py and gallery.py helper logic extracted into dedicated _support files"
+        ]
+      },
+      {
+        "title": "Frontend component split",
+        "items": [
+          "Review detail page trimmed from ~390 to ~93 lines; logic moved to features/reviews/",
+          "6 new UI components and 5 custom hooks created for the review page",
+          "useUploadFlow utility functions extracted to uploadFlowSupport.ts"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "2026-04-13-blog-view-counts",
+    "date": "2026-04-13",
+    "title": "Blog post view counts are now visible",
+    "summary": "Added public view counts for blog posts and wired article detail visits to increment the count automatically.",
+    "docPath": "docs/changelog/update-log-2026-04-13-blog-view-counts.md",
+    "sections": [
+      {
+        "title": "Tracking",
+        "items": [
+          "Added a dedicated blog_post_views table and public APIs keyed by article slug",
+          "Opening a blog post detail page now records one new view automatically"
+        ]
+      },
+      {
+        "title": "UI",
+        "items": [
+          "View counts now appear in the blog index, featured article block, related posts, and article detail header",
+          "A 5-second session throttle prevents accidental rapid duplicate increments"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "2026-04-12-llms-seo-schema",
+    "date": "2026-04-12",
+    "title": "llms.txt, Enhanced Schema.org, and Localized Updates Pages",
+    "summary": "Added llms.txt for AI search visibility, expanded Person and SoftwareSourceCode structured data, and launched locale-pinned /zh/updates, /en/updates, and /ja/updates routes.",
+    "docPath": "docs/changelog/update-log-2026-04-12-llms-seo-schema.md",
+    "sections": [
+      {
+        "title": "AI Visibility (llms.txt)",
+        "items": [
+          "Added /llms.txt and /.well-known/llms.txt with structured product summary, pricing, blog topics, and canonical URLs",
+          "Extended siteConfig with author, social links, and repository URL for shared use across Schema and llms.txt"
+        ]
+      },
+      {
+        "title": "Schema.org Expansion",
+        "items": [
+          "Added Person and SoftwareSourceCode JSON-LD to home, blog index, and blog post pages",
+          "Blog and BlogPosting schemas now reference author by @id and include publisher, isPartOf, and inLanguage"
+        ]
+      },
+      {
+        "title": "Localized Updates Pages",
+        "items": [
+          "Added /[locale]/updates routes with per-locale metadata and hreflang alternates",
+          "Extracted UpdatesPageContent into a shared component that accepts a configurable homeHref"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "2026-04-11-blog-gallery-sort-theme",
+    "date": "2026-04-11",
+    "title": "Blog Module, Gallery Sort, and Dark Theme Refinement",
+    "summary": "Launched a trilingual blog with 6 SEO articles, added gallery sorting (recommended, latest, top score, most likes), and recalibrated the dark theme to a warmer tone.",
+    "docPath": "docs/changelog/update-log-2026-04-11-blog-gallery-sort-theme.md",
+    "sections": [
+      {
+        "title": "Blog Module",
+        "items": [
+          "Added a /[locale]/blog route with 6 trilingual photography articles and full SSR metadata",
+          "Wired blog links into Header, Footer, MarketingHeader, and home page",
+          "Extended sitemap with per-locale blog index and per-post hreflang entries"
+        ]
+      },
+      {
+        "title": "Gallery Sort",
+        "items": [
+          "Gallery now supports recommended, latest, top score, and most likes sort modes",
+          "Backend sort parameter reuses the existing three-part cursor pagination"
+        ]
+      },
+      {
+        "title": "Theme and Style Unification",
+        "items": [
+          "Shifted dark-mode palette to warmer tones and replaced hard-coded rgba values with CSS variables",
+          "Photo proxy URLs now respect X-Forwarded-* headers for correct HTTPS generation behind reverse proxies"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "2026-04-10-locale-seo-and-gallery-refactor",
+    "date": "2026-04-10",
+    "title": "Locale-Pinned Home Routes, SEO Signals, and Gallery UI Refactor",
+    "summary": "Added /zh, /en, and /ja locale-pinned home pages, wired hreflang and JSON-LD signals across public routes, and moved scattered home, gallery, review, and workspace copy into shared i18n keys while splitting the gallery UI into focused components.",
+    "docPath": "docs/changelog/update-log-2026-04-10-locale-seo-and-gallery-refactor.md",
+    "sections": [
+      {
+        "title": "Locale Homes and SEO",
+        "items": [
+          "Added direct /zh, /en, and /ja home routes that pin the active locale from the URL",
+          "Gave each locale home its own metadata, keywords, Open Graph fields, and JSON-LD",
+          "Expanded sitemap and public-page alternates so search engines can map the language variants correctly"
+        ]
+      },
+      {
+        "title": "Copy and UI Restructure",
+        "items": [
+          "Moved home pricing, updates, and contact copy into the translation dictionaries and repointed the latest update hint to this release",
+          "Unified workspace replay copy, review favorites labels, promo-card copy, and gallery SEO copy under shared zh/en/ja i18n keys",
+          "Split the gallery page into dedicated filter, card, and pagination components without changing the public browsing flow"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "2026-04-09-gallery-ranking-and-quality-gates",
+    "date": "2026-04-09",
+    "title": "Gallery Ranking, Image Rendering, and Lint Gates Updated",
+    "summary": "The public gallery now ranks work with score-weighted freshness, uses stable paging cursors for that combined order, restores reliable gallery card image rendering, and ships a real frontend lint baseline.",
+    "docPath": "docs/changelog/update-log-2026-04-09-gallery-ranking-and-quality-gates.md",
+    "sections": [
+      {
+        "title": "Public Gallery Ranking",
+        "items": [
+          "Changed gallery ordering from pure publish time to a combined score that favors higher-rated work while still rewarding recency",
+          "Weighted score slightly above time so clearly stronger work stays ahead, while close scores let newer posts surface first",
+          "Upgraded the gallery cursor format so paging stays stable under the new combined ordering"
+        ]
+      },
+      {
+        "title": "Rendering and Quality Gates",
+        "items": [
+          "Allowed local backend image hosts in Next config so development thumbnails no longer fail host validation",
+          "Moved gallery cards back to native `img` rendering after the `next/image` migration caused visible load regressions",
+          "Added ESLint config and switched the lint script to the ESLint CLI so `npm run lint` is now a real non-interactive quality gate"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "2026-04-07-activation-code-billing",
+    "date": "2026-04-07",
+    "title": "Activation Codes and China Purchase Flow Added",
+    "summary": "Added an Afdian plus activation-code path for Chinese Pro purchases, tightened expiry-aware billing sync, and exposed redeem entry points across the home, review, promo, and account surfaces.",
+    "docPath": "docs/changelog/update-log-2026-04-07-activation-code-billing.md",
+    "sections": [
+      {
+        "title": "Activation-Code Billing",
+        "items": [
+          "Added the activation-code table, redeem API, and 30-day Pro grant flow",
+          "Redeeming on an already active manual Pro term now extends from the current expiry instead of overwriting it",
+          "Auth-time and webhook-time plan sync now share the same access rules so expired paid plans fall back correctly"
+        ]
+      },
+      {
+        "title": "Chinese Purchase and Account UX",
+        "items": [
+          "Chinese checkout buttons now open the Afdian purchase page and guide users back to redeem in-app",
+          "The usage page now includes an activation-code explainer, redeem modal, and no-auto-renew messaging",
+          "Activation-code subscriptions surface renewal entry points instead of the regular billing portal flow"
+        ]
+      },
+      {
+        "title": "Entry Points and Engineering",
+        "items": [
+          "Added redeem CTAs to the home pricing block, shared Pro promo card, review detail, and usage page",
+          "Added an activation-code generation script plus backend test coverage",
+          "Moved review-page helper copy into its own module and switched production webpack caching to memory"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "2026-04-01-audit-score-gallery-polish",
+    "date": "2026-04-01",
+    "title": "Moderation, Score Labels, and Gallery Cards Refined",
+    "summary": "Relaxed public-gallery moderation for clearly allowed borderline content, expanded review score labels to 10 localized tiers, and stabilized gallery cards for landscape images.",
+    "docPath": "docs/changelog/update-log-2026-04-01-audit-score-gallery-polish.md",
+    "sections": [
+      {
+        "title": "Public Gallery Moderation",
+        "items": [
+          "Updated the audit prompt so only clearly disallowed content is marked unsafe",
+          "Treat swimwear, fashion shoots, non-explicit tight clothing, and artistic body expression as safe by default",
+          "Bias uncertain cases toward safe to reduce over-blocking in the public gallery"
+        ]
+      },
+      {
+        "title": "Review Score Labels",
+        "items": [
+          "Round final scores into 1 to 10 buckets and map them to dedicated labels",
+          "Added full 10-tier score copy across Chinese, English, and Japanese"
+        ]
+      },
+      {
+        "title": "Gallery Cards",
+        "items": [
+          "Unified gallery cards around an `object-contain` image treatment so landscape photos are not cropped away",
+          "Added prompt regression coverage and ignored `.vercel` plus local env files in Git"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "2026-03-28-home-review-gallery-refresh",
+    "date": "2026-03-28",
+    "title": "Home, Review, and Gallery Experience Refresh",
+    "summary": "Unified the home header with the app shell, added a sign-up entry, fixed review-detail display issues, and improved public gallery paging and thumbnail delivery.",
+    "docPath": "docs/changelog/update-log-2026-03-28-home-review-gallery-refresh.md",
+    "sections": [
+      {
+        "title": "Home Experience",
+        "items": [
+          "Aligned the home header with the standard in-app header",
+          "Added a sign-up action beside sign-in and fixed avatar / Pro card tip clipping",
+          "Kept FAQ, auth entry points, and background effects lazily mounted to protect first load"
+        ]
+      },
+      {
+        "title": "Review Detail",
+        "items": [
+          "Stopped a single improvement suggestion from being split into multiple cards by punctuation",
+          "Prefer locally cached upload previews on the review page to reduce missing-image cases"
+        ]
+      },
+      {
+        "title": "Public Gallery",
+        "items": [
+          "Added first / last / page-number pagination controls with visible range feedback",
+          "Generated dedicated gallery thumbnails with long-lived caching and added a backfill script"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "2026-03-27-gallery-navigation-and-filters",
+    "date": "2026-03-27",
+    "title": "Public Gallery Navigation and Filters Updated",
+    "summary": "The public gallery now supports history-style filters, URL-synced state, reliable return-position restoration, and thumbnail-only card loading.",
+    "docPath": "docs/changelog/update-log-2026-03-27-gallery-navigation-and-filters.md",
+    "sections": [
+      {
+        "title": "Gallery Filters",
+        "items": [
+          "Added date range, min score, max score, and image-type filters to the public gallery",
+          "Matched the filter interaction model used in review history",
+          "Updated the backend `/gallery` route so both result rows and `total_count` follow the active filters"
+        ]
+      },
+      {
+        "title": "Back Navigation Recovery",
+        "items": [
+          "Saved page, loaded items, and scroll position before opening a gallery detail page",
+          "Restored gallery state for both in-page back buttons and browser back/forward navigation",
+          "Scoped restore data by the active filter set so different gallery result sets do not overwrite each other"
+        ]
+      },
+      {
+        "title": "Thumbnail Loading",
+        "items": [
+          "Gallery cards now render only from `photo_thumbnail_url`",
+          "Removed the original-image-first loading path from the gallery list",
+          "Kept gallery cards visually sharp while reducing unnecessary image transfer"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "2026-03-25-pro-launch-checkout",
+    "date": "2026-03-25",
+    "title": "Pro Launch Offer and Direct Checkout Updated",
+    "summary": "Standardized the launch-offer messaging, expanded Pro entry points, and sent purchase buttons straight to checkout.",
+    "docPath": "docs/changelog/update-log-2026-03-25-pro-launch-checkout.md"
+  },
+  {
+    "id": "2026-03-24-score-upgrade",
+    "date": "2026-03-24",
+    "title": "Scoring Upgrade and Gallery Recommendation Logic",
+    "summary": "Unified scoring behavior across modes and added score-version-aware recommendation logic to the public gallery.",
+    "docPath": "docs/changelog/update-log-2026-03-24-score-upgrade.md"
+  },
+  {
+    "id": "2026-03-22-gallery-likes",
+    "date": "2026-03-22",
+    "title": "Public Gallery Likes and SEO Improvements",
+    "summary": "Added persistent gallery likes for signed-in users and tightened SEO metadata for public-facing pages.",
+    "docPath": "docs/changelog/update-log-2026-03-22-gallery-likes.md"
+  },
+  {
+    "id": "2026-03-21-strict-scoring",
+    "date": "2026-03-21",
+    "title": "Stricter Scoring Prompt and Correct Gallery Count",
+    "summary": "Tightened the AI scoring prompt and fixed the gallery header so the total count is correct from page one.",
+    "docPath": "docs/changelog/update-log-2026-03-21-strict-scoring.md"
+  },
+  {
+    "id": "2026-03-20-gallery",
+    "date": "2026-03-20",
+    "title": "Public Gallery Browsing, Moderation, and Paging",
+    "summary": "Rolled out the public gallery workflow with moderation, guest browsing, gallery cards, and stable paging behavior.",
+    "docPath": "docs/changelog/update-log-2026-03-20-gallery.md"
+  },
+  {
+    "id": "2026-03-20-history-and-favorites",
+    "date": "2026-03-20",
+    "title": "History, Sharing, Replay, and Favorites Connected",
+    "summary": "Connected history filtering, sharing, export, replay analysis, and favorites across the frontend and backend.",
+    "docPath": "docs/changelog/update-log-2026-03-20.md"
+  }
+]

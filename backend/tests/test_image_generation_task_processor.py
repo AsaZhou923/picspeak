@@ -19,6 +19,7 @@ from app.services.image_generation_task_processor import (  # noqa: E402
     _persist_successful_generation,
     _serialize_generation_task_status,
     claim_next_pending_image_generation_task,
+    make_generation_task,
 )
 
 
@@ -109,6 +110,18 @@ class ImageGenerationTaskProcessorTests(unittest.TestCase):
 
         self.assertIsNone(claimed)
         running_query.join.assert_not_called()
+
+    def test_make_generation_task_uses_null_next_attempt_for_immediate_claim(self) -> None:
+        task = make_generation_task(
+            owner_user_id=20,
+            prompt='final prompt',
+            request_payload={'quality': 'low', 'size': '1024x1024', 'output_format': 'webp'},
+            generation_mode='general',
+            intent='social_visual',
+        )
+
+        self.assertEqual(task.status, TaskStatus.PENDING)
+        self.assertIsNone(task.next_attempt_at)
 
     def test_output_format_follows_downloaded_content_type(self) -> None:
         self.assertEqual(_output_format_for_content_type('image/png', fallback='webp'), 'png')

@@ -13,6 +13,12 @@ import { markProductAttributionSource, trackProductEvent } from '@/lib/product-a
 import { siteConfig } from '@/lib/site';
 import { VALID_LOCALES } from '../../locales';
 
+const ARTICLE_LANGUAGE_BY_LOCALE: Record<Locale, string> = {
+  zh: 'zh-CN',
+  en: 'en',
+  ja: 'ja',
+};
+
 function BlogPostContent({ slug }: { slug: string }) {
   const { locale } = useI18n();
   const ui = getBlogUi(locale);
@@ -93,10 +99,13 @@ function BlogPostContent({ slug }: { slug: string }) {
     '@type': 'BlogPosting',
     headline: post.title,
     description: post.description,
+    abstract: post.excerpt,
     datePublished: post.publishedAt,
     dateModified: post.updatedAt,
-    inLanguage: locale,
+    inLanguage: ARTICLE_LANGUAGE_BY_LOCALE[locale],
     url: `${siteConfig.url}/${locale}/blog/${post.slug}`,
+    image: `${siteConfig.url}${siteConfig.ogImage}`,
+    isAccessibleForFree: true,
     isPartOf: {
       '@type': 'Blog',
       name: ui.name,
@@ -117,6 +126,10 @@ function BlogPostContent({ slug }: { slug: string }) {
     mainEntityOfPage: `${siteConfig.url}/${locale}/blog/${post.slug}`,
     articleSection: post.category,
     keywords: post.keywords.join(', '),
+    about: post.keywords.map((keyword) => ({
+      '@type': 'Thing',
+      name: keyword,
+    })),
   };
 
   return (

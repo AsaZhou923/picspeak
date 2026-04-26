@@ -66,16 +66,15 @@ function readSessionAuthToken(): AuthToken | null {
 }
 
 function readLegacyAuthToken(): AuthToken | null {
-  for (const storage of [window.localStorage]) {
-    try {
-      const stored = storage.getItem(TOKEN_KEY);
-      if (!stored) continue;
+  try {
+    const stored = window.localStorage.getItem(TOKEN_KEY);
+    if (stored) {
       const parsed: AuthToken = JSON.parse(stored);
       if (parsed?.access_token && !isExpiredToken(parsed.access_token)) return parsed;
-      storage.removeItem(TOKEN_KEY);
-    } catch {
-      // Ignore malformed or restricted storage access.
+      window.localStorage.removeItem(TOKEN_KEY);
     }
+  } catch {
+    // Ignore malformed or restricted storage access.
   }
 
   try {
@@ -158,10 +157,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const pendingGuestTokenRef = useRef<Promise<string> | null>(null);
   const isLoadingRef = useRef(true);
+  const readyWaitersRef = useRef<Set<() => void>>(new Set());
+
+  const resolveReadyWaiters = useCallback(() => {
+    for (const resolve of readyWaitersRef.current) {
+      resolve();
+    }
+    readyWaitersRef.current.clear();
+  }, []);
 
   useEffect(() => {
     isLoadingRef.current = isLoading;
-  }, [isLoading]);
+    if (!isLoading) resolveReadyWaiters();
+  }, [isLoading, resolveReadyWaiters]);
+
+  useEffect(() => resolveReadyWaiters, [resolveReadyWaiters]);
 
   useEffect(() => {
     try {
@@ -209,13 +219,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const waitForReady = useCallback(async (): Promise<void> => {
     if (!isLoadingRef.current) return;
     await new Promise<void>((resolve) => {
-      const startedAt = Date.now();
-      const timer = window.setInterval(() => {
-        if (!isLoadingRef.current || Date.now() - startedAt > 10000) {
-          window.clearInterval(timer);
-          resolve();
-        }
-      }, 25);
+      let timeoutId: number | null = null;
+      const finish = () => {
+        if (timeoutId !== null) window.clearTimeout(timeoutId);
+        readyWaitersRef.current.delete(finish);
+        resolve();
+      };
+
+      timeoutId = window.setTimeout(finish, 10000);
+      readyWaitersRef.current.add(finish);
+      if (!isLoadingRef.current) finish();
     });
   }, []);
 

@@ -7,7 +7,6 @@ const LOCALES = ['zh', 'en', 'ja'] as const;
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
-  const blogPosts = getBlogPosts('en');
 
   return [
     // Root page (x-default)
@@ -112,7 +111,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     })),
     // Blog posts — one entry per locale × slug
     ...LOCALES.flatMap((locale) =>
-      blogPosts.map((post) => ({
+      getBlogPosts(locale).map((post) => ({
         url: `${siteConfig.url}/${locale}/blog/${post.slug}`,
         lastModified: new Date(post.updatedAt),
         changeFrequency: 'monthly' as const,

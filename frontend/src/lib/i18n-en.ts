@@ -9,6 +9,9 @@ export const enTranslations = {
     nav_gallery: 'Gallery',
     nav_usage: 'Quota',
     nav_more: 'More',
+    app_error_title: 'Something went wrong',
+    app_error_body: 'The error has been isolated. Try loading this view again.',
+    app_error_retry: 'Try again',
     theme_dark: 'Switch to light theme',
     theme_light: 'Switch to dark theme',
     plan_guest_label: 'Guest',
@@ -190,7 +193,7 @@ export const enTranslations = {
     pro_offer_highlight: 'Pro',
     updates_label: 'Updates',
     updates_hint_home: 'See the public gallery update',
-    updates_hint_latest: 'See the AI Create and image credits update',
+    updates_hint_latest: 'See the content and homepage rendering update',
     contact_label: 'Contact',
     contact_headline: 'Get in Touch',
 

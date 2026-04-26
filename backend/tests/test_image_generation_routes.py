@@ -15,8 +15,8 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 from app.api.deps import get_current_actor  # noqa: E402
-from app.api.routers.generations import _generation_item_payload  # noqa: E402
-from app.db.models import User, UserPlan, UserStatus  # noqa: E402
+from app.api.routers.generations import _generation_item_payload, get_generation_task_status  # noqa: E402
+from app.db.models import TaskStatus, User, UserPlan, UserStatus  # noqa: E402
 from app.db.session import get_db  # noqa: E402
 from app.main import app  # noqa: E402
 
@@ -160,6 +160,38 @@ class ImageGenerationRoutesTests(unittest.TestCase):
         self.assertEqual(payload.source_photo_id, 'pho_source')
         self.assertEqual(payload.source_review_id, 'rev_source')
         self.assertEqual(payload.prompt, 'next shoot reference')
+
+    def test_generation_task_status_read_does_not_commit(self) -> None:
+        db = MagicMock()
+        task = SimpleNamespace(
+            id=10,
+            public_id='igt_status',
+            status=TaskStatus.PENDING,
+            progress=0,
+            attempt_count=0,
+            max_attempts=2,
+            next_attempt_at=None,
+            last_heartbeat_at=None,
+            started_at=None,
+            finished_at=None,
+            error_code=None,
+            error_message=None,
+        )
+        task_query = MagicMock()
+        task_query.filter.return_value.first.return_value = task
+        image_query = MagicMock()
+        image_query.filter.return_value.first.return_value = None
+        db.query.side_effect = [task_query, image_query]
+
+        response = get_generation_task_status(
+            'igt_status',
+            db=db,
+            actor=SimpleNamespace(user=SimpleNamespace(id=7)),
+        )
+
+        self.assertEqual(response.task_id, 'igt_status')
+        self.assertIsNone(response.generation_id)
+        db.commit.assert_not_called()
 
 
 if __name__ == '__main__':

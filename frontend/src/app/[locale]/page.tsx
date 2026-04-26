@@ -1,8 +1,6 @@
-'use client';
-
 import { I18nProvider, type Locale } from '@/lib/i18n';
-import { HomePageContent } from '@/app/page';
-import { use } from 'react';
+import { getInitialTranslations } from '@/lib/i18n-initial';
+import { HomePageContent } from '@/components/home/HomePageClient';
 import { VALID_LOCALES } from './locales';
 
 
@@ -17,12 +15,12 @@ import { VALID_LOCALES } from './locales';
  * own I18nProvider, but this inner provider takes precedence through React
  * Context's nearest-ancestor rule.
  */
-export default function LocalePage({
+export default async function LocalePage({
   params,
 }: {
   params: Promise<{ locale: string }>;
 }) {
-  const { locale } = use(params);
+  const { locale } = await params;
 
   // VALID_LOCALES guard is already enforced by the layout, but type-narrow here.
   const pinnedLocale: Locale = VALID_LOCALES.includes(locale as Locale)
@@ -30,7 +28,7 @@ export default function LocalePage({
     : 'en';
 
   return (
-    <I18nProvider initialLocale={pinnedLocale}>
+    <I18nProvider initialLocale={pinnedLocale} initialMessages={getInitialTranslations(pinnedLocale)}>
       <HomePageContent structuredDataScope="locale" />
     </I18nProvider>
   );

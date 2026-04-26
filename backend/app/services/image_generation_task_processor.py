@@ -520,5 +520,5 @@ def make_generation_task(
         attempt_count=0,
         max_attempts=2,
         progress=0,
-        next_attempt_at=datetime.now(timezone.utc),
+        next_attempt_at=None,
     )

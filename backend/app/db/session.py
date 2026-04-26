@@ -1,4 +1,4 @@
-﻿from sqlalchemy import create_engine
+from sqlalchemy import create_engine
 from sqlalchemy.exc import IllegalStateChangeError
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
