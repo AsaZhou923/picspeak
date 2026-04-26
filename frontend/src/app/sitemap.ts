@@ -91,6 +91,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
         },
       },
     },
+    {
+      url: `${siteConfig.url}/workspace`,
+      lastModified: now,
+      changeFrequency: 'weekly',
+      priority: 0.9,
+    },
     // Blog index — one entry per locale
     ...LOCALES.map((locale) => ({
       url: `${siteConfig.url}/${locale}/blog`,
