@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-04-27-gpt-image2-prompt-gallery",
+    "date": "2026-04-27",
+    "title": "厳選 GPT-Image-2 prompt ライブラリを追加",
+    "summary": "AI 作成ページに、出力例画像・作者/出典・ローカライズ済みタイトル/prompt を持つ 30 件の GPT-Image-2 prompt 例を追加しました。prompt 入力欄の下で品質、比率、スタイルを調整し、その後に例を下書きとして適用できます。",
+    "docPath": "docs/changelog/update-log-2026-04-27-gpt-image2-prompt-gallery.md",
+    "sections": [
+      {
+        "title": "AI 作成 prompt ライブラリ",
+        "items": [
+          "/generate では、メイン prompt 入力欄の直下に品質・比率・スタイル・ネガティブ prompt の設定を置き、その下に例ライブラリを表示します",
+          "30 件の例は写真、ポートレート、ポスター、商品ビジュアル、UI インフォグラフィック、実験的な表現をカバーします",
+          "カテゴリ絞り込み、出典表示、prompt コピー、現在の生成フォームへのワンクリック適用に対応しました"
+        ]
+      },
+      {
+        "title": "出典と多言語対応",
+        "items": [
+          "prompt とサンプル画像は awesome-gpt-image-2-prompts から選定し、作者と元の X 出典リンクを保持しています",
+          "タイトルと prompt は zh/en/ja フィールドを持ち、元リポジトリの多言語 README にある原文を優先します",
+          "サンプル画像は public の静的ディレクトリにコピーし、出典と Apache-2.0 ライセンスを NOTICE に記載しました"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-04-26-content-bundles-and-home-ssr",
     "date": "2026-04-26",
     "title": "コンテンツ bundle、ホーム SSR 翻訳、タスク安定性を更新",

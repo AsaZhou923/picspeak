@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-04-27-gpt-image2-prompt-gallery",
+    "date": "2026-04-27",
+    "title": "精选 GPT-Image-2 提示词库上线",
+    "summary": "AI 创作页新增精选 GPT-Image-2 提示词库，提供 30 个带示例图、作者来源和三语标题/prompt 的案例。用户可以在描述输入框下方调整质量、比例和风格，再套用案例作为草稿继续生成。",
+    "docPath": "docs/changelog/update-log-2026-04-27-gpt-image2-prompt-gallery.md",
+    "sections": [
+      {
+        "title": "AI 创作提示词库",
+        "items": [
+          "/generate 在主提示词输入区下方加入质量、比例、风格和负面提示词控制，再展示精选案例库",
+          "30 个案例覆盖摄影、人像、海报、产品商业、UI 信息图和实验视觉方向",
+          "案例支持按分类筛选、查看来源、复制 prompt，并一键填入当前生成表单"
+        ]
+      },
+      {
+        "title": "内容来源与多语言",
+        "items": [
+          "prompt 与示例图来自 awesome-gpt-image-2-prompts，保留作者和原始 X 来源链接",
+          "标题与 prompt 提供 zh/en/ja 字段，优先沿用源仓库多语言 README 的原文",
+          "示例图复制到 public 静态目录，并补充 NOTICE 说明来源和 Apache-2.0 许可"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-04-26-content-bundles-and-home-ssr",
     "date": "2026-04-26",
     "title": "内容数据外置、首页 SSR 翻译与任务稳定性更新",

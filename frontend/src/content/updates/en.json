@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-04-27-gpt-image2-prompt-gallery",
+    "date": "2026-04-27",
+    "title": "Curated GPT-Image-2 prompt library",
+    "summary": "The AI Create page now includes 30 curated GPT-Image-2 prompt examples with output images, author/source attribution, and localized title/prompt fields. Users can tune quality, ratio, and style below the prompt box, then apply an example as a draft.",
+    "docPath": "docs/changelog/update-log-2026-04-27-gpt-image2-prompt-gallery.md",
+    "sections": [
+      {
+        "title": "AI Create prompt library",
+        "items": [
+          "/generate now keeps quality, ratio, style, and negative prompt controls directly below the main prompt field before the example library",
+          "30 examples cover photography, portraits, posters, product commercial imagery, UI infographics, and experimental visuals",
+          "Examples support category filtering, source links, prompt copy, and one-click application into the current generation form"
+        ]
+      },
+      {
+        "title": "Source and localization",
+        "items": [
+          "Prompts and sample images are curated from awesome-gpt-image-2-prompts with creator and original X source links retained",
+          "Titles and prompts include zh/en/ja fields, preferring the original multilingual README text from the source repository",
+          "Sample images are copied into the public static directory with a NOTICE covering source and Apache-2.0 licensing"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-04-26-content-bundles-and-home-ssr",
     "date": "2026-04-26",
     "title": "Content bundles, homepage SSR translations, and task stability",

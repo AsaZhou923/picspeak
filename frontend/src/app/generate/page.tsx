@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AlertCircle, ArrowUpRight, Copy, ImageIcon, Sparkles, Wand2 } from 'lucide-react';
@@ -24,6 +24,8 @@ import {
   formatGenerationOutputSpec,
   getTemplateByKey,
 } from '@/features/generations/generation-config';
+import { PromptExampleGallery } from '@/features/generations/components/PromptExampleGallery';
+import { getLocalizedPromptExampleText, type GenerationPromptExample } from '@/content/generation/prompt-examples';
 
 const STYLE_OPTIONS = [
   { value: 'none', labelKey: 'generation_style_none' },
@@ -108,6 +110,8 @@ export default function GeneratePage() {
   const router = useRouter();
   const { token, ensureToken, userInfo, isLoading: authLoading } = useAuth();
   const { t, locale } = useI18n();
+  const promptRef = useRef<HTMLTextAreaElement | null>(null);
+  const skipNextTemplatePromptSyncRef = useRef(false);
   const [templateKey, setTemplateKey] = useState('photo_inspiration');
   const [prompt, setPrompt] = useState<string>(() => t(TEMPLATE_COPY_KEYS.photo_inspiration.prompt));
   const [quality, setQuality] = useState<GenerationQuality>('medium');
@@ -148,6 +152,10 @@ export default function GeneratePage() {
   }, []);
 
   useEffect(() => {
+    if (skipNextTemplatePromptSyncRef.current) {
+      skipNextTemplatePromptSyncRef.current = false;
+      return;
+    }
     setPrompt(t(selectedTemplateCopy.prompt));
   }, [locale, selectedTemplateCopy.prompt, t]);
 
@@ -201,6 +209,35 @@ export default function GeneratePage() {
       });
     },
     [locale, t, token]
+  );
+
+  const handlePromptExampleApply = useCallback(
+    (example: GenerationPromptExample) => {
+      const nextTemplate = getTemplateByKey(example.suggestedTemplateKey);
+      if (nextTemplate.key !== templateKey) {
+        skipNextTemplatePromptSyncRef.current = true;
+      }
+      setTemplateKey(nextTemplate.key);
+      setPrompt(getLocalizedPromptExampleText(example.prompt, locale));
+      setStyle(example.suggestedStyle);
+      setSize(example.suggestedSize);
+      setError('');
+      void trackProductEvent('generation_prompt_opened', {
+        token: token ?? undefined,
+        pagePath: '/generate',
+        locale,
+        metadata: {
+          prompt_example_id: example.id,
+          prompt_example_category: example.category,
+          template_key: nextTemplate.key,
+        },
+      });
+      window.requestAnimationFrame(() => {
+        promptRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        promptRef.current?.focus();
+      });
+    },
+    [locale, templateKey, token]
   );
 
   const handleGenerate = useCallback(async () => {
@@ -372,6 +409,7 @@ export default function GeneratePage() {
               <label className="block">
                 <span className="mb-3 block text-sm text-ink">{t('generation_prompt_label')}</span>
                 <textarea
+                  ref={promptRef}
                   value={prompt}
                   onChange={(event) => setPrompt(event.target.value)}
                   onFocus={() =>
@@ -450,6 +488,10 @@ export default function GeneratePage() {
                     placeholder="no text, no watermark, no distorted face"
                   />
                 )}
+              </div>
+
+              <div className="mt-5 border-t border-border-subtle pt-5">
+                <PromptExampleGallery onApply={handlePromptExampleApply} />
               </div>
             </section>
           </main>
