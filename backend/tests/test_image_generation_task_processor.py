@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from io import BytesIO
 import sys
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
+
+from PIL import Image
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
@@ -158,7 +161,7 @@ class ImageGenerationTaskProcessorTests(unittest.TestCase):
         self.assertEqual(_output_format_for_content_type('image/jpeg; charset=binary', fallback='webp'), 'jpeg')
         self.assertEqual(_output_format_for_content_type('', fallback='webp'), 'webp')
 
-    def test_load_reference_image_includes_public_object_url(self) -> None:
+    def test_load_reference_image_uploads_normalized_public_object_url(self) -> None:
         db = MagicMock()
         photo = SimpleNamespace(
             id=11,
@@ -173,11 +176,13 @@ class ImageGenerationTaskProcessorTests(unittest.TestCase):
         photo_query.filter.return_value.first.return_value = photo
         db.query.return_value = photo_query
         storage = MagicMock()
+        source_image = BytesIO()
+        Image.new('RGB', (1536, 2048), color=(120, 80, 40)).save(source_image, format='JPEG')
         storage.get_object.return_value = {
             'ContentType': 'image/png',
-            'Body': SimpleNamespace(read=lambda: b'image-bytes'),
+            'Body': SimpleNamespace(read=lambda: source_image.getvalue()),
         }
-        task = SimpleNamespace(source_photo_id=11, owner_user_id=20)
+        task = SimpleNamespace(public_id='igt_source', source_photo_id=11, owner_user_id=20)
         storage_client_path = 'app.services.image_generation_task_processor.get_object_storage_client'
 
         with (
@@ -186,13 +191,18 @@ class ImageGenerationTaskProcessorTests(unittest.TestCase):
                 'app.services.image_generation_task_processor.settings.object_base_url',
                 'https://cdn.example.com',
             ),
+            unittest.mock.patch('app.services.image_generation_task_processor.settings.object_bucket', 'reference-bucket'),
         ):
             reference = _load_reference_image(db, task)
 
-        self.assertEqual(reference['bytes'], b'image-bytes')
-        self.assertEqual(reference['content_type'], 'image/png')
-        self.assertEqual(reference['filename'], 'pho_source.png')
-        self.assertEqual(reference['url'], 'https://cdn.example.com/uploads/user%2020/source%20image.png')
+        self.assertEqual(reference['content_type'], 'image/jpeg')
+        self.assertEqual(reference['filename'], 'pho_source.jpg')
+        self.assertEqual(reference['url'], 'https://cdn.example.com/generated/reference-inputs/igt_source/pho_source.jpg')
+        upload = storage.put_object.call_args.kwargs
+        self.assertEqual(upload['Bucket'], 'reference-bucket')
+        self.assertEqual(upload['Key'], 'generated/reference-inputs/igt_source/pho_source.jpg')
+        self.assertEqual(upload['ContentType'], 'image/jpeg')
+        self.assertTrue(upload['Body'].startswith(b'\xff\xd8'))
 
     def test_generation_credit_counts_split_consumption_and_grants(self) -> None:
         db = MagicMock()

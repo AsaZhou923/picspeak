@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 import hashlib
+from io import BytesIO
 import logging
 from typing import Any
 from urllib.parse import quote
 
+from PIL import Image, ImageOps, UnidentifiedImageError
 from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
@@ -154,6 +156,7 @@ def _prompt_hash(prompt: str) -> str:
 
 
 _ALLOWED_OUTPUT_FORMATS = frozenset({'webp', 'png', 'jpeg'})
+_REFERENCE_IMAGE_MAX_EDGE = 2048
 
 
 def generation_object_key(*, owner_public_id: str, generated_public_id: str, output_format: str, now: datetime | None = None) -> str:
@@ -374,24 +377,60 @@ def _load_reference_image(db: Session, task: ImageGenerationTask) -> dict[str, A
     if photo is None:
         raise ImageGenerationError('Reference photo is not available')
 
+    storage = get_object_storage_client()
     try:
-        response = get_object_storage_client().get_object(Bucket=photo.bucket, Key=photo.object_key)
+        response = storage.get_object(Bucket=photo.bucket, Key=photo.object_key)
         body = response['Body']
         image_bytes = body.read() if hasattr(body, 'read') else b''.join(body.iter_chunks())
     except Exception as exc:
         raise ImageGenerationError('Reference photo could not be loaded') from exc
 
-    content_type = str(response.get('ContentType') or photo.content_type or 'image/png')
+    normalized_bytes, content_type = _normalize_reference_image(image_bytes)
+    normalized_key = _reference_input_object_key(task, photo)
+    try:
+        storage.put_object(
+            Bucket=settings.object_bucket,
+            Key=normalized_key,
+            Body=normalized_bytes,
+            ContentType=content_type,
+        )
+    except Exception as exc:
+        raise ImageGenerationError('Reference photo could not be prepared') from exc
+
     return {
-        'bytes': image_bytes,
+        'bytes': normalized_bytes,
         'content_type': content_type,
         'filename': _reference_filename(photo.public_id, content_type),
-        'url': _public_object_url(photo.object_key),
+        'url': _public_object_url(normalized_key),
     }
 
 
 def _public_object_url(object_key: str) -> str:
     return f'{settings.object_base_url.rstrip("/")}/{quote(str(object_key).lstrip("/"))}'
+
+
+def _reference_input_object_key(task: ImageGenerationTask, photo: Photo) -> str:
+    return f'generated/reference-inputs/{task.public_id}/{photo.public_id}.jpg'
+
+
+def _normalize_reference_image(source_bytes: bytes) -> tuple[bytes, str]:
+    try:
+        with Image.open(BytesIO(source_bytes)) as image:
+            image = ImageOps.exif_transpose(image)
+            if image.mode in {'RGBA', 'LA'} or 'transparency' in image.info:
+                background = Image.new('RGB', image.size, (255, 255, 255))
+                rgba_image = image.convert('RGBA')
+                background.paste(rgba_image, mask=rgba_image.getchannel('A'))
+                image = background
+            elif image.mode != 'RGB':
+                image = image.convert('RGB')
+
+            image.thumbnail((_REFERENCE_IMAGE_MAX_EDGE, _REFERENCE_IMAGE_MAX_EDGE), Image.Resampling.LANCZOS)
+            output = BytesIO()
+            image.save(output, format='JPEG', quality=92, optimize=True)
+            return output.getvalue(), 'image/jpeg'
+    except (OSError, UnidentifiedImageError) as exc:
+        raise ImageGenerationError('Reference photo is not a supported image file') from exc
 
 
 def _reference_filename(public_id: str, content_type: str) -> str:
