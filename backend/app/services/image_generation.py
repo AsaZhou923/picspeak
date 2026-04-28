@@ -80,15 +80,34 @@ class OpenAIImageGenerationClient:
         prompt: str,
         quality: str,
         size: str,
-        image_bytes: bytes,
-        image_content_type: str,
+        image_bytes: bytes | None = None,
+        image_content_type: str = 'image/png',
         image_filename: str = 'reference.png',
         output_format: str = 'webp',
+        reference_image_url: str | None = None,
     ) -> ImageGenerationResult:
         if not self.api_key:
             raise ImageGenerationError('OPENAI_API_KEY is not configured')
         if _is_apimart_endpoint(self.api_url):
-            raise ImageGenerationError('Reference image edits are not supported by the configured image endpoint')
+            normalized_reference_url = str(reference_image_url or '').strip()
+            if not normalized_reference_url:
+                raise ImageGenerationError('Reference image URL is required by the configured image endpoint')
+            apimart_size = _to_apimart_size(size)
+            payload = {
+                'model': self.model_name,
+                'prompt': prompt,
+                'quality': quality,
+                'n': 1,
+                'output_format': output_format,
+                'size': apimart_size,
+                'resolution': _to_apimart_resolution(quality=quality, size=apimart_size),
+                'image_urls': [normalized_reference_url],
+            }
+            response = self._post_json(payload)
+            return self._parse_generation_response(response, output_format=output_format)
+
+        if image_bytes is None:
+            raise ImageGenerationError('Reference image bytes are required by the configured image endpoint')
 
         fields = {
             'model': self.model_name,

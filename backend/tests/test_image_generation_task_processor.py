@@ -13,6 +13,7 @@ if str(BACKEND_ROOT) not in sys.path:
 from app.db.models import GeneratedImage, TaskStatus, UsageLedger  # noqa: E402
 from app.services.image_generation import ImageGenerationResult  # noqa: E402
 from app.services.image_generation_task_processor import (  # noqa: E402
+    _load_reference_image,
     count_monthly_generation_credit_consumed,
     count_monthly_generation_credit_grants,
     _output_format_for_content_type,
@@ -45,6 +46,35 @@ class ImageGenerationTaskProcessorTests(unittest.TestCase):
         self.assertEqual(payload['task_id'], 'igt_123')
         self.assertEqual(payload['generation_id'], 'gen_123')
         self.assertIsNone(payload['error'])
+
+    def test_serialize_generation_task_status_only_says_retry_scheduled_when_pending(self) -> None:
+        base_task = {
+            'public_id': 'igt_failed',
+            'progress': 100,
+            'attempt_count': 2,
+            'max_attempts': 2,
+            'last_heartbeat_at': None,
+            'started_at': None,
+            'finished_at': None,
+            'error_code': 'OPENAI_IMAGE_GENERATION_FAILED',
+            'error_message': 'provider detail',
+        }
+        failed_payload = _serialize_generation_task_status(
+            SimpleNamespace(**base_task, status=TaskStatus.FAILED, next_attempt_at=None),
+            None,
+        )
+        pending_payload = _serialize_generation_task_status(
+            SimpleNamespace(**base_task, status=TaskStatus.PENDING, next_attempt_at='2026-04-28T14:20:00Z'),
+            None,
+        )
+
+        self.assertEqual(failed_payload['error']['message'], 'Image generation is temporarily unavailable')
+        self.assertFalse(failed_payload['error']['retryable'])
+        self.assertEqual(
+            pending_payload['error']['message'],
+            'Image generation is temporarily unavailable; retry scheduled',
+        )
+        self.assertTrue(pending_payload['error']['retryable'])
 
     def test_persist_successful_generation_records_generated_image_and_usage_ledger(self) -> None:
         db = MagicMock()
@@ -127,6 +157,42 @@ class ImageGenerationTaskProcessorTests(unittest.TestCase):
         self.assertEqual(_output_format_for_content_type('image/png', fallback='webp'), 'png')
         self.assertEqual(_output_format_for_content_type('image/jpeg; charset=binary', fallback='webp'), 'jpeg')
         self.assertEqual(_output_format_for_content_type('', fallback='webp'), 'webp')
+
+    def test_load_reference_image_includes_public_object_url(self) -> None:
+        db = MagicMock()
+        photo = SimpleNamespace(
+            id=11,
+            public_id='pho_source',
+            owner_user_id=20,
+            status='READY',
+            bucket='source-bucket',
+            object_key='uploads/user 20/source image.png',
+            content_type='image/png',
+        )
+        photo_query = MagicMock()
+        photo_query.filter.return_value.first.return_value = photo
+        db.query.return_value = photo_query
+        storage = MagicMock()
+        storage.get_object.return_value = {
+            'ContentType': 'image/png',
+            'Body': SimpleNamespace(read=lambda: b'image-bytes'),
+        }
+        task = SimpleNamespace(source_photo_id=11, owner_user_id=20)
+        storage_client_path = 'app.services.image_generation_task_processor.get_object_storage_client'
+
+        with (
+            unittest.mock.patch(storage_client_path, return_value=storage),
+            unittest.mock.patch(
+                'app.services.image_generation_task_processor.settings.object_base_url',
+                'https://cdn.example.com',
+            ),
+        ):
+            reference = _load_reference_image(db, task)
+
+        self.assertEqual(reference['bytes'], b'image-bytes')
+        self.assertEqual(reference['content_type'], 'image/png')
+        self.assertEqual(reference['filename'], 'pho_source.png')
+        self.assertEqual(reference['url'], 'https://cdn.example.com/uploads/user%2020/source%20image.png')
 
     def test_generation_credit_counts_split_consumption_and_grants(self) -> None:
         db = MagicMock()

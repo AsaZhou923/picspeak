@@ -150,6 +150,41 @@ class ImageGenerationServiceTests(unittest.TestCase):
         self.assertEqual([payload['resolution'] for payload in payloads], ['1k', '2k', '2k'])
         self.assertEqual(payloads[2]['size'], '1:1')
 
+    def test_apimart_reference_edit_posts_image_urls_to_generation_endpoint(self) -> None:
+        client = OpenAIImageGenerationClient(
+            api_key='test-key',
+            api_url='https://api.apimart.ai/v1/images/generations',
+        )
+        submitted_payload = {'code': 200, 'data': [{'status': 'submitted', 'task_id': 'task_ref'}]}
+        completed_payload = {
+            'code': 200,
+            'data': {
+                'status': 'completed',
+                'result': {'images': [{'url': ['https://upload.example.com/generated.png']}]},
+            },
+        }
+
+        with (
+            patch.object(client, '_post_json', return_value=submitted_payload) as post_json,
+            patch.object(client, '_get_json', return_value=completed_payload),
+            patch.object(client, '_download_image', return_value=(b'png-bytes', 'image/png')),
+        ):
+            result = client.edit(
+                prompt='make a cleaner lighting reference',
+                quality='low',
+                size='1024x1536',
+                output_format='webp',
+                reference_image_url='https://cdn.example.com/source.png',
+            )
+
+        self.assertEqual(result.image_bytes, b'png-bytes')
+        request_payload = post_json.call_args.args[0]
+        self.assertEqual(request_payload['model'], 'gpt-image-2-official')
+        self.assertEqual(request_payload['image_urls'], ['https://cdn.example.com/source.png'])
+        self.assertEqual(request_payload['size'], '9:16')
+        self.assertEqual(request_payload['resolution'], '1k')
+        self.assertNotIn('response_format', request_payload)
+
 
 if __name__ == '__main__':
     unittest.main()

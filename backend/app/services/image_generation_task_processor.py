@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 import hashlib
 import logging
 from typing import Any
+from urllib.parse import quote
 
 from sqlalchemy import case, func
 from sqlalchemy.orm import Session
@@ -25,7 +26,7 @@ from app.services.object_storage import get_object_storage_client
 logger = logging.getLogger(__name__)
 
 _PUBLIC_GENERATION_ERROR_MESSAGES = {
-    'OPENAI_IMAGE_GENERATION_FAILED': 'Image generation is temporarily unavailable; retry scheduled',
+    'OPENAI_IMAGE_GENERATION_FAILED': 'Image generation is temporarily unavailable',
     'IMAGE_GENERATION_PROCESSING_FAILED': 'Image generation could not be completed',
     'IMAGE_GENERATION_CREDITS_EXHAUSTED': 'Image generation credits are exhausted',
     'IMAGE_GENERATION_STORAGE_FAILED': 'Generated image could not be saved',
@@ -119,9 +120,12 @@ def _serialize_generation_task_status(task: ImageGenerationTask, image: Generate
     error = None
     if task.error_code or task.error_message:
         retryable = task.status == TaskStatus.PENDING and task.next_attempt_at is not None
+        public_message = _PUBLIC_GENERATION_ERROR_MESSAGES.get(str(task.error_code), task.error_message)
+        if task.error_code == 'OPENAI_IMAGE_GENERATION_FAILED' and retryable:
+            public_message = 'Image generation is temporarily unavailable; retry scheduled'
         error = {
             'code': task.error_code,
-            'message': _PUBLIC_GENERATION_ERROR_MESSAGES.get(str(task.error_code), task.error_message),
+            'message': public_message,
             'retryable': retryable,
             'timeout': task.error_code in {'TASK_EXPIRED', 'TASK_STALLED'},
             'failure_stage': 'pre_charge',
@@ -292,6 +296,7 @@ def _process_generation_task(db: Session, task: ImageGenerationTask) -> None:
                 image_content_type=reference_image['content_type'],
                 image_filename=reference_image['filename'],
                 output_format=output_format,
+                reference_image_url=reference_image['url'],
             )
     except ImageGenerationError as exc:
         _handle_generation_failure(
@@ -381,7 +386,12 @@ def _load_reference_image(db: Session, task: ImageGenerationTask) -> dict[str, A
         'bytes': image_bytes,
         'content_type': content_type,
         'filename': _reference_filename(photo.public_id, content_type),
+        'url': _public_object_url(photo.object_key),
     }
+
+
+def _public_object_url(object_key: str) -> str:
+    return f'{settings.object_base_url.rstrip("/")}/{quote(str(object_key).lstrip("/"))}'
 
 
 def _reference_filename(public_id: str, content_type: str) -> str:
