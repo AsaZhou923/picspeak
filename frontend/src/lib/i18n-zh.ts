@@ -1,4 +1,4 @@
-import { enTranslations } from './i18n-en';
+import { enTranslations, type TranslationDictionary, type TranslationKey } from './i18n-en';
 
 export const zhTranslations = {
   ...enTranslations,
@@ -17,8 +17,8 @@ export const zhTranslations = {
   app_error_retry: '重试',
   plan_guest_label: '游客',
   updates_label: '更新记录',
-  updates_hint_home: '查看公开长廊更新',
-  updates_hint_latest: '查看精选 GPT-Image-2 提示词库',
+  updates_hint_home: '查看运行时迁移与稳定性更新',
+  updates_hint_latest: '查看运行时迁移与稳定性更新',
 
   generation_badge: 'AI 创作',
   generation_title: 'AI 创作',
@@ -82,6 +82,9 @@ export const zhTranslations = {
   demo_suggestion_body: '下一次可以加入前景或地面线索，增强空间深度，让画面从风景记录变成更完整的叙事。',
   demo_view_example: '查看完整点评示例',
   demo_image_alt: '示例点评照片：金色银杏树冠、逆光树叶、蓝色渐变天空和暖冷色彩对比',
+  demo_review_advantage: '1. 色彩：金黄色银杏叶与柔和蓝粉渐变天空形成高对比但和谐的色域，贴近秋季黄金时刻的暖色温；饱和度控制稳定，没有明显溢出。 2. 光线：侧逆光让叶片边缘形成干净轮廓光，叶脉细节清楚，高光没有丢失，曝光判断比较准确。 3. 构图节奏：左侧稀疏枝干与右侧密集树冠形成密度平衡，竖向线条自然把视线带向上方。',
+  demo_review_critique: '1. 空间深度偏平：前景和中景的银杏树几乎在同一焦平面，缺少前景引导线或地面锚点，画面显得扁平。 2. 右侧树冠略杂：右上方枝干密集交错，深色枝条切入金色区域，削弱主体统一感。 3. 叙事线索不足：画面主要停留在季节色彩记录，缺少落叶、足迹、人物、道路或建筑等时间与环境线索，容易变成打卡式风景。',
+  demo_review_suggestions: '1. 机位调整：后退 5-8 m，并把相机降到约 1.2 m；纳入落叶、小路或地面纹理作为前景引导线，增强空间深度。 2. 曝光与色彩：如果拍 RAW，高光可下拉 -15 到 -20 保住叶缘细节，阴影提升 +10 到 +15 露出枝干质感；色温降低约 200 K，强化冷暖对比。 3. 拍摄时机：尽量在日出后 20 分钟内、太阳高度低于 10 度时拍摄，让阴影更长；等待微风带来轻微叶片运动，增加生气。',
   score_composition: '构图',
   score_lighting: '光线',
   score_color: '色彩',
@@ -650,7 +653,6 @@ export const zhTranslations = {
   review_promo_low_quota_body: '如果你准备继续比较更多照片，Pro 会比反复计算额度更顺手。中文 Pro 为 $1.99 一次性开通 30 天。',
   review_promo_low_score_body: '分数偏低时，更需要完整拆解和明确修改方向。中文 Pro 为 $1.99 一次性开通 30 天。',
   review_promo_standard_body: '更深入的分析加上永久历史记录，更适合连续复盘和稳定提升。中文 Pro 为 $1.99 一次性开通 30 天。',
-} as const;
+} as const satisfies TranslationDictionary;
 
-export type TranslationDictionary = typeof zhTranslations;
-export type TranslationKey = keyof TranslationDictionary;
+export type { TranslationDictionary, TranslationKey };

@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from sqlalchemy.exc import IntegrityError
 
+from app.api.request_state import get_current_user_public_id
 from app.api.router import router, webhook_router
 from app.core.config import settings
 from app.core.errors import normalize_http_error
@@ -19,6 +20,8 @@ from app.services.audit import log_api_request
 from app.services.worker import worker
 
 logger = logging.getLogger(__name__)
+_AUDIT_TASKS: set[asyncio.Task[object]] = set()
+_AUDIT_TASK_DRAIN_TIMEOUT_SECONDS = 5.0
 
 
 def _dev_cors_origin_regex() -> str | None:
@@ -34,6 +37,7 @@ async def lifespan(app: FastAPI):
     if settings.run_embedded_worker:
         worker.start()
     yield
+    await _drain_audit_tasks()
     if settings.run_embedded_worker:
         worker.stop()
 
@@ -86,7 +90,7 @@ def _log_error_response(
         'error_code': code,
         'error_message': message,
         'client_ip': client_ip_from_request(request),
-        'user_public_id': getattr(request.state, 'current_user_public_id', None),
+        'user_public_id': get_current_user_public_id(request),
     }
     if extra:
         log_payload['extra'] = extra
@@ -207,6 +211,29 @@ def _persist_audit_log(
         db.close()
 
 
+def _schedule_audit_task(coro) -> None:
+    task = asyncio.create_task(coro)
+    _AUDIT_TASKS.add(task)
+    task.add_done_callback(_AUDIT_TASKS.discard)
+
+
+async def _drain_audit_tasks() -> None:
+    if not _AUDIT_TASKS:
+        return
+
+    done, pending = await asyncio.wait(_AUDIT_TASKS, timeout=_AUDIT_TASK_DRAIN_TIMEOUT_SECONDS)
+    for task in done:
+        try:
+            task.result()
+        except Exception:
+            logger.exception('Audit task failed during shutdown')
+    if pending:
+        logger.warning('Cancelling %s pending audit task(s) during shutdown', len(pending))
+        for task in pending:
+            task.cancel()
+        await asyncio.gather(*pending, return_exceptions=True)
+
+
 @app.middleware('http')
 async def request_audit_middleware(request: Request, call_next):
     started_at = time.perf_counter()
@@ -231,7 +258,7 @@ async def request_audit_middleware(request: Request, call_next):
             duration_ms = int((time.perf_counter() - started_at) * 1000)
             # Fire-and-forget: run the synchronous DB write in the
             # default thread-pool so the event loop stays unblocked.
-            asyncio.create_task(
+            _schedule_audit_task(
                 asyncio.to_thread(
                     _persist_audit_log,
                     request_id=request_id,
@@ -240,7 +267,7 @@ async def request_audit_middleware(request: Request, call_next):
                     query_string=request.url.query or None,
                     endpoint=request.scope.get('path'),
                     client_ip=client_ip_from_request(request),
-                    user_public_id=getattr(request.state, 'current_user_public_id', None),
+                    user_public_id=get_current_user_public_id(request),
                     user_agent=request.headers.get('user-agent'),
                     request_body=request_body,
                     status_code=status_code,

@@ -37,8 +37,24 @@ import {
   UsageResponse,
 } from './types';
 
-const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000').replace(/\/$/, '');
-const GOOGLE_OAUTH_START_PATH = '/api/v1/auth/google/start';
+function resolveApiBase(): string {
+  const configured = process.env.NEXT_PUBLIC_API_URL?.trim();
+  if (!configured) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('NEXT_PUBLIC_API_URL is required for production builds');
+    }
+    return 'http://localhost:8000';
+  }
+
+  try {
+    return new URL(configured).toString().replace(/\/$/, '');
+  } catch {
+    throw new Error('NEXT_PUBLIC_API_URL must be an absolute URL');
+  }
+}
+
+const API_BASE = resolveApiBase();
+const GOOGLE_OAUTH_START_PATH = '/auth/google/start';
 const USAGE_CACHE_TTL_MS = 30_000;
 const DEVICE_ID_KEY = 'ps_device_id';
 
@@ -62,6 +78,21 @@ type ApiRequestOptions = RequestInit & {
 
 let unauthorizedHandler: UnauthorizedHandler | null = null;
 let usageCache: UsageCacheEntry | null = null;
+
+function apiBasePath(): string {
+  const pathname = new URL(API_BASE).pathname.replace(/\/$/, '');
+  if (pathname.endsWith('/api/v1')) return pathname;
+  return pathname.endsWith('/api') ? `${pathname}/v1` : `${pathname}/api/v1`;
+}
+
+function buildApiUrl(path: string): string {
+  const url = new URL(API_BASE);
+  const [rawPath, rawQuery = ''] = path.split('?', 2);
+  const normalizedPath = rawPath.startsWith('/') ? rawPath : `/${rawPath}`;
+  url.pathname = `${apiBasePath()}${normalizedPath}`.replace(/\/{2,}/g, '/');
+  url.search = rawQuery ? `?${rawQuery}` : '';
+  return url.toString();
+}
 
 function createAbortError(): Error {
   if (typeof DOMException === 'function') {
@@ -164,7 +195,7 @@ async function request<T>(
     allHeaders['X-Device-Id'] = deviceId;
   }
 
-  const res = await fetch(`${API_BASE}/api/v1${path}`, {
+  const res = await fetch(buildApiUrl(path), {
     ...rest,
     credentials: 'include',
     headers: allHeaders,
@@ -503,7 +534,7 @@ export async function downloadGeneration(
   generationId: string,
   token: string
 ): Promise<{ blob: Blob; filename: string }> {
-  const res = await fetch(`${API_BASE}/api/v1/generations/${encodeURIComponent(generationId)}/download`, {
+  const res = await fetch(buildApiUrl(`/generations/${encodeURIComponent(generationId)}/download`), {
     credentials: 'include',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -528,8 +559,7 @@ function parseContentDispositionFilename(disposition: string): string | null {
 }
 
 export function buildTaskWebSocketUrl(taskId: string): string {
-  const apiBase = API_BASE.replace(/\/$/, '');
-  const url = new URL(`${apiBase}/api/v1/ws/tasks/${encodeURIComponent(taskId)}`);
+  const url = new URL(buildApiUrl(`/ws/tasks/${encodeURIComponent(taskId)}`));
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
   return url.toString();
 }
@@ -674,5 +704,5 @@ export async function updateReviewMeta(
 // ─── Google OAuth URL builder ─────────────────────────────────────────────────
 
 export function buildGoogleOAuthUrl(): string {
-  return `${API_BASE}${GOOGLE_OAUTH_START_PATH}`;
+  return buildApiUrl(GOOGLE_OAUTH_START_PATH);
 }

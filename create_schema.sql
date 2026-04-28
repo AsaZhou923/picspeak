@@ -1,3 +1,6 @@
+-- Legacy schema snapshot kept for reference.
+-- Runtime database changes are managed by backend/alembic migrations.
+
 create table users
 (
     id                bigserial

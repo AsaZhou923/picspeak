@@ -1,5 +1,5 @@
 // Minimal JPEG/TIFF EXIF extractor — no dependencies.
-// Reads the first 128 KB of the file to cover the APP1 segment
+// Reads a bounded prefix of the file to cover the APP1 segment
 // and extracts the most photographic-relevant tags.
 
 export interface ExifData {
@@ -36,6 +36,7 @@ const TAG_EXPOSURE_MODE      = 0xA402;
 const TAG_WHITE_BALANCE      = 0xA403;
 const TAG_FOCAL_LENGTH_35MM  = 0xA405;
 const TAG_LENS_MODEL         = 0xA434;
+const EXIF_SCAN_BYTES = 1024 * 1024;
 
 // TIFF data types
 const SHORT    = 3;
@@ -176,7 +177,7 @@ export async function extractExif(file: File): Promise<ExifData> {
   }
 
   // Read first 128 KB — enough for almost all APP1 segments
-  const slice = file.slice(0, 131072);
+  const slice = file.slice(0, Math.min(file.size, EXIF_SCAN_BYTES));
   const buffer = await slice.arrayBuffer();
   const view = new DataView(buffer);
 

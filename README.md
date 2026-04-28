@@ -68,13 +68,7 @@ git clone https://github.com/AsaZhou923/picspeak.git
 cd picspeak
 ```
 
-### 2. Initialize the database
-
-```bash
-psql "$DATABASE_URL" -f create_schema.sql
-```
-
-### 3. Configure the backend
+### 2. Configure the backend
 
 ```bash
 cp backend/.env.example backend/.env
@@ -82,12 +76,23 @@ cp backend/.env.example backend/.env
 # image generation, and billing settings as needed
 ```
 
-### 4. Start the backend
+### 3. Install backend dependencies and run migrations
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r backend/requirements.txt
+
+cd backend
+python scripts/ensure_runtime_schema.py
+# Or run Alembic directly:
+# alembic upgrade head
+cd ..
+```
+
+### 4. Start the backend
+
+```bash
 uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 

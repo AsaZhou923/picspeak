@@ -1,5 +1,7 @@
 'use client';
 
+import { canvasToBlob } from './canvas';
+
 const CACHE_NAME = 'ps-review-thumbnails-v1';
 const CACHE_PATH = '/__cache__/review-thumbnails/';
 const CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 30;
@@ -113,16 +115,6 @@ function getTargetDimensions(width: number, height: number, maxSize: number) {
   };
 }
 
-function canvasToBlob(
-  canvas: HTMLCanvasElement,
-  type: string,
-  quality?: number
-): Promise<Blob | null> {
-  return new Promise((resolve) => {
-    canvas.toBlob((blob) => resolve(blob), type, quality);
-  });
-}
-
 async function createThumbnailBlob(source: Blob, maxSize: number): Promise<Blob> {
   if (typeof document === 'undefined' || !source.type.startsWith('image/')) {
     return source;
@@ -217,7 +209,14 @@ export async function getReviewThumbnailSrc(
     await persistCachedBlob(photoId, size, thumbnailBlob);
     return rememberObjectUrl(entryKey, thumbnailBlob);
   })
-    .catch(() => null)
+    .catch((error: unknown) => {
+      console.warn('Review thumbnail load failed', {
+        photoId,
+        size,
+        error,
+      });
+      return null;
+    })
     .finally(() => {
       pendingLoads.delete(entryKey);
     });

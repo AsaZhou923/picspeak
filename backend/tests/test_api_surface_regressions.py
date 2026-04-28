@@ -262,7 +262,7 @@ class ApiSurfaceRegressionTests(unittest.TestCase):
 
     def test_image_credit_code_redeem_adds_bonus_credit_ledger_entry(self) -> None:
         db = MagicMock()
-        db.query.return_value.filter.return_value.all.return_value = []
+        db.query.return_value.filter.return_value.first.return_value = None
         user = User(
             id=23,
             public_id='usr_credit_free',
@@ -338,9 +338,9 @@ class ApiSurfaceRegressionTests(unittest.TestCase):
 
     def test_image_credit_code_redeem_is_one_time_per_user(self) -> None:
         db = MagicMock()
-        db.query.return_value.filter.return_value.all.return_value = [
-            SimpleNamespace(metadata_json={'grant_type': 'promo_code', 'grant_code': 'PICSPEAKART'})
-        ]
+        db.query.return_value.filter.return_value.first.return_value = SimpleNamespace(
+            metadata_json={'grant_type': 'promo_code', 'grant_code': 'PICSPEAKART'}
+        )
         user = User(
             id=24,
             public_id='usr_credit_repeat',

@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-04-28-runtime-migrations-and-stability",
+    "date": "2026-04-28",
+    "title": "运行时迁移、API 稳定性与首页语言收口",
+    "summary": "后端 runtime schema 迁入 Alembic baseline 与增量迁移，游客创建、审计日志、博客阅读数、长廊推荐和 AI 生图下载补上稳定性保护；前端同步收口 API URL、默认语言、html lang、演示点评文案和图片处理工具。",
+    "docPath": "docs/changelog/update-log-2026-04-28-runtime-migrations-and-stability.md",
+    "sections": [
+      {
+        "title": "后端运行时与 API",
+        "items": [
+          "ensure_runtime_schema 改为执行 Alembic head，新增 baseline 迁移和低风险索引迁移",
+          "游客创建限速、登录时间刷新间隔、审计任务关闭收尾、转发 IP 校验和 Cloud Tasks secret 比对都已加固",
+          "博客阅读数 upsert、长廊推荐百分位、AI 生图分页游标与下载大小校验改为更稳定的实现"
+        ]
+      },
+      {
+        "title": "前端语言与图片处理",
+        "items": [
+          "API、下载、WebSocket 和 Google OAuth 地址统一通过同一套 base URL 构造",
+          "首页默认语言、html lang 与 locale 同步逻辑收口，未知语言默认回到英文",
+          "演示图支持环境变量覆盖，中文/日文演示点评文案和 canvas/EXIF/缩略图处理补齐回归保护"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-04-27-gpt-image2-prompt-gallery",
     "date": "2026-04-27",
     "title": "精选 GPT-Image-2 提示词库上线",

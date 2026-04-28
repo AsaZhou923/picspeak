@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-04-28-runtime-migrations-and-stability",
+    "date": "2026-04-28",
+    "title": "Runtime migration、API 安定性、ホーム言語設定を整理",
+    "summary": "runtime schema 管理を Alembic baseline と増分 migration に移行しました。ゲスト作成、監査ログ、Blog 閲覧数、Gallery 推薦、AI 生成画像ダウンロードに安定性ガードを追加し、フロントエンドでは API URL、既定 locale、html lang、デモ講評、画像処理を整理しました。",
+    "docPath": "docs/changelog/update-log-2026-04-28-runtime-migrations-and-stability.md",
+    "sections": [
+      {
+        "title": "Backend runtime と API",
+        "items": [
+          "ensure_runtime_schema は Alembic head への upgrade を実行し、baseline migration と低リスク index migration を追加",
+          "ゲスト作成 rate limit、login touch 間隔、監査 task の shutdown drain、forwarded IP 検証、Cloud Tasks secret 比較を強化",
+          "Blog 閲覧数 upsert、Gallery 推薦 percentile、AI 生成 cursor、download サイズ検証をより安定した実装へ変更"
+        ]
+      },
+      {
+        "title": "Frontend locale と画像処理",
+        "items": [
+          "API、download、WebSocket、Google OAuth URL を同じ base URL ルールで生成",
+          "ホームの既定 locale、html lang、locale 同期を揃え、不明な locale は英語へ fallback",
+          "デモ画像は環境変数で上書き可能になり、デモ講評の多言語文言と canvas/EXIF/thumbnail 処理に回帰保護を追加"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-04-27-gpt-image2-prompt-gallery",
     "date": "2026-04-27",
     "title": "厳選 GPT-Image-2 prompt ライブラリを追加",

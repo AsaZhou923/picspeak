@@ -204,7 +204,7 @@ def confirm_photo_upload(
             .filter(
                 Photo.owner_user_id == actor.user.id,
                 Photo.checksum_sha256 == checksum_sha256,
-                Photo.status.in_([PhotoStatus.READY, PhotoStatus.REJECTED]),
+                Photo.status == PhotoStatus.READY,
             )
             .order_by(Photo.created_at.desc(), Photo.id.desc())
             .first()

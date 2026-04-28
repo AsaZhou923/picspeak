@@ -47,7 +47,7 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
 function isExpiredToken(token: string): boolean {
   const payload = decodeJwtPayload(token);
   const exp = payload?.exp;
-  return typeof exp === 'number' && exp <= Math.floor(Date.now() / 1000);
+  return typeof exp !== 'number' || exp <= Math.floor(Date.now() / 1000);
 }
 
 function readSessionAuthToken(): AuthToken | null {

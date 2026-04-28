@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import secrets
+
 from fastapi import APIRouter, Depends, Request, Response, status
 from sqlalchemy.orm import Session
 
@@ -88,7 +90,7 @@ def execute_review_task(payload: InternalTaskExecuteRequest, request: Request):
     if not settings.cloud_tasks_enabled:
         raise api_error(status.HTTP_404_NOT_FOUND, 'TASK_DISPATCH_DISABLED', 'Cloud Tasks execution is not enabled')
     header_secret = request.headers.get('X-Task-Dispatch-Secret', '')
-    if header_secret != settings.cloud_tasks_secret:
+    if not secrets.compare_digest(header_secret, settings.cloud_tasks_secret):
         raise api_error(status.HTTP_401_UNAUTHORIZED, 'TASK_DISPATCH_UNAUTHORIZED', 'Invalid task dispatch secret')
     result = process_review_task(payload.task_id, worker_name='cloud-tasks')
     if result.get('result') == 'delayed':

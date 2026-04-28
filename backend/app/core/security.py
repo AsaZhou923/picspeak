@@ -79,7 +79,7 @@ def create_access_token(payload: dict[str, Any], ttl_seconds: int = 24 * 3600) -
 
 def validate_access_token(token: str) -> dict[str, Any]:
     try:
-        header_b64, payload_b64, signature_b64 = token.split('.')
+        header_b64, payload_b64, signature_b64 = token.split('.', 2)
     except ValueError as exc:
         raise JWTValidationError('malformed jwt') from exc
 

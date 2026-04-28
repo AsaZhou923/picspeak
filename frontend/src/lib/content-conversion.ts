@@ -1,3 +1,5 @@
+import { normalizeLocale } from './locale';
+
 export type ContentConversionLocale = 'zh' | 'en' | 'ja';
 export type ContentConversionSource = 'home_direct' | 'blog' | 'gallery';
 export type ContentConversionEntrypoint =
@@ -346,13 +348,6 @@ const HOME_INTENT_COPY: Record<ContentConversionLocale, HomeIntentEntrance[]> = 
     },
   ],
 };
-
-function normalizeLocale(locale: string): ContentConversionLocale {
-  if (locale === 'en' || locale === 'ja') {
-    return locale;
-  }
-  return 'zh';
-}
 
 function appendIfPresent(params: URLSearchParams, key: string, value: string | undefined): void {
   const normalized = value?.trim();

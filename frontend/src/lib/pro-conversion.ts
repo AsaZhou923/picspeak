@@ -1,3 +1,5 @@
+import { normalizeLocale } from './locale';
+
 export type ProConversionLocale = 'zh' | 'en' | 'ja';
 export type ProUpgradeTrigger =
   | 'guest_save'
@@ -285,13 +287,6 @@ const COPY: Record<ProConversionLocale, LocaleCopy> = {
     },
   },
 };
-
-function normalizeLocale(locale: string): ProConversionLocale {
-  if (locale === 'en' || locale === 'ja') {
-    return locale;
-  }
-  return 'zh';
-}
 
 function interpolateRemaining(text: string, context?: ProUpgradeTriggerContext): string {
   if (context?.remaining === null || context?.remaining === undefined) {

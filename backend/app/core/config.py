@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     # Minimum required length for app_secret in non-dev environments (32 bytes → 64 hex chars).
     _APP_SECRET_MIN_LENGTH: int = 32
     database_url: str = 'postgresql+psycopg2://postgres:postgres@localhost:5432/aipingtubackend'
+    db_pool_size: int = 10
+    db_max_overflow: int = 20
+    db_pool_recycle_seconds: int = 3600
 
     object_bucket: str = 'aipingtuphotos'
     object_base_url: str = 'https://object.example.com'
@@ -30,6 +33,7 @@ class Settings(BaseSettings):
     rate_limit_per_minute: int = 10
     ip_rate_limit_per_minute: int = 30
     guest_api_rate_limit_per_minute: int = 60
+    guest_creation_rate_limit_per_minute: int = 10
     guest_review_rate_limit_per_minute: int = 4
     guest_review_limit_per_day: int = 3
     guest_review_limit_per_month: int = 30
@@ -115,6 +119,7 @@ class Settings(BaseSettings):
     image_generation_pro_default_quality: str = 'medium'
     image_generation_max_outputs_per_request: int = 1
     image_generation_timeout_seconds: int = 180
+    image_generation_download_max_bytes: int = 25 * 1024 * 1024
     image_generation_worker_concurrency: int = 1
     image_generation_daily_ipm_limit: int = 5
     image_generation_enable_streaming: bool = False

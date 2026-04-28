@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import { Cormorant_Garamond, DM_Sans, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 import SiteChrome from '@/components/layout/SiteChrome';
@@ -88,10 +89,19 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+function documentLang(locale: string | null): string {
+  if (locale === 'zh') return 'zh-CN';
+  if (locale === 'ja') return 'ja';
+  return 'en';
+}
+
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const requestHeaders = await headers();
+  const lang = documentLang(requestHeaders.get('x-picspeak-locale'));
+
   return (
     <html
-      lang="en"
+      lang={lang}
       className={`${cormorant.variable} ${dmSans.variable} ${jetbrainsMono.variable}`}
       suppressHydrationWarning
     >

@@ -189,19 +189,16 @@ def _normalize_image_credit_code(raw_code: str) -> str:
 
 
 def _has_redeemed_image_credit_code(db: Session, user: User, code: str) -> bool:
-    grants = (
+    return (
         db.query(UsageLedger)
         .filter(
             UsageLedger.user_id == user.id,
             UsageLedger.usage_type == 'image_generation_credit',
+            UsageLedger.metadata_json.contains({'grant_type': 'promo_code', 'grant_code': code}),
         )
-        .all()
+        .first()
+        is not None
     )
-    for grant in grants:
-        metadata = getattr(grant, 'metadata_json', None) or {}
-        if metadata.get('grant_type') == 'promo_code' and metadata.get('grant_code') == code:
-            return True
-    return False
 
 
 @router.get('/me/usage', response_model=UsageResponse)

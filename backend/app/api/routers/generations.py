@@ -6,6 +6,7 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Request, status
 from fastapi.responses import StreamingResponse
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 from app.api.deps import CurrentActor, get_current_actor, get_db
@@ -44,6 +45,18 @@ from app.services.product_analytics import record_product_event
 
 
 router = APIRouter(tags=['generations'])
+
+
+def _encode_generation_cursor(image: GeneratedImage) -> str:
+    return f'{image.created_at.isoformat()}|{image.id}'
+
+
+def _decode_generation_cursor(cursor: str) -> tuple[datetime, int]:
+    raw_created_at, separator, raw_id = cursor.partition('|')
+    if not separator:
+        raise ValueError('legacy cursor')
+    created_at = datetime.fromisoformat(raw_created_at)
+    return created_at, int(raw_id)
 
 
 @router.get('/generations/templates', response_model=GenerationTemplatesResponse)
@@ -233,14 +246,34 @@ def list_my_generations(
         .order_by(GeneratedImage.created_at.desc(), GeneratedImage.id.desc())
     )
     if cursor:
-        query = query.filter(GeneratedImage.public_id < cursor)
+        try:
+            cursor_created_at, cursor_id = _decode_generation_cursor(cursor)
+        except ValueError:
+            legacy_cursor = (
+                db.query(GeneratedImage.created_at, GeneratedImage.id)
+                .filter(
+                    GeneratedImage.public_id == cursor,
+                    GeneratedImage.owner_user_id == actor.user.id,
+                    GeneratedImage.deleted_at.is_(None),
+                )
+                .first()
+            )
+            if legacy_cursor is None:
+                raise api_error(status.HTTP_400_BAD_REQUEST, 'GENERATION_CURSOR_INVALID', 'Invalid generation cursor')
+            cursor_created_at, cursor_id = legacy_cursor
+        query = query.filter(
+            or_(
+                GeneratedImage.created_at < cursor_created_at,
+                and_(GeneratedImage.created_at == cursor_created_at, GeneratedImage.id < cursor_id),
+            )
+        )
     rows = query.limit(page_size + 1).all()
     has_more = len(rows) > page_size
     items = rows[:page_size]
     related_public_ids = _generation_related_public_ids(db, items)
     return {
         'items': [_generation_item_payload(db, image, related_public_ids=related_public_ids) for image in items],
-        'next_cursor': items[-1].public_id if has_more and items else None,
+        'next_cursor': _encode_generation_cursor(items[-1]) if has_more and items else None,
     }
 
 
@@ -269,6 +302,23 @@ def download_generation(
     except Exception as exc:
         raise api_error(status.HTTP_502_BAD_GATEWAY, 'GENERATION_DOWNLOAD_FAILED', 'Generated image could not be downloaded') from exc
 
+    content_length = _response_content_length(response)
+    max_bytes = settings.image_generation_download_max_bytes
+    if content_length is None:
+        raise api_error(
+            status.HTTP_502_BAD_GATEWAY,
+            'GENERATION_DOWNLOAD_SIZE_UNKNOWN',
+            'Generated image size could not be verified',
+        )
+    if content_length > max_bytes:
+        raise api_error(
+            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            'GENERATION_DOWNLOAD_TOO_LARGE',
+            'Generated image exceeds the download size limit',
+            max_bytes=max_bytes,
+            content_length=content_length,
+        )
+
     content_type = str(response.get('ContentType') or image.content_type or 'application/octet-stream')
     extension = _extension_for_content_type(content_type, fallback=image.output_format)
     filename = f'{image.public_id}.{extension}'
@@ -276,7 +326,10 @@ def download_generation(
     return StreamingResponse(
         body.iter_chunks(),
         media_type=content_type,
-        headers={'Content-Disposition': f'attachment; filename="{filename}"'},
+        headers={
+            'Content-Disposition': f'attachment; filename="{filename}"',
+            'Content-Length': str(content_length),
+        },
     )
 
 
@@ -472,3 +525,11 @@ def _extension_for_content_type(content_type: str, *, fallback: str) -> str:
     if normalized == 'image/webp':
         return 'webp'
     return str(fallback or 'bin').strip().lstrip('.') or 'bin'
+
+
+def _response_content_length(response: dict) -> int | None:
+    try:
+        content_length = int(response.get('ContentLength'))
+    except (TypeError, ValueError):
+        return None
+    return content_length if content_length >= 0 else None

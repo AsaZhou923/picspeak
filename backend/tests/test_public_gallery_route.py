@@ -50,21 +50,28 @@ class PublicGalleryRouteTests(unittest.TestCase):
 
     def test_gallery_recommendation_map_marks_top_percentile_with_sufficient_type_sample(self) -> None:
         db = MagicMock()
-        query = MagicMock()
-        query.filter.return_value = query
-        query.all.return_value = [
-            SimpleNamespace(id=1, image_type='architecture', final_score=5.8),
-            SimpleNamespace(id=2, image_type='architecture', final_score=6.0),
-            SimpleNamespace(id=3, image_type='architecture', final_score=6.2),
-            SimpleNamespace(id=4, image_type='architecture', final_score=6.4),
-            SimpleNamespace(id=5, image_type='architecture', final_score=6.8),
-            SimpleNamespace(id=6, image_type='architecture', final_score=7.1),
-            SimpleNamespace(id=7, image_type='architecture', final_score=7.4),
-            SimpleNamespace(id=8, image_type='architecture', final_score=8.0),
+        ranked_reviews = SimpleNamespace(
+            c=SimpleNamespace(
+                review_id=MagicMock(),
+                global_count=object(),
+                type_count=object(),
+                global_percent_rank=object(),
+                type_percent_rank=object(),
+            )
+        )
+        ranked_reviews.c.review_id.in_.return_value = object()
+        ranking_query = MagicMock()
+        ranking_query.filter.return_value = ranking_query
+        ranking_query.subquery.return_value = ranked_reviews
+        result_query = MagicMock()
+        result_query.filter.return_value = result_query
+        result_query.all.return_value = [
+            SimpleNamespace(review_id=1, global_count=8, type_count=8, global_percent_rank=0.0, type_percent_rank=0.0),
+            SimpleNamespace(review_id=8, global_count=8, type_count=8, global_percent_rank=1.0, type_percent_rank=1.0),
         ]
-        db.query.return_value = query
+        db.query.side_effect = [ranking_query, result_query]
 
-        with patch('app.api.routers.gallery._public_gallery_filters', return_value=()):
+        with patch('app.api.routers.gallery_support._public_gallery_filters', return_value=()):
             recommendations = _gallery_recommendation_map(db, [1, 8])
 
         self.assertFalse(recommendations[1]['recommended'])

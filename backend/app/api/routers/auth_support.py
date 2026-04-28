@@ -23,6 +23,7 @@ from app.services.clerk_webhooks import ClerkWebhookEvent
 GOOGLE_OAUTH_STATE_COOKIE = 'ps_google_oauth_state'
 GOOGLE_OAUTH_STATE_TTL_SECONDS = 600
 USERNAME_SANITIZE_RE = re.compile(r'[^a-z0-9_]+')
+MAX_USERNAME_ATTEMPTS = 100
 
 
 def _http_exception_message(exc: HTTPException) -> str:
@@ -66,16 +67,18 @@ def _username_seed(identity: ClerkIdentity) -> str:
 
 def _build_unique_username(db: Session, identity: ClerkIdentity, current_user_id: int | None = None) -> str:
     base = _username_seed(identity)
-    candidate = base
-    suffix = 2
-    while True:
+    for attempt in range(MAX_USERNAME_ATTEMPTS):
+        if attempt == 0:
+            candidate = base
+        else:
+            suffix_text = str(attempt + 1)
+            trimmed_base = base[: max(1, 40 - len(suffix_text) - 1)]
+            candidate = f'{trimmed_base}_{suffix_text}'
         existing = db.query(User).filter(User.username == candidate).first()
         if existing is None or existing.id == current_user_id:
             return candidate
-        suffix_text = str(suffix)
-        trimmed_base = base[: max(1, 40 - len(suffix_text) - 1)]
-        candidate = f'{trimmed_base}_{suffix_text}'
-        suffix += 1
+
+    raise api_error(status.HTTP_409_CONFLICT, 'USERNAME_UNAVAILABLE', 'Could not allocate a unique username')
 
 
 def _serialize_auth_response(

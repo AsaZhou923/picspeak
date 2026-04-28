@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from bisect import bisect_right
 from datetime import datetime, timezone
 from typing import Any
 
@@ -185,53 +184,46 @@ def _optional_gallery_viewer(authorization: str | None, db: Session) -> User | N
   return get_user_from_token(token, db)
 
 
-def _score_percentile(value: float, sorted_values: list[float]) -> float | None:
-  if not sorted_values:
-    return None
-  if len(sorted_values) == 1:
-    return 100.0
-  rank = bisect_right(sorted_values, value) - 1
-  rank = max(0, min(rank, len(sorted_values) - 1))
-  return round((rank / (len(sorted_values) - 1)) * 100.0, 1)
-
-
 def _gallery_recommendation_map(db: Session, review_ids: list[int]) -> dict[int, dict[str, float | bool | None]]:
   if not review_ids:
     return {}
 
-  gallery_rows = (
-    db.query(Review.id, Review.image_type, Review.final_score)
+  target_ids = [int(review_id) for review_id in review_ids]
+  ranked_reviews = (
+    db.query(
+      Review.id.label('review_id'),
+      func.count(Review.id).over().label('global_count'),
+      func.count(Review.id).over(partition_by=Review.image_type).label('type_count'),
+      func.percent_rank().over(order_by=Review.final_score).label('global_percent_rank'),
+      func.percent_rank().over(partition_by=Review.image_type, order_by=Review.final_score).label('type_percent_rank'),
+    )
     .filter(*_public_gallery_filters())
+    .subquery()
+  )
+  rows = (
+    db.query(
+      ranked_reviews.c.review_id,
+      ranked_reviews.c.global_count,
+      ranked_reviews.c.type_count,
+      ranked_reviews.c.global_percent_rank,
+      ranked_reviews.c.type_percent_rank,
+    )
+    .filter(ranked_reviews.c.review_id.in_(target_ids))
     .all()
   )
-  if not gallery_rows:
-    return {}
-
-  global_scores = sorted(float(row.final_score) for row in gallery_rows)
-  scores_by_type: dict[str, list[float]] = {}
-  row_map: dict[int, tuple[str, float]] = {}
-  for row in gallery_rows:
-    image_type = str(row.image_type or 'default')
-    score = float(row.final_score)
-    scores_by_type.setdefault(image_type, []).append(score)
-    row_map[int(row.id)] = (image_type, score)
-
-  for scores in scores_by_type.values():
-    scores.sort()
 
   recommendations: dict[int, dict[str, float | bool | None]] = {}
-  for review_id in review_ids:
-    row = row_map.get(int(review_id))
-    if row is None:
-      continue
-    image_type, score = row
-    type_scores = scores_by_type.get(image_type, [])
-    percentile = (
-      _score_percentile(score, type_scores)
-      if len(type_scores) >= GALLERY_RECOMMEND_MIN_IMAGE_TYPE_SAMPLE
-      else _score_percentile(score, global_scores)
-    )
-    recommendations[int(review_id)] = {
+  for row in rows:
+    type_count = int(row.type_count or 0)
+    if type_count >= GALLERY_RECOMMEND_MIN_IMAGE_TYPE_SAMPLE:
+      sample_count = type_count
+      raw_percentile = row.type_percent_rank
+    else:
+      sample_count = int(row.global_count or 0)
+      raw_percentile = row.global_percent_rank
+
+    percentile = 100.0 if sample_count == 1 else round(float(raw_percentile or 0) * 100.0, 1)
+    recommendations[int(row.review_id)] = {
       'recommended': bool(percentile is not None and percentile >= GALLERY_RECOMMEND_PERCENTILE_THRESHOLD),
       'score_percentile': percentile,
     }

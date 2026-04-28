@@ -206,8 +206,8 @@ export const enTranslations = {
     pro_offer_label: '',
     pro_offer_highlight: 'Pro',
     updates_label: 'Updates',
-    updates_hint_home: 'See the public gallery update',
-    updates_hint_latest: 'See the curated GPT-Image-2 prompt library',
+    updates_hint_home: 'See runtime migrations and stability update',
+    updates_hint_latest: 'See runtime migrations and stability update',
     contact_label: 'Contact',
     contact_headline: 'Get in Touch',
 
@@ -699,3 +699,6 @@ export const enTranslations = {
     faq_q10: 'How do I use light to improve photo quality?',
     faq_a10: 'Light is the soul of photography. In natural light, the "golden hour" (30–60 minutes after sunrise or before sunset) gives soft, warm tones ideal for portraits and landscapes. Avoid harsh midday sun; overcast days produce even diffused light great for food, product, or still-life shots. Backlighting creates rim light and silhouettes; side lighting emphasises texture and depth.',
 } as const;
+
+export type TranslationKey = keyof typeof enTranslations;
+export type TranslationDictionary = Readonly<Record<TranslationKey, string>>;

@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-04-28-runtime-migrations-and-stability",
+    "date": "2026-04-28",
+    "title": "Runtime migrations, API stability, and homepage language cleanup",
+    "summary": "Runtime schema management now runs through Alembic baseline and incremental migrations. Guest creation, audit logging, blog view counts, gallery recommendations, and AI generation downloads gained stability guards, while the frontend now has tighter API URL, default locale, html lang, demo critique, and image-processing behavior.",
+    "docPath": "docs/changelog/update-log-2026-04-28-runtime-migrations-and-stability.md",
+    "sections": [
+      {
+        "title": "Backend runtime and APIs",
+        "items": [
+          "ensure_runtime_schema now upgrades Alembic to head with a baseline migration and low-risk index migration",
+          "Guest creation rate limits, login touch intervals, audit shutdown draining, forwarded IP validation, and Cloud Tasks secret comparison were tightened",
+          "Blog view upserts, gallery recommendation percentiles, AI generation cursors, and download size checks now use more stable implementations"
+        ]
+      },
+      {
+        "title": "Frontend locale and image handling",
+        "items": [
+          "API, download, WebSocket, and Google OAuth URLs are built through the same base URL path rules",
+          "Homepage default locale, html lang, and locale sync behavior were aligned, with unknown locales falling back to English",
+          "The demo image can be overridden by environment config, localized demo critique copy was repaired, and canvas/EXIF/thumbnail helpers gained regression coverage"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-04-27-gpt-image2-prompt-gallery",
     "date": "2026-04-27",
     "title": "Curated GPT-Image-2 prompt library",

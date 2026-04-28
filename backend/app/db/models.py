@@ -1,6 +1,7 @@
 ﻿from __future__ import annotations
 
 from datetime import date, datetime
+from decimal import Decimal
 import enum
 
 from sqlalchemy import (
@@ -17,6 +18,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -83,7 +85,7 @@ class User(Base):
     status: Mapped[UserStatus] = mapped_column(Enum(UserStatus, name='user_status', create_type=False), nullable=False, default=UserStatus.active)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 
 
 class Photo(Base):
@@ -111,10 +113,10 @@ class Photo(Base):
     exif_data: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     client_meta: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     nsfw_label: Mapped[str | None] = mapped_column(Text)
-    nsfw_score: Mapped[float | None] = mapped_column(Numeric(5, 4))
+    nsfw_score: Mapped[Decimal | None] = mapped_column(Numeric(5, 4))
     rejected_reason: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 
 
 class ReviewTask(Base):
@@ -147,7 +149,7 @@ class ReviewTask(Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     expire_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 
     photo: Mapped[Photo] = relationship()
 
@@ -160,6 +162,23 @@ class Review(Base):
         Index('idx_reviews_owner_deleted_created', 'owner_user_id', 'deleted_at', 'created_at'),
         Index('idx_reviews_owner_image_type_created', 'owner_user_id', 'image_type', 'created_at'),
         Index('idx_reviews_source_review', 'source_review_id'),
+        Index(
+            'idx_reviews_gallery_public',
+            'gallery_added_at',
+            'id',
+            postgresql_where=text(
+                "gallery_visible = TRUE AND gallery_audit_status = 'approved' AND deleted_at IS NULL"
+            ),
+        ),
+        Index(
+            'idx_reviews_gallery_recommendation',
+            'image_type',
+            'final_score',
+            'id',
+            postgresql_where=text(
+                "gallery_visible = TRUE AND gallery_audit_status = 'approved' AND deleted_at IS NULL"
+            ),
+        ),
         Index('uq_reviews_share_token', 'share_token', unique=True),
     )
 
@@ -174,7 +193,7 @@ class Review(Base):
     image_type: Mapped[str] = mapped_column(Text, nullable=False, default='default', server_default='default')
     schema_version: Mapped[str] = mapped_column(Text, nullable=False, default='1.0')
     result_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
-    final_score: Mapped[float] = mapped_column(Numeric(4, 2), nullable=False)
+    final_score: Mapped[Decimal] = mapped_column(Numeric(4, 2), nullable=False)
     is_public: Mapped[bool] = mapped_column(nullable=False, default=False, server_default='false')
     share_token: Mapped[str | None] = mapped_column(Text)
     favorite: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default='false')
@@ -187,11 +206,11 @@ class Review(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     input_tokens: Mapped[int | None] = mapped_column(Integer)
     output_tokens: Mapped[int | None] = mapped_column(Integer)
-    cost_usd: Mapped[float | None] = mapped_column(Numeric(12, 6))
+    cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(12, 6))
     latency_ms: Mapped[int | None] = mapped_column(Integer)
     model_name: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 
 
 class ReviewLike(Base):
@@ -276,7 +295,7 @@ class ImageGenerationTask(Base):
     claimed_by: Mapped[str | None] = mapped_column(Text)
     last_heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 
 
 class GeneratedImage(Base):
@@ -310,13 +329,13 @@ class GeneratedImage(Base):
     input_text_tokens: Mapped[int | None] = mapped_column(Integer)
     input_image_tokens: Mapped[int | None] = mapped_column(Integer)
     output_image_tokens: Mapped[int | None] = mapped_column(Integer)
-    cost_usd: Mapped[float | None] = mapped_column(Numeric(12, 6))
+    cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(12, 6))
     credits_charged: Mapped[int] = mapped_column(Integer, nullable=False)
     template_key: Mapped[str | None] = mapped_column(Text)
     metadata_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 
 
 class UsageLedger(Base):
@@ -324,6 +343,7 @@ class UsageLedger(Base):
     __table_args__ = (
         Index('idx_usage_ledger_user_bill_date', 'user_id', 'bill_date'),
         Index('idx_usage_ledger_type_bill_date', 'usage_type', 'bill_date'),
+        Index('idx_usage_ledger_user_type', 'user_id', 'usage_type'),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
@@ -331,7 +351,7 @@ class UsageLedger(Base):
     review_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey('reviews.id'))
     task_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey('review_tasks.id'))
     usage_type: Mapped[str] = mapped_column(Text, nullable=False)
-    amount: Mapped[float] = mapped_column(Numeric(18, 6), nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False)
     unit: Mapped[str] = mapped_column(Text, nullable=False)
     bill_date: Mapped[date] = mapped_column(Date, nullable=False)
     metadata_json: Mapped[dict] = mapped_column('metadata', JSONB, nullable=False, default=dict)
@@ -374,7 +394,7 @@ class BillingSubscription(Base):
     last_payment_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     raw_payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 
 
 class BillingActivationCode(Base):
@@ -400,7 +420,7 @@ class BillingActivationCode(Base):
     disabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     metadata_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 
 
 class BillingWebhookEvent(Base):
@@ -440,7 +460,7 @@ class RateLimitCounter(Base):
     window_seconds: Mapped[int] = mapped_column(Integer, nullable=False)
     hit_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 
 
 class IdempotencyKey(Base):

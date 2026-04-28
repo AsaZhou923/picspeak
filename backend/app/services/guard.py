@@ -391,6 +391,22 @@ def enforce_guest_api_rate_limit(db: Session, actor: 'CurrentActor', endpoint: s
     }
 
 
+def enforce_guest_creation_rate_limit(db: Session, scope_key: str) -> dict:
+    now = utc_now()
+    minute_rate = _enforce_scope_rate_limit(
+        db,
+        scope='guest_creation_minute',
+        scope_key=scope_key,
+        endpoint='guest_create',
+        per_minute_limit=settings.guest_creation_rate_limit_per_minute,
+        window_start=minute_window_start(now),
+        window_seconds=60,
+    )
+    return {
+        'guest_creation_minute': minute_rate,
+    }
+
+
 def hash_request(payload: str) -> str:
     return hashlib.sha256(payload.encode('utf-8')).hexdigest()
 

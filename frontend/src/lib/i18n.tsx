@@ -1,9 +1,10 @@
 'use client';
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { zhTranslations, type TranslationDictionary, type TranslationKey } from './i18n-zh';
+import { enTranslations, type TranslationDictionary, type TranslationKey } from './i18n-en';
+import { zhTranslations } from './i18n-zh';
 
-export type { TranslationKey } from './i18n-zh';
+export type { TranslationKey } from './i18n-en';
 
 export type Locale = 'zh' | 'en' | 'ja';
 
@@ -22,28 +23,27 @@ interface I18nContextValue {
 }
 
 const I18nContext = createContext<I18nContextValue>({
-  locale: 'zh',
+  locale: 'en',
   setLocale: () => {},
   t: (key) => key,
 });
 
 const STORAGE_KEY = 'picspeak-locale';
+const LOCALE_SYNC_EVENT = 'picspeak-locale-sync';
 
-function detectBrowserLocale(): Locale {
-  if (typeof navigator === 'undefined') return 'zh';
+function documentLang(locale: Locale): string {
+  if (locale === 'zh') return 'zh-CN';
+  return locale;
+}
 
-  const candidates = Array.isArray(navigator.languages) && navigator.languages.length > 0
-    ? navigator.languages
-    : [navigator.language];
+function isLocale(value: string | null | undefined): value is Locale {
+  return Boolean(value && Object.prototype.hasOwnProperty.call(LOCALE_LABELS, value));
+}
 
-  for (const candidate of candidates) {
-    const normalized = String(candidate || '').trim().toLowerCase();
-    if (normalized.startsWith('zh')) return 'zh';
-    if (normalized.startsWith('ja')) return 'ja';
-    if (normalized.startsWith('en')) return 'en';
-  }
-
-  return 'zh';
+function detectPathLocale(): Locale | null {
+  if (typeof window === 'undefined') return null;
+  const firstSegment = window.location.pathname.split('/').filter(Boolean)[0];
+  return isLocale(firstSegment) ? firstSegment : null;
 }
 
 async function loadTranslations(locale: Locale): Promise<TranslationDictionary> {
@@ -51,29 +51,29 @@ async function loadTranslations(locale: Locale): Promise<TranslationDictionary> 
     case 'zh':
       return zhTranslations;
     case 'ja':
-      return (await import('./i18n-ja')).jaTranslations as unknown as TranslationDictionary;
+      return (await import('./i18n-ja')).jaTranslations;
     case 'en':
     default:
-      return (await import('./i18n-en')).enTranslations as unknown as TranslationDictionary;
+      return enTranslations;
   }
 }
 
 export function I18nProvider({
   children,
   initialLocale,
-  defaultLocale = 'zh',
+  defaultLocale = 'en',
   initialMessages,
 }: {
   children: React.ReactNode;
   /** When set, skips localStorage / browser-detection and pins this locale. */
   initialLocale?: Locale;
-  /** Initial SSR locale when the route is not pinned. */
+  /** Default locale when there is no URL prefix or saved user preference. */
   defaultLocale?: Locale;
   /** Initial SSR translation bundle so crawlers receive localized HTML. */
   initialMessages?: TranslationDictionary;
 }) {
   const [locale, setLocaleState] = useState<Locale>(initialLocale ?? defaultLocale);
-  const [messages, setMessages] = useState<TranslationDictionary>(initialMessages ?? zhTranslations);
+  const [messages, setMessages] = useState<TranslationDictionary>(initialMessages ?? enTranslations);
 
   useEffect(() => {
     // If a locale was pinned by the URL route, honour it and persist it.
@@ -90,6 +90,12 @@ export function I18nProvider({
       return;
     }
 
+    const pathLocale = detectPathLocale();
+    if (pathLocale) {
+      setLocaleState(pathLocale);
+      return;
+    }
+
     try {
       const saved = localStorage.getItem(STORAGE_KEY) as Locale | null;
       if (saved && saved in LOCALE_LABELS) {
@@ -100,8 +106,24 @@ export function I18nProvider({
       // ignore
     }
 
-    setLocaleState(detectBrowserLocale());
-  }, [initialLocale, initialMessages]);
+    setLocaleState(defaultLocale);
+  }, [defaultLocale, initialLocale, initialMessages]);
+
+  useEffect(() => {
+    if (initialLocale || typeof window === 'undefined') {
+      return;
+    }
+
+    const handleLocaleSync = (event: Event) => {
+      const nextLocale = (event as CustomEvent<Locale>).detail;
+      if (isLocale(nextLocale)) {
+        setLocaleState(nextLocale);
+      }
+    };
+
+    window.addEventListener(LOCALE_SYNC_EVENT, handleLocaleSync);
+    return () => window.removeEventListener(LOCALE_SYNC_EVENT, handleLocaleSync);
+  }, [initialLocale]);
 
   useEffect(() => {
     let cancelled = false;
@@ -127,11 +149,14 @@ export function I18nProvider({
     } catch {
       // ignore
     }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent<Locale>(LOCALE_SYNC_EVENT, { detail: l }));
+    }
   }, []);
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
-    document.documentElement.lang = locale;
+    document.documentElement.lang = documentLang(locale);
   }, [locale]);
 
   const t = useCallback(

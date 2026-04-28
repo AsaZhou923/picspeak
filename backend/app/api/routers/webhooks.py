@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
+from app.api.request_state import set_current_user_public_id
 from app.db.models import User
 from app.services.lemonsqueezy_webhooks import (
     process_lemonsqueezy_webhook_event,
@@ -33,7 +34,7 @@ async def _handle_lemonsqueezy_webhook(request: Request, db: Session) -> dict[st
             user = db.query(User).filter(User.public_id == user_public_id).first()
             if user is not None:
                 event_record.user_id = user.id
-                request.state.current_user_public_id = user_public_id
+                set_current_user_public_id(request, user_public_id)
         db.add(event_record)
         db.commit()
     except Exception:

@@ -8,6 +8,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
@@ -15,7 +16,7 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 from app.api.deps import get_current_actor  # noqa: E402
-from app.api.routers.generations import _generation_item_payload, get_generation_task_status  # noqa: E402
+from app.api.routers.generations import _generation_item_payload, download_generation, get_generation_task_status  # noqa: E402
 from app.db.models import TaskStatus, User, UserPlan, UserStatus  # noqa: E402
 from app.db.session import get_db  # noqa: E402
 from app.main import app  # noqa: E402
@@ -192,6 +193,63 @@ class ImageGenerationRoutesTests(unittest.TestCase):
         self.assertEqual(response.task_id, 'igt_status')
         self.assertIsNone(response.generation_id)
         db.commit.assert_not_called()
+
+    def test_generation_download_rejects_oversized_object(self) -> None:
+        db = MagicMock()
+        image = SimpleNamespace(
+            public_id='gen_large',
+            object_bucket='generated',
+            object_key='generated/gen_large.webp',
+            content_type='image/webp',
+            output_format='webp',
+        )
+        storage = MagicMock()
+        storage.get_object.return_value = {
+            'ContentLength': 25 * 1024 * 1024 + 1,
+            'ContentType': 'image/webp',
+            'Body': SimpleNamespace(iter_chunks=lambda: iter([b'image-bytes'])),
+        }
+
+        with patch('app.api.routers.generations._find_generation_owned', return_value=image), patch(
+            'app.api.routers.generations.get_object_storage_client',
+            return_value=storage,
+        ), self.assertRaises(HTTPException) as raised:
+            download_generation(
+                'gen_large',
+                db=db,
+                actor=SimpleNamespace(user=SimpleNamespace(id=7)),
+            )
+
+        self.assertEqual(raised.exception.status_code, 413)
+        self.assertEqual(raised.exception.detail['code'], 'GENERATION_DOWNLOAD_TOO_LARGE')
+
+    def test_generation_download_rejects_unknown_object_size(self) -> None:
+        db = MagicMock()
+        image = SimpleNamespace(
+            public_id='gen_unknown_size',
+            object_bucket='generated',
+            object_key='generated/gen_unknown_size.webp',
+            content_type='image/webp',
+            output_format='webp',
+        )
+        storage = MagicMock()
+        storage.get_object.return_value = {
+            'ContentType': 'image/webp',
+            'Body': SimpleNamespace(iter_chunks=lambda: iter([b'image-bytes'])),
+        }
+
+        with patch('app.api.routers.generations._find_generation_owned', return_value=image), patch(
+            'app.api.routers.generations.get_object_storage_client',
+            return_value=storage,
+        ), self.assertRaises(HTTPException) as raised:
+            download_generation(
+                'gen_unknown_size',
+                db=db,
+                actor=SimpleNamespace(user=SimpleNamespace(id=7)),
+            )
+
+        self.assertEqual(raised.exception.status_code, 502)
+        self.assertEqual(raised.exception.detail['code'], 'GENERATION_DOWNLOAD_SIZE_UNKNOWN')
 
 
 if __name__ == '__main__':

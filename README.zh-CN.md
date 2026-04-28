@@ -67,25 +67,30 @@ git clone https://github.com/AsaZhou923/picspeak.git
 cd picspeak
 ```
 
-### 2. 初始化数据库
-
-```bash
-psql "$DATABASE_URL" -f create_schema.sql
-```
-
-### 3. 配置后端
+### 2. 配置后端
 
 ```bash
 cp backend/.env.example backend/.env
 # 编辑 backend/.env，按需填入数据库、对象存储、AI API、生图和计费配置
 ```
 
-### 4. 启动后端
+### 3. 安装后端依赖并运行迁移
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r backend/requirements.txt
+
+cd backend
+python scripts/ensure_runtime_schema.py
+# 也可以直接运行 Alembic:
+# alembic upgrade head
+cd ..
+```
+
+### 4. 启动后端
+
+```bash
 uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 

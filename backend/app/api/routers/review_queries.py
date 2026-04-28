@@ -35,24 +35,26 @@ def get_review(
     db: Session = Depends(get_db),
     actor: CurrentActor = Depends(get_current_actor),
 ):
-    review = db.query(Review).filter(
-        Review.public_id == review_id,
-        Review.deleted_at.is_(None),
-        (Review.owner_user_id == actor.user.id) | (Review.is_public == True),  # noqa: E712
-    ).first()
-    if review is None:
+    row = (
+        db.query(Review, Photo, User)
+        .join(Photo, Photo.id == Review.photo_id)
+        .join(User, User.id == Photo.owner_user_id)
+        .filter(
+            Review.public_id == review_id,
+            Review.deleted_at.is_(None),
+            (Review.owner_user_id == actor.user.id) | (Review.is_public == True),  # noqa: E712
+        )
+        .first()
+    )
+    if row is None:
         raise api_error(status.HTTP_404_NOT_FOUND, 'REVIEW_NOT_FOUND', 'Review not found')
+    review, photo, photo_owner = row
     is_owner = review.owner_user_id == actor.user.id
     cutoff = review_history_cutoff(actor.plan)
     if cutoff is not None and is_owner and not review.is_public and review.created_at < cutoff:
         raise api_error(status.HTTP_404_NOT_FOUND, 'REVIEW_NOT_FOUND', 'Review not found')
 
-    photo = db.query(Photo).filter(Photo.id == review.photo_id).first()
-    if photo is not None:
-        photo_owner = db.query(User).filter(User.id == photo.owner_user_id).first()
-        photo_url = _build_photo_proxy_url(request, photo.public_id, photo_owner.public_id) if photo_owner else None
-    else:
-        photo_url = None
+    photo_url = _build_photo_proxy_url(request, photo.public_id, photo_owner.public_id)
     db.commit()
     return ReviewGetResponse(
         review_id=review.public_id,
@@ -89,20 +91,22 @@ def get_public_review(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    review = db.query(Review).filter(
-        Review.share_token == share_token,
-        Review.is_public == True,  # noqa: E712
-        Review.deleted_at.is_(None),
-    ).first()
-    if review is None:
+    row = (
+        db.query(Review, Photo, User)
+        .join(Photo, Photo.id == Review.photo_id)
+        .join(User, User.id == Photo.owner_user_id)
+        .filter(
+            Review.share_token == share_token,
+            Review.is_public == True,  # noqa: E712
+            Review.deleted_at.is_(None),
+        )
+        .first()
+    )
+    if row is None:
         raise api_error(status.HTTP_404_NOT_FOUND, 'REVIEW_NOT_FOUND', 'Review not found')
+    review, photo, photo_owner = row
 
-    photo = db.query(Photo).filter(Photo.id == review.photo_id).first()
-    if photo is not None:
-        photo_owner = db.query(User).filter(User.id == photo.owner_user_id).first()
-        photo_url = _build_photo_proxy_url(request, photo.public_id, photo_owner.public_id) if photo_owner else None
-    else:
-        photo_url = None
+    photo_url = _build_photo_proxy_url(request, photo.public_id, photo_owner.public_id)
 
     db.commit()
     return ReviewGetResponse(
