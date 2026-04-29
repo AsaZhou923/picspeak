@@ -36,6 +36,7 @@ class OpenAIImageGenerationClient:
         api_key: str | None = None,
         api_url: str | None = None,
         api_base_url: str | None = None,
+        api_mode: str | None = None,
         timeout_seconds: int | None = None,
         model_name: str | None = None,
     ) -> None:
@@ -44,6 +45,10 @@ class OpenAIImageGenerationClient:
             api_url=api_url if api_url is not None else settings.image_generation_api_url,
             api_base_url=api_base_url,
         )
+        mode_source = api_mode
+        if mode_source is None and api_url is None and api_base_url is None:
+            mode_source = settings.image_generation_api_mode
+        self.api_mode = _resolve_api_mode(api_mode=mode_source, api_url=self.api_url)
         self.timeout_seconds = timeout_seconds or settings.image_generation_timeout_seconds
         self.model_name = _resolve_model_name(model_name or settings.image_generation_model, self.api_url)
 
@@ -65,9 +70,9 @@ class OpenAIImageGenerationClient:
             'n': 1,
             'output_format': output_format,
         }
-        if _is_apimart_endpoint(self.api_url):
-            payload['size'] = _to_apimart_size(size)
-            payload['resolution'] = _to_apimart_resolution(quality=quality, size=payload['size'])
+        if self.api_mode in {'apimart', 'resolution'}:
+            payload['size'] = _to_mode_size(size=size, api_mode=self.api_mode)
+            payload['resolution'] = _to_resolution_tier(quality=quality, size=payload['size'])
         else:
             payload['size'] = size
             payload['response_format'] = 'b64_json'
@@ -88,19 +93,19 @@ class OpenAIImageGenerationClient:
     ) -> ImageGenerationResult:
         if not self.api_key:
             raise ImageGenerationError('OPENAI_API_KEY is not configured')
-        if _is_apimart_endpoint(self.api_url):
+        if self.api_mode in {'apimart', 'resolution'}:
             normalized_reference_url = str(reference_image_url or '').strip()
             if not normalized_reference_url:
                 raise ImageGenerationError('Reference image URL is required by the configured image endpoint')
-            apimart_size = _to_apimart_size(size)
+            output_size = _to_mode_size(size=size, api_mode=self.api_mode)
             payload = {
                 'model': self.model_name,
                 'prompt': prompt,
                 'quality': quality,
                 'n': 1,
                 'output_format': output_format,
-                'size': apimart_size,
-                'resolution': _to_apimart_resolution(quality=quality, size=apimart_size),
+                'size': output_size,
+                'resolution': _to_resolution_tier(quality=quality, size=output_size),
                 'image_urls': [normalized_reference_url],
             }
             response = self._post_json(payload)
@@ -292,6 +297,23 @@ def _resolve_generation_api_url(*, api_url: str | None, api_base_url: str | None
     return f'{resolved_url}/images/generations'
 
 
+def _resolve_api_mode(*, api_mode: str | None, api_url: str) -> str:
+    normalized = str(api_mode or '').strip().lower()
+    if normalized in {'apimart', 'api-mart'}:
+        return 'apimart'
+    if normalized in {'resolution', 'resolution-param', 'resolution_param', 'tiered-resolution'}:
+        return 'resolution'
+    if normalized in {'openai', 'official'}:
+        return 'openai'
+    if normalized not in {'', 'auto'}:
+        raise ImageGenerationError(
+            'IMAGE_GENERATION_API_MODE must be one of auto, openai, resolution, or apimart'
+        )
+    if _is_apimart_endpoint(api_url):
+        return 'apimart'
+    return 'openai'
+
+
 def _resolve_model_name(model_name: str | None, api_url: str) -> str:
     normalized = str(model_name or '').strip()
     if _is_apimart_endpoint(api_url) and normalized in {'', 'gpt-image-2'}:
@@ -303,6 +325,24 @@ def _is_apimart_endpoint(api_url: str) -> bool:
     return 'api.apimart.ai' in api_url.lower()
 
 
+def _to_mode_size(*, size: str, api_mode: str) -> str:
+    if api_mode == 'apimart':
+        return _to_apimart_size(size)
+    return _to_pixel_size(size)
+
+
+def _to_pixel_size(size: str) -> str:
+    normalized = str(size or '').strip().lower()
+    return {
+        '1:1': '1024x1024',
+        '2:3': '1024x1536',
+        '9:16': '1024x1536',
+        '3:2': '1536x1024',
+        '16:9': '1536x1024',
+        'auto': '1024x1024',
+    }.get(normalized, normalized or '1024x1024')
+
+
 def _to_apimart_size(size: str) -> str:
     normalized = str(size or '').strip().lower()
     return {
@@ -312,7 +352,7 @@ def _to_apimart_size(size: str) -> str:
     }.get(normalized, normalized or '1:1')
 
 
-def _to_apimart_resolution(*, quality: str, size: str) -> str:
+def _to_resolution_tier(*, quality: str, size: str) -> str:
     normalized_quality = str(quality or '').strip().lower()
     normalized_size = str(size or '').strip().lower()
     if normalized_quality == 'low':
@@ -320,7 +360,20 @@ def _to_apimart_resolution(*, quality: str, size: str) -> str:
     if normalized_quality == 'medium':
         return '2k'
     if normalized_quality == 'high':
-        if normalized_size in {'16:9', '9:16', '2:1', '1:2', '21:9', '9:21'}:
+        if normalized_size in {
+            '16:9',
+            '9:16',
+            '3:2',
+            '2:3',
+            '2:1',
+            '1:2',
+            '21:9',
+            '9:21',
+            '1536x1024',
+            '1024x1536',
+            '3840x2160',
+            '2160x3840',
+        }:
             return '4k'
         return '2k'
     return '1k'

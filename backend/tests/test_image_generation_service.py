@@ -123,6 +123,35 @@ class ImageGenerationServiceTests(unittest.TestCase):
         self.assertEqual(request_payload['resolution'], '4k')
         self.assertNotIn('response_format', request_payload)
 
+    def test_resolution_mode_can_be_forced_for_custom_proxy_url(self) -> None:
+        client = OpenAIImageGenerationClient(
+            api_key='test-key',
+            api_url='http://45.76.203.46/v1/images/generations',
+            api_mode='resolution',
+            model_name='gpt-image-2',
+        )
+        submitted_payload = {'code': 200, 'data': [{'status': 'submitted', 'task_id': 'task_proxy'}]}
+        completed_payload = {
+            'code': 200,
+            'data': {
+                'status': 'completed',
+                'result': {'images': [{'url': ['https://upload.example.com/proxy-generated.png']}]},
+            },
+        }
+
+        with (
+            patch.object(client, '_post_json', return_value=submitted_payload) as post_json,
+            patch.object(client, '_get_json', return_value=completed_payload),
+            patch.object(client, '_download_image', return_value=(b'png-bytes', 'image/png')),
+        ):
+            client.generate(prompt='prompt', quality='high', size='1536x1024', output_format='webp')
+
+        self.assertEqual(client.model_name, 'gpt-image-2')
+        request_payload = post_json.call_args.args[0]
+        self.assertEqual(request_payload['size'], '1536x1024')
+        self.assertEqual(request_payload['resolution'], '4k')
+        self.assertNotIn('response_format', request_payload)
+
     def test_apimart_endpoint_differentiates_resolution_by_quality(self) -> None:
         client = OpenAIImageGenerationClient(
             api_key='test-key',

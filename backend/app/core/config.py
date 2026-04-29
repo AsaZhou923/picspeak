@@ -113,6 +113,7 @@ class Settings(BaseSettings):
     image_generation_api_url: str = Field(
         default='https://api.openai.com/v1/images/generations',
     )
+    image_generation_api_mode: str = 'auto'
     image_generation_model: str = 'gpt-image-2'
     image_generation_model_snapshot: str = 'gpt-image-2-2026-04-21'
     image_generation_default_quality: str = 'low'
@@ -179,6 +180,7 @@ class Settings(BaseSettings):
         'image_generation_model_snapshot',
         'image_generation_default_quality',
         'image_generation_pro_default_quality',
+        'image_generation_api_mode',
         mode='before',
     )
     @classmethod
