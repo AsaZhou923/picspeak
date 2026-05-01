@@ -1,4 +1,4 @@
-import { enTranslations, type TranslationDictionary, type TranslationKey } from './i18n-en';
+import { enTranslations, type TranslationDictionary, type TranslationKey } from './i18n-en.ts';
 
 export const zhTranslations = {
   ...enTranslations,
@@ -17,8 +17,8 @@ export const zhTranslations = {
   app_error_retry: '重试',
   plan_guest_label: '游客',
   updates_label: '更新记录',
-  updates_hint_home: '查看运行时迁移与稳定性更新',
-  updates_hint_latest: '查看运行时迁移与稳定性更新',
+  updates_hint_home: '查看 SEO 优化、OG 图与提示词案例更新',
+  updates_hint_latest: '查看 SEO 优化、OG 图与提示词案例更新',
 
   generation_badge: 'AI 创作',
   generation_title: 'AI 创作',

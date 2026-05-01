@@ -4,8 +4,15 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  GENERATION_PROMPT_EXAMPLE_CATEGORIES,
+  GENERATION_PROMPT_EXAMPLE_CATEGORY_LABELS,
   GENERATION_PROMPT_EXAMPLE_LOCALES,
   GENERATION_PROMPT_EXAMPLES,
+  getGenerationPromptExample,
+  getLocalizedPromptExampleCategoryLabel,
+  getLocalizedPromptExampleText,
+  getLocalizedPromptExampleTitle,
+  normalizePromptExampleExcerpt,
 } from '../src/content/generation/prompt-examples.ts';
 
 const TEST_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -50,5 +57,34 @@ test('curated generation prompt examples are complete and deployable', () => {
     assert.ok(existsSync(assetPath), `missing image asset: ${example.imagePath}`);
 
     assert.match(example.sourceUrl, /^https:\/\/x\.com\//);
+  }
+});
+
+test('prompt example helpers support static SEO pages', () => {
+  for (const category of GENERATION_PROMPT_EXAMPLE_CATEGORIES) {
+    assert.ok(GENERATION_PROMPT_EXAMPLE_CATEGORY_LABELS[category]);
+    assert.ok(getLocalizedPromptExampleCategoryLabel(category, 'zh'));
+    assert.ok(getLocalizedPromptExampleCategoryLabel(category, 'ja'));
+  }
+
+  const firstExample = GENERATION_PROMPT_EXAMPLES[0];
+  assert.equal(getGenerationPromptExample(firstExample.id)?.id, firstExample.id);
+  assert.equal(getGenerationPromptExample('missing-example'), undefined);
+  assert.equal(getLocalizedPromptExampleTitle(firstExample, 'zh'), '便利店霓虹灯人像');
+  assert.equal(getLocalizedPromptExampleTitle(firstExample, 'ja'), 'コンビニネオンポートレート');
+
+  const excerpt = normalizePromptExampleExcerpt(`${firstExample.prompt.en}\n\n${firstExample.prompt.en}`, 90);
+  assert.ok(excerpt.length <= 90);
+  assert.ok(excerpt.endsWith('...'));
+});
+
+test('localized prompt helpers avoid mojibake data in visible copy', () => {
+  const mojibakePattern = /[�銈銉鎽鐓鍐鏋瑭鈥閫]/;
+
+  for (const example of GENERATION_PROMPT_EXAMPLES) {
+    for (const locale of GENERATION_PROMPT_EXAMPLE_LOCALES) {
+      assert.ok(!mojibakePattern.test(getLocalizedPromptExampleTitle(example, locale)), `mojibake title: ${example.id}:${locale}`);
+      assert.ok(!getLocalizedPromptExampleText(example.prompt, locale).includes('�'), `replacement char in prompt: ${example.id}:${locale}`);
+    }
   }
 });

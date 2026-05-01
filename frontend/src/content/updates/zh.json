@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-05-01-seo-og-gallery-prompt-library",
+    "date": "2026-05-01",
+    "title": "SEO 全量优化、真实 OG 图与可索引提示词案例页",
+    "summary": "完成 PicSpeak 全量 SEO / GEO 审计，并把 AI 摄影点评、AI Create 和公开长廊统一到新的 metadata、sitemap、llms.txt、真实产品 OG 图和可索引提示词案例页中。",
+    "docPath": "docs/changelog/update-log-2026-05-01-seo-og-gallery-prompt-library.md",
+    "sections": [
+      {
+        "title": "AI 搜索与索引边界",
+        "items": [
+          "新增 1200x630 真实产品 OG 图，覆盖 AI critique、AI Create 和 gallery example",
+          "更新 sitemap、robots、llms.txt、结构化数据与 noindex 边界，减少公开页误配和私有生成页误索引",
+          "站点标题、描述和关键词扩展到“AI 摄影点评 + GPT Image 2 视觉参考生成”双产品面"
+        ]
+      },
+      {
+        "title": "长廊与提示词案例",
+        "items": [
+          "/gallery 增加服务端可见的首屏摘要和 CollectionPage JSON-LD",
+          "/generate/prompts 新增可索引提示词库首页，并为 30 个 GPT Image 2 案例生成静态详情页",
+          "单 URL 公共页面会根据路径或语言 cookie 输出对应中英日文案"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-04-28-runtime-migrations-and-stability",
     "date": "2026-04-28",
     "title": "运行时迁移、API 稳定性与首页语言收口",

@@ -1,4 +1,4 @@
-import { normalizeLocale } from './locale';
+import { normalizeLocale } from './locale.ts';
 
 export type ProConversionLocale = 'zh' | 'en' | 'ja';
 export type ProUpgradeTrigger =

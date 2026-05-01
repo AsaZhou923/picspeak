@@ -24,10 +24,10 @@ export const metadata: Metadata = {
     title: blogConfig.title,
     description: blogConfig.description,
     siteName: siteConfig.name,
-    images: [{ url: siteConfig.ogImage, alt: blogConfig.title }],
+    images: [{ url: siteConfig.ogImage, width: siteConfig.ogImageWidth, height: siteConfig.ogImageHeight, alt: blogConfig.title }],
   },
   twitter: {
-    card: 'summary',
+    card: 'summary_large_image',
     title: blogConfig.title,
     description: blogConfig.description,
     images: [siteConfig.ogImage],

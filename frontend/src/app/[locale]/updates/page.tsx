@@ -50,10 +50,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       siteName: siteConfig.name,
       title: meta.title,
       description: meta.description,
-      images: [{ url: siteConfig.ogImage, alt: meta.title }],
+      images: [{ url: siteConfig.ogImage, width: siteConfig.ogImageWidth, height: siteConfig.ogImageHeight, alt: meta.title }],
     },
     twitter: {
-      card: 'summary',
+      card: 'summary_large_image',
       title: meta.title,
       description: meta.description,
       images: [siteConfig.ogImage],

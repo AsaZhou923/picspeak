@@ -120,7 +120,7 @@ function BlogPostContent({ slug }: { slug: string }) {
       url: siteConfig.url,
       logo: {
         '@type': 'ImageObject',
-        url: `${siteConfig.url}${siteConfig.ogImage}`,
+        url: `${siteConfig.url}${siteConfig.logoImage}`,
       },
     },
     mainEntityOfPage: `${siteConfig.url}/${locale}/blog/${post.slug}`,

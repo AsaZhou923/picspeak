@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-05-01-seo-og-gallery-prompt-library",
+    "date": "2026-05-01",
+    "title": "Full SEO pass, real product OG image, and crawlable prompt examples",
+    "summary": "Completed a full PicSpeak SEO / GEO audit and aligned AI critique, AI Create, and the public gallery across metadata, sitemap, llms.txt, a real product Open Graph image, and crawlable GPT Image 2 prompt example pages.",
+    "docPath": "docs/changelog/update-log-2026-05-01-seo-og-gallery-prompt-library.md",
+    "sections": [
+      {
+        "title": "AI search and indexing boundaries",
+        "items": [
+          "Added a 1200x630 product OG image that shows AI critique, AI Create, and a gallery example together",
+          "Updated sitemap, robots, llms.txt, structured data, and noindex boundaries to reduce public-page mismatch and private-generation indexing risk",
+          "Expanded site title, description, and keywords around both AI photo critique and GPT Image 2 visual references"
+        ]
+      },
+      {
+        "title": "Gallery and prompt examples",
+        "items": [
+          "/gallery now starts with a server-visible summary and CollectionPage JSON-LD before the client gallery loads",
+          "/generate/prompts now exposes a crawlable prompt library plus 30 static GPT Image 2 example detail pages",
+          "Single-URL public pages render localized Chinese, English, or Japanese copy from the path or locale cookie"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-04-28-runtime-migrations-and-stability",
     "date": "2026-04-28",
     "title": "Runtime migrations, API stability, and homepage language cleanup",

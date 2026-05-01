@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import AffiliatePageContent from '@/components/marketing/AffiliatePageContent';
+import { singlePageAlternates } from '@/lib/seo';
 
 export const metadata: Metadata = {
   title: 'PicSpeak Affiliate Program | 推广联盟计划 | アフィリエイト — PicSpeak',
@@ -17,15 +18,7 @@ export const metadata: Metadata = {
     '写真アフィリエイト',
     'AIツール紹介',
   ],
-  alternates: {
-    canonical: '/affiliate',
-    languages: {
-      'zh-CN': '/zh',
-      en: '/affiliate',
-      ja: '/ja',
-      'x-default': '/affiliate',
-    },
-  },
+  alternates: singlePageAlternates('/affiliate'),
 };
 
 export default function AffiliatePage() {

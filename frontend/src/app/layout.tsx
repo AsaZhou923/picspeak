@@ -6,6 +6,9 @@ import SiteChrome from '@/components/layout/SiteChrome';
 import AppProviders from '@/components/providers/AppProviders';
 import PerformanceTelemetry from '@/components/performance/PerformanceTelemetry';
 import DeferredBackgroundEffect from '@/components/ui/DeferredBackgroundEffect';
+import { getInitialTranslations } from '@/lib/i18n-initial';
+import { isSupportedLocale } from '@/lib/locale';
+import { HOME_LANGUAGE_ALTERNATES } from '@/lib/seo';
 import { siteConfig } from '@/lib/site';
 
 const cormorant = Cormorant_Garamond({
@@ -39,18 +42,13 @@ export const metadata: Metadata = {
   description: siteConfig.description,
   applicationName: siteConfig.name,
   keywords: [...siteConfig.keywords],
-  authors: [{ name: 'PicSpeak' }],
+  authors: [{ name: siteConfig.author.name, url: siteConfig.author.id }],
   creator: 'PicSpeak',
   publisher: 'PicSpeak',
   category: 'photography',
   alternates: {
     canonical: '/',
-    languages: {
-      'zh-CN': '/zh',
-      en: '/',
-      ja: '/ja',
-      'x-default': '/',
-    },
+    languages: HOME_LANGUAGE_ALTERNATES,
   },
   verification: {
     google: siteConfig.googleSiteVerification,
@@ -67,9 +65,9 @@ export const metadata: Metadata = {
     },
   },
   icons: {
-    icon: '/logo.png',
-    shortcut: '/logo.png',
-    apple: '/logo.png',
+    icon: siteConfig.logoImage,
+    shortcut: siteConfig.logoImage,
+    apple: siteConfig.logoImage,
   },
   openGraph: {
     type: 'website',
@@ -78,10 +76,17 @@ export const metadata: Metadata = {
     title: siteConfig.title,
     description: siteConfig.description,
     locale: 'en_US',
-    images: [{ url: siteConfig.ogImage, width: 512, height: 512, alt: 'PicSpeak Logo' }],
+    images: [
+      {
+        url: siteConfig.ogImage,
+        width: siteConfig.ogImageWidth,
+        height: siteConfig.ogImageHeight,
+        alt: 'PicSpeak AI critique, AI Create, and gallery examples',
+      },
+    ],
   },
   twitter: {
-    card: 'summary',
+    card: 'summary_large_image',
     title: siteConfig.title,
     description: siteConfig.description,
     images: [siteConfig.ogImage],
@@ -97,7 +102,9 @@ function documentLang(locale: string | null): string {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const requestHeaders = await headers();
-  const lang = documentLang(requestHeaders.get('x-picspeak-locale'));
+  const requestLocale = requestHeaders.get('x-picspeak-locale');
+  const initialLocale = isSupportedLocale(requestLocale) ? requestLocale : undefined;
+  const lang = documentLang(initialLocale ?? null);
 
   return (
     <html
@@ -117,7 +124,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         />
       </head>
       <body className="text-ink min-h-screen">
-        <AppProviders>
+        <AppProviders
+          initialLocale={initialLocale}
+          initialMessages={initialLocale ? getInitialTranslations(initialLocale) : undefined}
+        >
           {process.env.NODE_ENV === 'production' ? <PerformanceTelemetry /> : null}
           <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
             <DeferredBackgroundEffect />

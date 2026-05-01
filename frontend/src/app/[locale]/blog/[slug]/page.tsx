@@ -38,7 +38,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         'zh-CN': `/zh/blog/${post.slug}`,
         en: `/en/blog/${post.slug}`,
         ja: `/ja/blog/${post.slug}`,
-        'x-default': `/en/blog/${post.slug}`,
+        'x-default': `/blog/${post.slug}`,
       },
     },
     openGraph: {
@@ -50,10 +50,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       publishedTime: post.publishedAt,
       modifiedTime: post.updatedAt,
       tags: post.keywords,
-      images: [{ url: siteConfig.ogImage, alt: post.title }],
+      images: [{ url: siteConfig.ogImage, width: siteConfig.ogImageWidth, height: siteConfig.ogImageHeight, alt: post.title }],
     },
     twitter: {
-      card: 'summary',
+      card: 'summary_large_image',
       title: post.title,
       description: post.description,
       images: [siteConfig.ogImage],

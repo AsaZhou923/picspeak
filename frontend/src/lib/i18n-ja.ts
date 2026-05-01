@@ -1,4 +1,4 @@
-import { enTranslations, type TranslationDictionary } from './i18n-en';
+import { enTranslations, type TranslationDictionary } from './i18n-en.ts';
 
 export const jaTranslations = {
     ...enTranslations,
@@ -20,8 +20,8 @@ export const jaTranslations = {
     pro_offer_label: '',
     pro_offer_highlight: 'Pro',
     updates_label: '更新履歴',
-    updates_hint_home: 'runtime migration と安定性更新を見る',
-    updates_hint_latest: 'runtime migration と安定性更新を見る',
+    updates_hint_home: 'SEO・OG 画像・prompt 例の更新を見る',
+    updates_hint_latest: 'SEO・OG 画像・prompt 例の更新を見る',
     contact_label: 'コンタクト',
     contact_headline: 'お問い合わせ',
     photo_ready_msg_short: 'アップロード完了',

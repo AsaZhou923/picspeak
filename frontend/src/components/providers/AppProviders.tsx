@@ -5,7 +5,8 @@ import { Suspense } from 'react';
 import { ClerkProvider } from '@clerk/nextjs';
 import { AuthProvider } from '@/lib/auth-context';
 import { getClerkLocalization } from '@/lib/clerk-localization';
-import { I18nProvider, useI18n } from '@/lib/i18n';
+import { I18nProvider, useI18n, type Locale } from '@/lib/i18n';
+import type { TranslationDictionary } from '@/lib/i18n-en';
 import { ThemeProvider } from '@/lib/theme-context';
 import { AppErrorBoundary } from '@/components/providers/AppErrorBoundary';
 import ProductAnalyticsProvider from '@/components/providers/ProductAnalyticsProvider';
@@ -50,9 +51,17 @@ function ProviderErrorFallback({ reset }: { reset: () => void }) {
   );
 }
 
-export default function AppProviders({ children }: { children: ReactNode }) {
+export default function AppProviders({
+  children,
+  initialLocale,
+  initialMessages,
+}: {
+  children: ReactNode;
+  initialLocale?: Locale;
+  initialMessages?: TranslationDictionary;
+}) {
   return (
-    <I18nProvider>
+    <I18nProvider initialLocale={initialLocale} initialMessages={initialMessages}>
       <AppErrorBoundary fallback={(reset) => <ProviderErrorFallback reset={reset} />}>
         <RouteScopedProviders>{children}</RouteScopedProviders>
       </AppErrorBoundary>

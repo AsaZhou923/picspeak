@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-05-01-seo-og-gallery-prompt-library",
+    "date": "2026-05-01",
+    "title": "SEO 全面改善、実プロダクト OG 画像、検索可能な prompt 例",
+    "summary": "PicSpeak の SEO / GEO を全面監査し、AI 写真講評、AI 作成、公開ギャラリーを metadata、sitemap、llms.txt、実プロダクト Open Graph 画像、検索可能な GPT Image 2 prompt 例ページに反映しました。",
+    "docPath": "docs/changelog/update-log-2026-05-01-seo-og-gallery-prompt-library.md",
+    "sections": [
+      {
+        "title": "AI 検索と index 境界",
+        "items": [
+          "AI critique、AI Create、gallery example をまとめて見せる 1200x630 のプロダクト OG 画像を追加",
+          "sitemap、robots、llms.txt、構造化データ、noindex 境界を更新し、公開ページの誤対応と private 生成ページの誤 index リスクを低減",
+          "サイト title、description、keywords を AI 写真講評と GPT Image 2 ビジュアル参考生成の両方へ拡張"
+        ]
+      },
+      {
+        "title": "ギャラリーと prompt 例",
+        "items": [
+          "/gallery は client gallery の前にサーバー表示の要約と CollectionPage JSON-LD を出力",
+          "/generate/prompts に検索可能な prompt ライブラリと 30 件の GPT Image 2 静的詳細ページを追加",
+          "単一 URL の公開ページでも、path または locale cookie に基づいて中英日文言を表示"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-04-28-runtime-migrations-and-stability",
     "date": "2026-04-28",
     "title": "Runtime migration、API 安定性、ホーム言語設定を整理",

@@ -1,6 +1,7 @@
 import { clerkMiddleware } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 
+import { isSupportedLocale, LOCALE_COOKIE_NAME, type SupportedLocale } from '@/lib/locale';
 import { siteConfig } from '@/lib/site';
 
 const productionOrigin = new URL(siteConfig.url).origin;
@@ -15,18 +16,23 @@ const developmentOrigins =
 
 const authorizedParties = Array.from(new Set([...developmentOrigins, productionOrigin, productionWwwOrigin]));
 
-function localeFromPathname(pathname: string): 'zh' | 'en' | 'ja' {
+function localeFromPathname(pathname: string): SupportedLocale | null {
   const firstSegment = pathname.split('/').filter(Boolean)[0];
-  if (firstSegment === 'zh' || firstSegment === 'ja' || firstSegment === 'en') {
+  if (isSupportedLocale(firstSegment)) {
     return firstSegment;
   }
-  return 'en';
+  return null;
 }
 
 export default clerkMiddleware(
   (_auth, request) => {
     const requestHeaders = new Headers(request.headers);
-    requestHeaders.set('x-picspeak-locale', localeFromPathname(request.nextUrl.pathname));
+    const pathLocale = localeFromPathname(request.nextUrl.pathname);
+    const cookieLocale = request.cookies.get(LOCALE_COOKIE_NAME)?.value;
+    const locale = pathLocale ?? (isSupportedLocale(cookieLocale) ? cookieLocale : null);
+    if (locale) {
+      requestHeaders.set('x-picspeak-locale', locale);
+    }
     return NextResponse.next({
       request: {
         headers: requestHeaders,

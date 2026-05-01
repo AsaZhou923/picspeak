@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { DEMO_REVIEW_ID, isDemoReviewId } from '@/lib/demo-review';
-import { INDEXABLE_ROBOTS, NO_INDEX_ROBOTS } from '@/lib/seo';
+import { INDEXABLE_ROBOTS, NO_INDEX_ROBOTS, singlePageAlternates } from '@/lib/seo';
 
 export async function generateMetadata(
   { params }: { params: Promise<{ reviewId: string }> }
@@ -29,15 +29,7 @@ export async function generateMetadata(
         ]
       : undefined,
     alternates: isDemoReview
-      ? {
-          canonical: `/reviews/${DEMO_REVIEW_ID}`,
-          languages: {
-            'zh-CN': '/zh',
-            en: `/reviews/${DEMO_REVIEW_ID}`,
-            ja: '/ja',
-            'x-default': `/reviews/${DEMO_REVIEW_ID}`,
-          },
-        }
+      ? singlePageAlternates(`/reviews/${DEMO_REVIEW_ID}`)
       : undefined,
     robots: isDemoReview ? INDEXABLE_ROBOTS : NO_INDEX_ROBOTS,
   };

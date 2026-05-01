@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { siteConfig } from '@/lib/site';
 import type { Locale } from '@/lib/i18n';
+import { HOME_LANGUAGE_ALTERNATES } from '@/lib/seo';
 import { VALID_LOCALES } from './locales';
 
 // ---------------------------------------------------------------------------
@@ -129,6 +130,7 @@ function buildSoftwareJsonLd(locale: Locale) {
   return {
     '@context': 'https://schema.org',
     '@type': 'SoftwareApplication',
+    '@id': `${siteConfig.url}/#software`,
     name: siteConfig.name,
     applicationCategory: 'PhotographyApplication',
     operatingSystem: 'Web',
@@ -141,6 +143,16 @@ function buildSoftwareJsonLd(locale: Locale) {
     creator: {
       '@id': siteConfig.author.id,
     },
+    publisher: {
+      '@type': 'Organization',
+      '@id': `${siteConfig.url}/#organization`,
+      name: siteConfig.name,
+      url: siteConfig.url,
+      logo: {
+        '@type': 'ImageObject',
+        url: `${siteConfig.url}${siteConfig.logoImage}`,
+      },
+    },
     offers: {
       '@type': 'Offer',
       price: '0',
@@ -148,9 +160,9 @@ function buildSoftwareJsonLd(locale: Locale) {
     },
     featureList:
       locale === 'ja'
-        ? ['構図分析', '光の評価', '色彩診断', 'インパクト採点', '技術評価', 'AIフィードバック']
+        ? ['構図分析', '光の評価', '色彩診断', 'インパクト採点', '技術評価', 'AIフィードバック', 'AI参考画像生成']
         : locale === 'zh'
-          ? ['构图分析', '光线评估', '色彩诊断', '表达力评分', '技术评估', 'AI反馈']
+          ? ['构图分析', '光线评估', '色彩诊断', '表达力评分', '技术评估', 'AI反馈', 'AI参考图生成']
           : [
               'Composition Analysis',
               'Lighting Evaluation',
@@ -158,6 +170,7 @@ function buildSoftwareJsonLd(locale: Locale) {
               'Impact Scoring',
               'Technical Assessment',
               'AI Feedback',
+              'GPT Image 2 visual reference generation',
             ],
   };
 }
@@ -354,12 +367,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     },
     alternates: {
       canonical: `/${locale}`,
-      languages: {
-        'zh-CN': '/zh',
-        en: '/en',
-        ja: '/ja',
-        'x-default': '/',
-      },
+      languages: HOME_LANGUAGE_ALTERNATES,
     },
     openGraph: {
       type: 'website',
@@ -371,14 +379,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       images: [
         {
           url: siteConfig.ogImage,
-          width: 512,
-          height: 512,
+          width: siteConfig.ogImageWidth,
+          height: siteConfig.ogImageHeight,
           alt: meta.ogImageAlt,
         },
       ],
     },
     twitter: {
-      card: 'summary',
+      card: 'summary_large_image',
       title: meta.title,
       description: meta.description,
       images: [siteConfig.ogImage],

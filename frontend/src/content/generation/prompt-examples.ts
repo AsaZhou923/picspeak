@@ -1,4 +1,5 @@
 import type { Locale } from '@/lib/i18n';
+import { normalizeLocale, type SupportedLocale } from '../../lib/locale.ts';
 import type { GenerationSize } from '@/lib/types';
 
 export type GenerationPromptExampleCategory = 'photography' | 'poster' | 'product' | 'ui' | 'experimental';
@@ -29,11 +30,241 @@ export const GENERATION_PROMPT_EXAMPLE_CATEGORIES = [
   'experimental',
 ] as const satisfies readonly GenerationPromptExampleCategory[];
 
+export const GENERATION_PROMPT_EXAMPLE_CATEGORY_LABELS: Record<GenerationPromptExampleCategory, string> = {
+  photography: 'Photography prompts',
+  poster: 'Poster prompts',
+  product: 'Product scene prompts',
+  ui: 'UI concept prompts',
+  experimental: 'Experimental prompts',
+};
+
+const GENERATION_PROMPT_EXAMPLE_CATEGORY_LABELS_BY_LOCALE: Record<
+  GenerationPromptExampleCategory,
+  Record<SupportedLocale, string>
+> = {
+  photography: {
+    zh: '摄影提示词',
+    en: 'Photography prompts',
+    ja: '写真プロンプト',
+  },
+  poster: {
+    zh: '海报提示词',
+    en: 'Poster prompts',
+    ja: 'ポスタープロンプト',
+  },
+  product: {
+    zh: '产品场景提示词',
+    en: 'Product scene prompts',
+    ja: '商品シーンプロンプト',
+  },
+  ui: {
+    zh: 'UI 概念提示词',
+    en: 'UI concept prompts',
+    ja: 'UI コンセプトプロンプト',
+  },
+  experimental: {
+    zh: '实验视觉提示词',
+    en: 'Experimental prompts',
+    ja: '実験的プロンプト',
+  },
+};
+
+const PROMPT_EXAMPLE_TITLE_OVERRIDES: Record<string, LocalizedGenerationPromptExampleText> = {
+  'photo-convenience-store-neon-portrait': {
+    zh: '便利店霓虹灯人像',
+    en: 'Convenience Store Neon Portrait',
+    ja: 'コンビニネオンポートレート',
+  },
+  'photo-cinematic-minimal-portrait': {
+    zh: '电影感极简人像',
+    en: 'Cinematic Minimal Portrait',
+    ja: 'シネマティック・ミニマルポートレート',
+  },
+  'photo-soft-airy-35mm': {
+    zh: '柔和通透 35mm 人像',
+    en: 'Soft Airy 35mm Portrait',
+    ja: 'やわらかく軽やかな 35mm ポートレート',
+  },
+  'photo-candid-bedroom-selfie': {
+    zh: '卧室抓拍自拍写实人像',
+    en: 'Candid Bedroom Selfie Photorealistic Portrait',
+    ja: 'ベッドルームの自然なセルフィー写実ポートレート',
+  },
+  'photo-soft-black-mist-editorial': {
+    zh: '柔和黑雾时尚编辑人像',
+    en: 'Soft Black Mist Editorial Portrait',
+    ja: 'ソフトブラックミストのエディトリアルポートレート',
+  },
+  'photo-bodega-night-musician': {
+    zh: '夜晚杂货店门口音乐人电影感人像',
+    en: 'Musician Leaving Bodega Night Cinematic Portrait',
+    ja: '夜のボデガを出るミュージシャンのシネマティックポートレート',
+  },
+  'photo-old-delhi-storefront': {
+    zh: '老德里甜品店门面纪实照片',
+    en: 'Old Delhi Sweet Shop Storefront Documentary Photo',
+    ja: 'オールドデリー菓子店の店先ドキュメンタリー写真',
+  },
+  'poster-amalfi-travel': {
+    zh: '复古阿马尔菲旅行海报',
+    en: 'Vintage Amalfi Travel Poster',
+    ja: 'ヴィンテージ風アマルフィ旅行ポスター',
+  },
+  'poster-chengdu-food-map': {
+    zh: '成都美食地图插画',
+    en: 'Chengdu Food Map Illustration',
+    ja: '成都グルメマップイラスト',
+  },
+  'poster-minimal-chinese-landscape': {
+    zh: '中式极简 S 形海报',
+    en: 'Chinese Minimalist S-Shaped Poster',
+    ja: '中国風ミニマル S 字ポスター',
+  },
+  'poster-peacock-botanical-print': {
+    zh: '孔雀植物复古对称装饰画',
+    en: 'Peacock Botanical Vintage Symmetrical Art Print',
+    ja: '孔雀と植物のヴィンテージ対称アートプリント',
+  },
+  'poster-perspective-typography-bridge': {
+    zh: '极端透视跨海大桥字体海报',
+    en: 'Extreme Perspective Typography Bridge',
+    ja: '極端遠近法の橋タイポグラフィ',
+  },
+  'poster-dreamy-watercolor-editorial': {
+    zh: '梦幻水彩编辑插画',
+    en: 'Dreamy Watercolor Editorial Illustration',
+    ja: '夢幻的な水彩エディトリアルイラスト',
+  },
+  'poster-dark-fantasy-guangzhou': {
+    zh: '暗黑幻想广州城市海报',
+    en: 'Dark-Fantasy Guangzhou City Poster',
+    ja: 'ダークファンタジー広州シティポスター',
+  },
+  'poster-watercolor-childrens-book': {
+    zh: '柔和诗意水彩儿童书插画',
+    en: "Soft Poetic Children's Book Illustration",
+    ja: 'やわらかな詩的水彩児童書イラスト',
+  },
+  'product-green-tea-film-kit': {
+    zh: '绿茶舒缓护肤膜套装产品图',
+    en: 'Calming Green Tea Film Kit Product Photo',
+    ja: 'カーミンググリーンティー・フィルムキット商品写真',
+  },
+  'product-strawberry-soft-serve': {
+    zh: '高级草莓软冰淇淋产品摄影',
+    en: 'Premium Strawberry Soft-Serve Product Photo',
+    ja: 'プレミアム苺ソフトクリーム商品写真',
+  },
+  'product-premium-tempura-bowl': {
+    zh: '高级食谱海报优雅版式',
+    en: 'Premium Food Recipe Poster Elegant Layout',
+    ja: '上質なレシピポスターのエレガントレイアウト',
+  },
+  'product-tennis-fashion-ad': {
+    zh: '前卫网球拍雕塑运动时尚广告',
+    en: 'Avant-Garde Tennis Racket Sculpture Sports Fashion Ad',
+    ja: '前衛的なテニスラケット彫刻スポーツ広告',
+  },
+  'product-beauty-commercial-photo': {
+    zh: '美妆产品商业营销摄影',
+    en: 'Beauty Product Commercial Marketing Photograph',
+    ja: 'ビューティー商品の商業マーケティング写真',
+  },
+  'ui-one-prompt-design-system': {
+    zh: '一句话 UI 设计系统生成',
+    en: 'One-Prompt UI Design Generation',
+    ja: '1 プロンプト UI デザイン生成',
+  },
+  'ui-style-to-design-system': {
+    zh: '风格参考生成 UI 设计系统',
+    en: 'Style-to-UI Design System',
+    ja: 'スタイル参照から UI デザインシステムへ',
+  },
+  'ui-hanfu-museum-infographic': {
+    zh: '博物馆式汉服拆解信息图',
+    en: 'Museum-Style Hanfu Breakdown Infographic',
+    ja: '博物館風の漢服分解インフォグラフィック',
+  },
+  'ui-cyberpunk-neon-system': {
+    zh: '赛博朋克霓虹 UI 设计系统',
+    en: 'Cyberpunk Neon UI Design System',
+    ja: 'サイバーパンクネオン UI デザインシステム',
+  },
+  'ui-ai-game-dev-overview-slide': {
+    zh: '日语 AI 游戏开发概览幻灯片提示词',
+    en: 'Japanese AI Game Dev Overview Slide Prompt',
+    ja: 'AI ゲーム開発概要スライドプロンプト',
+  },
+  'experimental-dark-myth-scene': {
+    zh: '狮驼岭暗黑神话场景',
+    en: 'Lion Camel Ridge Dark Myth Scene',
+    ja: '獅駝嶺ダーク神話シーン',
+  },
+  'experimental-street-fashion-motion': {
+    zh: '街头时装动态全身摄影',
+    en: 'Street Fashion Motion Full-Body Shot',
+    ja: 'ストリートファッションの動きある全身ショット',
+  },
+  'experimental-silhouette-universe-poster': {
+    zh: '轮廓宇宙叙事海报',
+    en: 'Silhouette Universe Narrative Poster',
+    ja: 'シルエット宇宙ナラティブポスター',
+  },
+  'experimental-retro-programming-cartoon': {
+    zh: '复古编程博物馆卡通',
+    en: 'Retro Programming Museum Cartoon',
+    ja: 'レトロプログラミング博物館カートゥーン',
+  },
+  'experimental-fourteenth-dimension-scene': {
+    zh: '第十四维投影场景',
+    en: '14th-Dimension Projection Scene',
+    ja: '第 14 次元プロジェクションシーン',
+  },
+};
+
+const MOJIBAKE_PATTERN = /[�銈銉鎽鐓鍐鏋瑭鈥閫]/;
+
+function isMojibakeLike(text: string) {
+  return MOJIBAKE_PATTERN.test(text);
+}
+
 export function getLocalizedPromptExampleText(
   text: LocalizedGenerationPromptExampleText,
   locale: Locale
 ) {
-  return text[locale as GenerationPromptExampleLocale] || text.en || text.zh || text.ja;
+  const normalizedLocale = normalizeLocale(locale);
+  const localized = text[normalizedLocale as GenerationPromptExampleLocale];
+  if (localized && !isMojibakeLike(localized)) {
+    return localized;
+  }
+  return text.en || text.zh || text.ja;
+}
+
+export function getLocalizedPromptExampleCategoryLabel(
+  category: GenerationPromptExampleCategory,
+  locale: Locale | string
+) {
+  return GENERATION_PROMPT_EXAMPLE_CATEGORY_LABELS_BY_LOCALE[category][normalizeLocale(locale)];
+}
+
+export function getLocalizedPromptExampleTitle(example: GenerationPromptExample, locale: Locale | string) {
+  const override = PROMPT_EXAMPLE_TITLE_OVERRIDES[example.id];
+  if (override) {
+    return getLocalizedPromptExampleText(override, normalizeLocale(locale));
+  }
+  return getLocalizedPromptExampleText(example.title, normalizeLocale(locale));
+}
+
+export function normalizePromptExampleExcerpt(prompt: string, maxLength = 220): string {
+  const normalized = prompt.replace(/\s+/g, ' ').trim();
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+  return `${normalized.slice(0, Math.max(0, maxLength - 3)).trimEnd()}...`;
+}
+
+export function getGenerationPromptExample(id: string): GenerationPromptExample | undefined {
+  return GENERATION_PROMPT_EXAMPLES.find((example) => example.id === id);
 }
 
 // Curated from EvoLinkAI/awesome-gpt-image-2-prompts (Apache-2.0). Source URLs are retained per item.

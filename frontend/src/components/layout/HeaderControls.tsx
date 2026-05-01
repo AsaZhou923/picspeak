@@ -37,6 +37,8 @@ export function LanguageSwitcher() {
     if (segments.length >= 2 && LOCALE_PREFIXES.includes(segments[1])) {
       segments[1] = nextLocale;
       router.push(segments.join('/'));
+    } else {
+      router.refresh();
     }
   };
 

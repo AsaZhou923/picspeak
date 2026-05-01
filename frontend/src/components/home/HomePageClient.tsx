@@ -62,6 +62,7 @@ export function HomePageContent({ structuredDataScope = 'root' }: HomePageProps 
   const softwareJsonLd = {
     '@context': 'https://schema.org',
     '@type': 'SoftwareApplication',
+    '@id': `${siteConfig.url}/#software`,
     name: siteConfig.name,
     applicationCategory: 'PhotographyApplication',
     operatingSystem: 'Web',
@@ -70,11 +71,32 @@ export function HomePageContent({ structuredDataScope = 'root' }: HomePageProps 
     image: `${siteConfig.url}${siteConfig.ogImage}`,
     sameAs: [siteConfig.social.x, siteConfig.repositoryUrl],
     isAccessibleForFree: true,
+    creator: {
+      '@id': siteConfig.author.id,
+    },
+    publisher: {
+      '@type': 'Organization',
+      '@id': `${siteConfig.url}/#organization`,
+      name: siteConfig.name,
+      url: siteConfig.url,
+      logo: {
+        '@type': 'ImageObject',
+        url: `${siteConfig.url}${siteConfig.logoImage}`,
+      },
+    },
     offers: {
       '@type': 'Offer',
       price: '0',
       priceCurrency: 'USD',
     },
+    featureList: [
+      'AI photo critique across composition, lighting, color, impact, and technique',
+      'GPT Image 2 visual reference generation',
+      'Curated AI prompt example library',
+      'Public critique gallery',
+      'Lens Notes photography education blog',
+      'Account history for progress review',
+    ],
   };
 
   const authorJsonLd = {

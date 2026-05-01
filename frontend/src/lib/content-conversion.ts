@@ -1,4 +1,4 @@
-import { normalizeLocale } from './locale';
+import { normalizeLocale } from './locale.ts';
 
 export type ContentConversionLocale = 'zh' | 'en' | 'ja';
 export type ContentConversionSource = 'home_direct' | 'blog' | 'gallery';

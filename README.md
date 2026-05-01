@@ -6,7 +6,7 @@
 [![Python](https://img.shields.io/badge/Python-3.11-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**PicSpeak** is an AI-powered web application for photography critique. Upload a photo and receive professional AI feedback on composition, lighting, and color within seconds. No registration is required. You can start immediately as a guest.
+**PicSpeak** is an AI-powered web application for photography critique and visual-reference creation. Upload a photo and receive professional AI feedback on composition, lighting, and color within seconds, then generate GPT Image 2 visual references for the next shoot. No registration is required. You can start immediately as a guest.
 
 ---
 
@@ -29,6 +29,7 @@
 - `Direct Image Upload` — Upload files directly from the frontend to object storage without routing through the backend
 - `AI Critique by Category` — Receive scoring and suggestions across composition, lighting, color, emotional impact, and technical execution for different types of photography, with both lightweight (`Flash`) and in-depth (`Pro`) modes
 - `AI Create` — Generate visual references from templates, prompts, quality, ratio, and style controls using an OpenAI-compatible image generation API
+- `Prompt Example Library` — Browse crawlable GPT Image 2 prompt examples with output images, source attribution, localized titles, and static detail pages
 - `Retake References` — Turn critique suggestions into AI-generated composition, lighting, color, or retake reference images from a review
 - `Generation History` — Browse generated images, download results, copy prompts, generate again, or send an image back to the workspace as retake inspiration
 - `Image Generation Credits` — Track monthly generation credits, redeem promo credits, and purchase extra credit packs
@@ -38,7 +39,7 @@
 - `Sharing and Export` — Generate share links or export structured review data for reuse
 - `Re-analysis` — Re-run analysis on a previous photo or upload a new one for another critique
 - `Favorites` — Save preferred critique results and manage them from a dedicated favorites page
-- `Gallery` — Showcase selected outstanding works from the community
+- `Gallery` — Showcase selected outstanding works from the community with server-visible critique summaries for public browsing and search
 - `Blog` — Access professional photography tutorials, AI analysis insights, and platform updates
 
 ## Tech Stack
@@ -124,7 +125,8 @@ cd frontend && npm run build && npm run start
 
 ## Documentation
 
-- [Changelog](docs/changelog/update-log-2026-04-25-ai-image-generation-and-credits.md)
+- [Latest Changelog](docs/changelog/update-log-2026-05-01-seo-og-gallery-prompt-library.md)
+- [SEO / GEO Audit](docs/seo/seo-audit-2026-05-01.md)
 - [Backend API Documentation](docs/api/后端接口文档_v1.md)
 - [System Architecture](docs/architecture/系统架构.md)
 - [Google Sign-In Integration Guide](docs/guides/Google登录接入指南.md)

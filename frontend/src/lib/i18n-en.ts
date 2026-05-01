@@ -206,8 +206,8 @@ export const enTranslations = {
     pro_offer_label: '',
     pro_offer_highlight: 'Pro',
     updates_label: 'Updates',
-    updates_hint_home: 'See runtime migrations and stability update',
-    updates_hint_latest: 'See runtime migrations and stability update',
+    updates_hint_home: 'See SEO, OG image, and prompt example update',
+    updates_hint_latest: 'See SEO, OG image, and prompt example update',
     contact_label: 'Contact',
     contact_headline: 'Get in Touch',
 

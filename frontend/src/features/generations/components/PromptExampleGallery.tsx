@@ -1,11 +1,13 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { Check, Copy, ExternalLink, Sparkles, Wand2 } from 'lucide-react';
 import {
   GENERATION_PROMPT_EXAMPLE_CATEGORIES,
   GENERATION_PROMPT_EXAMPLES,
   getLocalizedPromptExampleText,
+  getLocalizedPromptExampleTitle,
   type GenerationPromptExample,
   type GenerationPromptExampleCategory,
 } from '@/content/generation/prompt-examples';
@@ -83,7 +85,19 @@ export function PromptExampleGallery({ onApply }: PromptExampleGalleryProps) {
             <Sparkles size={14} />
             {t('generation_examples_label')}
           </p>
-          <h2 className="font-display text-2xl text-ink">{t('generation_examples_title')}</h2>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <h2 className="font-display text-2xl text-ink">{t('generation_examples_title')}</h2>
+            <Link
+              href="/generate/prompts"
+              className="text-xs font-medium text-gold/80 transition-colors hover:text-gold"
+            >
+              {locale === 'zh'
+                ? 'GPT Image 2 提示词案例'
+                : locale === 'ja'
+                  ? 'GPT Image 2 プロンプト例'
+                  : 'GPT Image 2 prompt examples'}
+            </Link>
+          </div>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-muted">{t('generation_examples_body')}</p>
         </div>
         <div
@@ -115,7 +129,7 @@ export function PromptExampleGallery({ onApply }: PromptExampleGalleryProps) {
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {examples.map((example) => {
             const copied = copiedId === example.id;
-            const title = getLocalizedPromptExampleText(example.title, locale);
+            const title = getLocalizedPromptExampleTitle(example, locale);
             const prompt = getLocalizedPromptExampleText(example.prompt, locale);
             return (
               <article

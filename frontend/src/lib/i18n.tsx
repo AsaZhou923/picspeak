@@ -3,6 +3,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { enTranslations, type TranslationDictionary, type TranslationKey } from './i18n-en';
 import { zhTranslations } from './i18n-zh';
+import { isSupportedLocale, LOCALE_COOKIE_NAME } from './locale';
 
 export type { TranslationKey } from './i18n-en';
 
@@ -28,8 +29,9 @@ const I18nContext = createContext<I18nContextValue>({
   t: (key) => key,
 });
 
-const STORAGE_KEY = 'picspeak-locale';
+const STORAGE_KEY = LOCALE_COOKIE_NAME;
 const LOCALE_SYNC_EVENT = 'picspeak-locale-sync';
+const LOCALE_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 
 function documentLang(locale: Locale): string {
   if (locale === 'zh') return 'zh-CN';
@@ -37,7 +39,7 @@ function documentLang(locale: Locale): string {
 }
 
 function isLocale(value: string | null | undefined): value is Locale {
-  return Boolean(value && Object.prototype.hasOwnProperty.call(LOCALE_LABELS, value));
+  return isSupportedLocale(value);
 }
 
 function detectPathLocale(): Locale | null {
@@ -55,6 +57,20 @@ async function loadTranslations(locale: Locale): Promise<TranslationDictionary> 
     case 'en':
     default:
       return enTranslations;
+  }
+}
+
+function persistLocalePreference(locale: Locale) {
+  try {
+    localStorage.setItem(STORAGE_KEY, locale);
+  } catch {
+    // ignore
+  }
+
+  try {
+    document.cookie = `${LOCALE_COOKIE_NAME}=${locale}; Path=/; Max-Age=${LOCALE_COOKIE_MAX_AGE}; SameSite=Lax`;
+  } catch {
+    // ignore
   }
 }
 
@@ -82,11 +98,7 @@ export function I18nProvider({
       if (initialMessages) {
         setMessages(initialMessages);
       }
-      try {
-        localStorage.setItem(STORAGE_KEY, initialLocale);
-      } catch {
-        // ignore
-      }
+      persistLocalePreference(initialLocale);
       return;
     }
 
@@ -100,6 +112,7 @@ export function I18nProvider({
       const saved = localStorage.getItem(STORAGE_KEY) as Locale | null;
       if (saved && saved in LOCALE_LABELS) {
         setLocaleState(saved);
+        persistLocalePreference(saved);
         return;
       }
     } catch {
@@ -144,11 +157,7 @@ export function I18nProvider({
 
   const setLocale = useCallback((l: Locale) => {
     setLocaleState(l);
-    try {
-      localStorage.setItem(STORAGE_KEY, l);
-    } catch {
-      // ignore
-    }
+    persistLocalePreference(l);
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent<Locale>(LOCALE_SYNC_EVENT, { detail: l }));
     }
