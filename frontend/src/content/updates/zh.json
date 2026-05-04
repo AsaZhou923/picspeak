@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-05-04-analytics-retake-waiting-reader",
+    "date": "2026-05-04",
+    "title": "产品分析周报、复拍练习闭环与等待页内嵌阅读",
+    "summary": "PicSpeak 现在可以把点评建议带回工作台作为下一轮拍摄目标，评图和生图等待页也能直接阅读全文；产品分析同步扩展 AI Create、Prompt Library、复拍贡献、locale 和数据健康报告。",
+    "docPath": "docs/changelog/update-log-2026-05-04-analytics-retake-waiting-reader.md",
+    "sections": [
+      {
+        "title": "用户流程",
+        "items": [
+          "评图和生图任务等待页新增内嵌 Blog 阅读器，等待时可以在窗口里直接读完整文章",
+          "点评结果里的下一轮清单可以带回工作台，并保留来源点评、复拍意图、目标维度和动作文本",
+          "评图历史页会根据 Free 最近窗口或 Pro 长周期历史推荐下一轮练习主题"
+        ]
+      },
+      {
+        "title": "产品分析",
+        "items": [
+          "产品分析新增 AI Create 漏斗、Prompt Library 来源转化、复拍贡献、locale 拆分和数据健康告警",
+          "新增产品经营周报导出脚本，可从数据库输出 markdown 报告",
+          "回归测试覆盖清单维度推断、历史练习主题、Prompt Library 转化和扩展后的分析快照"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-05-01-seo-og-gallery-prompt-library",
     "date": "2026-05-01",
     "title": "SEO 全量优化、真实 OG 图与可索引提示词案例页",

@@ -15,8 +15,10 @@ export function useReplayContext({ preview }: { preview: string | null }) {
   );
   const [replayPhotoUrl, setReplayPhotoUrl] = useState<string | null>(null);
 
-  const clearReplay = useCallback(() => {
-    setSourceReviewId(null);
+  const clearReplay = useCallback((options?: { clearSource?: boolean }) => {
+    if (options?.clearSource) {
+      setSourceReviewId(null);
+    }
     setReplayPhotoId(null);
     setReplayPhotoUrl(null);
   }, []);
@@ -46,5 +48,9 @@ export function useReplayContext({ preview }: { preview: string | null }) {
     clearReplay,
     initialMode: searchParams.get('mode'),
     initialImageType: searchParams.get('image_type'),
+    retakeIntent: searchParams.get('retake_intent'),
+    nextShootAction: searchParams.get('next_shoot_action'),
+    nextShootDimension: searchParams.get('next_shoot_dimension'),
+    sourceGenerationId: searchParams.get('generation_id'),
   };
 }

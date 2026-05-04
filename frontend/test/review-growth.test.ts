@@ -61,7 +61,20 @@ test('buildNextShootChecklist extracts short actionable titles from structured s
     ],
   );
   assert.match(checklist[0].detail, /bottom 15% of frame/i);
+  assert.equal(checklist[0].dimension, 'composition');
+  assert.equal(checklist[1].dimension, 'lighting');
+  assert.equal(checklist[2].dimension, 'impact');
   assert.equal(checklist.length, 3);
+});
+
+test('buildNextShootChecklist falls back to weakest scored dimension when text is generic', () => {
+  const checklist = buildNextShootChecklist(
+    '1. Action: Make one simple change before the next round.',
+    3,
+    makeScores({ composition: 8, lighting: 7, color: 5, impact: 6, technical: 7 }),
+  );
+
+  assert.equal(checklist[0].dimension, 'color');
 });
 
 test('buildHistoryGrowthSnapshot summarizes recent average trend and frequent weak dimensions', () => {
@@ -75,12 +88,31 @@ test('buildHistoryGrowthSnapshot summarizes recent average trend and frequent we
   ]);
 
   assert.equal(snapshot.recentItems.length, 3);
+  assert.equal(snapshot.previousItems.length, 3);
+  assert.equal(snapshot.analyzedItems.length, 6);
   assert.equal(snapshot.recentAverage, 7.7);
   assert.equal(snapshot.previousAverage, 6.1);
   assert.equal(snapshot.averageDelta, 1.6);
   assert.equal(snapshot.trend, 'up');
+  assert.deepEqual(snapshot.practiceTheme, {
+    dimension: 'lighting',
+    intensity: 'extend',
+    reviewCount: 6,
+  });
   assert.deepEqual(
     snapshot.weakDimensions.map((item) => item.key),
     ['lighting', 'technical', 'composition'],
   );
+});
+
+test('buildHistoryGrowthSnapshot uses the lowest average dimension when no dimension is under 7', () => {
+  const snapshot = buildHistoryGrowthSnapshot([
+    makeHistoryItem('rev-3', '2026-04-18T10:00:00Z', 8.6, makeScores({ composition: 9, lighting: 8, color: 7.5, impact: 8, technical: 8 })),
+    makeHistoryItem('rev-2', '2026-04-17T10:00:00Z', 8.4, makeScores({ composition: 8, lighting: 8, color: 7.2, impact: 9, technical: 8 })),
+    makeHistoryItem('rev-1', '2026-04-16T10:00:00Z', 8.3, makeScores({ composition: 8, lighting: 8, color: 7.1, impact: 8, technical: 8 })),
+  ]);
+
+  assert.deepEqual(snapshot.weakDimensions, []);
+  assert.equal(snapshot.practiceTheme.dimension, 'color');
+  assert.equal(snapshot.practiceTheme.intensity, 'stabilize');
 });

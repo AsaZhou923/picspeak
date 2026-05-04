@@ -12,7 +12,6 @@ interface ReplayBannerProps {
   reviewMode: 'flash' | 'pro';
   isGuest: boolean;
   stage: Stage;
-  promoModeBadge: string;
   onImageTypeChange: (type: ImageType) => void;
   onReviewModeChange: (mode: 'flash' | 'pro') => void;
   onStartReview: () => void;
@@ -26,7 +25,6 @@ export function ReplayBanner({
   reviewMode,
   isGuest,
   stage,
-  promoModeBadge,
   onImageTypeChange,
   onReviewModeChange,
   onStartReview,
@@ -80,7 +78,6 @@ export function ReplayBanner({
               value={reviewMode}
               onChange={onReviewModeChange}
               isGuest={isGuest}
-              promoModeBadge={promoModeBadge}
               variant="compact"
               t={t}
             />

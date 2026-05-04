@@ -40,6 +40,8 @@ class ProductAnalyticsServiceTests(unittest.TestCase):
             'gallery_viewed',
             'share_viewed',
             'content_workspace_clicked',
+            'prompt_library_viewed',
+            'next_shoot_action_clicked',
             'generation_page_viewed',
             'generation_template_selected',
             'generation_requested',
@@ -160,6 +162,7 @@ class ProductAnalyticsServiceTests(unittest.TestCase):
                 session_id='sess-3',
                 plan='guest',
                 source='blog',
+                metadata={'has_source_review_id': True, 'retake_intent': 'new_photo_retake'},
             ),
             AnalyticsEventSample(
                 event_name='review_result_viewed',
@@ -168,6 +171,53 @@ class ProductAnalyticsServiceTests(unittest.TestCase):
                 session_id='sess-3',
                 plan='guest',
                 source='blog',
+            ),
+            AnalyticsEventSample(
+                event_name='prompt_library_viewed',
+                occurred_at=datetime(2026, 4, 11, 11, 0, tzinfo=timezone.utc),
+                device_id='dev-3',
+                session_id='sess-4',
+                plan='free',
+                source='prompt_library',
+                locale='en',
+            ),
+            AnalyticsEventSample(
+                event_name='generation_requested',
+                occurred_at=datetime(2026, 4, 11, 11, 2, tzinfo=timezone.utc),
+                device_id='dev-3',
+                session_id='sess-4',
+                plan='free',
+                source='prompt_library',
+                locale='en',
+            ),
+            AnalyticsEventSample(
+                event_name='generation_succeeded',
+                occurred_at=datetime(2026, 4, 11, 11, 4, tzinfo=timezone.utc),
+                device_id='dev-3',
+                session_id='sess-4',
+                plan='free',
+                source='prompt_library',
+                locale='en',
+            ),
+            AnalyticsEventSample(
+                event_name='generation_used_for_retake',
+                occurred_at=datetime(2026, 4, 11, 11, 6, tzinfo=timezone.utc),
+                device_id='dev-3',
+                session_id='sess-4',
+                plan='free',
+                source='prompt_library',
+                locale='en',
+                metadata={'generation_id': 'gen-1'},
+            ),
+            AnalyticsEventSample(
+                event_name='next_shoot_action_clicked',
+                occurred_at=datetime(2026, 4, 11, 11, 8, tzinfo=timezone.utc),
+                device_id='dev-2',
+                session_id='sess-3',
+                plan='guest',
+                source='blog',
+                locale='zh',
+                metadata={'dimension': 'lighting', 'retake_intent': 'new_photo_retake'},
             ),
         ]
         reviews = [
@@ -228,12 +278,36 @@ class ProductAnalyticsServiceTests(unittest.TestCase):
         self.assertEqual(source_breakdown['blog']['review_results'], 1)
         self.assertEqual(source_breakdown['blog']['workspace_clicks'], 0)
         self.assertEqual(source_breakdown['blog']['uploads'], 0)
+        self.assertEqual(source_breakdown['prompt_library']['visitors'], 1)
 
         plan_breakdown = snapshot['plan_breakdown']
         self.assertEqual(plan_breakdown['guest']['active_users'], 2)
         self.assertEqual(plan_breakdown['guest']['review_requests'], 2)
         self.assertEqual(plan_breakdown['free']['checkout_started'], 1)
         self.assertEqual(plan_breakdown['pro']['paid_success'], 1)
+
+        generation_funnel = snapshot['generation_funnel']
+        self.assertEqual(generation_funnel['overall']['prompt_library_viewed'], 1)
+        self.assertEqual(generation_funnel['overall']['generation_requested'], 1)
+        self.assertEqual(generation_funnel['overall']['generation_succeeded'], 1)
+        self.assertEqual(generation_funnel['request_success_rate'], 1.0)
+        self.assertEqual(generation_funnel['by_source']['prompt_library']['requests'], 1)
+
+        locale_breakdown = snapshot['locale_breakdown']
+        self.assertEqual(locale_breakdown['en']['generation_requests'], 1)
+        self.assertEqual(locale_breakdown['en']['generation_successes'], 1)
+
+        data_health = snapshot['data_health']
+        self.assertEqual(data_health['total_events'], len(events))
+        self.assertEqual(data_health['unknown_source_events'], 0)
+
+        retake_contribution = snapshot['retake_contribution']
+        self.assertEqual(retake_contribution['review_requests'], 2)
+        self.assertEqual(retake_contribution['retake_review_requests'], 1)
+        self.assertEqual(retake_contribution['retake_review_request_rate'], 0.5)
+        self.assertEqual(retake_contribution['generation_used_for_retake'], 1)
+        self.assertEqual(retake_contribution['by_intent']['new_photo_retake']['review_requests'], 1)
+        self.assertEqual(retake_contribution['by_intent']['new_photo_retake']['next_shoot_actions'], 1)
 
     def test_build_stage_a_snapshot_calculates_content_conversion_weekly_report(self) -> None:
         events = [
@@ -324,6 +398,25 @@ class ProductAnalyticsServiceTests(unittest.TestCase):
                 plan='guest',
                 source='gallery',
             ),
+            AnalyticsEventSample(
+                event_name='prompt_library_viewed',
+                occurred_at=datetime(2026, 4, 20, 11, 0, tzinfo=timezone.utc),
+                device_id='prompt-dev',
+                session_id='prompt-session',
+                plan='guest',
+                source='prompt_library',
+                page_path='/generate/prompts',
+            ),
+            AnalyticsEventSample(
+                event_name='content_workspace_clicked',
+                occurred_at=datetime(2026, 4, 20, 11, 1, tzinfo=timezone.utc),
+                device_id='prompt-dev',
+                session_id='prompt-session',
+                plan='guest',
+                source='prompt_library',
+                page_path='/generate/prompts',
+                metadata={'entrypoint': 'prompt_library_retake'},
+            ),
         ]
 
         snapshot = build_stage_a_snapshot(
@@ -344,6 +437,9 @@ class ProductAnalyticsServiceTests(unittest.TestCase):
         self.assertEqual(content_report['gallery']['workspace_clicks'], 1)
         self.assertEqual(content_report['gallery']['uploads'], 1)
         self.assertEqual(content_report['gallery']['gallery_to_upload_conversion_rate'], 1.0)
+        self.assertEqual(content_report['prompt_library']['visitors'], 1)
+        self.assertEqual(content_report['prompt_library']['workspace_clicks'], 1)
+        self.assertEqual(content_report['prompt_library']['prompt_library_to_workspace_click_rate'], 1.0)
 
     def test_render_stage_a_snapshot_markdown_outputs_a_daily_table(self) -> None:
         snapshot = build_stage_a_snapshot(
@@ -365,6 +461,9 @@ class ProductAnalyticsServiceTests(unittest.TestCase):
         markdown = render_stage_a_snapshot_markdown(snapshot)
 
         self.assertIn('# PicSpeak 阶段 A 基线快照', markdown)
+        self.assertIn('## 数据健康检查', markdown)
+        self.assertIn('## 复拍贡献拆分', markdown)
+        self.assertIn('## AI Create 漏斗', markdown)
         self.assertIn('| 日期 | DAU | WAU | 首评完成率 | 7 日二次使用率 |', markdown)
         self.assertIn('| 2026-04-10 | 1 | 1 | 0.0% | 0.0% |', markdown)
 
@@ -398,6 +497,7 @@ class ProductAnalyticsServiceTests(unittest.TestCase):
         self.assertIn('# PicSpeak 内容来源转化周报', markdown)
         self.assertIn('| 来源 | 浏览访客 | 工作台点击 | 工作台进入 | 上传成功 | 发起点评 | 查看结果 | 点击率 | 上传转化率 | 首评完成率 |', markdown)
         self.assertIn('| blog | 1 | 1 | 0 | 0 | 0 | 0 | 100.0% | 0.0% | 0.0% |', markdown)
+        self.assertIn('| prompt_library | 0 | 0 | 0 | 0 | 0 | 0 | 0.0% | 0.0% | 0.0% |', markdown)
 
 
 if __name__ == '__main__':

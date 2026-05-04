@@ -18,6 +18,8 @@ export type ProductAnalyticsEventName =
   | 'share_clicked'
   | 'export_clicked'
   | 'content_workspace_clicked'
+  | 'prompt_library_viewed'
+  | 'next_shoot_action_clicked'
   | 'upgrade_pro_clicked'
   | 'checkout_started'
   | 'paid_success'
@@ -48,6 +50,8 @@ export function normalizeProductAnalyticsSource(value: string | null | undefined
       return 'blog';
     case 'gallery':
       return 'gallery';
+    case 'prompt_library':
+      return 'prompt_library';
     case 'share':
       return 'share';
     case 'checkout':
@@ -120,6 +124,9 @@ export function derivePageEvent(pathname: string): ProductAnalyticsEventName | n
   if (pathname === '/generate') {
     return 'generation_page_viewed';
   }
+  if (/^\/generate\/prompts(?:\/[^/]+)?$/.test(pathname)) {
+    return 'prompt_library_viewed';
+  }
   if (pathname === '/gallery') {
     return 'gallery_viewed';
   }
@@ -147,6 +154,9 @@ export function deriveAttributionSourceForPath(pathname: string): ProductAnalyti
   }
   if (pathname === '/gallery') {
     return 'gallery';
+  }
+  if (/^\/generate\/prompts(?:\/[^/]+)?$/.test(pathname)) {
+    return 'prompt_library';
   }
   if (/^\/share\/[^/]+$/.test(pathname)) {
     return 'share';

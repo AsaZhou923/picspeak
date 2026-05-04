@@ -170,7 +170,7 @@ export function useReviewActions({
       token: token ?? undefined,
       pagePath: `/reviews/${review.review_id}`,
       locale,
-      metadata: { review_id: review.review_id, photo_id: review.photo_id, mode: review.mode },
+      metadata: { review_id: review.review_id, photo_id: review.photo_id, mode: review.mode, retake_intent: 'same_photo_fix' },
     });
     setActionBusy('replay');
     setActionError('');
@@ -180,6 +180,7 @@ export function useReviewActions({
       photo_id: review.photo_id,
       mode: review.mode,
       image_type: review.image_type ?? review.result.image_type ?? 'default',
+      retake_intent: 'same_photo_fix',
     });
     router.push(`/workspace?${nextParams.toString()}`);
   }, [review, actionBusy, token, locale, actionCopy, router]);

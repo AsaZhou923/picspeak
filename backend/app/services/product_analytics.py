@@ -77,6 +77,16 @@ STAGE_A_EVENT_CATALOG: dict[str, dict[str, Any]] = {
         'stage': 'D',
         'description': 'A Blog, Gallery, or content-oriented CTA sent the user toward the workspace.',
     },
+    'prompt_library_viewed': {
+        'label': '进入 Prompt Library',
+        'stage': 'A',
+        'description': 'Prompt library entry used for AI Create and workspace attribution.',
+    },
+    'next_shoot_action_clicked': {
+        'label': '点击下次拍摄动作',
+        'stage': 'B',
+        'description': 'The user carried a critique-derived next-shoot action back to the workspace.',
+    },
     'upgrade_pro_clicked': {
         'label': '点击升级 Pro',
         'stage': 'A',
@@ -173,6 +183,7 @@ KNOWN_SOURCES = {
     'home_direct',
     'blog',
     'gallery',
+    'prompt_library',
     'share',
     'checkout',
     'unknown',
@@ -182,10 +193,32 @@ VISITOR_EVENT_BY_SOURCE = {
     'home_direct': 'home_viewed',
     'blog': 'blog_post_viewed',
     'gallery': 'gallery_viewed',
+    'prompt_library': 'prompt_library_viewed',
     'share': 'share_viewed',
 }
 
-CONTENT_CONVERSION_SOURCES = ('blog', 'gallery')
+CONTENT_CONVERSION_SOURCES = ('blog', 'gallery', 'prompt_library')
+GENERATION_FUNNEL_EVENTS = (
+    'generation_page_viewed',
+    'prompt_library_viewed',
+    'generation_template_selected',
+    'generation_prompt_opened',
+    'generation_intent_selected',
+    'generation_requested',
+    'generation_succeeded',
+    'generation_failed',
+    'generation_viewed',
+    'generation_download_clicked',
+    'generation_used_for_retake',
+    'generation_credit_exhausted',
+    'generation_upgrade_clicked',
+    'credit_pack_checkout_started',
+)
+DATA_HEALTH_CORE_EVENTS = (
+    'workspace_viewed',
+    'review_requested',
+    'review_result_viewed',
+)
 
 
 @dataclass(slots=True)
@@ -198,6 +231,7 @@ class AnalyticsEventSample:
     plan: str = 'guest'
     source: str = 'unknown'
     page_path: str | None = None
+    locale: str | None = None
     metadata: dict[str, Any] | None = None
 
 
@@ -369,10 +403,258 @@ def _build_content_conversion_weekly(period_events: list[AnalyticsEventSample]) 
         elif source == 'gallery':
             row['gallery_to_workspace_click_rate'] = row['workspace_click_rate']
             row['gallery_to_upload_conversion_rate'] = row['upload_conversion_rate']
+        elif source == 'prompt_library':
+            row['prompt_library_to_workspace_click_rate'] = row['workspace_click_rate']
+            row['prompt_library_source_first_review_completion_rate'] = row['first_review_completion_rate']
 
         report[source] = row
 
     return report
+
+
+def _event_count(
+    events: Iterable[AnalyticsEventSample],
+    *,
+    event_names: set[str] | None = None,
+    source: str | None = None,
+    plan: str | None = None,
+    locale: str | None = None,
+) -> int:
+    count = 0
+    for event in events:
+        if event_names is not None and event.event_name not in event_names:
+            continue
+        if source is not None and event.source != source:
+            continue
+        if plan is not None and event.plan != plan:
+            continue
+        if locale is not None and _event_locale(event) != locale:
+            continue
+        count += 1
+    return count
+
+
+def _event_locale(event: AnalyticsEventSample) -> str:
+    metadata_locale = ''
+    if event.metadata:
+        metadata_locale = str(event.metadata.get('locale') or '').strip().lower()
+    locale = str(getattr(event, 'locale', '') or metadata_locale).strip().lower()
+    if locale in {'zh', 'en', 'ja'}:
+        return locale
+    return 'unknown'
+
+
+def _event_metadata_text(event: AnalyticsEventSample, key: str) -> str:
+    if not event.metadata:
+        return ''
+    return str(event.metadata.get(key) or '').strip().lower()
+
+
+def _event_metadata_bool(event: AnalyticsEventSample, key: str) -> bool:
+    if not event.metadata:
+        return False
+    value = event.metadata.get(key)
+    if isinstance(value, bool):
+        return value
+    return str(value or '').strip().lower() in {'1', 'true', 'yes'}
+
+
+def _build_generation_funnel(period_events: list[AnalyticsEventSample]) -> dict[str, Any]:
+    overall = {
+        event_name: _count_distinct(
+            period_events,
+            event_names={event_name},
+            key_builder=_guest_conversion_key,
+        )
+        for event_name in GENERATION_FUNNEL_EVENTS
+    }
+    requested = overall['generation_requested']
+    succeeded = overall['generation_succeeded']
+    failed = overall['generation_failed']
+    viewed = overall['generation_viewed']
+
+    by_source = {}
+    for source in (*VISITOR_EVENT_BY_SOURCE.keys(), 'checkout', 'unknown'):
+        by_source[source] = {
+            'page_views': _count_distinct(
+                period_events,
+                event_names={'generation_page_viewed', 'prompt_library_viewed'},
+                source=source,
+                key_builder=_guest_conversion_key,
+            ),
+            'requests': _count_distinct(
+                period_events,
+                event_names={'generation_requested'},
+                source=source,
+                key_builder=_guest_conversion_key,
+            ),
+            'successes': _count_distinct(
+                period_events,
+                event_names={'generation_succeeded'},
+                source=source,
+                key_builder=_guest_conversion_key,
+            ),
+            'credit_exhausted': _count_distinct(
+                period_events,
+                event_names={'generation_credit_exhausted'},
+                source=source,
+                key_builder=_guest_conversion_key,
+            ),
+            'credit_pack_checkout': _count_distinct(
+                period_events,
+                event_names={'credit_pack_checkout_started'},
+                source=source,
+                key_builder=_guest_conversion_key,
+            ),
+        }
+
+    return {
+        'overall': overall,
+        'request_success_rate': _safe_rate(succeeded, requested),
+        'request_failure_rate': _safe_rate(failed, requested),
+        'result_view_rate': _safe_rate(viewed, succeeded),
+        'by_source': by_source,
+    }
+
+
+def _build_locale_breakdown(period_events: list[AnalyticsEventSample]) -> dict[str, dict[str, int]]:
+    breakdown = {}
+    for locale in ('zh', 'en', 'ja', 'unknown'):
+        locale_events = [event for event in period_events if _event_locale(event) == locale]
+        breakdown[locale] = {
+            'active_users': _count_distinct(
+                locale_events,
+                key_builder=_guest_conversion_key,
+            ),
+            'workspace_entries': _count_distinct(
+                locale_events,
+                event_names={'workspace_viewed'},
+                key_builder=_guest_conversion_key,
+            ),
+            'review_requests': _count_distinct(
+                locale_events,
+                event_names={'review_requested'},
+                key_builder=_guest_conversion_key,
+            ),
+            'review_results': _count_distinct(
+                locale_events,
+                event_names={'review_result_viewed'},
+                key_builder=_guest_conversion_key,
+            ),
+            'generation_requests': _count_distinct(
+                locale_events,
+                event_names={'generation_requested'},
+                key_builder=_guest_conversion_key,
+            ),
+            'generation_successes': _count_distinct(
+                locale_events,
+                event_names={'generation_succeeded'},
+                key_builder=_guest_conversion_key,
+            ),
+            'checkout_started': _count_distinct(
+                locale_events,
+                event_names={'checkout_started', 'credit_pack_checkout_started'},
+                key_builder=_event_user_key,
+            ),
+        }
+    return breakdown
+
+
+def _build_data_health(period_events: list[AnalyticsEventSample]) -> dict[str, Any]:
+    total_events = len(period_events)
+    unknown_source_events = _event_count(period_events, source='unknown')
+    missing_core_events = [
+        event_name
+        for event_name in DATA_HEALTH_CORE_EVENTS
+        if _event_count(period_events, event_names={event_name}) == 0
+    ]
+    generation_events = _event_count(period_events, event_names=set(GENERATION_FUNNEL_EVENTS))
+    warnings = []
+    if total_events == 0:
+        warnings.append('no_events_in_window')
+    if total_events > 0 and unknown_source_events / total_events > 0.3:
+        warnings.append('unknown_source_over_30_percent')
+    if missing_core_events:
+        warnings.append('missing_core_review_events')
+    if _event_count(period_events, event_names={'generation_page_viewed', 'prompt_library_viewed'}) > 0 and generation_events <= 1:
+        warnings.append('generation_funnel_events_missing_after_entry')
+
+    return {
+        'total_events': total_events,
+        'unknown_source_events': unknown_source_events,
+        'unknown_source_rate': _safe_rate(unknown_source_events, total_events),
+        'missing_core_events': missing_core_events,
+        'generation_events': generation_events,
+        'warnings': warnings,
+    }
+
+
+def _build_retake_contribution(period_events: list[AnalyticsEventSample]) -> dict[str, Any]:
+    review_request_events = [event for event in period_events if event.event_name == 'review_requested']
+    retake_request_events = [
+        event
+        for event in review_request_events
+        if _event_metadata_text(event, 'retake_intent') in {'same_photo_fix', 'new_photo_retake'}
+        or _event_metadata_bool(event, 'has_source_review_id')
+    ]
+
+    by_intent: dict[str, dict[str, int]] = {}
+    for intent in ('same_photo_fix', 'new_photo_retake'):
+        intent_events = [
+            event
+            for event in review_request_events
+            if _event_metadata_text(event, 'retake_intent') == intent
+        ]
+        by_intent[intent] = {
+            'review_requests': _count_distinct(
+                intent_events,
+                key_builder=_guest_conversion_key,
+            ),
+            'next_shoot_actions': _count_distinct(
+                [
+                    event
+                    for event in period_events
+                    if event.event_name == 'next_shoot_action_clicked'
+                    and _event_metadata_text(event, 'retake_intent') == intent
+                ],
+                key_builder=_guest_conversion_key,
+            ),
+        }
+
+    linked_without_intent = [
+        event
+        for event in review_request_events
+        if not _event_metadata_text(event, 'retake_intent')
+        and _event_metadata_bool(event, 'has_source_review_id')
+    ]
+    by_intent['linked_without_intent'] = {
+        'review_requests': _count_distinct(
+            linked_without_intent,
+            key_builder=_guest_conversion_key,
+        ),
+        'next_shoot_actions': 0,
+    }
+
+    review_requests = _count_distinct(
+        review_request_events,
+        key_builder=_guest_conversion_key,
+    )
+    retake_review_requests = _count_distinct(
+        retake_request_events,
+        key_builder=_guest_conversion_key,
+    )
+
+    return {
+        'review_requests': review_requests,
+        'retake_review_requests': retake_review_requests,
+        'retake_review_request_rate': _safe_rate(retake_review_requests, review_requests),
+        'generation_used_for_retake': _count_distinct(
+            period_events,
+            event_names={'generation_used_for_retake'},
+            key_builder=_guest_conversion_key,
+        ),
+        'by_intent': by_intent,
+    }
 
 
 def build_stage_a_snapshot(
@@ -394,6 +676,7 @@ def build_stage_a_snapshot(
                 plan=str(event.plan or 'guest').strip().lower() or 'guest',
                 source=normalize_analytics_source(event.source),
                 page_path=event.page_path,
+                locale=event.locale,
                 metadata=dict(event.metadata or {}),
             )
         )
@@ -597,6 +880,10 @@ def build_stage_a_snapshot(
         'source_breakdown': source_breakdown,
         'content_conversion_weekly': _build_content_conversion_weekly(period_events),
         'plan_breakdown': plan_breakdown,
+        'locale_breakdown': _build_locale_breakdown(period_events),
+        'generation_funnel': _build_generation_funnel(period_events),
+        'retake_contribution': _build_retake_contribution(period_events),
+        'data_health': _build_data_health(period_events),
     }
 
 
@@ -610,11 +897,29 @@ def render_stage_a_snapshot_markdown(snapshot: dict[str, Any]) -> str:
         '',
         f"- 时间窗口：{snapshot['window_start']} -> {snapshot['window_end']}",
         '',
-        '## 日度漏斗总览',
+        '## 数据健康检查',
         '',
-        '| 日期 | DAU | WAU | 首评完成率 | 7 日二次使用率 | guest -> sign-in | free -> checkout | checkout -> paid |',
-        '| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |',
+        '| 检查项 | 结果 |',
+        '| --- | --- |',
     ]
+
+    data_health = snapshot.get('data_health', {})
+    missing_core_events = ', '.join(data_health.get('missing_core_events') or []) or '无'
+    warnings = ', '.join(data_health.get('warnings') or []) or '无'
+    lines.extend(
+        [
+            f"| 总事件数 | {data_health.get('total_events', 0)} |",
+            f"| unknown source 事件数 | {data_health.get('unknown_source_events', 0)} ({_format_percent(data_health.get('unknown_source_rate', 0.0))}) |",
+            f"| 缺失核心事件 | {missing_core_events} |",
+            f"| 生图漏斗事件数 | {data_health.get('generation_events', 0)} |",
+            f"| 告警 | {warnings} |",
+            '',
+            '## 日度漏斗总览',
+            '',
+            '| 日期 | DAU | WAU | 首评完成率 | 7 日二次使用率 | guest -> sign-in | free -> checkout | checkout -> paid |',
+            '| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |',
+        ]
+    )
 
     for row in snapshot['daily_rows']:
         lines.append(
@@ -627,6 +932,72 @@ def render_stage_a_snapshot_markdown(snapshot: dict[str, Any]) -> str:
                 guest_to_sign_in=_format_percent(row['guest_to_sign_in']['rate']),
                 free_to_checkout=_format_percent(row['free_to_checkout']['rate']),
                 checkout_to_paid=_format_percent(row['checkout_to_paid']['rate']),
+            )
+        )
+
+    retake_contribution = snapshot.get('retake_contribution', {})
+    lines.extend(
+        [
+            '',
+            '## 复拍贡献拆分',
+            '',
+            '| 指标 | 去重用户数 / 比率 |',
+            '| --- | ---: |',
+            f"| 发起评图用户 | {retake_contribution.get('review_requests', 0)} |",
+            f"| 复拍/再分析评图用户 | {retake_contribution.get('retake_review_requests', 0)} |",
+            f"| 复拍/再分析贡献率 | {_format_percent(retake_contribution.get('retake_review_request_rate', 0.0))} |",
+            f"| 生图结果用于复拍 | {retake_contribution.get('generation_used_for_retake', 0)} |",
+            '',
+            '| 复拍意图 | 发起评图 | 下一次拍摄动作点击 |',
+            '| --- | ---: | ---: |',
+        ]
+    )
+    for intent, row in retake_contribution.get('by_intent', {}).items():
+        lines.append(
+            '| {intent} | {review_requests} | {next_shoot_actions} |'.format(
+                intent=intent,
+                review_requests=row.get('review_requests', 0),
+                next_shoot_actions=row.get('next_shoot_actions', 0),
+            )
+        )
+
+    generation_funnel = snapshot.get('generation_funnel', {})
+    generation_overall = generation_funnel.get('overall', {})
+    lines.extend(
+        [
+            '',
+            '## AI Create 漏斗',
+            '',
+            '| 事件 | 去重用户数 |',
+            '| --- | ---: |',
+        ]
+    )
+    for event_name in GENERATION_FUNNEL_EVENTS:
+        lines.append(f"| {event_name} | {generation_overall.get(event_name, 0)} |")
+    lines.extend(
+        [
+            '',
+            '| 指标 | 比率 |',
+            '| --- | ---: |',
+            f"| 请求成功率 | {_format_percent(generation_funnel.get('request_success_rate', 0.0))} |",
+            f"| 请求失败率 | {_format_percent(generation_funnel.get('request_failure_rate', 0.0))} |",
+            f"| 成功后查看率 | {_format_percent(generation_funnel.get('result_view_rate', 0.0))} |",
+            '',
+            '### AI Create 来源拆分',
+            '',
+            '| 来源 | 入口访问 | 发起生图 | 生图成功 | credits 耗尽 | credit pack checkout |',
+            '| --- | ---: | ---: | ---: | ---: | ---: |',
+        ]
+    )
+    for source, row in generation_funnel.get('by_source', {}).items():
+        lines.append(
+            '| {source} | {page_views} | {requests} | {successes} | {credit_exhausted} | {credit_pack_checkout} |'.format(
+                source=source,
+                page_views=row.get('page_views', 0),
+                requests=row.get('requests', 0),
+                successes=row.get('successes', 0),
+                credit_exhausted=row.get('credit_exhausted', 0),
+                credit_pack_checkout=row.get('credit_pack_checkout', 0),
             )
         )
 
@@ -673,7 +1044,38 @@ def render_stage_a_snapshot_markdown(snapshot: dict[str, Any]) -> str:
             )
         )
 
+    lines.extend(
+        [
+            '',
+            '## Locale 拆分',
+            '',
+            '| locale | 活跃用户 | 工作台进入 | 发起点评 | 查看结果 | 发起生图 | 生图成功 | checkout 发起 |',
+            '| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |',
+        ]
+    )
+    for locale, row in snapshot.get('locale_breakdown', {}).items():
+        lines.append(
+            '| {locale} | {active_users} | {workspace_entries} | {review_requests} | {review_results} | {generation_requests} | {generation_successes} | {checkout_started} |'.format(
+                locale=locale,
+                active_users=row['active_users'],
+                workspace_entries=row['workspace_entries'],
+                review_requests=row['review_requests'],
+                review_results=row['review_results'],
+                generation_requests=row['generation_requests'],
+                generation_successes=row['generation_successes'],
+                checkout_started=row['checkout_started'],
+            )
+        )
+
     return '\n'.join(lines) + '\n'
+
+
+def render_product_analytics_weekly_markdown(snapshot: dict[str, Any]) -> str:
+    return render_stage_a_snapshot_markdown(snapshot).replace(
+        '# PicSpeak 阶段 A 基线快照',
+        '# PicSpeak 产品经营周报',
+        1,
+    )
 
 
 def render_content_conversion_weekly_markdown(snapshot: dict[str, Any]) -> str:
@@ -713,6 +1115,7 @@ def render_content_conversion_weekly_markdown(snapshot: dict[str, Any]) -> str:
             '- Blog 点击率：`content_workspace_clicked(source=blog) / blog_post_viewed`。',
             '- Blog 首评完成率：`review_result_viewed(source=blog) / review_requested(source=blog)`。',
             '- Gallery 上传转化率：`upload_succeeded(source=gallery) / gallery_viewed`。',
+            '- Prompt Library 点击率：`content_workspace_clicked(source=prompt_library) / prompt_library_viewed`。',
             '- 工作台进入和上传成功都继承前端会话级来源，点击事件用来确认具体入口位。',
         ]
     )
@@ -804,6 +1207,7 @@ def load_stage_a_snapshot_from_db(
                 plan=row.plan,
                 source=row.source,
                 page_path=row.page_path,
+                locale=row.locale,
                 metadata=dict(row.metadata_json or {}),
             )
             for row in event_rows

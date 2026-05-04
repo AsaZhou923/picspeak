@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-05-04-analytics-retake-waiting-reader",
+    "date": "2026-05-04",
+    "title": "分析週報、撮り直し練習ループ、待ち時間の本文リーダー",
+    "summary": "講評の提案を次の撮影目標としてワークスペースへ戻せるようになり、講評・生成の待機画面では記事全文をその場で読めます。分析側も AI Create、Prompt Library、撮り直し貢献、locale、データ健全性まで拡張しました。",
+    "docPath": "docs/changelog/update-log-2026-05-04-analytics-retake-waiting-reader.md",
+    "sections": [
+      {
+        "title": "ユーザーフロー",
+        "items": [
+          "講評タスクと生成タスクの待機画面に埋め込み Blog リーダーを追加し、画面を離れずに記事全文を読めるようにしました",
+          "講評結果のチェックリストから、元の講評、撮り直し意図、対象次元、アクション文をワークスペースへ持ち込めます",
+          "講評履歴では Free の直近ウィンドウまたは Pro の長期履歴から次の練習テーマを提案します"
+        ]
+      },
+      {
+        "title": "プロダクト分析",
+        "items": [
+          "AI Create funnel、Prompt Library source conversion、撮り直し貢献、locale breakdown、data-health warning を追加しました",
+          "データベースから markdown の運営週報を書き出す product analytics export script を追加しました",
+          "チェックリスト次元推定、履歴練習テーマ、Prompt Library conversion、拡張 analytics snapshot を回帰テストで保護しました"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-05-01-seo-og-gallery-prompt-library",
     "date": "2026-05-01",
     "title": "SEO 全面改善、実プロダクト OG 画像、検索可能な prompt 例",

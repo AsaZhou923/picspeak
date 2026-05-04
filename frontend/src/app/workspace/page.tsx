@@ -26,11 +26,38 @@ function isImageType(value: string | null): value is ImageType {
   return ['default', 'landscape', 'portrait', 'street', 'still_life', 'architecture'].includes(value as string);
 }
 
+function retakeTargetCopy(locale: 'zh' | 'en' | 'ja') {
+  if (locale === 'ja') {
+    return {
+      label: 'Retake Target',
+      title: '次の撮影目標を引き継ぎました',
+      sourceReview: 'Source review',
+      dimension: 'Focus',
+      uploadHint: '新しい写真をアップロードすると、この目標と元の講評をつないで比較できます。',
+    };
+  }
+  if (locale === 'en') {
+    return {
+      label: 'Retake Target',
+      title: 'Next-shoot target carried over',
+      sourceReview: 'Source review',
+      dimension: 'Focus',
+      uploadHint: 'Upload a new photo and PicSpeak will connect this goal back to the source critique for comparison.',
+    };
+  }
+  return {
+    label: '复拍目标',
+    title: '已带入下一次拍摄目标',
+    sourceReview: '来源点评',
+    dimension: '重点维度',
+    uploadHint: '上传新照片后，PicSpeak 会把这次目标和来源点评关联起来，方便比较进步。',
+  };
+}
+
 function WorkspacePageContent() {
   const router = useRouter();
   const { token, ensureToken } = useAuth();
   const { t, locale } = useI18n();
-  const promoModeBadge = '$3.99/mo';
 
   const [reviewMode, setReviewMode] = useState<'flash' | 'pro'>('flash');
   const [imageType, setImageType] = useState<ImageType>('default');
@@ -52,7 +79,18 @@ function WorkspacePageContent() {
     handleReset,
   } = useUploadFlow({ fetchUsage });
 
-  const { sourceReviewId, replayPhotoId, replayPhotoUrl, clearReplay, initialMode, initialImageType } =
+  const {
+    sourceReviewId,
+    replayPhotoId,
+    replayPhotoUrl,
+    clearReplay,
+    initialMode,
+    initialImageType,
+    retakeIntent,
+    nextShootAction,
+    nextShootDimension,
+    sourceGenerationId,
+  } =
     useReplayContext({ preview });
 
   const handleFileSelected = useCallback(
@@ -64,6 +102,8 @@ function WorkspacePageContent() {
   );
 
   const canReplayWithoutUpload = Boolean(sourceReviewId && replayPhotoId && !preview);
+  const canUseNextShootTarget = Boolean(sourceReviewId && nextShootAction && !preview && !canReplayWithoutUpload);
+  const targetCopy = retakeTargetCopy(locale);
 
   useEffect(() => {
     if (isGuest && reviewMode === 'pro') setReviewMode('flash');
@@ -84,7 +124,15 @@ function WorkspacePageContent() {
       token: token ?? undefined,
       pagePath: '/workspace',
       locale,
-      metadata: { review_mode: reviewMode, image_type: imageType, has_source_review_id: Boolean(sourceReviewId) },
+      metadata: {
+        review_mode: reviewMode,
+        image_type: imageType,
+        has_source_review_id: Boolean(sourceReviewId),
+        retake_intent: retakeIntent,
+        next_shoot_action: nextShootAction,
+        next_shoot_dimension: nextShootDimension,
+        source_generation_id: sourceGenerationId,
+      },
     });
     if (usage && remainingQuota !== null && remainingQuota <= 0) {
       setShowQuotaModal(true);
@@ -120,6 +168,10 @@ function WorkspacePageContent() {
             task_id: asyncResult.task_id,
             async: true,
             has_source_review_id: Boolean(sourceReviewId),
+            retake_intent: retakeIntent,
+            next_shoot_action: nextShootAction,
+            next_shoot_dimension: nextShootDimension,
+            source_generation_id: sourceGenerationId,
           },
         });
         router.push(`/tasks/${asyncResult.task_id}?mode=${reviewMode}`);
@@ -136,6 +188,10 @@ function WorkspacePageContent() {
             review_id: syncResult.review_id,
             async: false,
             has_source_review_id: Boolean(sourceReviewId),
+            retake_intent: retakeIntent,
+            next_shoot_action: nextShootAction,
+            next_shoot_dimension: nextShootDimension,
+            source_generation_id: sourceGenerationId,
           },
         });
         router.push(`/reviews/${syncResult.review_id}`);
@@ -154,7 +210,7 @@ function WorkspacePageContent() {
         setErrMessage(formatUserFacingError(t, err, t('err_upload')));
       }
     }
-  }, [photo, replayPhotoId, reviewMode, locale, imageType, sourceReviewId, ensureToken, router, t, token, usage, remainingQuota, setStage, setErrMessage]);
+  }, [photo, replayPhotoId, reviewMode, locale, imageType, sourceReviewId, retakeIntent, nextShootAction, nextShootDimension, sourceGenerationId, ensureToken, router, t, token, usage, remainingQuota, setStage, setErrMessage]);
 
   return (
     <div className="pt-14 min-h-screen">
@@ -186,13 +242,30 @@ function WorkspacePageContent() {
                   reviewMode={reviewMode}
                   isGuest={isGuest}
                   stage={stage}
-                  promoModeBadge={promoModeBadge}
                   onImageTypeChange={setImageType}
                   onReviewModeChange={setReviewMode}
                   onStartReview={handleReview}
                   onUploadNew={() => { clearReplay(); setStage('idle'); }}
                   t={t}
                 />
+              )}
+              {canUseNextShootTarget && (
+                <div className="rounded-[24px] border border-gold/25 bg-[radial-gradient(circle_at_top_left,rgba(200,171,90,0.16),transparent_34%),rgb(var(--color-surface)/0.82)] p-5 animate-fade-in">
+                  <p className="mb-2 font-mono text-[11px] uppercase tracking-[0.22em] text-gold/80">{targetCopy.label}</p>
+                  <h2 className="font-display text-2xl text-ink">{targetCopy.title}</h2>
+                  <p className="mt-3 text-sm leading-7 text-ink">{nextShootAction}</p>
+                  <div className="mt-4 flex flex-wrap gap-2 text-[11px] text-ink-subtle">
+                    {nextShootDimension && (
+                      <span className="rounded-full border border-border-subtle bg-void/30 px-3 py-1">
+                        {targetCopy.dimension}: {nextShootDimension}
+                      </span>
+                    )}
+                    <span className="rounded-full border border-border-subtle bg-void/30 px-3 py-1">
+                      {targetCopy.sourceReview}: {sourceReviewId}
+                    </span>
+                  </div>
+                  <p className="mt-4 text-xs leading-5 text-ink-muted">{targetCopy.uploadHint}</p>
+                </div>
               )}
               {stage === 'error' && errMessage && (
                 <div className="flex items-center gap-2 rounded border border-rust/20 bg-rust/5 px-3 py-2 text-sm text-rust animate-scale-in">
@@ -276,7 +349,6 @@ function WorkspacePageContent() {
                       value={reviewMode}
                       onChange={setReviewMode}
                       isGuest={isGuest}
-                      promoModeBadge={promoModeBadge}
                       t={t}
                     />
                   </div>

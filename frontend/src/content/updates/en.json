@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-05-04-analytics-retake-waiting-reader",
+    "date": "2026-05-04",
+    "title": "Analytics weekly report, retake practice loop, and in-task reading",
+    "summary": "PicSpeak now connects critique suggestions back to the workspace as concrete next-shoot targets, lets users read full Lens Notes articles inside review and generation waiting pages, and expands product analytics with AI Create, Prompt Library, retake, locale, and data-health reporting.",
+    "docPath": "docs/changelog/update-log-2026-05-04-analytics-retake-waiting-reader.md",
+    "sections": [
+      {
+        "title": "User workflow",
+        "items": [
+          "Review and generation task pages now include an embedded Blog reader so users can read full articles without leaving the waiting screen",
+          "Review result checklist actions can be carried back into the workspace with source review, retake intent, target dimension, and action text",
+          "Review history now recommends the next practice theme from recent or long-term history, depending on account plan"
+        ]
+      },
+      {
+        "title": "Analytics",
+        "items": [
+          "Product analytics now reports AI Create funnel, Prompt Library source conversion, retake contribution, locale breakdown, and data-health warnings",
+          "A new weekly product analytics export script writes a markdown operating report from the database",
+          "Regression tests cover checklist dimension inference, history practice themes, Prompt Library conversion, and the expanded analytics snapshot"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-05-01-seo-og-gallery-prompt-library",
     "date": "2026-05-01",
     "title": "Full SEO pass, real product OG image, and crawlable prompt examples",

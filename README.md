@@ -31,6 +31,7 @@
 - `AI Create` — Generate visual references from templates, prompts, quality, ratio, and style controls using an OpenAI-compatible image generation API
 - `Prompt Example Library` — Browse crawlable GPT Image 2 prompt examples with output images, source attribution, localized titles, and static detail pages
 - `Retake References` — Turn critique suggestions into AI-generated composition, lighting, color, or retake reference images from a review
+- `Retake Practice Loop` — Carry a concrete next-shoot action from a critique back into the workspace, preserving source review and target dimension context
 - `Generation History` — Browse generated images, download results, copy prompts, generate again, or send an image back to the workspace as retake inspiration
 - `Image Generation Credits` — Track monthly generation credits, redeem promo credits, and purchase extra credit packs
 - `Usage Quotas` — Daily and monthly limits with separate tracking for guests and registered users
@@ -41,6 +42,7 @@
 - `Favorites` — Save preferred critique results and manage them from a dedicated favorites page
 - `Gallery` — Showcase selected outstanding works from the community with server-visible critique summaries for public browsing and search
 - `Blog` — Access professional photography tutorials, AI analysis insights, and platform updates
+- `In-Task Reading` — Read full Lens Notes articles inside review and generation waiting screens without leaving the task page
 
 ## Tech Stack
 
@@ -125,7 +127,7 @@ cd frontend && npm run build && npm run start
 
 ## Documentation
 
-- [Latest Changelog](docs/changelog/update-log-2026-05-01-seo-og-gallery-prompt-library.md)
+- [Latest Changelog](docs/changelog/update-log-2026-05-04-analytics-retake-waiting-reader.md)
 - [SEO / GEO Audit](docs/seo/seo-audit-2026-05-01.md)
 - [Backend API Documentation](docs/api/后端接口文档_v1.md)
 - [System Architecture](docs/architecture/系统架构.md)

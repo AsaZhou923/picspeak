@@ -13,6 +13,7 @@ Core product areas:
 - Public gallery, blog, changelog/updates, SEO metadata, and llms.txt support
 - AI image generation with templates, tasks, generated image detail pages, history, credits, and credit-pack billing
 - Review-to-generation loop for composition, lighting, color, and retake reference images
+- Review-to-workspace retake targets, history practice themes, and in-task Blog reading during critique/generation waits
 
 ## Architecture
 
@@ -53,6 +54,7 @@ python -m app.cleanup_guests_main
 python scripts/generate_activation_codes.py
 python scripts/register_lemonsqueezy_webhook.py
 python scripts/verify_product_analytics_write.py
+python scripts/export_product_analytics_weekly_report.py
 python scripts/backfill_gallery_thumbnails.py
 ```
 
@@ -113,9 +115,9 @@ node --test test/*.test.ts
 
 - `app/` - App Router routes, including workspace, reviews, tasks, gallery, generate, generation tasks/details, account pages, blog, updates, localized pages, robots, sitemap, and llms.txt routes
 - `features/workspace/` - Upload flow, quota display, mode/image type pickers, and replay context
-- `features/reviews/` - Review detail hooks and UI panels, including action bar, gallery publishing, growth loop, and reference generation
+- `features/reviews/` - Review detail hooks and UI panels, including action bar, gallery publishing, growth loop, retake target handoff, and reference generation
 - `features/generations/` - Generation contracts, config, and prompt example UI
-- `components/` - Shared auth, billing, gallery, home, layout, marketing, provider, upload, and UI components
+- `components/` - Shared auth, billing, blog, gallery, home, layout, marketing, provider, upload, and UI components
 - `content/` - Blog, updates, generation prompt examples, and review copy/content bundles
 - `lib/` - API client, auth context, i18n, locale routing, SEO helpers, llms.txt content, checkout helpers, analytics, EXIF/compression/canvas utilities, and shared types
 - `test/` - Node test-runner coverage for content, SEO, i18n, conversion copy, generation prompts, and UI support utilities

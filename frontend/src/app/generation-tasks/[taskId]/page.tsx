@@ -9,6 +9,7 @@ import { ApiException, GenerationTaskStatusResponse } from '@/lib/types';
 import { useI18n } from '@/lib/i18n';
 import { formatUserFacingError } from '@/lib/error-utils';
 import { trackProductEvent } from '@/lib/product-analytics';
+import { WaitingBlogWindow } from '@/components/blog/WaitingBlogWindow';
 
 const POLL_INTERVAL = 1200;
 const GENERATION_WAIT_NOTES = [
@@ -135,6 +136,10 @@ export default function GenerationTaskPage() {
     [t]
   );
   const failed = task?.status === 'FAILED' || task?.status === 'EXPIRED' || task?.status === 'DEAD_LETTER';
+  const showWaitingBlog = !failed && !error;
+  const waitingLayoutClass = showWaitingBlog
+    ? 'max-w-6xl lg:grid-cols-[minmax(0,560px)_360px]'
+    : 'max-w-lg';
   const statusTitle =
     task?.status === 'SUCCEEDED'
       ? t('generation_task_opening')
@@ -148,8 +153,9 @@ export default function GenerationTaskPage() {
   );
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-6 pt-14">
-      <div className="w-full max-w-lg space-y-9 text-center">
+    <div className="min-h-screen px-6 pb-12 pt-20 lg:flex lg:items-center lg:pt-14">
+      <div className={`mx-auto grid w-full items-center justify-items-center gap-6 lg:justify-items-stretch ${waitingLayoutClass}`}>
+        <div className="mx-auto w-full max-w-lg space-y-9 text-center">
         <p className="font-mono text-xs text-ink-subtle">{t('generation_task_id_label')} {taskId}</p>
         <div className="relative">
           <div className="absolute left-10 right-10 top-5 h-px bg-border" />
@@ -227,6 +233,12 @@ export default function GenerationTaskPage() {
         {error && (
           <p className="rounded-lg border border-rust/20 bg-rust/5 px-4 py-3 text-sm text-rust">{error}</p>
         )}
+      </div>
+      {showWaitingBlog && (
+        <div className="mx-auto w-full max-w-md lg:max-w-none">
+          <WaitingBlogWindow variant="generation" />
+        </div>
+      )}
       </div>
     </div>
   );

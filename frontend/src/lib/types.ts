@@ -489,6 +489,7 @@ export type ProductAnalyticsSource =
   | 'home_direct'
   | 'blog'
   | 'gallery'
+  | 'prompt_library'
   | 'share'
   | 'checkout'
   | 'unknown';

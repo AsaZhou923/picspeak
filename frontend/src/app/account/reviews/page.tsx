@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { AlertCircle, ArrowUpRight, CalendarDays, ChevronRight, Minus, RefreshCw, SlidersHorizontal, TrendingDown, TrendingUp } from 'lucide-react';
+import { AlertCircle, ArrowUpRight, CalendarDays, ChevronRight, Minus, RefreshCw, SlidersHorizontal, Target, TrendingDown, TrendingUp } from 'lucide-react';
 import { getMyReviews } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { ImageType, ReviewHistoryItem, ReviewHistoryQuery } from '@/lib/types';
@@ -210,6 +210,56 @@ function getHistoryGrowthCopy(locale: 'zh' | 'en' | 'ja') {
   };
 }
 
+function getHistoryPracticeThemeCopy(
+  locale: 'zh' | 'en' | 'ja',
+  dimensionLabel: string,
+  intensity: 'recover' | 'stabilize' | 'extend',
+  isPro: boolean,
+  analyzedCount: number,
+  totalCount: number,
+) {
+  if (locale === 'ja') {
+    const action = intensity === 'recover' ? '立て直す' : intensity === 'extend' ? '伸ばす' : '安定させる';
+    return {
+      windowLabel: isPro
+        ? `Pro long trend · ${analyzedCount} reviews`
+        : `Free recent window · ${analyzedCount}/${totalCount} reviews`,
+      practiceLabel: 'Next Practice',
+      title: `${dimensionLabel}を${action}`,
+      body: isPro
+        ? '読み込まれている履歴全体から次の練習テーマを選んでいます。'
+        : 'Free では直近の履歴で傾向を読みます。長い期間の弱点変化は Pro で確認できます。',
+      noWeak: '7 未満の反復弱点はまだありません。最低平均の次元を次の練習候補にしています。',
+    };
+  }
+  if (locale === 'en') {
+    const action = intensity === 'recover' ? 'recover' : intensity === 'extend' ? 'extend' : 'stabilize';
+    return {
+      windowLabel: isPro
+        ? `Pro long trend · ${analyzedCount} reviews`
+        : `Free recent window · ${analyzedCount}/${totalCount} reviews`,
+      practiceLabel: 'Next Practice',
+      title: `${action} ${dimensionLabel}`,
+      body: isPro
+        ? 'This practice theme is calculated from the loaded long-term history.'
+        : 'Free reads the recent window. Pro keeps the longer trail so weak dimensions can be compared across more shoots.',
+      noWeak: 'No repeated dimension is under 7 yet. The lowest average dimension becomes the next practice candidate.',
+    };
+  }
+  const action = intensity === 'recover' ? '拉回' : intensity === 'extend' ? '继续放大' : '稳定';
+  return {
+    windowLabel: isPro
+      ? `Pro 长周期趋势 · ${analyzedCount} 条记录`
+      : `Free 最近窗口 · ${analyzedCount}/${totalCount} 条记录`,
+    practiceLabel: '下一轮练习',
+    title: `${action}${dimensionLabel}`,
+    body: isPro
+      ? '当前练习主题来自已加载的完整历史窗口，更适合观察长期弱项是否改善。'
+      : 'Free 先用最近窗口判断趋势；升级 Pro 后可以用更长历史追踪弱项和复拍进步。',
+    noWeak: '目前没有反复低于 7 分的维度，已用平均分最低的维度作为下一轮练习候选。',
+  };
+}
+
 function getImageTypeLabel(locale: 'zh' | 'en' | 'ja', imageType?: ImageType) {
   const normalized = imageType ?? 'default';
   const zh: Record<ImageType, string> = {
@@ -399,7 +449,6 @@ export default function ReviewHistoryPage() {
   const createdFromInvalid = isInvalidCompletedDate(draftFilters.createdFrom);
   const createdToInvalid = isInvalidCompletedDate(draftFilters.createdTo);
   const hasInvalidDate = createdFromInvalid || createdToInvalid;
-  const growthSnapshot = useMemo(() => buildHistoryGrowthSnapshot(items), [items]);
   const dimensionLabels = useMemo(
     () => ({
       composition: t('score_composition'),
@@ -409,6 +458,22 @@ export default function ReviewHistoryPage() {
       technical: t('score_technical'),
     }),
     [t]
+  );
+  const growthWindowItems = useMemo(() => {
+    const sortedItems = [...items].sort((left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime());
+    return plan === 'pro' ? sortedItems : sortedItems.slice(0, 6);
+  }, [items, plan]);
+  const growthSnapshot = useMemo(() => buildHistoryGrowthSnapshot(growthWindowItems), [growthWindowItems]);
+  const practiceThemeCopy = useMemo(
+    () => getHistoryPracticeThemeCopy(
+      locale,
+      dimensionLabels[growthSnapshot.practiceTheme.dimension],
+      growthSnapshot.practiceTheme.intensity,
+      plan === 'pro',
+      growthSnapshot.practiceTheme.reviewCount,
+      items.length,
+    ),
+    [dimensionLabels, growthSnapshot.practiceTheme, items.length, locale, plan]
   );
 
   const fetchPage = useCallback(
@@ -574,6 +639,9 @@ export default function ReviewHistoryPage() {
                 <p className="mb-2 text-[11px] font-mono uppercase tracking-[0.24em] text-sage/80">{growthCopy.label}</p>
                 <h2 className="font-display text-2xl text-ink">{growthCopy.title}</h2>
                 <p className="mt-2 max-w-3xl text-sm leading-7 text-ink-muted">{growthCopy.body}</p>
+                <p className="mt-2 inline-flex rounded-full border border-sage/20 bg-sage/10 px-3 py-1 text-[11px] font-medium text-sage">
+                  {practiceThemeCopy.windowLabel}
+                </p>
               </div>
               <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium ${
                 growthSnapshot.trend === 'up'
@@ -633,21 +701,35 @@ export default function ReviewHistoryPage() {
                   <span>{growthCopy.commonGaps}</span>
                 </div>
                 <div className="space-y-3">
-                  {growthSnapshot.weakDimensions.map((item) => (
-                    <div
-                      key={item.key}
-                      className="flex items-center justify-between gap-3 rounded-2xl border border-border-subtle bg-raised/80 px-4 py-3"
-                    >
-                      <div>
-                        <p className="text-sm font-medium text-ink">{dimensionLabels[item.key]}</p>
-                        <p className="mt-1 text-xs text-ink-subtle">{growthCopy.lowCountLabel(item.lowCount)}</p>
+                  {growthSnapshot.weakDimensions.length > 0 ? (
+                    growthSnapshot.weakDimensions.map((item) => (
+                      <div
+                        key={item.key}
+                        className="flex items-center justify-between gap-3 rounded-2xl border border-border-subtle bg-raised/80 px-4 py-3"
+                      >
+                        <div>
+                          <p className="text-sm font-medium text-ink">{dimensionLabels[item.key]}</p>
+                          <p className="mt-1 text-xs text-ink-subtle">{growthCopy.lowCountLabel(item.lowCount)}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-display text-2xl text-ink">{item.average.toFixed(1)}</p>
+                          <p className="text-[11px] text-ink-subtle">{growthCopy.averageLabel}</p>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <p className="font-display text-2xl text-ink">{item.average.toFixed(1)}</p>
-                        <p className="text-[11px] text-ink-subtle">{growthCopy.averageLabel}</p>
-                      </div>
+                    ))
+                  ) : (
+                    <p className="rounded-2xl border border-border-subtle bg-raised/80 px-4 py-3 text-xs leading-6 text-ink-muted">
+                      {practiceThemeCopy.noWeak}
+                    </p>
+                  )}
+                  <div className="rounded-2xl border border-gold/25 bg-gold/10 px-4 py-3">
+                    <div className="mb-2 flex items-center gap-2 text-xs font-medium text-gold">
+                      <Target size={14} />
+                      <span>{practiceThemeCopy.practiceLabel}</span>
                     </div>
-                  ))}
+                    <p className="font-display text-xl text-ink">{practiceThemeCopy.title}</p>
+                    <p className="mt-2 text-xs leading-6 text-ink-muted">{practiceThemeCopy.body}</p>
+                  </div>
                 </div>
               </div>
             </div>

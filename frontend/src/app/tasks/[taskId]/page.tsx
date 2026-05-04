@@ -8,6 +8,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useI18n } from '@/lib/i18n';
 import { ApiException, TaskErrorPayload, TaskStatusResponse, TaskStreamMessage } from '@/lib/types';
 import { formatSupportMessage, formatUserFacingError } from '@/lib/error-utils';
+import { WaitingBlogWindow } from '@/components/blog/WaitingBlogWindow';
 
 const POLL_INTERVAL = 1000;
 const HEARTBEAT_STALE_MS = 3 * 60 * 1000;
@@ -271,10 +272,15 @@ export default function TaskPage() {
   );
   const taskError: TaskErrorPayload | null = task?.error ?? null;
   const taskErrorMessage = taskError ? formatSupportMessage(t, taskError.message ?? t('err_unknown_title')) : '';
+  const showWaitingBlog = !isFinal && !error;
+  const waitingLayoutClass = showWaitingBlog
+    ? 'max-w-6xl lg:grid-cols-[minmax(0,560px)_360px]'
+    : 'max-w-md';
 
   return (
-    <div className="pt-14 min-h-screen flex items-center justify-center px-6">
-      <div className="w-full max-w-md text-center space-y-10 animate-fade-in">
+    <div className="min-h-screen px-6 pb-12 pt-20 lg:flex lg:items-center lg:pt-14">
+      <div className={`mx-auto grid w-full items-center justify-items-center gap-6 lg:justify-items-stretch ${waitingLayoutClass}`}>
+        <div className="mx-auto w-full max-w-xl text-center space-y-10 animate-fade-in">
         <p className="text-xs text-ink-muted font-mono">{t('task_id_label')} {taskId}</p>
 
         {isFinal ? (
@@ -412,6 +418,12 @@ export default function TaskPage() {
             </button>
           </div>
         )}
+      </div>
+      {showWaitingBlog && (
+        <div className="mx-auto w-full max-w-md lg:max-w-none">
+          <WaitingBlogWindow variant="review" />
+        </div>
+      )}
       </div>
     </div>
   );
