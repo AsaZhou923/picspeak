@@ -127,6 +127,11 @@ STAGE_A_EVENT_CATALOG: dict[str, dict[str, Any]] = {
         'stage': 'A',
         'description': 'The user opened an image generation prompt surface.',
     },
+    'generation_prompt_example_applied': {
+        'label': '应用生图案例',
+        'stage': 'A',
+        'description': 'The user applied a prompt library example into AI Create.',
+    },
     'generation_intent_selected': {
         'label': '选择参考图意图',
         'stage': 'A',
@@ -156,6 +161,11 @@ STAGE_A_EVENT_CATALOG: dict[str, dict[str, Any]] = {
         'label': '下载生图',
         'stage': 'A',
         'description': 'The user downloaded a generated image.',
+    },
+    'generation_reuse_clicked': {
+        'label': '复用生图',
+        'stage': 'A',
+        'description': 'The user started another generation from an existing result.',
     },
     'generation_used_for_retake': {
         'label': '生图用于复拍',
@@ -203,12 +213,14 @@ GENERATION_FUNNEL_EVENTS = (
     'prompt_library_viewed',
     'generation_template_selected',
     'generation_prompt_opened',
+    'generation_prompt_example_applied',
     'generation_intent_selected',
     'generation_requested',
     'generation_succeeded',
     'generation_failed',
     'generation_viewed',
     'generation_download_clicked',
+    'generation_reuse_clicked',
     'generation_used_for_retake',
     'generation_credit_exhausted',
     'generation_upgrade_clicked',
@@ -459,6 +471,48 @@ def _event_metadata_bool(event: AnalyticsEventSample, key: str) -> bool:
     return str(value or '').strip().lower() in {'1', 'true', 'yes'}
 
 
+def _event_metadata_number(event: AnalyticsEventSample, key: str) -> float:
+    if not event.metadata:
+        return 0.0
+    try:
+        return float(event.metadata.get(key) or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _distinct_keys(
+    events: Iterable[AnalyticsEventSample],
+    *,
+    event_names: set[str],
+    key_builder=_guest_conversion_key,
+) -> set[str]:
+    keys = set()
+    for event in events:
+        if event.event_name not in event_names:
+            continue
+        key = key_builder(event)
+        if key:
+            keys.add(key)
+    return keys
+
+
+def _generation_entrypoint(event: AnalyticsEventSample) -> str:
+    if event.event_name == 'generation_reuse_clicked':
+        return 'history_reuse'
+    if event.event_name == 'generation_intent_selected':
+        return 'review_linked'
+    generation_mode = _event_metadata_text(event, 'generation_mode')
+    if generation_mode == 'review_linked' or _event_metadata_text(event, 'source_review_id'):
+        return 'review_linked'
+    if _event_metadata_text(event, 'entrypoint') == 'generation_detail_reuse':
+        return 'history_reuse'
+    if event.source == 'prompt_library' or _event_metadata_text(event, 'prompt_example_id'):
+        return 'prompt_library'
+    if event.source == 'home_direct':
+        return 'home'
+    return 'direct_or_unknown'
+
+
 def _build_generation_funnel(period_events: list[AnalyticsEventSample]) -> dict[str, Any]:
     overall = {
         event_name: _count_distinct(
@@ -472,6 +526,13 @@ def _build_generation_funnel(period_events: list[AnalyticsEventSample]) -> dict[
     succeeded = overall['generation_succeeded']
     failed = overall['generation_failed']
     viewed = overall['generation_viewed']
+
+    credit_exhausted_users = _distinct_keys(period_events, event_names={'generation_credit_exhausted'})
+    credit_pack_checkout_users = _distinct_keys(period_events, event_names={'credit_pack_checkout_started'})
+    generation_upgrade_users = _distinct_keys(
+        period_events,
+        event_names={'generation_upgrade_clicked', 'upgrade_pro_clicked'},
+    )
 
     by_source = {}
     for source in (*VISITOR_EVENT_BY_SOURCE.keys(), 'checkout', 'unknown'):
@@ -508,12 +569,109 @@ def _build_generation_funnel(period_events: list[AnalyticsEventSample]) -> dict[
             ),
         }
 
+    by_entrypoint = {}
+    for entrypoint in ('home', 'prompt_library', 'review_linked', 'history_reuse', 'direct_or_unknown'):
+        entry_events = [event for event in period_events if _generation_entrypoint(event) == entrypoint]
+        by_entrypoint[entrypoint] = {
+            'page_views': _count_distinct(
+                entry_events,
+                event_names={'generation_page_viewed', 'prompt_library_viewed'},
+                key_builder=_guest_conversion_key,
+            ),
+            'prompt_examples_applied': _count_distinct(
+                entry_events,
+                event_names={'generation_prompt_example_applied'},
+                key_builder=_guest_conversion_key,
+            ),
+            'requests': _count_distinct(
+                entry_events,
+                event_names={'generation_requested'},
+                key_builder=_guest_conversion_key,
+            ),
+            'successes': _count_distinct(
+                entry_events,
+                event_names={'generation_succeeded'},
+                key_builder=_guest_conversion_key,
+            ),
+            'failures': _count_distinct(
+                entry_events,
+                event_names={'generation_failed'},
+                key_builder=_guest_conversion_key,
+            ),
+            'views': _count_distinct(
+                entry_events,
+                event_names={'generation_viewed'},
+                key_builder=_guest_conversion_key,
+            ),
+            'downloads': _count_distinct(
+                entry_events,
+                event_names={'generation_download_clicked'},
+                key_builder=_guest_conversion_key,
+            ),
+            'reuse_clicks': _count_distinct(
+                entry_events,
+                event_names={'generation_reuse_clicked'},
+                key_builder=_guest_conversion_key,
+            ),
+            'retake_uses': _count_distinct(
+                entry_events,
+                event_names={'generation_used_for_retake'},
+                key_builder=_guest_conversion_key,
+            ),
+            'credit_exhausted': _count_distinct(
+                entry_events,
+                event_names={'generation_credit_exhausted'},
+                key_builder=_guest_conversion_key,
+            ),
+            'credit_pack_checkout': _count_distinct(
+                entry_events,
+                event_names={'credit_pack_checkout_started'},
+                key_builder=_guest_conversion_key,
+            ),
+            'pro_upgrade_clicks': _count_distinct(
+                entry_events,
+                event_names={'generation_upgrade_clicked', 'upgrade_pro_clicked'},
+                key_builder=_guest_conversion_key,
+            ),
+        }
+
+    prompt_examples_by_category: dict[str, int] = {}
+    prompt_examples_by_template: dict[str, int] = {}
+    for event in period_events:
+        if event.event_name != 'generation_prompt_example_applied':
+            continue
+        category = _event_metadata_text(event, 'prompt_example_category') or 'unknown'
+        template_key = _event_metadata_text(event, 'template_key') or 'unknown'
+        prompt_examples_by_category[category] = prompt_examples_by_category.get(category, 0) + 1
+        prompt_examples_by_template[template_key] = prompt_examples_by_template.get(template_key, 0) + 1
+
     return {
         'overall': overall,
         'request_success_rate': _safe_rate(succeeded, requested),
         'request_failure_rate': _safe_rate(failed, requested),
         'result_view_rate': _safe_rate(viewed, succeeded),
         'by_source': by_source,
+        'by_entrypoint': by_entrypoint,
+        'prompt_examples': {
+            'applied_users': overall.get('generation_prompt_example_applied', 0),
+            'requests_with_example': _count_distinct(
+                [
+                    event
+                    for event in period_events
+                    if event.event_name == 'generation_requested' and _event_metadata_text(event, 'prompt_example_id')
+                ],
+                key_builder=_guest_conversion_key,
+            ),
+            'by_category': prompt_examples_by_category,
+            'by_template': prompt_examples_by_template,
+        },
+        'credit_exhausted_followup': {
+            'credit_exhausted_users': len(credit_exhausted_users),
+            'credit_pack_checkout_users': len(credit_exhausted_users & credit_pack_checkout_users),
+            'pro_upgrade_click_users': len(credit_exhausted_users & generation_upgrade_users),
+            'credit_pack_checkout_rate': _safe_rate(len(credit_exhausted_users & credit_pack_checkout_users), len(credit_exhausted_users)),
+            'pro_upgrade_click_rate': _safe_rate(len(credit_exhausted_users & generation_upgrade_users), len(credit_exhausted_users)),
+        },
     }
 
 
@@ -558,6 +716,65 @@ def _build_locale_breakdown(period_events: list[AnalyticsEventSample]) -> dict[s
             ),
         }
     return breakdown
+
+
+def _build_generation_unit_economics(period_events: list[AnalyticsEventSample]) -> dict[str, Any]:
+    success_events = [
+        event
+        for event in period_events
+        if event.event_name == 'generation_succeeded'
+        and (_event_metadata_number(event, 'credits_charged') > 0 or _event_metadata_number(event, 'cost_usd') > 0)
+    ]
+    paid_credit_pack_events = [
+        event
+        for event in period_events
+        if event.event_name == 'paid_success' and _event_metadata_text(event, 'kind') == 'image_credit_pack'
+    ]
+
+    credits_charged = sum(_event_metadata_number(event, 'credits_charged') for event in success_events)
+    cost_usd = sum(_event_metadata_number(event, 'cost_usd') for event in success_events)
+    revenue_proxy_usd = sum(
+        _event_metadata_number(event, 'revenue_usd') or 3.99
+        for event in paid_credit_pack_events
+    )
+
+    by_quality_size: dict[str, dict[str, Any]] = {}
+    for event in success_events:
+        key = f"{_event_metadata_text(event, 'quality') or 'unknown'}:{_event_metadata_text(event, 'size') or 'unknown'}"
+        row = by_quality_size.setdefault(
+            key,
+            {
+                'successes': 0,
+                'credits_charged': 0.0,
+                'cost_usd': 0.0,
+            },
+        )
+        row['successes'] += 1
+        row['credits_charged'] += _event_metadata_number(event, 'credits_charged')
+        row['cost_usd'] += _event_metadata_number(event, 'cost_usd')
+
+    for row in by_quality_size.values():
+        successes = int(row.get('successes') or 0)
+        row['avg_credits'] = round(float(row['credits_charged']) / successes, 2) if successes else 0.0
+        row['avg_cost_usd'] = round(float(row['cost_usd']) / successes, 4) if successes else 0.0
+        row['credits_charged'] = round(float(row['credits_charged']), 2)
+        row['cost_usd'] = round(float(row['cost_usd']), 4)
+
+    success_count = len(success_events)
+    return {
+        'metered_successes': success_count,
+        'credits_charged': round(credits_charged, 2),
+        'cost_usd': round(cost_usd, 4),
+        'avg_credits_per_success': round(credits_charged / success_count, 2) if success_count else 0.0,
+        'avg_cost_usd_per_success': round(cost_usd / success_count, 4) if success_count else 0.0,
+        'credit_pack_paid_orders': len(paid_credit_pack_events),
+        'credit_pack_credits_granted': int(
+            sum(_event_metadata_number(event, 'credits_granted') for event in paid_credit_pack_events)
+        ),
+        'credit_pack_revenue_proxy_usd': round(revenue_proxy_usd, 2),
+        'gross_margin_proxy_usd': round(revenue_proxy_usd - cost_usd, 2),
+        'by_quality_size': by_quality_size,
+    }
 
 
 def _build_data_health(period_events: list[AnalyticsEventSample]) -> dict[str, Any]:
@@ -882,6 +1099,7 @@ def build_stage_a_snapshot(
         'plan_breakdown': plan_breakdown,
         'locale_breakdown': _build_locale_breakdown(period_events),
         'generation_funnel': _build_generation_funnel(period_events),
+        'generation_unit_economics': _build_generation_unit_economics(period_events),
         'retake_contribution': _build_retake_contribution(period_events),
         'data_health': _build_data_health(period_events),
     }
@@ -1000,6 +1218,107 @@ def render_stage_a_snapshot_markdown(snapshot: dict[str, Any]) -> str:
                 credit_pack_checkout=row.get('credit_pack_checkout', 0),
             )
         )
+
+    lines.extend(
+        [
+            '',
+            '### AI Create 入口拆分',
+            '',
+            '| 入口 | 访问/进入 | 案例应用 | 发起 | 成功 | 失败 | 查看 | 下载 | 复用 | 复拍 | credits 耗尽 | credit pack | Pro 点击 |',
+            '| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |',
+        ]
+    )
+    for entrypoint, row in generation_funnel.get('by_entrypoint', {}).items():
+        lines.append(
+            '| {entrypoint} | {page_views} | {prompt_examples_applied} | {requests} | {successes} | {failures} | {views} | {downloads} | {reuse_clicks} | {retake_uses} | {credit_exhausted} | {credit_pack_checkout} | {pro_upgrade_clicks} |'.format(
+                entrypoint=entrypoint,
+                page_views=row.get('page_views', 0),
+                prompt_examples_applied=row.get('prompt_examples_applied', 0),
+                requests=row.get('requests', 0),
+                successes=row.get('successes', 0),
+                failures=row.get('failures', 0),
+                views=row.get('views', 0),
+                downloads=row.get('downloads', 0),
+                reuse_clicks=row.get('reuse_clicks', 0),
+                retake_uses=row.get('retake_uses', 0),
+                credit_exhausted=row.get('credit_exhausted', 0),
+                credit_pack_checkout=row.get('credit_pack_checkout', 0),
+                pro_upgrade_clicks=row.get('pro_upgrade_clicks', 0),
+            )
+        )
+
+    prompt_examples = generation_funnel.get('prompt_examples', {})
+    credit_followup = generation_funnel.get('credit_exhausted_followup', {})
+    lines.extend(
+        [
+            '',
+            '### Prompt example 应用漏斗',
+            '',
+            '| 指标 | 数值 |',
+            '| --- | ---: |',
+            f"| 应用案例用户 | {prompt_examples.get('applied_users', 0)} |",
+            f"| 应用后发起生图用户 | {prompt_examples.get('requests_with_example', 0)} |",
+            '',
+            '| 类别 | 应用次数 |',
+            '| --- | ---: |',
+        ]
+    )
+    for category, count in prompt_examples.get('by_category', {}).items():
+        lines.append(f'| {category} | {count} |')
+    if not prompt_examples.get('by_category'):
+        lines.append('| 无 | 0 |')
+
+    lines.extend(
+        [
+            '',
+            '### Credit exhausted 承接',
+            '',
+            '| 指标 | 数值 |',
+            '| --- | ---: |',
+            f"| credits 耗尽用户 | {credit_followup.get('credit_exhausted_users', 0)} |",
+            f"| 耗尽后 credit pack checkout 用户 | {credit_followup.get('credit_pack_checkout_users', 0)} |",
+            f"| 耗尽后 Pro 点击用户 | {credit_followup.get('pro_upgrade_click_users', 0)} |",
+            f"| credit pack 承接率 | {_format_percent(credit_followup.get('credit_pack_checkout_rate', 0.0))} |",
+            f"| Pro 点击承接率 | {_format_percent(credit_followup.get('pro_upgrade_click_rate', 0.0))} |",
+        ]
+    )
+
+    unit_economics = snapshot.get('generation_unit_economics', {})
+    lines.extend(
+        [
+            '',
+            '### AI Create 单位经济模型',
+            '',
+            '| 指标 | 数值 |',
+            '| --- | ---: |',
+            f"| 带成本读数的成功生图 | {unit_economics.get('metered_successes', 0)} |",
+            f"| credits 消耗 | {unit_economics.get('credits_charged', 0)} |",
+            f"| 平均 credits / 成功图 | {unit_economics.get('avg_credits_per_success', 0)} |",
+            f"| 成本 USD | {unit_economics.get('cost_usd', 0)} |",
+            f"| 平均成本 USD / 成功图 | {unit_economics.get('avg_cost_usd_per_success', 0)} |",
+            f"| credit pack 支付订单 | {unit_economics.get('credit_pack_paid_orders', 0)} |",
+            f"| credit pack credits 发放 | {unit_economics.get('credit_pack_credits_granted', 0)} |",
+            f"| credit pack revenue proxy USD | {unit_economics.get('credit_pack_revenue_proxy_usd', 0)} |",
+            f"| gross margin proxy USD | {unit_economics.get('gross_margin_proxy_usd', 0)} |",
+            '',
+            '| 质量/尺寸 | 成功 | credits | 平均 credits | 成本 USD | 平均成本 USD |',
+            '| --- | ---: | ---: | ---: | ---: | ---: |',
+        ]
+    )
+    by_quality_size = unit_economics.get('by_quality_size') or {}
+    for quality_size, row in by_quality_size.items():
+        lines.append(
+            '| {quality_size} | {successes} | {credits_charged} | {avg_credits} | {cost_usd} | {avg_cost_usd} |'.format(
+                quality_size=quality_size,
+                successes=row.get('successes', 0),
+                credits_charged=row.get('credits_charged', 0),
+                avg_credits=row.get('avg_credits', 0),
+                cost_usd=row.get('cost_usd', 0),
+                avg_cost_usd=row.get('avg_cost_usd', 0),
+            )
+        )
+    if not by_quality_size:
+        lines.append('| 无 | 0 | 0 | 0 | 0 | 0 |')
 
     lines.extend(
         [

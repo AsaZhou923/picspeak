@@ -23,6 +23,7 @@ from app.services.image_generation_pricing import (
     normalize_generation_size,
 )
 from app.services.object_storage import get_object_storage_client
+from app.services.product_analytics import record_product_event
 
 
 logger = logging.getLogger(__name__)
@@ -341,7 +342,7 @@ def _process_generation_task(db: Session, task: ImageGenerationTask) -> None:
         )
         return
 
-    _persist_successful_generation(
+    generated = _persist_successful_generation(
         db,
         task=task,
         owner=owner,
@@ -358,6 +359,26 @@ def _process_generation_task(db: Session, task: ImageGenerationTask) -> None:
     task.error_code = None
     task.error_message = None
     db.add(task)
+    _record_generation_task_event(
+        db,
+        task=task,
+        owner=owner,
+        event_name='generation_succeeded',
+        metadata={
+            'generation_id': generated.public_id,
+            'task_id': task.public_id,
+            'generation_mode': task.generation_mode,
+            'intent': task.intent,
+            'quality': quality,
+            'size': size,
+            'credits_charged': credits,
+            'cost_usd': result.cost_usd,
+            'template_key': payload.get('template_key'),
+            'prompt_example_id': payload.get('prompt_example_id'),
+            'prompt_example_category': payload.get('prompt_example_category'),
+            'source_review_id': payload.get('source_review_public_id'),
+        },
+    )
     db.commit()
 
 
@@ -483,6 +504,8 @@ def _persist_successful_generation(
             'style': payload.get('style'),
             'negative_prompt': payload.get('negative_prompt'),
             'image_type': payload.get('image_type'),
+            'prompt_example_id': payload.get('prompt_example_id'),
+            'prompt_example_category': payload.get('prompt_example_category'),
             'source_review_public_id': payload.get('source_review_public_id'),
         },
     )
@@ -509,6 +532,28 @@ def _persist_successful_generation(
     return generated
 
 
+def _record_generation_task_event(
+    db: Session,
+    *,
+    task: ImageGenerationTask,
+    owner: User,
+    event_name: str,
+    metadata: dict[str, Any],
+) -> None:
+    try:
+        record_product_event(
+            db,
+            event_name=event_name,
+            user_public_id=owner.public_id,
+            plan=owner.plan.value if hasattr(owner.plan, 'value') else str(owner.plan),
+            source='unknown',
+            page_path='/generation-worker',
+            metadata=metadata,
+        )
+    except Exception:
+        logger.debug('Failed to record generation task analytics event %s for %s', event_name, task.public_id, exc_info=True)
+
+
 def _output_format_for_content_type(content_type: str, *, fallback: str) -> str:
     normalized = str(content_type or '').split(';', 1)[0].strip().lower()
     if normalized == 'image/png':
@@ -518,6 +563,20 @@ def _output_format_for_content_type(content_type: str, *, fallback: str) -> str:
     if normalized == 'image/webp':
         return 'webp'
     return fallback
+
+
+def _generation_failure_stage(error_code: str) -> str:
+    if error_code == 'IMAGE_GENERATION_CREDITS_EXHAUSTED':
+        return 'quota'
+    if error_code == 'IMAGE_GENERATION_STORAGE_FAILED':
+        return 'storage'
+    if error_code == 'OPENAI_IMAGE_GENERATION_FAILED':
+        return 'ai_service'
+    if error_code in {'GENERATION_PROMPT_REJECTED', 'PROMPT_SAFETY'}:
+        return 'prompt_safety'
+    if error_code in {'USER_NOT_FOUND', 'SOURCE_REVIEW_NOT_FOUND', 'SOURCE_PHOTO_NOT_FOUND'}:
+        return 'auth_or_source'
+    return 'worker'
 
 
 def _handle_generation_failure(
@@ -540,6 +599,29 @@ def _handle_generation_failure(
     task.error_message = error_message[:500]
     task.last_heartbeat_at = datetime.now(timezone.utc)
     db.add(task)
+    if task.status == TaskStatus.FAILED:
+        owner = db.query(User).filter(User.id == task.owner_user_id).first()
+        if owner is not None:
+            payload = dict(task.request_payload or {})
+            _record_generation_task_event(
+                db,
+                task=task,
+                owner=owner,
+                event_name='generation_failed',
+                metadata={
+                    'task_id': task.public_id,
+                    'generation_mode': task.generation_mode,
+                    'intent': task.intent,
+                    'quality': payload.get('quality'),
+                    'size': payload.get('size'),
+                    'template_key': payload.get('template_key'),
+                    'prompt_example_id': payload.get('prompt_example_id'),
+                    'prompt_example_category': payload.get('prompt_example_category'),
+                    'source_review_id': payload.get('source_review_public_id'),
+                    'error_code': error_code,
+                    'failure_stage': _generation_failure_stage(error_code),
+                },
+            )
     db.commit()
 
 

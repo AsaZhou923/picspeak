@@ -55,10 +55,25 @@ export default function GenerationDetailPage() {
   }, [ensureToken, generationId, locale, t]);
 
   const handleReuse = useCallback(async () => {
+    if (!generation) return;
     setBusy(true);
     setError('');
     try {
       const token = await ensureToken();
+      void trackProductEvent('generation_reuse_clicked', {
+        token,
+        pagePath: `/generations/${generationId}`,
+        locale,
+        metadata: {
+          generation_id: generation.generation_id,
+          generation_mode: generation.generation_mode,
+          source_review_id: generation.source_review_id,
+          template_key: generation.template_key,
+          quality: generation.quality,
+          size: generation.size,
+          entrypoint: 'generation_detail_reuse',
+        },
+      });
       const result = await reuseGeneration(generationId, token);
       router.push(`/generation-tasks/${result.task_id}`);
     } catch (err) {
@@ -66,7 +81,7 @@ export default function GenerationDetailPage() {
     } finally {
       setBusy(false);
     }
-  }, [ensureToken, generationId, router, t]);
+  }, [ensureToken, generation, generationId, locale, router, t]);
 
   const handleCopy = useCallback(async () => {
     if (!generation) return;
@@ -121,6 +136,9 @@ export default function GenerationDetailPage() {
     if (generation.source_photo_id) params.set('photo_id', generation.source_photo_id);
     const imageType = typeof generation.metadata.image_type === 'string' ? generation.metadata.image_type : null;
     if (imageType) params.set('image_type', imageType);
+    params.set('retake_intent', 'new_photo_retake');
+    params.set('next_shoot_action', generation.prompt.slice(0, 220));
+    params.set('next_shoot_dimension', generation.intent);
     router.push(`/workspace?${params.toString()}`);
   }, [generation, generationId, locale, router]);
 

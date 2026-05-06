@@ -18,7 +18,7 @@ export const zhTranslations = {
   plan_guest_label: '游客',
   updates_label: '更新记录',
   updates_hint_home: '查看产品分析、复拍练习与等待页阅读更新',
-  updates_hint_latest: '查看产品分析、复拍练习与等待页阅读更新',
+  updates_hint_latest: '查看 AI Create 案例、额度承接与分析更新',
 
   generation_badge: 'AI 创作',
   generation_title: 'AI 创作',
@@ -33,6 +33,7 @@ export const zhTranslations = {
   generation_auth_loading_cta: '正在准备账户…',
   generation_login_cta: '登录后生成',
   generation_upgrade_cta: '升级到 Pro',
+  generation_credit_exhausted_pro_cta: '对比 Pro',
   generation_submitting_cta: '正在提交…',
   generation_free_cta: '生成图片',
   generation_submit_cta: '生成图片',
@@ -430,6 +431,7 @@ export const zhTranslations = {
   payment_success_body: 'Pro 已经激活，现在可以返回额度页管理订阅，或直接继续评图。',
   payment_success_pending_body: '支付已经完成，我们正在等待订阅状态同步。通常几秒内会更新。',
   payment_success_error: '暂时无法确认订阅状态，请稍后到额度页查看。',
+  payment_success_return_cta: '回到刚才的位置',
   payment_success_usage_cta: '查看我的额度',
   payment_success_workspace_cta: '继续去评图',
 

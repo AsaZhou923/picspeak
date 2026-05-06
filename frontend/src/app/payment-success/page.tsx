@@ -9,6 +9,7 @@ import { UsageResponse } from '@/lib/types';
 import { SkeletonBlock } from '@/components/ui/LoadingSpinner';
 import { useI18n } from '@/lib/i18n';
 import { formatUserFacingError } from '@/lib/error-utils';
+import { consumeCheckoutReturnPath } from '@/lib/checkout-return';
 
 export default function PaymentSuccessPage() {
   const { ensureToken, syncPlan } = useAuth();
@@ -16,6 +17,11 @@ export default function PaymentSuccessPage() {
   const [usage, setUsage] = useState<UsageResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [returnPath, setReturnPath] = useState<string | null>(null);
+
+  useEffect(() => {
+    setReturnPath(consumeCheckoutReturnPath());
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -86,9 +92,22 @@ export default function PaymentSuccessPage() {
           )}
 
           <div className="mt-8 flex flex-col sm:flex-row gap-3">
+            {returnPath && (
+              <Link
+                href={returnPath}
+                className="inline-flex items-center justify-center gap-2 text-sm text-void bg-gold hover:bg-gold-light transition-colors rounded-lg px-4 py-3"
+              >
+                {t('payment_success_return_cta')}
+                <ArrowRight size={14} />
+              </Link>
+            )}
             <Link
               href="/account/usage"
-              className="inline-flex items-center justify-center gap-2 text-sm text-void bg-gold hover:bg-gold-light transition-colors rounded-lg px-4 py-3"
+              className={`inline-flex items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm transition-colors ${
+                returnPath
+                  ? 'border border-border text-ink hover:border-gold/40 hover:bg-gold/5'
+                  : 'bg-gold text-void hover:bg-gold-light'
+              }`}
             >
               {t('payment_success_usage_cta')}
               <ArrowRight size={14} />

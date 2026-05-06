@@ -52,6 +52,7 @@ export const enTranslations = {
     generation_login_cta: 'Sign in to generate',
     generation_auth_loading_cta: 'Checking sign-in status',
     generation_upgrade_cta: 'Upgrade to Pro',
+    generation_credit_exhausted_pro_cta: 'Compare Pro',
     generation_submitting_cta: 'Generating',
     generation_free_cta: 'Use trial generation',
     generation_submit_cta: 'Generate image',
@@ -214,7 +215,7 @@ export const enTranslations = {
     pro_offer_highlight: 'Pro',
     updates_label: 'Updates',
     updates_hint_home: 'See analytics, retake practice, and waiting-page reader update',
-    updates_hint_latest: 'See analytics, retake practice, and waiting-page reader update',
+    updates_hint_latest: 'See AI Create examples, checkout recovery, and analytics update',
     contact_label: 'Contact',
     contact_headline: 'Get in Touch',
 
@@ -470,6 +471,7 @@ export const enTranslations = {
     payment_success_body: 'Pro is active now. You can return to your usage page to manage the subscription, or head back to the workspace.',
     payment_success_pending_body: 'Your payment is complete and we are waiting for the subscription status to sync. This usually updates within a few seconds.',
     payment_success_error: 'Unable to confirm your subscription status right now. Please check your usage page in a moment.',
+    payment_success_return_cta: 'Resume where I left off',
     payment_success_usage_cta: 'View my usage',
     payment_success_workspace_cta: 'Back to workspace',
 

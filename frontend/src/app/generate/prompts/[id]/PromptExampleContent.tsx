@@ -52,6 +52,7 @@ export default function PromptExampleContent({ example }: { example: GenerationP
   const title = getLocalizedPromptExampleTitle(example, locale);
   const prompt = getLocalizedPromptExampleText(example.prompt, locale);
   const categoryLabel = getLocalizedPromptExampleCategoryLabel(example.category, locale);
+  const generateHref = `/generate?source=prompt_library&entrypoint=prompt_example_detail&prompt_example_id=${encodeURIComponent(example.id)}`;
 
   return (
     <main className="min-h-screen px-6 pb-20 pt-24">
@@ -65,7 +66,7 @@ export default function PromptExampleContent({ example }: { example: GenerationP
           <p className="mt-5 max-w-2xl text-sm leading-7 text-ink-muted">{copy.body}</p>
           <div className="mt-7 flex flex-wrap gap-3">
             <Link
-              href="/generate"
+              href={generateHref}
               className="rounded bg-gold px-5 py-2.5 text-sm font-bold text-void transition-colors hover:bg-gold-light"
             >
               {copy.primaryCta}

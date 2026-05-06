@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-05-06-ai-create-checkout-analytics",
+    "date": "2026-05-06",
+    "title": "AI Create 例の引き継ぎ、credit 回復、分析分解",
+    "summary": "Prompt Library の例から prompt と推奨設定を AI Create に引き継げるようになりました。credits 不足時はその場で credit pack または Pro checkout を開始し、支払い後に元の作業へ戻れます。分析側も例の利用、再利用、credit 回復、生成単位経済を分解します。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-05-06-ai-create-checkout-analytics",
+    "sections": [
+      {
+        "title": "AI Create フロー",
+        "items": [
+          "Prompt library のホームと詳細ページは source、entrypoint、example ID を付けて生成ページへ入り、ローカライズ済み prompt、template、style、size を自動適用します",
+          "生成リクエストと task payload は prompt example ID とカテゴリを保持し、成功した生成 metadata にも保存します",
+          "生成詳細の再利用アクションは reuse event を記録し、生成画像を次の撮影参考として workspace に戻します"
+        ]
+      },
+      {
+        "title": "Credits と分析",
+        "items": [
+          "生成ページ、失敗した task ページ、講評内の参考生成パネルで credits 不足時に credit pack checkout を開始でき、支払い後は直前の場所へ戻れます",
+          "Free の品質ゲートと credits 不足経路では Pro 比較クリックを記録します",
+          "product analytics report に AI Create entrypoint、Prompt example funnel、Credit exhausted recovery、generation unit economics を追加しました"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-05-04-analytics-retake-waiting-reader",
     "date": "2026-05-04",
     "title": "分析週報、撮り直し練習ループ、待ち時間の本文リーダー",

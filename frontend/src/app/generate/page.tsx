@@ -15,7 +15,9 @@ import {
   navigateExternalCheckoutWindow,
   openExternalCheckoutWindow,
 } from '@/lib/external-checkout-window';
+import { rememberCheckoutReturnPath } from '@/lib/checkout-return';
 import { trackProductEvent } from '@/lib/product-analytics';
+import { startProCheckout } from '@/lib/pro-checkout';
 import {
   GENERATION_SIZE_OPTIONS,
   GENERATION_TEMPLATES,
@@ -25,7 +27,11 @@ import {
   getTemplateByKey,
 } from '@/features/generations/generation-config';
 import { PromptExampleGallery } from '@/features/generations/components/PromptExampleGallery';
-import { getLocalizedPromptExampleText, type GenerationPromptExample } from '@/content/generation/prompt-examples';
+import {
+  getGenerationPromptExample,
+  getLocalizedPromptExampleText,
+  type GenerationPromptExample,
+} from '@/content/generation/prompt-examples';
 
 const STYLE_OPTIONS = [
   { value: 'none', labelKey: 'generation_style_none' },
@@ -106,12 +112,20 @@ function templateCopyKey(templateKey: string) {
   return TEMPLATE_COPY_KEYS[templateKey as keyof typeof TEMPLATE_COPY_KEYS] ?? TEMPLATE_COPY_KEYS.photo_inspiration;
 }
 
+type AppliedPromptExample = {
+  id: string;
+  category: string;
+  templateKey: string;
+  promptText: string;
+};
+
 export default function GeneratePage() {
   const router = useRouter();
   const { token, ensureToken, userInfo, isLoading: authLoading } = useAuth();
   const { t, locale } = useI18n();
   const promptRef = useRef<HTMLTextAreaElement | null>(null);
   const skipNextTemplatePromptSyncRef = useRef(false);
+  const initialUrlPromptAppliedRef = useRef(false);
   const [templateKey, setTemplateKey] = useState('photo_inspiration');
   const [prompt, setPrompt] = useState<string>(() => t(TEMPLATE_COPY_KEYS.photo_inspiration.prompt));
   const [quality, setQuality] = useState<GenerationQuality>('medium');
@@ -126,6 +140,7 @@ export default function GeneratePage() {
   const [history, setHistory] = useState<GeneratedImageItem[]>([]);
   const [hasHydrated, setHasHydrated] = useState(false);
   const [sourceMetadata, setSourceMetadata] = useState<Record<string, string>>({});
+  const [appliedPromptExample, setAppliedPromptExample] = useState<AppliedPromptExample | null>(null);
   const [creditsTable, setCreditsTable] = useState<GenerationCreditsTable | null>(null);
 
   const authReady = hasHydrated && !authLoading;
@@ -143,13 +158,46 @@ export default function GeneratePage() {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const metadata: Record<string, string> = {};
-      ['source', 'entrypoint', 'content_slug', 'gallery_review_id', 'image_type'].forEach((key) => {
+      ['source', 'entrypoint', 'content_slug', 'gallery_review_id', 'image_type', 'prompt_example_id'].forEach((key) => {
         const value = params.get(key);
         if (value) metadata[key] = value;
       });
+      const promptExample = getGenerationPromptExample(params.get('prompt_example_id') ?? '');
+      if (promptExample && !initialUrlPromptAppliedRef.current) {
+        initialUrlPromptAppliedRef.current = true;
+        const nextTemplate = getTemplateByKey(promptExample.suggestedTemplateKey);
+        const nextPrompt = getLocalizedPromptExampleText(promptExample.prompt, locale);
+        skipNextTemplatePromptSyncRef.current = true;
+        setTemplateKey(nextTemplate.key);
+        setPrompt(nextPrompt);
+        setStyle(promptExample.suggestedStyle);
+        setSize(promptExample.suggestedSize);
+        setAppliedPromptExample({
+          id: promptExample.id,
+          category: promptExample.category,
+          templateKey: nextTemplate.key,
+          promptText: nextPrompt,
+        });
+        metadata.prompt_example_id = promptExample.id;
+        metadata.prompt_example_category = promptExample.category;
+        metadata.template_key = nextTemplate.key;
+        void trackProductEvent('generation_prompt_example_applied', {
+          token: token ?? undefined,
+          pagePath: '/generate',
+          locale,
+          metadata: {
+            prompt_example_id: promptExample.id,
+            prompt_example_category: promptExample.category,
+            template_key: nextTemplate.key,
+            trigger: 'url_prefill',
+            source: metadata.source,
+            entrypoint: metadata.entrypoint,
+          },
+        });
+      }
       setSourceMetadata(metadata);
     }
-  }, []);
+  }, [locale, token]);
 
   useEffect(() => {
     if (skipNextTemplatePromptSyncRef.current) {
@@ -201,6 +249,7 @@ export default function GeneratePage() {
       const nextTemplate = getTemplateByKey(key);
       setTemplateKey(nextTemplate.key);
       setPrompt(t(templateCopyKey(nextTemplate.key).prompt));
+      setAppliedPromptExample(null);
       void trackProductEvent('generation_template_selected', {
         token: token ?? undefined,
         pagePath: '/generate',
@@ -217,12 +266,19 @@ export default function GeneratePage() {
       if (nextTemplate.key !== templateKey) {
         skipNextTemplatePromptSyncRef.current = true;
       }
+      const nextPrompt = getLocalizedPromptExampleText(example.prompt, locale);
       setTemplateKey(nextTemplate.key);
-      setPrompt(getLocalizedPromptExampleText(example.prompt, locale));
+      setPrompt(nextPrompt);
       setStyle(example.suggestedStyle);
       setSize(example.suggestedSize);
+      setAppliedPromptExample({
+        id: example.id,
+        category: example.category,
+        templateKey: nextTemplate.key,
+        promptText: nextPrompt,
+      });
       setError('');
-      void trackProductEvent('generation_prompt_opened', {
+      void trackProductEvent('generation_prompt_example_applied', {
         token: token ?? undefined,
         pagePath: '/generate',
         locale,
@@ -230,6 +286,9 @@ export default function GeneratePage() {
           prompt_example_id: example.id,
           prompt_example_category: example.category,
           template_key: nextTemplate.key,
+          style: example.suggestedStyle,
+          size: example.suggestedSize,
+          trigger: 'gallery_apply',
         },
       });
       window.requestAnimationFrame(() => {
@@ -255,6 +314,8 @@ export default function GeneratePage() {
           intent: selectedTemplate.intent,
           prompt,
           template_key: selectedTemplate.key,
+          prompt_example_id: appliedPromptExample?.id ?? null,
+          prompt_example_category: appliedPromptExample?.category ?? null,
           image_type: 'default',
           quality,
           size,
@@ -274,6 +335,9 @@ export default function GeneratePage() {
           ...sourceMetadata,
           task_id: result.task_id,
           template_key: selectedTemplate.key,
+          prompt_example_id: appliedPromptExample?.id,
+          prompt_example_category: appliedPromptExample?.category,
+          prompt_example_modified: appliedPromptExample ? prompt.trim() !== appliedPromptExample.promptText.trim() : false,
           quality,
           size,
           credits_reserved: result.credits_reserved,
@@ -286,18 +350,27 @@ export default function GeneratePage() {
           token: token ?? undefined,
           pagePath: '/generate',
           locale,
-          metadata: { quality, size, credits },
+          metadata: {
+            ...sourceMetadata,
+            quality,
+            size,
+            credits,
+            template_key: selectedTemplate.key,
+            prompt_example_id: appliedPromptExample?.id,
+            prompt_example_category: appliedPromptExample?.category,
+          },
         });
       }
       setError(formatUserFacingError(t, err, t('generation_error_fallback')));
     } finally {
       setSubmitting(false);
     }
-  }, [credits, creditsReady, ensureToken, isFreeQualityBlocked, isGuest, locale, negativePrompt, prompt, quality, router, selectedTemplate, size, sourceMetadata, style, submitting, t, token]);
+  }, [appliedPromptExample, credits, creditsReady, ensureToken, isFreeQualityBlocked, isGuest, locale, negativePrompt, prompt, quality, router, selectedTemplate, size, sourceMetadata, style, submitting, t, token]);
 
   const handleCreditPackCheckout = useCallback(
-    async (currency: 'usd') => {
+    async (currency: 'usd', entrypoint: 'sidebar' | 'credit_exhausted') => {
       if (plan === 'guest' || creditPackBusy) return;
+      rememberCheckoutReturnPath();
       const checkoutWindow = openExternalCheckoutWindow(t('usage_checkout_loading'));
       setCreditPackBusy(true);
       setCreditPackMessage('');
@@ -305,6 +378,24 @@ export default function GeneratePage() {
         const activeToken = await ensureToken();
         const response = await createImageCreditPackCheckout(activeToken, { currency, locale });
         if (response.checkout_url) {
+          void trackProductEvent('credit_pack_checkout_started', {
+            token: activeToken,
+            pagePath: '/generate',
+            locale,
+            metadata: {
+              ...sourceMetadata,
+              entrypoint,
+              quality,
+              size,
+              credits,
+              template_key: selectedTemplate.key,
+              prompt_example_id: appliedPromptExample?.id,
+              prompt_example_category: appliedPromptExample?.category,
+              pack: response.pack,
+              pack_credits: response.credits,
+              price: response.price,
+            },
+          });
           if (!navigateExternalCheckoutWindow(checkoutWindow, response.checkout_url)) {
             throw new Error('Checkout window was blocked');
           }
@@ -319,7 +410,34 @@ export default function GeneratePage() {
         setCreditPackBusy(false);
       }
     },
-    [creditPackBusy, ensureToken, locale, plan, t]
+    [appliedPromptExample, creditPackBusy, credits, ensureToken, locale, plan, quality, selectedTemplate.key, size, sourceMetadata, t]
+  );
+
+  const handleGenerationProUpgrade = useCallback(
+    async (entrypoint: 'quality_gate' | 'credit_exhausted') => {
+      if (plan === 'guest') return;
+      void trackProductEvent('generation_upgrade_clicked', {
+        token: token ?? undefined,
+        pagePath: '/generate',
+        locale,
+        metadata: {
+          ...sourceMetadata,
+          entrypoint,
+          quality,
+          size,
+          credits,
+          template_key: selectedTemplate.key,
+          prompt_example_id: appliedPromptExample?.id,
+          prompt_example_category: appliedPromptExample?.category,
+        },
+      });
+      try {
+        await startProCheckout(ensureToken, locale);
+      } catch (err) {
+        setError(formatUserFacingError(t, err, t('usage_checkout_unavailable')));
+      }
+    },
+    [appliedPromptExample, credits, ensureToken, locale, plan, quality, selectedTemplate.key, size, sourceMetadata, t, token]
   );
 
   const ctaLabel = isGuest
@@ -529,12 +647,21 @@ export default function GeneratePage() {
                     <div className="mt-3 flex flex-wrap gap-2">
                       <button
                         type="button"
-                        onClick={() => void handleCreditPackCheckout('usd')}
+                        onClick={() => void handleCreditPackCheckout('usd', 'credit_exhausted')}
                         disabled={creditPackBusy}
                         className="rounded-full border border-rust/25 bg-void/40 px-3 py-1.5 text-xs text-rust transition-colors hover:bg-rust/10 disabled:opacity-60"
                       >
                         {t('usage_credit_pack_button')}
                       </button>
+                      {plan === 'free' && (
+                        <button
+                          type="button"
+                          onClick={() => void handleGenerationProUpgrade('credit_exhausted')}
+                          className="rounded-full border border-gold/30 bg-gold/10 px-3 py-1.5 text-xs text-gold transition-colors hover:bg-gold/15"
+                        >
+                          {t('generation_credit_exhausted_pro_cta')}
+                        </button>
+                      )}
                       <span className="self-center text-xs text-ink-subtle">
                         {t('usage_credit_pack_payment_hint')}
                       </span>
@@ -563,8 +690,8 @@ export default function GeneratePage() {
               ) : (
                 <button
                   type="button"
-                  onClick={handleGenerate}
-                  disabled={submitting || isFreeQualityBlocked || !creditsReady || prompt.trim().length < 3}
+                  onClick={isFreeQualityBlocked ? () => void handleGenerationProUpgrade('quality_gate') : handleGenerate}
+                  disabled={submitting || !creditsReady || prompt.trim().length < 3}
                   className="mt-5 w-full rounded-full bg-gold px-5 py-3 text-sm font-bold text-void transition-colors hover:bg-gold-light disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {ctaLabel}
@@ -583,7 +710,7 @@ export default function GeneratePage() {
                 <div className="mt-4 grid gap-2">
                   <button
                     type="button"
-                    onClick={() => void handleCreditPackCheckout('usd')}
+                    onClick={() => void handleCreditPackCheckout('usd', 'sidebar')}
                     disabled={creditPackBusy}
                     className="rounded-full border border-gold/30 px-4 py-2 text-xs font-medium text-gold transition-colors hover:bg-gold/10 disabled:opacity-60"
                   >

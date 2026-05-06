@@ -475,6 +475,7 @@ def _process_image_credit_pack_order(db: Session, event: LemonSqueezyWebhookEven
             'kind': 'image_credit_pack',
             'pack': IMAGE_CREDIT_PACK_KEY,
             'credits_granted': credits,
+            'revenue_usd': 3.99,
             'order_id': order_id,
             'event_name': event.event_name,
         },

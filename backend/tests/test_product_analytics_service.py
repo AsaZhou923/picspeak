@@ -44,12 +44,15 @@ class ProductAnalyticsServiceTests(unittest.TestCase):
             'next_shoot_action_clicked',
             'generation_page_viewed',
             'generation_template_selected',
+            'generation_prompt_example_applied',
             'generation_requested',
             'generation_succeeded',
             'generation_failed',
             'generation_viewed',
+            'generation_reuse_clicked',
             'generation_credit_exhausted',
             'generation_upgrade_clicked',
+            'credit_pack_checkout_started',
         }
 
         self.assertTrue(required_events.issubset(STAGE_A_EVENT_CATALOG.keys()))
@@ -182,6 +185,20 @@ class ProductAnalyticsServiceTests(unittest.TestCase):
                 locale='en',
             ),
             AnalyticsEventSample(
+                event_name='generation_prompt_example_applied',
+                occurred_at=datetime(2026, 4, 11, 11, 1, tzinfo=timezone.utc),
+                device_id='dev-3',
+                session_id='sess-4',
+                plan='free',
+                source='prompt_library',
+                locale='en',
+                metadata={
+                    'prompt_example_id': 'neon-portrait',
+                    'prompt_example_category': 'photography',
+                    'template_key': 'photo_inspiration',
+                },
+            ),
+            AnalyticsEventSample(
                 event_name='generation_requested',
                 occurred_at=datetime(2026, 4, 11, 11, 2, tzinfo=timezone.utc),
                 device_id='dev-3',
@@ -189,6 +206,12 @@ class ProductAnalyticsServiceTests(unittest.TestCase):
                 plan='free',
                 source='prompt_library',
                 locale='en',
+                metadata={
+                    'prompt_example_id': 'neon-portrait',
+                    'prompt_example_category': 'photography',
+                    'template_key': 'photo_inspiration',
+                    'generation_mode': 'general',
+                },
             ),
             AnalyticsEventSample(
                 event_name='generation_succeeded',
@@ -198,6 +221,7 @@ class ProductAnalyticsServiceTests(unittest.TestCase):
                 plan='free',
                 source='prompt_library',
                 locale='en',
+                metadata={'quality': 'low', 'size': '1024x1024', 'credits_charged': 1, 'cost_usd': 0.01},
             ),
             AnalyticsEventSample(
                 event_name='generation_used_for_retake',
@@ -208,6 +232,47 @@ class ProductAnalyticsServiceTests(unittest.TestCase):
                 source='prompt_library',
                 locale='en',
                 metadata={'generation_id': 'gen-1'},
+            ),
+            AnalyticsEventSample(
+                event_name='generation_credit_exhausted',
+                occurred_at=datetime(2026, 4, 11, 11, 12, tzinfo=timezone.utc),
+                device_id='dev-4',
+                session_id='sess-5',
+                user_public_id='usr-4',
+                plan='free',
+                source='prompt_library',
+                locale='en',
+            ),
+            AnalyticsEventSample(
+                event_name='credit_pack_checkout_started',
+                occurred_at=datetime(2026, 4, 11, 11, 13, tzinfo=timezone.utc),
+                device_id='dev-4',
+                session_id='sess-5',
+                user_public_id='usr-4',
+                plan='free',
+                source='prompt_library',
+                locale='en',
+            ),
+            AnalyticsEventSample(
+                event_name='paid_success',
+                occurred_at=datetime(2026, 4, 11, 11, 16, tzinfo=timezone.utc),
+                device_id='dev-4',
+                session_id='sess-5',
+                user_public_id='usr-4',
+                plan='free',
+                source='checkout',
+                locale='en',
+                metadata={'kind': 'image_credit_pack', 'credits_granted': 300, 'revenue_usd': 3.99},
+            ),
+            AnalyticsEventSample(
+                event_name='generation_reuse_clicked',
+                occurred_at=datetime(2026, 4, 11, 11, 18, tzinfo=timezone.utc),
+                device_id='dev-3',
+                session_id='sess-4',
+                plan='free',
+                source='prompt_library',
+                locale='en',
+                metadata={'entrypoint': 'generation_detail_reuse', 'generation_id': 'gen-1'},
             ),
             AnalyticsEventSample(
                 event_name='next_shoot_action_clicked',
@@ -288,14 +353,30 @@ class ProductAnalyticsServiceTests(unittest.TestCase):
 
         generation_funnel = snapshot['generation_funnel']
         self.assertEqual(generation_funnel['overall']['prompt_library_viewed'], 1)
+        self.assertEqual(generation_funnel['overall']['generation_prompt_example_applied'], 1)
         self.assertEqual(generation_funnel['overall']['generation_requested'], 1)
         self.assertEqual(generation_funnel['overall']['generation_succeeded'], 1)
+        self.assertEqual(generation_funnel['overall']['generation_reuse_clicked'], 1)
         self.assertEqual(generation_funnel['request_success_rate'], 1.0)
         self.assertEqual(generation_funnel['by_source']['prompt_library']['requests'], 1)
+        self.assertEqual(generation_funnel['by_source']['prompt_library']['credit_exhausted'], 1)
+        self.assertEqual(generation_funnel['by_source']['prompt_library']['credit_pack_checkout'], 1)
+        self.assertEqual(generation_funnel['by_entrypoint']['prompt_library']['prompt_examples_applied'], 1)
+        self.assertEqual(generation_funnel['by_entrypoint']['history_reuse']['reuse_clicks'], 1)
+        self.assertEqual(generation_funnel['prompt_examples']['requests_with_example'], 1)
+        self.assertEqual(generation_funnel['prompt_examples']['by_category']['photography'], 1)
+        self.assertEqual(generation_funnel['credit_exhausted_followup']['credit_pack_checkout_users'], 1)
 
         locale_breakdown = snapshot['locale_breakdown']
         self.assertEqual(locale_breakdown['en']['generation_requests'], 1)
         self.assertEqual(locale_breakdown['en']['generation_successes'], 1)
+
+        unit_economics = snapshot['generation_unit_economics']
+        self.assertEqual(unit_economics['metered_successes'], 1)
+        self.assertEqual(unit_economics['credits_charged'], 1)
+        self.assertEqual(unit_economics['cost_usd'], 0.01)
+        self.assertEqual(unit_economics['credit_pack_paid_orders'], 1)
+        self.assertEqual(unit_economics['credit_pack_revenue_proxy_usd'], 3.99)
 
         data_health = snapshot['data_health']
         self.assertEqual(data_health['total_events'], len(events))
@@ -464,6 +545,9 @@ class ProductAnalyticsServiceTests(unittest.TestCase):
         self.assertIn('## 数据健康检查', markdown)
         self.assertIn('## 复拍贡献拆分', markdown)
         self.assertIn('## AI Create 漏斗', markdown)
+        self.assertIn('### Prompt example 应用漏斗', markdown)
+        self.assertIn('### Credit exhausted 承接', markdown)
+        self.assertIn('### AI Create 单位经济模型', markdown)
         self.assertIn('| 日期 | DAU | WAU | 首评完成率 | 7 日二次使用率 |', markdown)
         self.assertIn('| 2026-04-10 | 1 | 1 | 0.0% | 0.0% |', markdown)
 

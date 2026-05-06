@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-05-06-ai-create-checkout-analytics",
+    "date": "2026-05-06",
+    "title": "AI Create example handoff, credit recovery, and analytics splits",
+    "summary": "Prompt Library examples can now carry their prompt and recommended settings into AI Create. When credits run out, users can start a credit pack or Pro checkout in context, return to the original task after payment, and analytics now breaks down example usage, reuse, credit recovery, and generation unit economics.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-05-06-ai-create-checkout-analytics",
+    "sections": [
+      {
+        "title": "AI Create flow",
+        "items": [
+          "Prompt library home and detail pages now enter generation with source, entrypoint, and example ID, then auto-apply localized prompt, template, style, and size",
+          "Generation requests and task payloads retain prompt example ID and category, and successful generations store the same metadata",
+          "The generation detail reuse action now records a reuse event and carries generated images back into the workspace as next-shoot references"
+        ]
+      },
+      {
+        "title": "Credits and analytics",
+        "items": [
+          "The generation page, failed task page, and review reference panel offer credit pack checkout when credits are exhausted, with payment success returning users to their previous location",
+          "Free quality-gate and credit-exhausted paths now record Pro comparison clicks",
+          "The product analytics report adds AI Create entrypoint splits, Prompt example funnel, Credit exhausted recovery, and generation unit economics"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-05-04-analytics-retake-waiting-reader",
     "date": "2026-05-04",
     "title": "Analytics weekly report, retake practice loop, and in-task reading",

@@ -4,6 +4,7 @@ import {
   navigateExternalCheckoutWindow,
   openExternalCheckoutWindow,
 } from './external-checkout-window';
+import { rememberCheckoutReturnPath } from './checkout-return';
 import { Locale } from './i18n';
 import { trackProductEvent } from './product-analytics';
 
@@ -16,6 +17,7 @@ export async function startProCheckout(
   ensureToken: () => Promise<string>,
   locale?: Locale
 ): Promise<void> {
+  rememberCheckoutReturnPath();
   const checkoutWindow = openExternalCheckoutWindow(
     locale === 'zh' ? '正在打开 Pro 支付页面...' : 'Opening Pro checkout...'
   );

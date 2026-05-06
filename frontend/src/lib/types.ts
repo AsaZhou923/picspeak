@@ -230,6 +230,8 @@ export interface GenerationCreateRequest {
   intent: string;
   prompt: string;
   template_key?: string | null;
+  prompt_example_id?: string | null;
+  prompt_example_category?: string | null;
   source_photo_id?: string | null;
   source_review_id?: string | null;
   image_type?: ImageType;

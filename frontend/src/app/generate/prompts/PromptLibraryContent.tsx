@@ -66,7 +66,7 @@ export default function PromptLibraryContent() {
           <p className="mt-5 max-w-2xl text-sm leading-7 text-ink-muted">{copy.body}</p>
           <div className="mt-7 flex flex-wrap gap-3">
             <Link
-              href="/generate"
+              href="/generate?source=prompt_library&entrypoint=prompt_library_home"
               className="rounded bg-gold px-5 py-2.5 text-sm font-bold text-void transition-colors hover:bg-gold-light"
             >
               {copy.primaryCta}

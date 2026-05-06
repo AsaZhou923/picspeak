@@ -4,12 +4,18 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, ImagePlus, Loader2, Sparkles } from 'lucide-react';
 import ClerkSignInTrigger from '@/components/auth/ClerkSignInTrigger';
-import { createGeneration, getGenerationTemplates } from '@/lib/api';
+import { createGeneration, createImageCreditPackCheckout, getGenerationTemplates } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { rememberCheckoutReturnPath } from '@/lib/checkout-return';
 import { formatUserFacingError } from '@/lib/error-utils';
+import {
+  closeExternalCheckoutWindow,
+  navigateExternalCheckoutWindow,
+  openExternalCheckoutWindow,
+} from '@/lib/external-checkout-window';
 import { useI18n, type TranslationKey } from '@/lib/i18n';
 import { trackProductEvent } from '@/lib/product-analytics';
-import type { GenerationQuality, GenerationSize, ImageType } from '@/lib/types';
+import { ApiException, type GenerationQuality, type GenerationSize, type ImageType } from '@/lib/types';
 import {
   type GenerationCreditsTable,
   estimateGenerationCredits,
@@ -67,6 +73,8 @@ export function ReviewReferenceGenerationPanel({
   const [customPrompt, setCustomPrompt] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [creditPackBusy, setCreditPackBusy] = useState(false);
+  const [creditPackMessage, setCreditPackMessage] = useState('');
   const [creditsTable, setCreditsTable] = useState<GenerationCreditsTable | null>(null);
 
   const quality: GenerationQuality = plan === 'pro' ? 'medium' : 'low';
@@ -149,9 +157,68 @@ export function ReviewReferenceGenerationPanel({
       });
       router.push(`/generation-tasks/${result.task_id}`);
     } catch (err) {
+      if (err instanceof ApiException && err.code === 'IMAGE_GENERATION_CREDITS_EXHAUSTED') {
+        void trackProductEvent('generation_credit_exhausted', {
+          pagePath: `/reviews/${reviewId}`,
+          locale,
+          metadata: {
+            source_review_id: reviewId,
+            source_photo_id: photoId,
+            generation_mode: 'review_linked',
+            intent,
+            quality,
+            size,
+            credits,
+            entrypoint: 'review_reference',
+          },
+        });
+      }
       setError(formatUserFacingError(t, err, t('generation_error_fallback')));
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function handleCreditPackCheckout() {
+    if (plan === 'guest' || creditPackBusy) return;
+    rememberCheckoutReturnPath();
+    const checkoutWindow = openExternalCheckoutWindow(t('usage_checkout_loading'));
+    setCreditPackBusy(true);
+    setCreditPackMessage('');
+    try {
+      const token = await ensureToken();
+      const response = await createImageCreditPackCheckout(token, { currency: 'usd', locale });
+      if (!response.checkout_url) {
+        closeExternalCheckoutWindow(checkoutWindow);
+        setCreditPackMessage(`${response.credits} credits / ${response.price} checkout is unavailable.`);
+        return;
+      }
+      void trackProductEvent('credit_pack_checkout_started', {
+        token,
+        pagePath: `/reviews/${reviewId}`,
+        locale,
+        metadata: {
+          source_review_id: reviewId,
+          source_photo_id: photoId,
+          generation_mode: 'review_linked',
+          intent,
+          quality,
+          size,
+          credits,
+          entrypoint: 'review_reference_credit_exhausted',
+          pack: response.pack,
+          pack_credits: response.credits,
+          price: response.price,
+        },
+      });
+      if (!navigateExternalCheckoutWindow(checkoutWindow, response.checkout_url)) {
+        throw new Error('Checkout window was blocked');
+      }
+    } catch (err) {
+      closeExternalCheckoutWindow(checkoutWindow);
+      setCreditPackMessage(formatUserFacingError(t, err, t('usage_checkout_unavailable')));
+    } finally {
+      setCreditPackBusy(false);
     }
   }
 
@@ -231,7 +298,29 @@ export function ReviewReferenceGenerationPanel({
             </span>
           </div>
 
-          {error && <p className="rounded-lg border border-rust/20 bg-rust/5 px-3 py-2 text-sm text-rust">{error}</p>}
+          {error && (
+            <div className="rounded-lg border border-rust/20 bg-rust/5 px-3 py-2 text-sm text-rust">
+              <p>{error}</p>
+              {error.toLowerCase().includes('credit') && plan !== 'guest' && (
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void handleCreditPackCheckout()}
+                    disabled={creditPackBusy}
+                    className="rounded-full border border-rust/25 bg-void/40 px-3 py-1.5 text-xs text-rust transition-colors hover:bg-rust/10 disabled:opacity-60"
+                  >
+                    {t('usage_credit_pack_button')}
+                  </button>
+                  <span className="text-xs text-ink-subtle">{t('usage_credit_pack_payment_hint')}</span>
+                </div>
+              )}
+              {creditPackMessage && (
+                <p className="mt-2 rounded-md border border-border-subtle bg-void/30 px-3 py-2 text-xs leading-5 text-ink-muted">
+                  {creditPackMessage}
+                </p>
+              )}
+            </div>
+          )}
 
           <div>
             {plan === 'guest' ? (

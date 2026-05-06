@@ -2,6 +2,100 @@
 
 本文件汇总了原 `docs/changelog/update-log-*.md` 的全部更新记录。新增 release 请追加到顶部，并为每条记录保留稳定锚点，供 `/updates` 的 `docPath` 和 README 链接定位。
 
+<a id="2026-05-06-ai-create-checkout-analytics"></a>
+
+## 2026-05-06 - ai create checkout analytics
+
+日期：2026-05-06
+
+### 概览
+
+这次更新把 AI Create 的“案例发现 -> 一键套用 -> 生成 -> 额度承接 -> 复盘分析”链路接得更紧：用户从提示词库进入生成页时会自动带入案例 prompt 和推荐参数，额度不足时可以就地购买 credit pack 或对比 Pro，支付成功后也能回到刚才的任务或页面；运营侧则能拆出 Prompt Library 案例应用、复用生成、credits 耗尽承接和单位经济模型。
+
+- Prompt Library 首页和案例详情页现在会带 `source`、`entrypoint` 与 `prompt_example_id` 跳转到 `/generate`，生成页会自动应用对应案例、模板、风格和尺寸
+- AI Create 请求、任务 payload 和生成记录 metadata 会保留 `prompt_example_id` 与 `prompt_example_category`，便于追踪案例应用后的生成表现
+- 生成页、生成任务失败页和点评详情里的参考图生成面板增加 credits 耗尽后的 credit pack checkout 入口，并记录 checkout 来源
+- Pro checkout 与 credit pack checkout 会记住当前相对路径，支付成功页新增“回到刚才的位置”入口，减少购买后丢失上下文
+- 产品分析新增 AI Create 入口拆分、Prompt example 应用漏斗、credit exhausted 承接、生成复用事件和 AI Create 单位经济模型
+
+### AI Create 案例带入
+
+- `/generate/prompts` 的主 CTA 会带 `source=prompt_library` 与 `entrypoint=prompt_library_home`
+- `/generate/prompts/[id]` 的主 CTA 会携带对应 `prompt_example_id`，进入 `/generate` 后自动填入本地化 prompt、推荐 template、style 和 size
+- 用户手动套用案例或通过 URL 预填案例时，前端统一记录 `generation_prompt_example_applied`，并附带案例分类、模板、触发方式和来源
+- 切换模板时会清空已应用案例状态，避免用户改成普通模板后仍被误计为案例生成
+- 发起生成和 credits 耗尽埋点会携带案例、模板、质量、尺寸和来源上下文
+
+### 额度耗尽与 checkout 回流
+
+- 生成页在 credits 耗尽时保留 credit pack CTA，并为 Free 用户补充 Pro 对比入口；质量门槛点击也会记录 `generation_upgrade_clicked`
+- `/generation-tasks/[taskId]` 在 `IMAGE_GENERATION_CREDITS_EXHAUSTED` 失败状态下显示 credit pack checkout，用户无需回到额度页再补购
+- `ReviewReferenceGenerationPanel` 捕获参考图生成里的额度耗尽错误，展示 credit pack checkout，并记录来自点评详情的承接来源
+- `checkout-return` helper 用 sessionStorage 保存安全的相对返回路径，Pro checkout 和 credit pack checkout 都会在跳转前记录当前位置
+- `/payment-success` 会消费返回路径并显示返回按钮；存在返回路径时，额度页入口降级为次要按钮
+
+### 产品分析与单位经济模型
+
+- 后端事件目录新增 `generation_prompt_example_applied` 和 `generation_reuse_clicked`，AI Create funnel 覆盖案例应用、结果复用、credit pack checkout 和 Pro 点击
+- generation worker 在任务成功时记录 `generation_succeeded`，包含生成 ID、credits、成本、质量、尺寸、模板、案例和来源点评；失败时记录 `generation_failed` 与 failure stage
+- LemonSqueezy credit pack 支付成功事件增加 `revenue_usd`，用于周报里的 revenue proxy
+- `build_stage_a_snapshot()` 新增 `generation_unit_economics`，按质量/尺寸汇总成功生图、credits、成本、credit pack 订单、revenue proxy 和 gross margin proxy
+- markdown 周报新增 AI Create 入口拆分、Prompt example 应用漏斗、Credit exhausted 承接和 AI Create 单位经济模型表格
+- 产品分析测试覆盖新增事件目录、Prompt Library 应用、credit pack 承接、单位经济模型和 markdown 输出章节
+
+### 首页更新记录同步
+
+- `/updates` 三语 JSON 新增本次更新记录，并指向本 changelog
+- 首页底部“更新记录”入口三语 hint 改为 AI Create 案例、checkout 回流与分析更新主题
+- README 与中文 README 的最新 changelog 链接更新到本次锚点
+- CLAUDE 项目说明保留 changelog、`/updates` docPath 和外部 Update Logs 镜像同步要求
+
+### 影响文件
+
+#### 后端
+
+- `backend/app/api/routers/generations.py`
+- `backend/app/schemas.py`
+- `backend/app/services/image_generation_task_processor.py`
+- `backend/app/services/lemonsqueezy_webhooks.py`
+- `backend/app/services/product_analytics.py`
+- `backend/tests/test_product_analytics_service.py`
+
+#### 前端
+
+- `frontend/src/app/generate/page.tsx`
+- `frontend/src/app/generate/prompts/PromptLibraryContent.tsx`
+- `frontend/src/app/generate/prompts/[id]/PromptExampleContent.tsx`
+- `frontend/src/app/generation-tasks/[taskId]/page.tsx`
+- `frontend/src/app/generations/[generationId]/page.tsx`
+- `frontend/src/app/payment-success/page.tsx`
+- `frontend/src/features/reviews/components/ReviewReferenceGenerationPanel.tsx`
+- `frontend/src/lib/checkout-return.ts`
+- `frontend/src/lib/i18n-en.ts`
+- `frontend/src/lib/i18n-ja.ts`
+- `frontend/src/lib/i18n-zh.ts`
+- `frontend/src/lib/pro-checkout.ts`
+- `frontend/src/lib/product-analytics.ts`
+- `frontend/src/lib/types.ts`
+
+#### 文档
+
+- `docs/changelog/CHANGELOG.md#2026-05-06-ai-create-checkout-analytics`
+- `docs/changelog/CHANGELOG_WORKFLOW.md`
+- `CLAUDE.md`
+- `README.md`
+- `README.zh-CN.md`
+
+### 验证
+
+- `node -e "for (const f of ['zh','en','ja']) JSON.parse(require('fs').readFileSync(`frontend/src/content/updates/${f}.json`, 'utf8'));"`
+- `cd backend && ..\.venv\Scripts\python.exe -m pytest tests/test_product_analytics_service.py`
+- `cd frontend && npm run typecheck`
+- `cd frontend && npm run build`
+- `Get-FileHash` 对比仓库 changelog / workflow 与外部 Update Logs 副本 SHA256 一致
+
+---
+
 <a id="2026-05-04-analytics-retake-waiting-reader"></a>
 
 ## 2026-05-04 - analytics retake waiting reader

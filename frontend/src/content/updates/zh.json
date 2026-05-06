@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-05-06-ai-create-checkout-analytics",
+    "date": "2026-05-06",
+    "title": "AI Create 案例套用、额度承接与分析拆分",
+    "summary": "Prompt Library 现在可以把案例 prompt 和推荐参数带入 AI Create；额度不足时可就地购买 credit pack 或对比 Pro，支付后回到原任务，产品分析也补齐案例应用、复用、额度承接和单位经济模型。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-05-06-ai-create-checkout-analytics",
+    "sections": [
+      {
+        "title": "AI Create 流程",
+        "items": [
+          "提示词库首页和案例详情页会带来源、入口和案例 ID 进入生成页，并自动应用本地化 prompt、模板、风格和尺寸",
+          "生成请求和任务 payload 会保留 prompt example ID 与分类，生成成功后也写入 metadata",
+          "生成详情页的复用按钮会记录 reuse 事件，并把生成图带回工作台作为下一轮复拍参考"
+        ]
+      },
+      {
+        "title": "额度与分析",
+        "items": [
+          "生成页、任务失败页和点评详情参考图面板在 credits 耗尽时提供 credit pack checkout，支付成功页可回到刚才的位置",
+          "Free 用户在质量门槛或额度耗尽场景下会记录 Pro 对比点击",
+          "产品分析周报新增 AI Create 入口拆分、Prompt example 应用漏斗、Credit exhausted 承接和单位经济模型"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-05-04-analytics-retake-waiting-reader",
     "date": "2026-05-04",
     "title": "产品分析周报、复拍练习闭环与等待页内嵌阅读",

@@ -153,6 +153,8 @@ class GenerationCreateRequest(BaseModel):
     intent: str = Field(default='photo_inspiration', max_length=64)
     prompt: str = Field(min_length=3, max_length=4000)
     template_key: str | None = Field(default=None, max_length=64)
+    prompt_example_id: str | None = Field(default=None, max_length=128)
+    prompt_example_category: str | None = Field(default=None, max_length=64)
     source_photo_id: str | None = None
     source_review_id: str | None = None
     image_type: str = Field(default='default', pattern='^(default|landscape|portrait|street|still_life|architecture)$')
