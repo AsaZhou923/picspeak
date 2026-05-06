@@ -4,7 +4,7 @@
     "date": "2026-05-04",
     "title": "Analytics weekly report, retake practice loop, and in-task reading",
     "summary": "PicSpeak now connects critique suggestions back to the workspace as concrete next-shoot targets, lets users read full Lens Notes articles inside review and generation waiting pages, and expands product analytics with AI Create, Prompt Library, retake, locale, and data-health reporting.",
-    "docPath": "docs/changelog/update-log-2026-05-04-analytics-retake-waiting-reader.md",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-05-04-analytics-retake-waiting-reader",
     "sections": [
       {
         "title": "User workflow",
@@ -29,7 +29,7 @@
     "date": "2026-05-01",
     "title": "Full SEO pass, real product OG image, and crawlable prompt examples",
     "summary": "Completed a full PicSpeak SEO / GEO audit and aligned AI critique, AI Create, and the public gallery across metadata, sitemap, llms.txt, a real product Open Graph image, and crawlable GPT Image 2 prompt example pages.",
-    "docPath": "docs/changelog/update-log-2026-05-01-seo-og-gallery-prompt-library.md",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-05-01-seo-og-gallery-prompt-library",
     "sections": [
       {
         "title": "AI search and indexing boundaries",
@@ -54,7 +54,7 @@
     "date": "2026-04-28",
     "title": "Runtime migrations, API stability, and homepage language cleanup",
     "summary": "Runtime schema management now runs through Alembic baseline and incremental migrations. Guest creation, audit logging, blog view counts, gallery recommendations, and AI generation downloads gained stability guards, while the frontend now has tighter API URL, default locale, html lang, demo critique, and image-processing behavior.",
-    "docPath": "docs/changelog/update-log-2026-04-28-runtime-migrations-and-stability.md",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-04-28-runtime-migrations-and-stability",
     "sections": [
       {
         "title": "Backend runtime and APIs",
@@ -79,7 +79,7 @@
     "date": "2026-04-27",
     "title": "Curated GPT-Image-2 prompt library",
     "summary": "The AI Create page now includes 30 curated GPT-Image-2 prompt examples with output images, author/source attribution, and localized title/prompt fields. Users can tune quality, ratio, and style below the prompt box, then apply an example as a draft.",
-    "docPath": "docs/changelog/update-log-2026-04-27-gpt-image2-prompt-gallery.md",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-04-27-gpt-image2-prompt-gallery",
     "sections": [
       {
         "title": "AI Create prompt library",
@@ -104,7 +104,7 @@
     "date": "2026-04-26",
     "title": "Content bundles, homepage SSR translations, and task stability",
     "summary": "Homepage, blog, updates, and review copy now sit behind clearer component and JSON bundle boundaries. Root and locale homepages render with initial translations, header controls are shared, and generation task status reads no longer commit the database session.",
-    "docPath": "docs/changelog/update-log-2026-04-26-content-bundles-and-home-ssr.md",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-04-26-content-bundles-and-home-ssr",
     "sections": [
       {
         "title": "Content and homepage rendering",
@@ -129,7 +129,7 @@
     "date": "2026-04-25",
     "title": "AI Create, image credits, and retake references",
     "summary": "PicSpeak now includes a standalone AI Create page, review-linked retake reference generation, generation history, downloads, and reuse. Image generation credits, a 30-credit redeem code, and a 300-credit checkout pack are wired into billing and usage.",
-    "docPath": "docs/changelog/update-log-2026-04-25-ai-image-generation-and-credits.md",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-04-25-ai-image-generation-and-credits",
     "sections": [
       {
         "title": "AI Create workflow",
@@ -154,7 +154,7 @@
     "date": "2026-04-24",
     "title": "Content-to-workspace conversion paths",
     "summary": "Blog, Gallery, and Home now send readers back to the workspace with intent-specific CTAs, while the analytics snapshot can track content views through clicks, uploads, and first critique completion.",
-    "docPath": "docs/changelog/update-log-2026-04-24-stage-d-content-conversion.md",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-04-24-stage-d-content-conversion",
     "sections": [
       {
         "title": "Workspace entrances",
@@ -179,7 +179,7 @@
     "date": "2026-04-22",
     "title": "Pro value repositioning and FAQPage duplicate fix",
     "summary": "Pro is now framed as next-shoot guidance, complete review, and progress tracking instead of just deeper analysis. Locale home pages also no longer emit duplicate FAQPage structured data.",
-    "docPath": "docs/changelog/update-log-2026-04-22-pro-conversion-and-faq-schema.md",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-04-22-pro-conversion-and-faq-schema",
     "sections": [
       {
         "title": "Pro value and conversion",
@@ -203,7 +203,7 @@
     "date": "2026-04-20",
     "title": "Growth loop, replay guidance, and next-shot checklists",
     "summary": "History now surfaces a recent-vs-previous growth loop, review detail separates same-photo verification from new-photo retakes, and Flash suggestions are shaped into cleaner next-shot checklist actions.",
-    "docPath": "docs/changelog/update-log-2026-04-20-review-growth-loop-and-replay-guidance.md",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-04-20-review-growth-loop-and-replay-guidance",
     "sections": [
       {
         "title": "Growth loop",
@@ -235,7 +235,7 @@
     "date": "2026-04-19",
     "title": "Auth hardening, safer task retries, and more stable requests",
     "summary": "Tightened CORS and cookie behavior, corrected webhook error codes, added activation-code rate limiting, locked JWKS cache refreshes, and made frontend requests cancellable.",
-    "docPath": "docs/changelog/update-log-2026-04-19-auth-hardening-and-request-stability.md",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-04-19-auth-hardening-and-request-stability",
     "sections": [
       {
         "title": "Auth and API safety",
@@ -260,7 +260,7 @@
     "date": "2026-04-19",
     "title": "Backend & frontend modular refactor",
     "summary": "Split oversized backend routers and the review detail page into single-responsibility modules. No user-facing changes — this is a code organization update that improves maintainability.",
-    "docPath": "docs/changelog/update-log-2026-04-19-backend-frontend-module-split.md",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-04-19-backend-frontend-module-split",
     "sections": [
       {
         "title": "Backend router split",
@@ -285,7 +285,7 @@
     "date": "2026-04-13",
     "title": "Blog post view counts are now visible",
     "summary": "Added public view counts for blog posts and wired article detail visits to increment the count automatically.",
-    "docPath": "docs/changelog/update-log-2026-04-13-blog-view-counts.md",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-04-13-blog-view-counts",
     "sections": [
       {
         "title": "Tracking",
@@ -308,7 +308,7 @@
     "date": "2026-04-12",
     "title": "llms.txt, Enhanced Schema.org, and Localized Updates Pages",
     "summary": "Added llms.txt for AI search visibility, expanded Person and SoftwareSourceCode structured data, and launched locale-pinned /zh/updates, /en/updates, and /ja/updates routes.",
-    "docPath": "docs/changelog/update-log-2026-04-12-llms-seo-schema.md",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-04-12-llms-seo-schema",
     "sections": [
       {
         "title": "AI Visibility (llms.txt)",
@@ -338,7 +338,7 @@
     "date": "2026-04-11",
     "title": "Blog Module, Gallery Sort, and Dark Theme Refinement",
     "summary": "Launched a trilingual blog with 6 SEO articles, added gallery sorting (recommended, latest, top score, most likes), and recalibrated the dark theme to a warmer tone.",
-    "docPath": "docs/changelog/update-log-2026-04-11-blog-gallery-sort-theme.md",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-04-11-blog-gallery-sort-theme",
     "sections": [
       {
         "title": "Blog Module",
@@ -369,7 +369,7 @@
     "date": "2026-04-10",
     "title": "Locale-Pinned Home Routes, SEO Signals, and Gallery UI Refactor",
     "summary": "Added /zh, /en, and /ja locale-pinned home pages, wired hreflang and JSON-LD signals across public routes, and moved scattered home, gallery, review, and workspace copy into shared i18n keys while splitting the gallery UI into focused components.",
-    "docPath": "docs/changelog/update-log-2026-04-10-locale-seo-and-gallery-refactor.md",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-04-10-locale-seo-and-gallery-refactor",
     "sections": [
       {
         "title": "Locale Homes and SEO",
@@ -394,7 +394,7 @@
     "date": "2026-04-09",
     "title": "Gallery Ranking, Image Rendering, and Lint Gates Updated",
     "summary": "The public gallery now ranks work with score-weighted freshness, uses stable paging cursors for that combined order, restores reliable gallery card image rendering, and ships a real frontend lint baseline.",
-    "docPath": "docs/changelog/update-log-2026-04-09-gallery-ranking-and-quality-gates.md",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-04-09-gallery-ranking-and-quality-gates",
     "sections": [
       {
         "title": "Public Gallery Ranking",
@@ -419,7 +419,7 @@
     "date": "2026-04-07",
     "title": "Activation Codes and China Purchase Flow Added",
     "summary": "Added an Afdian plus activation-code path for Chinese Pro purchases, tightened expiry-aware billing sync, and exposed redeem entry points across the home, review, promo, and account surfaces.",
-    "docPath": "docs/changelog/update-log-2026-04-07-activation-code-billing.md",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-04-07-activation-code-billing",
     "sections": [
       {
         "title": "Activation-Code Billing",
@@ -452,7 +452,7 @@
     "date": "2026-04-01",
     "title": "Moderation, Score Labels, and Gallery Cards Refined",
     "summary": "Relaxed public-gallery moderation for clearly allowed borderline content, expanded review score labels to 10 localized tiers, and stabilized gallery cards for landscape images.",
-    "docPath": "docs/changelog/update-log-2026-04-01-audit-score-gallery-polish.md",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-04-01-audit-score-gallery-polish",
     "sections": [
       {
         "title": "Public Gallery Moderation",
@@ -483,7 +483,7 @@
     "date": "2026-03-28",
     "title": "Home, Review, and Gallery Experience Refresh",
     "summary": "Unified the home header with the app shell, added a sign-up entry, fixed review-detail display issues, and improved public gallery paging and thumbnail delivery.",
-    "docPath": "docs/changelog/update-log-2026-03-28-home-review-gallery-refresh.md",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-03-28-home-review-gallery-refresh",
     "sections": [
       {
         "title": "Home Experience",
@@ -514,7 +514,7 @@
     "date": "2026-03-27",
     "title": "Public Gallery Navigation and Filters Updated",
     "summary": "The public gallery now supports history-style filters, URL-synced state, reliable return-position restoration, and thumbnail-only card loading.",
-    "docPath": "docs/changelog/update-log-2026-03-27-gallery-navigation-and-filters.md",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-03-27-gallery-navigation-and-filters",
     "sections": [
       {
         "title": "Gallery Filters",
@@ -547,41 +547,41 @@
     "date": "2026-03-25",
     "title": "Pro Launch Offer and Direct Checkout Updated",
     "summary": "Standardized the launch-offer messaging, expanded Pro entry points, and sent purchase buttons straight to checkout.",
-    "docPath": "docs/changelog/update-log-2026-03-25-pro-launch-checkout.md"
+    "docPath": "docs/changelog/CHANGELOG.md#2026-03-25-pro-launch-checkout"
   },
   {
     "id": "2026-03-24-score-upgrade",
     "date": "2026-03-24",
     "title": "Scoring Upgrade and Gallery Recommendation Logic",
     "summary": "Unified scoring behavior across modes and added score-version-aware recommendation logic to the public gallery.",
-    "docPath": "docs/changelog/update-log-2026-03-24-score-upgrade.md"
+    "docPath": "docs/changelog/CHANGELOG.md#2026-03-24-score-upgrade"
   },
   {
     "id": "2026-03-22-gallery-likes",
     "date": "2026-03-22",
     "title": "Public Gallery Likes and SEO Improvements",
     "summary": "Added persistent gallery likes for signed-in users and tightened SEO metadata for public-facing pages.",
-    "docPath": "docs/changelog/update-log-2026-03-22-gallery-likes.md"
+    "docPath": "docs/changelog/CHANGELOG.md#2026-03-22-gallery-likes"
   },
   {
     "id": "2026-03-21-strict-scoring",
     "date": "2026-03-21",
     "title": "Stricter Scoring Prompt and Correct Gallery Count",
     "summary": "Tightened the AI scoring prompt and fixed the gallery header so the total count is correct from page one.",
-    "docPath": "docs/changelog/update-log-2026-03-21-strict-scoring.md"
+    "docPath": "docs/changelog/CHANGELOG.md#2026-03-21-strict-scoring"
   },
   {
     "id": "2026-03-20-gallery",
     "date": "2026-03-20",
     "title": "Public Gallery Browsing, Moderation, and Paging",
     "summary": "Rolled out the public gallery workflow with moderation, guest browsing, gallery cards, and stable paging behavior.",
-    "docPath": "docs/changelog/update-log-2026-03-20-gallery.md"
+    "docPath": "docs/changelog/CHANGELOG.md#2026-03-20-gallery"
   },
   {
     "id": "2026-03-20-history-and-favorites",
     "date": "2026-03-20",
     "title": "History, Sharing, Replay, and Favorites Connected",
     "summary": "Connected history filtering, sharing, export, replay analysis, and favorites across the frontend and backend.",
-    "docPath": "docs/changelog/update-log-2026-03-20.md"
+    "docPath": "docs/changelog/CHANGELOG.md#2026-03-20"
   }
 ]

@@ -125,7 +125,7 @@ cd frontend && npm run build && npm run start
 
 ## 文档
 
-- [最新更新日志](docs/changelog/update-log-2026-05-04-analytics-retake-waiting-reader.md)
+- [最新更新日志](docs/changelog/CHANGELOG.md#2026-05-04-analytics-retake-waiting-reader)
 - [SEO / GEO 审计报告](docs/seo/seo-audit-2026-05-01.md)
 - [后端接口文档](docs/api/后端接口文档_v1.md)
 - [系统架构说明](docs/architecture/系统架构.md)

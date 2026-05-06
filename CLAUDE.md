@@ -179,7 +179,7 @@ Frontend values live in `frontend/.env.local`; `NEXT_PUBLIC_API_URL` and site/pu
 - Do not bypass quota, credit, or guest/auth helpers when adding new creation endpoints.
 - When touching image generation, update pricing, task processor, API schemas, frontend contracts, and tests together.
 - When touching public pages, update localized copy and SEO tests together.
-- Keep docs/changelog entries synchronized for user-facing feature work.
+- Keep `docs/changelog/CHANGELOG.md` entries and `/updates` docPath anchors synchronized for user-facing feature work.
 
 ## Verification Checklist
 

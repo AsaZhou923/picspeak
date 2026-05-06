@@ -4,7 +4,7 @@
     "date": "2026-05-04",
     "title": "分析週報、撮り直し練習ループ、待ち時間の本文リーダー",
     "summary": "講評の提案を次の撮影目標としてワークスペースへ戻せるようになり、講評・生成の待機画面では記事全文をその場で読めます。分析側も AI Create、Prompt Library、撮り直し貢献、locale、データ健全性まで拡張しました。",
-    "docPath": "docs/changelog/update-log-2026-05-04-analytics-retake-waiting-reader.md",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-05-04-analytics-retake-waiting-reader",
     "sections": [
       {
         "title": "ユーザーフロー",
@@ -29,7 +29,7 @@
     "date": "2026-05-01",
     "title": "SEO 全面改善、実プロダクト OG 画像、検索可能な prompt 例",
     "summary": "PicSpeak の SEO / GEO を全面監査し、AI 写真講評、AI 作成、公開ギャラリーを metadata、sitemap、llms.txt、実プロダクト Open Graph 画像、検索可能な GPT Image 2 prompt 例ページに反映しました。",
-    "docPath": "docs/changelog/update-log-2026-05-01-seo-og-gallery-prompt-library.md",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-05-01-seo-og-gallery-prompt-library",
     "sections": [
       {
         "title": "AI 検索と index 境界",
@@ -54,7 +54,7 @@
     "date": "2026-04-28",
     "title": "Runtime migration、API 安定性、ホーム言語設定を整理",
     "summary": "runtime schema 管理を Alembic baseline と増分 migration に移行しました。ゲスト作成、監査ログ、Blog 閲覧数、Gallery 推薦、AI 生成画像ダウンロードに安定性ガードを追加し、フロントエンドでは API URL、既定 locale、html lang、デモ講評、画像処理を整理しました。",
-    "docPath": "docs/changelog/update-log-2026-04-28-runtime-migrations-and-stability.md",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-04-28-runtime-migrations-and-stability",
     "sections": [
       {
         "title": "Backend runtime と API",
@@ -79,7 +79,7 @@
     "date": "2026-04-27",
     "title": "厳選 GPT-Image-2 prompt ライブラリを追加",
     "summary": "AI 作成ページに、出力例画像・作者/出典・ローカライズ済みタイトル/prompt を持つ 30 件の GPT-Image-2 prompt 例を追加しました。prompt 入力欄の下で品質、比率、スタイルを調整し、その後に例を下書きとして適用できます。",
-    "docPath": "docs/changelog/update-log-2026-04-27-gpt-image2-prompt-gallery.md",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-04-27-gpt-image2-prompt-gallery",
     "sections": [
       {
         "title": "AI 作成 prompt ライブラリ",
@@ -104,7 +104,7 @@
     "date": "2026-04-26",
     "title": "コンテンツ bundle、ホーム SSR 翻訳、タスク安定性を更新",
     "summary": "ホーム、Blog、Updates、レビュー文言をコンポーネントと JSON bundle の境界へ整理しました。ルートと多言語ホームは初期翻訳付きで描画され、ヘッダー操作も共通化。生成タスク状態の読み取りでは不要な commit を行わないようにしました。",
-    "docPath": "docs/changelog/update-log-2026-04-26-content-bundles-and-home-ssr.md",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-04-26-content-bundles-and-home-ssr",
     "sections": [
       {
         "title": "コンテンツとホーム描画",
@@ -129,7 +129,7 @@
     "date": "2026-04-25",
     "title": "AI 作成、画像クレジット、再撮影用リファレンスを追加",
     "summary": "独立した AI 作成ページ、レビューからの再撮影リファレンス生成、生成履歴、ダウンロード、再生成を追加しました。あわせて画像生成クレジット、30 クレジット引き換えコード、300 クレジット購入パックを整えました。",
-    "docPath": "docs/changelog/update-log-2026-04-25-ai-image-generation-and-credits.md",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-04-25-ai-image-generation-and-credits",
     "sections": [
       {
         "title": "AI 作成体験",
@@ -154,7 +154,7 @@
     "date": "2026-04-24",
     "title": "コンテンツ流入から評価ワークスペースへの導線を追加",
     "summary": "Blog、Gallery、ホームから目的別にワークスペースへ戻れる入口を追加し、コンテンツ閲覧からクリック、アップロード、初回評価完了まで追える週次レポート口径を整えました。",
-    "docPath": "docs/changelog/update-log-2026-04-24-stage-d-content-conversion.md",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-04-24-stage-d-content-conversion",
     "sections": [
       {
         "title": "ワークスペース入口",
@@ -179,7 +179,7 @@
     "date": "2026-04-22",
     "title": "Pro 価値訴求の再設計と FAQPage 重複修正",
     "summary": "Pro を「より深い分析」ではなく、次回撮影ガイド・完全な振り返り・上達追跡として再整理しました。あわせて /zh・/en・/ja ホームの FAQPage 構造化データ重複を修正しました。",
-    "docPath": "docs/changelog/update-log-2026-04-22-pro-conversion-and-faq-schema.md",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-04-22-pro-conversion-and-faq-schema",
     "sections": [
       {
         "title": "Pro 価値訴求",
@@ -203,7 +203,7 @@
     "date": "2026-04-20",
     "title": "成長ループ、再評価ガイド、次回チェックリスト",
     "summary": "履歴ページで直近 3 回の伸びを見比べられるようにし、レビュー詳細では「同じ写真で再評価」と「新しく撮り直す」を分けて案内します。Flash の提案も次回の撮影チェックリストにしやすい形へ整理しました。",
-    "docPath": "docs/changelog/update-log-2026-04-20-review-growth-loop-and-replay-guidance.md",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-04-20-review-growth-loop-and-replay-guidance",
     "sections": [
       {
         "title": "成長ループ",
@@ -235,7 +235,7 @@
     "date": "2026-04-19",
     "title": "認証強化・タスクリトライ整理・リクエスト安定化",
     "summary": "CORS、Cookie、Webhook、JWKS キャッシュ、タスクエラー公開範囲、フロントエンドのリクエスト中断をまとめて整え、認証まわりと API 呼び出しの安定性を上げました。",
-    "docPath": "docs/changelog/update-log-2026-04-19-auth-hardening-and-request-stability.md",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-04-19-auth-hardening-and-request-stability",
     "sections": [
       {
         "title": "認証と API 保護",
@@ -260,7 +260,7 @@
     "date": "2026-04-19",
     "title": "バックエンド・フロントエンドのモジュール分割リファクタリング",
     "summary": "肥大化していたバックエンドルーターとフロントエンドページを単一責任の小モジュールに分割し、コードの可読性と保守性を向上させました。ユーザー向けの機能変更はありません。",
-    "docPath": "docs/changelog/update-log-2026-04-19-backend-frontend-module-split.md",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-04-19-backend-frontend-module-split",
     "sections": [
       {
         "title": "バックエンドルーター分割",
@@ -285,7 +285,7 @@
     "date": "2026-04-13",
     "title": "ブログ記事の閲覧回数表示を追加",
     "summary": "ブログ記事ごとの閲覧回数を公開表示し、記事詳細を開いたときに自動で 1 回加算される仕組みを追加しました。",
-    "docPath": "docs/changelog/update-log-2026-04-13-blog-view-counts.md",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-04-13-blog-view-counts",
     "sections": [
       {
         "title": "閲覧数の記録",
@@ -308,7 +308,7 @@
     "date": "2026-04-12",
     "title": "llms.txt 導入・Schema.org 拡張・多言語 Updates ページ追加",
     "summary": "AI 検索エンジン向け llms.txt を新設、Person・SoftwareSourceCode 等 の構造化データを補完し、Updates ページも /zh・/en・/ja ルートで公開開始。",
-    "docPath": "docs/changelog/update-log-2026-04-12-llms-seo-schema.md",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-04-12-llms-seo-schema",
     "sections": [
       {
         "title": "AI 可視性（llms.txt）",
@@ -338,7 +338,7 @@
     "date": "2026-04-11",
     "title": "ブログ・ギャラリーソート・ダークテーマを追加",
     "summary": "6 本の三言語ブログ記事を公開し、ギャラリーに4種ソートを追加。ダークモード配色を暖色系へ調整しました。",
-    "docPath": "docs/changelog/update-log-2026-04-11-blog-gallery-sort-theme.md",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-04-11-blog-gallery-sort-theme",
     "sections": [
       {
         "title": "ブログモジュール",
@@ -369,7 +369,7 @@
     "date": "2026-04-10",
     "title": "多言語ホーム導線、SEO ルーティング、ギャラリー構成を刷新",
     "summary": "/zh・/en・/ja の言語固定ホームを追加し、hreflang・JSON-LD・sitemap を整備しました。あわせてギャラリー、ホーム、レビュー、ワークスペースの文言を i18n に集約し、ギャラリー画面を部品化して保守しやすくしました。",
-    "docPath": "docs/changelog/update-log-2026-04-10-locale-seo-and-gallery-refactor.md",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-04-10-locale-seo-and-gallery-refactor",
     "sections": [
       {
         "title": "言語固定ホームと SEO",
@@ -394,7 +394,7 @@
     "date": "2026-04-09",
     "title": "公開ギャラリー順位付け、画像表示、Lint 基盤を調整",
     "summary": "公開ギャラリーをスコア優先かつ新しさも加味する順位付けに更新し、安定したページングカーソルへ切り替えました。あわせてギャラリー画像表示の不具合を修正し、フロントエンドの lint 実行基盤を整備しました。",
-    "docPath": "docs/changelog/update-log-2026-04-09-gallery-ranking-and-quality-gates.md",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-04-09-gallery-ranking-and-quality-gates",
     "sections": [
       {
         "title": "公開ギャラリー順位付け",
@@ -419,7 +419,7 @@
     "date": "2026-04-07",
     "title": "アクティベーションコード開通と中国向け購入導線を追加",
     "summary": "中国語ユーザー向けに愛発電とアクティベーションコードによる Pro 開通フローを追加し、期限同期と失効時のプラン反映も補強しました。",
-    "docPath": "docs/changelog/update-log-2026-04-07-activation-code-billing.md",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-04-07-activation-code-billing",
     "sections": [
       {
         "title": "アクティベーションコード基盤",
@@ -452,7 +452,7 @@
     "date": "2026-04-01",
     "title": "審査基準・スコア表現・ギャラリー表示を調整",
     "summary": "公開ギャラリーの審査を過度に厳しくしすぎないよう見直し、レビュー結果のスコア文言を 10 段階に細分化し、ギャラリーカードの横写真表示を安定化しました。",
-    "docPath": "docs/changelog/update-log-2026-04-01-audit-score-gallery-polish.md",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-04-01-audit-score-gallery-polish",
     "sections": [
       {
         "title": "公開ギャラリー審査",
@@ -483,7 +483,7 @@
     "date": "2026-03-28",
     "title": "ホーム・レビュー・ギャラリー体験を一括で調整",
     "summary": "ホームのヘッダー統一、サインアップ導線の追加、レビュー詳細の表示修正、公開ギャラリーのページングとサムネイル運用をまとめて改善しました。",
-    "docPath": "docs/changelog/update-log-2026-03-28-home-review-gallery-refresh.md",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-03-28-home-review-gallery-refresh",
     "sections": [
       {
         "title": "ホーム体験",
@@ -514,7 +514,7 @@
     "date": "2026-03-27",
     "title": "公開ギャラリーの復元と絞り込みを強化",
     "summary": "公開ギャラリーに履歴ページと同じ絞り込みを追加し、URL 同期、戻る復元、サムネイル読み込み整理までまとめて補強しました。",
-    "docPath": "docs/changelog/update-log-2026-03-27-gallery-navigation-and-filters.md",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-03-27-gallery-navigation-and-filters",
     "sections": [
       {
         "title": "ギャラリー絞り込み",
@@ -547,41 +547,41 @@
     "date": "2026-03-25",
     "title": "Pro 初回キャンペーンと直接チェックアウトを整理",
     "summary": "Pro の初回価格表現を統一し、各ページの導線を補強し、購入ボタンを直接チェックアウトに接続しました。",
-    "docPath": "docs/changelog/update-log-2026-03-25-pro-launch-checkout.md"
+    "docPath": "docs/changelog/CHANGELOG.md#2026-03-25-pro-launch-checkout"
   },
   {
     "id": "2026-03-24-score-upgrade",
     "date": "2026-03-24",
     "title": "新しい採点口径とギャラリー推薦表示を導入",
     "summary": "flash と pro の採点口径を揃え、公開ギャラリーに score version と推薦ロジックを追加しました。",
-    "docPath": "docs/changelog/update-log-2026-03-24-score-upgrade.md"
+    "docPath": "docs/changelog/CHANGELOG.md#2026-03-24-score-upgrade"
   },
   {
     "id": "2026-03-22-gallery-likes",
     "date": "2026-03-22",
     "title": "公開ギャラリーのいいねと SEO を追加",
     "summary": "公開ギャラリーに永続化されたいいねを追加し、同時に公開ページの SEO 設定も整えました。",
-    "docPath": "docs/changelog/update-log-2026-03-22-gallery-likes.md"
+    "docPath": "docs/changelog/CHANGELOG.md#2026-03-22-gallery-likes"
   },
   {
     "id": "2026-03-21-strict-scoring",
     "date": "2026-03-21",
     "title": "厳しめの採点 prompt とギャラリー総数表示を修正",
     "summary": "AI 採点 prompt を引き締め、公開ギャラリーの総件数表示が先頭ページでも正しく出るように修正しました。",
-    "docPath": "docs/changelog/update-log-2026-03-21-strict-scoring.md"
+    "docPath": "docs/changelog/CHANGELOG.md#2026-03-21-strict-scoring"
   },
   {
     "id": "2026-03-20-gallery",
     "date": "2026-03-20",
     "title": "公開ギャラリーの閲覧・審査・ページングを整備",
     "summary": "公開ギャラリーを本格導入し、審査、ゲスト閲覧、長廊カード、ページング体験をまとめて整えました。",
-    "docPath": "docs/changelog/update-log-2026-03-20-gallery.md"
+    "docPath": "docs/changelog/CHANGELOG.md#2026-03-20-gallery"
   },
   {
     "id": "2026-03-20-history-and-favorites",
     "date": "2026-03-20",
     "title": "履歴・共有・再分析・お気に入りを接続",
     "summary": "履歴ページの絞り込み、共有、エクスポート、再分析、お気に入りを前後端でつなぎ込みました。",
-    "docPath": "docs/changelog/update-log-2026-03-20.md"
+    "docPath": "docs/changelog/CHANGELOG.md#2026-03-20"
   }
 ]

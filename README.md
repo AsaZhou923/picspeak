@@ -127,7 +127,7 @@ cd frontend && npm run build && npm run start
 
 ## Documentation
 
-- [Latest Changelog](docs/changelog/update-log-2026-05-04-analytics-retake-waiting-reader.md)
+- [Latest Changelog](docs/changelog/CHANGELOG.md#2026-05-04-analytics-retake-waiting-reader)
 - [SEO / GEO Audit](docs/seo/seo-audit-2026-05-01.md)
 - [Backend API Documentation](docs/api/后端接口文档_v1.md)
 - [System Architecture](docs/architecture/系统架构.md)
