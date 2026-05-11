@@ -14,6 +14,7 @@ Core product areas:
 - AI image generation with templates, tasks, generated image detail pages, history, credits, and credit-pack billing
 - Review-to-generation loop for composition, lighting, color, and retake reference images
 - Review-to-workspace retake targets, history practice themes, and in-task Blog reading during critique/generation waits
+- Operational health snapshots for task status, AI costs, credits, payments, and public-content audits
 
 ## Architecture
 
@@ -55,6 +56,7 @@ python scripts/generate_activation_codes.py
 python scripts/register_lemonsqueezy_webhook.py
 python scripts/verify_product_analytics_write.py
 python scripts/export_product_analytics_weekly_report.py
+python scripts/export_operational_health_snapshot.py
 python scripts/backfill_gallery_thumbnails.py
 ```
 
@@ -102,7 +104,7 @@ node --test test/*.test.ts
 - `services/task_dispatcher.py`, `services/task_events.py`, `services/worker.py` - Task dispatch, WebSocket/event polling, and worker orchestration
 - `services/clerk_auth.py`, `services/clerk_webhooks.py` - Clerk identity and webhook handling
 - `services/lemonsqueezy*.py` - Checkout, webhook, Pro, and credit-pack handling
-- `services/product_analytics.py` and `services/content_audit.py` - Analytics and content conversion support
+- `services/product_analytics.py`, `services/content_audit.py`, and `services/operational_health.py` - Analytics, content conversion, and operational health reporting support
 - `core/config.py` - Environment-backed settings via `pydantic-settings`
 
 ### Backend scripts and schema

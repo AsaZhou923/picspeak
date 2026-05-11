@@ -52,5 +52,9 @@ export function useReplayContext({ preview }: { preview: string | null }) {
     nextShootAction: searchParams.get('next_shoot_action'),
     nextShootDimension: searchParams.get('next_shoot_dimension'),
     sourceGenerationId: searchParams.get('generation_id'),
+    contentEntrypoint: searchParams.get('entrypoint'),
+    contentSlug: searchParams.get('content_slug'),
+    galleryReviewId: searchParams.get('gallery_review_id'),
+    promptExampleId: searchParams.get('prompt_example_id'),
   };
 }

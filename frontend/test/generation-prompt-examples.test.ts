@@ -29,7 +29,7 @@ const VALID_TEMPLATE_KEYS = new Set([
 const VALID_SIZES = new Set(['1024x1024', '1024x1536', '1536x1024']);
 
 test('curated generation prompt examples are complete and deployable', () => {
-  assert.equal(GENERATION_PROMPT_EXAMPLES.length, 30);
+  assert.equal(GENERATION_PROMPT_EXAMPLES.length, 50);
 
   const ids = new Set<string>();
   const imagePaths = new Set<string>();

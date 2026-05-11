@@ -450,6 +450,80 @@
           ]
         }
       ]
+    },
+    {
+      "slug": "gpt-image-2-prompt-examples-workflow",
+      "title": "How to turn GPT Image 2 prompt examples into usable photo references",
+      "description": "Prompt libraries are most useful when they become a repeatable image-making workflow. This guide explains how to choose GPT Image 2 prompt examples, adapt them to your own subject, and turn the result into a concrete reference for your next shoot or AI Create session.",
+      "excerpt": "A good prompt example is not something to copy blindly. Treat it like a visual recipe: keep the structure, replace the subject, tighten the constraints, then compare the generated reference against your real creative goal.",
+      "category": "AI Create",
+      "readingTime": "6 min read",
+      "publishedAt": "2026-05-11",
+      "updatedAt": "2026-05-11",
+      "keywords": [
+        "GPT Image 2 prompt examples",
+        "AI image prompt workflow",
+        "photo reference generation",
+        "AI Create prompts",
+        "visual reference workflow",
+        "prompt adaptation"
+      ],
+      "intro": "Prompt examples are powerful because they show working visual structure: subject, lighting, camera language, material cues, layout, typography, and constraints. The mistake is copying them as finished recipes. The better move is to extract the reusable pattern and adapt it to your own image goal.",
+      "takeawayTitle": "Prompt examples work best as adaptable patterns",
+      "takeawayItems": [
+        "Start with the visual job: portrait reference, poster, product scene, UI concept, or experimental study.",
+        "Keep the structure of a strong prompt but replace the subject, context, and constraints.",
+        "Remove details that belong only to the original example before generating your version.",
+        "Use the output as a reference, then critique whether it actually supports the next shoot or design decision."
+      ],
+      "sections": [
+        {
+          "title": "1. Pick examples by intent, not by surface style",
+          "paragraphs": [
+            "The best prompt is not always the prettiest one in the library. Choose the example that matches your task: a lighting study, a product layout, a poster hierarchy, a UI information design, or a mood reference for a real shoot.",
+            "If you need a food ad, start from a product or commercial layout prompt rather than a cinematic portrait prompt. If you need a portrait reference, choose an example with the right camera distance, pose, light direction, and background relationship. Matching intent first prevents a beautiful but irrelevant output."
+          ],
+          "bullets": [
+            "Photography: camera distance, lens language, light direction, subject-background separation.",
+            "Poster: hierarchy, typography, negative space, shape system, print texture.",
+            "Product: hero object, surface material, props, callouts, selling point structure.",
+            "UI: screen density, component language, labels, layout logic, visual hierarchy."
+          ]
+        },
+        {
+          "title": "2. Separate reusable structure from one-off details",
+          "paragraphs": [
+            "A strong GPT Image 2 prompt usually has two layers. The reusable layer is the structure: composition, lighting, texture, camera language, quality bar, and constraints. The one-off layer is the exact city, outfit, product name, character, slogan, or cultural reference.",
+            "Before adapting an example, mark which words describe the system and which words describe the original content. Keep the system. Replace the content. This is how a Boston city poster prompt can become a Kyoto spring poster, or a camera exploded-view prompt can become a coffee grinder breakdown."
+          ]
+        },
+        {
+          "title": "3. Rewrite the subject and constraints clearly",
+          "paragraphs": [
+            "After choosing the structure, rewrite the subject in plain language. Avoid leaving placeholder fragments from the original prompt, because the model may mix two incompatible directions. If the source says \"Boston, a city of river, memory, and invention,\" replace the whole city identity, not only the word Boston.",
+            "Constraints matter just as much as style. Add what must not happen: no extra logo text, no unreadable labels, no unrelated props, no over-crowded layout, no plastic skin, no fake UI elements if this needs to feel product-ready."
+          ],
+          "bullets": [
+            "Replace subject nouns first: person, city, product, dish, object, page type.",
+            "Replace cultural references second: signage language, location details, era, materials.",
+            "Review negative constraints last: text quality, clutter, wrong aspect ratio, off-brand colors."
+          ]
+        },
+        {
+          "title": "4. Use PicSpeak critique to close the loop",
+          "paragraphs": [
+            "A generated reference is useful only if it changes the next decision. After generating a candidate, treat it like a draft: does the subject read instantly, does the light support the mood, does the composition have a clear hierarchy, and does the color palette match the intended emotion?",
+            "For photography practice, use the generated image as a target reference, then upload the real frame after your shoot. Compare the critique against the reference goal. The point is not to make reality imitate the AI perfectly; it is to make your next real image more intentional."
+          ]
+        },
+        {
+          "title": "5. Build a small personal prompt shelf",
+          "paragraphs": [
+            "Save only the examples you would actually reuse. A smaller shelf of ten reliable structures is more valuable than a giant folder you never open. Organize them by job: portrait light, product hero, poster hierarchy, information card, moodboard, and experimental visual test.",
+            "Each time a prompt works, write down what made it useful. Was it the light description, the module layout, the negative constraints, or the camera language? Over time, this turns a public prompt library into your own repeatable visual system."
+          ]
+        }
+      ]
     }
   ]
 }

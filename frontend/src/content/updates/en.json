@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-05-11-prompt-library-retake-health",
+    "date": "2026-05-11",
+    "title": "Prompt Library expansion, example retakes, and operational health",
+    "summary": "The AI Create prompt library now has 50 examples, detail pages can carry an example target into the workspace for retake practice, the trilingual Blog adds a prompt workflow article, and the backend now exports a daily operational health snapshot for tasks, costs, payments, and public-content checks.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-05-11-prompt-library-retake-health",
+    "sections": [
+      {
+        "title": "Prompt Library and retakes",
+        "items": [
+          "Added 20 GPT Image 2 examples with image assets across photography, posters, products, UI, and experimental visuals",
+          "Prompt example detail pages now include a retake CTA that carries the prompt example ID, next-shoot target, and target dimension into the workspace",
+          "The workspace retake target card can show prompt-example or content-source context and sends that context with review requests"
+        ]
+      },
+      {
+        "title": "Content and operations",
+        "items": [
+          "Added a trilingual GPT Image 2 prompt example workflow article about adapting examples into real photo references",
+          "Added an external entity signal checklist for weekly Search Console, llms.txt, external citation, and brand-consistency checks",
+          "Added an operational health service and export script covering task status, failure clusters, AI costs, credits, payment webhooks, and public gallery checks"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-05-06-ai-create-checkout-analytics",
     "date": "2026-05-06",
     "title": "AI Create example handoff, credit recovery, and analytics splits",

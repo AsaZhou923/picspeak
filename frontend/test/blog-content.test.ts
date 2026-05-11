@@ -58,7 +58,7 @@ test('blog content bundles keep the same slug order across locales', () => {
   >;
   const canonicalSlugs = bundles.en.posts.map((post) => post.slug);
 
-  assert.equal(canonicalSlugs.length, 6);
+  assert.equal(canonicalSlugs.length, 7);
 
   for (const locale of LOCALES) {
     assert.deepEqual(

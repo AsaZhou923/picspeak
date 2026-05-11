@@ -5,6 +5,7 @@ import {
   getBlogWorkspaceCta,
   getGalleryWorkspaceCtas,
   getHomeIntentEntrances,
+  getPromptLibraryWorkspaceCta,
 } from '../src/lib/content-conversion.ts';
 import type { PublicGalleryItem } from '../src/lib/types.ts';
 
@@ -86,4 +87,20 @@ test('workspace conversion href omits empty optional fields', () => {
   });
 
   assert.equal(href, '/workspace?source=blog&entrypoint=blog_same_critique&image_type=street');
+});
+
+test('prompt library CTA carries example context into workspace practice', () => {
+  const cta = getPromptLibraryWorkspaceCta('en', {
+    id: 'photo-cinematic-minimal-portrait',
+    category: 'photography',
+    title: 'Cinematic Minimal Portrait',
+  });
+
+  assert.equal(cta.entrypoint, 'prompt_library_retake');
+  assert.equal(cta.imageType, 'portrait');
+  assert.match(cta.href, /^\/workspace\?/);
+  assert.match(cta.href, /source=prompt_library/);
+  assert.match(cta.href, /entrypoint=prompt_library_retake/);
+  assert.match(cta.href, /prompt_example_id=photo-cinematic-minimal-portrait/);
+  assert.match(cta.href, /next_shoot_dimension=composition/);
 });

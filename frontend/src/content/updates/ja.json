@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-05-11-prompt-library-retake-health",
+    "date": "2026-05-11",
+    "title": "Prompt Library 拡張、例からの撮り直し、運用健康スナップショット",
+    "summary": "AI Create の prompt ライブラリを 50 件に拡張し、詳細ページから例の目標をワークスペースへ引き継いで撮り直し練習できるようにしました。三言語 Blog に prompt ワークフロー記事を追加し、バックエンドには task、cost、payment、公開コンテンツ確認をまとめる日次運用健康スナップショットも追加しています。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-05-11-prompt-library-retake-health",
+    "sections": [
+      {
+        "title": "Prompt Library と撮り直し",
+        "items": [
+          "写真、ポスター、商品、UI、実験ビジュアルにわたる GPT Image 2 例を 20 件と画像素材を追加",
+          "prompt 例の詳細ページに撮り直し CTA を追加し、prompt example ID、次の撮影目標、対象次元をワークスペースへ引き継ぎます",
+          "ワークスペースの撮り直し目標カードは prompt 例またはコンテンツ元を表示し、その文脈を講評リクエストにも送ります"
+        ]
+      },
+      {
+        "title": "コンテンツと運用",
+        "items": [
+          "GPT Image 2 prompt 例を実写の参考に書き換える三言語 Blog 記事を追加",
+          "Search Console、llms.txt、外部引用、ブランド一貫性を毎週確認する外部エンティティ信号チェックリストを追加",
+          "task 状態、失敗聚類、AI cost、credits、payment webhook、公開ギャラリー確認をまとめる運用健康サービスと export script を追加"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-05-06-ai-create-checkout-analytics",
     "date": "2026-05-06",
     "title": "AI Create 例の引き継ぎ、credit 回復、分析分解",

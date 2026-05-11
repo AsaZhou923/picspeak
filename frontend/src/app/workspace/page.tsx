@@ -32,8 +32,10 @@ function retakeTargetCopy(locale: 'zh' | 'en' | 'ja') {
       label: 'Retake Target',
       title: '次の撮影目標を引き継ぎました',
       sourceReview: 'Source review',
+      sourcePrompt: 'Prompt example',
+      sourceContent: 'Content source',
       dimension: 'Focus',
-      uploadHint: '新しい写真をアップロードすると、この目標と元の講評をつないで比較できます。',
+      uploadHint: '新しい写真をアップロードすると、この目標と流入元の文脈を保ったまま講評できます。',
     };
   }
   if (locale === 'en') {
@@ -41,16 +43,20 @@ function retakeTargetCopy(locale: 'zh' | 'en' | 'ja') {
       label: 'Retake Target',
       title: 'Next-shoot target carried over',
       sourceReview: 'Source review',
+      sourcePrompt: 'Prompt example',
+      sourceContent: 'Content source',
       dimension: 'Focus',
-      uploadHint: 'Upload a new photo and PicSpeak will connect this goal back to the source critique for comparison.',
+      uploadHint: 'Upload a new photo and PicSpeak will keep this goal and source context attached to the critique.',
     };
   }
   return {
     label: '复拍目标',
     title: '已带入下一次拍摄目标',
     sourceReview: '来源点评',
+    sourcePrompt: '来源案例',
+    sourceContent: '内容来源',
     dimension: '重点维度',
-    uploadHint: '上传新照片后，PicSpeak 会把这次目标和来源点评关联起来，方便比较进步。',
+    uploadHint: '上传新照片后，PicSpeak 会保留这次练习目标和来源上下文，方便继续复盘。',
   };
 }
 
@@ -90,6 +96,10 @@ function WorkspacePageContent() {
     nextShootAction,
     nextShootDimension,
     sourceGenerationId,
+    contentEntrypoint,
+    contentSlug,
+    galleryReviewId,
+    promptExampleId,
   } =
     useReplayContext({ preview });
 
@@ -102,8 +112,9 @@ function WorkspacePageContent() {
   );
 
   const canReplayWithoutUpload = Boolean(sourceReviewId && replayPhotoId && !preview);
-  const canUseNextShootTarget = Boolean(sourceReviewId && nextShootAction && !preview && !canReplayWithoutUpload);
+  const canUseNextShootTarget = Boolean(nextShootAction && !preview && !canReplayWithoutUpload);
   const targetCopy = retakeTargetCopy(locale);
+  const contentSourceLabel = promptExampleId ?? contentSlug ?? galleryReviewId;
 
   useEffect(() => {
     if (isGuest && reviewMode === 'pro') setReviewMode('flash');
@@ -132,6 +143,10 @@ function WorkspacePageContent() {
         next_shoot_action: nextShootAction,
         next_shoot_dimension: nextShootDimension,
         source_generation_id: sourceGenerationId,
+        content_entrypoint: contentEntrypoint,
+        content_slug: contentSlug,
+        gallery_review_id: galleryReviewId,
+        prompt_example_id: promptExampleId,
       },
     });
     if (usage && remainingQuota !== null && remainingQuota <= 0) {
@@ -172,6 +187,10 @@ function WorkspacePageContent() {
             next_shoot_action: nextShootAction,
             next_shoot_dimension: nextShootDimension,
             source_generation_id: sourceGenerationId,
+            content_entrypoint: contentEntrypoint,
+            content_slug: contentSlug,
+            gallery_review_id: galleryReviewId,
+            prompt_example_id: promptExampleId,
           },
         });
         router.push(`/tasks/${asyncResult.task_id}?mode=${reviewMode}`);
@@ -192,6 +211,10 @@ function WorkspacePageContent() {
             next_shoot_action: nextShootAction,
             next_shoot_dimension: nextShootDimension,
             source_generation_id: sourceGenerationId,
+            content_entrypoint: contentEntrypoint,
+            content_slug: contentSlug,
+            gallery_review_id: galleryReviewId,
+            prompt_example_id: promptExampleId,
           },
         });
         router.push(`/reviews/${syncResult.review_id}`);
@@ -210,7 +233,7 @@ function WorkspacePageContent() {
         setErrMessage(formatUserFacingError(t, err, t('err_upload')));
       }
     }
-  }, [photo, replayPhotoId, reviewMode, locale, imageType, sourceReviewId, retakeIntent, nextShootAction, nextShootDimension, sourceGenerationId, ensureToken, router, t, token, usage, remainingQuota, setStage, setErrMessage]);
+  }, [photo, replayPhotoId, reviewMode, locale, imageType, sourceReviewId, retakeIntent, nextShootAction, nextShootDimension, sourceGenerationId, contentEntrypoint, contentSlug, galleryReviewId, promptExampleId, ensureToken, router, t, token, usage, remainingQuota, setStage, setErrMessage]);
 
   return (
     <div className="pt-14 min-h-screen">
@@ -260,9 +283,21 @@ function WorkspacePageContent() {
                         {targetCopy.dimension}: {nextShootDimension}
                       </span>
                     )}
-                    <span className="rounded-full border border-border-subtle bg-void/30 px-3 py-1">
-                      {targetCopy.sourceReview}: {sourceReviewId}
-                    </span>
+                    {sourceReviewId && (
+                      <span className="rounded-full border border-border-subtle bg-void/30 px-3 py-1">
+                        {targetCopy.sourceReview}: {sourceReviewId}
+                      </span>
+                    )}
+                    {promptExampleId && (
+                      <span className="rounded-full border border-border-subtle bg-void/30 px-3 py-1">
+                        {targetCopy.sourcePrompt}: {promptExampleId}
+                      </span>
+                    )}
+                    {!promptExampleId && contentSourceLabel && (
+                      <span className="rounded-full border border-border-subtle bg-void/30 px-3 py-1">
+                        {targetCopy.sourceContent}: {contentSourceLabel}
+                      </span>
+                    )}
                   </div>
                   <p className="mt-4 text-xs leading-5 text-ink-muted">{targetCopy.uploadHint}</p>
                 </div>

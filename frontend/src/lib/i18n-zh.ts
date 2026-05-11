@@ -18,7 +18,7 @@ export const zhTranslations = {
   plan_guest_label: '游客',
   updates_label: '更新记录',
   updates_hint_home: '查看产品分析、复拍练习与等待页阅读更新',
-  updates_hint_latest: '查看 AI Create 案例、额度承接与分析更新',
+  updates_hint_latest: '查看 Prompt 案例复拍、运营健康与内容更新',
 
   generation_badge: 'AI 创作',
   generation_title: 'AI 创作',

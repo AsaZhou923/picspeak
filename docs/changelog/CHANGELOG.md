@@ -2,6 +2,94 @@
 
 本文件汇总了原 `docs/changelog/update-log-*.md` 的全部更新记录。新增 release 请追加到顶部，并为每条记录保留稳定锚点，供 `/updates` 的 `docPath` 和 README 链接定位。
 
+<a id="2026-05-11-prompt-library-retake-health"></a>
+
+## 2026-05-11 - prompt library retake health
+
+日期：2026-05-11
+
+### 概览
+
+这次更新把 Prompt Library 从“看案例、套 prompt”推进到“看案例、带目标去练习、再做运营复盘”：AI Create 提示词案例扩展到 50 个，案例详情页可以直接把视觉目标带进工作台复拍；内容侧新增三语 prompt 工作流文章和外部实体信号检查清单；后端新增每日运营健康快照，集中汇总任务、成本、支付和公开内容抽查。
+
+- Prompt Library 新增 20 个 GPT Image 2 案例及对应图片素材，覆盖摄影、海报、产品、UI 和实验视觉方向
+- 案例详情页新增“作为复拍灵感 / Use for retake / 撮り直しに使う”入口，点击后会记录来源并把案例 ID、下一轮目标和目标维度带到 `/workspace`
+- 工作台复拍目标卡现在可以展示 prompt example 或内容来源上下文，不再要求一定存在来源点评 ID
+- Blog 三语内容新增 GPT Image 2 prompt 案例工作流文章，补充“如何把案例改写成真实拍摄参考”的站内长内容
+- 后端新增运营健康快照服务和导出脚本，可按日期窗口汇总评图/生图任务、失败聚类、AI 成本、credits、支付 webhook 与公开长廊抽查
+
+### Prompt Library 复拍链路
+
+- `frontend/src/content/generation/prompt-examples.ts` 从 30 个案例扩展到 50 个案例，并新增对应 `frontend/public/generation-prompt-examples/*.jpg` 图片资产
+- `/generate/prompts/[id]` 详情页新增第二个 CTA：用户既可以打开 AI Create，也可以把当前案例作为下一轮拍摄练习目标带入工作台
+- 复拍 CTA 会通过 `content-conversion` 生成 `source=prompt_library`、`entrypoint=prompt_library_retake`、`prompt_example_id`、`next_shoot_action` 和 `next_shoot_dimension`
+- 点击 AI Create 或复拍入口时会记录 prompt library 来源归因和产品事件，便于后续分析案例库对生成和复拍的贡献
+- 工作台读取 `entrypoint`、`content_slug`、`gallery_review_id`、`prompt_example_id` 后，会把这些字段写入评图请求 metadata，并在提示卡里展示来源案例或内容来源
+
+### 内容与 SEO/GEO 补充
+
+- 三语 Blog 新增 `gpt-image-2-prompt-examples-workflow`，说明如何按意图选择 prompt 案例、抽取可复用结构、替换主体与限制条件，并用 PicSpeak 点评闭环验证参考图
+- Blog 内容测试同步把三语文章数量从 6 调整到 7，确保 slug 顺序仍跨语言一致
+- 新增 `docs/seo/2026-05-09-external-entity-signal-checklist.md`，固定 Search Console、llms.txt、外部引用候选和品牌实体一致性的每周检查项
+
+### 运营健康快照
+
+- 新增 `backend/app/services/operational_health.py`，用纯样本对象和数据库加载器构建运营健康快照
+- 快照覆盖 review / generation 任务状态、stale pending / running、失败原因聚类、AI 成本、credits 消耗与发放、checkout 转化、webhook 处理和公开长廊缩略图/摘要抽查
+- 新增 `backend/scripts/export_operational_health_snapshot.py`，默认导出 `docs/analytics/operational-health-snapshot.md`；数据库不可用时输出带说明的空窗口回退报告
+- 后端测试覆盖快照聚合、告警状态、成本与 credits 指标、支付健康、公开内容抽查和 markdown 表格输出
+
+### 首页更新记录同步
+
+- `/updates` 三语 JSON 新增本次更新记录，并指向本 changelog 锚点
+- 首页底部“更新记录”入口三语 hint 改为 Prompt 案例复拍、运营健康和内容更新主题
+- README / README.zh-CN 的最新 changelog 链接更新到本次锚点，并同步提示词案例库扩容与工作台复拍承接
+- CLAUDE 项目说明补充运营健康快照导出脚本和后端服务定位
+
+### 影响文件
+
+#### 后端
+
+- `backend/app/services/operational_health.py`
+- `backend/scripts/export_operational_health_snapshot.py`
+- `backend/tests/test_operational_health_service.py`
+
+#### 前端
+
+- `frontend/src/app/generate/prompts/[id]/PromptExampleContent.tsx`
+- `frontend/src/app/workspace/page.tsx`
+- `frontend/src/content/blog/zh.json`
+- `frontend/src/content/blog/en.json`
+- `frontend/src/content/blog/ja.json`
+- `frontend/src/content/generation/prompt-examples.ts`
+- `frontend/src/content/updates/zh.json`
+- `frontend/src/content/updates/en.json`
+- `frontend/src/content/updates/ja.json`
+- `frontend/src/features/workspace/hooks/useReplayContext.ts`
+- `frontend/src/lib/content-conversion.ts`
+- `frontend/src/lib/i18n-zh.ts`
+- `frontend/src/lib/i18n-en.ts`
+- `frontend/src/lib/i18n-ja.ts`
+- `frontend/public/generation-prompt-examples/*.jpg`
+
+#### 文档
+
+- `docs/changelog/CHANGELOG.md#2026-05-11-prompt-library-retake-health`
+- `docs/seo/2026-05-09-external-entity-signal-checklist.md`
+- `CLAUDE.md`
+- `README.md`
+- `README.zh-CN.md`
+
+### 验证
+
+- `node -e "const fs=require('fs'); for (const f of ['zh','en','ja']) JSON.parse(fs.readFileSync('frontend/src/content/updates/'+f+'.json','utf8'));"`
+- `cd frontend && node --test test/blog-content.test.ts test/content-conversion.test.ts test/generation-prompt-examples.test.ts`
+- `cd frontend && npm run typecheck`
+- `cd backend && ..\.venv\Scripts\python.exe -m pytest tests/test_operational_health_service.py`
+- `Get-FileHash` 对比仓库 changelog / workflow 与外部 Update Logs 副本 SHA256 一致
+
+---
+
 <a id="2026-05-06-ai-create-checkout-analytics"></a>
 
 ## 2026-05-06 - ai create checkout analytics

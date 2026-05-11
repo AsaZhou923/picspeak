@@ -2,13 +2,16 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import { Camera } from 'lucide-react';
 import {
   getLocalizedPromptExampleCategoryLabel,
   getLocalizedPromptExampleText,
   getLocalizedPromptExampleTitle,
   type GenerationPromptExample,
 } from '@/content/generation/prompt-examples';
+import { getPromptLibraryWorkspaceCta } from '@/lib/content-conversion';
 import { useI18n } from '@/lib/i18n';
+import { markProductAttributionSource, trackProductEvent } from '@/lib/product-analytics';
 
 const PROMPT_EXAMPLE_PAGE_COPY = {
   zh: {
@@ -16,6 +19,7 @@ const PROMPT_EXAMPLE_PAGE_COPY = {
     body:
       '这是 PicSpeak AI 创作库中的可索引 GPT Image 2 提示词案例，包含来源署名、推荐模板、风格、比例和完整提示词文本。',
     primaryCta: '打开 AI 创作',
+    retakeCta: '作为复拍灵感',
     sourceCta: '原始来源',
     template: '模板',
     style: '风格',
@@ -27,6 +31,7 @@ const PROMPT_EXAMPLE_PAGE_COPY = {
     body:
       'A crawlable GPT Image 2 prompt example from the PicSpeak AI Create library, including the source credit, suggested template, style, ratio, and full prompt text.',
     primaryCta: 'Open AI Create',
+    retakeCta: 'Use for retake',
     sourceCta: 'Original source',
     template: 'Template',
     style: 'Style',
@@ -38,6 +43,7 @@ const PROMPT_EXAMPLE_PAGE_COPY = {
     body:
       'PicSpeak AI 作成ライブラリの検索可能な GPT Image 2 プロンプト例です。出典、推奨テンプレート、スタイル、比率、全文プロンプトを確認できます。',
     primaryCta: 'AI 作成を開く',
+    retakeCta: '撮り直しに使う',
     sourceCta: '元の出典',
     template: 'テンプレート',
     style: 'スタイル',
@@ -52,7 +58,43 @@ export default function PromptExampleContent({ example }: { example: GenerationP
   const title = getLocalizedPromptExampleTitle(example, locale);
   const prompt = getLocalizedPromptExampleText(example.prompt, locale);
   const categoryLabel = getLocalizedPromptExampleCategoryLabel(example.category, locale);
+  const workspaceCta = getPromptLibraryWorkspaceCta(locale, {
+    id: example.id,
+    category: example.category,
+    title,
+  });
   const generateHref = `/generate?source=prompt_library&entrypoint=prompt_example_detail&prompt_example_id=${encodeURIComponent(example.id)}`;
+
+  const handleGenerateClick = () => {
+    markProductAttributionSource('prompt_library');
+    void trackProductEvent('generation_prompt_opened', {
+      source: 'prompt_library',
+      pagePath: `/generate/prompts/${example.id}`,
+      locale,
+      metadata: {
+        entrypoint: 'prompt_example_detail',
+        prompt_example_id: example.id,
+        prompt_example_category: example.category,
+        template_key: example.suggestedTemplateKey,
+      },
+    });
+  };
+
+  const handleRetakeClick = () => {
+    markProductAttributionSource('prompt_library');
+    void trackProductEvent('content_workspace_clicked', {
+      source: 'prompt_library',
+      pagePath: `/generate/prompts/${example.id}`,
+      locale,
+      metadata: {
+        entrypoint: workspaceCta.entrypoint,
+        prompt_example_id: example.id,
+        prompt_example_category: example.category,
+        template_key: example.suggestedTemplateKey,
+        image_type: workspaceCta.imageType,
+      },
+    });
+  };
 
   return (
     <main className="min-h-screen px-6 pb-20 pt-24">
@@ -67,9 +109,18 @@ export default function PromptExampleContent({ example }: { example: GenerationP
           <div className="mt-7 flex flex-wrap gap-3">
             <Link
               href={generateHref}
+              onClick={handleGenerateClick}
               className="rounded bg-gold px-5 py-2.5 text-sm font-bold text-void transition-colors hover:bg-gold-light"
             >
               {copy.primaryCta}
+            </Link>
+            <Link
+              href={workspaceCta.href}
+              onClick={handleRetakeClick}
+              className="inline-flex items-center gap-2 rounded border border-sage/30 px-5 py-2.5 text-sm text-sage transition-colors hover:bg-sage/10"
+            >
+              <Camera size={14} />
+              {copy.retakeCta}
             </Link>
             <a
               href={example.sourceUrl}

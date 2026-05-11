@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-05-11-prompt-library-retake-health",
+    "date": "2026-05-11",
+    "title": "Prompt Library 扩容、案例复拍与运营健康快照",
+    "summary": "AI Create 提示词库扩展到 50 个案例，详情页可以直接把案例目标带入工作台复拍；三语 Blog 新增 prompt 工作流文章，后端也补齐每日运营健康快照，用于汇总任务、成本、支付和公开内容抽查。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-05-11-prompt-library-retake-health",
+    "sections": [
+      {
+        "title": "Prompt Library 与复拍",
+        "items": [
+          "新增 20 个 GPT Image 2 案例及图片素材，覆盖摄影、海报、产品、UI 和实验视觉方向",
+          "案例详情页新增“作为复拍灵感”入口，点击后会把 prompt example ID、下一轮目标和目标维度带入工作台",
+          "工作台复拍目标卡现在可以展示来源案例或内容来源，并把这些上下文写入评图请求"
+        ]
+      },
+      {
+        "title": "内容与运营",
+        "items": [
+          "三语 Blog 新增 GPT Image 2 prompt 案例工作流文章，解释如何把案例改写成真实拍摄参考",
+          "新增外部实体信号清单，用于每周复查 Search Console、llms.txt、外部引用和品牌一致性",
+          "后端新增运营健康快照服务和导出脚本，汇总任务状态、失败聚类、AI 成本、credits、支付 webhook 和公开长廊抽查"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-05-06-ai-create-checkout-analytics",
     "date": "2026-05-06",
     "title": "AI Create 案例套用、额度承接与分析拆分",

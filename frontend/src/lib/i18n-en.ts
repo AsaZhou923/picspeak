@@ -215,7 +215,7 @@ export const enTranslations = {
     pro_offer_highlight: 'Pro',
     updates_label: 'Updates',
     updates_hint_home: 'See analytics, retake practice, and waiting-page reader update',
-    updates_hint_latest: 'See AI Create examples, checkout recovery, and analytics update',
+    updates_hint_latest: 'See prompt example retakes, operational health, and content updates',
     contact_label: 'Contact',
     contact_headline: 'Get in Touch',
 
