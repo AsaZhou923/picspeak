@@ -15,6 +15,7 @@ from app.services.operational_health import (
     load_operational_health_snapshot_from_db,
     render_operational_health_markdown,
 )
+from scripts.export_error_handling import describe_export_error, is_database_unavailable_error
 
 
 def parse_args() -> argparse.Namespace:
@@ -47,6 +48,8 @@ def main() -> None:
                 end_date=end_date,
             )
         except Exception as exc:
+            if not is_database_unavailable_error(exc):
+                raise
             snapshot = build_operational_health_snapshot(
                 tasks=[],
                 costs=[],
@@ -58,7 +61,7 @@ def main() -> None:
             )
             snapshot['generation_note'] = (
                 '数据库不可用，当前文件为运营健康回退快照，不代表真实健康状态。'
-                f' 原始错误：{exc.__class__.__name__}'
+                f' 原始错误：{describe_export_error(exc)}'
             )
     finally:
         db.close()

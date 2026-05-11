@@ -120,6 +120,7 @@ class Settings(BaseSettings):
     image_generation_pro_default_quality: str = 'medium'
     image_generation_max_outputs_per_request: int = 1
     image_generation_timeout_seconds: int = 180
+    image_generation_task_stale_timeout_seconds: int = 600
     image_generation_download_max_bytes: int = 25 * 1024 * 1024
     image_generation_worker_concurrency: int = 1
     image_generation_daily_ipm_limit: int = 5

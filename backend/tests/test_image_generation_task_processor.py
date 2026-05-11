@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from io import BytesIO
 import sys
 import unittest
@@ -19,6 +20,7 @@ from app.services.image_generation_task_processor import (  # noqa: E402
     _load_reference_image,
     count_monthly_generation_credit_consumed,
     count_monthly_generation_credit_grants,
+    expire_image_generation_tasks,
     _output_format_for_content_type,
     _persist_successful_generation,
     _serialize_generation_task_status,
@@ -137,12 +139,88 @@ class ImageGenerationTaskProcessorTests(unittest.TestCase):
         running_query.filter.return_value.scalar.return_value = 1
         db.query.return_value = running_query
 
-        with unittest.mock.patch('app.services.image_generation_task_processor.settings') as mocked_settings:
+        with (
+            unittest.mock.patch('app.services.image_generation_task_processor.expire_image_generation_tasks') as expire_tasks,
+            unittest.mock.patch('app.services.image_generation_task_processor.settings') as mocked_settings,
+        ):
             mocked_settings.image_generation_worker_concurrency = 1
             claimed = claim_next_pending_image_generation_task(db, worker_name='embedded-worker-0')
 
         self.assertIsNone(claimed)
+        expire_tasks.assert_called_once_with(db)
         running_query.join.assert_not_called()
+
+    def test_expire_image_generation_tasks_requeues_stalled_running_task(self) -> None:
+        now = datetime.now(timezone.utc)
+        task = SimpleNamespace(
+            status=TaskStatus.RUNNING,
+            progress=60,
+            attempt_count=1,
+            max_attempts=2,
+            error_code=None,
+            error_message=None,
+            next_attempt_at=None,
+            claimed_by='embedded-worker',
+            started_at=now - timedelta(hours=1),
+            finished_at=None,
+            last_heartbeat_at=now - timedelta(hours=1),
+        )
+        db = MagicMock()
+        completed_query = MagicMock()
+        completed_query.join.return_value.filter.return_value.all.return_value = []
+        stalled_query = MagicMock()
+        stalled_query.filter.return_value.all.return_value = [task]
+        db.query.side_effect = [completed_query, stalled_query]
+
+        with unittest.mock.patch('app.services.image_generation_task_processor.settings') as mocked_settings:
+            mocked_settings.image_generation_task_stale_timeout_seconds = 600
+            mocked_settings.image_generation_timeout_seconds = 180
+            mocked_settings.review_retry_base_delay_seconds = 10
+            mocked_settings.review_retry_max_delay_seconds = 300
+            expire_image_generation_tasks(db)
+
+        self.assertEqual(task.status, TaskStatus.PENDING)
+        self.assertEqual(task.progress, 0)
+        self.assertEqual(task.error_code, 'TASK_STALLED')
+        self.assertEqual(task.claimed_by, None)
+        self.assertEqual(task.started_at, None)
+        self.assertIsNotNone(task.next_attempt_at)
+        db.add.assert_called_once_with(task)
+        db.commit.assert_called_once()
+
+    def test_expire_image_generation_tasks_dead_letters_exhausted_stalled_task(self) -> None:
+        now = datetime.now(timezone.utc)
+        task = SimpleNamespace(
+            status=TaskStatus.RUNNING,
+            progress=60,
+            attempt_count=2,
+            max_attempts=2,
+            error_code=None,
+            error_message=None,
+            next_attempt_at=None,
+            claimed_by='embedded-worker',
+            started_at=now - timedelta(hours=1),
+            finished_at=None,
+            last_heartbeat_at=now - timedelta(hours=1),
+        )
+        db = MagicMock()
+        completed_query = MagicMock()
+        completed_query.join.return_value.filter.return_value.all.return_value = []
+        stalled_query = MagicMock()
+        stalled_query.filter.return_value.all.return_value = [task]
+        db.query.side_effect = [completed_query, stalled_query]
+
+        with unittest.mock.patch('app.services.image_generation_task_processor.settings') as mocked_settings:
+            mocked_settings.image_generation_task_stale_timeout_seconds = 600
+            mocked_settings.image_generation_timeout_seconds = 180
+            expire_image_generation_tasks(db)
+
+        self.assertEqual(task.status, TaskStatus.DEAD_LETTER)
+        self.assertEqual(task.progress, 100)
+        self.assertEqual(task.error_code, 'TASK_STALLED')
+        self.assertIsNotNone(task.finished_at)
+        db.add.assert_called_once_with(task)
+        db.commit.assert_called_once()
 
     def test_make_generation_task_uses_null_next_attempt_for_immediate_claim(self) -> None:
         task = make_generation_task(

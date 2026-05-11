@@ -166,6 +166,88 @@ def generation_object_key(*, owner_public_id: str, generated_public_id: str, out
     return f'generated/user_{owner_public_id}/{current:%Y/%m}/{generated_public_id}.{output_format}'
 
 
+def _generation_task_stale_timeout_seconds() -> int:
+    configured_timeout = int(getattr(settings, 'image_generation_task_stale_timeout_seconds', 0) or 0)
+    provider_timeout = int(getattr(settings, 'image_generation_timeout_seconds', 180) or 180)
+    return max(configured_timeout, provider_timeout + 60, 60)
+
+
+def _generation_retry_delay_seconds(attempt_count: int) -> int:
+    base = max(int(settings.review_retry_base_delay_seconds), 1)
+    max_delay = max(int(settings.review_retry_max_delay_seconds), base)
+    return min(base * (2 ** max(attempt_count - 1, 0)), max_delay)
+
+
+def expire_image_generation_tasks(db: Session) -> None:
+    _reconcile_completed_generation_tasks(db)
+    now = datetime.now(timezone.utc)
+    stale_cutoff = now - timedelta(seconds=_generation_task_stale_timeout_seconds())
+    stalled_tasks = (
+        db.query(ImageGenerationTask)
+        .filter(
+            ImageGenerationTask.status == TaskStatus.RUNNING,
+            ImageGenerationTask.finished_at.is_(None),
+            (
+                (ImageGenerationTask.last_heartbeat_at.is_not(None) & (ImageGenerationTask.last_heartbeat_at < stale_cutoff))
+                | (
+                    ImageGenerationTask.last_heartbeat_at.is_(None)
+                    & ImageGenerationTask.started_at.is_not(None)
+                    & (ImageGenerationTask.started_at < stale_cutoff)
+                )
+            ),
+        )
+        .all()
+    )
+    if not stalled_tasks:
+        return
+
+    for task in stalled_tasks:
+        if task.attempt_count < task.max_attempts:
+            retry_at = now + timedelta(seconds=_generation_retry_delay_seconds(task.attempt_count))
+            task.status = TaskStatus.PENDING
+            task.progress = 0
+            task.error_code = 'TASK_STALLED'
+            task.error_message = 'Image generation heartbeat stalled; retry scheduled'
+            task.next_attempt_at = retry_at
+            task.claimed_by = None
+            task.started_at = None
+            task.last_heartbeat_at = now
+        else:
+            task.status = TaskStatus.DEAD_LETTER
+            task.progress = 100
+            task.error_code = 'TASK_STALLED'
+            task.error_message = 'Image generation heartbeat stalled and max retries were exhausted'
+            task.finished_at = now
+            task.last_heartbeat_at = now
+        db.add(task)
+    db.commit()
+
+
+def _reconcile_completed_generation_tasks(db: Session) -> None:
+    now = datetime.now(timezone.utc)
+    completed_pairs = (
+        db.query(ImageGenerationTask, GeneratedImage)
+        .join(GeneratedImage, GeneratedImage.task_id == ImageGenerationTask.id)
+        .filter(
+            ImageGenerationTask.status.in_([TaskStatus.PENDING, TaskStatus.RUNNING]),
+            GeneratedImage.deleted_at.is_(None),
+        )
+        .all()
+    )
+    if not completed_pairs:
+        return
+
+    for task, _image in completed_pairs:
+        task.status = TaskStatus.SUCCEEDED
+        task.progress = 100
+        task.finished_at = task.finished_at or now
+        task.last_heartbeat_at = now
+        task.error_code = None
+        task.error_message = None
+        db.add(task)
+    db.commit()
+
+
 def _claim_generation_task(db: Session, task_id: int, worker_name: str) -> bool:
     now = datetime.now(timezone.utc)
     updated = (
@@ -191,6 +273,7 @@ def _claim_generation_task(db: Session, task_id: int, worker_name: str) -> bool:
 
 
 def claim_next_pending_image_generation_task(db: Session, *, worker_name: str) -> ImageGenerationTask | None:
+    expire_image_generation_tasks(db)
     now = datetime.now(timezone.utc)
     max_running = max(1, int(settings.image_generation_worker_concurrency or 1))
     running_count = (

@@ -15,6 +15,7 @@ from app.services.product_analytics import (
     load_stage_a_snapshot_from_db,
     render_content_conversion_weekly_markdown,
 )
+from scripts.export_error_handling import describe_export_error, is_database_unavailable_error
 
 
 def parse_args() -> argparse.Namespace:
@@ -48,6 +49,8 @@ def main() -> None:
                 end_date=end_date,
             )
         except Exception as exc:
+            if not is_database_unavailable_error(exc):
+                raise
             snapshot = build_stage_a_snapshot(
                 events=[],
                 reviews=[],
@@ -56,7 +59,7 @@ def main() -> None:
             )
             snapshot['generation_note'] = (
                 '数据库不可用，当前文件为零基线回退周报。'
-                f' 原始错误：{exc.__class__.__name__}'
+                f' 原始错误：{describe_export_error(exc)}'
             )
     finally:
         db.close()
