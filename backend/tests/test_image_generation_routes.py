@@ -128,6 +128,60 @@ class ImageGenerationRoutesTests(unittest.TestCase):
         db.add.assert_called()
         db.commit.assert_called()
 
+    def test_cloud_tasks_enabled_dispatches_generation_task(self) -> None:
+        db, _user = self._install_actor(UserPlan.pro)
+        db.query.return_value.filter.return_value.first.return_value = None
+
+        with (
+            patch('app.api.routers.generations.settings.cloud_tasks_enabled', True),
+            patch('app.api.routers.generations.enqueue_image_generation_task') as enqueue_task,
+            self._client() as client,
+        ):
+            response = client.post(
+                '/api/v1/generations',
+                json={
+                    'generation_mode': 'general',
+                    'intent': 'social_visual',
+                    'prompt': 'cinematic rainy street portrait with neon reflections',
+                    'template_key': 'social_visual',
+                    'quality': 'medium',
+                    'size': '1024x1536',
+                    'output_format': 'webp',
+                    'async': True,
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        enqueue_task.assert_called_once()
+        self.assertTrue(enqueue_task.call_args.args[0].startswith('igt_'))
+
+    def test_internal_generation_task_execute_requires_dispatch_secret(self) -> None:
+        with patch('app.api.routers.tasks.settings.cloud_tasks_enabled', True), patch(
+            'app.api.routers.tasks.settings.cloud_tasks_secret',
+            'secret',
+        ), self._client() as client:
+            response = client.post('/api/v1/internal/tasks/generations/execute', json={'task_id': 'igt_123'})
+
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json()['error']['code'], 'TASK_DISPATCH_UNAUTHORIZED')
+
+    def test_internal_generation_task_execute_processes_task(self) -> None:
+        with (
+            patch('app.api.routers.tasks.settings.cloud_tasks_enabled', True),
+            patch('app.api.routers.tasks.settings.cloud_tasks_secret', 'secret'),
+            patch('app.api.routers.tasks.process_image_generation_task', return_value={'result': 'processed', 'status': 'SUCCEEDED'}) as process_task,
+            self._client() as client,
+        ):
+            response = client.post(
+                '/api/v1/internal/tasks/generations/execute',
+                json={'task_id': 'igt_123'},
+                headers={'X-Task-Dispatch-Secret': 'secret'},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['result'], 'processed')
+        process_task.assert_called_once_with('igt_123', worker_name='cloud-tasks')
+
     def test_generation_payload_exposes_source_photo_and_review_public_ids(self) -> None:
         db = MagicMock()
         photo_query = MagicMock()

@@ -101,6 +101,7 @@ class Settings(BaseSettings):
     cloud_tasks_location: str = ''
     cloud_tasks_queue: str = ''
     cloud_tasks_target_url: str = ''
+    cloud_tasks_generation_target_url: str = ''
     cloud_tasks_secret: str = ''
     cloud_tasks_service_account_email: str = ''
     cloud_tasks_oidc_audience: str = ''
@@ -192,6 +193,7 @@ class Settings(BaseSettings):
 
     @field_validator(
         'cloud_tasks_target_url',
+        'cloud_tasks_generation_target_url',
         'cloud_tasks_service_account_email',
         'cloud_tasks_oidc_audience',
         'clerk_api_url',

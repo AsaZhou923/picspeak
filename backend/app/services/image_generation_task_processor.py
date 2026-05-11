@@ -259,8 +259,11 @@ def _claim_generation_task(db: Session, task_id: int, worker_name: str) -> bool:
                 ImageGenerationTask.progress: 10,
                 ImageGenerationTask.attempt_count: ImageGenerationTask.attempt_count + 1,
                 ImageGenerationTask.started_at: now,
+                ImageGenerationTask.next_attempt_at: None,
                 ImageGenerationTask.claimed_by: worker_name,
                 ImageGenerationTask.last_heartbeat_at: now,
+                ImageGenerationTask.error_code: None,
+                ImageGenerationTask.error_message: None,
             },
             synchronize_session=False,
         )
@@ -670,10 +673,12 @@ def _handle_generation_failure(
     error_message: str,
     retryable: bool,
 ) -> None:
+    retry_delay: int | None = None
     if retryable and task.attempt_count < task.max_attempts:
+        retry_delay = _generation_retry_delay_seconds(task.attempt_count)
         task.status = TaskStatus.PENDING
         task.progress = 0
-        task.next_attempt_at = datetime.now(timezone.utc) + timedelta(seconds=10)
+        task.next_attempt_at = datetime.now(timezone.utc) + timedelta(seconds=retry_delay)
     else:
         task.status = TaskStatus.FAILED
         task.progress = 100
@@ -706,6 +711,24 @@ def _handle_generation_failure(
                 },
             )
     db.commit()
+    if retry_delay is not None and getattr(settings, 'cloud_tasks_enabled', False) is True:
+        try:
+            from app.services.task_dispatcher import TaskDispatchError, enqueue_image_generation_task
+
+            enqueue_image_generation_task(task.public_id, delay_seconds=retry_delay)
+        except TaskDispatchError as exc:
+            logger.exception('Failed to enqueue Cloud Task retry for image generation task %s', task.public_id)
+            failed_task = db.query(ImageGenerationTask).filter(ImageGenerationTask.id == task.id).first()
+            if failed_task is not None:
+                now = datetime.now(timezone.utc)
+                failed_task.status = TaskStatus.FAILED
+                failed_task.progress = 100
+                failed_task.finished_at = now
+                failed_task.last_heartbeat_at = now
+                failed_task.error_code = 'TASK_DISPATCH_FAILED'
+                failed_task.error_message = str(exc)[:500]
+                db.add(failed_task)
+                db.commit()
 
 
 def make_generation_task(

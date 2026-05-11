@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from datetime import datetime, timezone
 from urllib.parse import quote
 
@@ -42,9 +43,11 @@ from app.services.image_generation_task_processor import (
 )
 from app.services.object_storage import get_object_storage_client
 from app.services.product_analytics import record_product_event
+from app.services.task_dispatcher import TaskDispatchError, enqueue_image_generation_task
 
 
 router = APIRouter(tags=['generations'])
+logger = logging.getLogger(__name__)
 
 
 def _encode_generation_cursor(image: GeneratedImage) -> str:
@@ -202,6 +205,17 @@ def create_generation(
         },
     )
     db.commit()
+    if settings.cloud_tasks_enabled:
+        try:
+            enqueue_image_generation_task(task.public_id)
+        except TaskDispatchError as exc:
+            logger.exception('Failed to enqueue Cloud Task for image generation task %s', task.public_id)
+            _mark_generation_dispatch_failed(db, task.public_id, str(exc))
+            raise api_error(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                'GENERATION_TASK_DISPATCH_FAILED',
+                'Failed to enqueue async image generation task',
+            ) from exc
     return response
 
 
@@ -383,12 +397,39 @@ def reuse_generation(
     )
     db.add(task)
     db.commit()
+    if settings.cloud_tasks_enabled:
+        try:
+            enqueue_image_generation_task(task.public_id)
+        except TaskDispatchError as exc:
+            logger.exception('Failed to enqueue Cloud Task for reused image generation task %s', task.public_id)
+            _mark_generation_dispatch_failed(db, task.public_id, str(exc))
+            raise api_error(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                'GENERATION_TASK_DISPATCH_FAILED',
+                'Failed to enqueue async image generation task',
+            ) from exc
     return {
         'task_id': task.public_id,
         'status': task.status.value,
         'estimated_seconds': 45,
         'credits_reserved': credits_reserved,
     }
+
+
+def _mark_generation_dispatch_failed(db: Session, task_public_id: str, error_message: str) -> None:
+    db.rollback()
+    failed_task = db.query(ImageGenerationTask).filter(ImageGenerationTask.public_id == task_public_id).first()
+    if failed_task is None:
+        return
+    now = datetime.now(timezone.utc)
+    failed_task.status = TaskStatus.FAILED
+    failed_task.progress = 100
+    failed_task.finished_at = now
+    failed_task.last_heartbeat_at = now
+    failed_task.error_code = 'TASK_DISPATCH_FAILED'
+    failed_task.error_message = error_message[:500]
+    db.add(failed_task)
+    db.commit()
 
 
 def _record_generation_event(
