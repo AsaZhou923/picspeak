@@ -2,6 +2,77 @@
 
 本文件汇总了原 `docs/changelog/update-log-*.md` 的全部更新记录。新增 release 请追加到顶部，并为每条记录保留稳定锚点，供 `/updates` 的 `docPath` 和 README 链接定位。
 
+<a id="2026-05-14-legal-pages-static-assets"></a>
+
+## 2026-05-14 - legal pages static assets
+
+日期：2026-05-14
+
+### 概览
+
+这次更新补齐 PicSpeak 的公开法律页面，并修复本地预览中首页退化成无样式 HTML 的问题。用户现在可以从页脚进入隐私说明和服务条款；开发者在 `localhost:3000` 预览生产构建时，Next 静态 CSS / JS 不再被 Clerk middleware 拦截为 400。
+
+- 新增 `/privacy` 隐私说明页和 `/terms` 服务条款页，覆盖照片、prompt、生成记录、账号、支付、公开分享、AI 输出和联系方式等说明。
+- 页脚新增 Privacy / Terms 链接，并同步中文、英文、日文导航文案。
+- sitemap 和 marketing shell 识别范围加入 `/privacy` 与 `/terms`，让两个公开页面使用正确外壳和索引配置。
+- middleware 对 `/_next/` 和静态文件增加运行时短路，避免 Next 15 将 matcher 编译成全量路径后继续把静态资源送进 Clerk。
+- 本地 production preview 中的 Vercel Analytics / Speed Insights 只在 `VERCEL_ENV=production` 时加载，避免 `next start` 出现无关 telemetry 404。
+
+### 法律页面与公开入口
+
+- `frontend/src/app/privacy/page.tsx` 和 `frontend/src/app/terms/page.tsx` 新增公开页面 metadata、Open Graph 和 Twitter metadata。
+- `frontend/src/components/marketing/LegalPageContent.tsx` 复用同一个法律页组件，根据当前 locale 渲染隐私说明或服务条款内容。
+- `frontend/src/components/layout/Footer.tsx` 改为可换行链接组，避免新增法律链接后在窄屏或较长语言下挤压布局。
+- `frontend/src/app/sitemap.ts` 为 `/privacy` 和 `/terms` 增加 yearly sitemap 条目。
+
+### 静态资源与本地预览稳定性
+
+- `frontend/src/middleware.ts` 不再只 re-export proxy，而是在入口处先放行 `/_next/` 与常见静态文件扩展名，再把业务页面交给 Clerk proxy。
+- 该修复覆盖浏览器实际请求路径，解决 CSS、JS、字体等 `/_next/static/...` 资源 400 导致首页无样式的问题。
+- `frontend/src/app/layout.tsx` 将性能 telemetry 限定到 Vercel production 环境，减少本地生产预览噪声。
+
+### 首页更新记录同步
+
+- `/updates` 三语 JSON 新增本次更新记录，`docPath` 指向 `docs/changelog/CHANGELOG.md#2026-05-14-legal-pages-static-assets`。
+- 首页底部“更新记录”入口的三语 hint 改为隐私/条款页面与静态资源修复主题。
+- README / README.zh-CN 的最新 changelog 链接更新到本次锚点。
+
+### 影响文件
+
+#### 前端
+
+- `frontend/src/app/layout.tsx`
+- `frontend/src/app/privacy/page.tsx`
+- `frontend/src/app/terms/page.tsx`
+- `frontend/src/app/sitemap.ts`
+- `frontend/src/components/layout/Footer.tsx`
+- `frontend/src/components/marketing/LegalPageContent.tsx`
+- `frontend/src/lib/i18n-en.ts`
+- `frontend/src/lib/i18n-ja.ts`
+- `frontend/src/lib/i18n-zh.ts`
+- `frontend/src/lib/route-shell.ts`
+- `frontend/src/middleware.ts`
+
+#### 文档与更新记录
+
+- `docs/changelog/CHANGELOG.md#2026-05-14-legal-pages-static-assets`
+- `frontend/src/content/updates/zh.json`
+- `frontend/src/content/updates/en.json`
+- `frontend/src/content/updates/ja.json`
+- `README.md`
+- `README.zh-CN.md`
+
+### 验证
+
+- `node -e "const fs=require('fs'); for (const f of ['zh','en','ja']) JSON.parse(fs.readFileSync('frontend/src/content/updates/'+f+'.json','utf8'));"`
+- `cd frontend && npm run typecheck`
+- `cd frontend && npm run lint`
+- `cd frontend && npm run build`
+- Playwright opened `http://localhost:3000/` and confirmed `/_next/static/...` CSS / JS requests returned 200 with 0 console errors.
+- `Get-FileHash` 对比仓库 changelog / workflow 与外部 Update Logs 副本 SHA256 一致。
+
+---
+
 <a id="2026-05-11-prompt-library-retake-health"></a>
 
 ## 2026-05-11 - prompt library retake health

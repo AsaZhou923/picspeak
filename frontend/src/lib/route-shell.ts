@@ -15,6 +15,8 @@ export function isMarketingRoute(pathname: string | null | undefined): boolean {
     normalized.startsWith('/affiliate') ||
     normalized.startsWith('/blog') ||
     normalized.startsWith('/updates') ||
+    normalized.startsWith('/privacy') ||
+    normalized.startsWith('/terms') ||
     normalized.startsWith('/share') ||
     normalized.startsWith('/error')
   );

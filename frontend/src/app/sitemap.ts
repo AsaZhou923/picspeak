@@ -77,6 +77,20 @@ export default function sitemap(): MetadataRoute.Sitemap {
       alternates: singleUrlAlternates('/affiliate'),
     },
     {
+      url: `${siteConfig.url}/privacy`,
+      lastModified: now,
+      changeFrequency: 'yearly',
+      priority: 0.45,
+      alternates: singleUrlAlternates('/privacy'),
+    },
+    {
+      url: `${siteConfig.url}/terms`,
+      lastModified: now,
+      changeFrequency: 'yearly',
+      priority: 0.45,
+      alternates: singleUrlAlternates('/terms'),
+    },
+    {
       url: `${siteConfig.url}/gallery`,
       lastModified: now,
       changeFrequency: 'daily',

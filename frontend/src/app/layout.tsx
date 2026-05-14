@@ -105,6 +105,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const requestLocale = requestHeaders.get('x-picspeak-locale');
   const initialLocale = isSupportedLocale(requestLocale) ? requestLocale : undefined;
   const lang = documentLang(initialLocale ?? null);
+  const enablePerformanceTelemetry =
+    process.env.NODE_ENV === 'production' && process.env.VERCEL_ENV === 'production';
 
   return (
     <html
@@ -128,7 +130,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           initialLocale={initialLocale}
           initialMessages={initialLocale ? getInitialTranslations(initialLocale) : undefined}
         >
-          {process.env.NODE_ENV === 'production' ? <PerformanceTelemetry /> : null}
+          {enablePerformanceTelemetry ? <PerformanceTelemetry /> : null}
           <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
             <DeferredBackgroundEffect />
           </div>

@@ -18,7 +18,7 @@ export const zhTranslations = {
   plan_guest_label: '游客',
   updates_label: '更新记录',
   updates_hint_home: '查看产品分析、复拍练习与等待页阅读更新',
-  updates_hint_latest: '查看 Prompt 案例复拍、运营健康与内容更新',
+  updates_hint_latest: '查看隐私条款页面与静态资源修复',
 
   generation_badge: 'AI 创作',
   generation_title: 'AI 创作',
@@ -243,6 +243,8 @@ export const zhTranslations = {
   footer_workspace: '工作台',
   footer_affiliate: '推广',
   footer_usage: '额度',
+  footer_privacy: '隐私',
+  footer_terms: '条款',
   affiliate_badge: '推广计划',
   affiliate_title_1: '推广 PicSpeak。',
   affiliate_title_2: '赚取持续收益。',

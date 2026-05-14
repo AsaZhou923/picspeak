@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-05-14-legal-pages-static-assets",
+    "date": "2026-05-14",
+    "title": "プライバシーと規約ページ、静的アセット読み込み修正",
+    "summary": "PicSpeak に公開プライバシー通知と利用規約ページを追加し、フッターから移動できるようにしました。あわせて、ローカルの production preview で Clerk が Next の CSS / JavaScript を遮断し、ホームが未スタイル HTML になる問題を修正しました。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-05-14-legal-pages-static-assets",
+    "sections": [
+      {
+        "title": "法務ページ",
+        "items": [
+          "/privacy と /terms の公開ページを追加し、metadata、Open Graph、三言語の法務コピーを設定しました",
+          "フッターに Privacy / Terms リンクを追加し、英語・中国語・日本語ラベルを同期しました",
+          "sitemap と marketing route shell に /privacy と /terms を追加しました"
+        ]
+      },
+      {
+        "title": "ローカルプレビューの安定化",
+        "items": [
+          "middleware が /_next/ と静的ファイルリクエストでは Clerk を通らないようにし、localhost で CSS / JS が 400 になる問題を防ぎました",
+          "performance telemetry は Vercel production のみで読み込み、local next start の不要な 404 を避けます",
+          "ブラウザでホームを確認し、静的アセットが 200 を返し、console error が 0 件であることを確認しました"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-05-11-prompt-library-retake-health",
     "date": "2026-05-11",
     "title": "Prompt Library 拡張、例からの撮り直し、運用健康スナップショット",

@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-05-14-legal-pages-static-assets",
+    "date": "2026-05-14",
+    "title": "隐私与条款页面上线，并修复静态资源加载",
+    "summary": "PicSpeak 新增公开隐私说明和服务条款页面，并从页脚提供入口；同时修复本地生产预览中 Clerk 拦截 Next 静态 CSS / JS 导致首页变成无样式 HTML 的问题。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-05-14-legal-pages-static-assets",
+    "sections": [
+      {
+        "title": "法律页面",
+        "items": [
+          "新增 /privacy 和 /terms 公开页面，包含 metadata、Open Graph 和三语法律说明",
+          "页脚新增隐私与条款入口，并同步中文、英文、日文文案",
+          "sitemap 与 marketing route shell 纳入 /privacy 和 /terms"
+        ]
+      },
+      {
+        "title": "本地预览稳定性",
+        "items": [
+          "middleware 对 /_next/ 和静态文件请求绕过 Clerk，避免 localhost 下 CSS / JS 返回 400",
+          "性能 telemetry 只在 Vercel production 环境加载，减少本地 next start 的无关 404 噪声",
+          "已用浏览器验证首页静态资源返回 200 且控制台无错误"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-05-11-prompt-library-retake-health",
     "date": "2026-05-11",
     "title": "Prompt Library 扩容、案例复拍与运营健康快照",

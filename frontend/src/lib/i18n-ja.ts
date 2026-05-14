@@ -21,7 +21,7 @@ export const jaTranslations = {
     pro_offer_highlight: 'Pro',
     updates_label: '更新履歴',
     updates_hint_home: '分析・撮り直し練習・待機リーダーの更新を見る',
-    updates_hint_latest: 'prompt 例の撮り直し・運用健康・コンテンツ更新を見る',
+    updates_hint_latest: 'プライバシー・規約ページと静的アセット修正を見る',
     contact_label: 'コンタクト',
     contact_headline: 'お問い合わせ',
     photo_ready_msg_short: 'アップロード完了',
@@ -228,6 +228,8 @@ export const jaTranslations = {
     footer_workspace: 'ワークスペース',
     footer_affiliate: 'アフィリエイト',
     footer_usage: 'クォータ',
+    footer_privacy: 'プライバシー',
+    footer_terms: '規約',
 
     // Affiliate page
     affiliate_badge: 'Affiliate Program',

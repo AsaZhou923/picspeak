@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-05-14-legal-pages-static-assets",
+    "date": "2026-05-14",
+    "title": "Privacy and terms pages, plus static asset recovery",
+    "summary": "PicSpeak now has public Privacy and Terms pages linked from the footer, and the local production preview no longer lets Clerk intercept Next static CSS and JavaScript assets. The homepage loads with styles again on localhost.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-05-14-legal-pages-static-assets",
+    "sections": [
+      {
+        "title": "Legal pages",
+        "items": [
+          "Added public /privacy and /terms pages with metadata, Open Graph data, and trilingual legal copy",
+          "Added footer links for Privacy and Terms with English, Chinese, and Japanese labels",
+          "Added /privacy and /terms to the sitemap and marketing route shell"
+        ]
+      },
+      {
+        "title": "Local preview stability",
+        "items": [
+          "Middleware now bypasses Clerk for /_next/ and static file requests, preventing CSS and JS from returning 400 on localhost",
+          "Performance telemetry only loads in Vercel production so local next start stays free of unrelated telemetry 404s",
+          "Verified the homepage in a browser with static assets returning 200 and no console errors"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-05-11-prompt-library-retake-health",
     "date": "2026-05-11",
     "title": "Prompt Library expansion, example retakes, and operational health",
