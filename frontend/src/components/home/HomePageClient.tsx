@@ -44,6 +44,11 @@ const DEMO_SCORES_KEYS = [
   { labelKey: 'score_technical' as const, score: 6 },
 ];
 
+const PRODUCT_HUNT_BADGE_HREF =
+  'https://www.producthunt.com/products/picspeak?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-picspeak';
+const PRODUCT_HUNT_BADGE_SRC =
+  'https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1145295&theme=light&t=1778592732649';
+
 type HomePageProps = {
   structuredDataScope?: HomeStructuredDataScope;
 };
@@ -269,6 +274,21 @@ export function HomePageContent({ structuredDataScope = 'root' }: HomePageProps 
             aria-hidden="true"
           />
         </div>
+
+        <a
+          href={PRODUCT_HUNT_BADGE_HREF}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="relative mt-6 inline-flex h-[54px] w-[250px] items-center justify-center overflow-hidden rounded-md bg-white shadow-[0_12px_30px_rgba(0,0,0,0.18)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_40px_rgba(0,0,0,0.24)] focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/70 focus-visible:ring-offset-2 focus-visible:ring-offset-void animate-fade-in anim-fill-both delay-300"
+        >
+          <Image
+            src={PRODUCT_HUNT_BADGE_SRC}
+            alt="PicSpeak - Get AI photo critiques and visual references in seconds | Product Hunt"
+            width={250}
+            height={54}
+            unoptimized
+          />
+        </a>
 
         <Link
           href="/generate"
