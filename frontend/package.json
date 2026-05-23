@@ -9,7 +9,7 @@
     "dev:clean": "npm run clean && next dev",
     "build": "npm run clean && next build",
     "start": "next start",
-    "test": "node --test \"test/*.test.ts\" \"src/features/generations/generation-contracts.test.ts\"",
+    "test": "node scripts/run-node-tests.mjs",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
     "typecheck": "tsc -p tsconfig.typecheck.json --noEmit"
   },

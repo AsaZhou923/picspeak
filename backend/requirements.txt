@@ -6,6 +6,7 @@ psycopg2==2.9.10
 pydantic==2.11.7
 pydantic-settings==2.10.1
 python-multipart==0.0.20
+httpx==0.28.1
 boto3==1.40.34
 google-cloud-tasks>=2.18.0,<3
 cryptography==46.0.5
