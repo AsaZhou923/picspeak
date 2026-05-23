@@ -9,6 +9,7 @@ import { useI18n } from '@/lib/i18n';
 import { ApiException, TaskErrorPayload, TaskStatusResponse, TaskStreamMessage } from '@/lib/types';
 import { formatSupportMessage, formatUserFacingError } from '@/lib/error-utils';
 import { WaitingBlogWindow } from '@/components/blog/WaitingBlogWindow';
+import { logClientError } from '@/lib/client-log';
 
 const POLL_INTERVAL = 1000;
 const HEARTBEAT_STALE_MS = 3 * 60 * 1000;
@@ -233,7 +234,7 @@ export default function TaskPage() {
         };
       } catch (err) {
         if (!cancelled) {
-          console.error('Failed to connect task websocket', err);
+          logClientError('Failed to connect task websocket', err, { taskId });
           poll();
         }
       }

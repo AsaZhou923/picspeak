@@ -56,7 +56,7 @@
 
 ### 前置依赖
 
-- Python 3.10+
+- Python 3.11+
 - Node.js 18+
 - PostgreSQL 14+
 - S3 兼容对象存储（如 Cloudflare R2、MinIO）
@@ -100,7 +100,7 @@ uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
 ### 5. 配置并启动前端
 
 ```bash
-cp frontend/.env.example frontend/.env.local
+cp frontend/.env.local.example frontend/.env.local
 # 编辑 frontend/.env.local，填入 NEXT_PUBLIC_API_URL 等配置
 
 cd frontend
@@ -125,7 +125,7 @@ cd frontend && npm run build && npm run start
 
 ## 文档
 
-- [最新更新日志](docs/changelog/CHANGELOG.md#2026-05-14-legal-pages-static-assets)
+- [最新更新日志](docs/changelog/CHANGELOG.md#2026-05-23-hardening-ci-accessibility)
 - [SEO / GEO 审计报告](docs/seo/seo-audit-2026-05-01.md)
 - [后端接口文档](docs/api/后端接口文档_v1.md)
 - [系统架构说明](docs/architecture/系统架构.md)

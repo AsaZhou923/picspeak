@@ -2,12 +2,14 @@
   "name": "picspeak-frontend",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "clean": "node -e \"require('fs').rmSync('.next',{recursive:true,force:true})\"",
     "dev": "next dev",
     "dev:clean": "npm run clean && next dev",
     "build": "npm run clean && next build",
     "start": "next start",
+    "test": "node --test \"test/*.test.ts\" \"src/features/generations/generation-contracts.test.ts\"",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
     "typecheck": "tsc -p tsconfig.typecheck.json --noEmit"
   },

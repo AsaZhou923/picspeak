@@ -1,6 +1,7 @@
 'use client';
 
 import { canvasToBlob } from './canvas';
+import { logClientWarning } from './client-log';
 
 const CACHE_NAME = 'ps-review-thumbnails-v1';
 const CACHE_PATH = '/__cache__/review-thumbnails/';
@@ -210,7 +211,7 @@ export async function getReviewThumbnailSrc(
     return rememberObjectUrl(entryKey, thumbnailBlob);
   })
     .catch((error: unknown) => {
-      console.warn('Review thumbnail load failed', {
+      logClientWarning('Review thumbnail load failed', {
         photoId,
         size,
         error,

@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-05-23-hardening-ci-accessibility",
+    "date": "2026-05-23",
+    "title": "Security hardening, CI gates, and accessibility polish",
+    "summary": "PicSpeak now enforces scoped upload and photo-proxy tokens, atomic rate limits, safer request-audit boundaries, pooled outbound HTTP calls, and new database indexes. The frontend also improves generated-image rendering, SEO defaults, keyboard menus, modal focus behavior, and GitHub Actions CI.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-05-23-hardening-ci-accessibility",
+    "sections": [
+      {
+        "title": "Backend safety and stability",
+        "items": [
+          "Upload confirmation and photo proxy tokens now carry separate purposes so signed payloads cannot be reused across flows",
+          "Guest rate limits use PostgreSQL atomic upserts, while request audit logging skips upload/photo binary paths and caps captured bodies",
+          "AI, Clerk, Google OAuth, and image generation calls now share urllib3 pooling, with review, generation, and billing indexes added"
+        ]
+      },
+      {
+        "title": "Frontend and verification",
+        "items": [
+          "Generation pages, generation history, Prompt Library, and Gallery avatars use more stable image rendering; workspace is noindex and Blog canonical defaults to English locale URLs",
+          "Language menus, quick links, gallery publish confirmation, and image zoom now support Escape handling, menu roles, and modal focus trapping",
+          "Added CI / PR CI and codified frontend coverage behind npm run test; backend pytest plus frontend test/typecheck/lint/build are passing"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-05-14-legal-pages-static-assets",
     "date": "2026-05-14",
     "title": "Privacy and terms pages, plus static asset recovery",

@@ -65,33 +65,18 @@ function readSessionAuthToken(): AuthToken | null {
   }
 }
 
-function readLegacyAuthToken(): AuthToken | null {
+function clearLegacyReadableAuthToken(): void {
   try {
-    const stored = window.localStorage.getItem(TOKEN_KEY);
-    if (stored) {
-      const parsed: AuthToken = JSON.parse(stored);
-      if (parsed?.access_token && !isExpiredToken(parsed.access_token)) return parsed;
-      window.localStorage.removeItem(TOKEN_KEY);
-    }
+    window.localStorage.removeItem(TOKEN_KEY);
   } catch {
-    // Ignore malformed or restricted storage access.
+    // Ignore restricted storage access.
   }
 
   try {
-    const pairs = document.cookie ? document.cookie.split(';') : [];
-    for (const pair of pairs) {
-      const [rawKey, ...rest] = pair.trim().split('=');
-      if (rawKey !== TOKEN_KEY) continue;
-      const rawValue = rest.join('=');
-      if (!rawValue) continue;
-      const parsed: AuthToken = JSON.parse(decodeURIComponent(rawValue));
-      if (parsed?.access_token && !isExpiredToken(parsed.access_token)) return parsed;
-    }
+    document.cookie = `${TOKEN_KEY}=; Max-Age=0; Path=/; SameSite=Lax`;
   } catch {
-    // ignore malformed cookie values
+    // ignore legacy cookie cleanup
   }
-
-  return null;
 }
 
 function persistAuthToken(tokenData: AuthToken): void {
@@ -181,11 +166,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // ignore legacy cache cleanup
     }
 
-    let parsed = readSessionAuthToken();
-    if (!parsed) {
-      parsed = readLegacyAuthToken();
-      if (parsed) persistAuthToken(parsed);
-    }
+    clearLegacyReadableAuthToken();
+
+    const parsed = readSessionAuthToken();
     if (parsed) {
       setToken(parsed.access_token);
       setUserInfo(parsed);
@@ -240,11 +223,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const syncAuthState = async (): Promise<void> => {
       setIsLoading(true);
 
-      let parsed = readSessionAuthToken();
-      if (!parsed) {
-        parsed = readLegacyAuthToken();
-        if (parsed) persistAuthToken(parsed);
-      }
+      clearLegacyReadableAuthToken();
+
+      const parsed = readSessionAuthToken();
 
       if (!isSignedIn) {
         if (parsed?.auth_provider === 'clerk') {

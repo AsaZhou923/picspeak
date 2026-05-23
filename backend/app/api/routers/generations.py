@@ -452,7 +452,7 @@ def _record_generation_event(
         )
     except Exception:
         # Analytics must not block generation flows.
-        pass
+        logger.debug('Failed to record generation analytics event %s', event_name, exc_info=True)
 
 
 def _find_generation_owned(db: Session, generation_id: str, owner_user_id: int) -> GeneratedImage:

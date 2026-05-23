@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { getReview, isAbortError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { logClientError } from '@/lib/client-log';
 
 export function useReplayContext({ preview }: { preview: string | null }) {
   const { ensureToken } = useAuth();
@@ -33,7 +34,7 @@ export function useReplayContext({ preview }: { preview: string | null }) {
       })
       .catch((err) => {
         if (!isAbortError(err) && !controller.signal.aborted) {
-          console.error('Failed to hydrate replay photo in workspace', err);
+          logClientError('Failed to hydrate replay photo in workspace', err, { sourceReviewId });
         }
       });
     return () => {

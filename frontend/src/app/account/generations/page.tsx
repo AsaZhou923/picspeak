@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { AlertCircle, ChevronRight, RefreshCw } from 'lucide-react';
 import { getMyGenerations } from '@/lib/api';
@@ -27,9 +28,14 @@ function GenerationCard({ item }: { item: GeneratedImageItem }) {
       href={`/generations/${item.generation_id}`}
       className="group grid gap-4 rounded-lg border border-border-subtle bg-raised p-3 transition-colors hover:border-gold/40 sm:grid-cols-[112px_minmax(0,1fr)_24px]"
     >
-      <div className="overflow-hidden rounded-lg bg-void">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={item.image_url} alt={item.prompt} className="aspect-square h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+      <div className="relative aspect-square overflow-hidden rounded-lg bg-void">
+        <Image
+          src={item.image_url}
+          alt={item.prompt}
+          fill
+          sizes="112px"
+          className="object-cover transition-transform duration-500 group-hover:scale-105"
+        />
       </div>
       <div className="min-w-0 py-1">
         <div className="mb-2 flex flex-wrap items-center gap-2">

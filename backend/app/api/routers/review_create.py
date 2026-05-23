@@ -194,7 +194,7 @@ def create_review(
             db.commit()
         return response
 
-    image_url = _build_storage_photo_url(photo.bucket, photo.object_key)
+    image_url = _build_storage_photo_url(photo.object_key)
     try:
         ai_response = run_ai_review(payload.mode, image_url=image_url, locale=payload.locale, exif_data=photo.exif_data or None, image_type=payload.image_type)
     except AIReviewError as exc:

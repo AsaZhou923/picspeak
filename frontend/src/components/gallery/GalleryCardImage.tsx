@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { PublicGalleryItem } from '@/lib/types';
 
-export default function GalleryCardImage({
+function GalleryCardImage({
   item,
   alt,
 }: {
@@ -65,3 +65,5 @@ export default function GalleryCardImage({
     </div>
   );
 }
+
+export default memo(GalleryCardImage);

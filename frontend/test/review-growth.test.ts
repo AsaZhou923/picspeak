@@ -116,3 +116,26 @@ test('buildHistoryGrowthSnapshot uses the lowest average dimension when no dimen
   assert.equal(snapshot.practiceTheme.dimension, 'color');
   assert.equal(snapshot.practiceTheme.intensity, 'stabilize');
 });
+
+test('buildHistoryGrowthSnapshot stays flat when there is no previous comparison window', () => {
+  const snapshot = buildHistoryGrowthSnapshot([
+    makeHistoryItem('rev-2', '2026-04-18T10:00:00Z', 7.4, makeScores({ composition: 7, lighting: 6, color: 7, impact: 8, technical: 7 })),
+    makeHistoryItem('rev-1', '2026-04-17T10:00:00Z', 7.1, makeScores({ composition: 7, lighting: 6, color: 6, impact: 7, technical: 7 })),
+  ]);
+
+  assert.equal(snapshot.previousItems.length, 0);
+  assert.equal(snapshot.previousAverage, null);
+  assert.equal(snapshot.averageDelta, null);
+  assert.equal(snapshot.trend, 'flat');
+  assert.equal(snapshot.practiceTheme.intensity, 'stabilize');
+});
+
+test('buildHistoryGrowthSnapshot falls back to composition when history is empty', () => {
+  const snapshot = buildHistoryGrowthSnapshot([]);
+
+  assert.equal(snapshot.recentAverage, null);
+  assert.equal(snapshot.previousAverage, null);
+  assert.deepEqual(snapshot.weakDimensions, []);
+  assert.equal(snapshot.practiceTheme.dimension, 'composition');
+  assert.equal(snapshot.practiceTheme.reviewCount, 0);
+});

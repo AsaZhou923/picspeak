@@ -1,7 +1,7 @@
 'use client';
 /* eslint-disable @next/next/no-img-element -- Cache-backed thumbnails are blob/object URLs that bypass Next image optimization. */
 
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { ImageOff } from 'lucide-react';
 import { getReviewThumbnailSrc } from '@/lib/review-thumbnail-cache';
 
@@ -16,7 +16,7 @@ interface CachedThumbnailProps {
   imageClassName?: string;
 }
 
-export default function CachedThumbnail({
+const CachedThumbnail = memo(function CachedThumbnail({
   photoId,
   photoUrl,
   fallbackUrl = null,
@@ -127,4 +127,6 @@ export default function CachedThumbnail({
       )}
     </div>
   );
-}
+});
+
+export default CachedThumbnail;

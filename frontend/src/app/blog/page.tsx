@@ -10,17 +10,17 @@ export const metadata: Metadata = {
   keywords: [...blogConfig.keywords],
   robots: INDEXABLE_ROBOTS,
   alternates: {
-    canonical: '/blog',
+    canonical: '/en/blog',
     languages: {
       'zh-CN': '/zh/blog',
       en: '/en/blog',
       ja: '/ja/blog',
-      'x-default': '/blog',
+      'x-default': '/en/blog',
     },
   },
   openGraph: {
     type: 'website',
-    url: `${siteConfig.url}/blog`,
+    url: `${siteConfig.url}/en/blog`,
     title: blogConfig.title,
     description: blogConfig.description,
     siteName: siteConfig.name,

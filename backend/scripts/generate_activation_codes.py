@@ -10,6 +10,8 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
+from psycopg2.extensions import adapt
+
 from app.services.billing_access import activation_code_hash, activation_code_prefix
 
 ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
@@ -38,16 +40,20 @@ def generate_unique_codes(count: int) -> list[str]:
     return codes
 
 
+def sql_literal(value: str) -> str:
+    return adapt(value).getquoted().decode('utf-8')
+
+
 def build_insert_sql(codes: list[str], *, batch_id: str, duration_days: int, source: str) -> str:
     values = []
     for code in codes:
         values.append(
             "(\n"
-            f"    '{activation_code_hash(code)}',\n"
-            f"    '{activation_code_prefix(code)}',\n"
+            f"    {sql_literal(activation_code_hash(code))},\n"
+            f"    {sql_literal(activation_code_prefix(code))},\n"
             f"    {duration_days},\n"
-            f"    '{source}',\n"
-            f"    '{batch_id}',\n"
+            f"    {sql_literal(source)},\n"
+            f"    {sql_literal(batch_id)},\n"
             "    '{}'::jsonb\n"
             ")"
         )

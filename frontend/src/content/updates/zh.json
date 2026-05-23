@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-05-23-hardening-ci-accessibility",
+    "date": "2026-05-23",
+    "title": "安全硬化、CI 门禁与前端可访问性补强",
+    "summary": "PicSpeak 补齐上传和照片代理 token 目的校验、原子限流、请求审计边界、池化外部 HTTP 调用和数据库索引；前端同步改进生成图渲染、SEO 入口、菜单与弹窗键盘体验，并新增 GitHub Actions CI。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-05-23-hardening-ci-accessibility",
+    "sections": [
+      {
+        "title": "后端安全与稳定性",
+        "items": [
+          "上传确认和照片代理 token 绑定不同 purpose，避免签名 payload 被跨场景复用",
+          "访客限流改为 PostgreSQL 原子 upsert，请求审计跳过上传/照片二进制路径并限制 body 捕获大小",
+          "AI、Clerk、Google OAuth 和生图调用统一使用 urllib3 连接池，并新增 review、generation、billing 查询索引"
+        ]
+      },
+      {
+        "title": "前端与验证",
+        "items": [
+          "生成页、生成历史、Prompt Library 和 Gallery 头像改进图片加载，workspace 改为 noindex，Blog canonical 对齐英文默认入口",
+          "语言菜单、快捷菜单、Gallery 发布弹窗和图片放大层补齐 Escape、focus trap 与 menu role",
+          "新增 CI / PR CI，并把前端测试固化为 npm run test；全量后端 pytest、前端 test/typecheck/lint/build 已通过"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-05-14-legal-pages-static-assets",
     "date": "2026-05-14",
     "title": "隐私与条款页面上线，并修复静态资源加载",

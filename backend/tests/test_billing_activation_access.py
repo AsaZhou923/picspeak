@@ -6,6 +6,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import MagicMock
 
+from sqlalchemy.sql.elements import BinaryExpression
+
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
@@ -134,6 +136,42 @@ class BillingActivationAccessTests(unittest.TestCase):
             (now + timedelta(days=40)).timestamp(),
             delta=3,
         )
+
+    def test_redeem_activation_code_filters_by_hash_not_raw_code_text(self) -> None:
+        now = datetime.now(timezone.utc)
+        raw_code = "pscn-' ; drop table billing_activation_codes; -- 123456"
+        code = BillingActivationCode(
+            code_hash=activation_code_hash(raw_code),
+            code_prefix=activation_code_prefix(raw_code),
+            duration_days=30,
+            source='ifdian',
+        )
+        user = User(
+            id=22,
+            public_id='usr_safe_lookup',
+            email='safe@example.com',
+            username='safe_user',
+            plan=UserPlan.free,
+            daily_quota_total=0,
+            daily_quota_used=0,
+            status=UserStatus.active,
+        )
+        code_query = _query_mock(first=code)
+        subscription_query = _query_mock(first=None, all_rows=[])
+        db = MagicMock()
+        db.query.side_effect = [
+            code_query,
+            subscription_query,
+            _query_mock(all_rows=[BillingSubscription(user_id=user.id, provider=ACTIVATION_CODE_PROVIDER, status='active', ends_at=now + timedelta(days=30))]),
+        ]
+
+        redeem_activation_code_for_user(db, user=user, raw_code=raw_code)
+
+        expression = code_query.filter.call_args.args[0]
+        self.assertIsInstance(expression, BinaryExpression)
+        self.assertEqual(getattr(expression.left, 'name', None), BillingActivationCode.code_hash.key)
+        self.assertEqual(getattr(expression.right, 'value', None), activation_code_hash(raw_code))
+        self.assertNotIn('drop table', str(getattr(expression.right, 'value', '')))
 
 
 if __name__ == '__main__':

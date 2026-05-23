@@ -325,9 +325,6 @@ def process_image_generation_task(task_public_id: str, *, worker_name: str) -> d
         elif task.status != TaskStatus.RUNNING:
             return {'result': 'noop', 'status': task.status.value}
 
-        task = db.query(ImageGenerationTask).filter(ImageGenerationTask.id == task.id).first()
-        if task is None:
-            return {'result': 'missing'}
         try:
             _process_generation_task(db, task)
         except Exception as exc:

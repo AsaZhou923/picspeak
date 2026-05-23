@@ -27,17 +27,17 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     keywords: [...post.keywords],
     robots: INDEXABLE_ROBOTS,
     alternates: {
-      canonical: `/blog/${post.slug}`,
+      canonical: `/en/blog/${post.slug}`,
       languages: {
         'zh-CN': `/zh/blog/${post.slug}`,
         en: `/en/blog/${post.slug}`,
         ja: `/ja/blog/${post.slug}`,
-        'x-default': `/blog/${post.slug}`,
+        'x-default': `/en/blog/${post.slug}`,
       },
     },
     openGraph: {
       type: 'article',
-      url: `${siteConfig.url}/blog/${post.slug}`,
+      url: `${siteConfig.url}/en/blog/${post.slug}`,
       title: post.title,
       description: post.description,
       siteName: siteConfig.name,

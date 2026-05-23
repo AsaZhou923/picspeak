@@ -122,12 +122,24 @@ class Settings(BaseSettings):
     image_generation_max_outputs_per_request: int = 1
     image_generation_timeout_seconds: int = 180
     image_generation_task_stale_timeout_seconds: int = 600
+    image_generation_shutdown_timeout_seconds: int = 30
     image_generation_download_max_bytes: int = 25 * 1024 * 1024
     image_generation_worker_concurrency: int = 1
     image_generation_daily_ipm_limit: int = 5
     image_generation_enable_streaming: bool = False
     image_generation_free_monthly_credits: int = 3
     image_generation_pro_monthly_credits: int = 199
+
+    def _local_dev_only(self) -> bool:
+        local_origins = {'localhost', '127.0.0.1', '::1'}
+        origin = self.frontend_origin.strip().lower()
+        database_url = self.database_url.strip().lower()
+        cors_origins = [origin.strip().lower() for origin in self.backend_cors_origins]
+        return (
+            any(host in origin for host in local_origins)
+            and all(any(host in item for host in local_origins) for item in cors_origins)
+            and any(host in database_url for host in local_origins)
+        )
 
     @field_validator('backend_cors_origins', mode='before')
     @classmethod
@@ -217,9 +229,15 @@ class Settings(BaseSettings):
 
         # Validate app_secret strength in non-dev environments.
         _insecure_app_secrets = {'', 'change-me', 'picspeakt123'}
+        insecure_app_secret = self.app_secret.strip() in _insecure_app_secrets or len(self.app_secret.strip()) < 32
+        if is_dev and insecure_app_secret and not self._local_dev_only():
+            raise ValueError(
+                'APP_ENV=dev with default APP_SECRET is only allowed for localhost-only development settings. '
+                'Set APP_ENV=production and strong secrets for deployed environments.'
+            )
         if not is_dev:
             secret = self.app_secret.strip()
-            if secret in _insecure_app_secrets or len(secret) < 32:
+            if insecure_app_secret:
                 raise ValueError(
                     'APP_SECRET must be set to a cryptographically random value of at least 32 characters outside dev mode. '
                     'Generate one with: python3 -c "import secrets; print(secrets.token_hex(32))"'
@@ -227,7 +245,13 @@ class Settings(BaseSettings):
 
         # Validate oauth_jwt_secret in non-dev environments.
         insecure_defaults = {'', 'change-me-jwt-secret'}
-        if not is_dev and self.oauth_jwt_secret.strip() in insecure_defaults:
+        insecure_oauth_secret = self.oauth_jwt_secret.strip() in insecure_defaults
+        if is_dev and insecure_oauth_secret and not self._local_dev_only():
+            raise ValueError(
+                'APP_ENV=dev with default OAUTH_JWT_SECRET is only allowed for localhost-only development settings. '
+                'Set a strong OAUTH_JWT_SECRET for deployed environments.'
+            )
+        if not is_dev and insecure_oauth_secret:
             raise ValueError('OAUTH_JWT_SECRET must be set to a non-default secret outside dev mode')
         if self.cloud_tasks_enabled:
             required_fields = {

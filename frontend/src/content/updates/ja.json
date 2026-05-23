@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-05-23-hardening-ci-accessibility",
+    "date": "2026-05-23",
+    "title": "セキュリティ強化、CI ゲート、アクセシビリティ改善",
+    "summary": "PicSpeak は upload と photo proxy token の用途を分離し、原子的な rate limit、より安全な request audit 境界、pool 化された外部 HTTP 呼び出し、新しい DB index を追加しました。フロントエンドも生成画像表示、SEO 既定値、キーボードメニュー、modal focus、GitHub Actions CI を改善しています。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-05-23-hardening-ci-accessibility",
+    "sections": [
+      {
+        "title": "バックエンドの安全性と安定性",
+        "items": [
+          "upload confirmation と photo proxy token に別々の purpose を付与し、署名 payload の流用を防ぎます",
+          "guest rate limit は PostgreSQL の atomic upsert を使い、request audit は upload/photo の binary path を除外し body capture を制限します",
+          "AI、Clerk、Google OAuth、image generation 呼び出しを urllib3 pool に統一し、review、generation、billing の index を追加しました"
+        ]
+      },
+      {
+        "title": "フロントエンドと検証",
+        "items": [
+          "generation ページ、generation history、Prompt Library、Gallery avatar の画像表示を安定化し、workspace を noindex、Blog canonical を英語 locale 既定にしました",
+          "language menu、quick links、gallery publish confirmation、image zoom に Escape、menu role、modal focus trap を追加しました",
+          "CI / PR CI を追加し、frontend coverage を npm run test に統一しました。backend pytest と frontend test/typecheck/lint/build は通過しています"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-05-14-legal-pages-static-assets",
     "date": "2026-05-14",
     "title": "プライバシーと規約ページ、静的アセット読み込み修正",

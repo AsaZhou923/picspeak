@@ -118,6 +118,27 @@ h3 {
   outline-offset: 2px;
 }
 
+.skip-link {
+  position: fixed;
+  left: 1rem;
+  top: 1rem;
+  z-index: 10000;
+  transform: translateY(-150%);
+  border: 1px solid rgb(var(--color-gold));
+  border-radius: 999px;
+  background: rgb(var(--color-void));
+  color: rgb(var(--color-ink));
+  padding: 0.65rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: transform 0.18s ease;
+}
+
+.skip-link:focus,
+.skip-link:focus-visible {
+  transform: translateY(0);
+}
+
 /* ─── Utility Classes ─────────────────────────────────────────────────────── */
 @layer utilities {
   .text-balance {

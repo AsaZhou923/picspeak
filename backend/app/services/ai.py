@@ -4,12 +4,11 @@ import json
 import re
 import time
 from dataclasses import dataclass
-from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
 
 from pydantic import ValidationError
 
 from app.core.config import settings
+from app.core.http_client import PooledHTTPRequestError, PooledHTTPStatusError, pooled_request
 from app.schemas import ReviewResult
 from app.services.ai_prompts import (
     ALLOWED_IMAGE_TYPES,
@@ -125,6 +124,13 @@ def _compute_final_score(scores: dict[str, int]) -> float:
             raise AIReviewError(f'Score for {key} out of range')
         values.append(value)
     return round(sum(values) / len(values), 1)
+
+
+def _normalize_locked_scores(raw_scores: dict) -> dict[str, int]:
+    scores = dict(raw_scores)
+    if 'impact' not in scores and 'story' in scores:
+        scores['impact'] = scores['story']
+    return {key: int(scores[key]) for key in ('composition', 'lighting', 'color', 'impact', 'technical')}
 
 
 def _extract_json_object(content: str) -> dict:
@@ -270,25 +276,26 @@ def _request_multimodal_json(*, model_name: str, prompt: str, image_url: str, te
         ],
     }
 
-    req = Request(
-        endpoint,
-        data=json.dumps(payload).encode('utf-8'),
-        headers={
-            'Authorization': f'Bearer {settings.ai_api_key}',
-            'Content-Type': 'application/json',
-        },
-        method='POST',
-    )
-
     start = time.perf_counter()
     try:
-        with urlopen(req, timeout=settings.ai_timeout_seconds) as resp:
-            body = json.loads(resp.read().decode('utf-8'))
-    except HTTPError as exc:
-        err_body = exc.read().decode('utf-8', errors='ignore') if hasattr(exc, 'read') else str(exc)
-        raise AIReviewError(f'AI provider HTTP {exc.code}: {err_body[:300]}') from exc
-    except URLError as exc:
-        raise AIReviewError(f'AI provider request failed: {exc.reason}') from exc
+        response = pooled_request(
+            'POST',
+            endpoint,
+            body=json.dumps(payload).encode('utf-8'),
+            headers={
+                'Authorization': f'Bearer {settings.ai_api_key}',
+                'Content-Type': 'application/json',
+            },
+            timeout_seconds=settings.ai_timeout_seconds,
+        )
+        body = json.loads(response.data.decode('utf-8'))
+    except PooledHTTPStatusError as exc:
+        err_body = exc.response.data.decode('utf-8', errors='ignore')
+        raise AIReviewError(f'AI provider HTTP {exc.response.status}: {err_body[:300]}') from exc
+    except PooledHTTPRequestError as exc:
+        raise AIReviewError(f'AI provider request failed: {exc}') from exc
+    except json.JSONDecodeError as exc:
+        raise AIReviewError('AI provider returned invalid JSON') from exc
 
     latency_ms = int((time.perf_counter() - start) * 1000)
     try:
@@ -332,7 +339,7 @@ def run_ai_review(
         scores = raw_scoring_payload.get('scores') if isinstance(raw_scoring_payload.get('scores'), dict) else raw_scoring_payload
         if not isinstance(scores, dict):
             raise AIReviewError('Model response missing scores object')
-        locked_scores = {key: int(scores[key]) for key in ('composition', 'lighting', 'color', 'impact', 'technical')}
+        locked_scores = _normalize_locked_scores(scores)
     except AIReviewError:
         raise
     except (KeyError, TypeError, ValueError) as exc:

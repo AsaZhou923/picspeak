@@ -1,6 +1,8 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
+import { memo } from 'react';
 import { Camera, ChevronRight, Gauge, Heart, Sparkles, Star, Zap } from 'lucide-react';
 import { PublicGalleryItem } from '@/lib/types';
 import { useI18n } from '@/lib/i18n';
@@ -59,7 +61,7 @@ function getModeBadgeConfig(mode: PublicGalleryItem['mode']) {
   };
 }
 
-export default function GalleryCard({
+function GalleryCard({
   item,
   index,
   likeBusyId,
@@ -127,12 +129,11 @@ export default function GalleryCard({
 
         <div className="absolute bottom-6 right-6 flex items-center gap-2 rounded-full border border-border bg-[rgba(250,248,244,0.92)] px-2.5 py-1.5 shadow-[0_12px_30px_rgba(120,96,68,0.14)] backdrop-blur-md dark:border-white/10 dark:bg-[rgba(241,237,230,0.9)] dark:shadow-[0_12px_36px_rgba(0,0,0,0.2)]">
           {item.owner_avatar_url ? (
-            /* eslint-disable-next-line @next/next/no-img-element */
-            <img
+            <Image
               src={item.owner_avatar_url}
               alt={author.label}
-              loading="lazy"
-              decoding="async"
+              width={28}
+              height={28}
               className="h-7 w-7 rounded-full border border-white/45 object-cover"
             />
           ) : (
@@ -247,3 +248,5 @@ export default function GalleryCard({
     </article>
   );
 }
+
+export default memo(GalleryCard);

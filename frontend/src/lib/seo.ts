@@ -7,6 +7,12 @@ export const HOME_LANGUAGE_ALTERNATES: NonNullable<Metadata['alternates']>['lang
   'x-default': '/',
 };
 
+export const OPEN_GRAPH_LOCALES = {
+  zh: 'zh_CN',
+  en: 'en_US',
+  ja: 'ja_JP',
+} as const;
+
 export const INDEXABLE_ROBOTS: NonNullable<Metadata['robots']> = {
   index: true,
   follow: true,
@@ -35,6 +41,9 @@ export function singlePageAlternates(canonical: string): NonNullable<Metadata['a
   return {
     canonical,
     languages: {
+      'zh-CN': canonical,
+      en: canonical,
+      ja: canonical,
       'x-default': canonical,
     },
   };

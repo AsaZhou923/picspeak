@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Copy, Download, ImageIcon, RefreshCw, RotateCcw } from 'lucide-react';
@@ -208,13 +209,17 @@ export default function GenerationDetailPage() {
                 </div>
               </div>
             ) : (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={generation.image_url}
-                alt={generation.prompt}
-                className="max-h-[78vh] w-full object-contain"
-                onError={() => setImageFailed(true)}
-              />
+              <div className="relative min-h-[56vh] w-full">
+                <Image
+                  src={generation.image_url}
+                  alt={generation.prompt}
+                  fill
+                  sizes="(min-width: 1024px) 62vw, 100vw"
+                  className="object-contain"
+                  priority
+                  onError={() => setImageFailed(true)}
+                />
+              </div>
             )}
           </main>
 

@@ -171,7 +171,7 @@ class PublicGalleryRouteTests(unittest.TestCase):
         self.assertTrue(payload.items[0].recommended)
         self.assertEqual(payload.items[0].score_percentile, 92.5)
         self.assertIsNone(payload.next_cursor)
-        db.commit.assert_called_once()
+        db.commit.assert_not_called()
 
     def test_list_public_gallery_applies_filters_to_count_and_list_queries(self) -> None:
         request = SimpleNamespace()

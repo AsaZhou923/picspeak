@@ -1,23 +1,23 @@
 from __future__ import annotations
 
 import base64
-import hashlib
 import json
 import logging
 import threading
 import time
 from dataclasses import dataclass
 from typing import Any
-from urllib import error as urllib_error
-from urllib import request as urllib_request
 
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from fastapi import status
 
 from app.core.config import settings
 from app.core.errors import api_error
+from app.core.http_client import PooledHTTPRequestError, PooledHTTPStatusError, pooled_request
 
 logger = logging.getLogger(__name__)
-_SHA256_DIGEST_INFO_PREFIX = bytes.fromhex('3031300d060960864801650304020105000420')
 _JWKS_CACHE_TTL_SECONDS = 300
 _jwks_cache: dict[str, Any] = {'expires_at': 0.0, 'keys': []}
 _jwks_cache_lock = threading.Lock()
@@ -65,11 +65,11 @@ def _decode_jwt_segment(raw: str) -> dict[str, Any]:
     return parsed
 
 
-def _parse_clerk_error(exc: urllib_error.HTTPError) -> str:
+def _parse_clerk_error(raw_payload: bytes, reason: str) -> str:
     try:
-        payload = json.loads(exc.read().decode('utf-8'))
+        payload = json.loads(raw_payload.decode('utf-8'))
     except Exception:
-        return exc.reason or 'Request failed'
+        return reason or 'Request failed'
 
     if isinstance(payload, dict):
         errors = payload.get('errors')
@@ -82,39 +82,44 @@ def _parse_clerk_error(exc: urllib_error.HTTPError) -> str:
         message = payload.get('message')
         if isinstance(message, str) and message.strip():
             return message.strip()
-    return exc.reason or 'Request failed'
+    return reason or 'Request failed'
 
 
 def _clerk_request(method: str, path: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
     secret_key = _require_clerk_secret_key()
     body = json.dumps(payload).encode('utf-8') if payload is not None else None
-    request_obj = urllib_request.Request(
-        f"{settings.clerk_api_url.rstrip('/')}{path}",
-        data=body,
-        method=method,
-    )
-    request_obj.add_header('Authorization', f'Bearer {secret_key}')
-    request_obj.add_header('Accept', 'application/json')
-    request_obj.add_header('Clerk-API-Version', settings.clerk_api_version.strip())
-    request_obj.add_header('User-Agent', _CLERK_BACKEND_USER_AGENT)
+    headers = {
+        'Authorization': f'Bearer {secret_key}',
+        'Accept': 'application/json',
+        'Clerk-API-Version': settings.clerk_api_version.strip(),
+        'User-Agent': _CLERK_BACKEND_USER_AGENT,
+    }
     if body is not None:
-        request_obj.add_header('Content-Type', 'application/json')
+        headers['Content-Type'] = 'application/json'
 
     try:
-        with urllib_request.urlopen(request_obj, timeout=10) as response:
-            raw = response.read().decode('utf-8')
-    except urllib_error.HTTPError as exc:
+        response = pooled_request(
+            method,
+            f"{settings.clerk_api_url.rstrip('/')}{path}",
+            body=body,
+            headers=headers,
+            timeout_seconds=10,
+        )
+        raw = response.data.decode('utf-8')
+    except PooledHTTPStatusError as exc:
+        response = exc.response
         logger.warning(
             'Clerk API %s %s failed with HTTP %s',
             method,
             path,
-            exc.code,
+            response.status,
         )
-        if exc.code in {401, 403, 404}:
-            raise api_error(status.HTTP_401_UNAUTHORIZED, 'CLERK_API_UNAUTHORIZED', _parse_clerk_error(exc)) from exc
-        raise api_error(status.HTTP_502_BAD_GATEWAY, 'CLERK_API_FAILED', _parse_clerk_error(exc)) from exc
-    except urllib_error.URLError as exc:
-        raise api_error(status.HTTP_502_BAD_GATEWAY, 'CLERK_API_UNREACHABLE', f'Clerk API request failed: {exc.reason}') from exc
+        message = _parse_clerk_error(response.data, response.reason)
+        if response.status in {401, 403, 404}:
+            raise api_error(status.HTTP_401_UNAUTHORIZED, 'CLERK_API_UNAUTHORIZED', message) from exc
+        raise api_error(status.HTTP_502_BAD_GATEWAY, 'CLERK_API_FAILED', message) from exc
+    except PooledHTTPRequestError as exc:
+        raise api_error(status.HTTP_502_BAD_GATEWAY, 'CLERK_API_UNREACHABLE', f'Clerk API request failed: {exc}') from exc
 
     try:
         parsed = json.loads(raw)
@@ -156,33 +161,16 @@ def _rsa_verify_rs256(signing_input: bytes, signature: bytes, jwk: dict[str, Any
     if not isinstance(n_raw, str) or not isinstance(e_raw, str):
         return False
 
-    modulus = int.from_bytes(_b64url_decode(n_raw), 'big')
-    exponent = int.from_bytes(_b64url_decode(e_raw), 'big')
-    if modulus <= 0 or exponent <= 0:
-        return False
-
-    key_size = (modulus.bit_length() + 7) // 8
-    if len(signature) != key_size:
-        return False
-
-    sig_int = int.from_bytes(signature, 'big')
-    em = pow(sig_int, exponent, modulus).to_bytes(key_size, 'big')
-    digest = hashlib.sha256(signing_input).digest()
-    expected_tail = _SHA256_DIGEST_INFO_PREFIX + digest
-
-    if len(em) < len(expected_tail) + 11:
-        return False
-    if em[0:2] != b'\x00\x01':
-        return False
     try:
-        separator_index = em.index(b'\x00', 2)
-    except ValueError:
+        modulus = int.from_bytes(_b64url_decode(n_raw), 'big')
+        exponent = int.from_bytes(_b64url_decode(e_raw), 'big')
+        public_key = rsa.RSAPublicNumbers(exponent, modulus).public_key()
+        public_key.verify(signature, signing_input, padding.PKCS1v15(), hashes.SHA256())
+    except InvalidSignature:
         return False
-    if separator_index < 10:
+    except (OverflowError, TypeError, ValueError):
         return False
-    if any(byte != 0xFF for byte in em[2:separator_index]):
-        return False
-    return em[separator_index + 1 :] == expected_tail
+    return True
 
 
 def _allowed_authorized_parties() -> set[str]:

@@ -156,7 +156,38 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 
 
 # Paths excluded from audit logging (high-frequency / non-business endpoints).
-_AUDIT_SKIP_PATHS = {'/healthz', '/docs', '/openapi.json', '/redoc'}
+_AUDIT_SKIP_PATHS = {
+    '/healthz',
+    '/docs',
+    '/openapi.json',
+    '/redoc',
+    '/api/v1/uploads/presign',
+    '/api/v1/photos',
+}
+_AUDIT_SKIP_PREFIXES = ('/api/v1/photos/',)
+_AUDIT_BODY_CAPTURE_LIMIT_BYTES = 4 * 1024
+_AUDIT_BINARY_CONTENT_TYPES = ('application/octet-stream', 'multipart/form-data')
+
+
+def _should_skip_audit(path: str) -> bool:
+    return path in _AUDIT_SKIP_PATHS or any(path.startswith(prefix) for prefix in _AUDIT_SKIP_PREFIXES)
+
+
+def _should_capture_audit_body(request: Request) -> bool:
+    content_type = request.headers.get('content-type', '').split(';', 1)[0].strip().lower()
+    if content_type in _AUDIT_BINARY_CONTENT_TYPES:
+        return False
+
+    content_length = request.headers.get('content-length')
+    if content_length:
+        try:
+            if int(content_length) > _AUDIT_BODY_CAPTURE_LIMIT_BYTES:
+                return False
+        except ValueError:
+            return False
+    elif request.method.upper() not in {'GET', 'HEAD', 'OPTIONS'}:
+        return False
+    return True
 
 
 def _persist_audit_log(
@@ -237,14 +268,20 @@ async def _drain_audit_tasks() -> None:
 @app.middleware('http')
 async def request_audit_middleware(request: Request, call_next):
     started_at = time.perf_counter()
-    request_body = await request.body()
     request_id = f'req_{uuid4().hex}'
     request.state.request_id = request_id
+    request_body = b''
+    skip_audit = _should_skip_audit(request.url.path)
 
-    async def receive() -> dict:
-        return {'type': 'http.request', 'body': request_body, 'more_body': False}
+    if not skip_audit and _should_capture_audit_body(request):
+        full_request_body = await request.body()
+        request_body = full_request_body[:_AUDIT_BODY_CAPTURE_LIMIT_BYTES]
 
-    request = Request(request.scope, receive)
+        async def receive() -> dict:
+            return {'type': 'http.request', 'body': full_request_body, 'more_body': False}
+
+        request = Request(request.scope, receive)
+        request.state.request_id = request_id
 
     status_code = 500
     try:
@@ -254,7 +291,7 @@ async def request_audit_middleware(request: Request, call_next):
         return response
     finally:
         # Skip audit for non-business endpoints.
-        if request.url.path not in _AUDIT_SKIP_PATHS:
+        if not skip_audit:
             duration_ms = int((time.perf_counter() - started_at) * 1000)
             # Fire-and-forget: run the synchronous DB write in the
             # default thread-pool so the event loop stays unblocked.

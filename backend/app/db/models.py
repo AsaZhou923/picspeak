@@ -161,6 +161,7 @@ class Review(Base):
         Index('idx_reviews_owner_created', 'owner_user_id', 'created_at'),
         Index('idx_reviews_owner_deleted_created', 'owner_user_id', 'deleted_at', 'created_at'),
         Index('idx_reviews_owner_image_type_created', 'owner_user_id', 'image_type', 'created_at'),
+        Index('idx_reviews_mode_created', 'mode', 'created_at'),
         Index('idx_reviews_source_review', 'source_review_id'),
         Index(
             'idx_reviews_gallery_public',
@@ -251,7 +252,7 @@ class ReviewTaskEvent(Base):
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    task_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('review_tasks.id'), nullable=False)
+    task_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('review_tasks.id', ondelete='CASCADE'), nullable=False)
     task_public_id: Mapped[str] = mapped_column(Text, nullable=False)
     event_type: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(Text, nullable=False)
@@ -268,6 +269,7 @@ class ImageGenerationTask(Base):
     __table_args__ = (
         UniqueConstraint('owner_user_id', 'idempotency_key', name='uq_image_generation_tasks_user_idempotency'),
         Index('idx_image_generation_tasks_status_created', 'status', 'created_at'),
+        Index('idx_image_generation_tasks_status_next_attempt', 'status', 'next_attempt_at'),
         Index('idx_image_generation_tasks_owner_created', 'owner_user_id', 'created_at'),
         Index('idx_image_generation_tasks_review_created', 'source_review_id', 'created_at'),
     )
@@ -304,6 +306,7 @@ class GeneratedImage(Base):
         Index('idx_generated_images_owner_created', 'owner_user_id', 'created_at'),
         Index('idx_generated_images_task', 'task_id'),
         Index('idx_generated_images_review_created', 'source_review_id', 'created_at'),
+        Index('idx_generated_images_object', 'object_bucket', 'object_key'),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
@@ -363,6 +366,7 @@ class BillingSubscription(Base):
     __table_args__ = (
         Index('uq_billing_subscriptions_provider_subscription', 'provider', 'provider_subscription_id', unique=True),
         Index('idx_billing_subscriptions_user_provider', 'user_id', 'provider'),
+        Index('idx_billing_subscriptions_provider_customer', 'provider_customer_id'),
         Index('idx_billing_subscriptions_status_updated', 'status', 'updated_at'),
     )
 

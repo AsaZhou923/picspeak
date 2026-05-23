@@ -1,6 +1,7 @@
 ﻿'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AlertCircle, ArrowUpRight, Copy, ImageIcon, Sparkles, Wand2 } from 'lucide-react';
@@ -748,8 +749,13 @@ export default function GeneratePage() {
                       className="group overflow-hidden rounded-lg border border-border-subtle bg-raised"
                     >
                       <div className="relative aspect-square bg-void">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={item.image_url} alt={item.prompt} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                        <Image
+                          src={item.image_url}
+                          alt={item.prompt}
+                          fill
+                          sizes="(min-width: 1024px) 160px, 45vw"
+                          className="object-cover transition-transform duration-500 group-hover:scale-105"
+                        />
                       </div>
                       <div className="p-2">
                         <p className="truncate text-[11px] text-ink-muted">{formatDate(item.created_at, locale)}</p>

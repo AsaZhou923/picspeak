@@ -15,6 +15,9 @@ test('single URL public pages do not point hreflang to unrelated locale home pag
   assert.deepEqual(singlePageAlternates('/gallery'), {
     canonical: '/gallery',
     languages: {
+      'zh-CN': '/gallery',
+      en: '/gallery',
+      ja: '/gallery',
       'x-default': '/gallery',
     },
   });

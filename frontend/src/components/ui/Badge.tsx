@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { memo } from 'react';
 import { useI18n } from '@/lib/i18n';
 
 interface BadgeProps {
@@ -22,7 +22,7 @@ const sizeStyles: Record<string, string> = {
   md: 'px-3 py-1 text-sm',
 };
 
-export default function Badge({ variant = 'neutral', size = 'sm', children }: BadgeProps) {
+const Badge = memo(function Badge({ variant = 'neutral', size = 'sm', children }: BadgeProps) {
   return (
     <span
       className={`inline-flex items-center rounded font-body leading-none ${variantStyles[variant]} ${sizeStyles[size]}`}
@@ -30,9 +30,11 @@ export default function Badge({ variant = 'neutral', size = 'sm', children }: Ba
       {children}
     </span>
   );
-}
+});
 
-export function StatusBadge({ status }: { status: string }) {
+export default Badge;
+
+export const StatusBadge = memo(function StatusBadge({ status }: { status: string }) {
   const { t } = useI18n();
   const config: Record<string, { label: string; variant: BadgeProps['variant'] }> = {
     PENDING: { label: t('status_pending'), variant: 'neutral' },
@@ -46,12 +48,12 @@ export function StatusBadge({ status }: { status: string }) {
   };
   const c = config[status] ?? { label: status, variant: 'neutral' as const };
   return <Badge variant={c.variant}>{c.label}</Badge>;
-}
+});
 
-export function ModeBadge({ mode }: { mode: string }) {
+export const ModeBadge = memo(function ModeBadge({ mode }: { mode: string }) {
   return (
     <Badge variant={mode === 'pro' ? 'gold' : 'outline'}>
       {mode === 'pro' ? 'Pro' : 'Flash'}
     </Badge>
   );
-}
+});

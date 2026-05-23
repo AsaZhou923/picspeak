@@ -22,14 +22,24 @@ def _b64url_decode(raw: str) -> bytes:
     return base64.urlsafe_b64decode(raw + padding)
 
 
-def sign_payload(payload: dict[str, Any], ttl_seconds: int) -> str:
+def sign_payload(payload: dict[str, Any], ttl_seconds: int, *, purpose: str | None = None) -> str:
     body = payload.copy()
+    if purpose is not None:
+        existing_purpose = body.get('purpose')
+        if existing_purpose is not None and existing_purpose != purpose:
+            raise ValueError('payload purpose does not match requested token purpose')
+        body['purpose'] = purpose
     body['exp'] = int(time.time()) + ttl_seconds
     return sign_payload_with_exp(body, body['exp'])
 
 
-def sign_payload_with_exp(payload: dict[str, Any], exp_timestamp: int) -> str:
+def sign_payload_with_exp(payload: dict[str, Any], exp_timestamp: int, *, purpose: str | None = None) -> str:
     body = payload.copy()
+    if purpose is not None:
+        existing_purpose = body.get('purpose')
+        if existing_purpose is not None and existing_purpose != purpose:
+            raise ValueError('payload purpose does not match requested token purpose')
+        body['purpose'] = purpose
     body['exp'] = int(exp_timestamp)
     serialized = json.dumps(body, separators=(',', ':'), ensure_ascii=False).encode('utf-8')
     payload_encoded = _b64url_encode(serialized)
@@ -37,7 +47,7 @@ def sign_payload_with_exp(payload: dict[str, Any], exp_timestamp: int) -> str:
     return f"{payload_encoded}.{_b64url_encode(signature)}"
 
 
-def verify_payload(token: str) -> dict[str, Any]:
+def verify_payload(token: str, *, expected_purpose: str | None = None) -> dict[str, Any]:
     try:
         payload_encoded, signature_encoded = token.split('.', 1)
     except ValueError as exc:
@@ -51,6 +61,8 @@ def verify_payload(token: str) -> dict[str, Any]:
     payload = json.loads(_b64url_decode(payload_encoded).decode('utf-8'))
     if int(payload.get('exp', 0)) < int(time.time()):
         raise api_error(400, 'TOKEN_EXPIRED', 'Token expired')
+    if expected_purpose is not None and payload.get('purpose') != expected_purpose:
+        raise api_error(400, 'TOKEN_PURPOSE_INVALID', 'Invalid token purpose')
     return payload
 
 

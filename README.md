@@ -57,7 +57,7 @@
 
 ### Prerequisites
 
-- Python 3.10+
+- Python 3.11+
 - Node.js 18+
 - PostgreSQL 14+
 - S3-compatible object storage such as Cloudflare R2 or MinIO
@@ -102,7 +102,7 @@ uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
 ### 5. Configure and start the frontend
 
 ```bash
-cp frontend/.env.example frontend/.env.local
+cp frontend/.env.local.example frontend/.env.local
 # Edit frontend/.env.local and fill in NEXT_PUBLIC_API_URL and other settings
 
 cd frontend
@@ -127,7 +127,7 @@ cd frontend && npm run build && npm run start
 
 ## Documentation
 
-- [Latest Changelog](docs/changelog/CHANGELOG.md#2026-05-14-legal-pages-static-assets)
+- [Latest Changelog](docs/changelog/CHANGELOG.md#2026-05-23-hardening-ci-accessibility)
 - [SEO / GEO Audit](docs/seo/seo-audit-2026-05-01.md)
 - [Backend API Documentation](docs/api/后端接口文档_v1.md)
 - [System Architecture](docs/architecture/系统架构.md)

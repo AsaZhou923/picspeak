@@ -1,12 +1,13 @@
 'use client';
 
 import { X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import ClerkSignInTrigger from '@/components/auth/ClerkSignInTrigger';
 import { useAuth } from '@/lib/auth-context';
 import { redeemActivationCode } from '@/lib/api';
 import { formatUserFacingError } from '@/lib/error-utils';
+import { useModalFocusTrap } from '@/lib/hooks/useModalFocusTrap';
 import { useI18n } from '@/lib/i18n';
 import { ActivationCodeRedeemResponse } from '@/lib/types';
 
@@ -48,6 +49,12 @@ export default function ActivationCodeModal({
   const [code, setCode] = useState('');
   const [message, setMessage] = useState('');
   const [redeeming, setRedeeming] = useState(false);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const dialogRef = useModalFocusTrap<HTMLDivElement>({
+    open,
+    onClose,
+    initialFocusRef: closeButtonRef,
+  });
 
   useEffect(() => {
     setMounted(true);
@@ -95,10 +102,16 @@ export default function ActivationCodeModal({
     >
       <div className="absolute inset-0 bg-black/70 backdrop-blur-md" />
       <div
+        ref={dialogRef}
         className="relative w-full max-w-[560px] rounded-[26px] border border-white/10 bg-[#171717]/95 p-9 shadow-[0_40px_120px_rgba(0,0,0,0.55)]"
         onClick={(event) => event.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Activation code"
+        tabIndex={-1}
       >
         <button
+          ref={closeButtonRef}
           type="button"
           onClick={onClose}
           className="absolute right-5 top-5 text-white/65 transition-colors hover:text-white"

@@ -13,7 +13,6 @@ from app.api.routers.gallery import GALLERY_AUDIT_NONE, GALLERY_AUDIT_VALUES
 from app.api.routers.photos import (
     PHOTO_THUMBNAIL_SIZE,
     _build_photo_proxy_url,
-    _build_storage_photo_url,
 )
 from app.core.errors import api_error
 from app.db.models import Photo, Review, ReviewMode, User, UserPlan
@@ -363,8 +362,8 @@ def _attach_billing_info(
     result_payload['billing_info'] = {
         'quota_charged': charged,
         'remaining_quota': {
-            'daily_remaining': usage.daily_remaining if usage else None,
-            'monthly_remaining': usage.monthly_remaining if usage else None,
-            'pro_monthly_remaining': usage.pro_monthly_remaining if usage else None,
+            'daily_remaining': usage.get('daily_remaining') if usage else None,
+            'monthly_remaining': usage.get('monthly_remaining') if usage else None,
+            'pro_monthly_remaining': usage.get('pro_monthly_remaining') if usage else None,
         },
     }

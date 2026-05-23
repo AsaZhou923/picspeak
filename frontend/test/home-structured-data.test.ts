@@ -9,3 +9,7 @@ test('root homepage renders FAQPage JSON-LD for rich results', () => {
 test('locale homepage suppresses nested FAQPage JSON-LD because locale layout owns it', () => {
   assert.equal(shouldRenderHomeFaqJsonLd('locale'), false);
 });
+
+test('unexpected scopes do not opt pages into FAQPage JSON-LD', () => {
+  assert.equal(shouldRenderHomeFaqJsonLd('marketing' as never), false);
+});

@@ -232,9 +232,6 @@ def process_review_task(task_public_id: str, *, worker_name: str) -> dict[str, s
                 return {'result': 'noop', 'status': fresh_task.status.value}
         elif task.status != TaskStatus.RUNNING:
             return {'result': 'noop', 'status': task.status.value}
-        task = db.query(ReviewTask).filter(ReviewTask.id == task.id).first()
-        if task is None:
-            return {'result': 'missing'}
         try:
             _process_task(db, task)
         except Exception as exc:

@@ -87,7 +87,7 @@ def _gallery_thumbnail_url(photo: Photo) -> str | None:
   object_key = _photo_client_meta(photo).get('gallery_thumbnail_key')
   if not isinstance(object_key, str) or not object_key.strip():
     return None
-  return _build_storage_photo_url(photo.bucket, object_key.strip())
+  return _build_storage_photo_url(object_key.strip())
 
 
 def _ensure_gallery_thumbnail(photo: Photo, *, size: int = PHOTO_THUMBNAIL_MAX_SIZE) -> str:
@@ -126,7 +126,7 @@ def _ensure_gallery_thumbnail(photo: Photo, *, size: int = PHOTO_THUMBNAIL_MAX_S
   client_meta['gallery_thumbnail_size'] = size
   client_meta['gallery_thumbnail_content_type'] = 'image/webp'
   photo.client_meta = client_meta
-  return _build_storage_photo_url(photo.bucket, object_key)
+  return _build_storage_photo_url(object_key)
 
 
 def _gallery_like_counts(db: Session, review_ids: list[int]) -> dict[int, int]:

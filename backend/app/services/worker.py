@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import threading
 import time
-from concurrent.futures import Future, ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor, wait
 
 from app.core.config import settings
 from app.services.guest_cleanup import cleanup_stale_guest_users
@@ -34,7 +34,6 @@ class ReviewWorker:
         if self._running:
             return
         self._running = True
-        import threading
 
         worker_count = max(int(settings.review_worker_concurrency), 1)
         self._threads = []
@@ -49,7 +48,8 @@ class ReviewWorker:
             if thread.is_alive():
                 thread.join(timeout=2)
         self._threads = []
-        self._gen_executor.shutdown(wait=False)
+        self._drain_generation_futures()
+        self._gen_executor.shutdown(wait=False, cancel_futures=True)
 
     def _loop(self) -> None:
         idle_sleep_seconds = max(int(settings.review_worker_idle_sleep_ms), 50) / 1000
@@ -105,8 +105,37 @@ class ReviewWorker:
         for future in done:
             exc = future.exception()
             if exc is not None:
-                logger.error('Image generation thread raised an unhandled exception: %s', exc, exc_info=exc)
+                logger.error(
+                    'Image generation thread raised an unhandled exception: %s',
+                    exc,
+                    exc_info=(type(exc), exc, exc.__traceback__),
+                )
         self._gen_futures = [f for f in self._gen_futures if not f.done()]
+
+    def _drain_generation_futures(self) -> None:
+        self._prune_done_gen_futures()
+        if not self._gen_futures:
+            return
+
+        timeout_seconds = max(int(settings.image_generation_shutdown_timeout_seconds or 0), 0)
+        done, pending = wait(self._gen_futures, timeout=timeout_seconds)
+        for future in done:
+            exc = future.exception()
+            if exc is not None:
+                logger.error(
+                    'Image generation thread raised during shutdown: %s',
+                    exc,
+                    exc_info=(type(exc), exc, exc.__traceback__),
+                )
+        if pending:
+            logger.warning(
+                'Worker shutdown timed out with %s image generation task(s) still running after %ss',
+                len(pending),
+                timeout_seconds,
+            )
+            for future in pending:
+                future.cancel()
+        self._gen_futures = [future for future in pending if not future.done()]
 
     def _run_guest_cleanup_if_due(self) -> None:
         if not settings.guest_user_cleanup_enabled:

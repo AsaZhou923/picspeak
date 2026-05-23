@@ -2,6 +2,110 @@
 
 本文件汇总了原 `docs/changelog/update-log-*.md` 的全部更新记录。新增 release 请追加到顶部，并为每条记录保留稳定锚点，供 `/updates` 的 `docPath` 和 README 链接定位。
 
+<a id="2026-05-23-hardening-ci-accessibility"></a>
+
+## 2026-05-23 - hardening ci accessibility
+
+日期：2026-05-23
+
+### 概览
+
+这次更新把 PicSpeak 的安全、稳定性、可访问性和验证链路补齐成一组可持续维护的硬化基线。后端增加更严格的上传/照片 token 目的校验、请求审计边界、原子限流、HTTP 连接池和数据库索引；前端修复公开页 SEO 细节、生成图渲染和弹窗键盘焦点；项目也新增 GitHub Actions CI，并修正文档中与当前测试/环境入口不一致的地方。
+
+- 后端 token 增加 purpose 绑定，上传确认和照片代理不再能混用签名 payload。
+- 速率限制改为 PostgreSQL 原子 upsert，并补充 review / generation / billing 查询索引和 review task event 级联清理迁移。
+- AI、Clerk、Google OAuth 和 image generation 调用统一走 urllib3 连接池，Docker 镜像改为 wheel builder + runtime slim 安装。
+- 前端生成历史、生成详情、Prompt Library 和 Gallery 头像逐步迁移到 `next/image`，弹窗与菜单补齐 Escape / focus trap / menu role 支持。
+- 新增 CI / PR CI 工作流，并把前端 Node 测试固化为 `npm run test`，清理 Node ESM 模块类型警告。
+- README、前端说明和 SEO 审计记录对齐当前 Python 3.11、Next.js 15、`.env.local.example` 和最新全量测试结果。
+
+### 后端硬化
+
+- `app.core.security` 的签名与验签支持 `purpose`，上传确认 token 使用 `upload_confirm`，照片代理 token 使用 `photo_proxy`。
+- 请求审计跳过上传和照片二进制路径，并只在小体积、非 multipart / binary 请求上截取有限 body，避免日志捕获大对象或敏感上传内容。
+- 访客限流使用 `ON CONFLICT ... DO UPDATE ... WHERE hit_count < limit`，减少并发请求下的超限竞态。
+- Clerk JWKS 验签改用 `cryptography` RSA 验证；Clerk、Google token 交换、AI 评图、生图与图片下载统一走 `urllib3` 池化请求。
+- Worker 停止流程会等待已提交的 image generation future，并在超时后取消未完成任务。
+- 新增 Alembic 迁移 `20260523_0003_review_hardening`，同步 `create_schema.sql` 的 review、generation、billing 索引与 `review_task_events` 级联外键。
+
+### 前端与公开入口
+
+- `/workspace` 改为 `noindex`，Blog canonical / `x-default` 指向英文 locale 入口，Open Graph locale 增加中英日映射。
+- Header 语言切换和快捷菜单支持 `aria-haspopup`、`role="menu"`、Escape 关闭与焦点返回。
+- Gallery 发布确认弹窗和图片放大层使用共享 `useModalFocusTrap`，避免键盘焦点跑出 modal。
+- 生成页、生成历史、生成详情、Prompt Library 和 Gallery 头像使用 `next/image` 或 memo 化组件减少渲染与图片加载问题。
+- 新增 `client-log` 统一前端错误记录入口，替换零散 `console.error` 调用。
+
+### CI 与文档校准
+
+- 新增 `.github/workflows/ci.yml` 和 `.github/workflows/pr-ci.yml`，覆盖后端 pytest、前端 test / typecheck / lint / build。
+- 前端包声明 ESM，`next.config.js` 迁移为 `next.config.mjs`，`postcss.config.js` 迁移为 `postcss.config.cjs`，`npm run test` 不再输出 `MODULE_TYPELESS_PACKAGE_JSON`。
+- README 和 README.zh-CN 的 Python 前置依赖更新为 3.11+，前端 env 示例路径更新为真实存在的 `frontend/.env.local.example`。
+- `frontend/front.md` 从 Next.js 14 更新为 Next.js 15 + TypeScript；SEO 审计补充 2026-05-23 全量测试复检结果。
+
+### 首页更新记录同步
+
+- `/updates` 三语 JSON 新增本次 hardening / CI / accessibility 更新记录，`docPath` 指向 `docs/changelog/CHANGELOG.md#2026-05-23-hardening-ci-accessibility`。
+- 首页底部“更新记录”三语 hint 改为本次安全硬化、CI 和可访问性主题。
+- README / README.zh-CN 最新 changelog 链接更新到本次锚点。
+- CLAUDE 项目说明中的前端检查命令同步为 `npm run test`。
+
+### 影响文件
+
+#### 后端
+
+- `backend/app/core/security.py`
+- `backend/app/core/config.py`
+- `backend/app/core/http_client.py`
+- `backend/app/main.py`
+- `backend/app/api/routers/{auth_support,uploads,photos,gallery,gallery_support,generations,review_*,tasks}.py`
+- `backend/app/services/{ai,clerk_auth,content_audit,guard,image_generation,lemonsqueezy,worker}.py`
+- `backend/app/db/models.py`
+- `backend/alembic/versions/20260523_0003_review_hardening.py`
+- `backend/Dockerfile`
+- `backend/requirements.txt`
+- `create_schema.sql`
+- `backend/tests/test_*.py`
+
+#### 前端
+
+- `frontend/package.json`
+- `frontend/package-lock.json`
+- `frontend/next.config.mjs`
+- `frontend/postcss.config.cjs`
+- `frontend/src/app/**`
+- `frontend/src/components/**`
+- `frontend/src/features/**`
+- `frontend/src/lib/client-log.ts`
+- `frontend/src/lib/hooks/useModalFocusTrap.ts`
+- `frontend/test/*.test.ts`
+
+#### CI 与文档
+
+- `.github/workflows/ci.yml`
+- `.github/workflows/pr-ci.yml`
+- `docs/changelog/CHANGELOG.md`
+- `frontend/src/content/updates/{zh,en,ja}.json`
+- `frontend/src/lib/i18n-{zh,en,ja}.ts`
+- `README.md`
+- `README.zh-CN.md`
+- `CLAUDE.md`
+- `frontend/front.md`
+- `docs/seo/seo-audit-2026-05-01.md`
+
+### 验证
+
+- `.\.venv\Scripts\python.exe -m pytest backend\tests -q` -> `179 passed, 8 subtests passed`
+- `cd frontend && npm run test` -> `47 passed`
+- `cd frontend && npm run typecheck`
+- `cd frontend && npm run lint`
+- `cd frontend && npm run build` -> 生成 112 个静态页面
+- `git diff --check`
+- `/updates` 三语 JSON parse
+- `Get-FileHash` 对比仓库 changelog / workflow 与外部 Update Logs 副本 SHA256 一致
+
+---
+
 <a id="2026-05-14-legal-pages-static-assets"></a>
 
 ## 2026-05-14 - legal pages static assets

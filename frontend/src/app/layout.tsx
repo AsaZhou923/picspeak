@@ -8,7 +8,7 @@ import PerformanceTelemetry from '@/components/performance/PerformanceTelemetry'
 import DeferredBackgroundEffect from '@/components/ui/DeferredBackgroundEffect';
 import { getInitialTranslations } from '@/lib/i18n-initial';
 import { isSupportedLocale } from '@/lib/locale';
-import { HOME_LANGUAGE_ALTERNATES } from '@/lib/seo';
+import { HOME_LANGUAGE_ALTERNATES, OPEN_GRAPH_LOCALES } from '@/lib/seo';
 import { siteConfig } from '@/lib/site';
 
 const cormorant = Cormorant_Garamond({
@@ -75,7 +75,8 @@ export const metadata: Metadata = {
     siteName: siteConfig.name,
     title: siteConfig.title,
     description: siteConfig.description,
-    locale: 'en_US',
+    locale: OPEN_GRAPH_LOCALES.en,
+    alternateLocale: [OPEN_GRAPH_LOCALES.zh, OPEN_GRAPH_LOCALES.ja],
     images: [
       {
         url: siteConfig.ogImage,

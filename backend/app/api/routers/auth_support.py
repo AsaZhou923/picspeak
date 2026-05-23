@@ -5,7 +5,7 @@ import re
 from datetime import datetime, timezone
 from typing import Any
 from urllib import error as urllib_error
-from urllib import parse, request as urllib_request
+from urllib import parse
 
 from fastapi import HTTPException, Response, status
 from sqlalchemy import func
@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_user_from_token, new_public_id, quota_for_plan
 from app.core.config import settings
 from app.core.errors import api_error
+from app.core.http_client import PooledHTTPRequestError, PooledHTTPStatusError, pooled_request
 from app.core.security import create_access_token
 from app.db.models import Photo, Review, ReviewTask, User, UserPlan, UserStatus
 from app.schemas import AuthTokenResponse
@@ -337,8 +338,14 @@ def _migrate_guest_records(
 
 
 def _google_token_info(id_token: str) -> dict:
-    with urllib_request.urlopen(f'https://oauth2.googleapis.com/tokeninfo?id_token={parse.quote(id_token)}', timeout=10) as resp:
-        return json.loads(resp.read().decode('utf-8'))
+    url = f'https://oauth2.googleapis.com/tokeninfo?id_token={parse.quote(id_token)}'
+    try:
+        response = pooled_request('GET', url, timeout_seconds=10)
+        return json.loads(response.data.decode('utf-8'))
+    except PooledHTTPStatusError as exc:
+        raise urllib_error.URLError(f'Google tokeninfo HTTP {exc.response.status}') from exc
+    except (PooledHTTPRequestError, json.JSONDecodeError) as exc:
+        raise urllib_error.URLError(str(exc)) from exc
 
 
 def _google_exchange_code(code: str) -> dict:
@@ -350,13 +357,19 @@ def _google_exchange_code(code: str) -> dict:
         'redirect_uri': redirect_uri,
         'grant_type': 'authorization_code',
     }).encode('utf-8')
-    req = urllib_request.Request(
-        'https://oauth2.googleapis.com/token',
-        data=payload,
-        headers={'Content-Type': 'application/x-www-form-urlencoded'},
-    )
-    with urllib_request.urlopen(req, timeout=10) as resp:
-        return json.loads(resp.read().decode('utf-8'))
+    try:
+        response = pooled_request(
+            'POST',
+            'https://oauth2.googleapis.com/token',
+            body=payload,
+            headers={'Content-Type': 'application/x-www-form-urlencoded'},
+            timeout_seconds=10,
+        )
+        return json.loads(response.data.decode('utf-8'))
+    except PooledHTTPStatusError as exc:
+        raise urllib_error.URLError(f'Google token exchange HTTP {exc.response.status}') from exc
+    except (PooledHTTPRequestError, json.JSONDecodeError) as exc:
+        raise urllib_error.URLError(str(exc)) from exc
 
 
 def _bind_google_oauth_state(response: Response, state: str) -> None:

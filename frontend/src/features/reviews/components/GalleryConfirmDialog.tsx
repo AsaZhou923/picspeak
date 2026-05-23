@@ -1,4 +1,8 @@
+'use client';
+
 import { LayoutGrid, X } from 'lucide-react';
+import { useRef } from 'react';
+import { useModalFocusTrap } from '@/lib/hooks/useModalFocusTrap';
 
 interface GalleryConfirmDialogProps {
   onClose: () => void;
@@ -15,6 +19,13 @@ interface GalleryConfirmDialogProps {
 }
 
 export function GalleryConfirmDialog({ onClose, onConfirm, actionBusy, galleryActionCopy }: GalleryConfirmDialogProps) {
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const dialogRef = useModalFocusTrap<HTMLDivElement>({
+    open: true,
+    onClose,
+    initialFocusRef: closeButtonRef,
+  });
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center px-6"
@@ -22,13 +33,16 @@ export function GalleryConfirmDialog({ onClose, onConfirm, actionBusy, galleryAc
     >
       <div className="absolute inset-0 bg-void/95" />
       <div
+        ref={dialogRef}
         className="relative w-full max-w-lg overflow-hidden rounded-[24px] border border-border bg-surface p-6 shadow-[0_32px_96px_rgba(0,0,0,0.72)] animate-fade-in"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-labelledby="gallery-confirm-title"
+        tabIndex={-1}
       >
         <button
+          ref={closeButtonRef}
           type="button"
           onClick={onClose}
           className="absolute right-4 top-4 rounded-full border border-border-subtle p-2 text-ink-muted transition-colors hover:border-gold/30 hover:text-gold"

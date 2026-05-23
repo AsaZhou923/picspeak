@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { KeyboardEvent, useMemo, useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { Check, Copy, ExternalLink, Sparkles, Wand2 } from 'lucide-react';
 import {
@@ -77,6 +78,34 @@ export function PromptExampleGallery({ onApply }: PromptExampleGalleryProps) {
     }
   }
 
+  function focusCategory(category: CategoryFilter) {
+    window.requestAnimationFrame(() => {
+      document.querySelector<HTMLButtonElement>(`[data-category-tab="${category}"]`)?.focus();
+    });
+  }
+
+  function handleCategoryKeyDown(event: KeyboardEvent<HTMLButtonElement>, category: CategoryFilter) {
+    const currentIndex = CATEGORY_FILTERS.indexOf(category);
+    let nextIndex: number | null = null;
+
+    if (event.key === 'ArrowRight') {
+      nextIndex = (currentIndex + 1) % CATEGORY_FILTERS.length;
+    } else if (event.key === 'ArrowLeft') {
+      nextIndex = (currentIndex - 1 + CATEGORY_FILTERS.length) % CATEGORY_FILTERS.length;
+    } else if (event.key === 'Home') {
+      nextIndex = 0;
+    } else if (event.key === 'End') {
+      nextIndex = CATEGORY_FILTERS.length - 1;
+    }
+
+    if (nextIndex === null) return;
+
+    event.preventDefault();
+    const nextCategory = CATEGORY_FILTERS[nextIndex];
+    setActiveCategory(nextCategory);
+    focusCategory(nextCategory);
+  }
+
   return (
     <section className="space-y-4">
       <div className="flex flex-col gap-4 border-l-2 border-gold/50 pl-4 lg:flex-row lg:items-end lg:justify-between">
@@ -110,8 +139,11 @@ export function PromptExampleGallery({ onApply }: PromptExampleGalleryProps) {
               key={category}
               type="button"
               role="tab"
+              data-category-tab={category}
               aria-selected={activeCategory === category}
+              tabIndex={activeCategory === category ? 0 : -1}
               onClick={() => setActiveCategory(category)}
+              onKeyDown={(event) => handleCategoryKeyDown(event, category)}
               className={`inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border px-3 text-xs font-medium transition-colors ${
                 activeCategory === category
                   ? 'border-gold/45 bg-gold/10 text-gold'
@@ -137,12 +169,12 @@ export function PromptExampleGallery({ onApply }: PromptExampleGalleryProps) {
                 className="group grid overflow-hidden rounded-lg border border-border-subtle bg-surface/90 transition-colors hover:border-gold/35"
               >
                 <div className="relative aspect-[4/3] bg-void/75 p-2">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
+                  <Image
                     src={example.imagePath}
                     alt={title}
-                    className="h-full w-full rounded-md object-contain transition-transform duration-500 group-hover:scale-[1.02]"
-                    loading="lazy"
+                    fill
+                    sizes="(min-width: 1280px) 260px, (min-width: 640px) 45vw, 100vw"
+                    className="rounded-md object-contain p-2 transition-transform duration-500 group-hover:scale-[1.02]"
                   />
                   <div className="absolute left-3 top-3 rounded-md border border-void/30 bg-void/80 px-2.5 py-1 text-[11px] font-medium text-ink shadow-sm backdrop-blur">
                     {t(CATEGORY_LABEL_KEYS[example.category])}

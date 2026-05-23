@@ -1,7 +1,7 @@
 'use client';
 
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { useI18n } from '@/lib/i18n';
 
 interface GalleryPaginationProps {
@@ -46,7 +46,7 @@ function buildPaginationSlots(currentPage: number, totalPages: number): Array<nu
   return result;
 }
 
-export default function GalleryPagination({
+const GalleryPagination = memo(function GalleryPagination({
   pageIndex,
   totalPages,
   totalCount,
@@ -152,4 +152,6 @@ export default function GalleryPagination({
       </div>
     </div>
   );
-}
+});
+
+export default GalleryPagination;

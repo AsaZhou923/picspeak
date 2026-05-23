@@ -84,7 +84,7 @@ npm run start
 cd frontend
 npm run lint
 npm run typecheck
-node --test test/*.test.ts
+npm run test
 ```
 
 ## Project Structure

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { Component, type ErrorInfo, type ReactNode } from 'react';
+import { logClientError } from '@/lib/client-log';
 
 type ErrorBoundaryFallback = (reset: () => void) => ReactNode;
 
@@ -22,7 +23,7 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
     if (process.env.NODE_ENV !== 'production') {
-      console.error('App error boundary caught an error', error, errorInfo);
+      logClientError('App error boundary caught an error', error, { errorInfo });
     }
   }
 

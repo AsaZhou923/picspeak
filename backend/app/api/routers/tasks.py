@@ -82,7 +82,6 @@ def get_task_status(
         raise api_error(status.HTTP_404_NOT_FOUND, 'TASK_NOT_FOUND', 'Task not found')
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     response.headers['Pragma'] = 'no-cache'
-    db.commit()
     return TaskStatusResponse(**_serialize_task_status(task, review))
 
 

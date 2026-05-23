@@ -303,12 +303,10 @@ def _verified_one_time_pro_payload(event: LemonSqueezyWebhookEvent, user: User) 
     if not token:
         return None
     try:
-        payload = verify_payload(token)
+        payload = verify_payload(token, expected_purpose=ONE_TIME_PRO_GRANT_PURPOSE)
     except (ApiHTTPException, ValueError, TypeError, UnicodeDecodeError):
         return None
 
-    if payload.get('purpose') != ONE_TIME_PRO_GRANT_PURPOSE:
-        return None
     if payload.get('user_id') != user.public_id:
         return None
     if payload.get('plan') != 'pro':

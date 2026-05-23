@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { memo, useEffect, useRef } from 'react';
 import { useI18n } from '@/lib/i18n';
 
 interface ScoreRingProps {
@@ -17,7 +17,7 @@ function scoreColor(score: number): string {
   return '#b07265'; // rust
 }
 
-export default function ScoreRing({
+const ScoreRing = memo(function ScoreRing({
   score,
   size = 80,
   strokeWidth = 3,
@@ -83,7 +83,9 @@ export default function ScoreRing({
       )}
     </div>
   );
-}
+});
+
+export default ScoreRing;
 
 // ─── Large final score display ────────────────────────────────────────────────
 

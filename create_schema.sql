@@ -205,6 +205,9 @@ create index idx_reviews_owner_deleted_created
 create index idx_reviews_owner_image_type_created
     on reviews (owner_user_id asc, image_type asc, created_at desc);
 
+create index idx_reviews_mode_created
+    on reviews (mode asc, created_at desc);
+
 create index idx_reviews_source_review
     on reviews (source_review_id);
 
@@ -382,6 +385,11 @@ create table review_task_events
 alter table review_task_events
     owner to pic;
 
+alter table review_task_events
+    drop constraint if exists review_task_events_task_id_fkey,
+    add constraint review_task_events_task_id_fkey
+        foreign key (task_id) references review_tasks (id) on delete cascade;
+
 create index idx_review_task_events_task_created
     on review_task_events (task_id asc, created_at desc);
 
@@ -438,6 +446,9 @@ alter table image_generation_tasks
 
 create index idx_image_generation_tasks_status_created
     on image_generation_tasks (status, created_at);
+
+create index idx_image_generation_tasks_status_next_attempt
+    on image_generation_tasks (status, next_attempt_at);
 
 create index idx_image_generation_tasks_owner_created
     on image_generation_tasks (owner_user_id asc, created_at desc);
@@ -505,6 +516,9 @@ create index idx_generated_images_task
 create index idx_generated_images_review_created
     on generated_images (source_review_id asc, created_at desc);
 
+create index idx_generated_images_object
+    on generated_images (object_bucket asc, object_key asc);
+
 create trigger trg_generated_images_updated_at
     before update
     on generated_images
@@ -555,6 +569,9 @@ create unique index uq_billing_subscriptions_provider_subscription
 
 create index idx_billing_subscriptions_user_provider
     on billing_subscriptions (user_id asc, provider asc);
+
+create index idx_billing_subscriptions_provider_customer
+    on billing_subscriptions (provider_customer_id);
 
 create index idx_billing_subscriptions_status_updated
     on billing_subscriptions (status asc, updated_at desc);

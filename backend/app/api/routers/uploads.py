@@ -17,7 +17,6 @@ from app.api.routers.photos import (
     ALLOWED_CONTENT_TYPES,
     PHOTO_THUMBNAIL_SIZE,
     _build_photo_proxy_url,
-    _build_storage_photo_url,
     _find_photo_owned,
 )
 from app.core.config import settings
@@ -46,6 +45,7 @@ UPLOAD_METRIC_KEYS = (
     'original_size_bytes',
     'final_size_bytes',
 )
+UPLOAD_CONFIRM_TOKEN_PURPOSE = 'upload_confirm'
 
 
 def _duration_ms(started_at: float) -> int:
@@ -134,7 +134,7 @@ def create_upload_presign(
         'size_bytes': payload.size_bytes,
         'sha256': payload.sha256,
     }
-    upload_id = sign_payload(token_payload, ttl_seconds=600)
+    upload_id = sign_payload(token_payload, ttl_seconds=600, purpose=UPLOAD_CONFIRM_TOKEN_PURPOSE)
 
     try:
         s3_client = get_object_storage_client()
@@ -186,7 +186,7 @@ def confirm_photo_upload(
     started_at = time.perf_counter()
     client_ip = client_ip_from_request(request)
     upload_metrics = _extract_upload_metrics(payload.client_meta)
-    token = verify_payload(payload.upload_id)
+    token = verify_payload(payload.upload_id, expected_purpose=UPLOAD_CONFIRM_TOKEN_PURPOSE)
     if token.get('uid') != actor.user.public_id:
         raise api_error(status.HTTP_403_FORBIDDEN, 'UPLOAD_OWNER_MISMATCH', 'Upload owner mismatch')
 

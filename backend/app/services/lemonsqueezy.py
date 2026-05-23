@@ -3,12 +3,11 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from typing import Any
-from urllib import error as urllib_error
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
-from urllib import request as urllib_request
 
-from app.core.security import sign_payload
 from app.core.config import settings
+from app.core.http_client import PooledHTTPRequestError, PooledHTTPStatusError, pooled_request
+from app.core.security import sign_payload
 from app.db.models import User
 
 ONE_TIME_PRO_BILLING_MODE = 'one_time_pro'
@@ -103,19 +102,18 @@ def _api_request(path: str, *, method: str = 'GET', payload: dict[str, Any] | No
         headers['Content-Type'] = 'application/vnd.api+json'
         data = json.dumps(payload).encode('utf-8')
 
-    request = urllib_request.Request(url, data=data, headers=headers, method=method.upper())
     try:
-        with urllib_request.urlopen(request, timeout=20) as response:
-            raw = response.read().decode('utf-8')
-    except urllib_error.HTTPError as exc:
-        response_body = exc.read().decode('utf-8', errors='replace')
+        response = pooled_request(method, url, body=data, headers=headers, timeout_seconds=20)
+        raw = response.data.decode('utf-8')
+    except PooledHTTPStatusError as exc:
+        response_body = exc.response.data.decode('utf-8', errors='replace')
         raise LemonSqueezyAPIError(
-            f'Lemon Squeezy API request failed with status {exc.code}',
-            status_code=exc.code,
+            f'Lemon Squeezy API request failed with status {exc.response.status}',
+            status_code=exc.response.status,
             response_body=response_body,
         ) from exc
-    except urllib_error.URLError as exc:
-        raise LemonSqueezyAPIError(f'Unable to reach Lemon Squeezy API: {exc.reason}') from exc
+    except PooledHTTPRequestError as exc:
+        raise LemonSqueezyAPIError(f'Unable to reach Lemon Squeezy API: {exc}') from exc
 
     try:
         decoded = json.loads(raw)
@@ -152,13 +150,13 @@ def _hosted_checkout_for_user(user: User, *, locale: str | None = None) -> Lemon
     if normalized_locale.startswith('zh'):
         grant_token = sign_payload(
             {
-                'purpose': ONE_TIME_PRO_GRANT_PURPOSE,
                 'user_id': user.public_id,
                 'plan': 'pro',
                 'billing_mode': ONE_TIME_PRO_BILLING_MODE,
                 'duration_days': ONE_TIME_PRO_DURATION_DAYS,
             },
             ttl_seconds=ONE_TIME_PRO_GRANT_TTL_SECONDS,
+            purpose=ONE_TIME_PRO_GRANT_PURPOSE,
         )
         query_params.update(
             {

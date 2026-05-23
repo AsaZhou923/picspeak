@@ -27,7 +27,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         'zh-CN': '/zh/blog',
         en: '/en/blog',
         ja: '/ja/blog',
-        'x-default': '/blog',
+        'x-default': '/en/blog',
       },
     },
     openGraph: {

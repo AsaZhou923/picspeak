@@ -6,10 +6,9 @@ import json
 import time
 import uuid
 from typing import Any
-from urllib import error as urllib_error
 from urllib.parse import quote
-from urllib import request as urllib_request
 
+from app.core.http_client import PooledHTTPRequestError, PooledHTTPStatusError, pooled_request
 from app.core.config import settings
 
 
@@ -131,25 +130,26 @@ class OpenAIImageGenerationClient:
 
     def _post_json(self, payload: dict[str, Any]) -> dict[str, Any]:
         body = json.dumps(payload).encode('utf-8')
-        request = urllib_request.Request(
-            self.api_url,
-            data=body,
-            headers={
-                'Authorization': f'Bearer {self.api_key}',
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'User-Agent': 'PicSpeak/1.0 (+https://picspeak.app)',
-            },
-            method='POST',
-        )
+        headers = {
+            'Authorization': f'Bearer {self.api_key}',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'User-Agent': 'PicSpeak/1.0 (+https://picspeak.app)',
+        }
         try:
-            with urllib_request.urlopen(request, timeout=self.timeout_seconds) as response:
-                return json.loads(response.read().decode('utf-8'))
-        except urllib_error.HTTPError as exc:
-            detail = exc.read().decode('utf-8', errors='replace')
-            raise ImageGenerationError(f'OpenAI image generation HTTP {exc.code}: {detail[:500]}') from exc
-        except urllib_error.URLError as exc:
-            raise ImageGenerationError(f'OpenAI image generation request failed: {exc.reason}') from exc
+            response = pooled_request(
+                'POST',
+                self.api_url,
+                body=body,
+                headers=headers,
+                timeout_seconds=self.timeout_seconds,
+            )
+            return json.loads(response.data.decode('utf-8'))
+        except PooledHTTPStatusError as exc:
+            detail = exc.response.data.decode('utf-8', errors='replace')
+            raise ImageGenerationError(f'OpenAI image generation HTTP {exc.response.status}: {detail[:500]}') from exc
+        except PooledHTTPRequestError as exc:
+            raise ImageGenerationError(f'OpenAI image generation request failed: {exc}') from exc
         except json.JSONDecodeError as exc:
             raise ImageGenerationError('OpenAI image generation returned invalid JSON') from exc
 
@@ -162,25 +162,26 @@ class OpenAIImageGenerationClient:
     ) -> dict[str, Any]:
         boundary = f'----PicSpeakBoundary{uuid.uuid4().hex}'
         body = _build_multipart_body(boundary=boundary, fields=fields, files=files)
-        request = urllib_request.Request(
-            url,
-            data=body,
-            headers={
-                'Authorization': f'Bearer {self.api_key}',
-                'Content-Type': f'multipart/form-data; boundary={boundary}',
-                'Accept': 'application/json',
-                'User-Agent': 'PicSpeak/1.0 (+https://picspeak.app)',
-            },
-            method='POST',
-        )
+        headers = {
+            'Authorization': f'Bearer {self.api_key}',
+            'Content-Type': f'multipart/form-data; boundary={boundary}',
+            'Accept': 'application/json',
+            'User-Agent': 'PicSpeak/1.0 (+https://picspeak.app)',
+        }
         try:
-            with urllib_request.urlopen(request, timeout=self.timeout_seconds) as response:
-                return json.loads(response.read().decode('utf-8'))
-        except urllib_error.HTTPError as exc:
-            detail = exc.read().decode('utf-8', errors='replace')
-            raise ImageGenerationError(f'OpenAI image edit HTTP {exc.code}: {detail[:500]}') from exc
-        except urllib_error.URLError as exc:
-            raise ImageGenerationError(f'OpenAI image edit request failed: {exc.reason}') from exc
+            response = pooled_request(
+                'POST',
+                url,
+                body=body,
+                headers=headers,
+                timeout_seconds=self.timeout_seconds,
+            )
+            return json.loads(response.data.decode('utf-8'))
+        except PooledHTTPStatusError as exc:
+            detail = exc.response.data.decode('utf-8', errors='replace')
+            raise ImageGenerationError(f'OpenAI image edit HTTP {exc.response.status}: {detail[:500]}') from exc
+        except PooledHTTPRequestError as exc:
+            raise ImageGenerationError(f'OpenAI image edit request failed: {exc}') from exc
         except json.JSONDecodeError as exc:
             raise ImageGenerationError('OpenAI image edit returned invalid JSON') from exc
 
@@ -239,40 +240,41 @@ class OpenAIImageGenerationClient:
         raise ImageGenerationError(f'OpenAI image generation task timed out while {last_status}')
 
     def _get_json(self, url: str) -> dict[str, Any]:
-        request = urllib_request.Request(
-            url,
-            headers={
-                'Authorization': f'Bearer {self.api_key}',
-                'Accept': 'application/json',
-                'User-Agent': 'PicSpeak/1.0 (+https://picspeak.app)',
-            },
-            method='GET',
-        )
+        headers = {
+            'Authorization': f'Bearer {self.api_key}',
+            'Accept': 'application/json',
+            'User-Agent': 'PicSpeak/1.0 (+https://picspeak.app)',
+        }
         try:
-            with urllib_request.urlopen(request, timeout=self.timeout_seconds) as response:
-                return json.loads(response.read().decode('utf-8'))
-        except urllib_error.HTTPError as exc:
-            detail = exc.read().decode('utf-8', errors='replace')
-            raise ImageGenerationError(f'OpenAI image generation HTTP {exc.code}: {detail[:500]}') from exc
-        except urllib_error.URLError as exc:
-            raise ImageGenerationError(f'OpenAI image generation request failed: {exc.reason}') from exc
+            response = pooled_request(
+                'GET',
+                url,
+                headers=headers,
+                timeout_seconds=self.timeout_seconds,
+            )
+            return json.loads(response.data.decode('utf-8'))
+        except PooledHTTPStatusError as exc:
+            detail = exc.response.data.decode('utf-8', errors='replace')
+            raise ImageGenerationError(f'OpenAI image generation HTTP {exc.response.status}: {detail[:500]}') from exc
+        except PooledHTTPRequestError as exc:
+            raise ImageGenerationError(f'OpenAI image generation request failed: {exc}') from exc
         except json.JSONDecodeError as exc:
             raise ImageGenerationError('OpenAI image generation returned invalid JSON') from exc
 
     def _download_image(self, image_url: str) -> tuple[bytes, str | None]:
-        request = urllib_request.Request(
-            image_url,
-            headers={'Accept': 'image/*', 'User-Agent': 'PicSpeak/1.0 (+https://picspeak.app)'},
-            method='GET',
-        )
         try:
-            with urllib_request.urlopen(request, timeout=self.timeout_seconds) as response:
-                return response.read(), response.headers.get('Content-Type')
-        except urllib_error.HTTPError as exc:
-            detail = exc.read().decode('utf-8', errors='replace')
-            raise ImageGenerationError(f'Generated image download HTTP {exc.code}: {detail[:500]}') from exc
-        except urllib_error.URLError as exc:
-            raise ImageGenerationError(f'Generated image download failed: {exc.reason}') from exc
+            response = pooled_request(
+                'GET',
+                image_url,
+                headers={'Accept': 'image/*', 'User-Agent': 'PicSpeak/1.0 (+https://picspeak.app)'},
+                timeout_seconds=self.timeout_seconds,
+            )
+            return response.data, response.headers.get('Content-Type')
+        except PooledHTTPStatusError as exc:
+            detail = exc.response.data.decode('utf-8', errors='replace')
+            raise ImageGenerationError(f'Generated image download HTTP {exc.response.status}: {detail[:500]}') from exc
+        except PooledHTTPRequestError as exc:
+            raise ImageGenerationError(f'Generated image download failed: {exc}') from exc
 
 
 def _optional_int(value: Any) -> int | None:

@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from fastapi import Request
 from sqlalchemy import func
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -220,38 +221,36 @@ def _enforce_scope_rate_limit(
     window_start: datetime,
     window_seconds: int,
 ) -> dict:
-    counter = (
-        db.query(RateLimitCounter)
-        .filter(
-            RateLimitCounter.scope == scope,
-            RateLimitCounter.scope_key == scope_key,
-            RateLimitCounter.endpoint == endpoint,
-            RateLimitCounter.window_start == window_start,
-            RateLimitCounter.window_seconds == window_seconds,
-        )
-        .first()
-    )
+    if per_minute_limit <= 0:
+        raise api_error(429, 'RATE_LIMIT_EXCEEDED', f'Rate limit exceeded ({scope})')
 
-    if counter is None:
-        counter = RateLimitCounter(
+    stmt = (
+        insert(RateLimitCounter)
+        .values(
             scope=scope,
             scope_key=scope_key,
             endpoint=endpoint,
             window_start=window_start,
             window_seconds=window_seconds,
-            hit_count=0,
+            hit_count=1,
         )
-        db.add(counter)
-
-    if counter.hit_count >= per_minute_limit:
+        .on_conflict_do_update(
+            constraint='uq_rate_limit_window',
+            set_={
+                'hit_count': RateLimitCounter.hit_count + 1,
+                'updated_at': func.now(),
+            },
+            where=RateLimitCounter.hit_count < per_minute_limit,
+        )
+        .returning(RateLimitCounter.hit_count)
+    )
+    hit_count = db.execute(stmt).scalar_one_or_none()
+    if hit_count is None:
         raise api_error(429, 'RATE_LIMIT_EXCEEDED', f'Rate limit exceeded ({scope})')
-
-    counter.hit_count += 1
-    db.add(counter)
 
     return {
         'limit_per_min': per_minute_limit,
-        'remaining': per_minute_limit - counter.hit_count,
+        'remaining': max(per_minute_limit - int(hit_count), 0),
         'reset_at': (window_start + timedelta(seconds=window_seconds)).isoformat(),
     }
 
@@ -285,33 +284,19 @@ def _hashed_guest_scope_key(key_basis: str) -> str:
 
 
 def guest_rate_limit_scope_key(request: Request, user: User | None = None) -> str:
-    device_key = device_key_from_request(request)
-    client_ip = client_ip_from_request(request)
-
-    if device_key and device_key.startswith('device:'):
-        return _hashed_guest_scope_key(device_key)
-
-    if device_key and client_ip:
-        return _hashed_guest_scope_key(f'{device_key}|ip:{client_ip}')
-
-    if client_ip:
-        return _hashed_guest_scope_key(f'ip:{client_ip}')
-
-    if user is not None and user.plan == UserPlan.guest and user.public_id.strip():
-        return f'guest_user:{user.public_id.strip()}'
-
-    if device_key:
-        return _hashed_guest_scope_key(device_key)
-
-    return _hashed_guest_scope_key('anonymous')
+    return _guest_scope_key(request, user=user, prefer_guest_user=False)
 
 
 def guest_quota_scope_key(request: Request, user: User | None = None) -> str:
+    return _guest_scope_key(request, user=user, prefer_guest_user=True)
+
+
+def _guest_scope_key(request: Request, user: User | None = None, *, prefer_guest_user: bool) -> str:
     device_key = device_key_from_request(request)
     if device_key and device_key.startswith('device:'):
         return _hashed_guest_scope_key(device_key)
 
-    if user is not None and user.plan == UserPlan.guest and user.public_id.strip():
+    if prefer_guest_user and user is not None and user.plan == UserPlan.guest and user.public_id.strip():
         return f'guest_user:{user.public_id.strip()}'
 
     client_ip = client_ip_from_request(request)
@@ -320,6 +305,9 @@ def guest_quota_scope_key(request: Request, user: User | None = None) -> str:
 
     if client_ip:
         return _hashed_guest_scope_key(f'ip:{client_ip}')
+
+    if not prefer_guest_user and user is not None and user.plan == UserPlan.guest and user.public_id.strip():
+        return f'guest_user:{user.public_id.strip()}'
 
     if device_key:
         return _hashed_guest_scope_key(device_key)
