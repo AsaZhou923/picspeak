@@ -7,6 +7,10 @@ export interface HeaderVisibilityState {
   showMobileTabs: boolean;
 }
 
+function isAuthenticatedHeaderUser(userInfo: AuthToken | null): userInfo is AuthToken {
+  return Boolean(userInfo && userInfo.plan !== 'guest');
+}
+
 export function getHeaderVisibilityState({
   hasHydrated,
   userInfo,
@@ -14,7 +18,7 @@ export function getHeaderVisibilityState({
   hasHydrated: boolean;
   userInfo: AuthToken | null;
 }): HeaderVisibilityState {
-  const safeUserInfo = hasHydrated ? userInfo : null;
+  const safeUserInfo = hasHydrated && isAuthenticatedHeaderUser(userInfo) ? userInfo : null;
 
   return {
     userInfo: safeUserInfo,

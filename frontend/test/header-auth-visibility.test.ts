@@ -12,6 +12,14 @@ const signedInUser: AuthToken = {
   clerk_user_id: 'clerk_123',
 };
 
+const guestUser: AuthToken = {
+  access_token: 'guest-token',
+  token_type: 'bearer',
+  user_id: 'guest_123',
+  plan: 'guest',
+  auth_provider: 'guest',
+};
+
 test('keeps auth-only header branches hidden before hydration even when user info exists', () => {
   const state = getHeaderVisibilityState({
     hasHydrated: false,
@@ -45,4 +53,16 @@ test('stays in guest shell when there is no user info', () => {
   assert.equal(state.showUsageNav, false);
   assert.equal(state.showAuthenticatedControls, false);
   assert.equal(state.showMobileTabs, false);
+});
+
+test('keeps guest tokens in the signed-out header shell', () => {
+  const state = getHeaderVisibilityState({
+    hasHydrated: true,
+    userInfo: guestUser,
+  });
+
+  assert.equal(state.showUsageNav, false);
+  assert.equal(state.showAuthenticatedControls, false);
+  assert.equal(state.showMobileTabs, false);
+  assert.equal(state.userInfo, null);
 });
