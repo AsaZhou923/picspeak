@@ -16,6 +16,7 @@ from app.services.product_analytics import (
     render_content_conversion_weekly_markdown,
 )
 from scripts.export_error_handling import describe_export_error, is_database_unavailable_error
+from scripts.report_export_paths import dated_analytics_report_path, resolve_report_output_path
 
 
 def parse_args() -> argparse.Namespace:
@@ -28,8 +29,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('--end-date', default=today.isoformat(), help='Inclusive YYYY-MM-DD end date.')
     parser.add_argument(
         '--output',
-        default=str(repo_root / 'docs' / 'analytics' / 'content-conversion-weekly-report.md'),
-        help='Output markdown path.',
+        default=None,
+        help=(
+            'Output markdown path. '
+            f'Default: {dated_analytics_report_path(repo_root, today, "content-conversion-weekly-report")}'
+        ),
     )
     return parser.parse_args()
 
@@ -38,7 +42,13 @@ def main() -> None:
     args = parse_args()
     start_date = date.fromisoformat(args.start_date)
     end_date = date.fromisoformat(args.end_date)
-    output_path = Path(args.output)
+    repo_root = Path(__file__).resolve().parents[2]
+    output_path = resolve_report_output_path(
+        args.output,
+        repo_root=repo_root,
+        end_date=end_date,
+        filename_stem='content-conversion-weekly-report',
+    )
 
     db = SessionLocal()
     try:

@@ -95,6 +95,42 @@ class ProductReportExportScriptTests(unittest.TestCase):
                     render_markdown.assert_not_called()
                     self.assertFalse(output_path.exists())
 
+    def test_main_uses_dated_default_output_when_output_is_omitted(self) -> None:
+        for module_name, renderer_name, _fallback_text in REPORT_SCRIPTS:
+            with self.subTest(module_name=module_name):
+                script = importlib.import_module(module_name)
+                db = MagicMock()
+                snapshot = {'generation_note': ''}
+                with tempfile.TemporaryDirectory() as tmp_dir:
+                    output_path = Path(tmp_dir) / '2026-05-11-report.md'
+                    args = SimpleNamespace(
+                        start_date='2026-05-05',
+                        end_date='2026-05-11',
+                        output=None,
+                    )
+
+                    with patch.object(script, 'parse_args', return_value=args), patch.object(
+                        script,
+                        'SessionLocal',
+                        return_value=db,
+                    ), patch.object(
+                        script,
+                        'resolve_report_output_path',
+                        return_value=output_path,
+                    ) as resolve_output_path, patch.object(
+                        script,
+                        'load_stage_a_snapshot_from_db',
+                        return_value=snapshot,
+                    ), patch.object(script, renderer_name, return_value='# report\n'):
+                        script.main()
+
+                    resolve_output_path.assert_called_once()
+                    _, kwargs = resolve_output_path.call_args
+                    self.assertIsNone(resolve_output_path.call_args.args[0])
+                    self.assertEqual(kwargs['end_date'].isoformat(), '2026-05-11')
+                    self.assertTrue(str(kwargs['filename_stem']).endswith(('weekly-report', 'baseline-snapshot')))
+                    self.assertEqual(output_path.read_text(encoding='utf-8'), '# report\n')
+
 
 if __name__ == '__main__':
     unittest.main()

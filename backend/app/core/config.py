@@ -1,14 +1,24 @@
 import json
+from pathlib import Path
 from typing import Any
 
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+REPO_ROOT = Path(__file__).resolve().parents[3]
+BACKEND_ROOT = REPO_ROOT / 'backend'
+
 
 class Settings(BaseSettings):
-    # Support running from repo root or backend/ while still finding the backend env file.
+    # Support running from repo root, backend/, or script subdirectories while still finding env files.
     model_config = SettingsConfigDict(
-        env_file=('.env', '../.env', 'backend/.env'),
+        env_file=(
+            '.env',
+            '../.env',
+            'backend/.env',
+            str(REPO_ROOT / '.env'),
+            str(BACKEND_ROOT / '.env'),
+        ),
         env_file_encoding='utf-8-sig',
         extra='ignore',
     )
