@@ -129,7 +129,6 @@ cd frontend && npm run build && npm run start
 
 - [Latest Changelog](docs/changelog/CHANGELOG.md#2026-05-23-hardening-ci-accessibility)
 - [SEO / GEO Audit](docs/seo/seo-audit-2026-05-01.md)
-- [Backend API Documentation](docs/api/后端接口文档_v1.md)
 - [System Architecture](docs/architecture/系统架构.md)
 - [Google Sign-In Integration Guide](docs/guides/Google登录接入指南.md)
 
