@@ -2,6 +2,65 @@
 
 本文件汇总了原 `docs/changelog/update-log-*.md` 的全部更新记录。新增 release 请追加到顶部，并为每条记录保留稳定锚点，供 `/updates` 的 `docPath` 和 README 链接定位。
 
+<a id="2026-06-02-home-h1-ssr-fallback"></a>
+
+## 2026-06-02 - home h1 ssr fallback
+
+日期：2026-06-02
+
+### 概览
+
+这次更新修复了 GEO / SEO 审查中指出的首页 H1 可抓取性问题。首页现在在 Server Component 入口输出稳定的 H1、描述和三个核心功能卡片，让搜索引擎和 AI crawler 在不依赖客户端 hydration 的情况下也能读取核心产品语义。
+
+- 新增 `HomeSeoFallback`，用三语初始翻译在 SSR HTML 中输出首页核心文案。
+- 根首页 `/` 与 locale 首页 `/zh`、`/en`、`/ja` 都挂载同一 fallback，避免只修英文默认入口。
+- 可见 hero 标题改为展示用 `div`，保留视觉效果，同时避免原始 HTML 中出现两个语义 H1。
+- 外部 GEO / SEO 审查报告已标记 H1 问题完成。
+
+### 前端 SEO fallback
+
+- `frontend/src/components/home/HomeSeoFallback.tsx` 从 `getInitialTranslations(locale)` 读取三语文案，输出 `data-seo-home-fallback` 标记、H1、hero 描述和三个核心功能条目。
+- `frontend/src/app/page.tsx` 在英文默认首页渲染 fallback 后再渲染现有 `HomePageContent`。
+- `frontend/src/app/[locale]/page.tsx` 在 locale-pinned 首页使用 `pinnedLocale` 渲染同一 fallback。
+- `frontend/src/components/home/HomePageClient.tsx` 将原客户端 `<h1>` 改为 `aria-hidden` 的展示标题，语义 H1 由 SSR fallback 统一承担。
+
+### 首页更新记录同步
+
+- `/updates` 三语 JSON 新增本次首页 H1 SSR fallback 更新记录，`docPath` 指向 `docs/changelog/CHANGELOG.md#2026-06-02-home-h1-ssr-fallback`。
+- 首页底部“更新记录”三语 hint 改为首页 H1 / SEO fallback 主题。
+- README / README.zh-CN 最新 changelog 链接更新到本次锚点。
+
+### 影响文件
+
+#### 前端
+
+- `frontend/src/app/page.tsx`
+- `frontend/src/app/[locale]/page.tsx`
+- `frontend/src/components/home/HomePageClient.tsx`
+- `frontend/src/components/home/HomeSeoFallback.tsx`
+- `frontend/src/content/updates/{zh,en,ja}.json`
+- `frontend/src/lib/i18n-{zh,en,ja}.ts`
+
+#### 文档
+
+- `docs/changelog/CHANGELOG.md`
+- `README.md`
+- `README.zh-CN.md`
+- `E:\Project Code\docs\01 - Projects\PicSpeak\07 - Analytics\2026-05-27 GEO-SEO 全面审查报告.md`
+
+### 验证
+
+- `cd frontend && npm run typecheck`
+- `cd frontend && npm run lint`
+- `cd frontend && npm run test` -> `50 passed`
+- `cd frontend && npm run build`
+- 本地 `next start -p 3027` 后抓取 `/` 与 `/zh` 原始 HTML，确认包含 `data-seo-home-fallback`，H1 数量为 1，且 H1 / 核心功能文案已出现在 SSR HTML。
+- `/updates` 三语 JSON parse
+- `Get-FileHash` 对比仓库 changelog / workflow 与外部 Update Logs 副本 SHA256 一致
+- `git diff --check`
+
+---
+
 <a id="2026-05-23-hardening-ci-accessibility"></a>
 
 ## 2026-05-23 - hardening ci accessibility

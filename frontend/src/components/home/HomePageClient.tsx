@@ -244,11 +244,14 @@ export function HomePageContent({ structuredDataScope = 'root' }: HomePageProps 
           <span>{t('hero_label')}</span>
         </div>
 
-        <h1 className="relative font-display text-5xl sm:text-6xl md:text-7xl text-center leading-[1.08] max-w-3xl text-balance animate-fade-in anim-fill-both delay-100">
+        <div
+          aria-hidden="true"
+          className="relative font-display text-5xl sm:text-6xl md:text-7xl text-center leading-[1.08] max-w-3xl text-balance animate-fade-in anim-fill-both delay-100"
+        >
           {t('hero_headline_1')}
           <br />
           <span className="text-gold">{t('hero_headline_2')}</span>
-        </h1>
+        </div>
 
         <p className="relative mt-6 text-ink-muted text-base sm:text-lg text-center max-w-xl leading-relaxed animate-fade-in anim-fill-both delay-200">
           {t('hero_desc')}

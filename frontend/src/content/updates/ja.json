@@ -1,5 +1,29 @@
 [
   {
+    "id": "2026-06-02-home-h1-ssr-fallback",
+    "date": "2026-06-02",
+    "title": "ホーム H1 の SSR fallback 修正",
+    "summary": "PicSpeak のホームは H1、説明文、3 つの主要機能カードを server HTML に出力するようになりました。検索エンジンと AI crawler は client hydration を待たずに中核の製品文脈を読めます。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-06-02-home-h1-ssr-fallback",
+    "sections": [
+      {
+        "title": "SEO crawlability",
+        "items": [
+          "HomeSeoFallback を追加し、ホームの H1、説明文、主要機能コピーを raw HTML に出力しました",
+          "root home と /zh、/en、/ja の locale home すべてに同じ SSR fallback を設置しました",
+          "表示用 hero title は display text に変更し、raw page の semantic H1 を 1 つに保ちました"
+        ]
+      },
+      {
+        "title": "監査の完了",
+        "items": [
+          "GEO / SEO audit report の H1 項目を完了としてマークしました",
+          "production build と local raw-HTML check で fallback の出力を確認しました"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-05-23-hardening-ci-accessibility",
     "date": "2026-05-23",
     "title": "セキュリティ強化、CI ゲート、アクセシビリティ改善",

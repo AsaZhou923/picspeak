@@ -1,6 +1,7 @@
 import { I18nProvider, type Locale } from '@/lib/i18n';
 import { getInitialTranslations } from '@/lib/i18n-initial';
 import { HomePageContent } from '@/components/home/HomePageClient';
+import { HomeSeoFallback } from '@/components/home/HomeSeoFallback';
 import { VALID_LOCALES } from './locales';
 
 
@@ -29,6 +30,7 @@ export default async function LocalePage({
 
   return (
     <I18nProvider initialLocale={pinnedLocale} initialMessages={getInitialTranslations(pinnedLocale)}>
+      <HomeSeoFallback locale={pinnedLocale} />
       <HomePageContent structuredDataScope="locale" />
     </I18nProvider>
   );

@@ -1,5 +1,29 @@
 [
   {
+    "id": "2026-06-02-home-h1-ssr-fallback",
+    "date": "2026-06-02",
+    "title": "首页 H1 SSR fallback 修复",
+    "summary": "PicSpeak 首页现在会在服务端输出稳定的 H1、描述和三个核心功能卡片，搜索引擎和 AI crawler 不再需要等待客户端 hydration 才能读取核心产品语义。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-06-02-home-h1-ssr-fallback",
+    "sections": [
+      {
+        "title": "SEO 可抓取性",
+        "items": [
+          "新增 HomeSeoFallback，在原始 HTML 中输出首页 H1、描述和核心功能条目",
+          "根首页和 /zh、/en、/ja locale 首页都使用同一个 SSR fallback",
+          "可见 hero 标题改为展示文本，避免页面出现两个语义 H1"
+        ]
+      },
+      {
+        "title": "审查闭环",
+        "items": [
+          "GEO / SEO 审查报告中的 H1 问题已标记完成",
+          "已用生产构建和本地原始 HTML 抓取验证 fallback 生效"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-05-23-hardening-ci-accessibility",
     "date": "2026-05-23",
     "title": "安全硬化、CI 门禁与前端可访问性补强",

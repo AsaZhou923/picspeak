@@ -1,5 +1,29 @@
 [
   {
+    "id": "2026-06-02-home-h1-ssr-fallback",
+    "date": "2026-06-02",
+    "title": "Homepage H1 SSR fallback",
+    "summary": "PicSpeak now renders the homepage H1, description, and three core feature cards in server HTML, so search engines and AI crawlers can read the core product meaning without waiting for client hydration.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-06-02-home-h1-ssr-fallback",
+    "sections": [
+      {
+        "title": "SEO crawlability",
+        "items": [
+          "Added HomeSeoFallback to place the homepage H1, description, and core feature copy in the raw HTML",
+          "Mounted the same SSR fallback on the root homepage and /zh, /en, /ja locale homepages",
+          "Changed the visible client hero title into display text so the raw page keeps one semantic H1"
+        ]
+      },
+      {
+        "title": "Audit closeout",
+        "items": [
+          "Marked the H1 item in the GEO / SEO audit report as complete",
+          "Verified the fallback through a production build and local raw-HTML checks"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-05-23-hardening-ci-accessibility",
     "date": "2026-05-23",
     "title": "Security hardening, CI gates, and accessibility polish",
