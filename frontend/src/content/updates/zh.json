@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-06-04-blog-og-image-cache",
+    "date": "2026-06-04",
+    "title": "博客专属 OG 分享图与公开页缓存",
+    "summary": "PicSpeak 的博客文章现在会按标题和分类生成 1200x630 分享图，并为公开首页、博客、更新记录、Prompt Library、法律页等入口增加 CDN 缓存，同时从 sitemap 移除不应公开索引的 workspace。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-06-04-blog-og-image-cache",
+    "sections": [
+      {
+        "title": "博客分享图",
+        "items": [
+          "英文默认博客和 zh / en / ja 三语博客都新增 opengraph-image 路由",
+          "内置 Cormorant Garamond 与 DM Sans WOFF 字体，并纳入 Next 部署输出追踪",
+          "BlogPosting 结构化数据和 Twitter card 会指向文章专属 OG 图片"
+        ]
+      },
+      {
+        "title": "公开页缓存与索引",
+        "items": [
+          "公开页面增加 public s-maxage=3600 与 stale-while-revalidate=86400 缓存头",
+          "缓存范围覆盖首页、博客、更新记录、Prompt Library、法律页和 Affiliate 页面",
+          "sitemap 移除 /workspace，避免工作台出现在公开索引入口"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-06-02-home-h1-ssr-fallback",
     "date": "2026-06-02",
     "title": "首页 H1 SSR fallback 修复",

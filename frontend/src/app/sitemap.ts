@@ -119,12 +119,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
       alternates: singleUrlAlternates(`/generate/prompts/${example.id}`),
     })),
     {
-      url: `${siteConfig.url}/workspace`,
-      lastModified: now,
-      changeFrequency: 'weekly',
-      priority: 0.75,
-    },
-    {
       url: `${siteConfig.url}/blog`,
       lastModified: now,
       changeFrequency: 'weekly',

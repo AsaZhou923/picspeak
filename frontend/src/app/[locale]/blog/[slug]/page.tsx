@@ -50,13 +50,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       publishedTime: post.publishedAt,
       modifiedTime: post.updatedAt,
       tags: post.keywords,
-      images: [{ url: siteConfig.ogImage, width: siteConfig.ogImageWidth, height: siteConfig.ogImageHeight, alt: post.title }],
     },
     twitter: {
       card: 'summary_large_image',
       title: post.title,
       description: post.description,
-      images: [siteConfig.ogImage],
+      images: [`/${locale}/blog/${post.slug}/opengraph-image`],
     },
   };
 }

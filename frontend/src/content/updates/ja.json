@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-06-04-blog-og-image-cache",
+    "date": "2026-06-04",
+    "title": "ブログ専用 OG 画像と公開ページキャッシュ",
+    "summary": "PicSpeak のブログ記事は、記事タイトルとカテゴリから 1200x630 の共有画像を生成するようになりました。ホーム、ブログ、更新履歴、Prompt Library、法務、affiliate などの公開ページには CDN キャッシュヘッダーを追加し、workspace は公開 sitemap から外しました。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-06-04-blog-og-image-cache",
+    "sections": [
+      {
+        "title": "ブログ共有画像",
+        "items": [
+          "英語既定ブログと zh / en / ja の各ブログ記事に opengraph-image ルートを追加しました",
+          "Cormorant Garamond と DM Sans の WOFF font を同梱し、Next の output tracing に含めました",
+          "BlogPosting structured data と Twitter card が記事専用 OG 画像を指すようになりました"
+        ]
+      },
+      {
+        "title": "公開ページ cache と index",
+        "items": [
+          "公開ページに public s-maxage=3600 と stale-while-revalidate=86400 の cache header を追加しました",
+          "cache header はホーム、ブログ、更新履歴、Prompt Library、法務、affiliate ページをカバーします",
+          "/workspace を sitemap から削除し、非公開寄りのワークスペースを公開 index URL に出さないようにしました"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-06-02-home-h1-ssr-fallback",
     "date": "2026-06-02",
     "title": "ホーム H1 の SSR fallback 修正",

@@ -73,10 +73,40 @@ const securityHeaders = [
   { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
 ];
 
+const publicPageCacheHeaders = [
+  {
+    key: 'Cache-Control',
+    value: 'public, s-maxage=3600, stale-while-revalidate=86400',
+  },
+];
+
+const cacheablePublicPageSources = [
+  '/',
+  '/:locale(zh|en|ja)',
+  '/gallery',
+  '/blog',
+  '/blog/:slug*',
+  '/:locale(zh|en|ja)/blog',
+  '/:locale(zh|en|ja)/blog/:slug*',
+  '/updates',
+  '/:locale(zh|en|ja)/updates',
+  '/generate/prompts',
+  '/generate/prompts/:id*',
+  '/privacy',
+  '/terms',
+  '/affiliate',
+];
+
+const ogFontFiles = ['./public/fonts/CormorantGaramond-SemiBold.woff', './public/fonts/DMSans-Medium.woff'];
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
     remotePatterns: buildRemotePatterns(),
+  },
+  outputFileTracingIncludes: {
+    '/blog/[slug]/opengraph-image': ogFontFiles,
+    '/[locale]/blog/[slug]/opengraph-image': ogFontFiles,
   },
   async headers() {
     return [
@@ -84,6 +114,10 @@ const nextConfig = {
         source: '/:path*',
         headers: securityHeaders,
       },
+      ...cacheablePublicPageSources.map((source) => ({
+        source,
+        headers: publicPageCacheHeaders,
+      })),
     ];
   },
   webpack: (config) => {

@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-06-04-blog-og-image-cache",
+    "date": "2026-06-04",
+    "title": "Blog-specific OG images and public page caching",
+    "summary": "PicSpeak blog posts now generate 1200x630 social images from each article title and category. Public home, blog, updates, Prompt Library, legal, and affiliate pages also get CDN cache headers, while workspace is removed from the public sitemap.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-06-04-blog-og-image-cache",
+    "sections": [
+      {
+        "title": "Blog sharing images",
+        "items": [
+          "Added opengraph-image routes for the default English blog and zh / en / ja localized blog posts",
+          "Vendored Cormorant Garamond and DM Sans WOFF fonts and included them in Next output tracing",
+          "BlogPosting structured data and Twitter cards now point to article-specific OG images"
+        ]
+      },
+      {
+        "title": "Public page cache and indexing",
+        "items": [
+          "Public pages now send public s-maxage=3600 and stale-while-revalidate=86400 cache headers",
+          "The cache header covers home, blog, updates, Prompt Library, legal, and affiliate pages",
+          "Removed /workspace from the sitemap so the private workspace is not exposed as a public index URL"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-06-02-home-h1-ssr-fallback",
     "date": "2026-06-02",
     "title": "Homepage H1 SSR fallback",

@@ -2,6 +2,79 @@
 
 本文件汇总了原 `docs/changelog/update-log-*.md` 的全部更新记录。新增 release 请追加到顶部，并为每条记录保留稳定锚点，供 `/updates` 的 `docPath` 和 README 链接定位。
 
+<a id="2026-06-04-blog-og-image-cache"></a>
+
+## 2026-06-04 - blog og image cache
+
+日期：2026-06-04
+
+### 概览
+
+这次更新让博客文章分享图从全站默认 OG 图改为每篇文章按标题和分类动态生成，并给公开页面补上 CDN 缓存策略。分享到社交平台时，博客链接会带出更贴合文章主题的 1200x630 图片；公开页也可以通过 `s-maxage` 和 `stale-while-revalidate` 减少重复渲染压力。
+
+- 新增英文默认博客与三语博客的 `opengraph-image` 路由，按文章标题和分类生成专属 PNG。
+- 内置 Cormorant Garamond 与 DM Sans WOFF 字体，并把字体文件纳入 Next 输出追踪，避免部署后 OG 路由缺字体。
+- 博客结构化数据和 Twitter card 改为指向文章专属 OG 图片。
+- 公开首页、博客、更新记录、Prompt Library、法律页和 Affiliate 页面增加 CDN 缓存响应头。
+- sitemap 移除不应公开索引的 `/workspace` 条目。
+
+### 博客分享图与字体
+
+- `frontend/src/app/blog/[slug]/opengraph-image.tsx` 为英文默认博客文章生成 OG 图，找不到文章时回退到 Lens Notes 通用标题。
+- `frontend/src/app/[locale]/blog/[slug]/opengraph-image.tsx` 为 `zh` / `en` / `ja` locale 博客文章生成同款 OG 图，并处理非法 locale 或缺失 slug 的 fallback。
+- `frontend/src/lib/blog-og-image.tsx` 负责 1200x630 OG 图布局、标题截断、分类标签和品牌页脚。
+- `frontend/src/lib/blog-og-fonts.ts` 从 `public/fonts` 读取并缓存 WOFF 字体，`next.config.mjs` 用 `outputFileTracingIncludes` 保证部署产物包含字体。
+
+### 公开页面缓存与索引边界
+
+- `frontend/next.config.mjs` 新增公开页面 `Cache-Control: public, s-maxage=3600, stale-while-revalidate=86400`。
+- 缓存范围覆盖首页、三语首页、博客、三语博客、更新记录、Prompt Library、隐私、条款和 Affiliate 页面。
+- `frontend/src/app/sitemap.ts` 移除 `/workspace`，避免把工作台作为公开 sitemap URL。
+
+### 首页更新记录同步
+
+- `/updates` 三语 JSON 新增本次博客 OG 图与公开页缓存更新记录，`docPath` 指向 `docs/changelog/CHANGELOG.md#2026-06-04-blog-og-image-cache`。
+- 首页底部“更新记录”三语 hint 改为博客专属分享图、公开页缓存和 sitemap 收口主题。
+- README / README.zh-CN 最新 changelog 链接更新到本次锚点。
+
+### 影响文件
+
+#### 前端
+
+- `frontend/next.config.mjs`
+- `frontend/src/app/blog/[slug]/page.tsx`
+- `frontend/src/app/blog/[slug]/opengraph-image.tsx`
+- `frontend/src/app/[locale]/blog/[slug]/page.tsx`
+- `frontend/src/app/[locale]/blog/[slug]/BlogPostClient.tsx`
+- `frontend/src/app/[locale]/blog/[slug]/opengraph-image.tsx`
+- `frontend/src/app/sitemap.ts`
+- `frontend/src/lib/blog-og-fonts.ts`
+- `frontend/src/lib/blog-og-image.tsx`
+- `frontend/src/lib/blog-og-types.ts`
+- `frontend/public/fonts/{CormorantGaramond-SemiBold,DMSans-Medium}.woff`
+- `frontend/src/content/updates/{zh,en,ja}.json`
+- `frontend/src/lib/i18n-{zh,en,ja}.ts`
+- `frontend/test/blog-og-image.test.ts`
+
+#### 文档
+
+- `docs/changelog/CHANGELOG.md`
+- `README.md`
+- `README.zh-CN.md`
+
+### 验证
+
+- `node -e "const fs=require('fs'); for (const f of ['zh','en','ja']) JSON.parse(fs.readFileSync('frontend/src/content/updates/'+f+'.json','utf8'));"`
+- `cd frontend && node --test test/blog-og-image.test.ts` -> `6 passed`
+- `cd frontend && npm run test` -> `56 passed`
+- `cd frontend && npm run typecheck`
+- `cd frontend && npm run lint`
+- `cd frontend && npm run build` -> 生成 112 个静态页面
+- `Get-FileHash` 对比仓库 changelog / workflow 与外部 Update Logs 副本 SHA256 一致
+- `git diff --check`
+
+---
+
 <a id="2026-06-02-home-h1-ssr-fallback"></a>
 
 ## 2026-06-02 - home h1 ssr fallback

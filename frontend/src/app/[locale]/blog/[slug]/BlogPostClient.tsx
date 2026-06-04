@@ -104,7 +104,7 @@ function BlogPostContent({ slug }: { slug: string }) {
     dateModified: post.updatedAt,
     inLanguage: ARTICLE_LANGUAGE_BY_LOCALE[locale],
     url: `${siteConfig.url}/${locale}/blog/${post.slug}`,
-    image: `${siteConfig.url}${siteConfig.ogImage}`,
+    image: `${siteConfig.url}/${locale}/blog/${post.slug}/opengraph-image`,
     isAccessibleForFree: true,
     isPartOf: {
       '@type': 'Blog',

@@ -125,7 +125,7 @@ cd frontend && npm run build && npm run start
 
 ## 文档
 
-- [最新更新日志](docs/changelog/CHANGELOG.md#2026-06-02-home-h1-ssr-fallback)
+- [最新更新日志](docs/changelog/CHANGELOG.md#2026-06-04-blog-og-image-cache)
 - [SEO / GEO 审计报告](docs/seo/seo-audit-2026-05-01.md)
 - [系统架构说明](docs/architecture/系统架构.md)
 - [Google 登录接入指南](docs/guides/Google登录接入指南.md)
