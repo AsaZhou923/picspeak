@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-06-05-structured-data-seo-alternates",
+    "date": "2026-06-05",
+    "title": "Structured data, demo review SEO, and Updates metadata",
+    "summary": "PicSpeak public content pages now expose stronger machine-readable signals: blog posts add breadcrumb JSON-LD, public demo reviews add Review / CreativeWork / Rating JSON-LD, and the default /updates page owns page-level metadata with shared hreflang alternates.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-06-05-structured-data-seo-alternates",
+    "sections": [
+      {
+        "title": "Structured data",
+        "items": [
+          "Blog post pages now emit BreadcrumbList JSON-LD linking the locale home, blog index, and article",
+          "Public demo review pages emit Review JSON-LD with the sample image, critique body, rating, and reviewed creative work",
+          "Non-demo reviews keep their noindex boundary; structured data is only injected for public examples"
+        ]
+      },
+      {
+        "title": "Updates metadata",
+        "items": [
+          "The default /updates page now uses generateMetadata for canonical, Open Graph, and Twitter metadata",
+          "Default and localized updates pages share UPDATES_LANGUAGE_ALTERNATES to reduce hreflang drift",
+          "Node tests now cover blog breadcrumbs, demo review JSON-LD, and updates metadata ownership"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-06-04-blog-og-image-cache",
     "date": "2026-06-04",
     "title": "Blog-specific OG images and public page caching",

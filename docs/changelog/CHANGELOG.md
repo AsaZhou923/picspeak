@@ -2,6 +2,77 @@
 
 本文件汇总了原 `docs/changelog/update-log-*.md` 的全部更新记录。新增 release 请追加到顶部，并为每条记录保留稳定锚点，供 `/updates` 的 `docPath` 和 README 链接定位。
 
+<a id="2026-06-05-structured-data-seo-alternates"></a>
+
+## 2026-06-05 - structured data seo alternates
+
+日期：2026-06-05
+
+### 概览
+
+这次更新补强了公开内容页给搜索引擎、AI crawler 和社交预览读取的结构化信号。Blog 文章会额外输出面包屑 JSON-LD，公开示例点评页会输出 Review / CreativeWork / Rating 结构化数据；默认 `/updates` 页面也从 layout 静态 metadata 改为页面级 `generateMetadata`，让 canonical、hreflang、Open Graph 和 Twitter metadata 更集中、更容易回归测试。
+
+- Blog 文章详情页新增 `BreadcrumbList` JSON-LD，串起 locale 首页、Blog 索引和当前文章。
+- 公开示例点评页新增 Review JSON-LD，包含示例图、讲评正文、评分、被评作品和发布者信息。
+- `/updates` 默认页 metadata 改为页面级生成，三语 updates 页共用同一份 hreflang alternates 常量。
+- SEO helper 集中维护 Blog breadcrumb、updates metadata 和 updates alternates，避免多个入口重复手写。
+- 新增 Node 测试覆盖面包屑、Review JSON-LD、updates metadata 归属与 alternates。
+
+### 结构化数据补强
+
+- `frontend/src/lib/seo.ts` 新增 `buildBlogBreadcrumbJsonLd`，用于生成 Blog 文章面包屑结构化数据。
+- `frontend/src/app/[locale]/blog/[slug]/BlogPostClient.tsx` 在现有 author / article JSON-LD 之外输出 `picspeak-blog-breadcrumb-structured-data`。
+- `frontend/src/lib/demo-review.ts` 新增 `buildDemoReviewJsonLd` 和示例评分常量，统一构造公开示例点评的 Review JSON-LD。
+- `frontend/src/app/reviews/[reviewId]/layout.tsx` 只在公开 demo review ID 上注入 `picspeak-demo-review-structured-data`，非 demo review 仍沿用 noindex metadata。
+
+### Updates metadata 与 hreflang
+
+- `frontend/src/lib/seo.ts` 新增 `UPDATES_LANGUAGE_ALTERNATES` 与 `buildDefaultUpdatesMetadata`，统一默认 `/updates` 和 locale updates 页的语言互链。
+- `frontend/src/app/updates/page.tsx` 通过 `generateMetadata()` 输出默认 updates 页 metadata、Open Graph 与 Twitter 预览。
+- `frontend/src/app/updates/layout.tsx` 移除静态 metadata，避免 layout 层继续承载页面专属 SEO 数据。
+- `frontend/src/app/[locale]/updates/page.tsx` 复用 `UPDATES_LANGUAGE_ALTERNATES`，减少三语页和默认页之间的 hreflang 漂移。
+
+### 首页更新记录同步
+
+- `/updates` 三语 JSON 新增本次结构化数据与 updates metadata 更新记录，`docPath` 指向 `docs/changelog/CHANGELOG.md#2026-06-05-structured-data-seo-alternates`。
+- 首页底部“更新记录”三语 hint 改为结构化数据、示例点评与 updates metadata 主题。
+- README / README.zh-CN 最新 changelog 链接更新到本次锚点。
+
+### 影响文件
+
+#### 前端
+
+- `frontend/src/app/[locale]/blog/[slug]/BlogPostClient.tsx`
+- `frontend/src/app/[locale]/updates/page.tsx`
+- `frontend/src/app/reviews/[reviewId]/layout.tsx`
+- `frontend/src/app/updates/layout.tsx`
+- `frontend/src/app/updates/page.tsx`
+- `frontend/src/lib/demo-review.ts`
+- `frontend/src/lib/seo.ts`
+- `frontend/src/content/updates/{zh,en,ja}.json`
+- `frontend/src/lib/i18n-{zh,en,ja}.ts`
+- `frontend/test/demo-review.test.ts`
+- `frontend/test/seo-alternates.test.ts`
+
+#### 文档
+
+- `docs/changelog/CHANGELOG.md`
+- `README.md`
+- `README.zh-CN.md`
+
+### 验证
+
+- `node -e "const fs=require('fs'); for (const f of ['zh','en','ja']) JSON.parse(fs.readFileSync('frontend/src/content/updates/'+f+'.json','utf8'));"`
+- `cd frontend && node --test test/demo-review.test.ts test/seo-alternates.test.ts` -> `11 passed`
+- `cd frontend && npm run test` -> `62 passed`
+- `cd frontend && npm run typecheck`
+- `cd frontend && npm run lint`
+- `cd frontend && npm run build` -> 生成 112 个静态页面
+- `Get-FileHash` 对比仓库 changelog / workflow 与外部 Update Logs 副本 SHA256 一致
+- `git diff --check`
+
+---
+
 <a id="2026-06-04-blog-og-image-cache"></a>
 
 ## 2026-06-04 - blog og image cache

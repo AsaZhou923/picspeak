@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import UpdatesPageContent from '@/components/marketing/UpdatesPageContent';
 import { I18nProvider, type Locale } from '@/lib/i18n';
+import { UPDATES_LANGUAGE_ALTERNATES } from '@/lib/seo';
 import { siteConfig } from '@/lib/site';
 import { VALID_LOCALES } from '../locales';
 
@@ -37,12 +38,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     description: meta.description,
     alternates: {
       canonical: `/${typedLocale}/updates`,
-      languages: {
-        'zh-CN': '/zh/updates',
-        en: '/en/updates',
-        ja: '/ja/updates',
-        'x-default': '/updates',
-      },
+      languages: UPDATES_LANGUAGE_ALTERNATES,
     },
     openGraph: {
       type: 'website',

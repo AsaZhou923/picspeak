@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-06-05-structured-data-seo-alternates",
+    "date": "2026-06-05",
+    "title": "结构化数据、示例点评与 Updates metadata 补强",
+    "summary": "PicSpeak 公开内容页补强了搜索和 AI crawler 可读取的结构化信号：Blog 文章新增面包屑 JSON-LD，公开示例点评新增 Review / CreativeWork / Rating JSON-LD，默认 /updates 页也改为页面级 metadata 并复用统一 hreflang。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-06-05-structured-data-seo-alternates",
+    "sections": [
+      {
+        "title": "结构化数据",
+        "items": [
+          "Blog 文章详情页新增 BreadcrumbList JSON-LD，连接 locale 首页、Blog 索引和当前文章",
+          "公开 demo review 详情页输出 Review JSON-LD，包含示例图、讲评正文、评分和被评作品",
+          "非 demo review 仍保持 noindex 边界，只在公开示例上注入结构化数据"
+        ]
+      },
+      {
+        "title": "Updates metadata",
+        "items": [
+          "默认 /updates 页面改为 generateMetadata，集中输出 canonical、Open Graph 和 Twitter metadata",
+          "默认页和三语 updates 页共用 UPDATES_LANGUAGE_ALTERNATES，减少 hreflang 漂移",
+          "新增 Node 测试覆盖 Blog 面包屑、demo review JSON-LD 和 updates metadata 归属"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-06-04-blog-og-image-cache",
     "date": "2026-06-04",
     "title": "博客专属 OG 分享图与公开页缓存",

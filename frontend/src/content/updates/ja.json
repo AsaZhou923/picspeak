@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-06-05-structured-data-seo-alternates",
+    "date": "2026-06-05",
+    "title": "構造化データ、demo review SEO、Updates metadata を補強",
+    "summary": "PicSpeak の公開コンテンツページに、検索エンジンや AI crawler が読み取りやすい signal を追加しました。Blog 記事は breadcrumb JSON-LD、公開 demo review は Review / CreativeWork / Rating JSON-LD を出力し、既定の /updates ページも page-level metadata と共通 hreflang を持つようになりました。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-06-05-structured-data-seo-alternates",
+    "sections": [
+      {
+        "title": "構造化データ",
+        "items": [
+          "Blog 記事ページは locale home、Blog index、記事をつなぐ BreadcrumbList JSON-LD を出力します",
+          "公開 demo review ページはサンプル画像、講評本文、rating、reviewed creative work を含む Review JSON-LD を出力します",
+          "demo 以外の review は noindex 境界を維持し、構造化データは公開例だけに注入します"
+        ]
+      },
+      {
+        "title": "Updates metadata",
+        "items": [
+          "既定の /updates ページは generateMetadata で canonical、Open Graph、Twitter metadata を出力します",
+          "既定ページと多言語 updates ページは UPDATES_LANGUAGE_ALTERNATES を共用し、hreflang のずれを減らします",
+          "Blog breadcrumb、demo review JSON-LD、updates metadata の責務を Node test で保護しました"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-06-04-blog-og-image-cache",
     "date": "2026-06-04",
     "title": "ブログ専用 OG 画像と公開ページキャッシュ",

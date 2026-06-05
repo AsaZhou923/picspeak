@@ -10,6 +10,7 @@ import { formatBlogViewCount, shouldTrackBlogView } from '@/lib/blog-view-stats'
 import { getBlogWorkspaceCta, type ContentConversionEntrypoint } from '@/lib/content-conversion';
 import { I18nProvider, useI18n, type Locale } from '@/lib/i18n';
 import { markProductAttributionSource, trackProductEvent } from '@/lib/product-analytics';
+import { buildBlogBreadcrumbJsonLd } from '@/lib/seo';
 import { siteConfig } from '@/lib/site';
 import { VALID_LOCALES } from '../../locales';
 
@@ -131,11 +132,24 @@ function BlogPostContent({ slug }: { slug: string }) {
       name: keyword,
     })),
   };
+  const breadcrumbJsonLd = buildBlogBreadcrumbJsonLd({
+    siteName: siteConfig.name,
+    siteUrl: siteConfig.url,
+    locale,
+    blogName: ui.name,
+    postTitle: post.title,
+    slug: post.slug,
+  });
 
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(authorJsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }} />
+      <script
+        id="picspeak-blog-breadcrumb-structured-data"
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+      />
 
       <article className="min-h-screen pt-14">
         <div className="mx-auto max-w-4xl px-6 py-14">
