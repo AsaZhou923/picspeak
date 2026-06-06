@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import BlogIndexClient from './BlogIndexClient';
+import BlogIndexPageContent from './BlogIndexPageContent';
 import { getBlogUi } from '@/lib/blog-data';
 import { INDEXABLE_ROBOTS } from '@/lib/seo';
 import { siteConfig } from '@/lib/site';
@@ -50,5 +50,5 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function BlogIndexPage({ params }: Props) {
   const { locale } = await params;
 
-  return <BlogIndexClient locale={locale} />;
+  return <BlogIndexPageContent locale={locale} />;
 }

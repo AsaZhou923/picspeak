@@ -98,6 +98,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
       alternates: singleUrlAlternates('/gallery'),
     },
     {
+      url: `${siteConfig.url}/author/asa-zhou`,
+      lastModified: now,
+      changeFrequency: 'monthly',
+      priority: 0.62,
+      alternates: singleUrlAlternates('/author/asa-zhou'),
+    },
+    {
       url: `${siteConfig.url}/generate`,
       lastModified: now,
       changeFrequency: 'weekly',

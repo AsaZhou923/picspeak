@@ -95,6 +95,7 @@ const cacheablePublicPageSources = [
   '/privacy',
   '/terms',
   '/affiliate',
+  '/author/:path*',
 ];
 
 const ogFontFiles = ['./public/fonts/CormorantGaramond-SemiBold.woff', './public/fonts/DMSans-Medium.woff'];

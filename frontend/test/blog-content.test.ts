@@ -99,3 +99,25 @@ test('blog content bundles include SEO metadata and readable article bodies', ()
     }
   }
 });
+
+test('blog index keeps static article data server-rendered with a small client view-count island', () => {
+  const blogContentSource = readFileSync(
+    path.join(TEST_DIR, '..', 'src', 'app', '[locale]', 'blog', 'BlogIndexPageContent.tsx'),
+    'utf8',
+  );
+  const viewCountSource = readFileSync(
+    path.join(TEST_DIR, '..', 'src', 'app', '[locale]', 'blog', 'BlogViewCount.tsx'),
+    'utf8',
+  );
+  const defaultPageSource = readFileSync(path.join(TEST_DIR, '..', 'src', 'app', 'blog', 'page.tsx'), 'utf8');
+  const localizedPageSource = readFileSync(path.join(TEST_DIR, '..', 'src', 'app', '[locale]', 'blog', 'page.tsx'), 'utf8');
+
+  assert.doesNotMatch(blogContentSource, /^'use client';/m);
+  assert.match(blogContentSource, /getBlogPosts\(pinnedLocale\)/);
+  assert.match(blogContentSource, /BlogViewCountProvider/);
+  assert.doesNotMatch(blogContentSource, /useEffect|useState|getBlogViewCounts/);
+  assert.match(viewCountSource, /^'use client';/m);
+  assert.match(viewCountSource, /getBlogViewCounts/);
+  assert.match(defaultPageSource, /BlogIndexPageContent/);
+  assert.match(localizedPageSource, /BlogIndexPageContent/);
+});

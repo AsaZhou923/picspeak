@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-06-06-indexnow-image-sitemap-author",
+    "date": "2026-06-06",
+    "title": "IndexNow, image sitemap, and author entity page",
+    "summary": "PicSpeak now exposes an image sitemap, an Asa Zhou author entity page, and a post-deployment IndexNow submission path. The blog index also renders static article content on the server while keeping view counts as a small client island.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-06-06-indexnow-image-sitemap-author",
+    "sections": [
+      {
+        "title": "Public discovery",
+        "items": [
+          "Added /sitemap-images.xml for Prompt Library examples, Gallery OG imagery, and the public demo review image",
+          "robots.txt now lists both regular and image sitemaps, and the main sitemap includes /author/asa-zhou",
+          "The Asa Zhou author page emits Person / ProfilePage JSON-LD and becomes the stable siteConfig.author.id entity URL"
+        ]
+      },
+      {
+        "title": "IndexNow and Blog SSR",
+        "items": [
+          "Added IndexNow URL filtering, payload building, submit helper, CLI script, and deployment-success workflow",
+          "Moved the blog index from a full client component to server-rendered article content",
+          "Kept view counts as a dedicated client island so first-fold article content does not depend on hydration"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-06-05-structured-data-seo-alternates",
     "date": "2026-06-05",
     "title": "Structured data, demo review SEO, and Updates metadata",

@@ -13,6 +13,7 @@ export function isMarketingRoute(pathname: string | null | undefined): boolean {
   return (
     normalized === '/' ||
     normalized.startsWith('/affiliate') ||
+    normalized.startsWith('/author') ||
     normalized.startsWith('/blog') ||
     normalized.startsWith('/updates') ||
     normalized.startsWith('/privacy') ||

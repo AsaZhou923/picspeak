@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-06-06-indexnow-image-sitemap-author",
+    "date": "2026-06-06",
+    "title": "IndexNow、画像 sitemap、author entity ページ",
+    "summary": "PicSpeak に画像 sitemap、Asa Zhou author entity ページ、deploy 後の IndexNow submit 導線を追加しました。Blog index も静的な記事内容を server render し、view count だけを小さな client island として残します。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-06-06-indexnow-image-sitemap-author",
+    "sections": [
+      {
+        "title": "公開 discovery",
+        "items": [
+          "Prompt Library 例、Gallery OG 画像、公開 demo review 画像を含む /sitemap-images.xml を追加しました",
+          "robots.txt は通常 sitemap と画像 sitemap の両方を示し、main sitemap には /author/asa-zhou を追加しました",
+          "Asa Zhou author ページは Person / ProfilePage JSON-LD を出力し、siteConfig.author.id の安定した entity URL になります"
+        ]
+      },
+      {
+        "title": "IndexNow と Blog SSR",
+        "items": [
+          "IndexNow の URL filter、payload build、submit helper、CLI script、deployment-success workflow を追加しました",
+          "Blog index を全 client component から server-rendered article content へ移しました",
+          "view count は専用 client island として残し、first-fold の記事内容が hydration に依存しないようにしました"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-06-05-structured-data-seo-alternates",
     "date": "2026-06-05",
     "title": "構造化データ、demo review SEO、Updates metadata を補強",

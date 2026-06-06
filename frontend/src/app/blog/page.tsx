@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import BlogIndexClient from '../[locale]/blog/BlogIndexClient';
+import BlogIndexPageContent from '../[locale]/blog/BlogIndexPageContent';
 import { blogConfig } from '@/lib/blog-data';
 import { INDEXABLE_ROBOTS } from '@/lib/seo';
 import { siteConfig } from '@/lib/site';
@@ -35,5 +35,5 @@ export const metadata: Metadata = {
 };
 
 export default function BlogPage() {
-  return <BlogIndexClient />;
+  return <BlogIndexPageContent />;
 }

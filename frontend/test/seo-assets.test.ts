@@ -3,6 +3,13 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { GENERATION_PROMPT_EXAMPLES } from '../src/content/generation/prompt-examples.ts';
+import {
+  buildImageSitemapEntries,
+  buildImageSitemapXml,
+  IMAGE_SITEMAP_PATH,
+} from '../src/lib/image-sitemap.ts';
+import { siteConfig } from '../src/lib/site.ts';
 
 const TEST_DIR = path.dirname(fileURLToPath(import.meta.url));
 const FRONTEND_DIR = path.join(TEST_DIR, '..');
@@ -31,4 +38,55 @@ test('llms.txt stays published as a plain-text discovery asset', () => {
   assert.match(llmsText, /^# PicSpeak/m);
   assert.match(llmsText, /\/generate\/prompts/);
   assert.match(llmsText, /Founder and editor:/);
+});
+
+test('image sitemap covers prompt examples, gallery, and the public demo review image', () => {
+  const entries = buildImageSitemapEntries();
+  const firstPrompt = GENERATION_PROMPT_EXAMPLES[0];
+
+  assert.equal(IMAGE_SITEMAP_PATH, '/sitemap-images.xml');
+  assert.equal(new Set(entries.map((entry) => entry.loc)).size, entries.length);
+  assert.ok(entries.length >= GENERATION_PROMPT_EXAMPLES.length + 2);
+  assert.ok(
+    entries.some(
+      (entry) =>
+        entry.loc === `${siteConfig.url}/gallery` &&
+        entry.images.some((image) => image.loc === `${siteConfig.url}${siteConfig.ogImage}`),
+    ),
+  );
+  assert.ok(
+    entries.some(
+      (entry) =>
+        entry.loc === `${siteConfig.url}/generate/prompts/${firstPrompt.id}` &&
+        entry.images.some((image) => image.loc === `${siteConfig.url}${firstPrompt.imagePath}`),
+    ),
+  );
+  assert.ok(entries.some((entry) => entry.loc.startsWith(`${siteConfig.url}/reviews/`)));
+
+  const xml = buildImageSitemapXml(entries);
+  assert.match(xml, /xmlns:image="http:\/\/www\.google\.com\/schemas\/sitemap-image\/1\.1"/);
+  assert.match(xml, /<image:image>/);
+  assert.match(xml, /<image:loc>https:\/\/picspeak\.art\/generation-prompt-examples\//);
+});
+
+test('robots and app routes expose the image sitemap', () => {
+  const robotsSource = readFileSync(path.join(FRONTEND_DIR, 'src', 'app', 'robots.ts'), 'utf8');
+  const routeSource = readFileSync(path.join(FRONTEND_DIR, 'src', 'app', 'sitemap-images.xml', 'route.ts'), 'utf8');
+
+  assert.match(robotsSource, /sitemap-images\.xml/);
+  assert.match(routeSource, /buildImageSitemapXml/);
+  assert.match(routeSource, /application\/xml/);
+});
+
+test('Asa Zhou author page is crawlable and wired into SEO discovery paths', () => {
+  const authorPageSource = readFileSync(path.join(FRONTEND_DIR, 'src', 'app', 'author', 'asa-zhou', 'page.tsx'), 'utf8');
+  const siteSource = readFileSync(path.join(FRONTEND_DIR, 'src', 'lib', 'site.ts'), 'utf8');
+  const sitemapSource = readFileSync(path.join(FRONTEND_DIR, 'src', 'app', 'sitemap.ts'), 'utf8');
+  const routeShellSource = readFileSync(path.join(FRONTEND_DIR, 'src', 'lib', 'route-shell.ts'), 'utf8');
+
+  assert.match(siteSource, /https:\/\/picspeak\.art\/author\/asa-zhou#person/);
+  assert.match(authorPageSource, /'@type': 'Person'/);
+  assert.match(authorPageSource, /siteConfig\.author\.id/);
+  assert.match(sitemapSource, /\/author\/asa-zhou/);
+  assert.match(routeShellSource, /startsWith\('\/author'\)/);
 });

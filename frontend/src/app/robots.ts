@@ -26,7 +26,7 @@ export default function robots(): MetadataRoute.Robots {
         allow: '/',
       })),
     ],
-    sitemap: `${siteConfig.url}/sitemap.xml`,
+    sitemap: [`${siteConfig.url}/sitemap.xml`, `${siteConfig.url}/sitemap-images.xml`],
     host: siteConfig.url,
   };
 }

@@ -2,6 +2,95 @@
 
 本文件汇总了原 `docs/changelog/update-log-*.md` 的全部更新记录。新增 release 请追加到顶部，并为每条记录保留稳定锚点，供 `/updates` 的 `docPath` 和 README 链接定位。
 
+<a id="2026-06-06-indexnow-image-sitemap-author"></a>
+
+## 2026-06-06 - indexnow image sitemap author
+
+日期：2026-06-06
+
+### 概览
+
+这次更新把 PicSpeak 的公开内容发现链路继续补齐：新增图片 sitemap 和 robots 暴露入口，让 Prompt Library 示例图、公开长廊和公开 demo review 图片可以被搜索引擎更明确地发现；新增 Asa Zhou author 实体页，并把作者 `@id` 从首页片段改为稳定的 Person URL；同时增加 IndexNow 提交脚本和 GitHub Actions 部署成功钩子，帮助 sitemap、作者页和关键公开入口在部署后更快通知搜索引擎。
+
+- 新增 `/sitemap-images.xml`，覆盖 Prompt Library 示例图、Gallery OG 图和公开 demo review 图片。
+- `robots.txt` 同时声明普通 sitemap 和图片 sitemap，`sitemap.ts` 增加 `/author/asa-zhou`。
+- 新增 `/author/asa-zhou` 可索引作者页，输出 Person / ProfilePage JSON-LD，并接入 marketing shell 与公开缓存。
+- Blog 索引页从全客户端组件改为 server-rendered 内容组件，仅保留浏览量为小型 client island。
+- 新增 IndexNow URL 规范化、payload 构造、提交 helper、CLI 脚本和 deployment_success GitHub Actions workflow。
+
+### 公开发现与图片索引
+
+- `frontend/src/lib/image-sitemap.ts` 生成 image sitemap 条目和 XML，覆盖 `/gallery`、公开 demo review 与所有 generation prompt example 详情页。
+- `frontend/src/app/sitemap-images.xml/route.ts` 以 `application/xml` 暴露图片 sitemap，并设置公开缓存。
+- `frontend/src/app/robots.ts` 将 `sitemap` 改为同时包含 `/sitemap.xml` 与 `/sitemap-images.xml`。
+- `frontend/src/app/sitemap.ts` 增加 `/author/asa-zhou` 公开条目，`frontend/src/lib/route-shell.ts` 与 `next.config.mjs` 也把 `/author` 纳入营销页和缓存范围。
+
+### Author 实体与 Blog 索引 SSR
+
+- `frontend/src/app/author/asa-zhou/page.tsx` 新增作者实体页，包含 profile metadata、社交链接、主题领域和 Person / ProfilePage JSON-LD。
+- `frontend/src/lib/site.ts` 将 `siteConfig.author.id` 更新为 `https://picspeak.art/author/asa-zhou#person`，让 Blog 与作者页引用同一个稳定实体。
+- `frontend/src/app/[locale]/blog/BlogIndexPageContent.tsx` 承担 Blog 索引静态内容、CollectionPage JSON-LD 和作者 JSON-LD 的 server render。
+- `frontend/src/app/[locale]/blog/BlogViewCount.tsx` 只保留浏览量获取和展示为 client island，减少 Blog 索引首屏对客户端 hydration 的依赖。
+
+### IndexNow 自动化
+
+- `frontend/src/lib/indexnow.ts` 新增 URL 去重、站内 URL 过滤、payload 构造和 `submitIndexNowUrls` helper。
+- `frontend/scripts/submit-indexnow.mjs` 可在部署后提交关键公开 URL、普通 sitemap 和图片 sitemap。
+- `frontend/package.json` 新增 `npm run indexnow:submit`。
+- `.github/workflows/indexnow.yml` 在 `deployment_status` 为 main 成功或手动触发时运行，使用 `INDEXNOW_KEY` secret 提交更新。
+
+### 首页更新记录同步
+
+- `/updates` 三语 JSON 新增本次 IndexNow、图片 sitemap、author 实体页与 Blog 索引 SSR 更新记录，`docPath` 指向 `docs/changelog/CHANGELOG.md#2026-06-06-indexnow-image-sitemap-author`。
+- 首页底部“更新记录”三语 hint 改为 IndexNow、图片 sitemap 和作者实体页主题。
+- README / README.zh-CN 最新 changelog 链接更新到本次锚点。
+
+### 影响文件
+
+#### 前端
+
+- `.github/workflows/indexnow.yml`
+- `frontend/next.config.mjs`
+- `frontend/package.json`
+- `frontend/scripts/submit-indexnow.mjs`
+- `frontend/src/app/[locale]/blog/BlogIndexPageContent.tsx`
+- `frontend/src/app/[locale]/blog/BlogViewCount.tsx`
+- `frontend/src/app/[locale]/blog/page.tsx`
+- `frontend/src/app/blog/page.tsx`
+- `frontend/src/app/author/asa-zhou/page.tsx`
+- `frontend/src/app/robots.ts`
+- `frontend/src/app/sitemap.ts`
+- `frontend/src/app/sitemap-images.xml/route.ts`
+- `frontend/src/lib/image-sitemap.ts`
+- `frontend/src/lib/indexnow.ts`
+- `frontend/src/lib/route-shell.ts`
+- `frontend/src/lib/site.ts`
+- `frontend/src/content/updates/{zh,en,ja}.json`
+- `frontend/src/lib/i18n-{zh,en,ja}.ts`
+- `frontend/test/blog-content.test.ts`
+- `frontend/test/indexnow.test.ts`
+- `frontend/test/seo-assets.test.ts`
+
+#### 文档
+
+- `docs/changelog/CHANGELOG.md`
+- `README.md`
+- `README.zh-CN.md`
+
+### 验证
+
+- `node -e "const fs=require('fs'); for (const f of ['zh','en','ja']) JSON.parse(fs.readFileSync('frontend/src/content/updates/'+f+'.json','utf8'));"`
+- `cd frontend && node --test test/blog-content.test.ts test/indexnow.test.ts test/seo-assets.test.ts` -> `13 passed`
+- `cd frontend && npm run indexnow:submit` -> 本地未配置 `INDEXNOW_KEY`，按预期跳过提交
+- `cd frontend && npm run test` -> `70 passed`
+- `cd frontend && npm run typecheck`
+- `cd frontend && npm run lint`
+- `cd frontend && npm run build` -> 生成 114 个静态页面
+- `Get-FileHash` 对比仓库 changelog / workflow 与外部 Update Logs 副本 SHA256 一致
+- `git diff --check`
+
+---
+
 <a id="2026-06-05-structured-data-seo-alternates"></a>
 
 ## 2026-06-05 - structured data seo alternates

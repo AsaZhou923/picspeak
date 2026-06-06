@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-06-06-indexnow-image-sitemap-author",
+    "date": "2026-06-06",
+    "title": "IndexNow、图片 sitemap 与作者实体页",
+    "summary": "PicSpeak 新增图片 sitemap、Asa Zhou 作者实体页和 IndexNow 部署后提交链路；Blog 索引页也改为服务端渲染静态内容，只把浏览量保留为小型客户端 island。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-06-06-indexnow-image-sitemap-author",
+    "sections": [
+      {
+        "title": "公开发现",
+        "items": [
+          "新增 /sitemap-images.xml，覆盖 Prompt Library 示例图、Gallery OG 图和公开 demo review 图片",
+          "robots.txt 同时声明普通 sitemap 和图片 sitemap，主 sitemap 增加 /author/asa-zhou",
+          "Asa Zhou 作者页输出 Person / ProfilePage JSON-LD，并成为 siteConfig.author.id 的稳定实体 URL"
+        ]
+      },
+      {
+        "title": "IndexNow 与 Blog SSR",
+        "items": [
+          "新增 IndexNow URL 过滤、payload 构造、提交 helper、CLI 脚本和部署成功 workflow",
+          "Blog 索引页从全客户端组件改为 server-rendered 内容组件",
+          "浏览量显示保留为独立 client island，减少首屏内容对 hydration 的依赖"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-06-05-structured-data-seo-alternates",
     "date": "2026-06-05",
     "title": "结构化数据、示例点评与 Updates metadata 补强",

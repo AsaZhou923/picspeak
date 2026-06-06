@@ -45,7 +45,7 @@ export const siteConfig = {
     githubProfile: 'https://github.com/AsaZhou923',
   },
   author: {
-    id: 'https://picspeak.art/#asa-zhou',
+    id: 'https://picspeak.art/author/asa-zhou#person',
     name: 'Asa Zhou',
     alternateName: ['@Zzw_Prime', 'AsaZhou923'],
     jobTitle: 'Founder and Lens Notes editor',
