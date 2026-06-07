@@ -187,6 +187,11 @@ STAGE_A_EVENT_CATALOG: dict[str, dict[str, Any]] = {
         'stage': 'A',
         'description': 'A generation credit pack checkout was started.',
     },
+    'web_vital_reported': {
+        'label': 'Core Web Vital',
+        'stage': 'OPS',
+        'description': 'Frontend Core Web Vitals and related browser performance metrics reported from production pages.',
+    },
 }
 
 KNOWN_SOURCES = {

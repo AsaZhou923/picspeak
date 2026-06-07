@@ -10,15 +10,9 @@ import { formatBlogViewCount, shouldTrackBlogView } from '@/lib/blog-view-stats'
 import { getBlogWorkspaceCta, type ContentConversionEntrypoint } from '@/lib/content-conversion';
 import { I18nProvider, useI18n, type Locale } from '@/lib/i18n';
 import { markProductAttributionSource, trackProductEvent } from '@/lib/product-analytics';
-import { buildBlogBreadcrumbJsonLd } from '@/lib/seo';
+import { buildBlogBreadcrumbJsonLd, buildBlogPostingJsonLd } from '@/lib/seo';
 import { siteConfig } from '@/lib/site';
 import { VALID_LOCALES } from '../../locales';
-
-const ARTICLE_LANGUAGE_BY_LOCALE: Record<Locale, string> = {
-  zh: 'zh-CN',
-  en: 'en',
-  ja: 'ja',
-};
 
 function BlogPostContent({ slug }: { slug: string }) {
   const { locale } = useI18n();
@@ -95,43 +89,12 @@ function BlogPostContent({ slug }: { slug: string }) {
     sameAs: [siteConfig.social.x, siteConfig.social.githubProfile],
   };
 
-  const articleJsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'BlogPosting',
-    headline: post.title,
-    description: post.description,
-    abstract: post.excerpt,
-    datePublished: post.publishedAt,
-    dateModified: post.updatedAt,
-    inLanguage: ARTICLE_LANGUAGE_BY_LOCALE[locale],
-    url: `${siteConfig.url}/${locale}/blog/${post.slug}`,
-    image: `${siteConfig.url}/${locale}/blog/${post.slug}/opengraph-image`,
-    isAccessibleForFree: true,
-    isPartOf: {
-      '@type': 'Blog',
-      name: ui.name,
-      url: `${siteConfig.url}/${locale}/blog`,
-    },
-    author: {
-      '@id': siteConfig.author.id,
-    },
-    publisher: {
-      '@type': 'Organization',
-      name: siteConfig.name,
-      url: siteConfig.url,
-      logo: {
-        '@type': 'ImageObject',
-        url: `${siteConfig.url}${siteConfig.logoImage}`,
-      },
-    },
-    mainEntityOfPage: `${siteConfig.url}/${locale}/blog/${post.slug}`,
-    articleSection: post.category,
-    keywords: post.keywords.join(', '),
-    about: post.keywords.map((keyword) => ({
-      '@type': 'Thing',
-      name: keyword,
-    })),
-  };
+  const articleJsonLd = buildBlogPostingJsonLd({
+    site: siteConfig,
+    locale,
+    ui,
+    post,
+  });
   const breadcrumbJsonLd = buildBlogBreadcrumbJsonLd({
     siteName: siteConfig.name,
     siteUrl: siteConfig.url,
@@ -161,7 +124,7 @@ function BlogPostContent({ slug }: { slug: string }) {
           <header className="mt-8 rounded-[30px] border border-border-subtle bg-[radial-gradient(circle_at_top_left,rgba(200,171,90,0.12),transparent_35%),rgb(var(--color-surface)/0.8)] px-6 py-8 sm:px-8">
             <p className="text-xs uppercase tracking-[0.28em] text-gold/72">{post.category}</p>
             <h1 className="mt-4 font-display text-4xl text-ink sm:text-5xl">{post.title}</h1>
-            <p className="mt-5 text-sm leading-8 text-ink-muted sm:text-base">{post.intro}</p>
+            <p data-speakable="blog-intro" className="mt-5 text-sm leading-8 text-ink-muted sm:text-base">{post.intro}</p>
             <div className="mt-6 flex flex-wrap items-center gap-4 text-sm text-ink-subtle">
               <span>{post.publishedAt}</span>
               <span className="h-1 w-1 rounded-full bg-gold/80" />

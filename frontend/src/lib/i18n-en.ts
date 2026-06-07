@@ -217,7 +217,7 @@ export const enTranslations = {
     pro_offer_highlight: 'Pro',
     updates_label: 'Updates',
     updates_hint_home: 'See analytics, retake practice, and waiting-page reader update',
-    updates_hint_latest: 'See the IndexNow, image sitemap, and author entity update',
+    updates_hint_latest: 'See the Web Vitals, canonical, and Blog speakable update',
     contact_label: 'Contact',
     contact_headline: 'Get in Touch',
 

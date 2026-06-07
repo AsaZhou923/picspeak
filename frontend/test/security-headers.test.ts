@@ -32,3 +32,37 @@ test('CSP allows the production Clerk custom domain', async () => {
   assert.match(csp, /(?:^|; )script-src[^;]*https:\/\/clerk\.picspeak\.art(?:\s|;)/);
   assert.match(csp, /(?:^|; )frame-src[^;]*https:\/\/clerk\.picspeak\.art(?:\s|;)/);
 });
+
+test('canonical redirects force the production domain onto HTTPS without www', async () => {
+  const nextConfigModule = await import('../next.config.mjs');
+  const nextConfig = nextConfigModule.default as {
+    redirects: () => Promise<
+      Array<{
+        source: string;
+        destination: string;
+        permanent: boolean;
+        has?: Array<{ type: string; key?: string; value?: string }>;
+      }>
+    >;
+  };
+
+  const redirects = await nextConfig.redirects();
+
+  assert.deepEqual(redirects, [
+    {
+      source: '/:path*',
+      has: [{ type: 'host', value: 'www.picspeak.art' }],
+      destination: 'https://picspeak.art/:path*',
+      permanent: true,
+    },
+    {
+      source: '/:path*',
+      has: [
+        { type: 'host', value: 'picspeak.art' },
+        { type: 'header', key: 'x-forwarded-proto', value: 'http' },
+      ],
+      destination: 'https://picspeak.art/:path*',
+      permanent: true,
+    },
+  ]);
+});

@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-06-07-web-vitals-canonical-speakable",
+    "date": "2026-06-07",
+    "title": "Web Vitals reporting, canonical redirects, and Blog speakable data",
+    "summary": "PicSpeak now sends Core Web Vitals and browser performance metrics into product analytics, adds canonical redirects from www and HTTP production traffic to https://picspeak.art, and marks BlogPosting JSON-LD with speakable headline and intro selectors.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-06-07-web-vitals-canonical-speakable",
+    "sections": [
+      {
+        "title": "Performance and analytics",
+        "items": [
+          "PerformanceTelemetry reports LCP, INP, CLS, and related metrics through useReportWebVitals",
+          "Frontend analytics event types and the backend product analytics catalog both include web_vital_reported",
+          "Web Vitals payloads include metric id, name, value, delta, rating, navigation type, and a Core Web Vital flag"
+        ]
+      },
+      {
+        "title": "SEO and structured data",
+        "items": [
+          "next.config.mjs forces www.picspeak.art and HTTP production requests onto https://picspeak.art",
+          "BlogPosting JSON-LD now comes from buildBlogPostingJsonLd and includes SpeakableSpecification",
+          "Article intros carry data-speakable, with tests covering canonical redirects and Blog speakable output"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-06-06-indexnow-image-sitemap-author",
     "date": "2026-06-06",
     "title": "IndexNow, image sitemap, and author entity page",

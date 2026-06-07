@@ -1,7 +1,11 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { usePathname } from 'next/navigation';
+import { useReportWebVitals } from 'next/web-vitals';
 import { useEffect, useState } from 'react';
+import { trackProductEvent } from '@/lib/product-analytics';
+import { reportWebVitalMetric } from '@/lib/web-vitals';
 
 const Analytics = dynamic(
   () => import('@vercel/analytics/react').then((mod) => mod.Analytics),
@@ -29,6 +33,11 @@ function scheduleWhenIdle(callback: () => void, timeout = 1500) {
 
 export default function PerformanceTelemetry() {
   const [enabled, setEnabled] = useState(false);
+  const pathname = usePathname();
+
+  useReportWebVitals((metric) => {
+    void reportWebVitalMetric(metric, { pagePath: pathname }, trackProductEvent);
+  });
 
   useEffect(() => {
     const cancel = scheduleWhenIdle(() => setEnabled(true));

@@ -98,6 +98,24 @@ const cacheablePublicPageSources = [
   '/author/:path*',
 ];
 
+const canonicalRedirects = [
+  {
+    source: '/:path*',
+    has: [{ type: 'host', value: 'www.picspeak.art' }],
+    destination: 'https://picspeak.art/:path*',
+    permanent: true,
+  },
+  {
+    source: '/:path*',
+    has: [
+      { type: 'host', value: 'picspeak.art' },
+      { type: 'header', key: 'x-forwarded-proto', value: 'http' },
+    ],
+    destination: 'https://picspeak.art/:path*',
+    permanent: true,
+  },
+];
+
 const ogFontFiles = ['./public/fonts/CormorantGaramond-SemiBold.woff', './public/fonts/DMSans-Medium.woff'];
 
 /** @type {import('next').NextConfig} */
@@ -120,6 +138,9 @@ const nextConfig = {
         headers: publicPageCacheHeaders,
       })),
     ];
+  },
+  async redirects() {
+    return canonicalRedirects;
   },
   webpack: (config) => {
     config.cache = {

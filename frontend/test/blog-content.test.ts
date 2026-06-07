@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { buildBlogPostingJsonLd } from '../src/lib/seo.ts';
+import { siteConfig } from '../src/lib/site.ts';
 
 type BlogPost = {
   slug: string;
@@ -26,6 +28,7 @@ type BlogPost = {
 
 type BlogBundle = {
   ui: {
+    name: string;
     title: string;
     description: string;
     keywords: string[];
@@ -120,4 +123,30 @@ test('blog index keeps static article data server-rendered with a small client v
   assert.match(viewCountSource, /getBlogViewCounts/);
   assert.match(defaultPageSource, /BlogIndexPageContent/);
   assert.match(localizedPageSource, /BlogIndexPageContent/);
+});
+
+test('blog post structured data exposes the headline and intro as speakable content', () => {
+  const bundle = readBundle('en');
+  const post = bundle.posts.find((entry) => entry.slug === 'five-photo-composition-checks');
+  assert.ok(post);
+
+  const schema = buildBlogPostingJsonLd({
+    site: siteConfig,
+    locale: 'en',
+    ui: bundle.ui,
+    post,
+  });
+  const blogPostSource = readFileSync(
+    path.join(TEST_DIR, '..', 'src', 'app', '[locale]', 'blog', '[slug]', 'BlogPostClient.tsx'),
+    'utf8',
+  );
+
+  assert.equal(schema['@type'], 'BlogPosting');
+  assert.equal(schema.articleBody, post.intro);
+  assert.deepEqual(schema.speakable, {
+    '@type': 'SpeakableSpecification',
+    cssSelector: ['article header h1', '[data-speakable="blog-intro"]'],
+  });
+  assert.match(blogPostSource, /data-speakable="blog-intro"/);
+  assert.match(blogPostSource, /buildBlogPostingJsonLd/);
 });

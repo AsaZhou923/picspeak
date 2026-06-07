@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import type { BlogPost, BlogUiCopy } from '@/lib/blog-data';
+import type { Locale } from '@/lib/i18n';
 
 export const HOME_LANGUAGE_ALTERNATES: NonNullable<Metadata['alternates']>['languages'] = {
   'zh-CN': '/zh',
@@ -44,6 +46,12 @@ export const NO_INDEX_ROBOTS: NonNullable<Metadata['robots']> = {
   },
 };
 
+const ARTICLE_LANGUAGE_BY_LOCALE: Record<Locale, string> = {
+  zh: 'zh-CN',
+  en: 'en',
+  ja: 'ja',
+};
+
 export function singlePageAlternates(canonical: string): NonNullable<Metadata['alternates']> {
   return {
     canonical,
@@ -64,6 +72,65 @@ type BlogBreadcrumbJsonLdInput = {
   postTitle: string;
   slug: string;
 };
+
+type BlogPostingJsonLdInput = {
+  site: {
+    name: string;
+    url: string;
+    logoImage: string;
+    author: {
+      id: string;
+    };
+  };
+  locale: Locale;
+  ui: Pick<BlogUiCopy, 'name'>;
+  post: BlogPost;
+};
+
+export function buildBlogPostingJsonLd({ site, locale, ui, post }: BlogPostingJsonLdInput) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BlogPosting',
+    headline: post.title,
+    description: post.description,
+    abstract: post.excerpt,
+    articleBody: post.intro,
+    datePublished: post.publishedAt,
+    dateModified: post.updatedAt,
+    inLanguage: ARTICLE_LANGUAGE_BY_LOCALE[locale],
+    url: `${site.url}/${locale}/blog/${post.slug}`,
+    image: `${site.url}/${locale}/blog/${post.slug}/opengraph-image`,
+    isAccessibleForFree: true,
+    speakable: {
+      '@type': 'SpeakableSpecification',
+      cssSelector: ['article header h1', '[data-speakable="blog-intro"]'],
+    },
+    isPartOf: {
+      '@type': 'Blog',
+      name: ui.name,
+      url: `${site.url}/${locale}/blog`,
+    },
+    author: {
+      '@id': site.author.id,
+    },
+    publisher: {
+      '@type': 'Organization',
+      name: site.name,
+      url: site.url,
+      logo: {
+        '@type': 'ImageObject',
+        url: `${site.url}${site.logoImage}`,
+      },
+    },
+    mainEntityOfPage: `${site.url}/${locale}/blog/${post.slug}`,
+    articleSection: post.category,
+    keywords: post.keywords.join(', '),
+    about: post.keywords.map((keyword) => ({
+      '@type': 'Thing',
+      name: keyword,
+    })),
+  };
+}
 
 export function buildBlogBreadcrumbJsonLd({
   siteName,

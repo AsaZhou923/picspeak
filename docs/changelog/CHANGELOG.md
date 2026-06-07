@@ -2,6 +2,89 @@
 
 本文件汇总了原 `docs/changelog/update-log-*.md` 的全部更新记录。新增 release 请追加到顶部，并为每条记录保留稳定锚点，供 `/updates` 的 `docPath` 和 README 链接定位。
 
+<a id="2026-06-07-web-vitals-canonical-speakable"></a>
+
+## 2026-06-07 - web vitals canonical speakable
+
+日期：2026-06-07
+
+### 概览
+
+这次更新把公开页的运行质量、规范域名和文章可读结构继续补齐：前端开始用 Next Web Vitals hook 上报 Core Web Vitals 及相关浏览器性能指标，后端产品分析事件 catalog 也纳入 `web_vital_reported`；生产域名增加 `www.picspeak.art` 到 `picspeak.art`、HTTP 到 HTTPS 的 canonical redirect；BlogPosting JSON-LD 抽成可测试 helper，并把文章标题和 intro 标记为 speakable 内容。
+
+- 前端 `PerformanceTelemetry` 接入 `useReportWebVitals`，把 LCP / INP / CLS 等指标发送到产品分析事件。
+- 后端 `STAGE_A_EVENT_CATALOG` 新增 `web_vital_reported`，让性能指标进入运营分析事件目录。
+- `next.config.mjs` 新增 canonical redirects，强制生产入口使用 `https://picspeak.art`。
+- Blog 文章 JSON-LD 通过 `buildBlogPostingJsonLd` 统一生成，并新增 `SpeakableSpecification`。
+- 新增 Web Vitals、canonical redirect 和 Blog speakable 的回归测试。
+
+### Web Vitals 与产品分析
+
+- `frontend/src/lib/web-vitals.ts` 新增 Core Web Vitals 判定、analytics payload 构造和上报 helper。
+- `frontend/src/components/performance/PerformanceTelemetry.tsx` 在保持 Vercel Analytics / Speed Insights 延迟加载的同时，通过 `useReportWebVitals` 上报浏览器性能指标。
+- `frontend/src/lib/product-analytics.ts` 把 `web_vital_reported` 加入前端产品分析事件类型。
+- `backend/app/services/product_analytics.py` 和 `backend/tests/test_product_analytics_service.py` 同步补齐后端事件 catalog 和测试。
+
+### Canonical redirects 与安全回归
+
+- `frontend/next.config.mjs` 新增 redirects：`www.picspeak.art/*` 永久跳转到 `https://picspeak.art/*`。
+- 当生产 host 是 `picspeak.art` 且 `x-forwarded-proto=http` 时，也会永久跳转到 HTTPS。
+- `frontend/test/security-headers.test.ts` 覆盖 canonical redirect 配置，避免后续调整 security headers 时丢失规范域名收口。
+
+### Blog speakable 结构化数据
+
+- `frontend/src/lib/seo.ts` 新增 `buildBlogPostingJsonLd`，把 BlogPosting JSON-LD 从组件内联对象抽成可测试 helper。
+- BlogPosting JSON-LD 新增 `articleBody: post.intro` 与 `SpeakableSpecification`，指向文章 H1 和 `data-speakable="blog-intro"`。
+- `frontend/src/app/[locale]/blog/[slug]/BlogPostClient.tsx` 为文章 intro 增加 `data-speakable="blog-intro"` 标记，并继续输出 article / breadcrumb / author 结构化数据。
+- `frontend/test/blog-content.test.ts` 补充 Blog speakable JSON-LD 回归保护。
+
+### 首页更新记录同步
+
+- `/updates` 三语 JSON 新增本次 Web Vitals、canonical redirects 和 Blog speakable 更新记录，`docPath` 指向 `docs/changelog/CHANGELOG.md#2026-06-07-web-vitals-canonical-speakable`。
+- 首页底部“更新记录”三语 hint 改为 Web Vitals、canonical 和 speakable 主题。
+- README / README.zh-CN 最新 changelog 链接更新到本次锚点。
+
+### 影响文件
+
+#### 后端
+
+- `backend/app/services/product_analytics.py`
+- `backend/tests/test_product_analytics_service.py`
+
+#### 前端
+
+- `frontend/next.config.mjs`
+- `frontend/src/app/[locale]/blog/[slug]/BlogPostClient.tsx`
+- `frontend/src/components/performance/PerformanceTelemetry.tsx`
+- `frontend/src/lib/product-analytics.ts`
+- `frontend/src/lib/seo.ts`
+- `frontend/src/lib/web-vitals.ts`
+- `frontend/src/content/updates/{zh,en,ja}.json`
+- `frontend/src/lib/i18n-{zh,en,ja}.ts`
+- `frontend/test/blog-content.test.ts`
+- `frontend/test/security-headers.test.ts`
+- `frontend/test/web-vitals.test.ts`
+
+#### 文档
+
+- `docs/changelog/CHANGELOG.md`
+- `README.md`
+- `README.zh-CN.md`
+
+### 验证
+
+- `node -e "const fs=require('fs'); for (const f of ['zh','en','ja']) JSON.parse(fs.readFileSync('frontend/src/content/updates/'+f+'.json','utf8'));"`
+- `cd frontend && node --test test/blog-content.test.ts test/security-headers.test.ts test/web-vitals.test.ts` -> `9 passed`
+- `cd frontend && npm run test` -> `74 passed`
+- `cd frontend && npm run typecheck`
+- `cd frontend && npm run lint`
+- `cd frontend && npm run build` -> 生成 114 个静态页面
+- `cd backend && ..\.venv\Scripts\python.exe -m unittest discover -s tests -p "test_product_analytics_service.py"` -> `5 passed`
+- `Get-FileHash` 对比仓库 changelog / workflow 与外部 Update Logs 副本 SHA256 一致
+- `git diff --check`
+
+---
+
 <a id="2026-06-06-indexnow-image-sitemap-author"></a>
 
 ## 2026-06-06 - indexnow image sitemap author

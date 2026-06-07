@@ -53,6 +53,7 @@ class ProductAnalyticsServiceTests(unittest.TestCase):
             'generation_credit_exhausted',
             'generation_upgrade_clicked',
             'credit_pack_checkout_started',
+            'web_vital_reported',
         }
 
         self.assertTrue(required_events.issubset(STAGE_A_EVENT_CATALOG.keys()))

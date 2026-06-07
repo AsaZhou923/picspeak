@@ -39,7 +39,8 @@ export type ProductAnalyticsEventName =
   | 'generation_used_for_retake'
   | 'generation_credit_exhausted'
   | 'generation_upgrade_clicked'
-  | 'credit_pack_checkout_started';
+  | 'credit_pack_checkout_started'
+  | 'web_vital_reported';
 
 const ANALYTICS_SOURCE_KEY = 'ps_product_source_v1';
 const ANALYTICS_SESSION_KEY = 'ps_product_session_v1';
