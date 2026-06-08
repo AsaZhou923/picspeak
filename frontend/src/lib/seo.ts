@@ -64,6 +64,71 @@ export function singlePageAlternates(canonical: string): NonNullable<Metadata['a
   };
 }
 
+type WebSiteJsonLdInput = {
+  site: {
+    name: string;
+    url: string;
+  };
+  locale: Locale;
+  language: string;
+  description: string;
+  searchActionName: string;
+};
+
+export function buildWebSiteJsonLd({
+  site,
+  locale,
+  language,
+  description,
+  searchActionName,
+}: WebSiteJsonLdInput) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: site.name,
+    url: `${site.url}/${locale}`,
+    inLanguage: language,
+    description,
+    potentialAction: [
+      {
+        '@type': 'SearchAction',
+        target: {
+          '@type': 'EntryPoint',
+          urlTemplate: `${site.url}/gallery?q={search_term_string}`,
+        },
+        'query-input': 'required name=search_term_string',
+        name: searchActionName,
+      },
+      {
+        '@type': 'SubscribeAction',
+        name: 'Subscribe to PicSpeak Updates',
+        target: {
+          '@type': 'EntryPoint',
+          urlTemplate: `${site.url}/updates`,
+          actionPlatform: [
+            'http://schema.org/DesktopWebPlatform',
+            'http://schema.org/MobileWebPlatform',
+          ],
+        },
+        object: {
+          '@type': 'WebPage',
+          name: 'PicSpeak Updates',
+          url: `${site.url}/updates`,
+          description:
+            'PicSpeak product updates covering AI scoring, gallery improvements, blog launches, AI Create releases, and workflow changes.',
+        },
+      },
+    ],
+    hasPart: [
+      {
+        '@type': 'WebPage',
+        name: 'PicSpeak Updates',
+        url: `${site.url}/updates`,
+      },
+    ],
+  };
+}
+
 type BlogBreadcrumbJsonLdInput = {
   siteName: string;
   siteUrl: string;
@@ -87,6 +152,29 @@ type BlogPostingJsonLdInput = {
   post: BlogPost;
 };
 
+function countReadableUnits(text: string): number {
+  const latinWords = text.match(/[A-Za-z0-9]+(?:[-'][A-Za-z0-9]+)*/g)?.length ?? 0;
+  const cjkCharacters = text.match(/[\u3040-\u30ff\u3400-\u9fff]/g)?.length ?? 0;
+
+  return latinWords + cjkCharacters;
+}
+
+export function estimateBlogPostWordCount(post: BlogPost): number {
+  const contentBlocks = [
+    post.title,
+    post.intro,
+    post.takeawayTitle,
+    ...post.takeawayItems,
+    ...post.sections.flatMap((section) => [
+      section.title,
+      ...section.paragraphs,
+      ...(section.bullets ?? []),
+    ]),
+  ];
+
+  return contentBlocks.reduce((total, block) => total + countReadableUnits(block), 0);
+}
+
 export function buildBlogPostingJsonLd({ site, locale, ui, post }: BlogPostingJsonLdInput) {
   return {
     '@context': 'https://schema.org',
@@ -95,6 +183,7 @@ export function buildBlogPostingJsonLd({ site, locale, ui, post }: BlogPostingJs
     description: post.description,
     abstract: post.excerpt,
     articleBody: post.intro,
+    wordCount: estimateBlogPostWordCount(post),
     datePublished: post.publishedAt,
     dateModified: post.updatedAt,
     inLanguage: ARTICLE_LANGUAGE_BY_LOCALE[locale],

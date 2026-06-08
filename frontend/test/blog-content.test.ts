@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildBlogPostingJsonLd } from '../src/lib/seo.ts';
+import { buildBlogPostingJsonLd, estimateBlogPostWordCount } from '../src/lib/seo.ts';
 import { siteConfig } from '../src/lib/site.ts';
 
 type BlogPost = {
@@ -143,6 +143,8 @@ test('blog post structured data exposes the headline and intro as speakable cont
 
   assert.equal(schema['@type'], 'BlogPosting');
   assert.equal(schema.articleBody, post.intro);
+  assert.equal(schema.wordCount, estimateBlogPostWordCount(post));
+  assert.ok(schema.wordCount > 100);
   assert.deepEqual(schema.speakable, {
     '@type': 'SpeakableSpecification',
     cssSelector: ['article header h1', '[data-speakable="blog-intro"]'],

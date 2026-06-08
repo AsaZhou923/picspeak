@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-06-08-ai-markdown-website-jsonld",
+    "date": "2026-06-08",
+    "title": "AI Markdown mirrors、llms.txt 与 WebSite JSON-LD",
+    "summary": "PicSpeak 新增 /ai-content/*.md Markdown mirror 入口，让首页、Lens Notes、Prompt Library、Gallery 和 Updates 都有 AI crawler 更容易引用的轻量摘要；llms.txt 同步列出这些镜像，WebSite JSON-LD 也补上搜索和 Updates 订阅动作。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-06-08-ai-markdown-website-jsonld",
+    "sections": [
+      {
+        "title": "AI 可读入口",
+        "items": [
+          "新增 /ai-content/home.md、/ai-content/lens-notes.md、/ai-content/prompt-library.md、/ai-content/gallery.md 和 /ai-content/updates.md",
+          "AI_MARKDOWN_CONTENT_PAGES 统一维护 Markdown mirror 的标题、source 页面和摘要段落",
+          "llms.txt 的 Markdown content mirrors 段落由同一份配置生成，减少静态文件和源码漂移"
+        ]
+      },
+      {
+        "title": "结构化数据与测试",
+        "items": [
+          "WebSite JSON-LD 新增 Gallery 搜索 SearchAction 和 Updates 订阅 SubscribeAction",
+          "BlogPosting JSON-LD 新增 wordCount，并从文章标题、intro、takeaway 和正文估算",
+          "新增测试覆盖 Markdown mirror 路由、llms.txt 同步、WebSite JSON-LD 和 Blog wordCount"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-06-07-web-vitals-canonical-speakable",
     "date": "2026-06-07",
     "title": "Web Vitals 上报、canonical redirects 与 Blog speakable",

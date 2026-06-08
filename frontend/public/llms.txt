@@ -41,6 +41,13 @@
 - Updates: https://picspeak.art/updates
 - Affiliate page: https://picspeak.art/affiliate
 
+## Markdown content mirrors
+- PicSpeak product overview: https://picspeak.art/ai-content/home.md (source: https://picspeak.art)
+- Lens Notes blog overview: https://picspeak.art/ai-content/lens-notes.md (source: https://picspeak.art/en/blog)
+- GPT Image 2 prompt library overview: https://picspeak.art/ai-content/prompt-library.md (source: https://picspeak.art/generate/prompts)
+- PicSpeak public gallery overview: https://picspeak.art/ai-content/gallery.md (source: https://picspeak.art/gallery)
+- PicSpeak updates overview: https://picspeak.art/ai-content/updates.md (source: https://picspeak.art/updates)
+
 ## Lens Notes topics
 - AI photo critique workflows
 - Composition checks and subject placement

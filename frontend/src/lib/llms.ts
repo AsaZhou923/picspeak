@@ -1,6 +1,11 @@
-import { siteConfig } from '@/lib/site';
+import { AI_MARKDOWN_CONTENT_PAGES } from './ai-markdown.ts';
+import { siteConfig } from './site.ts';
 
 export function getLlmsText(): string {
+  const markdownContentLinks = AI_MARKDOWN_CONTENT_PAGES.map(
+    (page) => `- ${page.title}: ${siteConfig.url}${page.markdownPath} (source: ${siteConfig.url}${page.sourcePath === '/' ? '' : page.sourcePath})`,
+  ).join('\n');
+
   return `# PicSpeak
 
 > PicSpeak is an AI photography critique and visual-reference creation web app. It scores uploaded photos across composition, lighting, color, impact, and technique, then can create GPT Image 2 visual references for the next shoot.
@@ -43,6 +48,9 @@ export function getLlmsText(): string {
 - Gallery: ${siteConfig.url}/gallery
 - Updates: ${siteConfig.url}/updates
 - Affiliate page: ${siteConfig.url}/affiliate
+
+## Markdown content mirrors
+${markdownContentLinks}
 
 ## Lens Notes topics
 - AI photo critique workflows

@@ -2,6 +2,78 @@
 
 本文件汇总了原 `docs/changelog/update-log-*.md` 的全部更新记录。新增 release 请追加到顶部，并为每条记录保留稳定锚点，供 `/updates` 的 `docPath` 和 README 链接定位。
 
+<a id="2026-06-08-ai-markdown-website-jsonld"></a>
+
+## 2026-06-08 - ai markdown website jsonld
+
+日期：2026-06-08
+
+### 概览
+
+这次更新把 PicSpeak 的 AI 可读公开内容入口继续补齐：新增 `/ai-content/*.md` Markdown mirror 路由，让首页、Lens Notes、Prompt Library、Gallery 和 Updates 都有轻量可引用摘要；`llms.txt` 改为从同一份页面配置生成镜像链接；首页 WebSite JSON-LD 也扩展出搜索与 Updates 订阅动作，并给 BlogPosting 增加可测试的 `wordCount`。
+
+- 新增 `/ai-content/home.md`、`/ai-content/lens-notes.md`、`/ai-content/prompt-library.md`、`/ai-content/gallery.md`、`/ai-content/updates.md` 五个 Markdown mirror。
+- `frontend/src/lib/ai-markdown.ts` 统一维护 mirror 页面配置、源页面 URL 和 Markdown 输出。
+- `llms.txt` 增加 Markdown content mirrors 段落，并由 `getLlmsText()` 与静态 `frontend/public/llms.txt` 保持一致。
+- `WebSite` JSON-LD 新增 `SearchAction` 和 `SubscribeAction`，把 Gallery 搜索和 Updates 入口纳入结构化数据。
+- BlogPosting JSON-LD 新增 `wordCount`，并用内容级测试保护估算逻辑。
+
+### AI Markdown mirrors
+
+- `frontend/src/app/ai-content/[slug]/route.ts` 新增公开 Markdown route，未知 slug 返回 `404` 和 `no-store`。
+- `generateStaticParams()` 只输出配置内的 `.md` slug，路由响应使用 `text/markdown; charset=utf-8` 和一小时公开缓存。
+- `AI_MARKDOWN_CONTENT_PAGES` 覆盖产品概览、Lens Notes、Prompt Library、Gallery 和 Updates，给 AI crawler 提供更稳定的摘要入口。
+
+### llms.txt 与结构化数据
+
+- `frontend/src/lib/llms.ts` 从 `AI_MARKDOWN_CONTENT_PAGES` 生成 Markdown mirror 链接，避免静态 `llms.txt` 与源码配置漂移。
+- `frontend/public/llms.txt` 同步新增 Markdown content mirrors 段落，列出每个 Markdown mirror 与对应 source 页面。
+- `frontend/src/lib/seo.ts` 新增 `buildWebSiteJsonLd()`，并让 locale layout 复用该 helper 输出 WebSite schema。
+- BlogPosting JSON-LD 的 `wordCount` 由 `estimateBlogPostWordCount()` 从标题、intro、takeaway 和正文段落估算。
+
+### 首页更新记录同步
+
+- `/updates` 三语 JSON 新增本次 AI Markdown mirrors、`llms.txt` 和 WebSite JSON-LD 更新记录，`docPath` 指向 `docs/changelog/CHANGELOG.md#2026-06-08-ai-markdown-website-jsonld`。
+- 首页底部“更新记录”三语 hint 改为 AI Markdown mirrors、`llms.txt` 和 WebSite JSON-LD 主题。
+- README / README.zh-CN 最新 changelog 链接更新到本次锚点。
+- `CLAUDE.md` 补充 `/ai-content/*.md` Markdown mirrors 是公开 AI-search/GEO surface 的一部分。
+
+### 影响文件
+
+#### 前端
+
+- `frontend/src/app/ai-content/[slug]/route.ts`
+- `frontend/src/app/[locale]/layout.tsx`
+- `frontend/src/lib/ai-markdown.ts`
+- `frontend/src/lib/llms.ts`
+- `frontend/src/lib/seo.ts`
+- `frontend/public/llms.txt`
+- `frontend/src/content/updates/{zh,en,ja}.json`
+- `frontend/src/lib/i18n-{zh,en,ja}.ts`
+- `frontend/test/blog-content.test.ts`
+- `frontend/test/seo-alternates.test.ts`
+- `frontend/test/seo-assets.test.ts`
+
+#### 文档
+
+- `docs/changelog/CHANGELOG.md`
+- `README.md`
+- `README.zh-CN.md`
+- `CLAUDE.md`
+
+### 验证
+
+- `node -e "for (const f of ['zh','en','ja']) JSON.parse(require('fs').readFileSync('frontend/src/content/updates/'+f+'.json', 'utf8'));"` -> JSON 解析通过
+- `cd frontend && node --test test/blog-content.test.ts test/seo-alternates.test.ts test/seo-assets.test.ts` -> `17 passed`
+- `cd frontend && npm run test` -> `76 passed`
+- `cd frontend && npm run typecheck`
+- `cd frontend && npm run lint`
+- `cd frontend && npm run build` -> 生成 119 个静态页面
+- `Get-FileHash` 对比仓库 changelog / workflow 与外部 Update Logs 副本 SHA256 一致
+- `git diff --check`
+
+---
+
 <a id="2026-06-07-web-vitals-canonical-speakable"></a>
 
 ## 2026-06-07 - web vitals canonical speakable

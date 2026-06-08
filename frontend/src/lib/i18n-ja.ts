@@ -21,7 +21,7 @@ export const jaTranslations = {
     pro_offer_highlight: 'Pro',
     updates_label: '更新履歴',
     updates_hint_home: '分析・撮り直し練習・待機リーダーの更新を見る',
-    updates_hint_latest: 'Web Vitals、canonical、Blog speakable 更新を見る',
+    updates_hint_latest: 'AI Markdown mirrors、llms.txt、WebSite JSON-LD 更新を見る',
     contact_label: 'コンタクト',
     contact_headline: 'お問い合わせ',
     photo_ready_msg_short: 'アップロード完了',

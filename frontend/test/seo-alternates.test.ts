@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   buildBlogBreadcrumbJsonLd,
+  buildWebSiteJsonLd,
   buildDefaultUpdatesMetadata,
   HOME_LANGUAGE_ALTERNATES,
   singlePageAlternates,
@@ -83,4 +84,31 @@ test('default updates page owns generateMetadata instead of relying on layout me
 
   assert.match(pageSource, /export function generateMetadata\(\)/);
   assert.doesNotMatch(layoutSource, /export const metadata/);
+});
+
+test('website JSON-LD exposes search and updates subscription actions', () => {
+  const schema = buildWebSiteJsonLd({
+    site: SITE,
+    locale: 'en',
+    language: 'en',
+    description: 'AI photo critique and visual-reference generation.',
+    searchActionName: 'Search photo critiques',
+  });
+
+  assert.equal(schema['@type'], 'WebSite');
+  assert.deepEqual(
+    schema.potentialAction.map((action) => action['@type']),
+    ['SearchAction', 'SubscribeAction'],
+  );
+  const searchAction = schema.potentialAction[0];
+  const subscribeAction = schema.potentialAction[1] as {
+    object: { name: string };
+    target: { urlTemplate: string };
+  } | undefined;
+
+  assert.ok(searchAction);
+  assert.ok(subscribeAction);
+  assert.equal(searchAction.target.urlTemplate, 'https://picspeak.art/gallery?q={search_term_string}');
+  assert.equal(subscribeAction.object.name, 'PicSpeak Updates');
+  assert.equal(subscribeAction.target.urlTemplate, 'https://picspeak.art/updates');
 });

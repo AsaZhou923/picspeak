@@ -4,11 +4,13 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { GENERATION_PROMPT_EXAMPLES } from '../src/content/generation/prompt-examples.ts';
+import { AI_MARKDOWN_CONTENT_PAGES } from '../src/lib/ai-markdown.ts';
 import {
   buildImageSitemapEntries,
   buildImageSitemapXml,
   IMAGE_SITEMAP_PATH,
 } from '../src/lib/image-sitemap.ts';
+import { getLlmsText } from '../src/lib/llms.ts';
 import { siteConfig } from '../src/lib/site.ts';
 
 const TEST_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -34,10 +36,28 @@ test('logo asset remains a square PNG suitable for metadata icons', () => {
 
 test('llms.txt stays published as a plain-text discovery asset', () => {
   const llmsText = readFileSync(path.join(FRONTEND_DIR, 'public', 'llms.txt'), 'utf8');
+  const generatedLlmsText = getLlmsText();
 
   assert.match(llmsText, /^# PicSpeak/m);
   assert.match(llmsText, /\/generate\/prompts/);
+  assert.match(llmsText, /## Markdown content mirrors/);
   assert.match(llmsText, /Founder and editor:/);
+  assert.equal(llmsText, generatedLlmsText);
+
+  for (const page of AI_MARKDOWN_CONTENT_PAGES) {
+    assert.match(llmsText, new RegExp(`${siteConfig.url}${page.markdownPath.replaceAll('/', '\\/')}`));
+  }
+});
+
+test('AI markdown content mirrors are routed as text markdown pages', () => {
+  const routeSource = readFileSync(path.join(FRONTEND_DIR, 'src', 'app', 'ai-content', '[slug]', 'route.ts'), 'utf8');
+  const markdownSource = readFileSync(path.join(FRONTEND_DIR, 'src', 'lib', 'ai-markdown.ts'), 'utf8');
+
+  assert.match(routeSource, /text\/markdown; charset=utf-8/);
+  assert.match(routeSource, /getAiMarkdownContentPage/);
+  assert.match(markdownSource, /home\.md/);
+  assert.match(markdownSource, /lens-notes\.md/);
+  assert.match(markdownSource, /prompt-library\.md/);
 });
 
 test('image sitemap covers prompt examples, gallery, and the public demo review image', () => {

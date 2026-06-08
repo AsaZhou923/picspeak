@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-06-08-ai-markdown-website-jsonld",
+    "date": "2026-06-08",
+    "title": "AI Markdown mirrors、llms.txt、WebSite JSON-LD",
+    "summary": "PicSpeak は home、Lens Notes、Prompt Library、Gallery、Updates に対応する /ai-content/*.md Markdown mirror を追加しました。AI crawler が短い公開 summary を引用しやすくなり、llms.txt も同じ mirror を掲載します。WebSite JSON-LD には検索と Updates 購読 action を追加しました。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-06-08-ai-markdown-website-jsonld",
+    "sections": [
+      {
+        "title": "AI が読みやすい入口",
+        "items": [
+          "/ai-content/home.md、/ai-content/lens-notes.md、/ai-content/prompt-library.md、/ai-content/gallery.md、/ai-content/updates.md を追加しました",
+          "AI_MARKDOWN_CONTENT_PAGES が各 Markdown mirror の title、source page、summary section を一元管理します",
+          "llms.txt の Markdown content mirrors section は同じ設定から生成し、静的ファイルとのずれを減らします"
+        ]
+      },
+      {
+        "title": "構造化データとテスト",
+        "items": [
+          "WebSite JSON-LD に Gallery SearchAction と Updates SubscribeAction を追加しました",
+          "BlogPosting JSON-LD は title、intro、takeaway、本文 section から推定した wordCount を含めます",
+          "Markdown mirror route、llms.txt parity、WebSite JSON-LD、Blog wordCount を test で保護しました"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-06-07-web-vitals-canonical-speakable",
     "date": "2026-06-07",
     "title": "Web Vitals reporting、canonical redirects、Blog speakable",

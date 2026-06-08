@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { siteConfig } from '@/lib/site';
 import type { Locale } from '@/lib/i18n';
-import { HOME_LANGUAGE_ALTERNATES } from '@/lib/seo';
+import { buildWebSiteJsonLd as buildStructuredWebSiteJsonLd, HOME_LANGUAGE_ALTERNATES } from '@/lib/seo';
 import { VALID_LOCALES } from './locales';
 
 // ---------------------------------------------------------------------------
@@ -177,31 +177,19 @@ function buildSoftwareJsonLd(locale: Locale) {
 
 function buildWebSiteJsonLd(locale: Locale) {
   const meta = LOCALE_META[locale];
-  const localePath = `${siteConfig.url}/${locale}`;
-
   const potentialActionByLocale: Record<Locale, string> = {
     zh: '搜索照片',
     en: 'Search photo critiques',
     ja: '写真を検索',
   };
 
-  return {
-    '@context': 'https://schema.org',
-    '@type': 'WebSite',
-    name: siteConfig.name,
-    url: localePath,
-    inLanguage: meta.lang,
+  return buildStructuredWebSiteJsonLd({
+    site: siteConfig,
+    locale,
+    language: meta.lang,
     description: meta.description,
-    potentialAction: {
-      '@type': 'SearchAction',
-      target: {
-        '@type': 'EntryPoint',
-        urlTemplate: `${siteConfig.url}/gallery?q={search_term_string}`,
-      },
-      'query-input': 'required name=search_term_string',
-      name: potentialActionByLocale[locale],
-    },
-  };
+    searchActionName: potentialActionByLocale[locale],
+  });
 }
 
 // FAQ structured data — rich results for "AI摄影点评" queries

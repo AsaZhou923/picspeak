@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-06-08-ai-markdown-website-jsonld",
+    "date": "2026-06-08",
+    "title": "AI Markdown mirrors, llms.txt, and WebSite JSON-LD",
+    "summary": "PicSpeak now exposes /ai-content/*.md Markdown mirrors for the home page, Lens Notes, Prompt Library, Gallery, and Updates so AI crawlers can cite concise public summaries. llms.txt lists the same mirrors, and WebSite JSON-LD now includes search and Updates subscription actions.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-06-08-ai-markdown-website-jsonld",
+    "sections": [
+      {
+        "title": "AI-readable entry points",
+        "items": [
+          "Added /ai-content/home.md, /ai-content/lens-notes.md, /ai-content/prompt-library.md, /ai-content/gallery.md, and /ai-content/updates.md",
+          "AI_MARKDOWN_CONTENT_PAGES now owns each Markdown mirror title, source page, and summary sections",
+          "The llms.txt Markdown content mirrors section is generated from the same configuration to reduce drift"
+        ]
+      },
+      {
+        "title": "Structured data and tests",
+        "items": [
+          "WebSite JSON-LD now includes a Gallery SearchAction and an Updates SubscribeAction",
+          "BlogPosting JSON-LD includes wordCount estimated from article titles, intros, takeaways, and body sections",
+          "Tests now cover Markdown mirror routing, llms.txt parity, WebSite JSON-LD, and Blog wordCount"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-06-07-web-vitals-canonical-speakable",
     "date": "2026-06-07",
     "title": "Web Vitals reporting, canonical redirects, and Blog speakable data",
