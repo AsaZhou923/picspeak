@@ -1,6 +1,6 @@
 export const siteConfig = {
   name: 'PicSpeak',
-  url: 'https://picspeak.art',
+  url: 'https://www.picspeak.art',
   title: 'PicSpeak | AI Photo Critique and GPT Image 2 Visual References',
   description:
     'PicSpeak critiques photos across composition, lighting, color, impact, and technique, then creates GPT Image 2 visual references for the next shoot.',
@@ -45,7 +45,7 @@ export const siteConfig = {
     githubProfile: 'https://github.com/AsaZhou923',
   },
   author: {
-    id: 'https://picspeak.art/author/asa-zhou#person',
+    id: 'https://www.picspeak.art/author/asa-zhou#person',
     name: 'Asa Zhou',
     alternateName: ['@Zzw_Prime', 'AsaZhou923'],
     jobTitle: 'Founder and Lens Notes editor',

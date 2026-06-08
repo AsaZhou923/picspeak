@@ -28,7 +28,7 @@
     "id": "2026-06-07-web-vitals-canonical-speakable",
     "date": "2026-06-07",
     "title": "Web Vitals 上报、canonical redirects 与 Blog speakable",
-    "summary": "PicSpeak 开始把 Core Web Vitals 和浏览器性能指标纳入产品分析；生产域名新增 www 到裸域、HTTP 到 HTTPS 的 canonical redirects；BlogPosting JSON-LD 也补上 speakable 标记，帮助搜索和语音场景识别标题与 intro。",
+    "summary": "PicSpeak 开始把 Core Web Vitals 和浏览器性能指标纳入产品分析；生产 canonical redirects 统一收敛到 https://www.picspeak.art；BlogPosting JSON-LD 也补上 speakable 标记，帮助搜索和语音场景识别标题与 intro。",
     "docPath": "docs/changelog/CHANGELOG.md#2026-06-07-web-vitals-canonical-speakable",
     "sections": [
       {
@@ -42,7 +42,7 @@
       {
         "title": "SEO 与结构化数据",
         "items": [
-          "next.config.mjs 强制 www.picspeak.art 和 HTTP 生产请求跳转到 https://picspeak.art",
+          "next.config.mjs 强制裸域和 HTTP 生产请求跳转到 https://www.picspeak.art",
           "BlogPosting JSON-LD 抽到 buildBlogPostingJsonLd，并新增 SpeakableSpecification",
           "文章 intro 增加 data-speakable 标记，测试覆盖 canonical redirects 和 Blog speakable 输出"
         ]

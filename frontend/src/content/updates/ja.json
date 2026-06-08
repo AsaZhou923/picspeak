@@ -28,7 +28,7 @@
     "id": "2026-06-07-web-vitals-canonical-speakable",
     "date": "2026-06-07",
     "title": "Web Vitals reporting、canonical redirects、Blog speakable",
-    "summary": "PicSpeak は Core Web Vitals と browser performance 指標を product analytics に送るようになりました。www と HTTP の production traffic は https://picspeak.art へ canonical redirect され、BlogPosting JSON-LD には headline と intro の speakable selector を追加しました。",
+    "summary": "PicSpeak は Core Web Vitals と browser performance 指標を product analytics に送るようになりました。production canonical redirects は https://www.picspeak.art にそろえ、BlogPosting JSON-LD には headline と intro の speakable selector を追加しました。",
     "docPath": "docs/changelog/CHANGELOG.md#2026-06-07-web-vitals-canonical-speakable",
     "sections": [
       {
@@ -42,7 +42,7 @@
       {
         "title": "SEO と structured data",
         "items": [
-          "next.config.mjs は www.picspeak.art と HTTP production request を https://picspeak.art へ正規化します",
+          "next.config.mjs は bare domain と HTTP production request を https://www.picspeak.art へ正規化します",
           "BlogPosting JSON-LD は buildBlogPostingJsonLd から生成し、SpeakableSpecification を含めます",
           "記事 intro に data-speakable を追加し、canonical redirects と Blog speakable 出力を test で保護しました"
         ]

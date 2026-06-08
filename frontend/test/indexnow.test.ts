@@ -17,23 +17,23 @@ const VALID_KEY = 'indexnow-test-key';
 test('IndexNow URL builder normalizes own relative URLs and rejects external URLs', () => {
   const urlList = buildIndexNowUrlList([
     '/blog',
-    'https://picspeak.art/gallery#featured',
+    'https://www.picspeak.art/gallery#featured',
     'https://example.com/not-owned',
     ' ',
     '/blog',
   ]);
 
-  assert.deepEqual(urlList, ['https://picspeak.art/blog', 'https://picspeak.art/gallery']);
+  assert.deepEqual(urlList, ['https://www.picspeak.art/blog', 'https://www.picspeak.art/gallery']);
 });
 
 test('IndexNow payload includes host, key location, and deduped URL list', () => {
   const payload = buildIndexNowPayload(['/sitemap.xml', '/sitemap-images.xml', 'https://example.com/nope'], VALID_KEY);
 
   assert.deepEqual(payload, {
-    host: 'picspeak.art',
+    host: 'www.picspeak.art',
     key: VALID_KEY,
-    keyLocation: 'https://picspeak.art/indexnow-key.txt',
-    urlList: ['https://picspeak.art/sitemap.xml', 'https://picspeak.art/sitemap-images.xml'],
+    keyLocation: 'https://www.picspeak.art/indexnow-key.txt',
+    urlList: ['https://www.picspeak.art/sitemap.xml', 'https://www.picspeak.art/sitemap-images.xml'],
   });
 });
 
@@ -57,10 +57,10 @@ test('IndexNow submit helper posts JSON to the IndexNow endpoint', async () => {
   assert.equal(calls[0].init?.method, 'POST');
   assert.equal(calls[0].init?.headers?.['Content-Type' as keyof HeadersInit], 'application/json');
   assert.deepEqual(JSON.parse(String(calls[0].init?.body)), {
-    host: 'picspeak.art',
+    host: 'www.picspeak.art',
     key: VALID_KEY,
-    keyLocation: 'https://picspeak.art/indexnow-key.txt',
-    urlList: ['https://picspeak.art/author/asa-zhou'],
+    keyLocation: 'https://www.picspeak.art/indexnow-key.txt',
+    urlList: ['https://www.picspeak.art/author/asa-zhou'],
   });
 });
 

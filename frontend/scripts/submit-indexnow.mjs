@@ -1,7 +1,7 @@
 import { pathToFileURL } from 'node:url';
 
 export const INDEXNOW_ENDPOINT = 'https://api.indexnow.org/indexnow';
-export const DEFAULT_SITE_URL = 'https://picspeak.art';
+export const DEFAULT_SITE_URL = 'https://www.picspeak.art';
 export const DEFAULT_INDEXNOW_PATHS = [
   '/',
   '/blog',

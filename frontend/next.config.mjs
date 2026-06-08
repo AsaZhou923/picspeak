@@ -101,17 +101,17 @@ const cacheablePublicPageSources = [
 const canonicalRedirects = [
   {
     source: '/:path*',
-    has: [{ type: 'host', value: 'www.picspeak.art' }],
-    destination: 'https://picspeak.art/:path*',
+    has: [{ type: 'host', value: 'picspeak.art' }],
+    destination: 'https://www.picspeak.art/:path*',
     permanent: true,
   },
   {
     source: '/:path*',
     has: [
-      { type: 'host', value: 'picspeak.art' },
+      { type: 'host', value: 'www.picspeak.art' },
       { type: 'header', key: 'x-forwarded-proto', value: 'http' },
     ],
-    destination: 'https://picspeak.art/:path*',
+    destination: 'https://www.picspeak.art/:path*',
     permanent: true,
   },
 ];

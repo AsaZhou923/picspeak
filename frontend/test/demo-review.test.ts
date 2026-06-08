@@ -24,7 +24,7 @@ test('demo critique exposes Review JSON-LD with a CreativeWork target and rating
   const schema = buildDemoReviewJsonLd({
     site: {
       name: 'PicSpeak',
-      url: 'https://picspeak.art',
+      url: 'https://www.picspeak.art',
       logoImage: '/logo.png',
     },
     title: 'AI Photo Critique Example',
@@ -37,7 +37,7 @@ test('demo critique exposes Review JSON-LD with a CreativeWork target and rating
   });
 
   assert.equal(schema['@type'], 'Review');
-  assert.equal(schema.url, `https://picspeak.art/reviews/${DEMO_REVIEW_ID}`);
+  assert.equal(schema.url, `https://www.picspeak.art/reviews/${DEMO_REVIEW_ID}`);
   assert.equal(schema.itemReviewed['@type'], 'CreativeWork');
   assert.equal(schema.itemReviewed.image.url, DEMO_IMAGE_FALLBACK_URL);
   assert.equal(schema.reviewRating['@type'], 'Rating');
@@ -50,7 +50,7 @@ test('demo critique JSON-LD can target any public demo review id', () => {
   const schema = buildDemoReviewJsonLd({
     site: {
       name: 'PicSpeak',
-      url: 'https://picspeak.art',
+      url: 'https://www.picspeak.art',
       logoImage: '/logo.png',
     },
     reviewId: 'rev_35e0951d0df94a1e',
@@ -63,8 +63,8 @@ test('demo critique JSON-LD can target any public demo review id', () => {
     suggestions: enTranslations.demo_review_suggestions,
   });
 
-  assert.equal(schema.url, 'https://picspeak.art/reviews/rev_35e0951d0df94a1e');
-  assert.equal(schema.itemReviewed.url, 'https://picspeak.art/reviews/rev_35e0951d0df94a1e');
+  assert.equal(schema.url, 'https://www.picspeak.art/reviews/rev_35e0951d0df94a1e');
+  assert.equal(schema.itemReviewed.url, 'https://www.picspeak.art/reviews/rev_35e0951d0df94a1e');
 });
 
 test('demo review route emits the structured data helper for public rich results', () => {

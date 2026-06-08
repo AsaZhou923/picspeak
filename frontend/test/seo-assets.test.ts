@@ -86,7 +86,7 @@ test('image sitemap covers prompt examples, gallery, and the public demo review 
   const xml = buildImageSitemapXml(entries);
   assert.match(xml, /xmlns:image="http:\/\/www\.google\.com\/schemas\/sitemap-image\/1\.1"/);
   assert.match(xml, /<image:image>/);
-  assert.match(xml, /<image:loc>https:\/\/picspeak\.art\/generation-prompt-examples\//);
+  assert.match(xml, /<image:loc>https:\/\/www\.picspeak\.art\/generation-prompt-examples\//);
 });
 
 test('robots and app routes expose the image sitemap', () => {
@@ -104,7 +104,7 @@ test('Asa Zhou author page is crawlable and wired into SEO discovery paths', () 
   const sitemapSource = readFileSync(path.join(FRONTEND_DIR, 'src', 'app', 'sitemap.ts'), 'utf8');
   const routeShellSource = readFileSync(path.join(FRONTEND_DIR, 'src', 'lib', 'route-shell.ts'), 'utf8');
 
-  assert.match(siteSource, /https:\/\/picspeak\.art\/author\/asa-zhou#person/);
+  assert.match(siteSource, /https:\/\/www\.picspeak\.art\/author\/asa-zhou#person/);
   assert.match(authorPageSource, /'@type': 'Person'/);
   assert.match(authorPageSource, /siteConfig\.author\.id/);
   assert.match(sitemapSource, /\/author\/asa-zhou/);

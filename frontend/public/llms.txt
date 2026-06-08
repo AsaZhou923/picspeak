@@ -3,7 +3,7 @@
 > PicSpeak is an AI photography critique and visual-reference creation web app. It scores uploaded photos across composition, lighting, color, impact, and technique, then can create GPT Image 2 visual references for the next shoot.
 
 ## Canonical site
-- https://picspeak.art
+- https://www.picspeak.art
 
 ## Product summary
 - Category: AI SaaS / photography utility
@@ -30,23 +30,23 @@
 - Image credit pack: 300 image credits for $3.99 where local payment methods are available
 
 ## Key public URLs
-- Home / x-default: https://picspeak.art
-- English home: https://picspeak.art/en
-- Chinese home: https://picspeak.art/zh
-- Japanese home: https://picspeak.art/ja
-- AI Create: https://picspeak.art/generate
-- GPT Image 2 prompt examples: https://picspeak.art/generate/prompts
-- Blog index: https://picspeak.art/en/blog
-- Gallery: https://picspeak.art/gallery
-- Updates: https://picspeak.art/updates
-- Affiliate page: https://picspeak.art/affiliate
+- Home / x-default: https://www.picspeak.art
+- English home: https://www.picspeak.art/en
+- Chinese home: https://www.picspeak.art/zh
+- Japanese home: https://www.picspeak.art/ja
+- AI Create: https://www.picspeak.art/generate
+- GPT Image 2 prompt examples: https://www.picspeak.art/generate/prompts
+- Blog index: https://www.picspeak.art/en/blog
+- Gallery: https://www.picspeak.art/gallery
+- Updates: https://www.picspeak.art/updates
+- Affiliate page: https://www.picspeak.art/affiliate
 
 ## Markdown content mirrors
-- PicSpeak product overview: https://picspeak.art/ai-content/home.md (source: https://picspeak.art)
-- Lens Notes blog overview: https://picspeak.art/ai-content/lens-notes.md (source: https://picspeak.art/en/blog)
-- GPT Image 2 prompt library overview: https://picspeak.art/ai-content/prompt-library.md (source: https://picspeak.art/generate/prompts)
-- PicSpeak public gallery overview: https://picspeak.art/ai-content/gallery.md (source: https://picspeak.art/gallery)
-- PicSpeak updates overview: https://picspeak.art/ai-content/updates.md (source: https://picspeak.art/updates)
+- PicSpeak product overview: https://www.picspeak.art/ai-content/home.md (source: https://www.picspeak.art)
+- Lens Notes blog overview: https://www.picspeak.art/ai-content/lens-notes.md (source: https://www.picspeak.art/en/blog)
+- GPT Image 2 prompt library overview: https://www.picspeak.art/ai-content/prompt-library.md (source: https://www.picspeak.art/generate/prompts)
+- PicSpeak public gallery overview: https://www.picspeak.art/ai-content/gallery.md (source: https://www.picspeak.art/gallery)
+- PicSpeak updates overview: https://www.picspeak.art/ai-content/updates.md (source: https://www.picspeak.art/updates)
 
 ## Lens Notes topics
 - AI photo critique workflows

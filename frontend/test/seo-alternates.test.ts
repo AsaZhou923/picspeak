@@ -15,7 +15,7 @@ import {
 const TEST_DIR = path.dirname(fileURLToPath(import.meta.url));
 const SITE = {
   name: 'PicSpeak',
-  url: 'https://picspeak.art',
+  url: 'https://www.picspeak.art',
   ogImage: '/og-product.png',
   ogImageWidth: 1200,
   ogImageHeight: 630,
@@ -56,9 +56,9 @@ test('blog post JSON-LD breadcrumbs link the locale home, blog index, and articl
   assert.deepEqual(
     schema.itemListElement.map((item) => item.item),
     [
-      'https://picspeak.art/en',
-      'https://picspeak.art/en/blog',
-      'https://picspeak.art/en/blog/five-photo-composition-checks',
+      'https://www.picspeak.art/en',
+      'https://www.picspeak.art/en/blog',
+      'https://www.picspeak.art/en/blog/five-photo-composition-checks',
     ],
   );
   assert.deepEqual(
@@ -73,7 +73,7 @@ test('default updates metadata has canonical URL, hreflang alternates, and socia
   assert.equal(metadata.title, 'PicSpeak Updates | 产品更新 | 更新履歴');
   assert.equal(metadata.alternates?.canonical, '/updates');
   assert.deepEqual(metadata.alternates?.languages, UPDATES_LANGUAGE_ALTERNATES);
-  assert.equal(metadata.openGraph?.url, 'https://picspeak.art/updates');
+  assert.equal(metadata.openGraph?.url, 'https://www.picspeak.art/updates');
   assert.equal(metadata.openGraph?.siteName, SITE.name);
   assert.deepEqual(metadata.twitter?.images, [SITE.ogImage]);
 });
@@ -108,7 +108,7 @@ test('website JSON-LD exposes search and updates subscription actions', () => {
 
   assert.ok(searchAction);
   assert.ok(subscribeAction);
-  assert.equal(searchAction.target.urlTemplate, 'https://picspeak.art/gallery?q={search_term_string}');
+  assert.equal(searchAction.target.urlTemplate, 'https://www.picspeak.art/gallery?q={search_term_string}');
   assert.equal(subscribeAction.object.name, 'PicSpeak Updates');
-  assert.equal(subscribeAction.target.urlTemplate, 'https://picspeak.art/updates');
+  assert.equal(subscribeAction.target.urlTemplate, 'https://www.picspeak.art/updates');
 });
