@@ -66,3 +66,19 @@ test('canonical redirects force the production domain onto HTTPS with www', asyn
     },
   ]);
 });
+
+test('public responses advertise language variance and third-party preconnects', async () => {
+  const nextConfigModule = await import('../next.config.mjs');
+  const nextConfig = nextConfigModule.default as {
+    headers: () => Promise<Array<{ source: string; headers: Array<{ key: string; value: string }> }>>;
+  };
+
+  const routes = await nextConfig.headers();
+  const globalRoute = routes.find((route) => route.source === '/:path*');
+  const headers = new Map(globalRoute?.headers.map((header) => [header.key, header.value]) ?? []);
+
+  assert.equal(headers.get('Vary'), 'Accept-Language');
+  assert.match(headers.get('Link') ?? '', /rel=preconnect/);
+  assert.match(headers.get('Link') ?? '', /https:\/\/clerk\.picspeak\.art/);
+  assert.match(headers.get('Link') ?? '', /https:\/\/pub-7ae066210514433e84a850bc95c5f1a2\.r2\.dev/);
+});

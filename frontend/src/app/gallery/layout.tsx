@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { singlePageAlternates } from '@/lib/seo';
+import { INDEXABLE_ROBOTS, singlePageAlternates } from '@/lib/seo';
 
 export const metadata: Metadata = {
   title: 'AI Photo Critique Gallery | AI 摄影点评长廊 | AI 写真講評ギャラリー | PicSpeak',
@@ -16,6 +16,7 @@ export const metadata: Metadata = {
     '写真採点例',
     '写真フィードバック例',
   ],
+  robots: INDEXABLE_ROBOTS,
   alternates: singlePageAlternates('/gallery'),
 };
 

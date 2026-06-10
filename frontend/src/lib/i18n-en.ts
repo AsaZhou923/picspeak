@@ -217,7 +217,7 @@ export const enTranslations = {
     pro_offer_highlight: 'Pro',
     updates_label: 'Updates',
     updates_hint_home: 'See analytics, retake practice, and waiting-page reader update',
-    updates_hint_latest: 'See the AI Markdown mirrors, llms.txt, and WebSite JSON-LD update',
+    updates_hint_latest: 'See the generate SEO fallback, sitemap, and structured data update',
     contact_label: 'Contact',
     contact_headline: 'Get in Touch',
 

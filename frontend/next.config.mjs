@@ -73,6 +73,15 @@ const securityHeaders = [
   { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
 ];
 
+const seoResponseHeaders = [
+  { key: 'Vary', value: 'Accept-Language' },
+  {
+    key: 'Link',
+    value:
+      '<https://clerk.picspeak.art>; rel=preconnect; crossorigin, <https://pub-7ae066210514433e84a850bc95c5f1a2.r2.dev>; rel=preconnect',
+  },
+];
+
 const publicPageCacheHeaders = [
   {
     key: 'Cache-Control',
@@ -131,7 +140,7 @@ const nextConfig = {
     return [
       {
         source: '/:path*',
-        headers: securityHeaders,
+        headers: [...securityHeaders, ...seoResponseHeaders],
       },
       ...cacheablePublicPageSources.map((source) => ({
         source,

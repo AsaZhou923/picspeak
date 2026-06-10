@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-06-10-seo-sitemaps-generate-fallback",
+    "date": "2026-06-10",
+    "title": "Generate SEO fallback, news sitemap, and structured data",
+    "summary": "PicSpeak's /generate page now keeps its full interactive experience while exposing server-rendered template, quality, and size copy through an SEO fallback. robots.txt also advertises image and news sitemaps while protecting private paths, and Gallery, Affiliate, and Prompt Example structured data now live behind tested helpers.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-06-10-seo-sitemaps-generate-fallback",
+    "sections": [
+      {
+        "title": "Crawlable generation page",
+        "items": [
+          "/generate moved from a fully client page to a server page plus GeneratePageClient",
+          "GenerateSeoFallback renders template, quality, and ratio copy so core page meaning does not depend on hydration",
+          "The existing template picker, prompt examples, credit estimate, checkout paths, and generation task navigation stay in the client component"
+        ]
+      },
+      {
+        "title": "Public discovery and structured data",
+        "items": [
+          "Added /sitemap-news.xml and listed it in robots.txt alongside the regular and image sitemaps",
+          "robots.txt now disallows API, account, workspace, task, and generation-result paths with a crawl delay",
+          "Affiliate metadata, Gallery CollectionPage JSON-LD, and Prompt Example CreativeWork JSON-LD now use tested helpers"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-06-08-ai-markdown-website-jsonld",
     "date": "2026-06-08",
     "title": "AI Markdown mirrors, llms.txt, and WebSite JSON-LD",

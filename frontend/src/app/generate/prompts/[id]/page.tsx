@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import {
   GENERATION_PROMPT_EXAMPLE_CATEGORY_LABELS,
   GENERATION_PROMPT_EXAMPLES,
+  buildPromptExampleCreativeWorkJsonLd,
   getGenerationPromptExample,
   getLocalizedPromptExampleText,
   getLocalizedPromptExampleTitle,
@@ -72,34 +73,10 @@ export default async function PromptExamplePage({ params }: Props) {
     notFound();
   }
 
-  const title = getLocalizedPromptExampleTitle(example, 'en');
-  const prompt = getLocalizedPromptExampleText(example.prompt, 'en');
-  const categoryLabel = GENERATION_PROMPT_EXAMPLE_CATEGORY_LABELS[example.category];
-
-  const creativeWorkJsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'CreativeWork',
-    name: title,
-    url: `${siteConfig.url}/generate/prompts/${example.id}`,
-    image: `${siteConfig.url}${example.imagePath}`,
-    text: prompt,
-    genre: categoryLabel,
-    creator: {
-      '@type': 'Person',
-      name: example.author,
-      url: example.sourceUrl,
-    },
-    isPartOf: {
-      '@type': 'CollectionPage',
-      name: 'PicSpeak GPT Image 2 Prompt Examples',
-      url: `${siteConfig.url}/generate/prompts`,
-    },
-    publisher: {
-      '@type': 'Organization',
-      name: siteConfig.name,
-      url: siteConfig.url,
-    },
-  };
+  const creativeWorkJsonLd = buildPromptExampleCreativeWorkJsonLd(example, {
+    siteUrl: siteConfig.url,
+    siteName: siteConfig.name,
+  });
 
   return (
     <>

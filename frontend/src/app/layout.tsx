@@ -47,7 +47,7 @@ export const metadata: Metadata = {
   publisher: 'PicSpeak',
   category: 'photography',
   alternates: {
-    canonical: '/',
+    canonical: '/en',
     languages: HOME_LANGUAGE_ALTERNATES,
   },
   verification: {

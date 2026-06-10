@@ -6,7 +6,7 @@ export const HOME_LANGUAGE_ALTERNATES: NonNullable<Metadata['alternates']>['lang
   'zh-CN': '/zh',
   en: '/en',
   ja: '/ja',
-  'x-default': '/',
+  'x-default': '/en',
 };
 
 export const UPDATES_LANGUAGE_ALTERNATES: NonNullable<Metadata['alternates']>['languages'] = {
@@ -262,6 +262,63 @@ type UpdatesMetadataSite = {
   ogImageWidth: number;
   ogImageHeight: number;
 };
+
+type SinglePageSocialMetadataSite = {
+  name: string;
+  url: string;
+  ogImage: string;
+  ogImageWidth: number;
+  ogImageHeight: number;
+};
+
+export const AFFILIATE_METADATA = {
+  title: 'PicSpeak Affiliate Program | 推广联盟计划 | アフィリエイト — PicSpeak',
+  description:
+    'Promote PicSpeak AI photo critique and earn recurring commissions. 推广 PicSpeak AI 摄影点评工具，赚取持续佣金。PicSpeakアフィリエイト — AI写真批評ツールを紹介して継続報酬を獲得。',
+  keywords: [
+    'PicSpeak affiliate',
+    'photography affiliate program',
+    'AI photo critique affiliate',
+    'PicSpeak推广联盟',
+    '摄影推广',
+    'AI工具推广',
+    '联盟营销',
+    'PicSpeakアフィリエイト',
+    '写真アフィリエイト',
+    'AIツール紹介',
+  ],
+} as const;
+
+export function buildAffiliateMetadata(site: SinglePageSocialMetadataSite): Metadata {
+  return {
+    title: AFFILIATE_METADATA.title,
+    description: AFFILIATE_METADATA.description,
+    keywords: [...AFFILIATE_METADATA.keywords],
+    robots: INDEXABLE_ROBOTS,
+    alternates: singlePageAlternates('/affiliate'),
+    openGraph: {
+      type: 'website',
+      url: `${site.url}/affiliate`,
+      siteName: site.name,
+      title: AFFILIATE_METADATA.title,
+      description: AFFILIATE_METADATA.description,
+      images: [
+        {
+          url: site.ogImage,
+          width: site.ogImageWidth,
+          height: site.ogImageHeight,
+          alt: 'PicSpeak Affiliate Program',
+        },
+      ],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: AFFILIATE_METADATA.title,
+      description: AFFILIATE_METADATA.description,
+      images: [site.ogImage],
+    },
+  };
+}
 
 export const DEFAULT_UPDATES_METADATA = {
   title: 'PicSpeak Updates | 产品更新 | 更新履歴',

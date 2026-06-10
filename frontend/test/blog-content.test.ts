@@ -125,6 +125,22 @@ test('blog index keeps static article data server-rendered with a small client v
   assert.match(localizedPageSource, /BlogIndexPageContent/);
 });
 
+test('generate page keeps template copy crawlable through a server SEO fallback', () => {
+  const pageSource = readFileSync(path.join(TEST_DIR, '..', 'src', 'app', 'generate', 'page.tsx'), 'utf8');
+  const clientSource = readFileSync(path.join(TEST_DIR, '..', 'src', 'app', 'generate', 'GeneratePageClient.tsx'), 'utf8');
+  const fallbackSource = readFileSync(
+    path.join(TEST_DIR, '..', 'src', 'components', 'generation', 'GenerateSeoFallback.tsx'),
+    'utf8',
+  );
+
+  assert.doesNotMatch(pageSource, /^'use client';/);
+  assert.match(pageSource, /<GenerateSeoFallback \/>/);
+  assert.match(pageSource, /<GeneratePageClient \/>/);
+  assert.match(clientSource, /^'use client';/);
+  assert.match(fallbackSource, /data-seo-generate-fallback/);
+  assert.match(fallbackSource, /GENERATION_TEMPLATES/);
+});
+
 test('blog post structured data exposes the headline and intro as speakable content', () => {
   const bundle = readBundle('en');
   const post = bundle.posts.find((entry) => entry.slug === 'five-photo-composition-checks');

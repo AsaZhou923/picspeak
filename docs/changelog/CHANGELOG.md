@@ -2,6 +2,93 @@
 
 本文件汇总了原 `docs/changelog/update-log-*.md` 的全部更新记录。新增 release 请追加到顶部，并为每条记录保留稳定锚点，供 `/updates` 的 `docPath` 和 README 链接定位。
 
+<a id="2026-06-10-seo-sitemaps-generate-fallback"></a>
+
+## 2026-06-10 - seo sitemaps generate fallback
+
+日期：2026-06-10
+
+### 概览
+
+这次更新继续补强 PicSpeak 的公开发现与 AI-search/GEO 可读性：`/generate` 从全客户端页面拆为 server page + client component，并保留服务端可见的 SEO fallback；robots、主 sitemap、图片 sitemap 与新增 news sitemap 对齐；Gallery、Affiliate 和 Prompt Example 的 metadata / JSON-LD 也抽成可测试 helper，降低后续 SEO 入口漂移。
+
+- `/generate` 现在由 server page 输出 `GenerateSeoFallback`，同时把原交互流程迁移到 `GeneratePageClient`。
+- 新增 `/sitemap-news.xml`，用最新 Updates 条目生成 Google News sitemap metadata，并在 `robots.ts` 中声明。
+- `robots.ts` 对公开 crawler 增加私有路径 disallow 与 crawl delay，同时继续允许搜索和 AI crawler 访问公开内容。
+- 首页 canonical / hreflang 的 `x-default` 改为 `/en`，并让 `llms.txt` 同步显示英文首页为 x-default。
+- Affiliate、Gallery 和 Prompt Example 的 metadata / JSON-LD 抽成 helper，并用测试保护结构化数据字段。
+
+### 生成页 SEO fallback
+
+- `frontend/src/app/generate/page.tsx` 不再是 client component，而是组合 `GenerateSeoFallback` 和 `GeneratePageClient`。
+- `frontend/src/app/generate/GeneratePageClient.tsx` 承接原生成页模板选择、prompt example 应用、额度估算、登录/升级门槛、信用包 checkout 和生成任务跳转。
+- `frontend/src/components/generation/GenerateSeoFallback.tsx` 用 `GENERATION_TEMPLATES`、quality 和 size 配置输出 screen-reader-only 的 crawlable 内容，确保生成页核心模板说明不依赖 hydration。
+
+### Sitemap、robots 与结构化数据
+
+- `frontend/src/lib/news-sitemap.ts` 和 `frontend/src/app/sitemap-news.xml/route.ts` 新增 news sitemap 生成与静态 XML route。
+- `frontend/src/app/robots.ts` 同时声明普通 sitemap、image sitemap 和 news sitemap，并对 `/api/`、账户、工作台、任务、生成结果等私有路径设置 disallow。
+- `frontend/src/lib/seo.ts` 新增 `buildAffiliateMetadata()`，Affiliate 页复用统一 metadata helper 并补上 robots 与 social preview。
+- `frontend/src/lib/gallery-schema.ts` 新增 `buildGalleryCollectionJsonLd()`，Gallery schema 增加 `hasPart`，把公开点评、demo review 和 prompt practice 作为可引用部分。
+- `frontend/src/content/generation/prompt-examples.ts` 新增 `buildPromptExampleCreativeWorkJsonLd()`，Prompt Example 结构化数据补充 learningResourceType、educationalLevel 与 teaches。
+
+### 首页更新记录同步
+
+- `/updates` 三语 JSON 新增本次生成页 SEO fallback、news sitemap、robots 和结构化数据更新记录，`docPath` 指向 `docs/changelog/CHANGELOG.md#2026-06-10-seo-sitemaps-generate-fallback`。
+- 首页底部“更新记录”三语 hint 改为生成页 SEO fallback、sitemap 与结构化数据主题。
+- README / README.zh-CN 最新 changelog 链接更新到本次锚点。
+- `CLAUDE.md` 补充 `/generate` SEO fallback、robots 和 sitemap routes 是公开 AI-search/GEO surface 的一部分。
+
+### 影响文件
+
+#### 前端
+
+- `frontend/next.config.mjs`
+- `frontend/public/llms.txt`
+- `frontend/src/app/affiliate/page.tsx`
+- `frontend/src/app/gallery/layout.tsx`
+- `frontend/src/app/gallery/page.tsx`
+- `frontend/src/app/generate/page.tsx`
+- `frontend/src/app/generate/GeneratePageClient.tsx`
+- `frontend/src/app/generate/prompts/[id]/page.tsx`
+- `frontend/src/app/layout.tsx`
+- `frontend/src/app/robots.ts`
+- `frontend/src/app/sitemap.ts`
+- `frontend/src/app/sitemap-news.xml/route.ts`
+- `frontend/src/components/generation/GenerateSeoFallback.tsx`
+- `frontend/src/content/generation/prompt-examples.ts`
+- `frontend/src/content/updates/{zh,en,ja}.json`
+- `frontend/src/lib/gallery-schema.ts`
+- `frontend/src/lib/i18n-{zh,en,ja}.ts`
+- `frontend/src/lib/llms.ts`
+- `frontend/src/lib/news-sitemap.ts`
+- `frontend/src/lib/seo.ts`
+- `frontend/test/blog-content.test.ts`
+- `frontend/test/generation-prompt-examples.test.ts`
+- `frontend/test/security-headers.test.ts`
+- `frontend/test/seo-alternates.test.ts`
+- `frontend/test/seo-assets.test.ts`
+
+#### 文档
+
+- `docs/changelog/CHANGELOG.md`
+- `README.md`
+- `README.zh-CN.md`
+- `CLAUDE.md`
+
+### 验证
+
+- `node -e "for (const f of ['zh','en','ja']) JSON.parse(require('fs').readFileSync('frontend/src/content/updates/'+f+'.json', 'utf8'));"` -> JSON 解析通过。
+- `cd frontend && node --test test/blog-content.test.ts test/generation-prompt-examples.test.ts test/security-headers.test.ts test/seo-alternates.test.ts test/seo-assets.test.ts` -> `29 passed`。
+- `cd frontend && npm run test` -> `82 passed`。
+- `cd frontend && npm run typecheck`。
+- `cd frontend && npm run lint`。
+- `cd frontend && npm run build` -> 生成 120 个静态页面。
+- `Get-FileHash` 对比仓库 changelog / workflow 与外部 Update Logs 副本 SHA256 一致。
+- `git diff --check`。
+
+---
+
 <a id="2026-06-08-ai-markdown-website-jsonld"></a>
 
 ## 2026-06-08 - ai markdown website jsonld

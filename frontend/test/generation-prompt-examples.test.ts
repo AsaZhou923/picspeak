@@ -8,6 +8,7 @@ import {
   GENERATION_PROMPT_EXAMPLE_CATEGORY_LABELS,
   GENERATION_PROMPT_EXAMPLE_LOCALES,
   GENERATION_PROMPT_EXAMPLES,
+  buildPromptExampleCreativeWorkJsonLd,
   getGenerationPromptExample,
   getLocalizedPromptExampleCategoryLabel,
   getLocalizedPromptExampleText,
@@ -76,6 +77,22 @@ test('prompt example helpers support static SEO pages', () => {
   const excerpt = normalizePromptExampleExcerpt(`${firstExample.prompt.en}\n\n${firstExample.prompt.en}`, 90);
   assert.ok(excerpt.length <= 90);
   assert.ok(excerpt.endsWith('...'));
+});
+
+test('prompt example structured data describes learning use cases', () => {
+  const firstExample = GENERATION_PROMPT_EXAMPLES[0];
+  const schema = buildPromptExampleCreativeWorkJsonLd(firstExample, {
+    siteUrl: 'https://www.picspeak.art',
+    siteName: 'PicSpeak',
+  });
+
+  assert.equal(schema['@type'], 'CreativeWork');
+  assert.equal(schema.learningResourceType, 'Prompt example');
+  assert.equal(schema.educationalLevel, 'Beginner to advanced photography and visual creation practice');
+  assert.ok(Array.isArray(schema.teaches));
+  assert.ok(schema.teaches.includes('Photography prompt adaptation'));
+  assert.ok(schema.teaches.includes(GENERATION_PROMPT_EXAMPLE_CATEGORY_LABELS[firstExample.category]));
+  assert.equal(schema.isPartOf.url, 'https://www.picspeak.art/generate/prompts');
 });
 
 test('localized prompt helpers avoid mojibake data in visible copy', () => {

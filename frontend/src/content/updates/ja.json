@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-06-10-seo-sitemaps-generate-fallback",
+    "date": "2026-06-10",
+    "title": "生成ページ SEO fallback、news sitemap、構造化データ",
+    "summary": "PicSpeak の /generate は完全な操作体験を保ちながら、server-rendered SEO fallback で template、quality、size の説明を公開します。robots.txt は image/news sitemap を示しつつ private path を守り、Gallery、Affiliate、Prompt Example の structured data も test 可能な helper に整理しました。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-06-10-seo-sitemaps-generate-fallback",
+    "sections": [
+      {
+        "title": "クロール可能な生成ページ",
+        "items": [
+          "/generate を全 client page から server page と GeneratePageClient に分けました",
+          "GenerateSeoFallback が template、quality、ratio の説明を出力し、主要内容が hydration に依存しません",
+          "既存の template picker、prompt example、credit estimate、checkout、generation task navigation は client component に残しています"
+        ]
+      },
+      {
+        "title": "公開 discovery と structured data",
+        "items": [
+          "/sitemap-news.xml を追加し、通常 sitemap と image sitemap と一緒に robots.txt で宣言しました",
+          "robots.txt は API、account、workspace、task、generation result などの private path を disallow し、crawl delay を設定します",
+          "Affiliate metadata、Gallery CollectionPage JSON-LD、Prompt Example CreativeWork JSON-LD を test 付き helper に整理しました"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-06-08-ai-markdown-website-jsonld",
     "date": "2026-06-08",
     "title": "AI Markdown mirrors、llms.txt、WebSite JSON-LD",

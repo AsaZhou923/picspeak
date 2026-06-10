@@ -4,13 +4,17 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  buildAffiliateMetadata,
   buildBlogBreadcrumbJsonLd,
   buildWebSiteJsonLd,
   buildDefaultUpdatesMetadata,
   HOME_LANGUAGE_ALTERNATES,
+  INDEXABLE_ROBOTS,
   singlePageAlternates,
   UPDATES_LANGUAGE_ALTERNATES,
 } from '../src/lib/seo.ts';
+import { buildGalleryCollectionJsonLd } from '../src/lib/gallery-schema.ts';
+import { siteConfig } from '../src/lib/site.ts';
 
 const TEST_DIR = path.dirname(fileURLToPath(import.meta.url));
 const SITE = {
@@ -26,7 +30,7 @@ test('home language alternates point only to equivalent locale home pages', () =
     'zh-CN': '/zh',
     en: '/en',
     ja: '/ja',
-    'x-default': '/',
+    'x-default': '/en',
   });
 });
 
@@ -76,6 +80,27 @@ test('default updates metadata has canonical URL, hreflang alternates, and socia
   assert.equal(metadata.openGraph?.url, 'https://www.picspeak.art/updates');
   assert.equal(metadata.openGraph?.siteName, SITE.name);
   assert.deepEqual(metadata.twitter?.images, [SITE.ogImage]);
+});
+
+test('affiliate metadata owns robots and social preview fields', () => {
+  const metadata = buildAffiliateMetadata(SITE);
+
+  assert.equal(metadata.alternates?.canonical, '/affiliate');
+  assert.deepEqual(metadata.robots, INDEXABLE_ROBOTS);
+  assert.equal(metadata.openGraph?.url, 'https://www.picspeak.art/affiliate');
+  assert.equal(metadata.openGraph?.siteName, SITE.name);
+  assert.deepEqual(metadata.twitter?.images, [SITE.ogImage]);
+});
+
+test('gallery collection schema exposes featured parts for AI citation', () => {
+  const schema = buildGalleryCollectionJsonLd({ site: siteConfig });
+
+  assert.equal(schema['@type'], 'CollectionPage');
+  assert.ok(Array.isArray(schema.hasPart));
+  assert.ok(schema.hasPart.length >= 3);
+  assert.ok(
+    schema.hasPart.every((part) => part['@type'] === 'CreativeWork' && part.url.startsWith(`${siteConfig.url}/`)),
+  );
 });
 
 test('default updates page owns generateMetadata instead of relying on layout metadata', () => {

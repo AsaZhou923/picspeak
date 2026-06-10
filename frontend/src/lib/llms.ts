@@ -38,7 +38,7 @@ export function getLlmsText(): string {
 - Image credit pack: 300 image credits for $3.99 where local payment methods are available
 
 ## Key public URLs
-- Home / x-default: ${siteConfig.url}
+- Home / x-default: ${siteConfig.url}/en
 - English home: ${siteConfig.url}/en
 - Chinese home: ${siteConfig.url}/zh
 - Japanese home: ${siteConfig.url}/ja

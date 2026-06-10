@@ -10,8 +10,14 @@ import {
   buildImageSitemapXml,
   IMAGE_SITEMAP_PATH,
 } from '../src/lib/image-sitemap.ts';
+import {
+  buildNewsSitemapEntries,
+  buildNewsSitemapXml,
+  NEWS_SITEMAP_PATH,
+} from '../src/lib/news-sitemap.ts';
 import { getLlmsText } from '../src/lib/llms.ts';
 import { siteConfig } from '../src/lib/site.ts';
+import robots from '../src/app/robots.ts';
 
 const TEST_DIR = path.dirname(fileURLToPath(import.meta.url));
 const FRONTEND_DIR = path.join(TEST_DIR, '..');
@@ -90,12 +96,35 @@ test('image sitemap covers prompt examples, gallery, and the public demo review 
 });
 
 test('robots and app routes expose the image sitemap', () => {
-  const robotsSource = readFileSync(path.join(FRONTEND_DIR, 'src', 'app', 'robots.ts'), 'utf8');
   const routeSource = readFileSync(path.join(FRONTEND_DIR, 'src', 'app', 'sitemap-images.xml', 'route.ts'), 'utf8');
+  const robotsConfig = robots();
+  const defaultRule = Array.isArray(robotsConfig.rules)
+    ? robotsConfig.rules.find((rule) => rule.userAgent === '*')
+    : undefined;
 
-  assert.match(robotsSource, /sitemap-images\.xml/);
+  assert.ok(Array.isArray(robotsConfig.sitemap));
+  assert.ok(robotsConfig.sitemap.includes(`${siteConfig.url}/sitemap-images.xml`));
+  assert.ok(robotsConfig.sitemap.includes(`${siteConfig.url}/sitemap-news.xml`));
+  assert.ok(defaultRule);
+  assert.equal(defaultRule.crawlDelay, 5);
+  assert.ok(Array.isArray(defaultRule.disallow));
+  assert.ok(defaultRule.disallow.includes('/api/'));
+  assert.ok(defaultRule.disallow.includes('/account/'));
   assert.match(routeSource, /buildImageSitemapXml/);
   assert.match(routeSource, /application\/xml/);
+});
+
+test('news sitemap publishes recent updates with Google News metadata', () => {
+  const entries = buildNewsSitemapEntries();
+  const xml = buildNewsSitemapXml(entries);
+
+  assert.equal(NEWS_SITEMAP_PATH, '/sitemap-news.xml');
+  assert.ok(entries.length > 0);
+  assert.ok(entries.length <= 1000);
+  assert.equal(entries[0].loc, `${siteConfig.url}/updates`);
+  assert.match(xml, /xmlns:news="http:\/\/www\.google\.com\/schemas\/sitemap-news\/0\.9"/);
+  assert.match(xml, /<news:name>PicSpeak Updates<\/news:name>/);
+  assert.match(xml, /<news:language>en<\/news:language>/);
 });
 
 test('Asa Zhou author page is crawlable and wired into SEO discovery paths', () => {

@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-06-10-seo-sitemaps-generate-fallback",
+    "date": "2026-06-10",
+    "title": "生成页 SEO fallback、news sitemap 与结构化数据",
+    "summary": "PicSpeak 的 /generate 现在保留完整交互体验，同时通过服务端 SEO fallback 暴露模板、质量和尺寸说明；robots 同步声明 image/news sitemap 并保护私有路径，Gallery、Affiliate 和 Prompt Example 的结构化数据也补强为可测试 helper。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-06-10-seo-sitemaps-generate-fallback",
+    "sections": [
+      {
+        "title": "生成页可抓取内容",
+        "items": [
+          "/generate 从全客户端页面拆成 server page 与 GeneratePageClient",
+          "GenerateSeoFallback 输出模板、质量和画幅说明，让核心内容不依赖 hydration",
+          "原有模板选择、prompt example、额度估算、checkout 和生成任务跳转都保留在客户端组件"
+        ]
+      },
+      {
+        "title": "公开发现与结构化数据",
+        "items": [
+          "新增 /sitemap-news.xml，并在 robots.txt 中与普通 sitemap、图片 sitemap 一起声明",
+          "robots.txt 对 API、账户、工作台、任务和生成结果等私有路径设置 disallow 与 crawl delay",
+          "Affiliate metadata、Gallery CollectionPage JSON-LD、Prompt Example CreativeWork JSON-LD 都抽成 helper 并增加测试"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-06-08-ai-markdown-website-jsonld",
     "date": "2026-06-08",
     "title": "AI Markdown mirrors、llms.txt 与 WebSite JSON-LD",

@@ -30,7 +30,7 @@
 - Image credit pack: 300 image credits for $3.99 where local payment methods are available
 
 ## Key public URLs
-- Home / x-default: https://www.picspeak.art
+- Home / x-default: https://www.picspeak.art/en
 - English home: https://www.picspeak.art/en
 - Chinese home: https://www.picspeak.art/zh
 - Japanese home: https://www.picspeak.art/ja

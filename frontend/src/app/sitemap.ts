@@ -38,13 +38,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
 
   return [
-    // Root page (x-default)
+    // Root page is still reachable for users, but /en is the x-default canonical SEO target.
     {
       url: siteConfig.url,
       lastModified: now,
       changeFrequency: 'weekly',
       priority: 1,
-      alternates: localizedAlternates((locale) => `/${locale}`, '/'),
+      alternates: localizedAlternates((locale) => `/${locale}`, '/en'),
     },
     // Locale-prefixed home pages — same content, pinned language for SEO
     {
@@ -52,21 +52,21 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified: now,
       changeFrequency: 'weekly',
       priority: 1,
-      alternates: localizedAlternates((locale) => `/${locale}`, '/'),
+      alternates: localizedAlternates((locale) => `/${locale}`, '/en'),
     },
     {
       url: `${siteConfig.url}/en`,
       lastModified: now,
       changeFrequency: 'weekly',
       priority: 1,
-      alternates: localizedAlternates((locale) => `/${locale}`, '/'),
+      alternates: localizedAlternates((locale) => `/${locale}`, '/en'),
     },
     {
       url: `${siteConfig.url}/ja`,
       lastModified: now,
       changeFrequency: 'weekly',
       priority: 1,
-      alternates: localizedAlternates((locale) => `/${locale}`, '/'),
+      alternates: localizedAlternates((locale) => `/${locale}`, '/en'),
     },
     // Public single-URL pages. They are multilingual/mixed-language pages, not locale alternates.
     {

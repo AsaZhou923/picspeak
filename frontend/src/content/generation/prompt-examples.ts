@@ -267,6 +267,49 @@ export function getGenerationPromptExample(id: string): GenerationPromptExample 
   return GENERATION_PROMPT_EXAMPLES.find((example) => example.id === id);
 }
 
+export function buildPromptExampleCreativeWorkJsonLd(
+  example: GenerationPromptExample,
+  site: { siteUrl: string; siteName: string },
+) {
+  const title = getLocalizedPromptExampleTitle(example, 'en');
+  const prompt = getLocalizedPromptExampleText(example.prompt, 'en');
+  const categoryLabel = GENERATION_PROMPT_EXAMPLE_CATEGORY_LABELS[example.category];
+
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'CreativeWork',
+    name: title,
+    url: `${site.siteUrl}/generate/prompts/${example.id}`,
+    image: `${site.siteUrl}${example.imagePath}`,
+    text: prompt,
+    genre: categoryLabel,
+    learningResourceType: 'Prompt example',
+    educationalLevel: 'Beginner to advanced photography and visual creation practice',
+    teaches: [
+      'Photography prompt adaptation',
+      categoryLabel,
+      `Template: ${example.suggestedTemplateKey}`,
+      `Style: ${example.suggestedStyle}`,
+      `Aspect ratio: ${example.suggestedSize}`,
+    ],
+    creator: {
+      '@type': 'Person',
+      name: example.author,
+      url: example.sourceUrl,
+    },
+    isPartOf: {
+      '@type': 'CollectionPage',
+      name: `${site.siteName} GPT Image 2 Prompt Examples`,
+      url: `${site.siteUrl}/generate/prompts`,
+    },
+    publisher: {
+      '@type': 'Organization',
+      name: site.siteName,
+      url: site.siteUrl,
+    },
+  };
+}
+
 // Curated from EvoLinkAI/awesome-gpt-image-2-prompts (Apache-2.0). Source URLs are retained per item.
 export const GENERATION_PROMPT_EXAMPLES = [
   {

@@ -155,7 +155,7 @@ npm run test
 - `/generate/prompts` and `/generate/prompts/[id]` are crawlable GPT Image 2 prompt-example pages backed by `content/generation/prompt-examples.ts`; keep static params, metadata, JSON-LD, localized visible titles, and sitemap entries aligned.
 - `/gallery` intentionally renders a server-visible SEO summary before the client gallery loads; keep `GallerySeoHero`, `gallery-seo-copy.ts`, and gallery metadata in sync when editing public gallery positioning.
 - `frontend/public/og-product.png` is the primary 1200x630 product social preview for AI critique, AI Create, and gallery examples; update `siteConfig` and `seo-assets` coverage together if replacing it.
-- `robots.ts`, `sitemap.ts`, `llms.txt` routes, `.well-known/llms.txt`, `frontend/public/llms.txt`, and `/ai-content/*.md` Markdown mirrors are part of the AI-search/GEO surface.
+- `robots.ts`, `sitemap.ts`, `/sitemap-images.xml`, `/sitemap-news.xml`, `llms.txt` routes, `.well-known/llms.txt`, `frontend/public/llms.txt`, `/ai-content/*.md` Markdown mirrors, and the `/generate` SEO fallback are part of the AI-search/GEO surface.
 - `/generation-tasks/[taskId]` and `/generations/[generationId]` are private generation-flow surfaces and should remain `noindex`.
 - Keep canonical URLs, locale alternates, structured data, and content bundle tests aligned when editing public pages.
 
