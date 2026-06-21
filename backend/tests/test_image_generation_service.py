@@ -58,6 +58,32 @@ class ImageGenerationServiceTests(unittest.TestCase):
 
         self.assertEqual(client.api_url, 'https://api.openai.test/v1/images/generations')
 
+    def test_client_prefers_dedicated_image_generation_api_key(self) -> None:
+        with patch('app.services.image_generation.settings') as mocked_settings:
+            mocked_settings.image_generation_api_key = 'image-key'
+            mocked_settings.openai_api_key = 'legacy-key'
+            mocked_settings.image_generation_api_url = 'https://api.apimart.ai/v1/images/generations'
+            mocked_settings.image_generation_api_mode = 'auto'
+            mocked_settings.image_generation_timeout_seconds = 180
+            mocked_settings.image_generation_model = 'gpt-image-2'
+
+            client = OpenAIImageGenerationClient()
+
+        self.assertEqual(client.api_key, 'image-key')
+
+    def test_client_falls_back_to_legacy_openai_api_key(self) -> None:
+        with patch('app.services.image_generation.settings') as mocked_settings:
+            mocked_settings.image_generation_api_key = ''
+            mocked_settings.openai_api_key = 'legacy-key'
+            mocked_settings.image_generation_api_url = 'https://api.apimart.ai/v1/images/generations'
+            mocked_settings.image_generation_api_mode = 'auto'
+            mocked_settings.image_generation_timeout_seconds = 180
+            mocked_settings.image_generation_model = 'gpt-image-2'
+
+            client = OpenAIImageGenerationClient()
+
+        self.assertEqual(client.api_key, 'legacy-key')
+
     def test_openai_client_posts_reference_edits_to_edits_endpoint(self) -> None:
         image_bytes = b'edited-webp'
         response_payload = {
@@ -85,7 +111,7 @@ class ImageGenerationServiceTests(unittest.TestCase):
         files = post_multipart.call_args.kwargs['files']
         self.assertEqual(files['image'][0], 'reference.png')
 
-    def test_apimart_endpoint_uses_official_model_ratio_size_and_async_result(self) -> None:
+    def test_apimart_endpoint_uses_documented_model_ratio_size_and_async_result(self) -> None:
         client = OpenAIImageGenerationClient(
             api_key='test-key',
             api_url='https://api.apimart.ai/v1/images/generations',
@@ -114,13 +140,15 @@ class ImageGenerationServiceTests(unittest.TestCase):
                 output_format='webp',
             )
 
-        self.assertEqual(client.model_name, 'gpt-image-2-official')
+        self.assertEqual(client.model_name, 'gpt-image-2')
         self.assertEqual(result.image_bytes, b'png-bytes')
         self.assertEqual(result.content_type, 'image/png')
         request_payload = post_json.call_args.args[0]
-        self.assertEqual(request_payload['model'], 'gpt-image-2-official')
+        self.assertEqual(request_payload['model'], 'gpt-image-2')
         self.assertEqual(request_payload['size'], '9:16')
         self.assertEqual(request_payload['resolution'], '4k')
+        self.assertNotIn('quality', request_payload)
+        self.assertNotIn('output_format', request_payload)
         self.assertNotIn('response_format', request_payload)
 
     def test_resolution_mode_can_be_forced_for_custom_proxy_url(self) -> None:
@@ -208,10 +236,12 @@ class ImageGenerationServiceTests(unittest.TestCase):
 
         self.assertEqual(result.image_bytes, b'png-bytes')
         request_payload = post_json.call_args.args[0]
-        self.assertEqual(request_payload['model'], 'gpt-image-2-official')
+        self.assertEqual(request_payload['model'], 'gpt-image-2')
         self.assertEqual(request_payload['image_urls'], ['https://cdn.example.com/source.png'])
         self.assertEqual(request_payload['size'], '9:16')
         self.assertEqual(request_payload['resolution'], '1k')
+        self.assertNotIn('quality', request_payload)
+        self.assertNotIn('output_format', request_payload)
         self.assertNotIn('response_format', request_payload)
 
 

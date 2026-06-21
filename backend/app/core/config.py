@@ -121,6 +121,7 @@ class Settings(BaseSettings):
     image_audit_reject_threshold: float = 0.78
 
     openai_api_key: str = ''
+    image_generation_api_key: str = ''
     image_generation_api_url: str = Field(
         default='https://api.openai.com/v1/images/generations',
     )
@@ -201,6 +202,7 @@ class Settings(BaseSettings):
         'lemonsqueezy_image_credit_pack_variant_id',
         'lemonsqueezy_webhook_signing_secret',
         'openai_api_key',
+        'image_generation_api_key',
         'image_generation_model_snapshot',
         'image_generation_default_quality',
         'image_generation_pro_default_quality',

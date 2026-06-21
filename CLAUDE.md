@@ -167,7 +167,7 @@ Backend values live in `backend/.env` and are documented by `backend/.env.exampl
 - Security/auth: `APP_SECRET`, `OAUTH_JWT_SECRET`, Clerk secrets, Google OAuth values
 - Storage: `OBJECT_*`
 - Critique AI: `AI_API_BASE_URL`, `AI_API_KEY`, `AI_MODEL_NAME`, `FLASH_MODEL_NAME`, `PRO_MODEL_NAME`
-- Generation AI: `OPENAI_API_KEY`, `IMAGE_GENERATION_*`
+- Generation AI: `IMAGE_GENERATION_API_KEY`, `IMAGE_GENERATION_*`
 - Workers/queue: `RUN_EMBEDDED_WORKER`, `REVIEW_WORKER_*`, `CLOUD_TASKS_*`
 - Billing: `LEMONSQUEEZY_*`
 - Frontend/CORS: `FRONTEND_ORIGIN`, `BACKEND_CORS_ORIGINS`

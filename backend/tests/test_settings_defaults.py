@@ -12,6 +12,14 @@ class SettingsDefaultsTestCase(unittest.TestCase):
         settings = Settings(_env_file=None)
         self.assertEqual(settings.image_generation_pro_monthly_credits, 199)
 
+    def test_image_generation_api_key_defaults_to_blank(self):
+        settings = Settings(_env_file=None)
+        self.assertEqual(settings.image_generation_api_key, '')
+
+    def test_image_generation_api_key_strips_whitespace(self):
+        settings = Settings(_env_file=None, image_generation_api_key='  img-key  ')
+        self.assertEqual(settings.image_generation_api_key, 'img-key')
+
     def test_image_credit_pack_checkout_url_defaults_to_blank(self):
         settings = Settings(_env_file=None)
         self.assertEqual(settings.lemonsqueezy_image_credit_pack_checkout_url, '')

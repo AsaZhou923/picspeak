@@ -39,7 +39,8 @@ class OpenAIImageGenerationClient:
         timeout_seconds: int | None = None,
         model_name: str | None = None,
     ) -> None:
-        self.api_key = (api_key if api_key is not None else settings.openai_api_key).strip()
+        configured_api_key = settings.image_generation_api_key or settings.openai_api_key
+        self.api_key = (api_key if api_key is not None else configured_api_key).strip()
         self.api_url = _resolve_generation_api_url(
             api_url=api_url if api_url is not None else settings.image_generation_api_url,
             api_base_url=api_base_url,
@@ -60,19 +61,24 @@ class OpenAIImageGenerationClient:
         output_format: str = 'webp',
     ) -> ImageGenerationResult:
         if not self.api_key:
-            raise ImageGenerationError('OPENAI_API_KEY is not configured')
+            raise ImageGenerationError('IMAGE_GENERATION_API_KEY is not configured')
 
         payload = {
             'model': self.model_name,
             'prompt': prompt,
-            'quality': quality,
             'n': 1,
-            'output_format': output_format,
         }
-        if self.api_mode in {'apimart', 'resolution'}:
+        if self.api_mode == 'apimart':
+            payload['size'] = _to_mode_size(size=size, api_mode=self.api_mode)
+            payload['resolution'] = _to_resolution_tier(quality=quality, size=payload['size'])
+        elif self.api_mode == 'resolution':
+            payload['quality'] = quality
+            payload['output_format'] = output_format
             payload['size'] = _to_mode_size(size=size, api_mode=self.api_mode)
             payload['resolution'] = _to_resolution_tier(quality=quality, size=payload['size'])
         else:
+            payload['quality'] = quality
+            payload['output_format'] = output_format
             payload['size'] = size
             payload['response_format'] = 'b64_json'
         response = self._post_json(payload)
@@ -91,7 +97,7 @@ class OpenAIImageGenerationClient:
         reference_image_url: str | None = None,
     ) -> ImageGenerationResult:
         if not self.api_key:
-            raise ImageGenerationError('OPENAI_API_KEY is not configured')
+            raise ImageGenerationError('IMAGE_GENERATION_API_KEY is not configured')
         if self.api_mode in {'apimart', 'resolution'}:
             normalized_reference_url = str(reference_image_url or '').strip()
             if not normalized_reference_url:
@@ -100,13 +106,14 @@ class OpenAIImageGenerationClient:
             payload = {
                 'model': self.model_name,
                 'prompt': prompt,
-                'quality': quality,
                 'n': 1,
-                'output_format': output_format,
                 'size': output_size,
                 'resolution': _to_resolution_tier(quality=quality, size=output_size),
                 'image_urls': [normalized_reference_url],
             }
+            if self.api_mode == 'resolution':
+                payload['quality'] = quality
+                payload['output_format'] = output_format
             response = self._post_json(payload)
             return self._parse_generation_response(response, output_format=output_format)
 
@@ -318,8 +325,6 @@ def _resolve_api_mode(*, api_mode: str | None, api_url: str) -> str:
 
 def _resolve_model_name(model_name: str | None, api_url: str) -> str:
     normalized = str(model_name or '').strip()
-    if _is_apimart_endpoint(api_url) and normalized in {'', 'gpt-image-2'}:
-        return 'gpt-image-2-official'
     return normalized or 'gpt-image-2'
 
 
