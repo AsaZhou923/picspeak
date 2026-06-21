@@ -56,9 +56,6 @@ export function singlePageAlternates(canonical: string): NonNullable<Metadata['a
   return {
     canonical,
     languages: {
-      'zh-CN': canonical,
-      en: canonical,
-      ja: canonical,
       'x-default': canonical,
     },
   };

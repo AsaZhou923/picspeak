@@ -10,9 +10,10 @@ import { GeneratedImageItem } from '@/lib/types';
 import { useI18n, type Locale } from '@/lib/i18n';
 import { formatUserFacingError } from '@/lib/error-utils';
 import { formatGenerationOutputSpec } from '@/features/generations/generation-config';
+import { localeToIntlLocale } from '@/lib/locale';
 
 function formatDate(value: string, locale: Locale) {
-  return new Date(value).toLocaleString(locale === 'zh' ? 'zh-CN' : locale === 'ja' ? 'ja-JP' : 'en-US', {
+  return new Date(value).toLocaleString(localeToIntlLocale(locale), {
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',

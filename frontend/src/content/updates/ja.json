@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-06-21-frontend-extraction-jsonld-hardening",
+    "date": "2026-06-21",
+    "title": "フロントエンド分割、共通 checkout、JSON-LD hardening",
+    "summary": "PicSpeak は生成ページ、account usage、review history、Gallery、home page の重複 UI と utility logic を reusable component/helper に整理しました。credit pack checkout、date filter、image type copy、locale date formatting を共有し、public JSON-LD script は安全な serialization を使います。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-06-21-frontend-extraction-jsonld-hardening",
+    "sections": [
+      {
+        "title": "ページ分割と再利用",
+        "items": [
+          "/generate は GeneratePageHeader、GenerateFormPanel、GenerationPricingGrid を使い、template selection、prompt example、credit estimate、generation submit は維持します",
+          "account usage は BillingContactModal、UsageGenerationCreditsPanel、UsageQuotaPanel を使うようになりました",
+          "review history、Favorites、Gallery は date、image type、locale formatting helper を共有します"
+        ]
+      },
+      {
+        "title": "構造化データと保守性",
+        "items": [
+          "JSON-LD script tag を壊し得る文字を escape する serializeJsonLd を追加しました",
+          "Home、Blog、author、locale layout の JSON-LD output は安全な serialization を使います",
+          "singlePageAlternates は canonical と x-default のみを残し、single URL page の不正確な multilingual hreflang を避けます"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-06-10-seo-sitemaps-generate-fallback",
     "date": "2026-06-10",
     "title": "生成ページ SEO fallback、news sitemap、構造化データ",

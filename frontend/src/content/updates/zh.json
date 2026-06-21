@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-06-21-frontend-extraction-jsonld-hardening",
+    "date": "2026-06-21",
+    "title": "前端组件拆分、共享 checkout 与 JSON-LD hardening",
+    "summary": "PicSpeak 把生成页、账户用量、点评历史、Gallery 和首页中的重复 UI 与工具逻辑拆成复用组件/helper；credit pack checkout、日期筛选、图片类型文案和 locale 日期格式化统一复用，公开页面 JSON-LD 也改用安全序列化输出。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-06-21-frontend-extraction-jsonld-hardening",
+    "sections": [
+      {
+        "title": "页面拆分与复用",
+        "items": [
+          "/generate 拆出 GeneratePageHeader、GenerateFormPanel 和 GenerationPricingGrid，保留原有模板选择、prompt example、额度估算和生成流程",
+          "账户用量页拆出 BillingContactModal、UsageGenerationCreditsPanel 和 UsageQuotaPanel",
+          "点评历史、收藏页和 Gallery 共用日期、图片类型和 locale 格式化 helper"
+        ]
+      },
+      {
+        "title": "结构化数据与维护性",
+        "items": [
+          "新增 serializeJsonLd，统一转义 JSON-LD script 中可能打断标签的字符",
+          "首页、Blog、作者页和 locale layout 的 JSON-LD 输出改用安全序列化",
+          "singlePageAlternates 只保留 canonical 与 x-default，避免单 URL 页面声明不准确的多语言 hreflang"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-06-10-seo-sitemaps-generate-fallback",
     "date": "2026-06-10",
     "title": "生成页 SEO fallback、news sitemap 与结构化数据",

@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { ArrowRight, Clock3, Sparkles } from 'lucide-react';
 import { getBlogPosts, getBlogUi } from '@/lib/blog-data';
 import type { Locale } from '@/lib/i18n';
+import { serializeJsonLd } from '@/lib/json-ld';
 import { siteConfig } from '@/lib/site';
 import { VALID_LOCALES } from '../locales';
 import { BlogViewCount, BlogViewCountProvider } from './BlogViewCount';
@@ -60,11 +61,11 @@ export default function BlogIndexPageContent({ locale }: { locale?: string }) {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(authorJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(authorJsonLd) }}
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(collectionJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(collectionJsonLd) }}
       />
 
       <BlogViewCountProvider locale={pinnedLocale} slugs={postSlugs}>

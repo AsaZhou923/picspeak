@@ -9,6 +9,7 @@ import { getBlogPost, getBlogPosts, getBlogUi } from '@/lib/blog-data';
 import { formatBlogViewCount, shouldTrackBlogView } from '@/lib/blog-view-stats';
 import { getBlogWorkspaceCta, type ContentConversionEntrypoint } from '@/lib/content-conversion';
 import { I18nProvider, useI18n, type Locale } from '@/lib/i18n';
+import { serializeJsonLd } from '@/lib/json-ld';
 import { markProductAttributionSource, trackProductEvent } from '@/lib/product-analytics';
 import { buildBlogBreadcrumbJsonLd, buildBlogPostingJsonLd } from '@/lib/seo';
 import { siteConfig } from '@/lib/site';
@@ -106,12 +107,12 @@ function BlogPostContent({ slug }: { slug: string }) {
 
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(authorJsonLd) }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(authorJsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(articleJsonLd) }} />
       <script
         id="picspeak-blog-breadcrumb-structured-data"
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbJsonLd) }}
       />
 
       <article className="min-h-screen pt-14">

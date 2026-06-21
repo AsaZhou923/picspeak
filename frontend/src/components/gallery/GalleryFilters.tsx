@@ -4,6 +4,7 @@ import { CalendarDays, SlidersHorizontal, Clock, Star, Heart, Zap } from 'lucide
 import { useRef } from 'react';
 import { ImageType } from '@/lib/types';
 import { useI18n } from '@/lib/i18n';
+import { displayDateToIso, isoDateToDisplay, normalizeDateDisplay } from '@/lib/date-filters';
 
 export type FilterDraft = {
   createdFrom: string;
@@ -23,41 +24,6 @@ interface GalleryFiltersProps {
   hasInvalidDate: boolean;
   createdFromInvalid: boolean;
   createdToInvalid: boolean;
-}
-
-function normalizeDateDisplay(raw: string): string {
-  const digits = raw.replace(/\D/g, '').slice(0, 8);
-  const year = digits.slice(0, 4);
-  const month = digits.slice(4, 6);
-  const day = digits.slice(6, 8);
-
-  if (digits.length <= 4) return year;
-  if (digits.length <= 6) return `${year}/${month}`;
-  return `${year}/${month}/${day}`;
-}
-
-function displayDateToIso(value: string): string | null {
-  const match = value.match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
-  if (!match) return null;
-
-  const [, year, month, day] = match;
-  const isoDate = `${year}-${month}-${day}`;
-  const parsed = new Date(`${isoDate}T00:00:00`);
-
-  if (Number.isNaN(parsed.getTime())) return null;
-  if (
-    parsed.getFullYear() !== Number(year) ||
-    parsed.getMonth() + 1 !== Number(month) ||
-    parsed.getDate() !== Number(day)
-  ) {
-    return null;
-  }
-
-  return isoDate;
-}
-
-function isoDateToDisplay(value: string): string {
-  return value.replace(/-/g, '/');
 }
 
 function DateFilterField({

@@ -9,6 +9,7 @@ import { redeemActivationCode } from '@/lib/api';
 import { formatUserFacingError } from '@/lib/error-utils';
 import { useModalFocusTrap } from '@/lib/hooks/useModalFocusTrap';
 import { useI18n } from '@/lib/i18n';
+import { localeToIntlLocale } from '@/lib/locale';
 import { ActivationCodeRedeemResponse } from '@/lib/types';
 
 type ActivationCodeModalProps = {
@@ -23,13 +24,7 @@ function formatActivationDate(value: string, locale: 'zh' | 'en' | 'ja'): string
     return value;
   }
 
-  const localeMap = {
-    zh: 'zh-CN',
-    en: 'en-US',
-    ja: 'ja-JP',
-  } as const;
-
-  return new Intl.DateTimeFormat(localeMap[locale], {
+  return new Intl.DateTimeFormat(localeToIntlLocale(locale), {
     year: 'numeric',
     month: 'short',
     day: 'numeric',

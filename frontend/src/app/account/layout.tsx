@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import RouteSuspenseBoundary from '@/components/layout/RouteSuspenseBoundary';
 import { NO_INDEX_ROBOTS } from '@/lib/seo';
 
 export const metadata: Metadata = {
@@ -6,5 +7,5 @@ export const metadata: Metadata = {
 };
 
 export default function AccountLayout({ children }: { children: React.ReactNode }) {
-  return <>{children}</>;
+  return <RouteSuspenseBoundary>{children}</RouteSuspenseBoundary>;
 }

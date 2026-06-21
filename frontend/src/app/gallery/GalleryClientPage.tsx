@@ -13,104 +13,21 @@ import { buildGalleryRestoreKey, readGalleryRestoreState, saveGalleryRestoreStat
 import { buildWorkspaceConversionHref } from '@/lib/content-conversion';
 import { useI18n } from '@/lib/i18n';
 import { markProductAttributionSource, trackProductEvent } from '@/lib/product-analytics';
-import { PublicGalleryItem, PublicGalleryQuery } from '@/lib/types';
+import { PublicGalleryItem } from '@/lib/types';
+import { isInvalidCompletedDate } from '@/lib/date-filters';
+import { localeToIntlLocale } from '@/lib/locale';
+import {
+  buildGallerySearchParams,
+  EMPTY_GALLERY_FILTERS,
+  galleryFiltersFromSearchParams,
+  GALLERY_PAGE_SIZE,
+  toGalleryQuery,
+} from '@/lib/gallery-query';
 
 // Extracted sub-components
 import GalleryFilters, { FilterDraft } from '@/components/gallery/GalleryFilters';
 import GalleryPagination from '@/components/gallery/GalleryPagination';
 import GalleryCard from '@/components/gallery/GalleryCard';
-
-const PAGE_SIZE = 12;
-
-const EMPTY_FILTERS: FilterDraft = {
-  createdFrom: '',
-  createdTo: '',
-  minScore: '',
-  maxScore: '',
-  imageType: '',
-  sort: 'default',
-};
-
-function displayDateToIso(value: string): string | null {
-  const match = value.match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
-  if (!match) return null;
-  const [, year, month, day] = match;
-  return `${year}-${month}-${day}`;
-}
-
-function isoDateToDisplay(value: string): string {
-  return value.replace(/-/g, '/');
-}
-
-function isInvalidCompletedDate(value: string): boolean {
-  if (!value) return false;
-  if (value.length < 10) return false;
-  const match = value.match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
-  if (!match) return true;
-  const [, year, month, day] = match;
-  const isoDate = `${year}-${month}-${day}`;
-  const parsed = new Date(`${isoDate}T00:00:00`);
-  return (
-    Number.isNaN(parsed.getTime()) ||
-    parsed.getFullYear() !== Number(year) ||
-    parsed.getMonth() + 1 !== Number(month) ||
-    parsed.getDate() !== Number(day)
-  );
-}
-
-function galleryFiltersFromSearchParams(searchParams: URLSearchParams): FilterDraft {
-  return {
-    createdFrom: searchParams.get('created_from') ? isoDateToDisplay(searchParams.get('created_from') as string) : '',
-    createdTo: searchParams.get('created_to') ? isoDateToDisplay(searchParams.get('created_to') as string) : '',
-    minScore: searchParams.get('min_score') ?? '',
-    maxScore: searchParams.get('max_score') ?? '',
-    imageType: (searchParams.get('image_type') as any) ?? '',
-    sort: searchParams.get('sort') ?? 'default',
-  };
-}
-
-function buildGallerySearchParams(filters: FilterDraft, options?: { restore?: boolean }): URLSearchParams {
-  const params = new URLSearchParams();
-  const createdFromIso = displayDateToIso(filters.createdFrom);
-  const createdToIso = displayDateToIso(filters.createdTo);
-
-  if (createdFromIso) params.set('created_from', createdFromIso);
-  if (createdToIso) params.set('created_to', createdToIso);
-  if (filters.minScore !== '') params.set('min_score', filters.minScore);
-  if (filters.maxScore !== '') params.set('max_score', filters.maxScore);
-  if (filters.imageType) params.set('image_type', filters.imageType);
-  if (filters.sort && filters.sort !== 'default') params.set('sort', filters.sort);
-  if (options?.restore) params.set('restore', '1');
-
-  return params;
-}
-
-function toGalleryQuery(filters: FilterDraft): PublicGalleryQuery {
-  const query: PublicGalleryQuery = { limit: PAGE_SIZE };
-  const createdFromIso = displayDateToIso(filters.createdFrom);
-  const createdToIso = displayDateToIso(filters.createdTo);
-
-  if (createdFromIso) {
-    query.created_from = new Date(`${createdFromIso}T00:00:00`).toISOString();
-  }
-  if (createdToIso) {
-    query.created_to = new Date(`${createdToIso}T23:59:59.999`).toISOString();
-  }
-  if (filters.minScore !== '') {
-    query.min_score = Number(filters.minScore);
-  }
-  if (filters.maxScore !== '') {
-    query.max_score = Number(filters.maxScore);
-  }
-  if (filters.imageType) {
-    query.image_type = filters.imageType as any;
-  }
-  if (filters.sort) {
-    query.sort = filters.sort;
-  }
-
-  return query;
-}
 
 function GalleryPageContent() {
   const router = useRouter();
@@ -133,7 +50,7 @@ function GalleryPageContent() {
   const [likeBusyId, setLikeBusyId] = useState<string | null>(null);
   const [guestLikePromptOpen, setGuestLikePromptOpen] = useState(false);
 
-  const dateLocale = locale === 'zh' ? 'zh-CN' : locale === 'ja' ? 'ja-JP' : 'en-US';
+  const dateLocale = localeToIntlLocale(locale);
   const viewerToken = userInfo?.plan && userInfo.plan !== 'guest' ? token ?? undefined : undefined;
   const currentPlan = (userInfo?.plan ?? 'guest') as 'guest' | 'free' | 'pro';
 
@@ -290,7 +207,7 @@ function GalleryPageContent() {
     );
   }, []);
 
-  const totalPages = Math.max(1, Math.ceil(Math.max(totalCount, 1) / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(Math.max(totalCount, 1) / GALLERY_PAGE_SIZE));
 
   const goToPage = useCallback(async (targetIndex: number) => {
     if (paging) return;
@@ -346,8 +263,8 @@ function GalleryPageContent() {
   };
 
   const handleResetFilters = () => {
-    setDraftFilters(EMPTY_FILTERS);
-    pushFilterState(EMPTY_FILTERS);
+    setDraftFilters(EMPTY_GALLERY_FILTERS);
+    pushFilterState(EMPTY_GALLERY_FILTERS);
   };
 
   const handleSortChange = (newSort: string) => {
@@ -385,7 +302,7 @@ function GalleryPageContent() {
   );
 
   const items = pages[pageIndex] ?? [];
-  const visibleStart = items.length > 0 ? pageIndex * PAGE_SIZE + 1 : 0;
+  const visibleStart = items.length > 0 ? pageIndex * GALLERY_PAGE_SIZE + 1 : 0;
   const visibleEnd = items.length > 0 ? visibleStart + items.length - 1 : 0;
 
   return (

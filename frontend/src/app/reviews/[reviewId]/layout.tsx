@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { buildDemoReviewJsonLd, DEMO_REVIEW_ID, isDemoReviewId } from '@/lib/demo-review';
 import { enTranslations } from '@/lib/i18n-en';
+import { serializeJsonLd } from '@/lib/json-ld';
 import { INDEXABLE_ROBOTS, NO_INDEX_ROBOTS, singlePageAlternates } from '@/lib/seo';
 import { siteConfig } from '@/lib/site';
 
@@ -66,7 +67,7 @@ export default async function ReviewDetailLayout({
         <script
           id="picspeak-demo-review-structured-data"
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(demoReviewJsonLd) }}
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(demoReviewJsonLd) }}
         />
       )}
       {children}

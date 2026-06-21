@@ -2,6 +2,109 @@
 
 本文件汇总了原 `docs/changelog/update-log-*.md` 的全部更新记录。新增 release 请追加到顶部，并为每条记录保留稳定锚点，供 `/updates` 的 `docPath` 和 README 链接定位。
 
+<a id="2026-06-21-frontend-extraction-jsonld-hardening"></a>
+
+## 2026-06-21 - frontend extraction jsonld hardening
+
+日期：2026-06-21
+
+### 概览
+
+这次更新把多个前端页面中重复的 UI、日期格式化、checkout 和结构化数据逻辑抽成可复用 helper/component，让生成页、账户页、点评历史、Gallery 和首页更容易维护，同时补强 JSON-LD script 输出的转义保护。
+
+- `/generate` 继续保留原有模板选择、prompt example、负面 prompt、额度估算、AI 生图与历史入口，但页面主体拆为表单、头部、定价等独立组件。
+- 账户用量页、点评历史页、收藏页、Gallery 和关联复拍参考图组件复用统一的日期、图片类型文案和 credit pack checkout 流程。
+- 首页联系区、生图定价区和首页结构化数据 builder 从 `HomePageClient` 中拆出，公开页面 JSON-LD 统一使用安全序列化。
+- `singlePageAlternates()` 只保留 canonical 与 `x-default`，避免单 URL 公共页面继续声明不准确的多语言 hreflang。
+- 新增/调整测试覆盖 JSON-LD 序列化与 hreflang 输出。
+
+### 生成页与账户页面拆分
+
+- `GeneratePageClient` 复用 `GeneratePageHeader`、`GenerateFormPanel` 和 `GenerationPricingGrid`，把模板卡片、prompt 表单、质量/尺寸/风格选择、prompt example 与定价说明从页面文件中移出。
+- `generation-page-copy.ts` 统一维护生成页模板/质量/尺寸文案 key、CTA 判断、历史时间格式化和字符串插值。
+- 账户用量页改用 `BillingContactModal`、`UsageGenerationCreditsPanel` 和 `UsageQuotaPanel`，并把激活码和订阅到期文案提取到 `usage-page-copy.ts`。
+- `useCreditPackCheckout()` 统一处理 credit pack checkout 弹窗、返回路径、错误文案和 `credit_pack_checkout_started` 事件，供 `/generate`、`/account/usage` 和点评关联生图入口复用。
+
+### Gallery、点评历史与日期工具
+
+- `date-filters.ts` 统一 `yyyy/mm/dd` 输入归一化、ISO 转换和真实日期校验，Gallery 与点评历史筛选共用同一套逻辑。
+- `gallery-query.ts` 集中维护 Gallery filter URL 参数、API query 和分页大小。
+- `ReviewHistoryPanels` 与 `review-history-copy.ts` 承接点评历史卡片、趋势面板、骨架屏、图片类型标签和三语文案，缩短 account reviews 页面。
+- 收藏页、Gallery 和激活码弹窗改用 `localeToIntlLocale()`，减少重复的 `zh-CN` / `en-US` / `ja-JP` 映射。
+
+### JSON-LD 与首页结构化数据
+
+- 新增 `serializeJsonLd()`，对 `<`、U+2028 和 U+2029 做转义，降低 JSON-LD 内容打断 `<script>` 标签的风险。
+- 首页、locale layout、Blog index、Blog post 和作者页的 JSON-LD script 改用 `serializeJsonLd()`。
+- `home-structured-data.ts` 新增 SoftwareApplication、Person、SoftwareSourceCode 和 FAQPage builder，首页组件只负责组装和渲染。
+- 首页联系区和 GPT Image 2 定价区拆为 `HomeContactSection`、`HomeGenerationPricingSection`，X 图标抽为共享 `XBrandIcon`。
+
+### 首页更新记录同步
+
+- `/updates` 三语 JSON 新增本次前端拆分、共享 checkout/date helper、JSON-LD 序列化和 hreflang 调整记录，`docPath` 指向 `docs/changelog/CHANGELOG.md#2026-06-21-frontend-extraction-jsonld-hardening`。
+- 首页底部“更新记录”三语 hint 改为前端拆分与 JSON-LD hardening 主题。
+- README / README.zh-CN 最新 changelog 链接更新到本次锚点。
+- `CLAUDE.md` 补充 JSON-LD 序列化与共享日期/checkout helper 的维护约定。
+
+### 影响文件
+
+#### 前端
+
+- `frontend/.eslintrc.json`
+- `frontend/src/app/[locale]/blog/BlogIndexPageContent.tsx`
+- `frontend/src/app/[locale]/blog/[slug]/BlogPostClient.tsx`
+- `frontend/src/app/[locale]/layout.tsx`
+- `frontend/src/app/account/favorites/page.tsx`
+- `frontend/src/app/account/generations/page.tsx`
+- `frontend/src/app/account/layout.tsx`
+- `frontend/src/app/account/reviews/layout.tsx`
+- `frontend/src/app/account/reviews/page.tsx`
+- `frontend/src/app/account/usage/layout.tsx`
+- `frontend/src/app/account/usage/page.tsx`
+- `frontend/src/app/author/asa-zhou/page.tsx`
+- `frontend/src/app/gallery/GalleryClientPage.tsx`
+- `frontend/src/app/gallery/page.tsx`
+- `frontend/src/app/generate/GeneratePageClient.tsx`
+- `frontend/src/app/generate/layout.tsx`
+- `frontend/src/app/generate/prompts/[id]/page.tsx`
+- `frontend/src/app/generate/prompts/page.tsx`
+- `frontend/src/app/generation-tasks/[taskId]/page.tsx`
+- `frontend/src/app/reviews/[reviewId]/layout.tsx`
+- `frontend/src/components/account/{BillingContactModal,UsageGenerationCreditsPanel,UsageQuotaPanel}.tsx`
+- `frontend/src/components/billing/ActivationCodeModal.tsx`
+- `frontend/src/components/gallery/GalleryFilters.tsx`
+- `frontend/src/components/home/{HomeContactSection,HomeGenerationPricingSection,HomePageClient}.tsx`
+- `frontend/src/components/layout/RouteSuspenseBoundary.tsx`
+- `frontend/src/components/ui/XBrandIcon.tsx`
+- `frontend/src/features/generations/components/{GenerateFormPanel,GeneratePageHeader,GenerationPricingGrid}.tsx`
+- `frontend/src/features/generations/generation-page-copy.ts`
+- `frontend/src/features/reviews/components/{ReviewHistoryPanels,ReviewReferenceGenerationPanel}.tsx`
+- `frontend/src/lib/{date-filters,gallery-query,home-structured-data,json-ld,locale,review-history-copy,seo,usage-page-copy}.ts`
+- `frontend/src/lib/hooks/useCreditPackCheckout.ts`
+- `frontend/src/content/updates/{zh,en,ja}.json`
+- `frontend/src/lib/i18n-{zh,en,ja}.ts`
+- `frontend/test/home-structured-data.test.ts`
+- `frontend/test/seo-alternates.test.ts`
+
+#### 文档
+
+- `docs/changelog/CHANGELOG.md`
+- `README.md`
+- `README.zh-CN.md`
+- `CLAUDE.md`
+
+### 验证
+
+- `node -e "for (const f of ['zh','en','ja']) JSON.parse(require('fs').readFileSync('frontend/src/content/updates/'+f+'.json', 'utf8'));"` -> JSON 解析通过。
+- `Get-FileHash` 对比仓库 changelog / workflow 与外部 Update Logs 副本 SHA256 一致。
+- `cd frontend && npm run typecheck`。
+- `cd frontend && npm run lint`。
+- `cd frontend && npm run test` -> `83 passed`。
+- `cd frontend && npm run build` -> 生成 120 个静态页面。
+- `git diff --check` -> 无 whitespace error（仅 CRLF 换行提醒）。
+
+---
+
 <a id="2026-06-10-seo-sitemaps-generate-fallback"></a>
 
 ## 2026-06-10 - seo sitemaps generate fallback

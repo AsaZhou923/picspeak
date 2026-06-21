@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowRight, BookOpenText, Camera, Github, Mail, Sparkles, Twitter } from 'lucide-react';
+import { serializeJsonLd } from '@/lib/json-ld';
 import { INDEXABLE_ROBOTS } from '@/lib/seo';
 import { siteConfig } from '@/lib/site';
 
@@ -102,11 +103,11 @@ export default function AsaZhouAuthorPage() {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(personJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(personJsonLd) }}
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(profileJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(profileJsonLd) }}
       />
 
       <main className="min-h-screen pt-14">

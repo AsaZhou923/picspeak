@@ -3,9 +3,12 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { AlertCircle, ArrowRight, Camera, CheckCircle2, ClipboardCheck, Coins, LineChart, Mail, X } from 'lucide-react';
+import { AlertCircle, ArrowRight, Camera, CheckCircle2, ClipboardCheck, LineChart } from 'lucide-react';
 import ActivationCodeModal from '@/components/billing/ActivationCodeModal';
-import { createBillingCheckout, createImageCreditPackCheckout, getBillingPortal, getUsage } from '@/lib/api';
+import BillingContactModal from '@/components/account/BillingContactModal';
+import UsageGenerationCreditsPanel from '@/components/account/UsageGenerationCreditsPanel';
+import UsageQuotaPanel from '@/components/account/UsageQuotaPanel';
+import { createBillingCheckout, getBillingPortal, getUsage } from '@/lib/api';
 import ClerkSignInTrigger from '@/components/auth/ClerkSignInTrigger';
 import ProPromoCard from '@/components/marketing/ProPromoCard';
 import { useAuth } from '@/lib/auth-context';
@@ -19,7 +22,9 @@ import {
   navigateExternalCheckoutWindow,
   openExternalCheckoutWindow,
 } from '@/lib/external-checkout-window';
+import { useCreditPackCheckout } from '@/lib/hooks/useCreditPackCheckout';
 import { getProPlanBoundaryCopy, getUsageDecisionCopy, type ProConversionLocale } from '@/lib/pro-conversion';
+import { activationUiCopy, fixedSubscriptionCopy, formatSubscriptionDate } from '@/lib/usage-page-copy';
 
 function UsageBar({
   label,
@@ -138,9 +143,18 @@ export default function UsagePage() {
   const [billingMessage, setBillingMessage] = useState('');
   const [billingModalOpen, setBillingModalOpen] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
-  const [creditPackLoading, setCreditPackLoading] = useState<'usd' | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
   const [activationModalOpen, setActivationModalOpen] = useState(false);
+  const creditPackCheckout = useCreditPackCheckout({
+    ensureToken,
+    locale,
+    t,
+    onMessage: (message) => {
+      if (!message) return;
+      setBillingMessage(message);
+      setBillingModalOpen(true);
+    },
+  });
 
   useEffect(() => {
     if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('checkout') === 'success') {
@@ -233,28 +247,12 @@ export default function UsagePage() {
   }
 
   async function handleCreditPackCheckout(currency: 'usd') {
-    const checkoutWindow = openExternalCheckoutWindow(t('usage_checkout_loading'));
-    setCreditPackLoading(currency);
     setBillingMessage('');
-    try {
-      const token = await ensureToken();
-      const response = await createImageCreditPackCheckout(token, { currency, locale });
-      if (response.checkout_url) {
-        if (!navigateExternalCheckoutWindow(checkoutWindow, response.checkout_url)) {
-          throw new Error('Checkout window was blocked');
-        }
-        return;
-      }
-      closeExternalCheckoutWindow(checkoutWindow);
-      setBillingMessage(`${response.credits} credits / ${response.price} checkout is unavailable.`);
-      setBillingModalOpen(true);
-    } catch (err) {
-      closeExternalCheckoutWindow(checkoutWindow);
-      setBillingMessage(formatUserFacingError(t, err, t('usage_checkout_unavailable')));
-      setBillingModalOpen(true);
-    } finally {
-      setCreditPackLoading(null);
-    }
+    await creditPackCheckout.startCreditPackCheckout({
+      currency,
+      entrypoint: 'account_usage',
+      pagePath: '/account/usage',
+    });
   }
 
   const historyRetentionText =
@@ -370,154 +368,23 @@ export default function UsagePage() {
               </div>
             </div>
 
-            <div className="overflow-hidden rounded-lg border border-gold/25 bg-[linear-gradient(135deg,rgba(200,162,104,0.16),transparent_44%),rgb(var(--color-raised)/0.78)] p-6">
-              <div className="flex flex-wrap items-start justify-between gap-5">
-                <div className="flex max-w-md items-start gap-3">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-gold/30 bg-gold/10 text-gold">
-                    <Coins size={18} />
-                  </span>
-                  <div>
-                    <p className="text-sm font-medium text-ink">{t('usage_generation_credits_title')}</p>
-                    <p className="mt-1 text-xs leading-5 text-ink-muted">{t('usage_generation_credits_body')}</p>
-                  </div>
-                </div>
-                <div className="min-w-[150px] text-left sm:text-right">
-                  <p className="font-display text-4xl text-gold">
-                    {generationCredits.monthly_remaining ?? 0}
-                  </p>
-                  <p className="mt-1 text-xs text-ink-muted">
-                    {t('usage_generation_credits_monthly_remaining').replace(
-                      '{total}',
-                      String(generationCredits.monthly_total ?? 0)
-                    )}
-                  </p>
-                </div>
-              </div>
+            <UsageGenerationCreditsPanel
+              t={t}
+              plan={usage.plan}
+              generationCredits={generationCredits}
+              creditPackBusy={creditPackCheckout.busy}
+              loadingCurrency={creditPackCheckout.loadingCurrency}
+              onCreditPackCheckout={() => void handleCreditPackCheckout('usd')}
+              renderUsageBar={(props) => <UsageBar {...props} />}
+            />
 
-              {generationCredits.monthly_total !== null &&
-                generationCredits.monthly_total > 0 &&
-                generationCredits.monthly_used !== null && (
-                  <div className="mt-5">
-                    <UsageBar
-                      label={t('usage_generation_credits_monthly_used')}
-                      used={generationCredits.monthly_used}
-                      total={generationCredits.monthly_total}
-                    />
-                  </div>
-                )}
-
-              <p className="mt-4 rounded-md border border-border-subtle bg-void/25 px-3 py-2 text-xs leading-5 text-ink-muted">
-                {usage.plan === 'guest'
-                  ? t('usage_generation_credits_guest_hint')
-                  : t('usage_generation_credits_pricing_hint')}
-              </p>
-              {usage.plan !== 'guest' && (
-                <div className="mt-4 rounded-lg border border-border-subtle bg-void/25 p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-medium text-ink">
-                        {t('usage_credit_pack_title')}
-                      </p>
-                      <p className="mt-1 text-xs leading-5 text-ink-muted">
-                        {t('usage_credit_pack_body')}
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => void handleCreditPackCheckout('usd')}
-                        disabled={creditPackLoading !== null}
-                        className="rounded-full border border-gold/30 px-4 py-2 text-xs font-medium text-gold transition-colors hover:bg-gold/10 disabled:opacity-60"
-                      >
-                        {creditPackLoading === 'usd' ? t('usage_checkout_loading') : t('usage_credit_pack_button')}
-                      </button>
-                      <span className="self-center text-xs text-ink-subtle">{t('usage_credit_pack_payment_hint')}</span>
-                    </div>
-                  </div>
-                  <p className="mt-3 text-xs leading-5 text-ink-subtle">
-                    {t('usage_credit_pack_refresh_hint')}
-                  </p>
-                </div>
-              )}
-            </div>
-
-            <div className="border border-border-subtle rounded-lg bg-raised p-6 space-y-5">
-              {usage.quota.daily_total !== null && usage.quota.daily_used !== null ? (
-                <div className="space-y-3">
-                  <div className="flex items-end gap-2">
-                    <span className="font-display text-4xl text-ink">
-                      {usage.quota.daily_remaining}
-                    </span>
-                    <span className="text-ink-muted mb-1.5 text-sm">
-                      {t('usage_daily_remaining').replace('{total}', String(usage.quota.daily_total))}
-                    </span>
-                  </div>
-                  <UsageBar
-                    label={t('usage_daily_quota')}
-                    used={usage.quota.daily_used}
-                    total={usage.quota.daily_total}
-                  />
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <p className="text-xs text-ink-muted">{t('usage_daily_quota')}</p>
-                  <p className="text-sm text-sage">{t('usage_unlimited_daily')}</p>
-                </div>
-              )}
-
-              {usage.quota.monthly_total !== null && usage.quota.monthly_used !== null && (
-                <div className="space-y-3">
-                  <div className="flex items-end gap-2">
-                    <span className="font-display text-3xl text-ink">
-                      {usage.quota.monthly_remaining}
-                    </span>
-                    <span className="text-ink-muted mb-1 text-sm">
-                      {t('usage_monthly_remaining').replace('{total}', String(usage.quota.monthly_total))}
-                    </span>
-                  </div>
-                  <UsageBar
-                    label={t('usage_monthly_quota')}
-                    used={usage.quota.monthly_used}
-                    total={usage.quota.monthly_total}
-                  />
-                </div>
-              )}
-
-              {usage.quota.pro_monthly_total !== null && usage.quota.pro_monthly_used !== null && (
-                <div className="space-y-3">
-                  <div className="flex items-end gap-2">
-                    <span className="font-display text-3xl text-ink">
-                      {usage.quota.pro_monthly_remaining}
-                    </span>
-                    <span className="text-ink-muted mb-1 text-sm">
-                      {t('usage_pro_monthly_remaining').replace('{total}', String(usage.quota.pro_monthly_total))}
-                    </span>
-                  </div>
-                  <UsageBar
-                    label={t('usage_pro_monthly_quota')}
-                    used={usage.quota.pro_monthly_used}
-                    total={usage.quota.pro_monthly_total}
-                  />
-                </div>
-              )}
-
-              <div className="grid sm:grid-cols-3 gap-3 text-sm">
-                <div className="border border-border-subtle rounded-md px-4 py-3">
-                  <p className="text-xs text-ink-muted mb-1">{t('usage_review_modes')}</p>
-                  <p>{reviewModesText}</p>
-                </div>
-                <div className="border border-border-subtle rounded-md px-4 py-3">
-                  <p className="text-xs text-ink-muted mb-1">{t('usage_history_label')}</p>
-                  <p>{historyRetentionText}</p>
-                </div>
-                <div className="border border-border-subtle rounded-md px-4 py-3">
-                  <p className="text-xs text-ink-muted mb-1">{t('usage_priority_label')}</p>
-                  <p>{usage.features.priority_queue ? t('usage_priority_yes') : t('usage_priority_no')}</p>
-                </div>
-              </div>
-
-
-            </div>
+            <UsageQuotaPanel
+              t={t}
+              usage={usage}
+              reviewModesText={reviewModesText}
+              historyRetentionText={historyRetentionText}
+              renderUsageBar={(props) => <UsageBar {...props} />}
+            />
 
             <UsageDecisionPanel locale={locale} plan={usage.plan} />
 
@@ -632,168 +499,12 @@ export default function UsagePage() {
       />
 
       {billingModalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center px-6"
-          onClick={() => setBillingModalOpen(false)}
-        >
-          <div className="absolute inset-0 bg-void/80 backdrop-blur-sm" />
-          <div
-            className="relative w-full max-w-md bg-raised border border-border rounded-xl p-7 shadow-2xl animate-fade-in"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              type="button"
-              onClick={() => setBillingModalOpen(false)}
-              className="absolute top-4 right-4 text-ink-muted hover:text-ink transition-colors"
-              aria-label="Close"
-            >
-              <X size={16} />
-            </button>
-
-            <div className="mb-5">
-              <p className="text-xs text-gold/70 font-mono mb-3 tracking-widest uppercase">Billing</p>
-              <p className="text-sm text-ink leading-relaxed">
-                {billingMessage || t('billing_payment_placeholder')}
-              </p>
-            </div>
-
-            <div className="border-t border-border-subtle pt-5">
-              <p className="text-xs text-ink-muted mb-4 leading-relaxed">
-                {t('billing_contact_prompt')}
-              </p>
-              <div className="flex flex-col gap-3">
-                <a
-                  href="https://x.com/Zzw_Prime"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 px-4 py-3 border border-border rounded-lg hover:border-gold/40 hover:bg-void/60 transition-all duration-200 group"
-                >
-                  <span className="flex items-center justify-center w-7 h-7 rounded-full border border-border group-hover:border-gold/40 transition-colors shrink-0">
-                    <XBrandIcon />
-                  </span>
-                  <div>
-                    <p className="text-xs font-medium text-ink group-hover:text-gold transition-colors">X (Twitter)</p>
-                    <p className="text-xs text-ink-subtle mt-0.5">@Zzw_Prime</p>
-                  </div>
-                </a>
-                <a
-                  href="mailto:xavierzhou23@gmail.com"
-                  className="flex items-center gap-3 px-4 py-3 border border-border rounded-lg hover:border-gold/40 hover:bg-void/60 transition-all duration-200 group"
-                >
-                  <span className="flex items-center justify-center w-7 h-7 rounded-full border border-border group-hover:border-gold/40 transition-colors shrink-0">
-                    <Mail size={13} className="text-ink-muted group-hover:text-gold transition-colors" />
-                  </span>
-                  <div>
-                    <p className="text-xs font-medium text-ink group-hover:text-gold transition-colors">Email</p>
-                    <p className="text-xs text-ink-subtle mt-0.5">xavierzhou23@gmail.com</p>
-                  </div>
-                </a>
-              </div>
-            </div>
-          </div>
-        </div>
+        <BillingContactModal
+          t={t}
+          message={billingMessage}
+          onClose={() => setBillingModalOpen(false)}
+        />
       )}
     </div>
-  );
-}
-
-const subscriptionCopy = {
-  zh: {
-    label: 'Pro 到期时间',
-    pending: '等待同步',
-    cancelledHint: '已取消自动续费，到期后将降级。',
-  },
-  en: {
-    label: 'Pro expires on',
-    pending: 'Syncing',
-    cancelledHint: 'Auto-renew is off and the plan will downgrade at the end of the term.',
-  },
-  ja: {
-    label: 'Pro の終了日時',
-    pending: '同期中',
-    cancelledHint: '自動更新は停止済みです。期間終了後にダウングレードされます。',
-  },
-} as const;
-
-const fixedSubscriptionCopy = {
-  zh: {
-    label: 'Pro 到期时间',
-    pending: '等待同步',
-    cancelledHint: '已关闭自动续费，到期后将降级。',
-  },
-  en: {
-    label: 'Pro expires on',
-    pending: 'Syncing',
-    cancelledHint: 'Auto-renew is off and the plan will downgrade at the end of the term.',
-  },
-  ja: {
-    label: 'Pro の終了日時',
-    pending: '同期中',
-    cancelledHint: '自動更新は停止中です。期間終了後にダウングレードされます。',
-  },
-} as const;
-
-const activationUiCopy = {
-  zh: {
-    title: '国内支付与激活码开通',
-    body: '中文用户可通过 Lemon Squeezy 中文专属 checkout 以 $1.99 一次性开通 30 天 Pro，不会自动续费。已收到激活码的用户仍可在站内兑换。',
-    stepBuy: '完成 Lemon Squeezy checkout',
-    stepReceive: '支付成功后等待同步',
-    stepRedeem: '如有激活码，也可登录后兑换',
-    purchaseCta: '开通 Pro',
-    renewCta: '再开通 30 天 Pro',
-    redeemCta: '输入激活码',
-    signInFirst: '先登录再兑换',
-    subscriptionHint: '当前账号通过激活码开通，无自动续费。',
-    modalEyebrow: 'Activation',
-    modalTitle: '兑换激活码',
-    modalBody: '请输入我发送给你的激活码。兑换成功后，当前账号会立即获得或延长 30 天 Pro 会员。',
-    codeLabel: '激活码',
-    codePlaceholder: '例如 PSCN-ABCD-EFGH-JKLM',
-    redeemSubmit: '立即兑换',
-    redeeming: '正在兑换...',
-    close: '关闭',
-    success: '兑换成功，Pro 已开通至 {date}。',
-    error: '暂时无法兑换激活码，请稍后再试。',
-    pending: '已开通',
-  },
-  en: {
-    pending: 'Activated',
-  },
-  ja: {
-    pending: '有効化済み',
-  },
-} as const;
-
-function formatSubscriptionDate(value: string | null | undefined, locale: 'zh' | 'en' | 'ja'): string | null {
-  if (!value) {
-    return null;
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-
-  const localeMap = {
-    zh: 'zh-CN',
-    en: 'en-US',
-    ja: 'ja-JP',
-  } as const;
-
-  return new Intl.DateTimeFormat(localeMap[locale], {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
-}
-
-function XBrandIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" className="text-ink-muted group-hover:text-gold transition-colors">
-      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.746l7.73-8.835L1.254 2.25H8.08l4.259 5.631 5.905-5.631Zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-    </svg>
   );
 }

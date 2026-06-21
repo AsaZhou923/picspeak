@@ -3,19 +3,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { AlertCircle, CheckCircle2, Clock, Cpu, Palette, Save, Sparkles } from 'lucide-react';
-import { createImageCreditPackCheckout, getGenerationTask, isAbortError } from '@/lib/api';
+import { getGenerationTask, isAbortError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
-import { rememberCheckoutReturnPath } from '@/lib/checkout-return';
 import { ApiException, GenerationTaskStatusResponse } from '@/lib/types';
 import { useI18n } from '@/lib/i18n';
 import { formatUserFacingError } from '@/lib/error-utils';
 import { trackProductEvent } from '@/lib/product-analytics';
 import { WaitingBlogWindow } from '@/components/blog/WaitingBlogWindow';
-import {
-  closeExternalCheckoutWindow,
-  navigateExternalCheckoutWindow,
-  openExternalCheckoutWindow,
-} from '@/lib/external-checkout-window';
+import { useCreditPackCheckout } from '@/lib/hooks/useCreditPackCheckout';
 
 const POLL_INTERVAL = 1200;
 const GENERATION_WAIT_NOTES = [
@@ -39,8 +34,6 @@ export default function GenerationTaskPage() {
   const { t, locale } = useI18n();
   const [task, setTask] = useState<GenerationTaskStatusResponse | null>(null);
   const [error, setError] = useState('');
-  const [creditPackBusy, setCreditPackBusy] = useState(false);
-  const [creditPackMessage, setCreditPackMessage] = useState('');
   const finalRef = useRef(false);
   const trackedFinalRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -174,45 +167,23 @@ export default function GenerationTaskPage() {
     Math.max(Math.floor((progress / 100) * GENERATION_DIMENSIONS.length), 0),
     GENERATION_DIMENSIONS.length - 1
   );
+  const creditPackCheckout = useCreditPackCheckout({
+    ensureToken,
+    locale,
+    t,
+  });
 
   async function handleCreditPackCheckout() {
-    if (creditPackBusy) return;
-    rememberCheckoutReturnPath();
-    const checkoutWindow = openExternalCheckoutWindow(t('usage_checkout_loading'));
-    setCreditPackBusy(true);
-    setCreditPackMessage('');
-    try {
-      const token = await ensureToken();
-      const response = await createImageCreditPackCheckout(token, { currency: 'usd', locale });
-      if (!response.checkout_url) {
-        closeExternalCheckoutWindow(checkoutWindow);
-        setCreditPackMessage(`${response.credits} credits / ${response.price} checkout is unavailable.`);
-        return;
-      }
-      void trackProductEvent('credit_pack_checkout_started', {
-        token,
-        pagePath: `/generation-tasks/${taskId}`,
-        locale,
-        metadata: {
-          task_id: taskId,
-          generation_mode: task?.generation_mode,
-          intent: task?.intent,
-          source_review_id: task?.source_review_id,
-          entrypoint: 'generation_task_credit_exhausted',
-          pack: response.pack,
-          pack_credits: response.credits,
-          price: response.price,
-        },
-      });
-      if (!navigateExternalCheckoutWindow(checkoutWindow, response.checkout_url)) {
-        throw new Error('Checkout window was blocked');
-      }
-    } catch (err) {
-      closeExternalCheckoutWindow(checkoutWindow);
-      setCreditPackMessage(formatUserFacingError(t, err, t('usage_checkout_unavailable')));
-    } finally {
-      setCreditPackBusy(false);
-    }
+    await creditPackCheckout.startCreditPackCheckout({
+      entrypoint: 'generation_task_credit_exhausted',
+      pagePath: `/generation-tasks/${taskId}`,
+      metadata: {
+        task_id: taskId,
+        generation_mode: task?.generation_mode,
+        intent: task?.intent,
+        source_review_id: task?.source_review_id,
+      },
+    });
   }
 
   return (
@@ -254,15 +225,15 @@ export default function GenerationTaskPage() {
                 <button
                   type="button"
                   onClick={() => void handleCreditPackCheckout()}
-                  disabled={creditPackBusy}
+                  disabled={creditPackCheckout.busy}
                   className="w-full rounded-full border border-rust/25 bg-void/40 px-4 py-2.5 text-sm font-medium text-rust transition-colors hover:bg-rust/10 disabled:opacity-60"
                 >
                   {t('usage_credit_pack_button')}
                 </button>
                 <p className="mt-2 text-xs leading-5 text-ink-subtle">{t('usage_credit_pack_payment_hint')}</p>
-                {creditPackMessage && (
+                {creditPackCheckout.message && (
                   <p className="mt-3 rounded-md border border-border-subtle bg-void/30 px-3 py-2 text-xs leading-5 text-ink-muted">
-                    {creditPackMessage}
+                    {creditPackCheckout.message}
                   </p>
                 )}
               </div>

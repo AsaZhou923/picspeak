@@ -1,6 +1,7 @@
 import GallerySeoHero from '@/components/gallery/GallerySeoHero';
 import GalleryClientPage from './GalleryClientPage';
 import { buildGalleryCollectionJsonLd } from '@/lib/gallery-schema';
+import { serializeJsonLd } from '@/lib/json-ld';
 import { siteConfig } from '@/lib/site';
 
 const galleryCollectionJsonLd = buildGalleryCollectionJsonLd({ site: siteConfig });
@@ -10,7 +11,7 @@ export default function GalleryPage() {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(galleryCollectionJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(galleryCollectionJsonLd) }}
       />
       <GallerySeoHero />
       <GalleryClientPage />

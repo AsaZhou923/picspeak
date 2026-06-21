@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import RouteSuspenseBoundary from '@/components/layout/RouteSuspenseBoundary';
 
 export const metadata: Metadata = {
   title: 'Your AI Photo Critique History and Review Archive',
@@ -7,5 +8,5 @@ export const metadata: Metadata = {
 };
 
 export default function AccountReviewsLayout({ children }: { children: React.ReactNode }) {
-  return <>{children}</>;
+  return <RouteSuspenseBoundary>{children}</RouteSuspenseBoundary>;
 }

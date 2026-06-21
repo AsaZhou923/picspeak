@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import RouteSuspenseBoundary from '@/components/layout/RouteSuspenseBoundary';
+import { serializeJsonLd } from '@/lib/json-ld';
 import { INDEXABLE_ROBOTS, singlePageAlternates } from '@/lib/seo';
 import { siteConfig } from '@/lib/site';
 
@@ -101,9 +103,9 @@ export default function GenerateLayout({ children }: { children: React.ReactNode
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(aiCreateJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(aiCreateJsonLd) }}
       />
-      {children}
+      <RouteSuspenseBoundary>{children}</RouteSuspenseBoundary>
     </>
   );
 }

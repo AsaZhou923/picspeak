@@ -4,6 +4,7 @@ import {
   GENERATION_PROMPT_EXAMPLES,
   getLocalizedPromptExampleTitle,
 } from '@/content/generation/prompt-examples';
+import { serializeJsonLd } from '@/lib/json-ld';
 import { INDEXABLE_ROBOTS, singlePageAlternates } from '@/lib/seo';
 import { siteConfig } from '@/lib/site';
 import PromptLibraryContent from './PromptLibraryContent';
@@ -73,7 +74,7 @@ export default function PromptLibraryPage() {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(promptLibraryJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(promptLibraryJsonLd) }}
       />
       <PromptLibraryContent />
     </>

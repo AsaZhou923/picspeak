@@ -4,18 +4,25 @@ import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import Link from 'next/link';
 import Script from 'next/script';
-import { ArrowRight, Aperture, Zap, Star, BarChart2, Mail, BookOpenText, Clock3, FileText, UploadCloud, Wand2, Coins } from 'lucide-react';
+import { ArrowRight, Aperture, Zap, Star, BarChart2, Clock3, FileText, UploadCloud, Wand2 } from 'lucide-react';
 import { getHomeIntentEntrances, type HomeIntent } from '@/lib/content-conversion';
 import ScoreRing from '@/components/ui/ScoreRing';
+import HomeContactSection from '@/components/home/HomeContactSection';
+import HomeGenerationPricingSection from '@/components/home/HomeGenerationPricingSection';
 import HomeImageCreditRedeem from '@/components/home/HomeImageCreditRedeem';
 import { DEMO_IMAGE_URL, DEMO_REVIEW_ID } from '@/lib/demo-review';
 import { useI18n } from '@/lib/i18n';
 import { markProductAttributionSource, trackProductEvent } from '@/lib/product-analytics';
 import { siteConfig } from '@/lib/site';
 import {
+  buildHomeAuthorJsonLd,
+  buildHomeFaqJsonLd,
+  buildHomeSoftwareJsonLd,
+  buildHomeSourceCodeJsonLd,
   shouldRenderHomeFaqJsonLd,
   type HomeStructuredDataScope,
 } from '@/lib/home-structured-data';
+import { serializeJsonLd } from '@/lib/json-ld';
 
 const HomeAuthWidgets = dynamic(() => import('@/components/home/HomeAuthWidgets'), {
   ssr: false,
@@ -57,81 +64,10 @@ export function HomePageContent({ structuredDataScope = 'root' }: HomePageProps 
   const { t, locale } = useI18n();
   const renderFaqJsonLd = shouldRenderHomeFaqJsonLd(structuredDataScope);
   const homeIntentEntrances = getHomeIntentEntrances(locale);
-  const blogHomeCopy = HOME_BLOG_LINK_COPY[locale] ?? HOME_BLOG_LINK_COPY.zh;
   const homeIntentIcons: Record<HomeIntent, typeof UploadCloud> = {
     new_user: UploadCloud,
     returning_user: Clock3,
     content_reader: FileText,
-  };
-
-  const softwareJsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'SoftwareApplication',
-    '@id': `${siteConfig.url}/#software`,
-    name: siteConfig.name,
-    applicationCategory: 'PhotographyApplication',
-    operatingSystem: 'Web',
-    url: siteConfig.url,
-    description: siteConfig.description,
-    image: `${siteConfig.url}${siteConfig.ogImage}`,
-    sameAs: [siteConfig.social.x, siteConfig.repositoryUrl],
-    isAccessibleForFree: true,
-    creator: {
-      '@id': siteConfig.author.id,
-    },
-    publisher: {
-      '@type': 'Organization',
-      '@id': `${siteConfig.url}/#organization`,
-      name: siteConfig.name,
-      url: siteConfig.url,
-      logo: {
-        '@type': 'ImageObject',
-        url: `${siteConfig.url}${siteConfig.logoImage}`,
-      },
-    },
-    offers: {
-      '@type': 'Offer',
-      price: '0',
-      priceCurrency: 'USD',
-    },
-    featureList: [
-      'AI photo critique across composition, lighting, color, impact, and technique',
-      'GPT Image 2 visual reference generation',
-      'Curated AI prompt example library',
-      'Public critique gallery',
-      'Lens Notes photography education blog',
-      'Account history for progress review',
-    ],
-  };
-
-  const authorJsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'Person',
-    '@id': siteConfig.author.id,
-    name: siteConfig.author.name,
-    alternateName: siteConfig.author.alternateName,
-    jobTitle: siteConfig.author.jobTitle,
-    description: siteConfig.author.description,
-    email: siteConfig.author.email,
-    sameAs: [siteConfig.social.x, siteConfig.social.githubProfile],
-  };
-
-  const sourceCodeJsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'SoftwareSourceCode',
-    name: 'PicSpeak',
-    codeRepository: siteConfig.repositoryUrl,
-    url: siteConfig.repositoryUrl,
-    programmingLanguage: ['TypeScript', 'Python'],
-    runtimePlatform: ['Next.js', 'FastAPI'],
-    author: {
-      '@id': siteConfig.author.id,
-    },
-    publisher: {
-      '@type': 'Organization',
-      name: siteConfig.name,
-      url: siteConfig.url,
-    },
   };
 
   const FAQ_KEYS = [
@@ -147,18 +83,13 @@ export function HomePageContent({ structuredDataScope = 'root' }: HomePageProps 
     { q: 'faq_q10' as const, a: 'faq_a10' as const },
   ];
 
-  const faqJsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'FAQPage',
-    mainEntity: FAQ_KEYS.map(({ q, a }) => ({
-      '@type': 'Question',
-      name: t(q),
-      acceptedAnswer: {
-        '@type': 'Answer',
-        text: t(a),
-      },
-    })),
-  };
+  const softwareJsonLd = buildHomeSoftwareJsonLd(siteConfig);
+  const authorJsonLd = buildHomeAuthorJsonLd(siteConfig);
+  const sourceCodeJsonLd = buildHomeSourceCodeJsonLd(siteConfig);
+  const faqJsonLd = buildHomeFaqJsonLd(FAQ_KEYS.map(({ q, a }) => ({
+    question: t(q),
+    answer: t(a),
+  })));
 
   const FEATURES = [
     { icon: Zap, title: t('feature_flash_title'), body: t('feature_flash_body') },
@@ -186,48 +117,29 @@ export function HomePageContent({ structuredDataScope = 'root' }: HomePageProps 
     },
   ];
 
-  const GENERATION_PRICING = [
-    {
-      title: t('home_generation_pricing_low_title'),
-      cost: t('home_generation_pricing_low_cost'),
-      body: t('home_generation_pricing_low_body'),
-    },
-    {
-      title: t('home_generation_pricing_medium_title'),
-      cost: t('home_generation_pricing_medium_cost'),
-      body: t('home_generation_pricing_medium_body'),
-      featured: true,
-    },
-    {
-      title: t('home_generation_pricing_high_title'),
-      cost: t('home_generation_pricing_high_cost'),
-      body: t('home_generation_pricing_high_body'),
-    },
-  ];
-
   return (
     <>
       <Script
         id="picspeak-structured-data"
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(softwareJsonLd) }}
       />
       {renderFaqJsonLd && (
         <Script
           id="picspeak-faq-structured-data"
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(faqJsonLd) }}
         />
       )}
       <Script
         id="picspeak-author-structured-data"
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(authorJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(authorJsonLd) }}
       />
       <Script
         id="picspeak-source-code-structured-data"
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(sourceCodeJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(sourceCodeJsonLd) }}
       />
       <HomeAuthWidgets />
       <section className="relative min-h-screen flex flex-col items-center justify-center px-6 pt-24 pb-20 overflow-hidden">
@@ -532,56 +444,7 @@ export function HomePageContent({ structuredDataScope = 'root' }: HomePageProps 
 	        </div>
       </section>
 
-      <section className="px-6 py-24 border-t border-border-subtle">
-        <div className="max-w-5xl mx-auto">
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="text-xs text-gold/70 font-mono mb-4 tracking-widest uppercase">
-                {t('home_generation_pricing_label')}
-              </p>
-              <h2 className="font-display text-3xl sm:text-4xl">{t('home_generation_pricing_headline')}</h2>
-              <p className="mt-4 max-w-2xl text-sm leading-7 text-ink-muted">
-                {t('home_generation_pricing_body')}
-              </p>
-            </div>
-            <Link
-              href="/generate"
-              className="inline-flex w-fit items-center gap-2 rounded border border-gold/35 px-4 py-2 text-sm text-gold transition-colors hover:bg-gold/10"
-            >
-              {t('home_gpt_image_cta')}
-              <ArrowRight size={14} />
-            </Link>
-          </div>
-
-          <div className="mt-10 grid gap-4 md:grid-cols-3">
-            {GENERATION_PRICING.map((item) => (
-              <div
-                key={item.title}
-                className={`rounded-lg border p-6 transition-all duration-300 ${
-                  item.featured
-                    ? 'border-gold/45 bg-raised shadow-[0_20px_54px_rgba(200,162,104,0.14)]'
-                    : 'border-border-subtle bg-raised/35 hover:border-gold/25'
-                }`}
-              >
-                <div className="mb-5 flex items-center justify-between gap-3">
-                  <p className={`font-display text-2xl ${item.featured ? 'text-gold' : 'text-ink'}`}>
-                    {item.title}
-                  </p>
-                  <span className="flex h-9 w-9 items-center justify-center rounded border border-gold/25 bg-gold/10 text-gold">
-                    <Coins size={15} />
-                  </span>
-                </div>
-                <p className="text-sm font-medium leading-6 text-ink">{item.cost}</p>
-                <p className="mt-4 text-sm leading-7 text-ink-muted">{item.body}</p>
-              </div>
-            ))}
-          </div>
-
-          <p className="mt-6 rounded-lg border border-border-subtle bg-void/25 px-4 py-3 text-xs leading-6 text-ink-muted">
-            {t('home_generation_pricing_model_note')}
-          </p>
-        </div>
-      </section>
+      <HomeGenerationPricingSection t={t} />
 
       <section className="px-6 py-24 border-t border-border-subtle">
         <div className="max-w-2xl mx-auto text-center space-y-8 animate-fade-in">
@@ -608,90 +471,11 @@ export function HomePageContent({ structuredDataScope = 'root' }: HomePageProps 
         </div>
       </section>
 
-      <section className="px-6 py-16 border-t border-border-subtle">
-        <div className="max-w-5xl mx-auto">
-          <p className="text-xs text-gold/70 font-mono mb-4 tracking-widest uppercase">{t('contact_label')}</p>
-          <h2 className="font-display text-2xl sm:text-3xl mb-8">{t('contact_headline')}</h2>
-          <div className="flex flex-col sm:flex-row gap-4">
-            <a
-              href="https://x.com/Zzw_Prime"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-3 px-5 py-4 border border-border rounded-lg hover:border-gold/40 hover:bg-raised/50 transition-all duration-300 group w-full sm:w-64 active:scale-[0.98]"
-            >
-              <span className="flex items-center justify-center w-8 h-8 rounded-full border border-border group-hover:border-gold/40 transition-colors shrink-0">
-                <XIcon />
-              </span>
-              <div>
-                <p className="text-sm font-medium text-ink group-hover:text-gold transition-colors">X (Twitter)</p>
-                <p className="text-xs text-ink-subtle mt-0.5">@Zzw_Prime</p>
-              </div>
-            </a>
-            <a
-              href="mailto:xavierzhou23@gmail.com"
-              className="flex items-center gap-3 px-5 py-4 border border-border rounded-lg hover:border-gold/40 hover:bg-raised/50 transition-all duration-300 group w-full sm:w-64 active:scale-[0.98]"
-            >
-              <span className="flex items-center justify-center w-8 h-8 rounded-full border border-border group-hover:border-gold/40 transition-colors shrink-0">
-                <Mail size={14} className="text-ink-muted group-hover:text-gold transition-colors" />
-              </span>
-              <div>
-                <p className="text-sm font-medium text-ink group-hover:text-gold transition-colors">Email</p>
-                <p className="text-xs text-ink-subtle mt-0.5">xavierzhou23@gmail.com</p>
-              </div>
-            </a>
-          </div>
-          <div className="mt-8 flex justify-end">
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <Link
-                href={`/${locale}/blog`}
-                className="inline-flex items-center gap-2 text-xs text-ink-subtle transition-colors hover:text-gold group"
-              >
-                <BookOpenText size={12} className="text-gold/75 transition-colors group-hover:text-gold" />
-                <span>{blogHomeCopy.label}</span>
-                <span className="hidden sm:inline opacity-60 group-hover:opacity-100 transition-opacity">
-                  {blogHomeCopy.hint}
-                </span>
-                <ArrowRight size={11} className="transition-transform group-hover:translate-x-0.5" />
-              </Link>
-              <Link
-                href={`/${locale}/updates`}
-                className="inline-flex items-center gap-2 text-xs text-ink-subtle transition-colors hover:text-gold group"
-              >
-                <span>{t('updates_label')}</span>
-                <span className="hidden sm:inline opacity-60 group-hover:opacity-100 transition-opacity">{t('updates_hint_latest')}</span>
-                <ArrowRight size={11} className="transition-transform group-hover:translate-x-0.5" />
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
+      <HomeContactSection locale={locale} t={t} />
     </>
   );
 }
 
 export default function HomePageClient() {
   return <HomePageContent />;
-}
-
-const HOME_BLOG_LINK_COPY = {
-  zh: {
-    label: '摄影学习文章',
-    hint: '从方法直接进入练习',
-  },
-  en: {
-    label: 'Photography guides',
-    hint: 'Move from reading to practice',
-  },
-  ja: {
-    label: '写真ガイド',
-    hint: '記事から練習へ',
-  },
-} as const;
-
-function XIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="text-ink-muted group-hover:text-gold transition-colors">
-      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.746l7.73-8.835L1.254 2.25H8.08l4.259 5.631 5.905-5.631Zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-    </svg>
-  );
 }

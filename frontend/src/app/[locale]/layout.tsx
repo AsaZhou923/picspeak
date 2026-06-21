@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { siteConfig } from '@/lib/site';
 import type { Locale } from '@/lib/i18n';
+import { serializeJsonLd } from '@/lib/json-ld';
 import { buildWebSiteJsonLd as buildStructuredWebSiteJsonLd, HOME_LANGUAGE_ALTERNATES } from '@/lib/seo';
 import { VALID_LOCALES } from './locales';
 
@@ -399,25 +400,25 @@ export default async function LocaleLayout({ params, children }: Props) {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(buildSoftwareJsonLd(typedLocale)),
+          __html: serializeJsonLd(buildSoftwareJsonLd(typedLocale)),
         }}
       />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(buildWebSiteJsonLd(typedLocale)),
+          __html: serializeJsonLd(buildWebSiteJsonLd(typedLocale)),
         }}
       />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(buildFAQJsonLd(typedLocale)),
+          __html: serializeJsonLd(buildFAQJsonLd(typedLocale)),
         }}
       />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(buildBreadcrumbJsonLd(typedLocale)),
+          __html: serializeJsonLd(buildBreadcrumbJsonLd(typedLocale)),
         }}
       />
       {children}

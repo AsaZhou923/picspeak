@@ -9,6 +9,7 @@ import {
   getLocalizedPromptExampleTitle,
   normalizePromptExampleExcerpt,
 } from '@/content/generation/prompt-examples';
+import { serializeJsonLd } from '@/lib/json-ld';
 import { INDEXABLE_ROBOTS } from '@/lib/seo';
 import { siteConfig } from '@/lib/site';
 import PromptExampleContent from './PromptExampleContent';
@@ -82,7 +83,7 @@ export default async function PromptExamplePage({ params }: Props) {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(creativeWorkJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(creativeWorkJsonLd) }}
       />
       <PromptExampleContent example={example} />
     </>

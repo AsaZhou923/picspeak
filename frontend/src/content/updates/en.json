@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-06-21-frontend-extraction-jsonld-hardening",
+    "date": "2026-06-21",
+    "title": "Frontend extraction, shared checkout, and JSON-LD hardening",
+    "summary": "PicSpeak now extracts repeated UI and utility logic from the generation page, account usage, review history, Gallery, and home page into reusable components and helpers. Credit-pack checkout, date filters, image-type copy, and locale date formatting are shared, and public JSON-LD scripts now use safe serialization.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-06-21-frontend-extraction-jsonld-hardening",
+    "sections": [
+      {
+        "title": "Page extraction and reuse",
+        "items": [
+          "/generate now uses GeneratePageHeader, GenerateFormPanel, and GenerationPricingGrid while keeping template selection, prompt examples, credit estimates, and generation submission intact",
+          "Account usage now uses BillingContactModal, UsageGenerationCreditsPanel, and UsageQuotaPanel",
+          "Review history, Favorites, and Gallery share date, image-type, and locale formatting helpers"
+        ]
+      },
+      {
+        "title": "Structured data and maintainability",
+        "items": [
+          "Added serializeJsonLd to escape characters that can break JSON-LD script tags",
+          "Home, Blog, author, and locale layout JSON-LD output now uses safe serialization",
+          "singlePageAlternates now keeps canonical plus x-default only, avoiding inaccurate multilingual hreflang on single-URL pages"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-06-10-seo-sitemaps-generate-fallback",
     "date": "2026-06-10",
     "title": "Generate SEO fallback, news sitemap, and structured data",
