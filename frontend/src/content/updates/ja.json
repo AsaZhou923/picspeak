@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-07-01-header-usage-nav-visibility",
+    "date": "2026-07-01",
+    "title": "ヘッダーの利用枠リンクとモバイルナビを固定",
+    "summary": "PicSpeak はアプリ内 Header の利用枠リンクを認証状態に依存しない公開ナビに変更しました。モバイル tab でも利用枠ボタンを常時表示し、中幅のヘッダー間隔も詰めて、復帰した入口が隠れないようにしました。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-07-01-header-usage-nav-visibility",
+    "sections": [
+      {
+        "title": "ヘッダー導線",
+        "items": [
+          "Workspace などのアプリ内ページでも home page と同じように利用枠リンクを常時表示します",
+          "モバイルヘッダーの tab は、認証 hydration を待たずに利用枠を表示します",
+          "アカウント操作は引き続き hydrated non-guest user state を待ち、signed-in shell のちらつきを避けます"
+        ]
+      },
+      {
+        "title": "レスポンシブ調整と回帰テスト",
+        "items": [
+          "Header と MarketingHeader は md 幅でナビ間隔を少し詰めました",
+          "PicSpeak の wordmark は lg 幅から表示し、機能ナビを優先します",
+          "header-auth-visibility test で公開ナビの常時表示と認証済み操作の表示条件を分けて保護します"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-06-21-frontend-extraction-jsonld-hardening",
     "date": "2026-06-21",
     "title": "フロントエンド分割、共通 checkout、JSON-LD hardening",

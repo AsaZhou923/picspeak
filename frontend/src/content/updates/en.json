@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-07-01-header-usage-nav-visibility",
+    "date": "2026-07-01",
+    "title": "Fixed usage nav in the header and mobile tabs",
+    "summary": "PicSpeak now treats the Usage link as public header navigation in the app shell instead of hiding it behind authenticated state. Mobile tabs keep the Usage button too, and medium-width header spacing was tightened so the restored entry stays visible.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-07-01-header-usage-nav-visibility",
+    "sections": [
+      {
+        "title": "Header access",
+        "items": [
+          "Workspace and other app pages now show the Usage link consistently with the home page",
+          "Mobile header tabs no longer wait for authenticated hydration before showing Usage",
+          "Account controls still wait for hydrated non-guest user state to avoid signed-in shell flicker"
+        ]
+      },
+      {
+        "title": "Responsive layout and regression coverage",
+        "items": [
+          "Header and MarketingHeader use tighter md-width nav spacing",
+          "The PicSpeak wordmark waits until lg width so functional nav entries fit first",
+          "header-auth-visibility tests now lock public nav visibility separately from authenticated controls"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-06-21-frontend-extraction-jsonld-hardening",
     "date": "2026-06-21",
     "title": "Frontend extraction, shared checkout, and JSON-LD hardening",

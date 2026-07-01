@@ -49,7 +49,7 @@ export default function Header() {
               className="rounded object-contain"
               priority
             />
-            <span className="font-display text-lg tracking-wide hidden xs:inline sm:inline">PicSpeak</span>
+            <span className="font-display text-lg tracking-wide hidden lg:inline">PicSpeak</span>
           </Link>
           <Link 
             href="/" 
@@ -64,7 +64,7 @@ export default function Header() {
         </div>
 
         {/* Nav */}
-        <nav className="hidden md:flex items-center gap-6 text-sm">
+        <nav className="hidden md:flex items-center gap-4 text-[13px] lg:gap-6 lg:text-sm">
           <Link href="/" className={`transition-colors ${isActive('/')}`}>
             {t('nav_home')}
           </Link>

@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-07-01-header-usage-nav-visibility",
+    "date": "2026-07-01",
+    "title": "顶栏额度入口与移动端导航固定",
+    "summary": "PicSpeak 将应用内 Header 的“额度”入口改为公共导航，不再依赖登录态；移动端 tab 也始终显示额度入口，同时收紧中等宽度顶栏间距，避免补回按钮后挤掉导航。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-07-01-header-usage-nav-visibility",
+    "sections": [
+      {
+        "title": "顶栏入口",
+        "items": [
+          "工作台等应用内页面现在和首页一样始终显示“额度”导航",
+          "手机端导航 tab 不再等登录态水合后才出现",
+          "账号菜单和登录态控件仍然保留 hydration 后显示，避免错误登录壳闪烁"
+        ]
+      },
+      {
+        "title": "响应式布局与回归",
+        "items": [
+          "Header 与 MarketingHeader 在 md 宽度收紧导航间距",
+          "品牌文字改为 lg 宽度再显示，让功能入口优先保留",
+          "header-auth-visibility 测试锁定公共导航常驻、账号控件按登录态显示的规则"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-06-21-frontend-extraction-jsonld-hardening",
     "date": "2026-06-21",
     "title": "前端组件拆分、共享 checkout 与 JSON-LD hardening",

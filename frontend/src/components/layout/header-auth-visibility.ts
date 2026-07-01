@@ -22,8 +22,8 @@ export function getHeaderVisibilityState({
 
   return {
     userInfo: safeUserInfo,
-    showUsageNav: Boolean(safeUserInfo),
+    showUsageNav: true,
     showAuthenticatedControls: Boolean(safeUserInfo),
-    showMobileTabs: Boolean(safeUserInfo),
+    showMobileTabs: true,
   };
 }

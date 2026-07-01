@@ -2,6 +2,72 @@
 
 本文件汇总了原 `docs/changelog/update-log-*.md` 的全部更新记录。新增 release 请追加到顶部，并为每条记录保留稳定锚点，供 `/updates` 的 `docPath` 和 README 链接定位。
 
+<a id="2026-07-01-header-usage-nav-visibility"></a>
+
+## 2026-07-01 - header usage nav visibility
+
+日期：2026-07-01
+
+### 概览
+
+这次更新修复了应用内顶栏和首页顶栏不一致的问题：工作台等应用内页面现在会固定显示“额度”入口，手机端导航也同样保留额度按钮，避免用户在未登录、Guest 或水合前状态下找不到用量页面。
+
+- 应用内 `Header` 的“额度”导航从账号登录态中拆出，变成始终可见的公共入口。
+- 手机端 tab 导航也不再依赖登录态，工作台、AI 创作、影像长廊、额度和镜头手记都会稳定出现。
+- 账号计划、更多菜单里的登录态分支和 Clerk 控件仍然等 hydration 后的真实非 Guest 用户状态，避免首屏闪出错误账号壳。
+- 桌面中等宽度下收紧顶栏导航间距，并让 PicSpeak 品牌文字到 `lg` 宽度再显示，优先保留功能入口。
+- 回归测试更新为明确锁定“公共导航常驻、账号控件按登录态显示”的规则。
+
+### 顶栏和移动端导航
+
+- `header-auth-visibility.ts` 现在把 `showUsageNav` 和 `showMobileTabs` 视为公共导航开关，始终返回 `true`。
+- `Header.tsx` 因此会在工作台等应用内页面固定渲染 `/account/usage` 的“额度”链接。
+- 移动端应用内二级导航会稳定显示包含“额度”的 tab 列表，不再因为 Guest token、未登录或 hydration 前状态消失。
+
+### 响应式收紧和回归测试
+
+- `Header.tsx` 与 `MarketingHeader.tsx` 在 `md` 宽度使用更紧的 gap 和 `13px` 字号，`lg` 以上恢复原有间距与字号。
+- 顶栏品牌文字从 `sm` 改为 `lg` 才显示，为中等宽度桌面导航留出空间。
+- `header-auth-visibility.test.ts` 更新断言：未水合、无用户信息和 Guest token 场景下，额度入口与移动端 tab 仍可见；只有账号控件保持隐藏。
+
+### 首页更新记录同步
+
+- `/updates` 三语 JSON 新增本次顶栏额度入口和移动端导航固定记录，`docPath` 指向 `docs/changelog/CHANGELOG.md#2026-07-01-header-usage-nav-visibility`。
+- 首页底部“更新记录”三语 hint 改为本次顶栏额度入口主题。
+- README / README.zh-CN 最新 changelog 链接更新到本次锚点。
+- `CLAUDE.md` 补充 Header 可见性边界，提醒后续开发不要把公共导航重新绑回账号态。
+
+### 影响文件
+
+#### 前端
+
+- `frontend/src/components/layout/Header.tsx`
+- `frontend/src/components/layout/MarketingHeader.tsx`
+- `frontend/src/components/layout/header-auth-visibility.ts`
+- `frontend/src/content/updates/{zh,en,ja}.json`
+- `frontend/src/lib/i18n-{zh,en,ja}.ts`
+- `frontend/test/header-auth-visibility.test.ts`
+
+#### 文档
+
+- `docs/changelog/CHANGELOG.md`
+- `README.md`
+- `README.zh-CN.md`
+- `CLAUDE.md`
+
+### 验证
+
+- `cd frontend && npm test -- header-auth-visibility.test.ts` -> `83 passed`。
+- `cd frontend && npm run typecheck`。
+- `cd frontend && npm run lint`。
+- `cd frontend && npm run build` -> 生成 120 个静态页面。
+- Playwright + 系统 Chrome 页面检查已尝试，但本地 dev 环境因 Clerk session token 刷新重定向循环未能渲染 `/workspace`，未作为通过项记录。
+- `node -e "for (const f of ['zh','en','ja']) JSON.parse(require('fs').readFileSync('frontend/src/content/updates/'+f+'.json', 'utf8'));"` -> JSON 解析通过。
+- `Get-FileHash` 对比仓库 changelog / workflow 与外部 Update Logs 副本 SHA256 一致。
+- `git diff --check`。
+
+---
+
 <a id="2026-06-21-frontend-extraction-jsonld-hardening"></a>
 
 ## 2026-06-21 - frontend extraction jsonld hardening

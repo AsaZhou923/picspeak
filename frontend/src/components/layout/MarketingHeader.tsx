@@ -77,7 +77,7 @@ export default function MarketingHeader() {
               className="rounded object-contain"
               priority
             />
-            <span className="font-display text-lg tracking-wide hidden xs:inline sm:inline">PicSpeak</span>
+            <span className="font-display text-lg tracking-wide hidden lg:inline">PicSpeak</span>
           </Link>
           <Link
             href="/"
@@ -91,7 +91,7 @@ export default function MarketingHeader() {
           </Link>
         </div>
 
-        <nav className="hidden md:flex items-center gap-6 text-sm">
+        <nav className="hidden md:flex items-center gap-4 text-[13px] lg:gap-6 lg:text-sm">
           {MARKETING_LINKS.map((link) => (
             <Link key={link.href} href={link.href} className={`transition-colors ${activeClass(link.href)}`}>
               {'key' in link ? t(link.key) : blogUi.navLabel}
