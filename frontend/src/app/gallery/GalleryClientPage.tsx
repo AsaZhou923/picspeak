@@ -9,9 +9,14 @@ import ProPromoCard from '@/components/marketing/ProPromoCard';
 import { getPublicGallery, likeGalleryReview, unlikeGalleryReview } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { formatUserFacingError } from '@/lib/error-utils';
-import { buildGalleryRestoreKey, readGalleryRestoreState, saveGalleryRestoreState } from '@/lib/gallery-navigation';
+import {
+  buildGalleryRestoreKey,
+  type GalleryRestoreState,
+  readGalleryRestoreState,
+  saveGalleryRestoreState,
+} from '@/lib/gallery-navigation';
 import { buildWorkspaceConversionHref } from '@/lib/content-conversion';
-import { useI18n } from '@/lib/i18n';
+import { type TranslationKey, useI18n } from '@/lib/i18n';
 import { markProductAttributionSource, trackProductEvent } from '@/lib/product-analytics';
 import { PublicGalleryItem } from '@/lib/types';
 import { isInvalidCompletedDate } from '@/lib/date-filters';
@@ -29,13 +34,19 @@ import GalleryFilters, { FilterDraft } from '@/components/gallery/GalleryFilters
 import GalleryPagination from '@/components/gallery/GalleryPagination';
 import GalleryCard from '@/components/gallery/GalleryCard';
 
+const GALLERY_SEO_SECTIONS: Array<{ titleKey: TranslationKey; bodyKey: TranslationKey }> = [
+  { titleKey: 'gallery_seo_section1_title', bodyKey: 'gallery_seo_section1_body' },
+  { titleKey: 'gallery_seo_section2_title', bodyKey: 'gallery_seo_section2_body' },
+  { titleKey: 'gallery_seo_section3_title', bodyKey: 'gallery_seo_section3_body' },
+];
+
 function GalleryPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { t, locale } = useI18n();
   const { token, userInfo, ensureToken, isLoading: authLoading } = useAuth();
   
-  const pendingRestoreRef = useRef<any>(null);
+  const pendingRestoreRef = useRef<GalleryRestoreState | null>(null);
   const pagesRef = useRef<PublicGalleryItem[][]>([]);
   const nextCursorRef = useRef<string | null>(null);
   
@@ -466,10 +477,10 @@ function GalleryPageContent() {
             <p className="mt-4 max-w-3xl text-sm leading-7 text-ink-muted">{t('gallery_seo_intro')}</p>
           </div>
           <div className="mt-8 grid gap-4 md:grid-cols-3">
-            {[1, 2, 3].map((i) => (
-              <article key={i} className="rounded-[22px] border border-border-subtle bg-void/35 p-5 transition-all duration-300 hover:border-gold/20">
-                <h3 className="font-display text-2xl text-ink">{t(`gallery_seo_section${i}_title` as any)}</h3>
-                <p className="mt-3 text-sm leading-7 text-ink-muted">{t(`gallery_seo_section${i}_body` as any)}</p>
+            {GALLERY_SEO_SECTIONS.map((section) => (
+              <article key={section.titleKey} className="rounded-[22px] border border-border-subtle bg-void/35 p-5 transition-all duration-300 hover:border-gold/20">
+                <h3 className="font-display text-2xl text-ink">{t(section.titleKey)}</h3>
+                <p className="mt-3 text-sm leading-7 text-ink-muted">{t(section.bodyKey)}</p>
               </article>
             ))}
           </div>

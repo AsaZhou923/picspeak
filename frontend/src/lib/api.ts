@@ -36,6 +36,7 @@ import {
   TaskStatusResponse,
   UsageResponse,
 } from './types';
+import { parseContentDispositionFilename } from './generation-download';
 
 function resolveApiBase(): string {
   const configured = process.env.NEXT_PUBLIC_API_URL?.trim();
@@ -546,16 +547,6 @@ export async function downloadGeneration(
   const disposition = res.headers.get('Content-Disposition') ?? '';
   const filename = parseContentDispositionFilename(disposition) ?? `${generationId}.png`;
   return { blob: await res.blob(), filename };
-}
-
-function parseContentDispositionFilename(disposition: string): string | null {
-  const match = /filename\*?=(?:UTF-8''|")?([^";]+)/i.exec(disposition);
-  if (!match?.[1]) return null;
-  try {
-    return decodeURIComponent(match[1].trim().replace(/^"|"$/g, ''));
-  } catch {
-    return match[1].trim().replace(/^"|"$/g, '');
-  }
 }
 
 export function buildTaskWebSocketUrl(taskId: string): string {
