@@ -3,7 +3,7 @@
 import { CalendarDays, SlidersHorizontal, Clock, Star, Heart, Zap } from 'lucide-react';
 import { useRef } from 'react';
 import { ImageType } from '@/lib/types';
-import { useI18n } from '@/lib/i18n';
+import { type TranslationKey, useI18n } from '@/lib/i18n';
 import { displayDateToIso, isoDateToDisplay, normalizeDateDisplay } from '@/lib/date-filters';
 
 export type FilterDraft = {
@@ -88,9 +88,9 @@ function DateFilterField({
   );
 }
 
-function getImageTypeLabel(t: (k: any) => string, imageType?: ImageType) {
+function getImageTypeLabel(t: (key: TranslationKey) => string, imageType?: ImageType) {
   const normalized = imageType ?? 'default';
-  const keyMap: Record<ImageType, any> = {
+  const keyMap: Record<ImageType, TranslationKey> = {
     default: 'image_type_default',
     landscape: 'image_type_landscape',
     portrait: 'image_type_portrait',
