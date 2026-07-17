@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import Link from 'next/link';
 import Script from 'next/script';
-import { ArrowRight, Aperture, Zap, Star, BarChart2, Clock3, FileText, UploadCloud, Wand2 } from 'lucide-react';
+import { ArrowRight, Aperture, Zap, Star, BarChart2, Clock3, FileText, Repeat2, UploadCloud, Wand2 } from 'lucide-react';
 import { getHomeIntentEntrances, type HomeIntent } from '@/lib/content-conversion';
 import ScoreRing from '@/components/ui/ScoreRing';
 import HomeContactSection from '@/components/home/HomeContactSection';
@@ -23,6 +23,7 @@ import {
   type HomeStructuredDataScope,
 } from '@/lib/home-structured-data';
 import { serializeJsonLd } from '@/lib/json-ld';
+import { getRetakeCoachCopy } from '@/lib/retake-coach-copy';
 
 const HomeAuthWidgets = dynamic(() => import('@/components/home/HomeAuthWidgets'), {
   ssr: false,
@@ -64,6 +65,7 @@ export function HomePageContent({ structuredDataScope = 'root' }: HomePageProps 
   const { t, locale } = useI18n();
   const renderFaqJsonLd = shouldRenderHomeFaqJsonLd(structuredDataScope);
   const homeIntentEntrances = getHomeIntentEntrances(locale);
+  const retakeCopy = getRetakeCoachCopy(locale);
   const homeIntentIcons: Record<HomeIntent, typeof UploadCloud> = {
     new_user: UploadCloud,
     returning_user: Clock3,
@@ -178,6 +180,13 @@ export function HomePageContent({ structuredDataScope = 'root' }: HomePageProps 
             {t('hero_cta_start')}
             <ArrowRight size={14} />
           </Link>
+          <Link
+            href="/retake"
+            className="flex items-center gap-2 rounded border border-sage/40 bg-sage/10 px-7 py-3 text-sm font-medium text-sage transition-all duration-200 hover:-translate-y-0.5 hover:bg-sage hover:text-void"
+          >
+            <Repeat2 size={14} />
+            {retakeCopy.homeCta}
+          </Link>
           <div
             id="home-signin-slot"
             className="flex min-h-[46px] items-center justify-center"
@@ -206,8 +215,30 @@ export function HomePageContent({ structuredDataScope = 'root' }: HomePageProps 
         </a>
 
         <Link
+          href="/retake"
+          className="relative mt-8 flex w-full max-w-2xl flex-col gap-4 rounded-[24px] border border-sage/30 bg-[radial-gradient(circle_at_top_left,rgba(122,154,120,0.2),transparent_48%),rgb(var(--color-raised)/0.58)] px-5 py-5 text-left transition-all duration-300 hover:-translate-y-1 hover:border-sage/55 hover:shadow-[0_22px_70px_rgba(122,154,120,0.14)] sm:flex-row sm:items-center sm:justify-between animate-fade-in anim-fill-both delay-300"
+        >
+          <span className="flex min-w-0 items-start gap-3">
+            <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-sage/35 bg-sage/10 text-sage">
+              <Repeat2 size={17} />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-[11px] font-mono uppercase tracking-[0.22em] text-sage">
+                {retakeCopy.label}
+              </span>
+              <span className="mt-1 block font-display text-2xl text-ink">{retakeCopy.homeTitle}</span>
+              <span className="mt-2 block text-sm leading-6 text-ink-muted">{retakeCopy.homeBody}</span>
+            </span>
+          </span>
+          <span className="inline-flex shrink-0 items-center gap-2 text-sm text-sage">
+            {retakeCopy.homeCta}
+            <ArrowRight size={14} />
+          </span>
+        </Link>
+
+        <Link
           href="/generate"
-          className="relative mt-8 flex w-full max-w-2xl flex-col gap-4 rounded-lg border border-gold/25 bg-[linear-gradient(135deg,rgba(200,162,104,0.16),transparent_46%),rgb(var(--color-raised)/0.58)] px-5 py-4 text-left transition-all duration-300 hover:-translate-y-0.5 hover:border-gold/45 hover:bg-raised/70 sm:flex-row sm:items-center sm:justify-between animate-fade-in anim-fill-both delay-300"
+          className="relative mt-4 flex w-full max-w-2xl flex-col gap-4 rounded-lg border border-gold/25 bg-[linear-gradient(135deg,rgba(200,162,104,0.16),transparent_46%),rgb(var(--color-raised)/0.58)] px-5 py-4 text-left transition-all duration-300 hover:-translate-y-0.5 hover:border-gold/45 hover:bg-raised/70 sm:flex-row sm:items-center sm:justify-between animate-fade-in anim-fill-both delay-300"
         >
           <span className="flex min-w-0 items-start gap-3">
             <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded border border-gold/30 bg-gold/10 text-gold">

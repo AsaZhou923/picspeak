@@ -3,19 +3,21 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { Camera, BarChart2, LayoutGrid, BookOpen, Wand2 } from 'lucide-react';
+import { Camera, BarChart2, LayoutGrid, Repeat2, Wand2 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { getBlogUi } from '@/lib/blog-data';
 import { useI18n } from '@/lib/i18n';
 import { useState, useEffect } from 'react';
 import { HeaderRightControls } from './HeaderControls';
 import { getHeaderVisibilityState } from './header-auth-visibility';
+import { getRetakeCoachCopy } from '@/lib/retake-coach-copy';
 
 export default function Header() {
   const { userInfo } = useAuth();
   const pathname = usePathname();
   const { t, locale } = useI18n();
   const blogUi = getBlogUi(locale);
+  const retakeCopy = getRetakeCoachCopy(locale);
   const [hasHydrated, setHasHydrated] = useState(false);
 
   useEffect(() => {
@@ -71,6 +73,10 @@ export default function Header() {
           <Link href="/workspace" className={`transition-colors ${isActive('/workspace')}`}>
             {t('nav_workspace')}
           </Link>
+          <Link href="/retake" className={`inline-flex items-center gap-1.5 transition-colors ${isActive('/retake')}`}>
+            {retakeCopy.nav}
+            <span className="rounded-full border border-sage/25 bg-sage/10 px-1.5 py-0.5 text-[9px] font-medium text-sage">Terra</span>
+          </Link>
           <Link href="/generate" className={`transition-colors ${isActive('/generate')}`}>
             {t('nav_generate')}
           </Link>
@@ -116,6 +122,17 @@ export default function Header() {
               <span className="tracking-wide">{t('nav_gallery')}</span>
             </Link>
             <Link
+              href="/retake"
+              className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-[10px] text-[10px] font-medium transition-all duration-200 ${
+                pathname === '/retake'
+                  ? 'bg-void shadow-sm text-sage'
+                  : 'text-ink-subtle hover:text-ink-muted active:scale-95'
+              }`}
+            >
+              <Repeat2 size={14} />
+              <span className="tracking-wide">{retakeCopy.navShort}</span>
+            </Link>
+            <Link
               href="/generate"
               className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-[10px] text-[10px] font-medium transition-all duration-200 ${
                 pathname === '/generate'
@@ -136,17 +153,6 @@ export default function Header() {
             >
               <BarChart2 size={14} />
               <span className="tracking-wide">{t('nav_usage')}</span>
-            </Link>
-            <Link
-              href={`/${locale}/blog`}
-              className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-[10px] text-[10px] font-medium transition-all duration-200 ${
-                pathname === `/${locale}/blog` || pathname?.startsWith(`/${locale}/blog/`)
-                  ? 'bg-void shadow-sm text-gold'
-                  : 'text-ink-subtle hover:text-ink-muted active:scale-95'
-              }`}
-            >
-              <BookOpen size={14} />
-              <span className="tracking-wide">{blogUi.navLabel}</span>
             </Link>
           </nav>
         </div>

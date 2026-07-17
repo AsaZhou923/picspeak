@@ -1,0 +1,57 @@
+{
+  "executed_at": "2026-07-17T23:10:00+09:00",
+  "environment": "local backend with user-approved OpenAI-compatible HTTP gateway",
+  "secrets_redacted": true,
+  "image_source": "authorized repository portrait sample encoded as a Base64 data URL",
+  "configured_models": {
+    "normal_review": "gpt-5.5",
+    "retake_comparison": "gpt-5.6-terra"
+  },
+  "normal_review": {
+    "resolved_model": "gpt-5.5",
+    "api": "Responses API",
+    "image_inputs": 1,
+    "structured_output": "strict JSON Schema",
+    "two_pass_score_lock": true,
+    "final_score": 5.4,
+    "scores": {
+      "composition": 6,
+      "lighting": 5,
+      "color": 6,
+      "impact": 5,
+      "technical": 5
+    },
+    "input_tokens": 3600,
+    "output_tokens": 485,
+    "latency_ms": 13014,
+    "result": "passed"
+  },
+  "retake_comparison": {
+    "resolved_model": "gpt-5.6-terra",
+    "api": "Responses API",
+    "image_inputs": 2,
+    "structured_output": "strict JSON Schema",
+    "same_image_boundary_test": true,
+    "is_comparable": true,
+    "comparison_confidence": "high",
+    "overall_delta": 0.0,
+    "dimension_keys": [
+      "color",
+      "composition",
+      "impact",
+      "lighting",
+      "technical"
+    ],
+    "next_actions": 4,
+    "input_tokens": 3198,
+    "output_tokens": 1192,
+    "latency_ms": 28872,
+    "result": "passed"
+  },
+  "not_recorded": [
+    "API key",
+    "gateway host",
+    "response ID",
+    "signed object URL"
+  ]
+}

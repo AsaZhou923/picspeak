@@ -1,19 +1,22 @@
 import Image from 'next/image';
-import { ImageType } from '@/lib/types';
+import { ImageType, ReviewModel } from '@/lib/types';
 import { Stage } from '../hooks/useUploadFlow';
 import { ImageTypePicker } from './ImageTypePicker';
 import { ModePicker } from './ModePicker';
 import { type Translator, useI18n } from '@/lib/i18n';
 import { getReplayIntentCopy } from '@/lib/replay-intent-copy';
+import { ReviewModelPicker } from './ReviewModelPicker';
 
 interface ReplayBannerProps {
   replayPhotoUrl: string | null;
   imageType: ImageType;
   reviewMode: 'flash' | 'pro';
+  reviewModel: ReviewModel;
   isGuest: boolean;
   stage: Stage;
   onImageTypeChange: (type: ImageType) => void;
   onReviewModeChange: (mode: 'flash' | 'pro') => void;
+  onReviewModelChange: (model: ReviewModel) => void;
   onStartReview: () => void;
   onUploadNew: () => void;
   t: Translator;
@@ -23,10 +26,12 @@ export function ReplayBanner({
   replayPhotoUrl,
   imageType,
   reviewMode,
+  reviewModel,
   isGuest,
   stage,
   onImageTypeChange,
   onReviewModeChange,
+  onReviewModelChange,
   onStartReview,
   onUploadNew,
   t,
@@ -70,6 +75,13 @@ export function ReplayBanner({
           <div>
             <p className="mb-3 text-xs text-ink-muted">{t('select_image_type')}</p>
             <ImageTypePicker value={imageType} onChange={onImageTypeChange} variant="compact" t={t} />
+          </div>
+
+          <div>
+            <p className="mb-3 text-xs text-ink-muted">
+              {locale === 'en' ? 'Select review model' : locale === 'ja' ? '講評モデルを選択' : '选择评图模型'}
+            </p>
+            <ReviewModelPicker value={reviewModel} onChange={onReviewModelChange} locale={locale} />
           </div>
 
           <div>

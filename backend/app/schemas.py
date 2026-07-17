@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 REVIEW_SCHEMA_VERSION = '1.0'
@@ -63,11 +63,21 @@ class PhotoCreateResponse(BaseModel):
 class ReviewCreateRequest(BaseModel):
     photo_id: str
     mode: str = Field(pattern='^(flash|pro)$')
+    review_model: str = Field(default='qwen', pattern=r'^(qwen|gpt-5\.5|gpt-5\.6-terra)$')
     image_type: str = Field(default='default', pattern='^(default|landscape|portrait|street|still_life|architecture)$')
     source_review_id: str | None = None
+    analysis_type: str = Field(default='single', pattern='^(single|retake_compare)$')
     async_mode: bool = Field(default=True, alias='async')
     idempotency_key: str | None = None
     locale: str = Field(default='zh', pattern='^(zh|en|ja)$')
+
+    @model_validator(mode='after')
+    def align_review_model_with_analysis_type(self):
+        if self.analysis_type == 'retake_compare':
+            self.review_model = 'gpt-5.6-terra'
+        elif self.review_model == 'gpt-5.6-terra':
+            raise ValueError('gpt-5.6-terra is reserved for retake comparison')
+        return self
 
 
 class GuestReviewMigrateRequest(BaseModel):
@@ -83,6 +93,40 @@ class AuthClerkExchangeRequest(BaseModel):
 class GuestReviewMigrateResponse(BaseModel):
     migrated_reviews: int
     migrated_photos: int
+
+
+class RetakeDimensionResult(BaseModel):
+    before_score: int = Field(ge=0, le=10)
+    after_score: int = Field(ge=0, le=10)
+    delta: int = Field(ge=-10, le=10)
+    trend: str = Field(pattern='^(improved|flat|declined)$')
+    evidence: list[str] = Field(default_factory=list)
+    remaining_gap: str = ''
+
+
+class RetakeActionItem(BaseModel):
+    priority: int = Field(ge=1, le=5)
+    dimension: str = Field(pattern='^(composition|lighting|color|impact|technical)$')
+    action: str
+    success_check: str
+
+
+class RetakeComparisonResult(BaseModel):
+    original_review_id: str
+    original_photo_id: str
+    retake_photo_id: str
+    is_comparable: bool
+    comparison_confidence: str = Field(pattern='^(low|medium|high)$')
+    comparison_caveat: str = ''
+    summary: str
+    dimensions: dict[str, RetakeDimensionResult]
+    overall_before: float = Field(ge=0, le=10)
+    overall_after: float = Field(ge=0, le=10)
+    overall_delta: float = Field(ge=-10, le=10)
+    strongest_improvement: str = Field(pattern='^(composition|lighting|color|impact|technical)$')
+    next_actions: list[RetakeActionItem] = Field(default_factory=list)
+    visual_reference_prompt: str
+    openai_response_id: str = ''
 
 
 class ReviewResult(BaseModel):
@@ -103,6 +147,7 @@ class ReviewResult(BaseModel):
     issue_marks: list[dict[str, Any]] = Field(default_factory=list)
     exif_info: dict[str, Any] = Field(default_factory=dict)
     share_info: dict[str, Any] = Field(default_factory=dict)
+    comparison: RetakeComparisonResult | None = None
 
 
 class ReviewCreateAsyncResponse(BaseModel):
@@ -265,6 +310,7 @@ class ReviewHistoryItem(BaseModel):
     status: str
     image_type: str = 'default'
     source_review_id: str | None = None
+    comparison: RetakeComparisonResult | None = None
     final_score: float
     scores: dict[str, int] = Field(default_factory=default_review_scores)
     model_name: str = ''
@@ -388,6 +434,7 @@ class ReviewExportData(BaseModel):
     advantage: str = ''
     critique: str = ''
     suggestions: str = ''
+    comparison: RetakeComparisonResult | None = None
     favorite: bool = False
     tags: list[str] = Field(default_factory=default_review_tags)
     note: str | None = None

@@ -320,10 +320,10 @@ const HOME_INTENT_COPY: Record<ContentConversionLocale, HomeIntentEntrance[]> = 
     {
       intent: 'returning_user',
       label: '回访用户',
-      title: '继续上次点评',
-      body: '回到历史记录，复用上次结果继续复拍、再分析或对比弱项。',
-      cta: '查看历史',
-      href: '/account/reviews',
+      title: '用重拍验证上次建议',
+      body: '选择一张历史原片，再上传重拍图，让 GPT-5.6 Terra 比较五个摄影维度的真实变化。',
+      cta: '开始重拍对比',
+      href: '/retake',
       source: 'home_direct',
     },
     {
@@ -351,10 +351,10 @@ const HOME_INTENT_COPY: Record<ContentConversionLocale, HomeIntentEntrance[]> = 
     {
       intent: 'returning_user',
       label: 'Returning',
-      title: 'Continue the last critique',
-      body: 'Open history and use the last result for a retake, re-analysis, or weak-dimension check.',
-      cta: 'View history',
-      href: '/account/reviews',
+      title: 'Test the last advice with a retake',
+      body: 'Choose a previous original, upload the retake, and let GPT-5.6 Terra measure change across five dimensions.',
+      cta: 'Start retake comparison',
+      href: '/retake',
       source: 'home_direct',
     },
     {
@@ -382,10 +382,10 @@ const HOME_INTENT_COPY: Record<ContentConversionLocale, HomeIntentEntrance[]> = 
     {
       intent: 'returning_user',
       label: '再訪ユーザー',
-      title: '前回の講評を続ける',
-      body: '履歴に戻り、撮り直し・再分析・弱点確認へ進みます。',
-      cta: '履歴を見る',
-      href: '/account/reviews',
+      title: '再撮影で前回の提案を検証',
+      body: '過去の元写真を選び、再撮影をアップロードして、GPT-5.6 Terra が5項目の変化を測ります。',
+      cta: '再撮影比較を始める',
+      href: '/retake',
       source: 'home_direct',
     },
     {

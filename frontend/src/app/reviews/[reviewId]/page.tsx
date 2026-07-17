@@ -33,6 +33,7 @@ import { ReviewGrowthLoopPanel } from '@/features/reviews/components/ReviewGrowt
 import { ReviewReferenceGenerationPanel } from '@/features/reviews/components/ReviewReferenceGenerationPanel';
 import { ReviewGalleryPanel } from '@/features/reviews/components/ReviewGalleryPanel';
 import { ImageZoomOverlay } from '@/features/reviews/components/ImageZoomOverlay';
+import { RetakeComparisonPanel } from '@/features/reviews/components/RetakeComparisonPanel';
 import { buildNextShootChecklist, type NextShootChecklistItem } from '@/lib/review-growth';
 import { getProUpgradeTriggerCopy, type ProUpgradeTrigger } from '@/lib/pro-conversion';
 import { trackProductEvent } from '@/lib/product-analytics';
@@ -194,6 +195,14 @@ export default function ReviewPage() {
   const isLowScore = r.final_score < 5.0;
   const reviewGalleryCardCopy = getReviewGalleryCardCopy(locale);
   const nextShootChecklist = buildNextShootChecklist(displaySuggestions, 3, r.scores);
+  const visualReferenceBrief = r.comparison
+    ? [
+        r.comparison.visual_reference_prompt,
+        ...r.comparison.next_actions
+          .slice(0, 3)
+          .map((item) => `${item.dimension}: ${item.action} Success check: ${item.success_check}`),
+      ].join('\n')
+    : displaySuggestions;
   const sourceContextCopy = getReviewSourceContextCopy(locale);
 
   function handleUploadNewRound() {
@@ -337,7 +346,9 @@ export default function ReviewPage() {
               </div>
             </div>
 
-            {activeReview.source_review_id && (
+            {r.comparison && <RetakeComparisonPanel review={activeReview} locale={locale} />}
+
+            {activeReview.source_review_id && !r.comparison && (
               <div className="rounded-2xl border border-sage/25 bg-sage/10 px-4 py-3">
                 <div className="mb-2 flex items-center gap-2 text-xs font-medium text-sage">
                   <History size={14} />
@@ -401,7 +412,7 @@ export default function ReviewPage() {
                   reviewId={activeReview.review_id}
                   photoId={activeReview.photo_id}
                   imageType={activeReview.image_type ?? activeReview.result.image_type ?? 'default'}
-                  suggestions={displaySuggestions}
+                  suggestions={visualReferenceBrief}
                   plan={plan}
                   locale={locale}
                   sourceAspect={imgNaturalSize}

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { AlertCircle, ChevronRight, RefreshCw, SlidersHorizontal } from 'lucide-react';
+import { AlertCircle, ChevronRight, RefreshCw, Repeat2, SlidersHorizontal } from 'lucide-react';
 import { getMyReviews } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { ImageType, ReviewHistoryItem, ReviewHistoryQuery } from '@/lib/types';
@@ -27,6 +27,8 @@ import {
   ReviewGrowthPanel,
   ReviewHistorySkeletonList,
 } from '@/features/reviews/components/ReviewHistoryPanels';
+import { RetakeProgressPanel } from '@/features/reviews/components/RetakeProgressPanel';
+import { getRetakeCoachCopy } from '@/lib/retake-coach-copy';
 
 type FilterDraft = {
   createdFrom: string;
@@ -73,6 +75,7 @@ export default function ReviewHistoryPage() {
   const { ensureToken, userInfo } = useAuth();
   const { t, locale } = useI18n();
   const copy = useMemo(() => getHistoryCopy(locale), [locale]);
+  const retakeCopy = useMemo(() => getRetakeCoachCopy(locale), [locale]);
   const growthCopy = useMemo(() => getHistoryGrowthCopy(locale), [locale]);
   const plan = userInfo?.plan ?? 'guest';
   const historyPromoCopy = useMemo(() => getProUpgradeTriggerCopy(locale, 'history_trend'), [locale]);
@@ -168,11 +171,20 @@ export default function ReviewHistoryPage() {
   return (
     <div className="min-h-screen pt-14">
       <div className="mx-auto max-w-3xl px-6 py-12 animate-fade-in">
-        <div className="mb-10">
-          <p className="mb-2 font-mono text-xs uppercase tracking-widest text-gold/70">
-            {t('account_reviews_label')}
-          </p>
-          <h1 className="font-display text-4xl sm:text-5xl">{t('account_reviews_headline')}</h1>
+        <div className="mb-10 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+          <div>
+            <p className="mb-2 font-mono text-xs uppercase tracking-widest text-gold/70">
+              {t('account_reviews_label')}
+            </p>
+            <h1 className="font-display text-4xl sm:text-5xl">{t('account_reviews_headline')}</h1>
+          </div>
+          <Link
+            href="/retake"
+            className="inline-flex w-fit items-center gap-2 rounded-full border border-sage/35 bg-sage/10 px-4 py-2.5 text-sm font-medium text-sage transition-colors hover:bg-sage hover:text-void"
+          >
+            <Repeat2 size={14} />
+            {retakeCopy.historyCta}
+          </Link>
         </div>
 
         <section className="mb-6 rounded-[24px] border border-border-subtle bg-[radial-gradient(circle_at_top_left,rgba(200,171,90,0.14),transparent_35%),rgb(var(--color-surface)/0.72)] p-5">
@@ -270,6 +282,10 @@ export default function ReviewHistoryPage() {
             </button>
           </div>
         </section>
+
+        {!loading && !error && items.length > 0 && (
+          <RetakeProgressPanel items={items} locale={locale} />
+        )}
 
         {!loading && !error && items.length > 0 && (
           <ReviewGrowthPanel

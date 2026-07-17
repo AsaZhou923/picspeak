@@ -15,7 +15,7 @@ from app.api.routers.photos import (
     _build_photo_proxy_url,
 )
 from app.core.errors import api_error
-from app.db.models import Photo, Review, ReviewMode, User, UserPlan
+from app.db.models import Photo, Review, ReviewMode, ReviewStatus, User, UserPlan
 from app.schemas import (
     REVIEW_SCHEMA_VERSION,
     ReviewCreateRequest,
@@ -198,6 +198,7 @@ def _review_result_payload(
         except (TypeError, ValueError):
             resolved_final_score = round(sum(scores.values()) / len(scores), 1)
 
+    comparison = _public_comparison_payload(raw_payload.get('comparison'))
     return {
         'schema_version': str(raw_payload.get('schema_version') or REVIEW_SCHEMA_VERSION),
         'prompt_version': str(raw_payload.get('prompt_version') or prompt_version or ''),
@@ -216,7 +217,18 @@ def _review_result_payload(
         'billing_info': billing_info,
         'exif_info': exif_info if isinstance(exif_info, dict) else stored_exif_info,
         'share_info': share_info_override if isinstance(share_info_override, dict) else share_info,
+        'comparison': comparison,
     }
+
+
+def _public_comparison_payload(value: Any) -> dict[str, Any] | None:
+    if not isinstance(value, dict):
+        return None
+    payload = dict(value)
+    # The Responses API identifier is retained in Review.result_json for audit,
+    # but is never exposed through owner, public-share, history, or export APIs.
+    payload['openai_response_id'] = ''
+    return payload
 
 
 def _find_review_owned(db: Session, review_public_id: str, owner_user_id: int, *, include_deleted: bool = False) -> Review:
@@ -230,10 +242,30 @@ def _find_review_owned(db: Session, review_public_id: str, owner_user_id: int, *
 
 
 def _resolve_source_review(db: Session, actor: CurrentActor, payload: ReviewCreateRequest, photo: Photo) -> Review | None:
+    if payload.analysis_type == 'retake_compare' and not payload.source_review_id:
+        raise api_error(
+            status.HTTP_400_BAD_REQUEST,
+            'RETAKE_SOURCE_REQUIRED',
+            'Retake comparison requires a source review',
+        )
     if not payload.source_review_id:
         return None
 
     source_review = _find_review_owned(db, payload.source_review_id, actor.user.id)
+    if source_review.status != ReviewStatus.SUCCEEDED:
+        raise api_error(
+            status.HTTP_400_BAD_REQUEST,
+            'RETAKE_SOURCE_NOT_READY',
+            'Source review is not ready for comparison',
+        )
+    if payload.analysis_type == 'retake_compare':
+        if source_review.photo_id == photo.id:
+            raise api_error(
+                status.HTTP_400_BAD_REQUEST,
+                'RETAKE_PHOTO_DUPLICATE',
+                'Retake comparison requires a newly uploaded photo',
+            )
+        return source_review
     if source_review.photo_id != photo.id:
         raise api_error(status.HTTP_400_BAD_REQUEST, 'REANALYZE_PHOTO_MISMATCH', 'Source review does not belong to this photo')
     return source_review
@@ -285,6 +317,7 @@ def _review_history_item(request: Request, review: Review, photo: Photo, owner_p
         status=review.status.value,
         image_type=_review_image_type(review),
         source_review_id=source_review_id,
+        comparison=_public_comparison_payload(result_payload.get('comparison')),
         final_score=float(review.final_score),
         scores=_coerce_review_scores(result_payload.get('scores')),
         model_name=str(review.model_name or ''),
@@ -328,6 +361,7 @@ def _build_review_export_payload(
             'advantage': str(result_payload.get('advantage') or ''),
             'critique': str(result_payload.get('critique') or ''),
             'suggestions': str(result_payload.get('suggestions') or ''),
+            'comparison': _public_comparison_payload(result_payload.get('comparison')),
             'favorite': bool(review.favorite),
             'tags': _normalize_review_tags(review.tags_json if isinstance(review.tags_json, list) else []),
             'note': review.note,

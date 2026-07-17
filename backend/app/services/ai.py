@@ -44,6 +44,35 @@ class AIJSONResponse:
     latency_ms: int
 
 
+_OPENAI_SCORE_SCHEMA = {
+    'type': 'object',
+    'additionalProperties': False,
+    'properties': {
+        'scores': {
+            'type': 'object',
+            'additionalProperties': False,
+            'properties': {
+                key: {'type': 'integer', 'minimum': 0, 'maximum': 10}
+                for key in ('composition', 'lighting', 'color', 'impact', 'technical')
+            },
+            'required': ['composition', 'lighting', 'color', 'impact', 'technical'],
+        }
+    },
+    'required': ['scores'],
+}
+
+_OPENAI_WRITING_SCHEMA = {
+    'type': 'object',
+    'additionalProperties': False,
+    'properties': {
+        'advantage': {'type': 'string'},
+        'critique': {'type': 'string'},
+        'suggestions': {'type': 'string'},
+    },
+    'required': ['advantage', 'critique', 'suggestions'],
+}
+
+
 def _is_multimodal_model(model_name: str) -> bool:
     normalized = (model_name or '').strip().lower()
     if not normalized:
@@ -314,6 +343,163 @@ def _request_multimodal_json(*, model_name: str, prompt: str, image_url: str, te
     )
 
 
+def _openai_responses_endpoint() -> str:
+    base_url = settings.openai_api_base_url.rstrip('/')
+    return base_url if base_url.endswith('/responses') else f'{base_url}/responses'
+
+
+def _extract_openai_output_text(body: dict) -> str:
+    if body.get('status') == 'incomplete':
+        details = body.get('incomplete_details')
+        reason = details.get('reason') if isinstance(details, dict) else None
+        suffix = f': {reason}' if isinstance(reason, str) and reason.strip() else ''
+        raise AIReviewError(f'OpenAI review response was incomplete{suffix}')
+
+    for output in body.get('output') or []:
+        if not isinstance(output, dict) or output.get('type') != 'message':
+            continue
+        for content in output.get('content') or []:
+            if not isinstance(content, dict):
+                continue
+            refusal = content.get('refusal')
+            if isinstance(refusal, str) and refusal.strip():
+                raise AIReviewError(f'OpenAI review was refused: {refusal[:300]}')
+            if content.get('type') == 'output_text' and isinstance(content.get('text'), str):
+                return content['text']
+    raise AIReviewError('OpenAI review response did not contain structured output text')
+
+
+def _request_openai_multimodal_json(
+    *,
+    prompt: str,
+    image_url: str,
+    schema_name: str,
+    schema: dict,
+) -> AIJSONResponse:
+    model_name = settings.openai_review_model
+    payload = {
+        'model': model_name,
+        'store': False,
+        'reasoning': {'effort': settings.openai_review_reasoning_effort},
+        'input': [
+            {
+                'role': 'user',
+                'content': [
+                    {'type': 'input_text', 'text': prompt},
+                    {'type': 'input_image', 'image_url': image_url, 'detail': 'high'},
+                ],
+            }
+        ],
+        'text': {
+            'format': {
+                'type': 'json_schema',
+                'name': schema_name,
+                'strict': True,
+                'schema': schema,
+            }
+        },
+    }
+
+    started = time.perf_counter()
+    try:
+        response = pooled_request(
+            'POST',
+            _openai_responses_endpoint(),
+            body=json.dumps(payload, ensure_ascii=False).encode('utf-8'),
+            headers={
+                'Authorization': f'Bearer {settings.openai_api_key}',
+                'Content-Type': 'application/json',
+            },
+            timeout_seconds=settings.openai_review_timeout_seconds,
+        )
+        body = json.loads(response.data.decode('utf-8'))
+    except PooledHTTPStatusError as exc:
+        error_body = exc.response.data.decode('utf-8', errors='ignore')
+        raise AIReviewError(f'OpenAI review API HTTP {exc.response.status}: {error_body[:300]}') from exc
+    except PooledHTTPRequestError as exc:
+        raise AIReviewError(f'OpenAI review API request failed: {exc}') from exc
+    except json.JSONDecodeError as exc:
+        raise AIReviewError('OpenAI review API returned invalid JSON') from exc
+
+    try:
+        parsed = json.loads(_extract_openai_output_text(body))
+    except json.JSONDecodeError as exc:
+        raise AIReviewError('OpenAI review structured output was not valid JSON') from exc
+
+    return AIJSONResponse(
+        parsed=parsed,
+        model_name=str(body.get('model') or model_name),
+        usage=body.get('usage') if isinstance(body.get('usage'), dict) else {},
+        latency_ms=int((time.perf_counter() - started) * 1000),
+    )
+
+
+def _run_openai_review(
+    *,
+    mode: str,
+    image_url: str,
+    locale: str,
+    exif_data: dict | None,
+    image_type: str,
+    enforce_suggestion_structure: bool,
+) -> AIReviewResponse:
+    if not settings.openai_api_key:
+        raise AIReviewError('OPENAI_API_KEY is not configured for GPT-5.5 photo review')
+    if not settings.openai_review_model:
+        raise AIReviewError('OPENAI_REVIEW_MODEL is not configured')
+
+    scoring_response = _request_openai_multimodal_json(
+        prompt=_score_prompt(exif_data, image_type=image_type),
+        image_url=image_url,
+        schema_name='picspeak_photo_scores',
+        schema=_OPENAI_SCORE_SCHEMA,
+    )
+    try:
+        raw_scores = scoring_response.parsed.get('scores')
+        if not isinstance(raw_scores, dict):
+            raise AIReviewError('OpenAI review response missing scores object')
+        locked_scores = _normalize_locked_scores(raw_scores)
+    except AIReviewError:
+        raise
+    except (KeyError, TypeError, ValueError) as exc:
+        raise AIReviewError(f'Invalid OpenAI review score structure: {exc}') from exc
+
+    final_score = _compute_final_score(locked_scores)
+    writing_response = _request_openai_multimodal_json(
+        prompt=_writing_prompt(mode, locale, locked_scores, exif_data, image_type=image_type),
+        image_url=image_url,
+        schema_name='picspeak_photo_review',
+        schema=_OPENAI_WRITING_SCHEMA,
+    )
+    try:
+        parsed = _normalize_review_result_fields(
+            writing_response.parsed,
+            image_type=image_type,
+            enforce_suggestion_structure=enforce_suggestion_structure,
+        )
+        parsed['score_version'] = SCORE_VERSION
+        parsed['scores'] = locked_scores
+        parsed['final_score'] = final_score
+        result = ReviewResult.model_validate(parsed)
+    except ValidationError as exc:
+        raise AIReviewError(f'Invalid OpenAI review structure: {_format_validation_error(exc)}') from exc
+    except ValueError as exc:
+        raise AIReviewError(f'Invalid OpenAI review structure: {exc}') from exc
+
+    return AIReviewResponse(
+        result=result,
+        model_name=writing_response.model_name,
+        model_version=model_version_for_name(writing_response.model_name),
+        prompt_version=PROMPT_VERSION,
+        input_tokens=(scoring_response.usage.get('input_tokens') or 0)
+        + (writing_response.usage.get('input_tokens') or 0),
+        output_tokens=(scoring_response.usage.get('output_tokens') or 0)
+        + (writing_response.usage.get('output_tokens') or 0),
+        cost_usd=None,
+        latency_ms=scoring_response.latency_ms + writing_response.latency_ms,
+    )
+
+
 def run_ai_review(
     mode: str,
     image_url: str,
@@ -321,7 +507,19 @@ def run_ai_review(
     exif_data: dict | None = None,
     image_type: str = 'default',
     enforce_suggestion_structure: bool = True,
+    review_model: str = 'qwen',
 ) -> AIReviewResponse:
+    if review_model == 'gpt-5.5':
+        return _run_openai_review(
+            mode=mode,
+            image_url=image_url,
+            locale=locale,
+            exif_data=exif_data,
+            image_type=image_type,
+            enforce_suggestion_structure=enforce_suggestion_structure,
+        )
+    if review_model != 'qwen':
+        raise AIReviewError(f'Unsupported review model option: {review_model}')
     if not settings.ai_api_key:
         raise AIReviewError('AI_API_KEY is not configured')
 

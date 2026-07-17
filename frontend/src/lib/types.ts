@@ -122,6 +122,8 @@ export interface PhotoCreateResponse {
 // ─── Review ──────────────────────────────────────────────────────────────────
 
 export type ReviewMode = 'flash' | 'pro';
+export type ReviewModel = 'qwen' | 'gpt-5.5' | 'gpt-5.6-terra';
+export type ReviewAnalysisType = 'single' | 'retake_compare';
 export type ImageType = 'default' | 'landscape' | 'portrait' | 'street' | 'still_life' | 'architecture';
 export type ReviewStatus = 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'EXPIRED';
 export type TaskStatus = 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'EXPIRED' | 'DEAD_LETTER';
@@ -138,6 +140,43 @@ export interface ReviewScores {
   technical: number;
 }
 
+export type RetakeDimensionKey = keyof ReviewScores;
+export type RetakeTrend = 'improved' | 'flat' | 'declined';
+
+export interface RetakeDimensionResult {
+  before_score: number;
+  after_score: number;
+  delta: number;
+  trend: RetakeTrend;
+  evidence: string[];
+  remaining_gap: string;
+}
+
+export interface RetakeActionItem {
+  priority: number;
+  dimension: RetakeDimensionKey;
+  action: string;
+  success_check: string;
+}
+
+export interface RetakeComparisonResult {
+  original_review_id: string;
+  original_photo_id: string;
+  retake_photo_id: string;
+  is_comparable: boolean;
+  comparison_confidence: 'low' | 'medium' | 'high';
+  comparison_caveat: string;
+  summary: string;
+  dimensions: Record<RetakeDimensionKey, RetakeDimensionResult>;
+  overall_before: number;
+  overall_after: number;
+  overall_delta: number;
+  strongest_improvement: RetakeDimensionKey;
+  next_actions: RetakeActionItem[];
+  visual_reference_prompt: string;
+  openai_response_id: string;
+}
+
 export interface ReviewResult {
   schema_version: string;
   prompt_version: string;
@@ -149,6 +188,7 @@ export interface ReviewResult {
   advantage: string;
   critique: string;
   suggestions: string;
+  comparison?: RetakeComparisonResult | null;
   image_type: ImageType;
   billing_info: {
     quota_charged?: boolean;
@@ -168,11 +208,13 @@ export interface ReviewResult {
 export interface ReviewCreateRequest {
   photo_id: string;
   mode: ReviewMode;
+  review_model?: ReviewModel;
   async: boolean;
   idempotency_key?: string;
   locale?: 'zh' | 'en' | 'ja';
   image_type?: ImageType;
   source_review_id?: string;
+  analysis_type?: ReviewAnalysisType;
 }
 
 export interface ReviewCreateAsyncResponse {
@@ -342,6 +384,7 @@ export interface ReviewHistoryItem {
   status: ReviewStatus;
   image_type: ImageType;
   source_review_id?: string | null;
+  comparison?: RetakeComparisonResult | null;
   final_score: number;
   scores: ReviewScores;
   model_name: string;
@@ -427,6 +470,7 @@ export interface ReviewExportData {
   advantage: string;
   critique: string;
   suggestions: string;
+  comparison?: RetakeComparisonResult | null;
   favorite: boolean;
   tags: string[];
   note: string | null;

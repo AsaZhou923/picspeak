@@ -171,6 +171,7 @@ export function HeaderRightControls({
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
   const { t, locale } = useI18n();
+  const [themeControlMounted, setThemeControlMounted] = useState(false);
   const visibleUserInfo = headerVisibility.userInfo;
   const authLabels = AUTH_LABELS[locale];
   const isLegacyAuthenticated = Boolean(
@@ -182,16 +183,22 @@ export function HeaderRightControls({
     router.push('/workspace');
   };
 
+  useEffect(() => {
+    setThemeControlMounted(true);
+  }, []);
+
+  const renderedTheme = themeControlMounted ? theme : 'dark';
+
   return (
     <div className={`flex items-center gap-1.5 sm:gap-2 ${className}`}>
       <LanguageSwitcher />
 
       <button
         onClick={toggleTheme}
-        aria-label={theme === 'dark' ? t('theme_dark') : t('theme_light')}
+        aria-label={renderedTheme === 'dark' ? t('theme_dark') : t('theme_light')}
         className="w-7 h-7 flex items-center justify-center rounded text-ink-muted hover:text-gold transition-colors"
       >
-        {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+        {renderedTheme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
       </button>
 
       {headerVisibility.showAuthenticatedControls ? (

@@ -73,7 +73,7 @@ test('home intent entrances split new, returning, and content traffic paths', ()
     ['new_user', 'returning_user', 'content_reader'],
   );
   assert.match(entrances[0].href, /entrypoint=home_new_user/);
-  assert.equal(entrances[1].href, '/account/reviews');
+  assert.equal(entrances[1].href, '/retake');
   assert.match(entrances[2].href, /source=blog/);
   assert.match(entrances[2].href, /entrypoint=home_content_reader/);
 });

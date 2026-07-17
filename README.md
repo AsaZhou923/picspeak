@@ -32,6 +32,7 @@
 - `Prompt Example Library` — Browse 50 crawlable GPT Image 2 prompt examples with output images, source attribution, localized titles, static detail pages, and workspace retake handoff
 - `Retake References` — Turn critique suggestions into AI-generated composition, lighting, color, or retake reference images from a review
 - `Retake Practice Loop` — Carry a concrete next-shoot action from a critique back into the workspace, preserving source review and target dimension context
+- `GPT-5.6 Terra Retake Coach` — Compare an original and a newly uploaded retake in one GPT-5.6 Terra vision request, with five-dimensional score changes, visible evidence, next-shoot actions, and a saved progress chain
 - `Generation History` — Browse generated images, download results, copy prompts, generate again, or send an image back to the workspace as retake inspiration
 - `Image Generation Credits` — Track monthly generation credits, redeem promo credits, and purchase extra credit packs
 - `Usage Quotas` — Daily and monthly limits with separate tracking for guests and registered users
@@ -43,6 +44,52 @@
 - `Gallery` — Showcase selected outstanding works from the community with server-visible critique summaries for public browsing and search
 - `Blog` — Access professional photography tutorials, AI analysis insights, and platform updates
 - `In-Task Reading` — Read full Lens Notes articles inside review and generation waiting screens without leaving the task page
+
+## OpenAI Build Week 2026
+
+PicSpeak existed before the Build Week submission window. The competition contribution is a meaningful extension, not a model-name replacement. The pre-event baseline is commit [`b74ddfb`](https://github.com/AsaZhou923/picspeak/commit/b74ddfb88ae32e37965ba8b29f40c9ebcbbf77fc), dated July 1, 2026.
+
+| Before Build Week | Built during Build Week |
+|---|---|
+| One-photo critique | One paired GPT-5.6 evaluation of the original and retake |
+| Five standalone scores | Before/after scores, deterministic deltas, and visible evidence in five dimensions |
+| A source-review link for another upload | A dedicated `retake_compare` request and persisted comparison result |
+| Advice inferred from a single critique | Prioritized next-shoot actions with observable success checks |
+| Recent-vs-previous history averages | A progress curve built only from the same retake chain |
+| Review-linked GPT Image 2 prompts | GPT-5.6's paired diagnosis becomes the GPT Image 2 visual target |
+| Existing OpenAI-compatible Qwen critique path | Official OpenAI Responses API call with `model: gpt-5.6-terra`, two image inputs, and strict Structured Outputs |
+
+### GPT-5.6 call path
+
+The normal one-photo workspace exposes a Qwen 3.5 / GPT-5.5 model picker. Choosing GPT-5.5 sends the real image through the OpenAI Responses API with strict Structured Outputs; Qwen remains the backward-compatible default. Retake Coach always locks paired comparison to GPT-5.6 Terra.
+
+```text
+workspace retake upload
+  -> frontend/src/lib/api.ts::createReview
+  -> POST /reviews (analysis_type=retake_compare)
+  -> backend/app/api/routers/review_create.py
+  -> backend/app/services/review_task_processor.py
+  -> backend/app/services/retake_comparison.py::run_retake_comparison
+  -> POST https://api.openai.com/v1/responses (model=gpt-5.6-terra)
+  -> two input_image blocks + strict JSON Schema
+  -> Review.result_json.comparison
+  -> RetakeComparisonPanel / RetakeProgressPanel / GPT Image 2 reference generation
+```
+
+The model scores both photos inside the same request. The server—not the model—calculates every dimension delta and overall delta before saving the result. Unrelated images are marked non-comparable and are excluded from the progress curve.
+
+Key engineering decisions, the timestamped contribution log, and the eventual Codex `/feedback` Session ID are tracked in [Build Week Log](docs/build-week/BUILD-WEEK-LOG.md).
+
+Submission and verification artifacts:
+
+- [Before Build Week baseline evidence](docs/build-week/BASELINE-EVIDENCE.md)
+- [Redacted live GPT-5.6 call evidence](docs/build-week/evidence/live-gpt56-retake-call-2026-07-16.json)
+- [Redacted normal-review and retake model-path evidence](docs/build-week/evidence/live-gpt56-model-choice-test-2026-07-17.json)
+- [Redacted GPT-5.5 / GPT-5.6 Terra routing evidence](docs/build-week/evidence/live-gpt55-terra-routing-test-2026-07-17.json)
+- [2:50 English demo script](docs/build-week/DEMO-SCRIPT.md)
+- [Judge testing instructions](docs/build-week/JUDGE-TESTING-INSTRUCTIONS.md)
+- [Devpost submission copy](docs/build-week/SUBMISSION-COPY.md)
+- [Authorized sample manifest](docs/build-week/AUTHORIZED-SAMPLE-MANIFEST.md)
 
 ## Tech Stack
 
@@ -62,6 +109,7 @@
 - PostgreSQL 14+
 - S3-compatible object storage such as Cloudflare R2 or MinIO
 - An AI API key compatible with the OpenAI API format
+- An OpenAI API key with GPT-5.6 access for Retake Coach
 - Optional: an OpenAI-compatible image generation endpoint and Lemon Squeezy checkout URLs for Pro and credit-pack billing
 
 ### 1. Clone the repository
@@ -77,6 +125,21 @@ cd picspeak
 cp backend/.env.example backend/.env
 # Edit backend/.env and fill in the database, object storage, AI API,
 # image generation, and billing settings as needed
+```
+
+Retake Coach uses the official OpenAI Responses API independently of the existing single-photo provider:
+
+```dotenv
+OPENAI_API_KEY=
+OPENAI_API_BASE_URL=https://api.openai.com/v1
+OPENAI_REVIEW_MODEL=gpt-5.5
+OPENAI_REVIEW_REASONING_EFFORT=medium
+OPENAI_REVIEW_TIMEOUT_SECONDS=180
+# Optional full endpoint override; otherwise /responses is appended to the base URL.
+RETAKE_ANALYSIS_API_URL=
+RETAKE_ANALYSIS_MODEL=gpt-5.6-terra
+RETAKE_ANALYSIS_REASONING_EFFORT=medium
+RETAKE_ANALYSIS_TIMEOUT_SECONDS=180
 ```
 
 ### 3. Install backend dependencies and run migrations

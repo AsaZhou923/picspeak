@@ -121,6 +121,14 @@ class Settings(BaseSettings):
     image_audit_reject_threshold: float = 0.78
 
     openai_api_key: str = ''
+    openai_api_base_url: str = 'https://api.openai.com/v1'
+    openai_review_model: str = 'gpt-5.5'
+    openai_review_reasoning_effort: str = 'medium'
+    openai_review_timeout_seconds: int = 180
+    retake_analysis_api_url: str = ''
+    retake_analysis_model: str = 'gpt-5.6-terra'
+    retake_analysis_reasoning_effort: str = 'medium'
+    retake_analysis_timeout_seconds: int = 180
     image_generation_api_key: str = ''
     image_generation_api_url: str = Field(
         default='https://api.openai.com/v1/images/generations',
@@ -202,6 +210,8 @@ class Settings(BaseSettings):
         'lemonsqueezy_image_credit_pack_variant_id',
         'lemonsqueezy_webhook_signing_secret',
         'openai_api_key',
+        'openai_review_reasoning_effort',
+        'retake_analysis_reasoning_effort',
         'image_generation_api_key',
         'image_generation_model_snapshot',
         'image_generation_default_quality',
@@ -215,6 +225,15 @@ class Settings(BaseSettings):
             return ''
         return value.strip()
 
+    @field_validator('openai_review_reasoning_effort', 'retake_analysis_reasoning_effort')
+    @classmethod
+    def validate_openai_reasoning_effort(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        allowed = {'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'}
+        if normalized not in allowed:
+            raise ValueError(f'OpenAI reasoning effort must be one of: {", ".join(sorted(allowed))}')
+        return normalized
+
     @field_validator(
         'cloud_tasks_target_url',
         'cloud_tasks_generation_target_url',
@@ -225,6 +244,10 @@ class Settings(BaseSettings):
         'lemonsqueezy_zh_pro_checkout_url',
         'lemonsqueezy_webhook_url',
         'lemonsqueezy_checkout_success_url',
+        'openai_api_base_url',
+        'openai_review_model',
+        'retake_analysis_api_url',
+        'retake_analysis_model',
         'image_generation_api_url',
         'image_generation_model',
         mode='before',

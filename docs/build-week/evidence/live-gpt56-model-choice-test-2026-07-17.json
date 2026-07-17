@@ -1,0 +1,54 @@
+{
+  "executed_at": "2026-07-17T22:22:00+09:00",
+  "environment": "local backend with user-approved OpenAI-compatible HTTP gateway",
+  "secrets_redacted": true,
+  "image_source": "authorized repository portrait sample encoded as a Base64 data URL",
+  "normal_review": {
+    "requested_product_option": "gpt-5.6",
+    "resolved_model": "gpt-5.6-sol",
+    "api": "Responses API",
+    "image_inputs": 1,
+    "structured_output": "strict JSON Schema",
+    "two_pass_score_lock": true,
+    "final_score": 6.6,
+    "scores": {
+      "composition": 7,
+      "lighting": 6,
+      "color": 7,
+      "impact": 6,
+      "technical": 7
+    },
+    "input_tokens": 3600,
+    "output_tokens": 337,
+    "latency_ms": 10583,
+    "result": "passed"
+  },
+  "retake_comparison": {
+    "resolved_model": "gpt-5.6-sol",
+    "api": "Responses API",
+    "image_inputs": 2,
+    "structured_output": "strict JSON Schema",
+    "same_image_boundary_test": true,
+    "is_comparable": false,
+    "comparison_confidence": "low",
+    "overall_delta": 0.0,
+    "dimension_keys": [
+      "color",
+      "composition",
+      "impact",
+      "lighting",
+      "technical"
+    ],
+    "next_actions": 5,
+    "input_tokens": 3198,
+    "output_tokens": 1550,
+    "latency_ms": 36444,
+    "result": "passed"
+  },
+  "not_recorded": [
+    "API key",
+    "gateway host",
+    "response ID",
+    "signed object URL"
+  ]
+}
