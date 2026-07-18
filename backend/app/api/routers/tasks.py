@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import secrets
+
 from fastapi import APIRouter, Depends, Request, Response, status
 from sqlalchemy.orm import Session
 
@@ -8,6 +10,7 @@ from app.core.config import settings
 from app.core.errors import api_error
 from app.db.models import Review, ReviewTask, ReviewTaskEvent, TaskStatus
 from app.schemas import InternalTaskExecuteRequest, TaskStatusResponse
+from app.services.image_generation_task_processor import process_image_generation_task
 from app.services.review_task_processor import expire_review_tasks, process_review_task, public_task_error_message
 
 router = APIRouter(tags=['tasks'])
@@ -79,7 +82,6 @@ def get_task_status(
         raise api_error(status.HTTP_404_NOT_FOUND, 'TASK_NOT_FOUND', 'Task not found')
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     response.headers['Pragma'] = 'no-cache'
-    db.commit()
     return TaskStatusResponse(**_serialize_task_status(task, review))
 
 
@@ -88,9 +90,22 @@ def execute_review_task(payload: InternalTaskExecuteRequest, request: Request):
     if not settings.cloud_tasks_enabled:
         raise api_error(status.HTTP_404_NOT_FOUND, 'TASK_DISPATCH_DISABLED', 'Cloud Tasks execution is not enabled')
     header_secret = request.headers.get('X-Task-Dispatch-Secret', '')
-    if header_secret != settings.cloud_tasks_secret:
+    if not secrets.compare_digest(header_secret, settings.cloud_tasks_secret):
         raise api_error(status.HTTP_401_UNAUTHORIZED, 'TASK_DISPATCH_UNAUTHORIZED', 'Invalid task dispatch secret')
     result = process_review_task(payload.task_id, worker_name='cloud-tasks')
+    if result.get('result') == 'delayed':
+        raise api_error(status.HTTP_503_SERVICE_UNAVAILABLE, 'TASK_RETRY_NOT_READY', 'Task is scheduled for a later retry')
+    return result
+
+
+@router.post('/internal/tasks/generations/execute')
+def execute_image_generation_task(payload: InternalTaskExecuteRequest, request: Request):
+    if not settings.cloud_tasks_enabled:
+        raise api_error(status.HTTP_404_NOT_FOUND, 'TASK_DISPATCH_DISABLED', 'Cloud Tasks execution is not enabled')
+    header_secret = request.headers.get('X-Task-Dispatch-Secret', '')
+    if not secrets.compare_digest(header_secret, settings.cloud_tasks_secret):
+        raise api_error(status.HTTP_401_UNAUTHORIZED, 'TASK_DISPATCH_UNAUTHORIZED', 'Invalid task dispatch secret')
+    result = process_image_generation_task(payload.task_id, worker_name='cloud-tasks')
     if result.get('result') == 'delayed':
         raise api_error(status.HTTP_503_SERVICE_UNAVAILABLE, 'TASK_RETRY_NOT_READY', 'Task is scheduled for a later retry')
     return result

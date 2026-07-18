@@ -1,4 +1,4 @@
-import { PhotoCreateResponse } from '@/lib/types';
+import type { PhotoCreateResponse } from '@/lib/types';
 import type { UploadPreprocessMetrics } from '@/components/upload/ImageUploader';
 
 type CachedPhotoEntry = { photo: PhotoCreateResponse; cached_at: number };
@@ -29,6 +29,7 @@ export type UploadMetricsSnapshot = {
 
 const PHOTO_UPLOAD_CACHE_KEY = 'ps_uploaded_photos_v1';
 const PHOTO_UPLOAD_CACHE_LIMIT = 20;
+let photoUploadCacheSequence = 0;
 
 export function extractClientMeta(file: File, extra?: ClientMetaOptions): Record<string, unknown> {
   return {
@@ -73,7 +74,8 @@ export function getCachedPhoto(sha256: string): PhotoCreateResponse | null {
 export function cachePhoto(sha256: string, photo: PhotoCreateResponse): void {
   try {
     const cache = readCachedPhotos();
-    const nextEntries = Object.entries({ ...cache, [sha256]: { photo, cached_at: Date.now() } })
+    photoUploadCacheSequence = (photoUploadCacheSequence + 1) % Number.MAX_SAFE_INTEGER;
+    const nextEntries = Object.entries({ ...cache, [sha256]: { photo, cached_at: Date.now() + photoUploadCacheSequence / 1000 } })
       .sort(([, left], [, right]) => right.cached_at - left.cached_at)
       .slice(0, PHOTO_UPLOAD_CACHE_LIMIT);
     window.sessionStorage.setItem(PHOTO_UPLOAD_CACHE_KEY, JSON.stringify(Object.fromEntries(nextEntries)));

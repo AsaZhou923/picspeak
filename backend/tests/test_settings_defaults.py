@@ -8,6 +8,34 @@ class SettingsDefaultsTestCase(unittest.TestCase):
         settings = Settings(_env_file=None)
         self.assertTrue(settings.image_audit_enabled)
 
+    def test_pro_image_generation_monthly_credits_default_to_199(self):
+        settings = Settings(_env_file=None)
+        self.assertEqual(settings.image_generation_pro_monthly_credits, 199)
+
+    def test_image_generation_api_key_defaults_to_blank(self):
+        settings = Settings(_env_file=None)
+        self.assertEqual(settings.image_generation_api_key, '')
+
+    def test_image_generation_api_key_strips_whitespace(self):
+        settings = Settings(_env_file=None, image_generation_api_key='  img-key  ')
+        self.assertEqual(settings.image_generation_api_key, 'img-key')
+
+    def test_image_credit_pack_checkout_url_defaults_to_blank(self):
+        settings = Settings(_env_file=None)
+        self.assertEqual(settings.lemonsqueezy_image_credit_pack_checkout_url, '')
+
+    def test_image_credit_pack_variant_id_defaults_to_blank(self):
+        settings = Settings(_env_file=None)
+        self.assertEqual(settings.lemonsqueezy_image_credit_pack_variant_id, '')
+
+    def test_zh_pro_checkout_url_defaults_to_blank(self):
+        settings = Settings(_env_file=None)
+        self.assertEqual(settings.lemonsqueezy_zh_pro_checkout_url, '')
+
+    def test_zh_pro_variant_id_defaults_to_blank(self):
+        settings = Settings(_env_file=None)
+        self.assertEqual(settings.lemonsqueezy_zh_pro_variant_id, '')
+
 
 if __name__ == '__main__':
     unittest.main()

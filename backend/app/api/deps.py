@@ -1,22 +1,29 @@
 ﻿from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 from uuid import uuid4
 
 from fastapi import Cookie, Depends, Header, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
+from app.api.request_state import set_current_user_public_id
 from app.core.config import settings
 from app.core.errors import api_error
 from app.core.security import JWTValidationError, create_access_token, validate_access_token
 from app.db.models import User, UserPlan, UserStatus
 from app.db.session import get_db
 from app.services.billing_access import sync_user_billing_plan
-from app.services.guard import daily_quota_for_plan, enforce_guest_api_rate_limit, guest_rate_limit_scope_key
+from app.services.guard import (
+    daily_quota_for_plan,
+    enforce_guest_api_rate_limit,
+    enforce_guest_creation_rate_limit,
+    guest_rate_limit_scope_key,
+)
 
 GUEST_TOKEN_COOKIE = 'ps_guest_token'
-GUEST_TOKEN_TTL_SECONDS = 30 * 24 * 3600
+GUEST_TOKEN_TTL_SECONDS = 14 * 24 * 3600
+LOGIN_TOUCH_INTERVAL = timedelta(minutes=5)
 
 
 class CurrentActor:
@@ -45,7 +52,14 @@ def _extract_bearer_token(authorization: str | None) -> str:
 
 
 def _touch_user_login(user: User, db: Session) -> None:
-    user.last_login_at = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc)
+    last_login = user.last_login_at
+    if last_login is not None and last_login.tzinfo is None:
+        last_login = last_login.replace(tzinfo=timezone.utc)
+    if last_login is not None and now - last_login < LOGIN_TOUCH_INTERVAL:
+        return
+
+    user.last_login_at = now
     db.add(user)
     # Defer transaction commit to the endpoint flow to avoid commit during dependency resolution.
     db.flush()
@@ -141,14 +155,15 @@ def get_current_actor(
     if token:
         user = _fetch_user_by_token(token, db)
         sync_user_billing_plan(db, user)
-        request.state.current_user_public_id = user.public_id
+        set_current_user_public_id(request, user.public_id)
         actor = CurrentActor(user)
         enforce_guest_api_rate_limit(db, actor, endpoint, guest_rate_limit_scope_key(request, user))
         _touch_user_login(user, db)
         return actor
 
+    enforce_guest_creation_rate_limit(db, guest_rate_limit_scope_key(request))
     user = create_guest_user(db)
-    request.state.current_user_public_id = user.public_id
+    set_current_user_public_id(request, user.public_id)
     token = issue_guest_token(user)
     bind_guest_token(response, token)
     actor = CurrentActor(user)
@@ -173,5 +188,5 @@ def get_optional_actor(
 
     user = _fetch_user_by_token(token, db)
     sync_user_billing_plan(db, user)
-    request.state.current_user_public_id = user.public_id
+    set_current_user_public_id(request, user.public_id)
     return CurrentActor(user)

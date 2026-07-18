@@ -3,6 +3,7 @@ import { getReview } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { ReviewGetResponse } from '@/lib/types';
 import { refreshUploadedPhotoPreviewSrc } from '@/lib/photo-preview-cache';
+import { logClientError } from '@/lib/client-log';
 
 export function useReviewPhoto({
   review,
@@ -69,7 +70,7 @@ export function useReviewPhoto({
       setPhotoUrl(refreshedRemote);
       return true;
     } catch (err) {
-      console.error('Failed to recover review photo after image error', err);
+      logClientError('Failed to recover review photo after image error', err, { reviewId: review.review_id });
       return false;
     }
   }, [ensureToken, review, setReview]);

@@ -2,14 +2,16 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { ArrowLeft, ArrowRight, Clock3, Eye } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Clock3, Eye, Sparkles } from 'lucide-react';
 import { notFound } from 'next/navigation';
 import { getBlogViewCounts, incrementBlogPostView } from '@/lib/api';
 import { getBlogPost, getBlogPosts, getBlogUi } from '@/lib/blog-data';
 import { formatBlogViewCount, shouldTrackBlogView } from '@/lib/blog-view-stats';
 import { getBlogWorkspaceCta, type ContentConversionEntrypoint } from '@/lib/content-conversion';
 import { I18nProvider, useI18n, type Locale } from '@/lib/i18n';
+import { serializeJsonLd } from '@/lib/json-ld';
 import { markProductAttributionSource, trackProductEvent } from '@/lib/product-analytics';
+import { buildBlogBreadcrumbJsonLd, buildBlogPostingJsonLd } from '@/lib/seo';
 import { siteConfig } from '@/lib/site';
 import { VALID_LOCALES } from '../../locales';
 
@@ -40,6 +42,7 @@ function BlogPostContent({ slug }: { slug: string }) {
       },
     });
   };
+  const generateHref = `/generate?source=blog&entrypoint=blog_reference_generation&content_slug=${encodeURIComponent(post.slug)}&image_type=${encodeURIComponent(workspaceCta.imageType)}`;
 
   useEffect(() => {
     let cancelled = false;
@@ -87,41 +90,30 @@ function BlogPostContent({ slug }: { slug: string }) {
     sameAs: [siteConfig.social.x, siteConfig.social.githubProfile],
   };
 
-  const articleJsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'BlogPosting',
-    headline: post.title,
-    description: post.description,
-    datePublished: post.publishedAt,
-    dateModified: post.updatedAt,
-    inLanguage: locale,
-    url: `${siteConfig.url}/${locale}/blog/${post.slug}`,
-    isPartOf: {
-      '@type': 'Blog',
-      name: ui.name,
-      url: `${siteConfig.url}/${locale}/blog`,
-    },
-    author: {
-      '@id': siteConfig.author.id,
-    },
-    publisher: {
-      '@type': 'Organization',
-      name: siteConfig.name,
-      url: siteConfig.url,
-      logo: {
-        '@type': 'ImageObject',
-        url: `${siteConfig.url}${siteConfig.ogImage}`,
-      },
-    },
-    mainEntityOfPage: `${siteConfig.url}/${locale}/blog/${post.slug}`,
-    articleSection: post.category,
-    keywords: post.keywords.join(', '),
-  };
+  const articleJsonLd = buildBlogPostingJsonLd({
+    site: siteConfig,
+    locale,
+    ui,
+    post,
+  });
+  const breadcrumbJsonLd = buildBlogBreadcrumbJsonLd({
+    siteName: siteConfig.name,
+    siteUrl: siteConfig.url,
+    locale,
+    blogName: ui.name,
+    postTitle: post.title,
+    slug: post.slug,
+  });
 
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(authorJsonLd) }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(authorJsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(articleJsonLd) }} />
+      <script
+        id="picspeak-blog-breadcrumb-structured-data"
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbJsonLd) }}
+      />
 
       <article className="min-h-screen pt-14">
         <div className="mx-auto max-w-4xl px-6 py-14">
@@ -133,7 +125,7 @@ function BlogPostContent({ slug }: { slug: string }) {
           <header className="mt-8 rounded-[30px] border border-border-subtle bg-[radial-gradient(circle_at_top_left,rgba(200,171,90,0.12),transparent_35%),rgb(var(--color-surface)/0.8)] px-6 py-8 sm:px-8">
             <p className="text-xs uppercase tracking-[0.28em] text-gold/72">{post.category}</p>
             <h1 className="mt-4 font-display text-4xl text-ink sm:text-5xl">{post.title}</h1>
-            <p className="mt-5 text-sm leading-8 text-ink-muted sm:text-base">{post.intro}</p>
+            <p data-speakable="blog-intro" className="mt-5 text-sm leading-8 text-ink-muted sm:text-base">{post.intro}</p>
             <div className="mt-6 flex flex-wrap items-center gap-4 text-sm text-ink-subtle">
               <span>{post.publishedAt}</span>
               <span className="h-1 w-1 rounded-full bg-gold/80" />
@@ -212,6 +204,26 @@ function BlogPostContent({ slug }: { slug: string }) {
                 className="inline-flex items-center gap-2 rounded-full border border-gold/25 px-5 py-2.5 text-sm text-gold transition-colors hover:bg-gold/10"
               >
                 {workspaceCta.secondaryCta}
+              </Link>
+              <Link
+                href={generateHref}
+                onClick={() => {
+                  markProductAttributionSource('blog');
+                  void trackProductEvent('generation_prompt_opened', {
+                    source: 'blog',
+                    pagePath: `/${locale}/blog/${post.slug}`,
+                    locale,
+                    metadata: {
+                      entrypoint: 'blog_reference_generation',
+                      content_slug: post.slug,
+                      image_type: workspaceCta.imageType,
+                    },
+                  });
+                }}
+                className="inline-flex items-center gap-2 rounded-full border border-sage/25 px-5 py-2.5 text-sm text-sage transition-colors hover:bg-sage/10"
+              >
+                <Sparkles size={14} />
+                {locale === 'zh' ? '按本文方法生成练习参考图' : locale === 'ja' ? '記事の方法で参考画像を生成' : 'Generate a practice reference'}
               </Link>
               <Link href={`/${locale}/blog`} className="inline-flex items-center gap-2 rounded-full border border-border-subtle px-5 py-2.5 text-sm text-ink-muted transition-colors hover:border-gold/30 hover:text-gold">
                 {ui.moreArticlesCta}

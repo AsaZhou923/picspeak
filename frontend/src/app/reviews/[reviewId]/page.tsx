@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { AlertCircle, ArrowLeft, Lightbulb, ThumbsDown, ThumbsUp, TrendingDown } from 'lucide-react';
+import { AlertCircle, ArrowLeft, History, Lightbulb, ThumbsDown, ThumbsUp, TrendingDown } from 'lucide-react';
 import ProPromoCard from '@/components/marketing/ProPromoCard';
 import { useAuth } from '@/lib/auth-context';
 import { FinalScoreRing } from '@/components/ui/ScoreRing';
@@ -29,17 +30,48 @@ import { GalleryConfirmDialog } from '@/features/reviews/components/GalleryConfi
 import { ReviewScorePanel } from '@/features/reviews/components/ReviewScorePanel';
 import { ReviewActionBar } from '@/features/reviews/components/ReviewActionBar';
 import { ReviewGrowthLoopPanel } from '@/features/reviews/components/ReviewGrowthLoopPanel';
+import { ReviewReferenceGenerationPanel } from '@/features/reviews/components/ReviewReferenceGenerationPanel';
 import { ReviewGalleryPanel } from '@/features/reviews/components/ReviewGalleryPanel';
 import { ImageZoomOverlay } from '@/features/reviews/components/ImageZoomOverlay';
-import { buildNextShootChecklist } from '@/lib/review-growth';
+import { RetakeComparisonPanel } from '@/features/reviews/components/RetakeComparisonPanel';
+import { buildNextShootChecklist, type NextShootChecklistItem } from '@/lib/review-growth';
 import { getProUpgradeTriggerCopy, type ProUpgradeTrigger } from '@/lib/pro-conversion';
+import { trackProductEvent } from '@/lib/product-analytics';
+
+function getReviewSourceContextCopy(locale: 'zh' | 'en' | 'ja') {
+  if (locale === 'ja') {
+    return {
+      label: 'Replay Context',
+      title: '元の講評につながる再分析です',
+      body: '今回の結果は、以前の講評から続く撮影または修正として記録されています。',
+      sourceReview: 'Source review',
+      openSource: '元の講評を見る',
+    };
+  }
+  if (locale === 'en') {
+    return {
+      label: 'Replay Context',
+      title: 'This critique is linked to a source review',
+      body: 'Use the source review to compare whether the retake or same-photo fix moved the next-shoot goal forward.',
+      sourceReview: 'Source review',
+      openSource: 'Open source review',
+    };
+  }
+  return {
+    label: '复拍上下文',
+    title: '这次点评已关联来源点评',
+    body: '你可以回到来源点评，对照这次复拍或同图修正是否推进了上一轮目标。',
+    sourceReview: '来源点评',
+    openSource: '查看来源点评',
+  };
+}
 
 export default function ReviewPage() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { t, locale } = useI18n();
-  const { userInfo } = useAuth();
+  const { userInfo, token } = useAuth();
 
   const reviewId = params.reviewId as string;
   const backHref = searchParams.get('back') ?? '/workspace';
@@ -162,12 +194,74 @@ export default function ReviewPage() {
   const gallerySaved = Boolean(review.gallery_visible);
   const isLowScore = r.final_score < 5.0;
   const reviewGalleryCardCopy = getReviewGalleryCardCopy(locale);
-  const nextShootChecklist = buildNextShootChecklist(displaySuggestions);
+  const nextShootChecklist = buildNextShootChecklist(displaySuggestions, 3, r.scores);
+  const visualReferenceBrief = r.comparison
+    ? [
+        r.comparison.visual_reference_prompt,
+        ...r.comparison.next_actions
+          .slice(0, 3)
+          .map((item) => `${item.dimension}: ${item.action} Success check: ${item.success_check}`),
+      ].join('\n')
+    : displaySuggestions;
+  const sourceContextCopy = getReviewSourceContextCopy(locale);
 
   function handleUploadNewRound() {
+    const primaryAction = nextShootChecklist[0];
+    if (primaryAction) {
+      void trackProductEvent('next_shoot_action_clicked', {
+        token: token ?? undefined,
+        pagePath: `/reviews/${activeReview.review_id}`,
+        locale,
+        metadata: {
+          review_id: activeReview.review_id,
+          photo_id: activeReview.photo_id,
+          mode: activeReview.mode,
+          image_type: activeReview.image_type ?? activeReview.result.image_type ?? 'default',
+          dimension: primaryAction.dimension,
+          action_index: 1,
+          action_title: primaryAction.title,
+          retake_intent: 'new_photo_retake',
+          trigger: 'new_photo_panel',
+        },
+      });
+    }
     const nextParams = new URLSearchParams({
+      source_review_id: activeReview.review_id,
       mode: activeReview.mode,
       image_type: activeReview.image_type ?? activeReview.result.image_type ?? 'default',
+      retake_intent: 'new_photo_retake',
+    });
+    if (primaryAction) {
+      nextParams.set('next_shoot_action', primaryAction.detail || primaryAction.title);
+      nextParams.set('next_shoot_dimension', primaryAction.dimension);
+    }
+    router.push(`/workspace?${nextParams.toString()}`);
+  }
+
+  function handleChecklistAction(item: NextShootChecklistItem, index: number) {
+    void trackProductEvent('next_shoot_action_clicked', {
+      token: token ?? undefined,
+      pagePath: `/reviews/${activeReview.review_id}`,
+      locale,
+      metadata: {
+        review_id: activeReview.review_id,
+        photo_id: activeReview.photo_id,
+        mode: activeReview.mode,
+        image_type: activeReview.image_type ?? activeReview.result.image_type ?? 'default',
+        dimension: item.dimension,
+        action_index: index + 1,
+        action_title: item.title,
+        retake_intent: 'new_photo_retake',
+        trigger: 'checklist_item',
+      },
+    });
+    const nextParams = new URLSearchParams({
+      source_review_id: activeReview.review_id,
+      mode: activeReview.mode,
+      image_type: activeReview.image_type ?? activeReview.result.image_type ?? 'default',
+      retake_intent: 'new_photo_retake',
+      next_shoot_action: item.detail || item.title,
+      next_shoot_dimension: item.dimension,
     });
     router.push(`/workspace?${nextParams.toString()}`);
   }
@@ -252,6 +346,30 @@ export default function ReviewPage() {
               </div>
             </div>
 
+            {r.comparison && <RetakeComparisonPanel review={activeReview} locale={locale} />}
+
+            {activeReview.source_review_id && !r.comparison && (
+              <div className="rounded-2xl border border-sage/25 bg-sage/10 px-4 py-3">
+                <div className="mb-2 flex items-center gap-2 text-xs font-medium text-sage">
+                  <History size={14} />
+                  <span>{sourceContextCopy.label}</span>
+                </div>
+                <h2 className="font-display text-xl text-ink">{sourceContextCopy.title}</h2>
+                <p className="mt-2 text-sm leading-6 text-ink-muted">{sourceContextCopy.body}</p>
+                <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                  <span className="rounded-full border border-border-subtle bg-void/30 px-3 py-1 text-ink-subtle">
+                    {sourceContextCopy.sourceReview}: {activeReview.source_review_id}
+                  </span>
+                  <Link
+                    href={`/reviews/${activeReview.source_review_id}?back=/reviews/${activeReview.review_id}`}
+                    className="rounded-full border border-sage/30 px-3 py-1 font-medium text-sage transition-colors hover:bg-sage/10"
+                  >
+                    {sourceContextCopy.openSource}
+                  </Link>
+                </div>
+              </div>
+            )}
+
             {showOwnerActions && (
               <ReviewActionBar
                 review={review}
@@ -275,19 +393,32 @@ export default function ReviewPage() {
 
             <div className="border-t border-border-subtle" />
 
-            <div className="space-y-6 max-w-2xl">
-              <CritiqueSection
-                accent="text-sage" borderColor="border-sage" bgColor="bg-sage/5"
-                icon={<ThumbsUp size={13} />} title={t('review_advantage')}
-                body={displayAdvantage} isPro={isPro}
-              />
-              <div className="border-t border-border-subtle" />
-              <CritiqueSection
-                accent="text-rust" borderColor="border-rust" bgColor="bg-rust/5"
-                icon={<ThumbsDown size={13} />} title={t('review_critique')}
-                body={displayCritique} isPro={isPro}
-              />
-              <div className="border-t border-border-subtle" />
+            <div className="space-y-5">
+              <div className="grid gap-5 xl:grid-cols-2">
+                <CritiqueSection
+                  accent="text-sage" borderColor="border-sage" bgColor="bg-sage/5"
+                  icon={<ThumbsUp size={13} />} title={t('review_advantage')}
+                  body={displayAdvantage} isPro={isPro}
+                />
+                <CritiqueSection
+                  accent="text-rust" borderColor="border-rust" bgColor="bg-rust/5"
+                  icon={<ThumbsDown size={13} />} title={t('review_critique')}
+                  body={displayCritique} isPro={isPro}
+                />
+              </div>
+
+              {showOwnerActions && (
+                <ReviewReferenceGenerationPanel
+                  reviewId={activeReview.review_id}
+                  photoId={activeReview.photo_id}
+                  imageType={activeReview.image_type ?? activeReview.result.image_type ?? 'default'}
+                  suggestions={visualReferenceBrief}
+                  plan={plan}
+                  locale={locale}
+                  sourceAspect={imgNaturalSize}
+                />
+              )}
+
               <CritiqueSection
                 accent="text-gold" borderColor="border-gold" bgColor="bg-gold/5"
                 icon={<Lightbulb size={13} />} title={t('review_suggestions')}
@@ -303,6 +434,7 @@ export default function ReviewPage() {
                 actionBusy={actionBusy}
                 onReplayReview={handleReplayReview}
                 onUploadNew={handleUploadNewRound}
+                onChecklistAction={handleChecklistAction}
                 t={t}
               />
             )}

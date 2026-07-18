@@ -1,6 +1,7 @@
 ﻿from __future__ import annotations
 
 from datetime import date, datetime
+from decimal import Decimal
 import enum
 
 from sqlalchemy import (
@@ -17,6 +18,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -61,6 +63,11 @@ class ReviewStatus(str, enum.Enum):
     FAILED = 'FAILED'
 
 
+class GenerationMode(str, enum.Enum):
+    general = 'general'
+    review_linked = 'review_linked'
+
+
 class User(Base):
     __tablename__ = 'users'
 
@@ -78,7 +85,7 @@ class User(Base):
     status: Mapped[UserStatus] = mapped_column(Enum(UserStatus, name='user_status', create_type=False), nullable=False, default=UserStatus.active)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 
 
 class Photo(Base):
@@ -106,10 +113,10 @@ class Photo(Base):
     exif_data: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     client_meta: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     nsfw_label: Mapped[str | None] = mapped_column(Text)
-    nsfw_score: Mapped[float | None] = mapped_column(Numeric(5, 4))
+    nsfw_score: Mapped[Decimal | None] = mapped_column(Numeric(5, 4))
     rejected_reason: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 
 
 class ReviewTask(Base):
@@ -142,7 +149,7 @@ class ReviewTask(Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     expire_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 
     photo: Mapped[Photo] = relationship()
 
@@ -154,7 +161,25 @@ class Review(Base):
         Index('idx_reviews_owner_created', 'owner_user_id', 'created_at'),
         Index('idx_reviews_owner_deleted_created', 'owner_user_id', 'deleted_at', 'created_at'),
         Index('idx_reviews_owner_image_type_created', 'owner_user_id', 'image_type', 'created_at'),
+        Index('idx_reviews_mode_created', 'mode', 'created_at'),
         Index('idx_reviews_source_review', 'source_review_id'),
+        Index(
+            'idx_reviews_gallery_public',
+            'gallery_added_at',
+            'id',
+            postgresql_where=text(
+                "gallery_visible = TRUE AND gallery_audit_status = 'approved' AND deleted_at IS NULL"
+            ),
+        ),
+        Index(
+            'idx_reviews_gallery_recommendation',
+            'image_type',
+            'final_score',
+            'id',
+            postgresql_where=text(
+                "gallery_visible = TRUE AND gallery_audit_status = 'approved' AND deleted_at IS NULL"
+            ),
+        ),
         Index('uq_reviews_share_token', 'share_token', unique=True),
     )
 
@@ -169,7 +194,7 @@ class Review(Base):
     image_type: Mapped[str] = mapped_column(Text, nullable=False, default='default', server_default='default')
     schema_version: Mapped[str] = mapped_column(Text, nullable=False, default='1.0')
     result_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
-    final_score: Mapped[float] = mapped_column(Numeric(4, 2), nullable=False)
+    final_score: Mapped[Decimal] = mapped_column(Numeric(4, 2), nullable=False)
     is_public: Mapped[bool] = mapped_column(nullable=False, default=False, server_default='false')
     share_token: Mapped[str | None] = mapped_column(Text)
     favorite: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default='false')
@@ -182,11 +207,11 @@ class Review(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     input_tokens: Mapped[int | None] = mapped_column(Integer)
     output_tokens: Mapped[int | None] = mapped_column(Integer)
-    cost_usd: Mapped[float | None] = mapped_column(Numeric(12, 6))
+    cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(12, 6))
     latency_ms: Mapped[int | None] = mapped_column(Integer)
     model_name: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 
 
 class ReviewLike(Base):
@@ -227,7 +252,7 @@ class ReviewTaskEvent(Base):
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    task_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('review_tasks.id'), nullable=False)
+    task_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('review_tasks.id', ondelete='CASCADE'), nullable=False)
     task_public_id: Mapped[str] = mapped_column(Text, nullable=False)
     event_type: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(Text, nullable=False)
@@ -239,11 +264,89 @@ class ReviewTaskEvent(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
+class ImageGenerationTask(Base):
+    __tablename__ = 'image_generation_tasks'
+    __table_args__ = (
+        UniqueConstraint('owner_user_id', 'idempotency_key', name='uq_image_generation_tasks_user_idempotency'),
+        Index('idx_image_generation_tasks_status_created', 'status', 'created_at'),
+        Index('idx_image_generation_tasks_status_next_attempt', 'status', 'next_attempt_at'),
+        Index('idx_image_generation_tasks_owner_created', 'owner_user_id', 'created_at'),
+        Index('idx_image_generation_tasks_review_created', 'source_review_id', 'created_at'),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    public_id: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
+    owner_user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('users.id'), nullable=False)
+    source_photo_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey('photos.id'))
+    source_review_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey('reviews.id'))
+    status: Mapped[TaskStatus] = mapped_column(Enum(TaskStatus, name='task_status', create_type=False), nullable=False, default=TaskStatus.PENDING)
+    generation_mode: Mapped[str] = mapped_column(Text, nullable=False, default='general', server_default='general')
+    intent: Mapped[str] = mapped_column(Text, nullable=False)
+    prompt: Mapped[str] = mapped_column(Text, nullable=False)
+    prompt_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    idempotency_key: Mapped[str | None] = mapped_column(Text)
+    request_payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default='0')
+    max_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=2, server_default='2')
+    progress: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default='0')
+    error_code: Mapped[str | None] = mapped_column(Text)
+    error_message: Mapped[str | None] = mapped_column(Text)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    claimed_by: Mapped[str | None] = mapped_column(Text)
+    last_heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+
+
+class GeneratedImage(Base):
+    __tablename__ = 'generated_images'
+    __table_args__ = (
+        Index('idx_generated_images_owner_created', 'owner_user_id', 'created_at'),
+        Index('idx_generated_images_task', 'task_id'),
+        Index('idx_generated_images_review_created', 'source_review_id', 'created_at'),
+        Index('idx_generated_images_object', 'object_bucket', 'object_key'),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    public_id: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
+    task_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey('image_generation_tasks.id'))
+    owner_user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('users.id'), nullable=False)
+    source_photo_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey('photos.id'))
+    source_review_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey('reviews.id'))
+    object_bucket: Mapped[str] = mapped_column(Text, nullable=False)
+    object_key: Mapped[str] = mapped_column(Text, nullable=False)
+    content_type: Mapped[str] = mapped_column(Text, nullable=False, default='image/webp', server_default='image/webp')
+    width: Mapped[int | None] = mapped_column(Integer)
+    height: Mapped[int | None] = mapped_column(Integer)
+    intent: Mapped[str] = mapped_column(Text, nullable=False)
+    generation_mode: Mapped[str] = mapped_column(Text, nullable=False, default='general', server_default='general')
+    prompt: Mapped[str] = mapped_column(Text, nullable=False)
+    revised_prompt: Mapped[str | None] = mapped_column(Text)
+    model_name: Mapped[str] = mapped_column(Text, nullable=False)
+    model_snapshot: Mapped[str | None] = mapped_column(Text)
+    quality: Mapped[str] = mapped_column(Text, nullable=False)
+    size: Mapped[str] = mapped_column(Text, nullable=False)
+    output_format: Mapped[str] = mapped_column(Text, nullable=False)
+    input_text_tokens: Mapped[int | None] = mapped_column(Integer)
+    input_image_tokens: Mapped[int | None] = mapped_column(Integer)
+    output_image_tokens: Mapped[int | None] = mapped_column(Integer)
+    cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(12, 6))
+    credits_charged: Mapped[int] = mapped_column(Integer, nullable=False)
+    template_key: Mapped[str | None] = mapped_column(Text)
+    metadata_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+
+
 class UsageLedger(Base):
     __tablename__ = 'usage_ledger'
     __table_args__ = (
         Index('idx_usage_ledger_user_bill_date', 'user_id', 'bill_date'),
         Index('idx_usage_ledger_type_bill_date', 'usage_type', 'bill_date'),
+        Index('idx_usage_ledger_user_type', 'user_id', 'usage_type'),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
@@ -251,7 +354,7 @@ class UsageLedger(Base):
     review_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey('reviews.id'))
     task_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey('review_tasks.id'))
     usage_type: Mapped[str] = mapped_column(Text, nullable=False)
-    amount: Mapped[float] = mapped_column(Numeric(18, 6), nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False)
     unit: Mapped[str] = mapped_column(Text, nullable=False)
     bill_date: Mapped[date] = mapped_column(Date, nullable=False)
     metadata_json: Mapped[dict] = mapped_column('metadata', JSONB, nullable=False, default=dict)
@@ -263,6 +366,7 @@ class BillingSubscription(Base):
     __table_args__ = (
         Index('uq_billing_subscriptions_provider_subscription', 'provider', 'provider_subscription_id', unique=True),
         Index('idx_billing_subscriptions_user_provider', 'user_id', 'provider'),
+        Index('idx_billing_subscriptions_provider_customer', 'provider_customer_id'),
         Index('idx_billing_subscriptions_status_updated', 'status', 'updated_at'),
     )
 
@@ -294,7 +398,7 @@ class BillingSubscription(Base):
     last_payment_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     raw_payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 
 
 class BillingActivationCode(Base):
@@ -320,7 +424,7 @@ class BillingActivationCode(Base):
     disabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     metadata_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 
 
 class BillingWebhookEvent(Base):
@@ -360,7 +464,7 @@ class RateLimitCounter(Base):
     window_seconds: Mapped[int] = mapped_column(Integer, nullable=False)
     hit_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 
 
 class IdempotencyKey(Base):

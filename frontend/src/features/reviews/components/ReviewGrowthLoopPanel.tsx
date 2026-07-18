@@ -1,6 +1,6 @@
 import { ArrowRight, Camera, ListTodo, RotateCcw } from 'lucide-react';
 import { type Translator } from '@/lib/i18n';
-import { NextShootChecklistItem } from '@/lib/review-growth';
+import { type NextShootChecklistItem } from '@/lib/review-growth';
 import { getReplayIntentCopy } from '@/lib/replay-intent-copy';
 
 interface ReviewGrowthLoopPanelProps {
@@ -9,6 +9,7 @@ interface ReviewGrowthLoopPanelProps {
   actionBusy: string | null;
   onReplayReview: () => void;
   onUploadNew: () => void;
+  onChecklistAction: (item: NextShootChecklistItem, index: number) => void;
   t: Translator;
 }
 
@@ -30,6 +31,7 @@ function getLoopCopy(locale: 'zh' | 'en' | 'ja') {
       reasonLabel: 'Why',
       primaryBadge: 'Priority',
       uploadBadge: 'New Photo',
+      actionCta: 'ワークスペースへ持ち込む',
     };
   }
   if (locale === 'en') {
@@ -49,6 +51,7 @@ function getLoopCopy(locale: 'zh' | 'en' | 'ja') {
       reasonLabel: 'Why',
       primaryBadge: 'Priority',
       uploadBadge: 'New Photo',
+      actionCta: 'Carry this to workspace',
     };
   }
   return {
@@ -67,6 +70,7 @@ function getLoopCopy(locale: 'zh' | 'en' | 'ja') {
     reasonLabel: '原因',
     primaryBadge: '第一优先级',
     uploadBadge: '新照片',
+    actionCta: '带到工作台',
   };
 }
 
@@ -76,6 +80,7 @@ export function ReviewGrowthLoopPanel({
   actionBusy,
   onReplayReview,
   onUploadNew,
+  onChecklistAction,
   t,
 }: ReviewGrowthLoopPanelProps) {
   const copy = getLoopCopy(locale);
@@ -170,6 +175,14 @@ export function ReviewGrowthLoopPanel({
                       {!item.observation && !item.reason && (
                         <p className="text-xs leading-5 text-ink-subtle">{item.detail}</p>
                       )}
+                      <button
+                        type="button"
+                        onClick={() => onChecklistAction(item, index)}
+                        className="inline-flex items-center gap-1 rounded-full border border-gold/25 px-3 py-1.5 text-xs font-medium text-gold transition-colors hover:border-gold/45 hover:bg-gold/10"
+                      >
+                        {copy.actionCta}
+                        <ArrowRight size={12} />
+                      </button>
                     </div>
                   </div>
                 </li>

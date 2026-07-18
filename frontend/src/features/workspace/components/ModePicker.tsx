@@ -10,12 +10,11 @@ interface ModePickerProps {
   value: 'flash' | 'pro';
   onChange: (mode: 'flash' | 'pro') => void;
   isGuest: boolean;
-  promoModeBadge: string;
   variant?: 'compact' | 'full';
   t: Translator;
 }
 
-export function ModePicker({ value, onChange, isGuest, promoModeBadge, variant = 'full', t }: ModePickerProps) {
+export function ModePicker({ value, onChange, isGuest, variant = 'full', t }: ModePickerProps) {
   return (
     <div className="grid grid-cols-2 gap-3">
       {MODE_OPTIONS.map((m) => {
@@ -41,11 +40,6 @@ export function ModePicker({ value, onChange, isGuest, promoModeBadge, variant =
             <div>
               <p className={`text-sm ${variant === 'compact' ? 'font-medium' : 'font-bold'} ${active ? 'text-gold' : 'text-ink'}`}>
                 {m.title}
-                {m.id === 'pro' && (
-                  <span className={`ml-2 rounded-full border border-gold/25 px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] ${variant === 'compact' ? 'bg-gold/10 text-gold/80' : 'bg-gold/15 text-gold/90 font-mono'}`}>
-                    {promoModeBadge}
-                  </span>
-                )}
               </p>
               <p className={`${variant === 'compact' ? 'mt-0.5 text-xs' : 'text-[11px] leading-relaxed mt-1 font-medium'} text-ink-muted`}>
                 {disabled ? t('mode_pro_guest') : t(m.descKey)}

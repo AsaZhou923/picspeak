@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Check, Download, Heart, History, Share2 } from 'lucide-react';
+import { memo } from 'react';
 import { ReviewGetResponse } from '@/lib/types';
 import { type Translator } from '@/lib/i18n';
 
@@ -16,7 +17,7 @@ interface ReviewActionBarProps {
   t: Translator;
 }
 
-export function ReviewActionBar({
+export const ReviewActionBar = memo(function ReviewActionBar({
   review,
   showOwnerActions,
   showGuestHistoryLink,
@@ -73,4 +74,4 @@ export function ReviewActionBar({
       )}
     </div>
   );
-}
+});

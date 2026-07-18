@@ -12,15 +12,23 @@ const signedInUser: AuthToken = {
   clerk_user_id: 'clerk_123',
 };
 
-test('keeps auth-only header branches hidden before hydration even when user info exists', () => {
+const guestUser: AuthToken = {
+  access_token: 'guest-token',
+  token_type: 'bearer',
+  user_id: 'guest_123',
+  plan: 'guest',
+  auth_provider: 'guest',
+};
+
+test('keeps account-only header branches hidden before hydration while public nav stays visible', () => {
   const state = getHeaderVisibilityState({
     hasHydrated: false,
     userInfo: signedInUser,
   });
 
-  assert.equal(state.showUsageNav, false);
+  assert.equal(state.showUsageNav, true);
   assert.equal(state.showAuthenticatedControls, false);
-  assert.equal(state.showMobileTabs, false);
+  assert.equal(state.showMobileTabs, true);
   assert.equal(state.userInfo, null);
 });
 
@@ -36,13 +44,25 @@ test('shows auth-only header branches after hydration when user info exists', ()
   assert.equal(state.userInfo?.user_id, 'usr_123');
 });
 
-test('stays in guest shell when there is no user info', () => {
+test('stays in guest account shell when there is no user info', () => {
   const state = getHeaderVisibilityState({
     hasHydrated: true,
     userInfo: null,
   });
 
-  assert.equal(state.showUsageNav, false);
+  assert.equal(state.showUsageNav, true);
   assert.equal(state.showAuthenticatedControls, false);
-  assert.equal(state.showMobileTabs, false);
+  assert.equal(state.showMobileTabs, true);
+});
+
+test('keeps guest tokens in the signed-out account shell while public nav stays visible', () => {
+  const state = getHeaderVisibilityState({
+    hasHydrated: true,
+    userInfo: guestUser,
+  });
+
+  assert.equal(state.showUsageNav, true);
+  assert.equal(state.showAuthenticatedControls, false);
+  assert.equal(state.showMobileTabs, true);
+  assert.equal(state.userInfo, null);
 });

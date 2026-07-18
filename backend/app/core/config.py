@@ -1,14 +1,24 @@
 import json
+from pathlib import Path
 from typing import Any
 
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+REPO_ROOT = Path(__file__).resolve().parents[3]
+BACKEND_ROOT = REPO_ROOT / 'backend'
+
 
 class Settings(BaseSettings):
-    # Support running from repo root or backend/ while still finding the backend env file.
+    # Support running from repo root, backend/, or script subdirectories while still finding env files.
     model_config = SettingsConfigDict(
-        env_file=('.env', '../.env', 'backend/.env'),
+        env_file=(
+            '.env',
+            '../.env',
+            'backend/.env',
+            str(REPO_ROOT / '.env'),
+            str(BACKEND_ROOT / '.env'),
+        ),
         env_file_encoding='utf-8-sig',
         extra='ignore',
     )
@@ -18,6 +28,9 @@ class Settings(BaseSettings):
     # Minimum required length for app_secret in non-dev environments (32 bytes → 64 hex chars).
     _APP_SECRET_MIN_LENGTH: int = 32
     database_url: str = 'postgresql+psycopg2://postgres:postgres@localhost:5432/aipingtubackend'
+    db_pool_size: int = 10
+    db_max_overflow: int = 20
+    db_pool_recycle_seconds: int = 3600
 
     object_bucket: str = 'aipingtuphotos'
     object_base_url: str = 'https://object.example.com'
@@ -30,6 +43,7 @@ class Settings(BaseSettings):
     rate_limit_per_minute: int = 10
     ip_rate_limit_per_minute: int = 30
     guest_api_rate_limit_per_minute: int = 60
+    guest_creation_rate_limit_per_minute: int = 10
     guest_review_rate_limit_per_minute: int = 4
     guest_review_limit_per_day: int = 3
     guest_review_limit_per_month: int = 30
@@ -51,7 +65,11 @@ class Settings(BaseSettings):
     lemonsqueezy_api_key: str = ''
     lemonsqueezy_store_id: str = ''
     lemonsqueezy_pro_variant_id: str = ''
+    lemonsqueezy_zh_pro_variant_id: str = ''
     lemonsqueezy_pro_checkout_url: str = ''
+    lemonsqueezy_zh_pro_checkout_url: str = ''
+    lemonsqueezy_image_credit_pack_checkout_url: str = ''
+    lemonsqueezy_image_credit_pack_variant_id: str = ''
     lemonsqueezy_webhook_signing_secret: str = ''
     lemonsqueezy_webhook_url: str = ''
     lemonsqueezy_checkout_success_url: str = ''
@@ -93,6 +111,7 @@ class Settings(BaseSettings):
     cloud_tasks_location: str = ''
     cloud_tasks_queue: str = ''
     cloud_tasks_target_url: str = ''
+    cloud_tasks_generation_target_url: str = ''
     cloud_tasks_secret: str = ''
     cloud_tasks_service_account_email: str = ''
     cloud_tasks_oidc_audience: str = ''
@@ -100,6 +119,46 @@ class Settings(BaseSettings):
 
     image_audit_enabled: bool = True
     image_audit_reject_threshold: float = 0.78
+
+    openai_api_key: str = ''
+    openai_api_base_url: str = 'https://api.openai.com/v1'
+    openai_review_model: str = 'gpt-5.5'
+    openai_review_reasoning_effort: str = 'medium'
+    openai_review_timeout_seconds: int = 180
+    retake_analysis_api_url: str = ''
+    retake_analysis_model: str = 'gpt-5.6-terra'
+    retake_analysis_reasoning_effort: str = 'medium'
+    retake_analysis_timeout_seconds: int = 180
+    image_generation_api_key: str = ''
+    image_generation_api_url: str = Field(
+        default='https://api.openai.com/v1/images/generations',
+    )
+    image_generation_api_mode: str = 'auto'
+    image_generation_model: str = 'gpt-image-2'
+    image_generation_model_snapshot: str = 'gpt-image-2-2026-04-21'
+    image_generation_default_quality: str = 'low'
+    image_generation_pro_default_quality: str = 'medium'
+    image_generation_max_outputs_per_request: int = 1
+    image_generation_timeout_seconds: int = 180
+    image_generation_task_stale_timeout_seconds: int = 600
+    image_generation_shutdown_timeout_seconds: int = 30
+    image_generation_download_max_bytes: int = 25 * 1024 * 1024
+    image_generation_worker_concurrency: int = 1
+    image_generation_daily_ipm_limit: int = 5
+    image_generation_enable_streaming: bool = False
+    image_generation_free_monthly_credits: int = 3
+    image_generation_pro_monthly_credits: int = 199
+
+    def _local_dev_only(self) -> bool:
+        local_origins = {'localhost', '127.0.0.1', '::1'}
+        origin = self.frontend_origin.strip().lower()
+        database_url = self.database_url.strip().lower()
+        cors_origins = [origin.strip().lower() for origin in self.backend_cors_origins]
+        return (
+            any(host in origin for host in local_origins)
+            and all(any(host in item for host in local_origins) for item in cors_origins)
+            and any(host in database_url for host in local_origins)
+        )
 
     @field_validator('backend_cors_origins', mode='before')
     @classmethod
@@ -144,8 +203,20 @@ class Settings(BaseSettings):
         'lemonsqueezy_api_key',
         'lemonsqueezy_store_id',
         'lemonsqueezy_pro_variant_id',
+        'lemonsqueezy_zh_pro_variant_id',
         'lemonsqueezy_pro_checkout_url',
+        'lemonsqueezy_zh_pro_checkout_url',
+        'lemonsqueezy_image_credit_pack_checkout_url',
+        'lemonsqueezy_image_credit_pack_variant_id',
         'lemonsqueezy_webhook_signing_secret',
+        'openai_api_key',
+        'openai_review_reasoning_effort',
+        'retake_analysis_reasoning_effort',
+        'image_generation_api_key',
+        'image_generation_model_snapshot',
+        'image_generation_default_quality',
+        'image_generation_pro_default_quality',
+        'image_generation_api_mode',
         mode='before',
     )
     @classmethod
@@ -154,14 +225,31 @@ class Settings(BaseSettings):
             return ''
         return value.strip()
 
+    @field_validator('openai_review_reasoning_effort', 'retake_analysis_reasoning_effort')
+    @classmethod
+    def validate_openai_reasoning_effort(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        allowed = {'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'}
+        if normalized not in allowed:
+            raise ValueError(f'OpenAI reasoning effort must be one of: {", ".join(sorted(allowed))}')
+        return normalized
+
     @field_validator(
         'cloud_tasks_target_url',
+        'cloud_tasks_generation_target_url',
         'cloud_tasks_service_account_email',
         'cloud_tasks_oidc_audience',
         'clerk_api_url',
         'lemonsqueezy_pro_checkout_url',
+        'lemonsqueezy_zh_pro_checkout_url',
         'lemonsqueezy_webhook_url',
         'lemonsqueezy_checkout_success_url',
+        'openai_api_base_url',
+        'openai_review_model',
+        'retake_analysis_api_url',
+        'retake_analysis_model',
+        'image_generation_api_url',
+        'image_generation_model',
         mode='before',
     )
     @classmethod
@@ -176,9 +264,15 @@ class Settings(BaseSettings):
 
         # Validate app_secret strength in non-dev environments.
         _insecure_app_secrets = {'', 'change-me', 'picspeakt123'}
+        insecure_app_secret = self.app_secret.strip() in _insecure_app_secrets or len(self.app_secret.strip()) < 32
+        if is_dev and insecure_app_secret and not self._local_dev_only():
+            raise ValueError(
+                'APP_ENV=dev with default APP_SECRET is only allowed for localhost-only development settings. '
+                'Set APP_ENV=production and strong secrets for deployed environments.'
+            )
         if not is_dev:
             secret = self.app_secret.strip()
-            if secret in _insecure_app_secrets or len(secret) < 32:
+            if insecure_app_secret:
                 raise ValueError(
                     'APP_SECRET must be set to a cryptographically random value of at least 32 characters outside dev mode. '
                     'Generate one with: python3 -c "import secrets; print(secrets.token_hex(32))"'
@@ -186,7 +280,13 @@ class Settings(BaseSettings):
 
         # Validate oauth_jwt_secret in non-dev environments.
         insecure_defaults = {'', 'change-me-jwt-secret'}
-        if not is_dev and self.oauth_jwt_secret.strip() in insecure_defaults:
+        insecure_oauth_secret = self.oauth_jwt_secret.strip() in insecure_defaults
+        if is_dev and insecure_oauth_secret and not self._local_dev_only():
+            raise ValueError(
+                'APP_ENV=dev with default OAUTH_JWT_SECRET is only allowed for localhost-only development settings. '
+                'Set a strong OAUTH_JWT_SECRET for deployed environments.'
+            )
+        if not is_dev and insecure_oauth_secret:
             raise ValueError('OAUTH_JWT_SECRET must be set to a non-default secret outside dev mode')
         if self.cloud_tasks_enabled:
             required_fields = {

@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.api.deps import CurrentActor, get_current_actor, get_db, new_public_id
@@ -36,6 +37,7 @@ from app.services.guard import (
 )
 from app.services.task_dispatcher import TaskDispatchError, enqueue_review_task
 from app.services.task_events import record_task_event
+from app.services.retake_comparison import run_retake_comparison
 from .review_support import (
     _attach_billing_info,
     _resolve_source_review,
@@ -77,15 +79,21 @@ def create_review(
             return response_json
 
     if actor.plan != UserPlan.guest and source_review is None:
-        existing_review = (
-            db.query(Review)
-            .filter(
-                Review.photo_id == photo.id,
-                Review.owner_user_id == actor.user.id,
-                Review.mode == mode_enum,
-                Review.status == ReviewStatus.SUCCEEDED,
-                Review.deleted_at.is_(None),
+        existing_query = db.query(Review).filter(
+            Review.photo_id == photo.id,
+            Review.owner_user_id == actor.user.id,
+            Review.mode == mode_enum,
+            Review.status == ReviewStatus.SUCCEEDED,
+            Review.deleted_at.is_(None),
+        )
+        if payload.review_model == 'gpt-5.5':
+            existing_query = existing_query.filter(Review.model_name.ilike('%gpt-5.5%'))
+        else:
+            existing_query = existing_query.filter(
+                or_(Review.model_name.is_(None), ~Review.model_name.ilike('%gpt-%'))
             )
+        existing_review = (
+            existing_query
             .order_by(Review.created_at.desc(), Review.id.desc())
             .first()
         )
@@ -150,7 +158,18 @@ def create_review(
         db.add(task)
         try:
             db.flush()
-            record_task_event(db, task, event_type='TASK_CREATED', message='Task enqueued', payload={'mode': payload.mode, 'locale': payload.locale})
+            record_task_event(
+                db,
+                task,
+                event_type='TASK_CREATED',
+                message='Task enqueued',
+                payload={
+                    'mode': payload.mode,
+                    'locale': payload.locale,
+                    'analysis_type': payload.analysis_type,
+                    'review_model': payload.review_model,
+                },
+            )
             db.commit()
         except IntegrityError as exc:
             db.rollback()
@@ -194,9 +213,36 @@ def create_review(
             db.commit()
         return response
 
-    image_url = _build_storage_photo_url(photo.bucket, photo.object_key)
+    image_url = _build_storage_photo_url(photo.object_key)
     try:
-        ai_response = run_ai_review(payload.mode, image_url=image_url, locale=payload.locale, exif_data=photo.exif_data or None, image_type=payload.image_type)
+        if payload.analysis_type == 'retake_compare':
+            if source_review is None:
+                raise AIReviewError('Retake comparison source review is missing')
+            source_photo = (
+                db.query(Photo)
+                .filter(Photo.id == source_review.photo_id, Photo.owner_user_id == actor.user.id)
+                .first()
+            )
+            if source_photo is None or source_photo.status != PhotoStatus.READY:
+                raise AIReviewError('Retake comparison source photo is not ready')
+            ai_response = run_retake_comparison(
+                original_image_url=_build_storage_photo_url(source_photo.object_key),
+                retake_image_url=image_url,
+                original_review_id=source_review.public_id,
+                original_photo_id=source_photo.public_id,
+                retake_photo_id=photo.public_id,
+                locale=payload.locale,
+                image_type=payload.image_type,
+            )
+        else:
+            ai_response = run_ai_review(
+                payload.mode,
+                image_url=image_url,
+                locale=payload.locale,
+                exif_data=photo.exif_data or None,
+                image_type=payload.image_type,
+                review_model=payload.review_model,
+            )
     except AIReviewError as exc:
         logger.warning('AI review failed for photo %s: %s', photo.public_id, exc)
         raise api_error(status.HTTP_502_BAD_GATEWAY, 'AI_REVIEW_FAILED', 'AI review could not be completed') from exc
@@ -238,7 +284,11 @@ def create_review(
             amount=1,
             unit='count',
             bill_date=datetime.now(timezone.utc).date(),
-            metadata_json={'mode': payload.mode},
+            metadata_json={
+                'mode': payload.mode,
+                'analysis_type': payload.analysis_type,
+                'review_model': payload.review_model,
+            },
         )
     )
     increment_quota(db, actor.user)

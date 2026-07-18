@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-from datetime import date
 import unittest
 from unittest.mock import Mock, patch
 
 from starlette.requests import Request
 
 from app.db.models import User, UserPlan, UserStatus
-from app.services.guard import guest_quota_scope_key, guest_rate_limit_scope_key, user_usage_snapshot
+from app.services.guard import guest_quota_scope_key, guest_rate_limit_scope_key, user_usage_snapshot, utc_now
 
 
 def _request(
@@ -43,7 +42,7 @@ def _user(*, plan: UserPlan, public_id: str, daily_quota_used: int = 0) -> User:
         plan=plan,
         daily_quota_total=0,
         daily_quota_used=daily_quota_used,
-        daily_quota_date=date.today(),
+        daily_quota_date=utc_now().date(),
         status=UserStatus.active,
     )
 

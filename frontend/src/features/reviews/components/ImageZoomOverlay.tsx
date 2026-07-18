@@ -1,5 +1,7 @@
 /* eslint-disable @next/next/no-img-element -- Zoom overlay uses raw img for client-side object URLs */
 import { X } from 'lucide-react';
+import { useRef } from 'react';
+import { useModalFocusTrap } from '@/lib/hooks/useModalFocusTrap';
 import { type Translator } from '@/lib/i18n';
 
 interface ImageZoomOverlayProps {
@@ -11,6 +13,13 @@ interface ImageZoomOverlayProps {
 }
 
 export function ImageZoomOverlay({ zoomMounted, zoomOpen, photoUrl, onClose, t }: ImageZoomOverlayProps) {
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const dialogRef = useModalFocusTrap<HTMLDivElement>({
+    open: zoomMounted && zoomOpen,
+    onClose,
+    initialFocusRef: closeButtonRef,
+  });
+
   if (!zoomMounted || !photoUrl) return null;
   return (
     <div
@@ -19,6 +28,7 @@ export function ImageZoomOverlay({ zoomMounted, zoomOpen, photoUrl, onClose, t }
       aria-hidden={!zoomOpen ? 'true' : 'false'}
     >
       <button
+        ref={closeButtonRef}
         type="button"
         onClick={onClose}
         className="absolute top-4 right-4 p-2 rounded-full bg-raised/80 border border-border-subtle text-ink-muted hover:text-ink transition-colors"
@@ -27,8 +37,13 @@ export function ImageZoomOverlay({ zoomMounted, zoomOpen, photoUrl, onClose, t }
         <X size={18} />
       </button>
       <div
+        ref={dialogRef}
         className="relative max-w-[90vw] max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label={t('review_photo_zoom_alt')}
+        tabIndex={-1}
       >
         <img
           src={photoUrl}

@@ -15,8 +15,13 @@ export default function SiteChrome({ children }: { children: ReactNode }) {
 
   return (
     <div className="relative z-10 min-h-screen flex flex-col">
+      <a href="#main-content" className="skip-link">
+        Skip to content
+      </a>
       {marketing ? <MarketingHeader /> : <Header />}
-      <main className="flex-1 pt-12 md:pt-0">{children}</main>
+      <main id="main-content" tabIndex={-1} className="flex-1 pt-12 md:pt-0">
+        {children}
+      </main>
       <Footer />
     </div>
   );

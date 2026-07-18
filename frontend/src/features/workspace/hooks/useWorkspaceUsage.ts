@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { getUsage, isAbortError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { UsageResponse } from '@/lib/types';
+import { logClientError } from '@/lib/client-log';
 
 function getEffectiveQuota(
   usage: UsageResponse | null,
@@ -44,7 +45,7 @@ export function useWorkspaceUsage(reviewMode: 'flash' | 'pro') {
       setUsage(data);
     } catch (err) {
       if (isAbortError(err)) return;
-      console.error('Failed to fetch usage in workspace', err);
+      logClientError('Failed to fetch usage in workspace', err);
       setUsageError(true);
     }
   }, [ensureToken, syncPlan]);

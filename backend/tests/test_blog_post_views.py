@@ -36,38 +36,29 @@ class BlogPostViewRouteTests(unittest.TestCase):
 
     def test_increment_blog_post_view_updates_existing_record(self) -> None:
         db = MagicMock()
-        query = MagicMock()
-        query.filter.return_value = query
-        existing = SimpleNamespace(slug='five-photo-composition-checks', view_count=12)
-        query.first.return_value = existing
-        db.query.return_value = query
+        db.execute.return_value.one.return_value = SimpleNamespace(slug='five-photo-composition-checks', view_count=13)
 
         payload = increment_blog_post_view('five-photo-composition-checks', db=db)
 
         self.assertEqual(payload.slug, 'five-photo-composition-checks')
         self.assertEqual(payload.view_count, 13)
-        self.assertEqual(existing.view_count, 13)
+        db.execute.assert_called_once()
         db.add.assert_not_called()
         db.commit.assert_called_once()
-        db.refresh.assert_called_once_with(existing)
+        db.refresh.assert_not_called()
 
-    def test_increment_blog_post_view_creates_record_when_missing(self) -> None:
+    def test_increment_blog_post_view_normalizes_slug_before_upsert(self) -> None:
         db = MagicMock()
-        query = MagicMock()
-        query.filter.return_value = query
-        query.first.return_value = None
-        db.query.return_value = query
+        db.execute.return_value.one.return_value = SimpleNamespace(slug='new-blog-post', view_count=1)
 
-        payload = increment_blog_post_view('new-blog-post', db=db)
+        payload = increment_blog_post_view(' New-Blog-Post ', db=db)
 
         self.assertEqual(payload.slug, 'new-blog-post')
         self.assertEqual(payload.view_count, 1)
-        db.add.assert_called_once()
-        created = db.add.call_args.args[0]
-        self.assertEqual(created.slug, 'new-blog-post')
-        self.assertEqual(created.view_count, 1)
+        db.execute.assert_called_once()
+        db.add.assert_not_called()
         db.commit.assert_called_once()
-        db.refresh.assert_called_once_with(created)
+        db.refresh.assert_not_called()
 
 
 if __name__ == '__main__':

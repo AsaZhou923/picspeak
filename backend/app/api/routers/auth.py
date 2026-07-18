@@ -18,6 +18,7 @@ from app.api.deps import (
     GUEST_TOKEN_COOKIE,
     issue_guest_token,
 )
+from app.api.request_state import set_current_user_public_id
 from app.core.config import settings
 from app.core.errors import api_error
 from app.db.models import UserPlan
@@ -32,6 +33,7 @@ from app.schemas import (
 )
 from app.services.clerk_auth import verify_clerk_session_token
 from app.services.clerk_webhooks import verify_clerk_webhook
+from app.services.guard import enforce_guest_creation_rate_limit, guest_rate_limit_scope_key
 from .auth_support import (
     GOOGLE_OAUTH_STATE_COOKIE,
     _bind_google_oauth_state,
@@ -77,6 +79,7 @@ def auth_google_start():
 
 @router.post('/guest', response_model=AuthGuestResponse)
 def auth_guest(
+    request: Request,
     response: Response,
     guest_cookie_token: str | None = Cookie(default=None, alias=GUEST_TOKEN_COOKIE),
     db: Session = Depends(get_db),
@@ -91,6 +94,7 @@ def auth_guest(
             user = None
 
     if user is None:
+        enforce_guest_creation_rate_limit(db, guest_rate_limit_scope_key(request))
         user = create_guest_user(db)
 
     db.commit()
@@ -128,9 +132,9 @@ def auth_clerk_exchange(
     session_token = _extract_bearer_token(authorization)
     identity = verify_clerk_session_token(session_token)
     user = _sync_clerk_user(db, identity)
-    request.state.current_user_public_id = user.public_id
+    set_current_user_public_id(request, user.public_id)
 
-    guest_token = (payload.guest_token if payload else None) or request.cookies.get(GUEST_TOKEN_COOKIE)
+    guest_token = payload.guest_token if payload and payload.guest_token is not None else request.cookies.get(GUEST_TOKEN_COOKIE)
     recent_limit = payload.recent_limit if payload else 20
     migrated_reviews, migrated_photos = _migrate_guest_records(
         db=db,
@@ -165,7 +169,7 @@ def migrate_guest_reviews(
     migrated_reviews, migrated_photos = _migrate_guest_records(
         db=db,
         target_user=actor.user,
-        guest_token=payload.guest_token or request.cookies.get(GUEST_TOKEN_COOKIE),
+        guest_token=payload.guest_token if payload.guest_token is not None else request.cookies.get(GUEST_TOKEN_COOKIE),
         recent_limit=payload.recent_limit,
         strict=True,
     )
@@ -259,5 +263,5 @@ async def clerk_webhook(request: Request, db: Session = Depends(get_db)):
         raise
 
     if user_public_id:
-        request.state.current_user_public_id = user_public_id
+        set_current_user_public_id(request, user_public_id)
     return {'ok': True, 'event_type': event.type, 'outcome': outcome}

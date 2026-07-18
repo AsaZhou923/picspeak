@@ -66,7 +66,7 @@ def update_review_meta(
             if photo is None:
                 raise api_error(status.HTTP_404_NOT_FOUND, 'PHOTO_NOT_FOUND', 'Photo not found')
             try:
-                audit_result = run_content_audit(_build_storage_photo_url(photo.bucket, photo.object_key))
+                audit_result = run_content_audit(_build_storage_photo_url(photo.object_key))
             except ContentAuditError as exc:
                 raise api_error(status.HTTP_502_BAD_GATEWAY, 'IMAGE_AUDIT_FAILED', f'Image content audit failed: {exc}') from exc
 

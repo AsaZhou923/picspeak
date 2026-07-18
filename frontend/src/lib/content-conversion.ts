@@ -1,14 +1,18 @@
+import { normalizeLocale } from './locale.ts';
+
 export type ContentConversionLocale = 'zh' | 'en' | 'ja';
-export type ContentConversionSource = 'home_direct' | 'blog' | 'gallery';
+export type ContentConversionSource = 'home_direct' | 'blog' | 'gallery' | 'prompt_library';
 export type ContentConversionEntrypoint =
   | 'blog_same_critique'
   | 'blog_topic_upload'
   | 'gallery_practice'
   | 'gallery_score_standard'
+  | 'prompt_library_retake'
   | 'home_new_user'
   | 'home_content_reader';
 export type HomeIntent = 'new_user' | 'returning_user' | 'content_reader';
 export type ConversionImageType = 'default' | 'landscape' | 'portrait' | 'street' | 'still_life' | 'architecture';
+export type PromptLibraryExampleCategory = 'photography' | 'poster' | 'product' | 'ui' | 'experimental';
 
 export type WorkspaceConversionHrefInput = {
   source: ContentConversionSource;
@@ -16,6 +20,9 @@ export type WorkspaceConversionHrefInput = {
   imageType?: ConversionImageType;
   contentSlug?: string;
   galleryReviewId?: string;
+  promptExampleId?: string;
+  nextShootAction?: string;
+  nextShootDimension?: string;
 };
 
 export type BlogWorkspaceCta = {
@@ -44,6 +51,16 @@ export type GalleryWorkspaceCtas = {
     href: string;
     entrypoint: ContentConversionEntrypoint;
   };
+};
+
+export type PromptLibraryWorkspaceCta = {
+  label: string;
+  title: string;
+  body: string;
+  cta: string;
+  href: string;
+  imageType: ConversionImageType;
+  entrypoint: Extract<ContentConversionEntrypoint, 'prompt_library_retake'>;
 };
 
 export type HomeIntentEntrance = {
@@ -251,6 +268,43 @@ const GALLERY_COPY = {
   },
 } as const;
 
+const PROMPT_LIBRARY_RETAKE_COPY = {
+  zh: {
+    label: '从案例进入工作台',
+    title: '把这个案例作为复拍灵感',
+    body: '上传你的真实照片，用这个案例的画面目标作为下一轮练习参考，而不是只停留在看 prompt。',
+    cta: '带着案例去练习',
+  },
+  en: {
+    label: 'From prompt example to workspace',
+    title: 'Use this example as retake inspiration',
+    body: 'Upload a real photo and use this prompt pattern as a visual target for the next practice round.',
+    cta: 'Practice with this example',
+  },
+  ja: {
+    label: 'プロンプト例からワークスペースへ',
+    title: 'この例を撮り直しの参考にする',
+    body: '実際の写真をアップロードし、このプロンプト例の画作りを次の練習目標として使います。',
+    cta: 'この例で練習する',
+  },
+} as const;
+
+const PROMPT_LIBRARY_CATEGORY_IMAGE_TYPE: Record<PromptLibraryExampleCategory, ConversionImageType> = {
+  photography: 'portrait',
+  poster: 'default',
+  product: 'still_life',
+  ui: 'default',
+  experimental: 'default',
+};
+
+const PROMPT_LIBRARY_CATEGORY_DIMENSION: Record<PromptLibraryExampleCategory, string> = {
+  photography: 'composition',
+  poster: 'impact',
+  product: 'lighting',
+  ui: 'composition',
+  experimental: 'impact',
+};
+
 const HOME_INTENT_COPY: Record<ContentConversionLocale, HomeIntentEntrance[]> = {
   zh: [
     {
@@ -266,10 +320,10 @@ const HOME_INTENT_COPY: Record<ContentConversionLocale, HomeIntentEntrance[]> = 
     {
       intent: 'returning_user',
       label: '回访用户',
-      title: '继续上次点评',
-      body: '回到历史记录，复用上次结果继续复拍、再分析或对比弱项。',
-      cta: '查看历史',
-      href: '/account/reviews',
+      title: '用重拍验证上次建议',
+      body: '选择一张历史原片，再上传重拍图，让 GPT-5.6 Terra 比较五个摄影维度的真实变化。',
+      cta: '开始重拍对比',
+      href: '/retake',
       source: 'home_direct',
     },
     {
@@ -297,10 +351,10 @@ const HOME_INTENT_COPY: Record<ContentConversionLocale, HomeIntentEntrance[]> = 
     {
       intent: 'returning_user',
       label: 'Returning',
-      title: 'Continue the last critique',
-      body: 'Open history and use the last result for a retake, re-analysis, or weak-dimension check.',
-      cta: 'View history',
-      href: '/account/reviews',
+      title: 'Test the last advice with a retake',
+      body: 'Choose a previous original, upload the retake, and let GPT-5.6 Terra measure change across five dimensions.',
+      cta: 'Start retake comparison',
+      href: '/retake',
       source: 'home_direct',
     },
     {
@@ -328,10 +382,10 @@ const HOME_INTENT_COPY: Record<ContentConversionLocale, HomeIntentEntrance[]> = 
     {
       intent: 'returning_user',
       label: '再訪ユーザー',
-      title: '前回の講評を続ける',
-      body: '履歴に戻り、撮り直し・再分析・弱点確認へ進みます。',
-      cta: '履歴を見る',
-      href: '/account/reviews',
+      title: '再撮影で前回の提案を検証',
+      body: '過去の元写真を選び、再撮影をアップロードして、GPT-5.6 Terra が5項目の変化を測ります。',
+      cta: '再撮影比較を始める',
+      href: '/retake',
       source: 'home_direct',
     },
     {
@@ -347,13 +401,6 @@ const HOME_INTENT_COPY: Record<ContentConversionLocale, HomeIntentEntrance[]> = 
   ],
 };
 
-function normalizeLocale(locale: string): ContentConversionLocale {
-  if (locale === 'en' || locale === 'ja') {
-    return locale;
-  }
-  return 'zh';
-}
-
 function appendIfPresent(params: URLSearchParams, key: string, value: string | undefined): void {
   const normalized = value?.trim();
   if (normalized) {
@@ -368,6 +415,9 @@ export function buildWorkspaceConversionHref(input: WorkspaceConversionHrefInput
   appendIfPresent(params, 'image_type', input.imageType);
   appendIfPresent(params, 'content_slug', input.contentSlug);
   appendIfPresent(params, 'gallery_review_id', input.galleryReviewId);
+  appendIfPresent(params, 'prompt_example_id', input.promptExampleId);
+  appendIfPresent(params, 'next_shoot_action', input.nextShootAction);
+  appendIfPresent(params, 'next_shoot_dimension', input.nextShootDimension);
   return `/workspace?${params.toString()}`;
 }
 
@@ -434,6 +484,39 @@ export function getGalleryWorkspaceCtas(
       }),
       entrypoint: 'gallery_score_standard',
     },
+  };
+}
+
+export function getPromptLibraryWorkspaceCta(
+  locale: string,
+  example: { id: string; category: PromptLibraryExampleCategory; title: string },
+): PromptLibraryWorkspaceCta {
+  const normalizedLocale = normalizeLocale(locale);
+  const copy = PROMPT_LIBRARY_RETAKE_COPY[normalizedLocale];
+  const imageType = PROMPT_LIBRARY_CATEGORY_IMAGE_TYPE[example.category] ?? 'default';
+  const dimension = PROMPT_LIBRARY_CATEGORY_DIMENSION[example.category] ?? 'composition';
+  const nextShootAction =
+    normalizedLocale === 'zh'
+      ? `参考「${example.title}」的画面目标，上传一张同题材照片做复拍练习。`
+      : normalizedLocale === 'ja'
+        ? `「${example.title}」の画作りを参考に、同じ題材の写真をアップロードして練習します。`
+        : `Use "${example.title}" as a visual target, then upload a matching photo for practice.`;
+
+  return {
+    label: copy.label,
+    title: copy.title,
+    body: copy.body,
+    cta: copy.cta,
+    href: buildWorkspaceConversionHref({
+      source: 'prompt_library',
+      entrypoint: 'prompt_library_retake',
+      imageType,
+      promptExampleId: example.id,
+      nextShootAction,
+      nextShootDimension: dimension,
+    }),
+    imageType,
+    entrypoint: 'prompt_library_retake',
   };
 }
 

@@ -26,6 +26,11 @@ export interface UsageResponse {
     pro_monthly_used: number | null;
     pro_monthly_remaining: number | null;
   };
+  generation_credits: {
+    monthly_total: number | null;
+    monthly_used: number | null;
+    monthly_remaining: number | null;
+  };
   features: {
     review_modes: Array<'flash' | 'pro'>;
     history_retention_days: number | null;
@@ -53,6 +58,16 @@ export interface BillingCheckoutResponse {
   checkout_url: string | null;
 }
 
+export interface CreditPackCheckoutResponse {
+  status: 'placeholder' | 'created';
+  pack: 'image_credits_300';
+  credits: number;
+  currency: 'usd';
+  price: string;
+  message: string;
+  checkout_url: string | null;
+}
+
 export interface BillingPortalResponse {
   status: string;
   portal_url: string | null;
@@ -65,6 +80,16 @@ export interface ActivationCodeRedeemResponse {
   provider: string;
   message: string;
   activated_until: string;
+}
+
+export interface ImageCreditCodeRedeemResponse {
+  status: string;
+  code: string;
+  credits_granted: number;
+  message: string;
+  monthly_total: number | null;
+  monthly_used: number | null;
+  monthly_remaining: number | null;
 }
 
 // ─── Upload ──────────────────────────────────────────────────────────────────
@@ -97,9 +122,15 @@ export interface PhotoCreateResponse {
 // ─── Review ──────────────────────────────────────────────────────────────────
 
 export type ReviewMode = 'flash' | 'pro';
+export type ReviewModel = 'qwen' | 'gpt-5.5' | 'gpt-5.6-terra';
+export type ReviewAnalysisType = 'single' | 'retake_compare';
 export type ImageType = 'default' | 'landscape' | 'portrait' | 'street' | 'still_life' | 'architecture';
 export type ReviewStatus = 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'EXPIRED';
 export type TaskStatus = 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'EXPIRED' | 'DEAD_LETTER';
+export type GenerationMode = 'general' | 'review_linked';
+export type GenerationQuality = 'low' | 'medium' | 'high';
+export type GenerationSize = '1024x1024' | '1024x1536' | '1536x1024';
+export type GenerationOutputFormat = 'webp' | 'png' | 'jpeg';
 
 export interface ReviewScores {
   composition: number;
@@ -107,6 +138,43 @@ export interface ReviewScores {
   color: number;
   impact: number;
   technical: number;
+}
+
+export type RetakeDimensionKey = keyof ReviewScores;
+export type RetakeTrend = 'improved' | 'flat' | 'declined';
+
+export interface RetakeDimensionResult {
+  before_score: number;
+  after_score: number;
+  delta: number;
+  trend: RetakeTrend;
+  evidence: string[];
+  remaining_gap: string;
+}
+
+export interface RetakeActionItem {
+  priority: number;
+  dimension: RetakeDimensionKey;
+  action: string;
+  success_check: string;
+}
+
+export interface RetakeComparisonResult {
+  original_review_id: string;
+  original_photo_id: string;
+  retake_photo_id: string;
+  is_comparable: boolean;
+  comparison_confidence: 'low' | 'medium' | 'high';
+  comparison_caveat: string;
+  summary: string;
+  dimensions: Record<RetakeDimensionKey, RetakeDimensionResult>;
+  overall_before: number;
+  overall_after: number;
+  overall_delta: number;
+  strongest_improvement: RetakeDimensionKey;
+  next_actions: RetakeActionItem[];
+  visual_reference_prompt: string;
+  openai_response_id: string;
 }
 
 export interface ReviewResult {
@@ -120,6 +188,7 @@ export interface ReviewResult {
   advantage: string;
   critique: string;
   suggestions: string;
+  comparison?: RetakeComparisonResult | null;
   image_type: ImageType;
   billing_info: {
     quota_charged?: boolean;
@@ -139,11 +208,13 @@ export interface ReviewResult {
 export interface ReviewCreateRequest {
   photo_id: string;
   mode: ReviewMode;
+  review_model?: ReviewModel;
   async: boolean;
   idempotency_key?: string;
   locale?: 'zh' | 'en' | 'ja';
   image_type?: ImageType;
   source_review_id?: string;
+  analysis_type?: ReviewAnalysisType;
 }
 
 export interface ReviewCreateAsyncResponse {
@@ -181,6 +252,95 @@ export interface TaskErrorPayload {
   timeout: boolean;
   failure_stage: string;
   quota_charged: boolean;
+}
+
+export interface GenerationTemplateItem {
+  key: string;
+  label_zh: string;
+  label_en: string;
+  description: string;
+  default_negative: string;
+}
+
+export interface GenerationTemplatesResponse {
+  items: GenerationTemplateItem[];
+  credits_table: Partial<Record<GenerationQuality, Partial<Record<GenerationSize, number>>>>;
+}
+
+export interface GenerationCreateRequest {
+  generation_mode: GenerationMode;
+  intent: string;
+  prompt: string;
+  template_key?: string | null;
+  prompt_example_id?: string | null;
+  prompt_example_category?: string | null;
+  source_photo_id?: string | null;
+  source_review_id?: string | null;
+  image_type?: ImageType;
+  quality: GenerationQuality;
+  size: GenerationSize;
+  style?: string;
+  negative_prompt?: string | null;
+  output_format: GenerationOutputFormat;
+  async: boolean;
+  idempotency_key?: string;
+}
+
+export interface GenerationCreateResponse {
+  task_id: string;
+  status: TaskStatus;
+  estimated_seconds: number;
+  credits_reserved: number;
+}
+
+export interface GenerationTaskStatusResponse {
+  task_id: string;
+  status: TaskStatus;
+  progress: number;
+  generation_id: string | null;
+  generation_mode: GenerationMode;
+  intent: string | null;
+  source_review_id: string | null;
+  attempt_count: number;
+  max_attempts: number;
+  next_attempt_at: string | null;
+  last_heartbeat_at: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  error: TaskErrorPayload | null;
+}
+
+export interface GeneratedImageItem {
+  generation_id: string;
+  task_id: string | null;
+  image_url: string;
+  generation_mode: GenerationMode;
+  intent: string;
+  prompt: string;
+  revised_prompt: string | null;
+  model_name: string;
+  model_snapshot: string | null;
+  quality: GenerationQuality;
+  size: GenerationSize;
+  output_format: GenerationOutputFormat;
+  credits_charged: number;
+  template_key: string | null;
+  source_photo_id: string | null;
+  source_review_id: string | null;
+  created_at: string;
+}
+
+export interface GeneratedImageDetailResponse extends GeneratedImageItem {
+  cost_usd: number | null;
+  input_text_tokens: number | null;
+  input_image_tokens: number | null;
+  output_image_tokens: number | null;
+  metadata: Record<string, unknown>;
+}
+
+export interface GeneratedImageHistoryResponse {
+  items: GeneratedImageItem[];
+  next_cursor: string | null;
 }
 
 export interface ReviewGetResponse {
@@ -224,6 +384,7 @@ export interface ReviewHistoryItem {
   status: ReviewStatus;
   image_type: ImageType;
   source_review_id?: string | null;
+  comparison?: RetakeComparisonResult | null;
   final_score: number;
   scores: ReviewScores;
   model_name: string;
@@ -309,6 +470,7 @@ export interface ReviewExportData {
   advantage: string;
   critique: string;
   suggestions: string;
+  comparison?: RetakeComparisonResult | null;
   favorite: boolean;
   tags: string[];
   note: string | null;
@@ -353,7 +515,7 @@ export interface GalleryLikeResponse {
   liked_by_viewer: boolean;
 }
 
-// ─── Error ───────────────────────────────────────────────────────────────────
+// ─── Blog Views ──────────────────────────────────────────────────────────────
 
 export interface BlogPostViewItem {
   slug: string;
@@ -373,6 +535,7 @@ export type ProductAnalyticsSource =
   | 'home_direct'
   | 'blog'
   | 'gallery'
+  | 'prompt_library'
   | 'share'
   | 'checkout'
   | 'unknown';

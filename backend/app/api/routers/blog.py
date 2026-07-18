@@ -3,7 +3,8 @@ from __future__ import annotations
 import re
 
 from fastapi import APIRouter, Depends, Query, status
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import func
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
@@ -61,31 +62,18 @@ def increment_blog_post_view(
     db: Session = Depends(get_db),
 ):
     normalized_slug = _normalize_blog_post_view_slugs([slug])[0]
-    record = (
-        db.query(BlogPostView)
-        .filter(BlogPostView.slug == normalized_slug)
-        .first()
+    stmt = (
+        insert(BlogPostView)
+        .values(slug=normalized_slug, view_count=1)
+        .on_conflict_do_update(
+            index_elements=[BlogPostView.slug],
+            set_={
+                'view_count': BlogPostView.view_count + 1,
+                'updated_at': func.now(),
+            },
+        )
+        .returning(BlogPostView.slug, BlogPostView.view_count)
     )
-
-    if record is None:
-        record = BlogPostView(slug=normalized_slug, view_count=1)
-        db.add(record)
-        try:
-            db.commit()
-        except IntegrityError:
-            db.rollback()
-            record = (
-                db.query(BlogPostView)
-                .filter(BlogPostView.slug == normalized_slug)
-                .first()
-            )
-            if record is None:
-                raise
-            record.view_count += 1
-            db.commit()
-    else:
-        record.view_count += 1
-        db.commit()
-
-    db.refresh(record)
-    return BlogPostViewIncrementResponse(slug=record.slug, view_count=record.view_count)
+    row = db.execute(stmt).one()
+    db.commit()
+    return BlogPostViewIncrementResponse(slug=row.slug, view_count=row.view_count)

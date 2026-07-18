@@ -47,7 +47,7 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
 function isExpiredToken(token: string): boolean {
   const payload = decodeJwtPayload(token);
   const exp = payload?.exp;
-  return typeof exp === 'number' && exp <= Math.floor(Date.now() / 1000);
+  return typeof exp !== 'number' || exp <= Math.floor(Date.now() / 1000);
 }
 
 function readSessionAuthToken(): AuthToken | null {
@@ -65,34 +65,18 @@ function readSessionAuthToken(): AuthToken | null {
   }
 }
 
-function readLegacyAuthToken(): AuthToken | null {
-  for (const storage of [window.localStorage]) {
-    try {
-      const stored = storage.getItem(TOKEN_KEY);
-      if (!stored) continue;
-      const parsed: AuthToken = JSON.parse(stored);
-      if (parsed?.access_token && !isExpiredToken(parsed.access_token)) return parsed;
-      storage.removeItem(TOKEN_KEY);
-    } catch {
-      // Ignore malformed or restricted storage access.
-    }
+function clearLegacyReadableAuthToken(): void {
+  try {
+    window.localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    // Ignore restricted storage access.
   }
 
   try {
-    const pairs = document.cookie ? document.cookie.split(';') : [];
-    for (const pair of pairs) {
-      const [rawKey, ...rest] = pair.trim().split('=');
-      if (rawKey !== TOKEN_KEY) continue;
-      const rawValue = rest.join('=');
-      if (!rawValue) continue;
-      const parsed: AuthToken = JSON.parse(decodeURIComponent(rawValue));
-      if (parsed?.access_token && !isExpiredToken(parsed.access_token)) return parsed;
-    }
+    document.cookie = `${TOKEN_KEY}=; Max-Age=0; Path=/; SameSite=Lax`;
   } catch {
-    // ignore malformed cookie values
+    // ignore legacy cookie cleanup
   }
-
-  return null;
 }
 
 function persistAuthToken(tokenData: AuthToken): void {
@@ -158,10 +142,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const pendingGuestTokenRef = useRef<Promise<string> | null>(null);
   const isLoadingRef = useRef(true);
+  const readyWaitersRef = useRef<Set<() => void>>(new Set());
+
+  const resolveReadyWaiters = useCallback(() => {
+    for (const resolve of readyWaitersRef.current) {
+      resolve();
+    }
+    readyWaitersRef.current.clear();
+  }, []);
 
   useEffect(() => {
     isLoadingRef.current = isLoading;
-  }, [isLoading]);
+    if (!isLoading) resolveReadyWaiters();
+  }, [isLoading, resolveReadyWaiters]);
+
+  useEffect(() => resolveReadyWaiters, [resolveReadyWaiters]);
 
   useEffect(() => {
     try {
@@ -171,11 +166,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // ignore legacy cache cleanup
     }
 
-    let parsed = readSessionAuthToken();
-    if (!parsed) {
-      parsed = readLegacyAuthToken();
-      if (parsed) persistAuthToken(parsed);
-    }
+    clearLegacyReadableAuthToken();
+
+    const parsed = readSessionAuthToken();
     if (parsed) {
       setToken(parsed.access_token);
       setUserInfo(parsed);
@@ -209,13 +202,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const waitForReady = useCallback(async (): Promise<void> => {
     if (!isLoadingRef.current) return;
     await new Promise<void>((resolve) => {
-      const startedAt = Date.now();
-      const timer = window.setInterval(() => {
-        if (!isLoadingRef.current || Date.now() - startedAt > 10000) {
-          window.clearInterval(timer);
-          resolve();
-        }
-      }, 25);
+      let timeoutId: number | null = null;
+      const finish = () => {
+        if (timeoutId !== null) window.clearTimeout(timeoutId);
+        readyWaitersRef.current.delete(finish);
+        resolve();
+      };
+
+      timeoutId = window.setTimeout(finish, 10000);
+      readyWaitersRef.current.add(finish);
+      if (!isLoadingRef.current) finish();
     });
   }, []);
 
@@ -227,11 +223,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const syncAuthState = async (): Promise<void> => {
       setIsLoading(true);
 
-      let parsed = readSessionAuthToken();
-      if (!parsed) {
-        parsed = readLegacyAuthToken();
-        if (parsed) persistAuthToken(parsed);
-      }
+      clearLegacyReadableAuthToken();
+
+      const parsed = readSessionAuthToken();
 
       if (!isSignedIn) {
         if (parsed?.auth_provider === 'clerk') {

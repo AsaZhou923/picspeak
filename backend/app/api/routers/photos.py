@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import ipaddress
 import time
 from io import BytesIO
 from typing import Any
@@ -21,6 +22,7 @@ from app.services.object_storage import get_object_storage_client
 router = APIRouter(prefix='/photos', tags=['photos'])
 
 ALLOWED_CONTENT_TYPES = {'image/jpeg', 'image/png', 'image/webp'}
+PHOTO_PROXY_TOKEN_PURPOSE = 'photo_proxy'
 PHOTO_PROXY_TTL_SECONDS = 600
 PHOTO_THUMBNAIL_SIZE = 128
 PHOTO_THUMBNAIL_MAX_SIZE = 512
@@ -38,7 +40,15 @@ def _request_origin(request: Request) -> tuple[str, str]:
     host = forwarded_host or request.headers.get('host', '').strip() or base.netloc
     scheme = forwarded_proto or base.scheme
 
-    if scheme == 'http' and host and not host.startswith('localhost') and not host.startswith('127.0.0.1'):
+    hostname = host.split(':', 1)[0].strip('[]').lower()
+    is_local_host = hostname in {'localhost', '127.0.0.1', '::1'}
+    try:
+        host_ip = ipaddress.ip_address(hostname)
+        is_private_host = host_ip.is_private or host_ip.is_loopback
+    except ValueError:
+        is_private_host = False
+
+    if scheme == 'http' and host and not is_local_host and not is_private_host:
         scheme = 'https'
 
     return scheme or base.scheme, host or base.netloc
@@ -50,8 +60,7 @@ def _request_url_for(request: Request, route_name: str, **path_params: str | int
     return urlunsplit((scheme, host, resolved.path, resolved.query, resolved.fragment))
 
 
-def _build_storage_photo_url(bucket: str, object_key: str) -> str:
-    _ = bucket
+def _build_storage_photo_url(object_key: str) -> str:
     base = settings.object_base_url.rstrip('/')
     return f'{base}/{quote(object_key)}'
 
@@ -78,17 +87,17 @@ def _build_photo_proxy_url(
             (int(time.time()) + PHOTO_THUMBNAIL_TTL_SECONDS + PHOTO_THUMBNAIL_STABLE_WINDOW_SECONDS - 1)
             // PHOTO_THUMBNAIL_STABLE_WINDOW_SECONDS
         ) * PHOTO_THUMBNAIL_STABLE_WINDOW_SECONDS
-        photo_token = sign_payload_with_exp(payload, rounded_exp)
+        photo_token = sign_payload_with_exp(payload, rounded_exp, purpose=PHOTO_PROXY_TOKEN_PURPOSE)
         query_parts.append(f'size={size}')
     else:
-        photo_token = sign_payload(payload, ttl_seconds=PHOTO_PROXY_TTL_SECONDS)
+        photo_token = sign_payload(payload, ttl_seconds=PHOTO_PROXY_TTL_SECONDS, purpose=PHOTO_PROXY_TOKEN_PURPOSE)
 
     query_parts.append(f'photo_token={quote(photo_token)}')
     return _request_url_for(request, route_name, photo_id=photo_public_id) + '?' + '&'.join(query_parts)
 
 
 def _find_photo_from_token(db: Session, photo_id: str, photo_token: str, size: int | None = None) -> Photo:
-    token_payload = verify_payload(photo_token)
+    token_payload = verify_payload(photo_token, expected_purpose=PHOTO_PROXY_TOKEN_PURPOSE)
     if token_payload.get('photo_id') != photo_id:
         raise api_error(status.HTTP_403_FORBIDDEN, 'PHOTO_TOKEN_INVALID', 'Invalid photo token')
 

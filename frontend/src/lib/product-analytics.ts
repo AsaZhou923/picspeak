@@ -18,11 +18,29 @@ export type ProductAnalyticsEventName =
   | 'share_clicked'
   | 'export_clicked'
   | 'content_workspace_clicked'
+  | 'prompt_library_viewed'
+  | 'next_shoot_action_clicked'
   | 'upgrade_pro_clicked'
   | 'checkout_started'
   | 'paid_success'
   | 'payment_success_viewed'
-  | 'sign_in_completed';
+  | 'sign_in_completed'
+  | 'generation_page_viewed'
+  | 'generation_template_selected'
+  | 'generation_prompt_opened'
+  | 'generation_prompt_example_applied'
+  | 'generation_intent_selected'
+  | 'generation_requested'
+  | 'generation_succeeded'
+  | 'generation_failed'
+  | 'generation_viewed'
+  | 'generation_download_clicked'
+  | 'generation_reuse_clicked'
+  | 'generation_used_for_retake'
+  | 'generation_credit_exhausted'
+  | 'generation_upgrade_clicked'
+  | 'credit_pack_checkout_started'
+  | 'web_vital_reported';
 
 const ANALYTICS_SOURCE_KEY = 'ps_product_source_v1';
 const ANALYTICS_SESSION_KEY = 'ps_product_session_v1';
@@ -35,6 +53,8 @@ export function normalizeProductAnalyticsSource(value: string | null | undefined
       return 'blog';
     case 'gallery':
       return 'gallery';
+    case 'prompt_library':
+      return 'prompt_library';
     case 'share':
       return 'share';
     case 'checkout':
@@ -104,6 +124,12 @@ export function derivePageEvent(pathname: string): ProductAnalyticsEventName | n
   if (pathname === '/workspace') {
     return 'workspace_viewed';
   }
+  if (pathname === '/generate') {
+    return 'generation_page_viewed';
+  }
+  if (/^\/generate\/prompts(?:\/[^/]+)?$/.test(pathname)) {
+    return 'prompt_library_viewed';
+  }
   if (pathname === '/gallery') {
     return 'gallery_viewed';
   }
@@ -112,6 +138,9 @@ export function derivePageEvent(pathname: string): ProductAnalyticsEventName | n
   }
   if (/^\/reviews\/[^/]+$/.test(pathname)) {
     return 'review_result_viewed';
+  }
+  if (/^\/generations\/[^/]+$/.test(pathname)) {
+    return 'generation_viewed';
   }
   if (/^\/share\/[^/]+$/.test(pathname)) {
     return 'share_viewed';
@@ -128,6 +157,9 @@ export function deriveAttributionSourceForPath(pathname: string): ProductAnalyti
   }
   if (pathname === '/gallery') {
     return 'gallery';
+  }
+  if (/^\/generate\/prompts(?:\/[^/]+)?$/.test(pathname)) {
+    return 'prompt_library';
   }
   if (/^\/share\/[^/]+$/.test(pathname)) {
     return 'share';

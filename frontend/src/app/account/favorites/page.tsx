@@ -11,6 +11,8 @@ import CachedThumbnail from '@/components/ui/CachedThumbnail';
 import { SkeletonBlock } from '@/components/ui/LoadingSpinner';
 import { useI18n } from '@/lib/i18n';
 import { formatUserFacingError } from '@/lib/error-utils';
+import { localeToIntlLocale } from '@/lib/locale';
+import { getImageTypeLabel } from '@/lib/review-history-copy';
 
 function getFavoritesCopy(locale: 'zh' | 'en' | 'ja') {
   if (locale === 'ja') {
@@ -63,37 +65,6 @@ function getFavoritesCopy(locale: 'zh' | 'en' | 'ja') {
   };
 }
 
-function getImageTypeLabel(locale: 'zh' | 'en' | 'ja', imageType?: ImageType) {
-  const normalized = imageType ?? 'default';
-  const zh: Record<ImageType, string> = {
-    default: '默认',
-    landscape: '风景',
-    portrait: '人像',
-    street: '街拍',
-    still_life: '静物',
-    architecture: '建筑',
-  };
-  const en: Record<ImageType, string> = {
-    default: 'Default',
-    landscape: 'Landscape',
-    portrait: 'Portrait',
-    street: 'Street',
-    still_life: 'Still Life',
-    architecture: 'Architecture',
-  };
-  const ja: Record<ImageType, string> = {
-    default: '標準',
-    landscape: '風景',
-    portrait: 'ポートレート',
-    street: 'ストリート',
-    still_life: '静物',
-    architecture: '建築',
-  };
-
-  if (locale === 'ja') return ja[normalized];
-  if (locale === 'en') return en[normalized];
-  return zh[normalized];
-}
 
 function ScoreBar({ score }: { score: number }) {
   const pct = Math.min(100, Math.max(0, (score / 10) * 100));
@@ -242,7 +213,7 @@ export default function FavoritesPage() {
           <>
             <div className="space-y-3">
               {items.map((item) => {
-                const dateLocale = locale === 'zh' ? 'zh-CN' : locale === 'ja' ? 'ja-JP' : 'en-US';
+                const dateLocale = localeToIntlLocale(locale);
                 const date = new Date(item.created_at).toLocaleString(dateLocale, {
                   year: 'numeric',
                   month: '2-digit',

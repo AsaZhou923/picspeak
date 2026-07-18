@@ -5,8 +5,13 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import Mock, patch
 
 from app.api.routers import billing as routes
-from app.api.routers.billing import _best_subscription_for_portal, _customer_portal_destination, _refresh_subscription_portal_urls
-from app.db.models import BillingSubscription
+from app.api.routers.billing import (
+    _best_subscription_for_portal,
+    _customer_portal_destination,
+    _generation_credit_usage_snapshot,
+    _refresh_subscription_portal_urls,
+)
+from app.db.models import BillingSubscription, User, UserPlan, UserStatus
 
 
 def _subscription(
@@ -137,6 +142,52 @@ class BillingPortalSelectionTests(unittest.TestCase):
         )
         db.add.assert_called_once_with(subscription)
         db.flush.assert_called_once_with()
+
+    def test_generation_credit_usage_snapshot_reports_monthly_remaining(self) -> None:
+        user = User(
+            id=42,
+            public_id='usr_credit',
+            email='credit@example.com',
+            username='credit_user',
+            plan=UserPlan.pro,
+            daily_quota_total=0,
+            daily_quota_used=0,
+            status=UserStatus.active,
+        )
+
+        with patch.object(routes, 'monthly_generation_credit_limit_for_plan', return_value=199), patch.object(
+            routes,
+            'count_monthly_generation_credit_grants',
+            return_value=0,
+        ), patch.object(routes, 'count_monthly_generation_credit_consumed', return_value=42):
+            snapshot = _generation_credit_usage_snapshot(Mock(), user, UserPlan.pro)
+
+        self.assertEqual(snapshot['monthly_total'], 199)
+        self.assertEqual(snapshot['monthly_used'], 42)
+        self.assertEqual(snapshot['monthly_remaining'], 157)
+
+    def test_generation_credit_usage_snapshot_displays_bonus_credits_without_negative_used(self) -> None:
+        user = User(
+            id=43,
+            public_id='usr_bonus_credit',
+            email='bonus@example.com',
+            username='bonus_user',
+            plan=UserPlan.free,
+            daily_quota_total=0,
+            daily_quota_used=0,
+            status=UserStatus.active,
+        )
+
+        with patch.object(routes, 'monthly_generation_credit_limit_for_plan', return_value=3), patch.object(
+            routes,
+            'count_monthly_generation_credit_grants',
+            return_value=30,
+        ), patch.object(routes, 'count_monthly_generation_credit_consumed', return_value=0):
+            snapshot = _generation_credit_usage_snapshot(Mock(), user, UserPlan.free)
+
+        self.assertEqual(snapshot['monthly_total'], 33)
+        self.assertEqual(snapshot['monthly_used'], 0)
+        self.assertEqual(snapshot['monthly_remaining'], 33)
 
 
 if __name__ == '__main__':

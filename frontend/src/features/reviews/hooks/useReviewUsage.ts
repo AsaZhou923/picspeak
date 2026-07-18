@@ -4,6 +4,7 @@ import { useAuth } from '@/lib/auth-context';
 import { UsageResponse } from '@/lib/types';
 import { useI18n } from '@/lib/i18n';
 import { formatUserFacingError } from '@/lib/error-utils';
+import { logClientError } from '@/lib/client-log';
 
 export function useReviewUsage() {
   const { ensureToken } = useAuth();
@@ -21,7 +22,7 @@ export function useReviewUsage() {
       })
       .catch((err) => {
         if (isAbortError(err)) return;
-        console.error('Failed to fetch usage on review page', err);
+        logClientError('Failed to fetch usage on review page', err);
         setUsageError(formatUserFacingError(t, err, t('usage_error')));
       });
     return () => {

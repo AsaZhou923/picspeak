@@ -6,13 +6,15 @@ import { AlertCircle, CheckCircle } from 'lucide-react';
 import Image from 'next/image';
 import { createReview } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
-import { ApiException, ImageType, ReviewCreateAsyncResponse, ReviewCreateSyncResponse } from '@/lib/types';
+import { ApiException, ImageType, ReviewCreateAsyncResponse, ReviewCreateSyncResponse, ReviewModel } from '@/lib/types';
 import ImageUploader from '@/components/upload/ImageUploader';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import ProPromoCard from '@/components/marketing/ProPromoCard';
 import { useI18n } from '@/lib/i18n';
 import { formatUserFacingError } from '@/lib/error-utils';
 import { trackProductEvent } from '@/lib/product-analytics';
+import { resolveReviewAnalysisType } from '@/lib/retake-coach';
+import { getRetakeCoachCopy } from '@/lib/retake-coach-copy';
 import { useWorkspaceUsage } from '@/features/workspace/hooks/useWorkspaceUsage';
 import { useUploadFlow } from '@/features/workspace/hooks/useUploadFlow';
 import { useReplayContext } from '@/features/workspace/hooks/useReplayContext';
@@ -21,18 +23,63 @@ import { QuotaBanner } from '@/features/workspace/components/QuotaBanner';
 import { ReplayBanner } from '@/features/workspace/components/ReplayBanner';
 import { ModePicker } from '@/features/workspace/components/ModePicker';
 import { ImageTypePicker } from '@/features/workspace/components/ImageTypePicker';
+import { RetakeWorkspaceIntro } from '@/features/workspace/components/RetakeWorkspaceIntro';
+import { ReviewModelPicker } from '@/features/workspace/components/ReviewModelPicker';
 
 function isImageType(value: string | null): value is ImageType {
   return ['default', 'landscape', 'portrait', 'street', 'still_life', 'architecture'].includes(value as string);
+}
+
+function retakeTargetCopy(locale: 'zh' | 'en' | 'ja') {
+  if (locale === 'ja') {
+    return {
+      label: 'Retake Target',
+      title: '次の撮影目標を引き継ぎました',
+      sourceReview: 'Source review',
+      sourcePrompt: 'Prompt example',
+      sourceContent: 'Content source',
+      dimension: 'Focus',
+      coachTitle: 'GPT-5.6 Terra Retake Coach',
+      originalLabel: '元の写真',
+      retakeLabel: '再撮影',
+      uploadHint: '新しい写真をアップロードすると、この目標と流入元の文脈を保ったまま講評できます。',
+    };
+  }
+  if (locale === 'en') {
+    return {
+      label: 'Retake Target',
+      title: 'Next-shoot target carried over',
+      sourceReview: 'Source review',
+      sourcePrompt: 'Prompt example',
+      sourceContent: 'Content source',
+      dimension: 'Focus',
+      coachTitle: 'GPT-5.6 Terra Retake Coach',
+      originalLabel: 'Original',
+      retakeLabel: 'Retake',
+      uploadHint: 'Upload a new photo and PicSpeak will keep this goal and source context attached to the critique.',
+    };
+  }
+  return {
+    label: '复拍目标',
+    title: '已带入下一次拍摄目标',
+    sourceReview: '来源点评',
+    sourcePrompt: '来源案例',
+    sourceContent: '内容来源',
+    dimension: '重点维度',
+    coachTitle: 'GPT-5.6 Terra 重拍教练',
+    originalLabel: '原片',
+    retakeLabel: '重拍图',
+    uploadHint: '上传新照片后，PicSpeak 会保留这次练习目标和来源上下文，方便继续复盘。',
+  };
 }
 
 function WorkspacePageContent() {
   const router = useRouter();
   const { token, ensureToken } = useAuth();
   const { t, locale } = useI18n();
-  const promoModeBadge = '25% off';
 
   const [reviewMode, setReviewMode] = useState<'flash' | 'pro'>('flash');
+  const [reviewModel, setReviewModel] = useState<ReviewModel>('qwen');
   const [imageType, setImageType] = useState<ImageType>('default');
   const [showQuotaModal, setShowQuotaModal] = useState(false);
 
@@ -52,18 +99,42 @@ function WorkspacePageContent() {
     handleReset,
   } = useUploadFlow({ fetchUsage });
 
-  const { sourceReviewId, replayPhotoId, replayPhotoUrl, clearReplay, initialMode, initialImageType } =
-    useReplayContext({ preview });
+  const {
+    sourceReviewId,
+    replayPhotoId,
+    replayPhotoUrl,
+    sourcePhotoError,
+    sourcePhotoLoading,
+    clearReplay,
+    initialMode,
+    initialImageType,
+    retakeIntent,
+    nextShootAction,
+    nextShootDimension,
+    sourceGenerationId,
+    contentEntrypoint,
+    contentSlug,
+    galleryReviewId,
+    promptExampleId,
+  } =
+    useReplayContext();
 
   const handleFileSelected = useCallback(
     async (...args: Parameters<typeof _handleFileSelected>) => {
-      clearReplay();
+      clearReplay({ preserveSourcePhoto: true });
       return _handleFileSelected(...args);
     },
     [clearReplay, _handleFileSelected]
   );
 
   const canReplayWithoutUpload = Boolean(sourceReviewId && replayPhotoId && !preview);
+  const canUseNextShootTarget = Boolean(nextShootAction && !preview && !canReplayWithoutUpload);
+  const targetCopy = retakeTargetCopy(locale);
+  const coachCopy = getRetakeCoachCopy(locale);
+  const isRetakeCoachFlow = retakeIntent === 'retake_coach' && Boolean(sourceReviewId);
+  const canUploadRetake = !isRetakeCoachFlow || Boolean(replayPhotoUrl);
+  const selectedReviewModel: ReviewModel = isRetakeCoachFlow ? 'gpt-5.6-terra' : reviewModel;
+  const contentSourceLabel = promptExampleId ?? contentSlug ?? galleryReviewId;
 
   useEffect(() => {
     if (isGuest && reviewMode === 'pro') setReviewMode('flash');
@@ -84,7 +155,20 @@ function WorkspacePageContent() {
       token: token ?? undefined,
       pagePath: '/workspace',
       locale,
-      metadata: { review_mode: reviewMode, image_type: imageType, has_source_review_id: Boolean(sourceReviewId) },
+      metadata: {
+        review_mode: reviewMode,
+        review_model: selectedReviewModel,
+        image_type: imageType,
+        has_source_review_id: Boolean(sourceReviewId),
+        retake_intent: retakeIntent,
+        next_shoot_action: nextShootAction,
+        next_shoot_dimension: nextShootDimension,
+        source_generation_id: sourceGenerationId,
+        content_entrypoint: contentEntrypoint,
+        content_slug: contentSlug,
+        gallery_review_id: galleryReviewId,
+        prompt_example_id: promptExampleId,
+      },
     });
     if (usage && remainingQuota !== null && remainingQuota <= 0) {
       setShowQuotaModal(true);
@@ -94,16 +178,18 @@ function WorkspacePageContent() {
     setErrMessage('');
     try {
       const tok = await ensureToken();
-      const idempotencyKey = `${activePhotoId}-${reviewMode}-${Date.now()}`;
+      const idempotencyKey = `${activePhotoId}-${reviewMode}-${selectedReviewModel}-${Date.now()}`;
       const result = await createReview(
         {
           photo_id: activePhotoId,
           mode: reviewMode,
+          review_model: selectedReviewModel,
           async: true,
           idempotency_key: idempotencyKey,
           locale,
           image_type: imageType,
           ...(sourceReviewId ? { source_review_id: sourceReviewId } : {}),
+          analysis_type: resolveReviewAnalysisType(sourceReviewId, Boolean(photo)),
         },
         tok
       );
@@ -115,11 +201,20 @@ function WorkspacePageContent() {
           locale,
           metadata: {
             review_mode: reviewMode,
+            review_model: selectedReviewModel,
             image_type: imageType,
             photo_id: activePhotoId,
             task_id: asyncResult.task_id,
             async: true,
             has_source_review_id: Boolean(sourceReviewId),
+            retake_intent: retakeIntent,
+            next_shoot_action: nextShootAction,
+            next_shoot_dimension: nextShootDimension,
+            source_generation_id: sourceGenerationId,
+            content_entrypoint: contentEntrypoint,
+            content_slug: contentSlug,
+            gallery_review_id: galleryReviewId,
+            prompt_example_id: promptExampleId,
           },
         });
         router.push(`/tasks/${asyncResult.task_id}?mode=${reviewMode}`);
@@ -131,11 +226,20 @@ function WorkspacePageContent() {
           locale,
           metadata: {
             review_mode: reviewMode,
+            review_model: selectedReviewModel,
             image_type: imageType,
             photo_id: activePhotoId,
             review_id: syncResult.review_id,
             async: false,
             has_source_review_id: Boolean(sourceReviewId),
+            retake_intent: retakeIntent,
+            next_shoot_action: nextShootAction,
+            next_shoot_dimension: nextShootDimension,
+            source_generation_id: sourceGenerationId,
+            content_entrypoint: contentEntrypoint,
+            content_slug: contentSlug,
+            gallery_review_id: galleryReviewId,
+            prompt_example_id: promptExampleId,
           },
         });
         router.push(`/reviews/${syncResult.review_id}`);
@@ -154,7 +258,7 @@ function WorkspacePageContent() {
         setErrMessage(formatUserFacingError(t, err, t('err_upload')));
       }
     }
-  }, [photo, replayPhotoId, reviewMode, locale, imageType, sourceReviewId, ensureToken, router, t, token, usage, remainingQuota, setStage, setErrMessage]);
+  }, [photo, replayPhotoId, reviewMode, selectedReviewModel, locale, imageType, sourceReviewId, retakeIntent, nextShootAction, nextShootDimension, sourceGenerationId, contentEntrypoint, contentSlug, galleryReviewId, promptExampleId, ensureToken, router, t, token, usage, remainingQuota, setStage, setErrMessage]);
 
   return (
     <div className="pt-14 min-h-screen">
@@ -164,9 +268,14 @@ function WorkspacePageContent() {
       <div className="max-w-3xl mx-auto px-6 py-12">
         <div className="mb-10 animate-fade-in">
           <p className="text-xs text-gold/70 font-mono mb-3 tracking-widest uppercase">
-            — {t('workspace_label')}
+            — {isRetakeCoachFlow ? coachCopy.label : t('workspace_label')}
           </p>
-          <h1 className="font-display text-4xl sm:text-5xl mb-4">{t('workspace_headline')}</h1>
+          <h1 className="font-display text-4xl sm:text-5xl mb-4">
+            {isRetakeCoachFlow ? coachCopy.workspaceTitle : t('workspace_headline')}
+          </h1>
+          {isRetakeCoachFlow && (
+            <p className="mb-5 max-w-2xl text-sm leading-7 text-ink-muted">{coachCopy.workspaceBody}</p>
+          )}
           <QuotaBanner
             usage={usage}
             usageError={usageError}
@@ -179,20 +288,59 @@ function WorkspacePageContent() {
         <div className="animate-slide-up anim-fill-both delay-100">
           {!preview ? (
             <div className="space-y-5">
+              {isRetakeCoachFlow && (
+                <RetakeWorkspaceIntro
+                  copy={coachCopy}
+                  sourcePhotoUrl={replayPhotoUrl}
+                  sourceLoading={sourcePhotoLoading}
+                  sourceError={sourcePhotoError}
+                />
+              )}
               {canReplayWithoutUpload && (
                 <ReplayBanner
                   replayPhotoUrl={replayPhotoUrl}
                   imageType={imageType}
                   reviewMode={reviewMode}
+                  reviewModel={reviewModel}
                   isGuest={isGuest}
                   stage={stage}
-                  promoModeBadge={promoModeBadge}
                   onImageTypeChange={setImageType}
                   onReviewModeChange={setReviewMode}
+                  onReviewModelChange={setReviewModel}
                   onStartReview={handleReview}
-                  onUploadNew={() => { clearReplay(); setStage('idle'); }}
+                  onUploadNew={() => { clearReplay({ preserveSourcePhoto: true }); setStage('idle'); }}
                   t={t}
                 />
+              )}
+              {canUseNextShootTarget && (
+                <div className="rounded-[24px] border border-gold/25 bg-[radial-gradient(circle_at_top_left,rgba(200,171,90,0.16),transparent_34%),rgb(var(--color-surface)/0.82)] p-5 animate-fade-in">
+                  <p className="mb-2 font-mono text-[11px] uppercase tracking-[0.22em] text-gold/80">{targetCopy.label}</p>
+                  <h2 className="font-display text-2xl text-ink">{targetCopy.title}</h2>
+                  <p className="mt-3 text-sm leading-7 text-ink">{nextShootAction}</p>
+                  <div className="mt-4 flex flex-wrap gap-2 text-[11px] text-ink-subtle">
+                    {nextShootDimension && (
+                      <span className="rounded-full border border-border-subtle bg-void/30 px-3 py-1">
+                        {targetCopy.dimension}: {nextShootDimension}
+                      </span>
+                    )}
+                    {sourceReviewId && (
+                      <span className="rounded-full border border-border-subtle bg-void/30 px-3 py-1">
+                        {targetCopy.sourceReview}: {sourceReviewId}
+                      </span>
+                    )}
+                    {promptExampleId && (
+                      <span className="rounded-full border border-border-subtle bg-void/30 px-3 py-1">
+                        {targetCopy.sourcePrompt}: {promptExampleId}
+                      </span>
+                    )}
+                    {!promptExampleId && contentSourceLabel && (
+                      <span className="rounded-full border border-border-subtle bg-void/30 px-3 py-1">
+                        {targetCopy.sourceContent}: {contentSourceLabel}
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-4 text-xs leading-5 text-ink-muted">{targetCopy.uploadHint}</p>
+                </div>
               )}
               {stage === 'error' && errMessage && (
                 <div className="flex items-center gap-2 rounded border border-rust/20 bg-rust/5 px-3 py-2 text-sm text-rust animate-scale-in">
@@ -200,7 +348,7 @@ function WorkspacePageContent() {
                   <span>{errMessage}</span>
                 </div>
               )}
-              {(!canReplayWithoutUpload || stage === 'idle' || stage === 'error') && (
+              {canUploadRetake && (!canReplayWithoutUpload || stage === 'idle' || stage === 'error') && (
                 <ImageUploader
                   onFileSelected={handleFileSelected}
                   disabled={stage !== 'idle' && stage !== 'error'}
@@ -209,6 +357,32 @@ function WorkspacePageContent() {
             </div>
           ) : (
             <div className="space-y-5 animate-fade-in">
+              {sourceReviewId && replayPhotoUrl && (
+                <div className="rounded-[24px] border border-sage/25 bg-sage/10 p-4">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-sage">{targetCopy.coachTitle}</p>
+                      <p className="mt-1 text-sm text-ink-muted">{targetCopy.uploadHint}</p>
+                    </div>
+                    <span className="rounded-full border border-sage/30 px-3 py-1 text-[11px] text-sage">GPT-5.6 Terra</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <p className="mb-2 text-xs text-ink-subtle">{targetCopy.originalLabel}</p>
+                      <div className="relative aspect-[4/3] overflow-hidden rounded-xl border border-border bg-raised">
+                        <Image src={replayPhotoUrl} alt={targetCopy.originalLabel} fill className="object-contain" unoptimized />
+                      </div>
+                    </div>
+                    <div>
+                      <p className="mb-2 text-xs text-ink-subtle">{targetCopy.retakeLabel}</p>
+                      <div className="relative aspect-[4/3] overflow-hidden rounded-xl border border-gold/30 bg-raised">
+                        <Image src={preview} alt={targetCopy.retakeLabel} fill className="object-contain" unoptimized />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="photo-frame relative aspect-[4/3] rounded-lg overflow-hidden border border-border bg-raised group">
                 <Image
                   src={preview}
@@ -270,13 +444,20 @@ function WorkspacePageContent() {
                     <p className="text-xs font-mono uppercase tracking-[0.2em] text-ink-subtle">{t('select_image_type')}</p>
                     <ImageTypePicker value={imageType} onChange={setImageType} t={t} />
                   </div>
+                  {!isRetakeCoachFlow && (
+                    <div className="space-y-3">
+                      <p className="text-xs font-mono uppercase tracking-[0.2em] text-ink-subtle">
+                        {locale === 'en' ? 'Select review model' : locale === 'ja' ? '講評モデルを選択' : '选择评图模型'}
+                      </p>
+                      <ReviewModelPicker value={reviewModel} onChange={setReviewModel} locale={locale} />
+                    </div>
+                  )}
                   <div className="space-y-3">
                     <p className="text-xs font-mono uppercase tracking-[0.2em] text-ink-subtle">{t('select_mode')}</p>
                     <ModePicker
                       value={reviewMode}
                       onChange={setReviewMode}
                       isGuest={isGuest}
-                      promoModeBadge={promoModeBadge}
                       t={t}
                     />
                   </div>

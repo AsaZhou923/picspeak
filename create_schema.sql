@@ -1,3 +1,6 @@
+-- Legacy schema snapshot kept for reference.
+-- Runtime database changes are managed by backend/alembic migrations.
+
 create table users
 (
     id                bigserial
@@ -202,6 +205,9 @@ create index idx_reviews_owner_deleted_created
 create index idx_reviews_owner_image_type_created
     on reviews (owner_user_id asc, image_type asc, created_at desc);
 
+create index idx_reviews_mode_created
+    on reviews (mode asc, created_at desc);
+
 create index idx_reviews_source_review
     on reviews (source_review_id);
 
@@ -379,6 +385,11 @@ create table review_task_events
 alter table review_task_events
     owner to pic;
 
+alter table review_task_events
+    drop constraint if exists review_task_events_task_id_fkey,
+    add constraint review_task_events_task_id_fkey
+        foreign key (task_id) references review_tasks (id) on delete cascade;
+
 create index idx_review_task_events_task_created
     on review_task_events (task_id asc, created_at desc);
 
@@ -387,6 +398,132 @@ create index idx_review_task_events_public_created
 
 create index idx_review_task_events_type_created
     on review_task_events (event_type asc, created_at desc);
+
+
+create table image_generation_tasks
+(
+    id                bigserial
+        primary key,
+    public_id         text                                                    not null
+        unique,
+    owner_user_id     bigint                                                  not null
+        references users,
+    source_photo_id   bigint
+        references photos,
+    source_review_id  bigint
+        references reviews,
+    status            task_status              default 'PENDING'::task_status not null,
+    generation_mode   text                     default 'general'::text        not null,
+    intent            text                                                    not null,
+    prompt            text                                                    not null,
+    prompt_hash       text                                                    not null,
+    idempotency_key   text,
+    request_payload   jsonb                    default '{}'::jsonb            not null,
+    attempt_count     integer                  default 0                      not null
+        constraint image_generation_tasks_attempt_count_check
+            check (attempt_count >= 0),
+    max_attempts      integer                  default 2                      not null
+        constraint image_generation_tasks_max_attempts_check
+            check (max_attempts > 0),
+    progress          integer                  default 0                      not null
+        constraint image_generation_tasks_progress_check
+            check ((progress >= 0) AND (progress <= 100)),
+    error_code        text,
+    error_message     text,
+    started_at        timestamp with time zone,
+    finished_at       timestamp with time zone,
+    next_attempt_at   timestamp with time zone,
+    claimed_by        text,
+    last_heartbeat_at timestamp with time zone,
+    created_at        timestamp with time zone default now()                  not null,
+    updated_at        timestamp with time zone default now()                  not null,
+    constraint uq_image_generation_tasks_user_idempotency
+        unique (owner_user_id, idempotency_key)
+);
+
+alter table image_generation_tasks
+    owner to pic;
+
+create index idx_image_generation_tasks_status_created
+    on image_generation_tasks (status, created_at);
+
+create index idx_image_generation_tasks_status_next_attempt
+    on image_generation_tasks (status, next_attempt_at);
+
+create index idx_image_generation_tasks_owner_created
+    on image_generation_tasks (owner_user_id asc, created_at desc);
+
+create index idx_image_generation_tasks_review_created
+    on image_generation_tasks (source_review_id asc, created_at desc);
+
+create trigger trg_image_generation_tasks_updated_at
+    before update
+    on image_generation_tasks
+    for each row
+execute procedure set_updated_at();
+
+create table generated_images
+(
+    id                  bigserial
+        primary key,
+    public_id           text                                          not null
+        unique,
+    task_id             bigint
+        references image_generation_tasks,
+    owner_user_id       bigint                                        not null
+        references users,
+    source_photo_id     bigint
+        references photos,
+    source_review_id    bigint
+        references reviews,
+    object_bucket       text                                          not null,
+    object_key          text                                          not null,
+    content_type        text                     default 'image/webp'::text not null,
+    width               integer,
+    height              integer,
+    intent              text                                          not null,
+    generation_mode     text                     default 'general'::text not null,
+    prompt              text                                          not null,
+    revised_prompt      text,
+    model_name          text                                          not null,
+    model_snapshot      text,
+    quality             text                                          not null,
+    size                text                                          not null,
+    output_format       text                                          not null,
+    input_text_tokens   integer,
+    input_image_tokens  integer,
+    output_image_tokens integer,
+    cost_usd            numeric(12, 6),
+    credits_charged     integer                                      not null
+        constraint generated_images_credits_charged_check
+            check (credits_charged >= 0),
+    template_key        text,
+    metadata_json       jsonb                    default '{}'::jsonb not null,
+    deleted_at          timestamp with time zone,
+    created_at          timestamp with time zone default now()        not null,
+    updated_at          timestamp with time zone default now()        not null
+);
+
+alter table generated_images
+    owner to pic;
+
+create index idx_generated_images_owner_created
+    on generated_images (owner_user_id asc, created_at desc);
+
+create index idx_generated_images_task
+    on generated_images (task_id);
+
+create index idx_generated_images_review_created
+    on generated_images (source_review_id asc, created_at desc);
+
+create index idx_generated_images_object
+    on generated_images (object_bucket asc, object_key asc);
+
+create trigger trg_generated_images_updated_at
+    before update
+    on generated_images
+    for each row
+execute procedure set_updated_at();
 
 
 create table billing_subscriptions
@@ -432,6 +569,9 @@ create unique index uq_billing_subscriptions_provider_subscription
 
 create index idx_billing_subscriptions_user_provider
     on billing_subscriptions (user_id asc, provider asc);
+
+create index idx_billing_subscriptions_provider_customer
+    on billing_subscriptions (provider_customer_id);
 
 create index idx_billing_subscriptions_status_updated
     on billing_subscriptions (status asc, updated_at desc);

@@ -27,6 +27,7 @@ pnpm-debug.log*
 
 # Local helper scripts
 start-dev.bat
+start-dev-proxy.bat
 
 .vercel
 .env*.local
@@ -71,4 +72,7 @@ htmlcov/
 docs/analytics/
 docs/marketing/
 docs/plans/
+docs/api/后端接口文档_v1.md
+docs/changelog/CHANGELOG_WORKFLOW.md
 
+.tmp/

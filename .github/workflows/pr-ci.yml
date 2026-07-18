@@ -1,0 +1,48 @@
+name: PR CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  backend-pytest:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install backend dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -r requirements.txt pytest
+      - name: Run backend pytest
+        run: python -m pytest tests
+
+  frontend-checks:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      NEXT_PUBLIC_API_URL: https://api.example.com
+      NEXT_PUBLIC_SITE_URL: https://picspeak.example.com
+      NEXT_PUBLIC_GOOGLE_OAUTH_REDIRECT_URI: https://api.example.com/api/v1/auth/google/callback
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend dependencies
+        run: npm ci
+      - name: Run frontend tests
+        run: npm test
+      - name: Run frontend typecheck
+        run: npm run typecheck
+      - name: Run frontend lint
+        run: npm run lint
+      - name: Run frontend build
+        run: npm run build

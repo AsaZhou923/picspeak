@@ -6,8 +6,16 @@ import {
   BlogPostViewsResponse,
   BillingCheckoutResponse,
   BillingPortalResponse,
+  CreditPackCheckoutResponse,
   GalleryLikeResponse,
+  GeneratedImageDetailResponse,
+  GeneratedImageHistoryResponse,
+  GenerationCreateRequest,
+  GenerationCreateResponse,
+  GenerationTaskStatusResponse,
+  GenerationTemplatesResponse,
   GuestMigrateResponse,
+  ImageCreditCodeRedeemResponse,
   PhotoCreateResponse,
   PhotoReviewsResponse,
   PresignRequest,
@@ -28,9 +36,26 @@ import {
   TaskStatusResponse,
   UsageResponse,
 } from './types';
+import { parseContentDispositionFilename } from './generation-download';
 
-const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000').replace(/\/$/, '');
-const GOOGLE_OAUTH_START_PATH = '/api/v1/auth/google/start';
+function resolveApiBase(): string {
+  const configured = process.env.NEXT_PUBLIC_API_URL?.trim();
+  if (!configured) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('NEXT_PUBLIC_API_URL is required for production builds');
+    }
+    return 'http://localhost:8000';
+  }
+
+  try {
+    return new URL(configured).toString().replace(/\/$/, '');
+  } catch {
+    throw new Error('NEXT_PUBLIC_API_URL must be an absolute URL');
+  }
+}
+
+const API_BASE = resolveApiBase();
+const GOOGLE_OAUTH_START_PATH = '/auth/google/start';
 const USAGE_CACHE_TTL_MS = 30_000;
 const DEVICE_ID_KEY = 'ps_device_id';
 
@@ -54,6 +79,21 @@ type ApiRequestOptions = RequestInit & {
 
 let unauthorizedHandler: UnauthorizedHandler | null = null;
 let usageCache: UsageCacheEntry | null = null;
+
+function apiBasePath(): string {
+  const pathname = new URL(API_BASE).pathname.replace(/\/$/, '');
+  if (pathname.endsWith('/api/v1')) return pathname;
+  return pathname.endsWith('/api') ? `${pathname}/v1` : `${pathname}/api/v1`;
+}
+
+function buildApiUrl(path: string): string {
+  const url = new URL(API_BASE);
+  const [rawPath, rawQuery = ''] = path.split('?', 2);
+  const normalizedPath = rawPath.startsWith('/') ? rawPath : `/${rawPath}`;
+  url.pathname = `${apiBasePath()}${normalizedPath}`.replace(/\/{2,}/g, '/');
+  url.search = rawQuery ? `?${rawQuery}` : '';
+  return url.toString();
+}
 
 function createAbortError(): Error {
   if (typeof DOMException === 'function') {
@@ -156,7 +196,7 @@ async function request<T>(
     allHeaders['X-Device-Id'] = deviceId;
   }
 
-  const res = await fetch(`${API_BASE}/api/v1${path}`, {
+  const res = await fetch(buildApiUrl(path), {
     ...rest,
     credentials: 'include',
     headers: allHeaders,
@@ -284,10 +324,26 @@ export async function getUsage(token: string, options: UsageOptions = {}): Promi
   return raceWithAbort(usagePromise, options.signal);
 }
 
-export async function createBillingCheckout(token: string, plan: 'pro'): Promise<BillingCheckoutResponse> {
+export async function createBillingCheckout(token: string, plan: 'pro', locale?: 'zh' | 'en' | 'ja'): Promise<BillingCheckoutResponse> {
   return request<BillingCheckoutResponse>('/billing/checkout', {
     method: 'POST',
-    body: JSON.stringify({ plan }),
+    body: JSON.stringify({ plan, locale }),
+    token,
+    unauthorizedRecovery: 'guest',
+  });
+}
+
+export async function createImageCreditPackCheckout(
+  token: string,
+  payload: { pack?: 'image_credits_300'; currency: 'usd'; locale?: 'zh' | 'en' | 'ja' }
+): Promise<CreditPackCheckoutResponse> {
+  return request<CreditPackCheckoutResponse>('/billing/image-credit-pack/checkout', {
+    method: 'POST',
+    body: JSON.stringify({
+      pack: payload.pack ?? 'image_credits_300',
+      currency: payload.currency,
+      locale: payload.locale,
+    }),
     token,
     unauthorizedRecovery: 'guest',
   });
@@ -302,6 +358,17 @@ export async function getBillingPortal(token: string): Promise<BillingPortalResp
 
 export async function redeemActivationCode(token: string, code: string): Promise<ActivationCodeRedeemResponse> {
   const response = await request<ActivationCodeRedeemResponse>('/billing/activation-code/redeem', {
+    method: 'POST',
+    body: JSON.stringify({ code }),
+    token,
+    unauthorizedRecovery: 'guest',
+  });
+  clearUsageCache(token);
+  return response;
+}
+
+export async function redeemImageCreditCode(token: string, code: string): Promise<ImageCreditCodeRedeemResponse> {
+  const response = await request<ImageCreditCodeRedeemResponse>('/billing/image-credit-code/redeem', {
     method: 'POST',
     body: JSON.stringify({ code }),
     token,
@@ -396,16 +463,94 @@ export async function getTask(taskId: string, token: string, signal?: AbortSigna
     token,
     cache: 'no-store',
     signal,
-    headers: {
-      'Cache-Control': 'no-cache',
-      Pragma: 'no-cache',
-    },
   });
 }
 
+export async function getGenerationTemplates(): Promise<GenerationTemplatesResponse> {
+  return request<GenerationTemplatesResponse>('/generations/templates');
+}
+
+export async function createGeneration(
+  payload: GenerationCreateRequest,
+  token: string
+): Promise<GenerationCreateResponse> {
+  const response = await request<GenerationCreateResponse>('/generations', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    token,
+    unauthorizedRecovery: 'guest',
+  });
+  clearUsageCache(token);
+  return response;
+}
+
+export async function getGenerationTask(
+  taskId: string,
+  token: string,
+  signal?: AbortSignal
+): Promise<GenerationTaskStatusResponse> {
+  return request<GenerationTaskStatusResponse>(`/generation-tasks/${taskId}?_ts=${Date.now()}`, {
+    token,
+    cache: 'no-store',
+    signal,
+  });
+}
+
+export async function getGeneration(
+  generationId: string,
+  token: string,
+  signal?: AbortSignal
+): Promise<GeneratedImageDetailResponse> {
+  return request<GeneratedImageDetailResponse>(`/generations/${generationId}`, { token, signal });
+}
+
+export async function getMyGenerations(
+  token: string,
+  query: { cursor?: string; limit?: number } = {}
+): Promise<GeneratedImageHistoryResponse> {
+  const params = new URLSearchParams({ limit: String(query.limit ?? 20) });
+  if (query.cursor) params.set('cursor', query.cursor);
+  return request<GeneratedImageHistoryResponse>(`/me/generations?${params.toString()}`, { token });
+}
+
+export async function reuseGeneration(
+  generationId: string,
+  token: string
+): Promise<GenerationCreateResponse> {
+  return request<GenerationCreateResponse>(`/generations/${generationId}/reuse`, {
+    method: 'POST',
+    token,
+    unauthorizedRecovery: 'guest',
+  });
+}
+
+export async function deleteGeneration(generationId: string, token: string): Promise<void> {
+  return request<void>(`/generations/${generationId}`, {
+    method: 'DELETE',
+    token,
+  });
+}
+
+export async function downloadGeneration(
+  generationId: string,
+  token: string
+): Promise<{ blob: Blob; filename: string }> {
+  const res = await fetch(buildApiUrl(`/generations/${encodeURIComponent(generationId)}/download`), {
+    credentials: 'include',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  if (!res.ok) {
+    throw new ApiException(res.status, 'GENERATION_DOWNLOAD_FAILED', `HTTP ${res.status}`);
+  }
+  const disposition = res.headers.get('Content-Disposition') ?? '';
+  const filename = parseContentDispositionFilename(disposition) ?? `${generationId}.png`;
+  return { blob: await res.blob(), filename };
+}
+
 export function buildTaskWebSocketUrl(taskId: string): string {
-  const apiBase = API_BASE.replace(/\/$/, '');
-  const url = new URL(`${apiBase}/api/v1/ws/tasks/${encodeURIComponent(taskId)}`);
+  const url = new URL(buildApiUrl(`/ws/tasks/${encodeURIComponent(taskId)}`));
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
   return url.toString();
 }
@@ -550,5 +695,5 @@ export async function updateReviewMeta(
 // ─── Google OAuth URL builder ─────────────────────────────────────────────────
 
 export function buildGoogleOAuthUrl(): string {
-  return `${API_BASE}${GOOGLE_OAUTH_START_PATH}`;
+  return buildApiUrl(GOOGLE_OAUTH_START_PATH);
 }

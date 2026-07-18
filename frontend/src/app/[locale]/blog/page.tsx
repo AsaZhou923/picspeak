@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import BlogIndexClient from './BlogIndexClient';
+import BlogIndexPageContent from './BlogIndexPageContent';
 import { getBlogUi } from '@/lib/blog-data';
 import { INDEXABLE_ROBOTS } from '@/lib/seo';
 import { siteConfig } from '@/lib/site';
@@ -36,10 +36,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       title: ui.title,
       description: ui.description,
       siteName: siteConfig.name,
-      images: [{ url: siteConfig.ogImage, alt: ui.title }],
+      images: [{ url: siteConfig.ogImage, width: siteConfig.ogImageWidth, height: siteConfig.ogImageHeight, alt: ui.title }],
     },
     twitter: {
-      card: 'summary',
+      card: 'summary_large_image',
       title: ui.title,
       description: ui.description,
       images: [siteConfig.ogImage],
@@ -50,5 +50,5 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function BlogIndexPage({ params }: Props) {
   const { locale } = await params;
 
-  return <BlogIndexClient locale={locale} />;
+  return <BlogIndexPageContent locale={locale} />;
 }

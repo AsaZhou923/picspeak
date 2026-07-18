@@ -1,21 +1,19 @@
-'use client';
+﻿'use client';
 
 import Link from 'next/link';
 import { ArrowRight, Settings2, Sparkles, Ticket } from 'lucide-react';
 import { useState } from 'react';
+import ClerkSignInTrigger from '@/components/auth/ClerkSignInTrigger';
 import ActivationCodeModal from '@/components/billing/ActivationCodeModal';
 import { useAuth } from '@/lib/auth-context';
 import { useI18n } from '@/lib/i18n';
-import { CN_PRO_CHECKOUT_TIP, openChinaProPurchase, startProCheckout } from '@/lib/pro-checkout';
+import { CN_PRO_CHECKOUT_TIP, startProCheckout } from '@/lib/pro-checkout';
 import { getProPlanBoundaryCopy, getProUpgradeTriggerCopy } from '@/lib/pro-conversion';
 
 export type PromoPlan = 'guest' | 'free' | 'pro';
 export type PromoScene = 'workspace' | 'gallery' | 'usage' | 'review';
 
-type SceneCopy = {
-  title: string;
-  body: string;
-};
+type SceneCopy = { title: string; body: string };
 
 type LocalePromoCopy = {
   badge: string;
@@ -26,8 +24,6 @@ type LocalePromoCopy = {
   features: string[];
   guestCta: string;
   freeCta: string;
-  chinaCta: string;
-  chinaHint: string;
   proCta: string;
   proStatus: string;
   activationCta: string;
@@ -53,180 +49,119 @@ function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
 
   if (locale === 'zh') {
     return {
-      badge: '首发促销',
-      discount: '网站运营初期 25% OFF',
-      price: '$2.99 / 月',
-      oldPrice: '$3.99',
+      badge: 'Pro',
+      discount: '30 天一次性开通',
+      price: '$1.99 / 30 天',
+      oldPrice: '',
       footnote: CN_PRO_CHECKOUT_TIP,
       features: proFeatures,
-      guestCta: '使用 Lemon Squeezy 开通',
-      freeCta: '使用 Lemon Squeezy 开通',
-      chinaCta: '中文用户可选：前往爱发电开通',
-      chinaHint: '爱发电通常会有更多优惠，下单后用激活码开通。',
+      guestCta: '升级到 Pro',
+      freeCta: '升级到 Pro',
       proCta: '查看账户页',
-      proStatus: '你当前已是 Pro，可继续通过激活码续期。',
+      proStatus: '你当前已经是 Pro，可以在账户页查看状态或兑换新的激活码。',
       activationCta: '输入激活码',
-      activationRenewCta: '输入新激活码',
+      activationRenewCta: '输入新的激活码',
       scenes: {
         workspace: {
           default: {
             title: workspaceTrigger.title,
-            body: `${workspaceTrigger.body} 主支付入口为 Lemon Squeezy，中文用户也可选爱发电。`,
+            body: `${workspaceTrigger.body} 中文用户使用 Lemon Squeezy 专属 checkout，$1.99 一次性开通 30 天，不会自动续费。`,
           },
           pro: {
-            title: '继续通过激活码续费你的 Pro',
-            body: '你已经是 Pro。再次购买后输入新的激活码，就能把当前到期时间继续顺延。',
+            title: '你的 Pro 已开通',
+            body: '你已经是 Pro，可以继续使用深度评图、永久历史和优先处理。',
           },
         },
         gallery: {
           default: {
             title: usageTrigger.title,
-            body: `${usageTrigger.body} 看完案例后，可以直接把下一次上传切到 Pro 成长闭环。`,
+            body: `${usageTrigger.body} 中文用户使用 Lemon Squeezy 专属 checkout，$1.99 一次性开通 30 天，不会自动续费。`,
           },
           pro: {
-            title: '你的 Pro 已开通，可继续续期',
-            body: '如果你继续购买中文优惠通道，输入新激活码即可顺延当前 Pro 时长。',
+            title: '你的 Pro 已开通',
+            body: '可以继续使用深度评图、永久历史和优先处理。',
           },
         },
         usage: {
           default: {
             title: usageTrigger.title,
-            body: `${usageTrigger.body} 默认支付入口仍是 Lemon Squeezy，中文用户可额外选择爱发电。`,
+            body: `${usageTrigger.body} 中文用户使用 Lemon Squeezy 专属 checkout，$1.99 一次性开通 30 天，不会自动续费。`,
           },
           pro: {
-            title: '当前账号已是 Pro，可继续续期',
-            body: '你可以继续用 Lemon Squeezy 管理订阅，或使用中文优惠通道购买后输入激活码续期。',
+            title: '当前账号已是 Pro',
+            body: '你可以在账户页查看 Pro 状态，或兑换已有激活码。',
           },
         },
         review: {
           default: {
             title: reviewTrigger.title,
-            body: `${reviewTrigger.body} 主支付入口仍是 Lemon Squeezy；中文用户也可以走爱发电优惠通道。`,
+            body: `${reviewTrigger.body} 中文用户使用 Lemon Squeezy 专属 checkout，$1.99 一次性开通 30 天，不会自动续费。`,
           },
           pro: {
-            title: '继续延长你的 Pro 时长',
-            body: '再次购买后输入新的激活码，就能把当前 Pro 时长继续顺延。',
+            title: '继续使用 Pro 深度分析',
+            body: '当前订阅已生效，可以继续使用深度评图和永久历史。',
           },
         },
       },
     };
   }
 
-  if (locale === 'ja') {
-    return {
-      badge: 'ローンチ特典',
-      discount: '早期ローンチ限定 25% OFF',
-      price: '$2.99 / 月',
-      oldPrice: '$3.99',
-      footnote: '現在はローンチ期間中の価格です。今後は通常料金に戻る場合があります。',
-      features: proFeatures,
-      guestCta: 'ローンチ価格で始める',
-      freeCta: '今すぐ Pro にアップグレード',
-      chinaCta: '',
-      chinaHint: '',
-      proCta: 'サブスクリプションを管理',
-      proStatus: '現在の契約はローンチ価格の Pro プランです',
-      activationCta: '',
-      activationRenewCta: '',
-      scenes: {
-        workspace: {
-          default: {
-            title: workspaceTrigger.title,
-            body: workspaceTrigger.body,
-          },
-          pro: {
-            title: '現在の Pro プランはローンチ価格のまま有効です',
-            body: '永久履歴と優先処理を含む Pro 特典を、そのまま使い続けられます。',
-          },
-        },
-        gallery: {
-          default: {
-            title: usageTrigger.title,
-            body: 'ギャラリーで参考を見たあと、次のアップロードを Pro の成長ループにつなげられます。',
-          },
-          pro: {
-            title: 'Pro のローンチ価格はそのまま維持されています',
-            body: '深い分析、永久履歴、優先処理を引き続き利用できます。',
-          },
-        },
-        usage: {
-          default: {
-            title: usageTrigger.title,
-            body: usageTrigger.body,
-          },
-          pro: {
-            title: 'すでに Pro のローンチ価格を確保しています',
-            body: 'プラン状況、請求、更新情報はサブスクリプション管理からいつでも確認できます。',
-          },
-        },
-        review: {
-          default: {
-            title: reviewTrigger.title,
-            body: reviewTrigger.body,
-          },
-          pro: {
-            title: 'この結果も Pro でさらに深く掘り下げられます',
-            body: '現在の契約は有効なので、深い分析と永久履歴をそのまま使い続けられます。',
-          },
-        },
-      },
-    };
-  }
-
+  const isJa = locale === 'ja';
   return {
-    badge: 'Launch Offer',
-    discount: '25% off during early launch',
-    price: '$2.99 / month',
-    oldPrice: '$3.99',
-    footnote: 'This is the current launch-period price and may return to the regular rate later.',
+    badge: 'Pro',
+    discount: isJa ? '月額プラン' : 'Monthly plan',
+    price: isJa ? '$3.99 / 月' : '$3.99 / month',
+    oldPrice: '',
+    footnote: isJa
+      ? 'より深い分析、永久履歴、優先処理、毎月の AI image credits が含まれます。'
+      : 'Includes deeper critique, permanent history, priority processing, and monthly AI image credits.',
     features: proFeatures,
-    guestCta: 'Claim the launch price',
-    freeCta: 'Upgrade to Pro now',
-    chinaCta: '',
-    chinaHint: '',
-    proCta: 'Manage subscription',
-    proStatus: 'Your subscription is already on the launch-price Pro plan',
+    guestCta: isJa ? 'Pro にアップグレード' : 'Upgrade to Pro',
+    freeCta: isJa ? '今すぐ Pro にアップグレード' : 'Upgrade to Pro now',
+    proCta: isJa ? 'サブスクリプションを管理' : 'Manage subscription',
+    proStatus: isJa ? '現在の契約は Pro プランです' : 'Your subscription is already on the Pro plan',
     activationCta: '',
     activationRenewCta: '',
     scenes: {
       workspace: {
-        default: {
-          title: workspaceTrigger.title,
-          body: workspaceTrigger.body,
-        },
+        default: { title: workspaceTrigger.title, body: workspaceTrigger.body },
         pro: {
-          title: 'Your Pro plan is still active at the launch price',
-          body: 'Your current subscription is still billed at the launch price and keeps deeper critique available.',
+          title: isJa ? 'Pro プランは有効です' : 'Your Pro plan is active',
+          body: isJa
+            ? '深い分析、永久履歴、優先処理をそのまま利用できます。'
+            : 'Your current subscription keeps deeper critique, permanent history, and priority processing available.',
         },
       },
       gallery: {
         default: {
           title: usageTrigger.title,
-          body: 'Use the gallery for reference, then move your next upload into the Pro growth loop.',
+          body: isJa
+            ? 'ギャラリーを参考にしながら、次のアップロードを Pro の成長ループへつなげられます。'
+            : 'Use the gallery for reference, then move your next upload into the Pro growth loop.',
         },
         pro: {
-          title: 'Your Pro plan is still locked in at the launch price',
-          body: 'Unlimited-style review flow, permanent history, and priority processing remain available.',
+          title: isJa ? 'Pro プランは有効です' : 'Your Pro plan is active',
+          body: isJa
+            ? '深い分析、永久履歴、優先処理を引き続き利用できます。'
+            : 'Unlimited-style review flow, permanent history, and priority processing remain available.',
         },
       },
       usage: {
-        default: {
-          title: usageTrigger.title,
-          body: usageTrigger.body,
-        },
+        default: { title: usageTrigger.title, body: usageTrigger.body },
         pro: {
-          title: 'You have already locked in the Pro launch price',
-          body: 'You can check plan status, billing, and renewal details anytime from subscription management.',
+          title: isJa ? 'すでに Pro を利用中です' : 'You already have Pro',
+          body: isJa
+            ? 'プラン状況、請求、更新の詳細はサブスクリプション管理から確認できます。'
+            : 'You can check plan status, billing, and renewal details anytime from subscription management.',
         },
       },
       review: {
-        default: {
-          title: reviewTrigger.title,
-          body: reviewTrigger.body,
-        },
+        default: { title: reviewTrigger.title, body: reviewTrigger.body },
         pro: {
-          title: 'This result can still be explored more deeply with Pro',
-          body: 'Your current subscription is active, so you can keep using deeper critique and permanent history.',
+          title: isJa ? 'Pro でさらに深く確認できます' : 'This result can still be explored more deeply with Pro',
+          body: isJa
+            ? '現在の契約は有効なので、深い分析と永久履歴を使い続けられます。'
+            : 'Your current subscription is active, so you can keep using deeper critique and permanent history.',
         },
       },
     },
@@ -239,12 +174,12 @@ export default function ProPromoCard({
   title,
   body,
   ctaHref = '/account/usage',
+  fallbackRedirectUrl = '/account/usage',
   className = '',
 }: ProPromoCardProps) {
   const { ensureToken } = useAuth();
   const { locale, t } = useI18n();
   const [checkoutLoading, setCheckoutLoading] = useState(false);
-  const [chinaCheckoutLoading, setChinaCheckoutLoading] = useState(false);
   const [activationOpen, setActivationOpen] = useState(false);
   const copy = getPromoCopy(locale);
   const sceneCopy = copy.scenes[scene][plan === 'pro' ? 'pro' : 'default'];
@@ -252,9 +187,7 @@ export default function ProPromoCard({
   const resolvedBody = body ?? sceneCopy.body;
 
   async function handleCheckout() {
-    if (checkoutLoading) {
-      return;
-    }
+    if (checkoutLoading) return;
 
     setCheckoutLoading(true);
     try {
@@ -263,19 +196,6 @@ export default function ProPromoCard({
       window.alert(t('usage_checkout_unavailable'));
     } finally {
       setCheckoutLoading(false);
-    }
-  }
-
-  function handleChinaCheckout() {
-    if (chinaCheckoutLoading) {
-      return;
-    }
-
-    setChinaCheckoutLoading(true);
-    try {
-      openChinaProPurchase(locale);
-    } finally {
-      setChinaCheckoutLoading(false);
     }
   }
 
@@ -315,7 +235,9 @@ export default function ProPromoCard({
           <p className="text-[11px] uppercase tracking-[0.24em] text-gold/75">{copy.discount}</p>
           <div className="mt-3 flex items-end gap-3">
             <p className="font-display text-4xl text-gold">{copy.price}</p>
-            <p className="pb-1 text-sm text-ink-subtle line-through">{copy.oldPrice}</p>
+            {copy.oldPrice && copy.oldPrice !== copy.price && (
+              <p className="pb-1 text-sm text-ink-subtle line-through">{copy.oldPrice}</p>
+            )}
           </div>
           <p className="mt-2 text-xs leading-6 text-ink-subtle">{copy.footnote}</p>
 
@@ -333,61 +255,47 @@ export default function ProPromoCard({
                 <ArrowRight size={14} />
               </Link>
               {locale === 'zh' && (
-                <>
-                  <button
-                    type="button"
-                    onClick={handleChinaCheckout}
-                    disabled={chinaCheckoutLoading}
-                    className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border border-gold/30 bg-gold/10 px-5 py-3 text-sm font-medium text-gold transition-colors hover:bg-gold/15 disabled:opacity-70"
-                  >
-                    {chinaCheckoutLoading ? '正在打开爱发电…' : copy.chinaCta}
-                    <ArrowRight size={14} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActivationOpen(true)}
-                    className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm font-medium text-ink transition-colors hover:border-gold/30 hover:text-gold"
-                  >
-                    {copy.activationRenewCta}
-                  </button>
-                  <p className="mt-3 text-xs leading-6 text-ink-subtle">{copy.chinaHint}</p>
-                </>
+                <button
+                  type="button"
+                  onClick={() => setActivationOpen(true)}
+                  className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm font-medium text-ink transition-colors hover:border-gold/30 hover:text-gold"
+                >
+                  {copy.activationRenewCta}
+                </button>
               )}
             </>
           ) : (
             <div className="mt-5">
-              <button
-                type="button"
-                onClick={() => void handleCheckout()}
-                disabled={checkoutLoading}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-gold px-5 py-3 text-sm font-medium text-void transition-colors hover:bg-gold-light disabled:cursor-wait disabled:opacity-70"
-              >
-                <Sparkles size={14} />
-                {checkoutLoading ? t('usage_checkout_loading') : plan === 'guest' ? copy.guestCta : copy.freeCta}
-                <ArrowRight size={14} />
-              </button>
+              {plan === 'guest' ? (
+                <ClerkSignInTrigger
+                  fallbackRedirectUrl={fallbackRedirectUrl}
+                  signedInClassName="hidden"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-gold px-5 py-3 text-sm font-medium text-void transition-colors hover:bg-gold-light"
+                >
+                  <Sparkles size={14} />
+                  {copy.guestCta}
+                  <ArrowRight size={14} />
+                </ClerkSignInTrigger>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => void handleCheckout()}
+                  disabled={checkoutLoading}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-gold px-5 py-3 text-sm font-medium text-void transition-colors hover:bg-gold-light disabled:cursor-wait disabled:opacity-70"
+                >
+                  <Sparkles size={14} />
+                  {checkoutLoading ? t('usage_checkout_loading') : copy.freeCta}
+                  <ArrowRight size={14} />
+                </button>
+              )}
               {locale === 'zh' && (
-                <>
-                  <button
-                    type="button"
-                    onClick={handleChinaCheckout}
-                    disabled={chinaCheckoutLoading}
-                    className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border border-gold/30 bg-gold/10 px-5 py-3 text-sm font-medium text-gold transition-colors hover:bg-gold/15 disabled:opacity-70"
-                  >
-                    {chinaCheckoutLoading ? '正在打开爱发电…' : copy.chinaCta}
-                    <ArrowRight size={14} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActivationOpen(true)}
-                    className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm font-medium text-ink transition-colors hover:border-gold/30 hover:text-gold"
-                  >
-                    {copy.activationCta}
-                  </button>
-                  <p className="mt-3 text-xs leading-6 text-ink-subtle">
-                    {copy.chinaHint}
-                  </p>
-                </>
+                <button
+                  type="button"
+                  onClick={() => setActivationOpen(true)}
+                  className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm font-medium text-ink transition-colors hover:border-gold/30 hover:text-gold"
+                >
+                  {copy.activationCta}
+                </button>
               )}
             </div>
           )}

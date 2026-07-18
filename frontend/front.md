@@ -1,10 +1,10 @@
 # 前端说明
 
-`frontend` 目录是 PicSpeak 的前端项目，基于 Next.js 14 + React 18 + Tailwind CSS，实现了页面规划文档中的主要页面和基础交互框架。
+`frontend` 目录是 PicSpeak 的前端项目，基于 Next.js 15 + React 18 + TypeScript + Tailwind CSS，实现了当前产品文档中的主要页面、内容入口和基础交互框架。
 
 ## 1. 技术栈
 
-- Next.js 14（App Router）
+- Next.js 15（App Router）
 - React 18
 - TypeScript
 - Tailwind CSS

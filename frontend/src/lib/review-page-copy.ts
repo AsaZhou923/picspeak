@@ -1,5 +1,6 @@
 import type { TranslationKey } from './i18n-zh';
 import type { ReviewScores, UsageResponse } from './types';
+import typeDimDescriptions from '@/content/review/dim-descriptions.json';
 
 export type CritiqueImageType = 'default' | 'landscape' | 'portrait' | 'street' | 'still_life' | 'architecture';
 export type DimKey = 'composition' | 'lighting' | 'color' | 'impact' | 'technical';
@@ -11,140 +12,7 @@ export type TagRule = {
   minWeakMatches?: number;
 };
 
-const TYPE_DIM_DESC: Record<'zh' | 'en' | 'ja', Record<CritiqueImageType, Record<DimKey, string>>> = {
-  zh: {
-    default: {
-      composition: '评估画面框架、主体位置与视觉引导，包括三分法、黄金比例等构图手法。',
-      lighting: '评估光源质量、方向、对比度及曝光控制，包括高光与阴影的层次细节。',
-      color: '评估色调、饱和度、白平衡与整体色彩和谐感，以及色彩情绪的表达力。',
-      impact: '评估照片的情绪表达、主题传达、叙事力度和与观者的视觉共鸣。',
-      technical: '评估焦点清晰度、噪点控制、景深运用与整体后期处理的完成度。',
-    },
-    portrait: {
-      composition: '评估人物在画面中的构图位置、肢体留白与视线引导是否自然。',
-      lighting: '评估面部光线方向、明暗过渡与肤质保留是否得当。',
-      color: '评估肤色准确性、肤色层次与整体色调风格的一致性。',
-      impact: '评估人物情绪表达、状态传达与人物故事感。',
-      technical: '评估眼部对焦、景深控制与背景虚化质量。',
-    },
-    landscape: {
-      composition: '评估前景、中景、远景层次与空间纵深是否清晰。',
-      lighting: '评估自然光影关系、光比控制与时段选择是否合理。',
-      color: '评估自然色彩还原、色彩关系与季节/天气氛围表现。',
-      impact: '评估景观震撼感、场景气势与观看沉浸感。',
-      technical: '评估曝光完整性、动态范围与整体清晰度。',
-    },
-    architecture: {
-      composition: '评估建筑几何结构、线条秩序与主体组织。',
-      lighting: '评估建筑体块光影塑造、反差与立面层次。',
-      color: '评估建筑色彩风格、材质色调与整体统一性。',
-      impact: '评估画面的视觉张力、秩序感与形式表达。',
-      technical: '评估透视控制、垂直线校正与边缘畸变控制。',
-    },
-    street: {
-      composition: '评估街头元素布局、主体关系与瞬间组织。',
-      lighting: '评估环境光利用、复杂光源控制与曝光平衡。',
-      color: '评估氛围色彩、现场色温关系与视觉记忆点。',
-      impact: '评估决定性瞬间的张力、叙事冲突与情绪触发。',
-      technical: '评估抓拍清晰度、快门策略与动态控制。',
-    },
-    still_life: {
-      composition: '评估主体摆放、道具关系与画面布局稳定性。',
-      lighting: '评估布光方向、质感塑造与阴影控制。',
-      color: '评估色彩搭配、主辅色关系与风格统一。',
-      impact: '评估背景设计与主体表达是否形成完整视觉主题。',
-      technical: '评估细节解析、材质质感与边缘过渡质量。',
-    },
-  },
-  en: {
-    default: {
-      composition: 'Evaluates framing structure, subject placement, and visual guidance in the image.',
-      lighting: 'Evaluates light direction, contrast, and highlight/shadow control.',
-      color: 'Evaluates hue, saturation, white balance, and overall color harmony.',
-      impact: 'Evaluates emotional expression, thematic clarity, and viewer resonance.',
-      technical: 'Evaluates focus precision, noise control, depth-of-field usage, and finish quality.',
-    },
-    portrait: {
-      composition: 'Evaluates subject framing, headroom, and portrait balance.',
-      lighting: 'Evaluates facial light quality, shadow transition, and skin-detail retention.',
-      color: 'Evaluates skin tone accuracy and tonal consistency.',
-      impact: 'Evaluates emotional expression and character storytelling.',
-      technical: 'Evaluates eye focus, bokeh quality, and depth control.',
-    },
-    landscape: {
-      composition: 'Evaluates foreground-to-background layering and spatial depth.',
-      lighting: 'Evaluates natural light timing, light-shadow structure, and dynamic balance.',
-      color: 'Evaluates natural palette quality and atmosphere consistency.',
-      impact: 'Evaluates scene grandeur and immersive visual effect.',
-      technical: 'Evaluates exposure completeness and global clarity.',
-    },
-    architecture: {
-      composition: 'Evaluates geometric structure and line organization.',
-      lighting: 'Evaluates light-shadow sculpting on forms and facades.',
-      color: 'Evaluates architectural color style and material-tone unity.',
-      impact: 'Evaluates visual tension and formal expression.',
-      technical: 'Evaluates perspective control and distortion correction.',
-    },
-    street: {
-      composition: 'Evaluates scene layout and relationship between subjects/elements.',
-      lighting: 'Evaluates ambient light handling in complex street conditions.',
-      color: 'Evaluates atmosphere color and memory-driving palette cues.',
-      impact: 'Evaluates decisive-moment tension and narrative immediacy.',
-      technical: 'Evaluates capture sharpness and motion control strategy.',
-    },
-    still_life: {
-      composition: 'Evaluates object placement and arrangement logic.',
-      lighting: 'Evaluates light shaping and texture-focused shadow control.',
-      color: 'Evaluates color matching and style consistency.',
-      impact: 'Evaluates background design as part of expression.',
-      technical: 'Evaluates detail rendering and material texture quality.',
-    },
-  },
-  ja: {
-    default: {
-      composition: '画面構成、主題配置、視線誘導を評価します。',
-      lighting: '光の方向、コントラスト、ハイライト/シャドウ制御を評価します。',
-      color: '色相・彩度・WB・全体の色調調和を評価します。',
-      impact: '感情表現、主題伝達、鑑賞者との共鳴を評価します。',
-      technical: 'ピント精度、ノイズ制御、被写界深度、仕上げ品質を評価します。',
-    },
-    portrait: {
-      composition: '人物の配置、余白、視線誘導の自然さを評価します。',
-      lighting: '顔の光、陰影のつながり、肌ディテール保持を評価します。',
-      color: '肌色の正確性とトーンの一貫性を評価します。',
-      impact: '人物の感情表現と人物像の伝達力を評価します。',
-      technical: '瞳への合焦、ボケ品質、被写界深度制御を評価します。',
-    },
-    landscape: {
-      composition: '前景〜遠景のレイヤーと奥行き表現を評価します。',
-      lighting: '自然光のタイミング、光と影の構造を評価します。',
-      color: '自然な色彩再現と雰囲気の整合性を評価します。',
-      impact: '景観の迫力と没入感を評価します。',
-      technical: '露出の完成度と全体解像感を評価します。',
-    },
-    architecture: {
-      composition: '幾何構造と線の秩序を評価します。',
-      lighting: '建築の立体感を作る光と影を評価します。',
-      color: '建築色彩スタイルと材質トーンの統一感を評価します。',
-      impact: '視覚的張力と形式美の表現を評価します。',
-      technical: '遠近制御と歪み補正を評価します。',
-    },
-    street: {
-      composition: '街頭要素の配置と瞬間の構成力を評価します。',
-      lighting: '環境光の活用と複雑光源下の露出バランスを評価します。',
-      color: '雰囲気色彩と記憶に残る色調を評価します。',
-      impact: '決定的瞬間の張力と物語性を評価します。',
-      technical: 'スナップの鮮明度と動体制御を評価します。',
-    },
-    still_life: {
-      composition: '主題配置とレイアウトの安定感を評価します。',
-      lighting: 'ライティング設計と質感表現を評価します。',
-      color: '配色設計とスタイル一貫性を評価します。',
-      impact: '背景設計を含む主題表現の完成度を評価します。',
-      technical: '細部描写と質感再現を評価します。',
-    },
-  },
-};
+const TYPE_DIM_DESC = typeDimDescriptions as Record<'zh' | 'en' | 'ja', Record<CritiqueImageType, Record<DimKey, string>>>;
 
 export function getDimDescByType(locale: string, imageType: string, dim: DimKey): string {
   const lang = locale === 'en' || locale === 'ja' ? locale : 'zh';

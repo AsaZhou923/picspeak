@@ -144,7 +144,6 @@ def list_public_gallery(
       review_id=last_review.id,
     )
 
-  db.commit()
   return PublicGalleryResponse(items=items, total_count=total_count, next_cursor=next_cursor)
 
 

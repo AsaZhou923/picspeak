@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import UpdatesPageContent from '@/components/marketing/UpdatesPageContent';
 import { I18nProvider, type Locale } from '@/lib/i18n';
+import { UPDATES_LANGUAGE_ALTERNATES } from '@/lib/seo';
 import { siteConfig } from '@/lib/site';
 import { VALID_LOCALES } from '../locales';
 
@@ -37,12 +38,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     description: meta.description,
     alternates: {
       canonical: `/${typedLocale}/updates`,
-      languages: {
-        'zh-CN': '/zh/updates',
-        en: '/en/updates',
-        ja: '/ja/updates',
-        'x-default': '/updates',
-      },
+      languages: UPDATES_LANGUAGE_ALTERNATES,
     },
     openGraph: {
       type: 'website',
@@ -50,10 +46,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       siteName: siteConfig.name,
       title: meta.title,
       description: meta.description,
-      images: [{ url: siteConfig.ogImage, alt: meta.title }],
+      images: [{ url: siteConfig.ogImage, width: siteConfig.ogImageWidth, height: siteConfig.ogImageHeight, alt: meta.title }],
     },
     twitter: {
-      card: 'summary',
+      card: 'summary_large_image',
       title: meta.title,
       description: meta.description,
       images: [siteConfig.ogImage],

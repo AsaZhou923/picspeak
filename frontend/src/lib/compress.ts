@@ -7,6 +7,8 @@
 //   3. Iteratively lower quality and, if needed, dimensions until near the target size.
 //   4. Returns the compressed File plus a stats object for UI feedback.
 
+import { canvasToRequiredBlob } from './canvas';
+
 export interface CompressionResult {
   file: File;
   originalSize: number;
@@ -34,22 +36,7 @@ const DEFAULTS: Required<CompressOptions> = {
   minQuality: 0.52,
 };
 
-async function canvasToBlob(
-  canvas: HTMLCanvasElement,
-  outputType: string,
-  quality: number
-): Promise<Blob> {
-  return new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob(
-      (blob) => {
-        if (blob) resolve(blob);
-        else reject(new Error('Canvas toBlob returned null'));
-      },
-      outputType,
-      quality
-    );
-  });
-}
+const MAX_COMPRESSION_RESIZE_PASSES = 8;
 
 function toCompressedFile(blob: Blob, file: File, outputType: string): File {
   const baseName = file.name.replace(/\.[^.]+$/, '');
@@ -117,7 +104,9 @@ export async function compressImage(
   let bestHeight = targetHeight;
   let cycleQuality = opts.quality;
 
-  while (true) {
+  let resizePasses = 0;
+  while (resizePasses < MAX_COMPRESSION_RESIZE_PASSES) {
+    resizePasses += 1;
     canvas.width = targetWidth;
     canvas.height = targetHeight;
     ctx.clearRect(0, 0, targetWidth, targetHeight);
@@ -127,7 +116,7 @@ export async function compressImage(
     let smallestBlobForThisSize: Blob | null = null;
 
     while (quality >= opts.minQuality) {
-      const blob = await canvasToBlob(canvas, outputType, quality);
+      const blob = await canvasToRequiredBlob(canvas, outputType, quality);
       if (!smallestBlobForThisSize || blob.size < smallestBlobForThisSize.size) {
         smallestBlobForThisSize = blob;
       }

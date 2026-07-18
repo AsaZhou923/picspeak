@@ -1,28 +1,50 @@
 import type { MetadataRoute } from 'next';
+import { GENERATION_PROMPT_EXAMPLES } from '@/content/generation/prompt-examples';
 import { DEMO_REVIEW_ID } from '@/lib/demo-review';
 import { getBlogPosts } from '@/lib/blog-data';
 import { siteConfig } from '@/lib/site';
 
 const LOCALES = ['zh', 'en', 'ja'] as const;
+type Locale = (typeof LOCALES)[number];
+
+const LANGUAGE_CODES: Record<Locale, string> = {
+  zh: 'zh-CN',
+  en: 'en',
+  ja: 'ja',
+};
+
+function absoluteUrl(path: string): string {
+  return path === '/' ? siteConfig.url : `${siteConfig.url}${path}`;
+}
+
+function localizedAlternates(pathForLocale: (locale: Locale) => string, xDefaultPath: string) {
+  return {
+    languages: Object.fromEntries([
+      ...LOCALES.map((locale) => [LANGUAGE_CODES[locale], absoluteUrl(pathForLocale(locale))]),
+      ['x-default', absoluteUrl(xDefaultPath)],
+    ]),
+  };
+}
+
+function singleUrlAlternates(path: string) {
+  return {
+    languages: {
+      'x-default': absoluteUrl(path),
+    },
+  };
+}
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
-  const blogPosts = getBlogPosts('en');
 
   return [
-    // Root page (x-default)
+    // Root page is still reachable for users, but /en is the x-default canonical SEO target.
     {
       url: siteConfig.url,
       lastModified: now,
       changeFrequency: 'weekly',
       priority: 1,
-      alternates: {
-        languages: {
-          zh: `${siteConfig.url}/zh`,
-          en: `${siteConfig.url}/en`,
-          ja: `${siteConfig.url}/ja`,
-        },
-      },
+      alternates: localizedAlternates((locale) => `/${locale}`, '/en'),
     },
     // Locale-prefixed home pages — same content, pinned language for SEO
     {
@@ -30,66 +52,85 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified: now,
       changeFrequency: 'weekly',
       priority: 1,
-      alternates: {
-        languages: {
-          en: `${siteConfig.url}/en`,
-          ja: `${siteConfig.url}/ja`,
-          'x-default': siteConfig.url,
-        },
-      },
+      alternates: localizedAlternates((locale) => `/${locale}`, '/en'),
     },
     {
       url: `${siteConfig.url}/en`,
       lastModified: now,
       changeFrequency: 'weekly',
       priority: 1,
-      alternates: {
-        languages: {
-          zh: `${siteConfig.url}/zh`,
-          ja: `${siteConfig.url}/ja`,
-          'x-default': siteConfig.url,
-        },
-      },
+      alternates: localizedAlternates((locale) => `/${locale}`, '/en'),
     },
     {
       url: `${siteConfig.url}/ja`,
       lastModified: now,
       changeFrequency: 'weekly',
       priority: 1,
-      alternates: {
-        languages: {
-          zh: `${siteConfig.url}/zh`,
-          en: `${siteConfig.url}/en`,
-          'x-default': siteConfig.url,
-        },
-      },
+      alternates: localizedAlternates((locale) => `/${locale}`, '/en'),
     },
-    // Public sub-pages — link back to locale homes as alternates
+    // Public single-URL pages. They are multilingual/mixed-language pages, not locale alternates.
     {
       url: `${siteConfig.url}/affiliate`,
       lastModified: now,
       changeFrequency: 'weekly',
       priority: 0.8,
-      alternates: {
-        languages: {
-          zh: `${siteConfig.url}/zh`,
-          ja: `${siteConfig.url}/ja`,
-          'x-default': siteConfig.url,
-        },
-      },
+      alternates: singleUrlAlternates('/affiliate'),
+    },
+    {
+      url: `${siteConfig.url}/privacy`,
+      lastModified: now,
+      changeFrequency: 'yearly',
+      priority: 0.45,
+      alternates: singleUrlAlternates('/privacy'),
+    },
+    {
+      url: `${siteConfig.url}/terms`,
+      lastModified: now,
+      changeFrequency: 'yearly',
+      priority: 0.45,
+      alternates: singleUrlAlternates('/terms'),
     },
     {
       url: `${siteConfig.url}/gallery`,
       lastModified: now,
       changeFrequency: 'daily',
       priority: 0.8,
-      alternates: {
-        languages: {
-          zh: `${siteConfig.url}/zh`,
-          ja: `${siteConfig.url}/ja`,
-          'x-default': siteConfig.url,
-        },
-      },
+      alternates: singleUrlAlternates('/gallery'),
+    },
+    {
+      url: `${siteConfig.url}/author/asa-zhou`,
+      lastModified: now,
+      changeFrequency: 'monthly',
+      priority: 0.62,
+      alternates: singleUrlAlternates('/author/asa-zhou'),
+    },
+    {
+      url: `${siteConfig.url}/generate`,
+      lastModified: now,
+      changeFrequency: 'weekly',
+      priority: 0.85,
+      alternates: singleUrlAlternates('/generate'),
+    },
+    {
+      url: `${siteConfig.url}/generate/prompts`,
+      lastModified: now,
+      changeFrequency: 'weekly',
+      priority: 0.76,
+      alternates: singleUrlAlternates('/generate/prompts'),
+    },
+    ...GENERATION_PROMPT_EXAMPLES.map((example) => ({
+      url: `${siteConfig.url}/generate/prompts/${example.id}`,
+      lastModified: now,
+      changeFrequency: 'monthly' as const,
+      priority: 0.58,
+      alternates: singleUrlAlternates(`/generate/prompts/${example.id}`),
+    })),
+    {
+      url: `${siteConfig.url}/blog`,
+      lastModified: now,
+      changeFrequency: 'weekly',
+      priority: 0.7,
+      alternates: localizedAlternates((locale) => `/${locale}/blog`, '/blog'),
     },
     // Blog index — one entry per locale
     ...LOCALES.map((locale) => ({
@@ -97,26 +138,23 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified: now,
       changeFrequency: 'weekly' as const,
       priority: 0.7,
-      alternates: {
-        languages: Object.fromEntries([
-          ...LOCALES.filter((l) => l !== locale).map((l) => [l, `${siteConfig.url}/${l}/blog`]),
-          ['x-default', `${siteConfig.url}/en/blog`],
-        ]),
-      },
+      alternates: localizedAlternates((entryLocale) => `/${entryLocale}/blog`, '/blog'),
+    })),
+    ...getBlogPosts('en').map((post) => ({
+      url: `${siteConfig.url}/blog/${post.slug}`,
+      lastModified: new Date(post.updatedAt),
+      changeFrequency: 'monthly' as const,
+      priority: 0.65,
+      alternates: localizedAlternates((locale) => `/${locale}/blog/${post.slug}`, `/blog/${post.slug}`),
     })),
     // Blog posts — one entry per locale × slug
     ...LOCALES.flatMap((locale) =>
-      blogPosts.map((post) => ({
+      getBlogPosts(locale).map((post) => ({
         url: `${siteConfig.url}/${locale}/blog/${post.slug}`,
         lastModified: new Date(post.updatedAt),
         changeFrequency: 'monthly' as const,
         priority: 0.65,
-        alternates: {
-          languages: Object.fromEntries([
-            ...LOCALES.filter((l) => l !== locale).map((l) => [l, `${siteConfig.url}/${l}/blog/${post.slug}`]),
-            ['x-default', `${siteConfig.url}/en/blog/${post.slug}`],
-          ]),
-        },
+        alternates: localizedAlternates((entryLocale) => `/${entryLocale}/blog/${post.slug}`, `/blog/${post.slug}`),
       }))
     ),
     ...LOCALES.map((locale) => ({
@@ -124,26 +162,14 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified: new Date('2026-04-11'),
       changeFrequency: 'monthly' as const,
       priority: 0.6,
-      alternates: {
-        languages: Object.fromEntries([
-          ...LOCALES.filter((l) => l !== locale).map((l) => [l, `${siteConfig.url}/${l}/updates`]),
-          ['x-default', `${siteConfig.url}/updates`],
-        ]),
-      },
+      alternates: localizedAlternates((entryLocale) => `/${entryLocale}/updates`, '/updates'),
     })),
     {
       url: `${siteConfig.url}/updates`,
       lastModified: new Date('2026-04-11'),
       changeFrequency: 'monthly',
       priority: 0.6,
-      alternates: {
-        languages: {
-          zh: `${siteConfig.url}/zh/updates`,
-          en: `${siteConfig.url}/en/updates`,
-          ja: `${siteConfig.url}/ja/updates`,
-          'x-default': `${siteConfig.url}/updates`,
-        },
-      },
+      alternates: localizedAlternates((locale) => `/${locale}/updates`, '/updates'),
     },
     {
       // Canonical public example of an AI photo critique result
@@ -151,13 +177,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified: new Date('2026-03-08'),
       changeFrequency: 'monthly',
       priority: 0.8,
-      alternates: {
-        languages: {
-          zh: `${siteConfig.url}/zh`,
-          ja: `${siteConfig.url}/ja`,
-          'x-default': siteConfig.url,
-        },
-      },
+      alternates: singleUrlAlternates(`/reviews/${DEMO_REVIEW_ID}`),
     },
   ];
 }

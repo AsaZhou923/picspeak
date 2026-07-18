@@ -1,6 +1,9 @@
 import type { Metadata } from 'next';
-import { DEMO_REVIEW_ID, isDemoReviewId } from '@/lib/demo-review';
-import { INDEXABLE_ROBOTS, NO_INDEX_ROBOTS } from '@/lib/seo';
+import { buildDemoReviewJsonLd, DEMO_REVIEW_ID, isDemoReviewId } from '@/lib/demo-review';
+import { enTranslations } from '@/lib/i18n-en';
+import { serializeJsonLd } from '@/lib/json-ld';
+import { INDEXABLE_ROBOTS, NO_INDEX_ROBOTS, singlePageAlternates } from '@/lib/seo';
+import { siteConfig } from '@/lib/site';
 
 export async function generateMetadata(
   { params }: { params: Promise<{ reviewId: string }> }
@@ -29,20 +32,45 @@ export async function generateMetadata(
         ]
       : undefined,
     alternates: isDemoReview
-      ? {
-          canonical: `/reviews/${DEMO_REVIEW_ID}`,
-          languages: {
-            'zh-CN': '/zh',
-            en: `/reviews/${DEMO_REVIEW_ID}`,
-            ja: '/ja',
-            'x-default': `/reviews/${DEMO_REVIEW_ID}`,
-          },
-        }
+      ? singlePageAlternates(`/reviews/${DEMO_REVIEW_ID}`)
       : undefined,
     robots: isDemoReview ? INDEXABLE_ROBOTS : NO_INDEX_ROBOTS,
   };
 }
 
-export default function ReviewDetailLayout({ children }: { children: React.ReactNode }) {
-  return <>{children}</>;
+export default async function ReviewDetailLayout({
+  children,
+  params,
+}: {
+  children: React.ReactNode;
+  params: Promise<{ reviewId: string }>;
+}) {
+  const { reviewId } = await params;
+  const demoReviewJsonLd = isDemoReviewId(reviewId)
+    ? buildDemoReviewJsonLd({
+        site: siteConfig,
+        reviewId,
+        title: 'AI Photo Critique Example',
+        description:
+          'Public PicSpeak example with composition, lighting, color, impact, and technique scores plus practical next-shoot suggestions.',
+        locale: 'en',
+        imageAlt: enTranslations.demo_image_alt,
+        advantage: enTranslations.demo_review_advantage,
+        critique: enTranslations.demo_review_critique,
+        suggestions: enTranslations.demo_review_suggestions,
+      })
+    : null;
+
+  return (
+    <>
+      {demoReviewJsonLd && (
+        <script
+          id="picspeak-demo-review-structured-data"
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(demoReviewJsonLd) }}
+        />
+      )}
+      {children}
+    </>
+  );
 }

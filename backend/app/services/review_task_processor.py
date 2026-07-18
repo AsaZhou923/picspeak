@@ -10,10 +10,11 @@ from sqlalchemy.orm import Session
 from app.api.deps import new_public_id
 from app.core.config import settings
 from app.core.errors import ApiHTTPException
-from app.db.models import Photo, Review, ReviewMode, ReviewStatus, ReviewTask, TaskStatus, UsageLedger, User, UserPlan
+from app.db.models import Photo, PhotoStatus, Review, ReviewMode, ReviewStatus, ReviewTask, TaskStatus, UsageLedger, User, UserPlan
 from app.db.session import SessionLocal
 from app.services.ai import AIReviewError, run_ai_review
 from app.services.guard import enforce_user_quota, guest_usage_snapshot, increment_quota, user_usage_snapshot
+from app.services.retake_comparison import run_retake_comparison
 from app.services.task_events import record_task_event
 
 
@@ -127,6 +128,7 @@ def _normalize_review_result_payload(
         'billing_info': billing_info if isinstance(billing_info, dict) else {},
         'exif_info': exif_info if isinstance(exif_info, dict) else (stored_exif_info if isinstance(stored_exif_info, dict) else {}),
         'share_info': share_info if isinstance(share_info, dict) else {},
+        'comparison': raw_payload.get('comparison') if isinstance(raw_payload.get('comparison'), dict) else None,
     }
 
 
@@ -232,9 +234,6 @@ def process_review_task(task_public_id: str, *, worker_name: str) -> dict[str, s
                 return {'result': 'noop', 'status': fresh_task.status.value}
         elif task.status != TaskStatus.RUNNING:
             return {'result': 'noop', 'status': task.status.value}
-        task = db.query(ReviewTask).filter(ReviewTask.id == task.id).first()
-        if task is None:
-            return {'result': 'missing'}
         try:
             _process_task(db, task)
         except Exception as exc:
@@ -452,19 +451,64 @@ def _process_task(db: Session, task: ReviewTask) -> None:
     image_url = f'{settings.object_base_url.rstrip("/")}/{quote(photo.object_key)}'
     payload_locale = (task.request_payload or {}).get('locale', 'zh')
     payload_image_type = (task.request_payload or {}).get('image_type', 'default')
+    analysis_type = (task.request_payload or {}).get('analysis_type', 'single')
+    review_model = (task.request_payload or {}).get('review_model', 'qwen')
     if payload_locale not in {'zh', 'en', 'ja'}:
         payload_locale = 'zh'
     _transition_progress(db, task, 70, 'AI_REVIEW_STARTED', 'Running AI review')
 
     try:
-        ai_response = run_ai_review(
-            task.mode.value if isinstance(task.mode, ReviewMode) else str(task.mode),
-            image_url=image_url,
-            locale=payload_locale,
-            exif_data=photo.exif_data or None,
-            image_type=payload_image_type,
-            enforce_suggestion_structure=task.attempt_count < task.max_attempts,
-        )
+        if analysis_type == 'retake_compare':
+            source_review_id = (task.request_payload or {}).get('source_review_internal_id')
+            source_row = (
+                db.query(Review, Photo)
+                .join(Photo, Photo.id == Review.photo_id)
+                .filter(
+                    Review.id == source_review_id,
+                    Review.owner_user_id == task.owner_user_id,
+                    Review.deleted_at.is_(None),
+                )
+                .first()
+            )
+            if source_row is None:
+                _handle_failure(
+                    db,
+                    task,
+                    error_code='RETAKE_SOURCE_NOT_FOUND',
+                    error_message='Source review or original photo not found for retake comparison',
+                    retryable=False,
+                )
+                return
+            source_review, source_photo = source_row
+            if source_review.status != ReviewStatus.SUCCEEDED or source_photo.status != PhotoStatus.READY:
+                _handle_failure(
+                    db,
+                    task,
+                    error_code='RETAKE_SOURCE_NOT_READY',
+                    error_message='Source review or original photo is not ready for retake comparison',
+                    retryable=False,
+                )
+                return
+            original_image_url = f'{settings.object_base_url.rstrip("/")}/{quote(source_photo.object_key)}'
+            ai_response = run_retake_comparison(
+                original_image_url=original_image_url,
+                retake_image_url=image_url,
+                original_review_id=source_review.public_id,
+                original_photo_id=source_photo.public_id,
+                retake_photo_id=photo.public_id,
+                locale=payload_locale,
+                image_type=payload_image_type,
+            )
+        else:
+            ai_response = run_ai_review(
+                task.mode.value if isinstance(task.mode, ReviewMode) else str(task.mode),
+                image_url=image_url,
+                locale=payload_locale,
+                exif_data=photo.exif_data or None,
+                image_type=payload_image_type,
+                enforce_suggestion_structure=task.attempt_count < task.max_attempts,
+                review_model=review_model,
+            )
     except AIReviewError as exc:
         logger.warning('AI review failed for task %s: %s', task.public_id, exc)
         _handle_failure(db, task, error_code='AI_CALL_FAILED', error_message=str(exc), retryable=True)
@@ -508,7 +552,11 @@ def _process_task(db: Session, task: ReviewTask) -> None:
         amount=1,
         unit='count',
         bill_date=datetime.now(timezone.utc).date(),
-        metadata_json={'mode': task.mode.value if isinstance(task.mode, ReviewMode) else str(task.mode)},
+        metadata_json={
+            'mode': task.mode.value if isinstance(task.mode, ReviewMode) else str(task.mode),
+            'analysis_type': analysis_type,
+            'review_model': review_model,
+        },
     )
     db.add(ledger)
     increment_quota(db, owner)

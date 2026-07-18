@@ -107,7 +107,7 @@ export default function Footer() {
           <span className="font-display text-sm text-ink-muted tracking-wider">PicSpeak</span>
         </div>
 
-        <div className="flex items-center gap-5">
+        <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
           <Link href="/" className="hover:text-ink transition-colors">
             {t('footer_home')}
           </Link>
@@ -122,6 +122,12 @@ export default function Footer() {
           </Link>
           <Link href="/account/usage" className="hover:text-ink transition-colors">
             {t('footer_usage')}
+          </Link>
+          <Link href="/privacy" className="hover:text-ink transition-colors">
+            {t('footer_privacy')}
+          </Link>
+          <Link href="/terms" className="hover:text-ink transition-colors">
+            {t('footer_terms')}
           </Link>
         </div>
 
