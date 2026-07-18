@@ -6,6 +6,11 @@ import { Github, Twitter } from 'lucide-react';
 import { getBlogUi } from '@/lib/blog-data';
 import { useI18n } from '@/lib/i18n';
 
+const PRODUCT_HUNT_BADGE_HREF =
+  'https://www.producthunt.com/products/picspeak?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-picspeak';
+const PRODUCT_HUNT_BADGE_SRC =
+  'https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1145295&theme=light&t=1778592732649';
+
 export default function Footer() {
   const { t, locale } = useI18n();
   const blogUi = getBlogUi(locale);
@@ -16,6 +21,20 @@ export default function Footer() {
 
   const badgeGroup = (
     <div className="flex items-center gap-6 pr-6">
+      <a
+        href={PRODUCT_HUNT_BADGE_HREF}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex h-[62px] w-[250px] shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_10px_24px_rgba(0,0,0,0.18)] focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/70 focus-visible:ring-offset-2 focus-visible:ring-offset-void"
+      >
+        <Image
+          src={PRODUCT_HUNT_BADGE_SRC}
+          alt="PicSpeak - Get AI photo critiques and visual references in seconds | Product Hunt"
+          width={250}
+          height={54}
+          unoptimized
+        />
+      </a>
       <a
         href="https://indieai.directory/"
         target="_blank"
