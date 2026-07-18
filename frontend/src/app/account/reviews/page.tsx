@@ -169,25 +169,25 @@ export default function ReviewHistoryPage() {
   };
 
   return (
-    <div className="min-h-screen pt-14">
-      <div className="mx-auto max-w-3xl px-6 py-12 animate-fade-in">
+    <div className="min-h-screen">
+      <div className="mx-auto max-w-task px-6 py-12 animate-fade-in">
         <div className="mb-10 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
           <div>
-            <p className="mb-2 font-mono text-xs uppercase tracking-widest text-gold/70">
+            <p className="ui-eyebrow mb-2">
               {t('account_reviews_label')}
             </p>
             <h1 className="font-display text-4xl sm:text-5xl">{t('account_reviews_headline')}</h1>
           </div>
           <Link
             href="/retake"
-            className="inline-flex w-fit items-center gap-2 rounded-full border border-sage/35 bg-sage/10 px-4 py-2.5 text-sm font-medium text-sage transition-colors hover:bg-sage hover:text-void"
+            className="ui-action-secondary w-fit border-sage/35 px-4 py-2.5 text-sm text-sage hover:bg-sage/10"
           >
             <Repeat2 size={14} />
             {retakeCopy.historyCta}
           </Link>
         </div>
 
-        <section className="mb-6 rounded-[24px] border border-border-subtle bg-[radial-gradient(circle_at_top_left,rgba(200,171,90,0.14),transparent_35%),rgb(var(--color-surface)/0.72)] p-5">
+        <section className="ui-panel mb-6 p-5">
           <div className="mb-4 flex items-center gap-2 text-sm text-ink">
             <SlidersHorizontal size={15} className="text-gold" />
             <span>{copy.filtersLabel}</span>
@@ -223,7 +223,7 @@ export default function ReviewHistoryPage() {
                 onChange={(event) =>
                   setDraftFilters((prev) => ({ ...prev, minScore: event.target.value }))
                 }
-                className="w-full min-w-0 rounded-xl border border-border bg-void/60 px-3 py-2.5 text-sm text-ink outline-none transition-colors focus:border-gold/40"
+                className="min-h-11 w-full min-w-0 rounded-control border border-border bg-void/60 px-3 py-2.5 text-sm text-ink outline-none transition-colors focus:border-gold/40"
               />
             </label>
 
@@ -238,7 +238,7 @@ export default function ReviewHistoryPage() {
                 onChange={(event) =>
                   setDraftFilters((prev) => ({ ...prev, maxScore: event.target.value }))
                 }
-                className="w-full min-w-0 rounded-xl border border-border bg-void/60 px-3 py-2.5 text-sm text-ink outline-none transition-colors focus:border-gold/40"
+                className="min-h-11 w-full min-w-0 rounded-control border border-border bg-void/60 px-3 py-2.5 text-sm text-ink outline-none transition-colors focus:border-gold/40"
               />
             </label>
 
@@ -252,7 +252,7 @@ export default function ReviewHistoryPage() {
                     imageType: event.target.value as '' | ImageType,
                   }))
                 }
-                className="w-full min-w-0 rounded-xl border border-border bg-void/60 px-3 py-2.5 text-sm text-ink outline-none transition-colors focus:border-gold/40"
+                className="min-h-11 w-full min-w-0 rounded-control border border-border bg-void/60 px-3 py-2.5 text-sm text-ink outline-none transition-colors focus:border-gold/40"
               >
                 <option value="">{copy.allTypes}</option>
                 {(['default', 'landscape', 'portrait', 'street', 'still_life', 'architecture'] as ImageType[]).map((type) => (
@@ -269,14 +269,14 @@ export default function ReviewHistoryPage() {
               type="button"
               onClick={handleApplyFilters}
               disabled={hasInvalidDate}
-              className="rounded-full bg-gold px-4 py-2 text-sm font-medium text-void transition-colors hover:bg-gold-light disabled:cursor-not-allowed disabled:opacity-50"
+              className="ui-action-primary px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
             >
               {copy.apply}
             </button>
             <button
               type="button"
               onClick={handleResetFilters}
-              className="rounded-full border border-border px-4 py-2 text-sm text-ink-muted transition-colors hover:border-gold/30 hover:text-ink"
+              className="ui-action-secondary px-4 py-2 text-sm"
             >
               {copy.reset}
             </button>
@@ -316,11 +316,11 @@ export default function ReviewHistoryPage() {
             {error}
           </div>
         ) : items.length === 0 ? (
-          <div className="space-y-3 py-20 text-center">
+          <div className="ui-panel space-y-3 px-6 py-16 text-center">
             <p className="text-sm text-ink-subtle">{t('reviews_empty')}</p>
             <Link
               href="/workspace"
-              className="inline-flex items-center gap-1.5 rounded border border-gold/30 px-3 py-1.5 text-xs text-gold transition-colors hover:bg-gold/10"
+              className="ui-action-primary px-3 py-1.5 text-xs"
             >
               {t('reviews_empty_cta')}
               <ChevronRight size={11} />
@@ -339,7 +339,7 @@ export default function ReviewHistoryPage() {
                 <button
                   onClick={handleLoadMore}
                   disabled={loadingMore}
-                  className="mx-auto flex items-center gap-2 rounded border border-border px-5 py-2 text-sm text-ink-muted transition-colors hover:border-gold/40 hover:text-ink disabled:opacity-50"
+                  className="ui-action-secondary mx-auto px-5 py-2 text-sm disabled:opacity-50"
                 >
                   {loadingMore && <RefreshCw size={13} className="animate-spin" />}
                   {loadingMore ? t('reviews_loading_more') : t('reviews_load_more')}

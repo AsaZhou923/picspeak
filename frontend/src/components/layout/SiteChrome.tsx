@@ -19,7 +19,7 @@ export default function SiteChrome({ children }: { children: ReactNode }) {
         Skip to content
       </a>
       {marketing ? <MarketingHeader /> : <Header />}
-      <main id="main-content" tabIndex={-1} className="flex-1 pt-12 md:pt-0">
+      <main id="main-content" tabIndex={-1} className="flex-1">
         {children}
       </main>
       <Footer />

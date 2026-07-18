@@ -2,7 +2,7 @@ import { Suspense, type ReactNode } from 'react';
 
 function RouteFallback() {
   return (
-    <div className="min-h-screen pt-14">
+    <div className="min-h-screen">
       <div className="mx-auto max-w-2xl px-6 py-12">
         <div className="space-y-4">
           <div className="h-28 animate-pulse rounded-2xl border border-border-subtle bg-void/40" />

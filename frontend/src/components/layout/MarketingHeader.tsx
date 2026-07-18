@@ -66,8 +66,8 @@ export default function MarketingHeader() {
       : 'text-ink-muted hover:text-ink';
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 border-b border-border-subtle bg-void/90 backdrop-blur-md">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+    <header className="sticky top-0 z-50 border-b border-border-subtle bg-void/90 backdrop-blur-xl">
+      <div className="max-w-editorial mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link
             href="/"
@@ -106,12 +106,12 @@ export default function MarketingHeader() {
         <HeaderRightControls headerVisibility={headerVisibility} className="shrink-0" />
       </div>
       <div className="md:hidden border-t border-border-subtle/40 px-3 py-2">
-        <nav className="flex items-stretch rounded-xl bg-surface/70 p-1 gap-0.5">
+        <nav className="flex items-stretch rounded-card bg-surface/70 p-1 gap-0.5">
           {MOBILE_MARKETING_LINKS.map(({ href, key, kind, icon: Icon }) => (
             <Link
               key={href}
               href={href}
-              className={`flex-1 flex flex-col items-center justify-center gap-1 rounded-[10px] py-2 text-[10px] font-medium transition-all duration-200 ${
+              className={`flex-1 flex flex-col items-center justify-center gap-1 rounded-control py-2 text-[10px] font-medium transition-all duration-200 ${
                 isActive(href)
                   ? 'bg-void shadow-sm text-gold'
                   : 'text-ink-subtle hover:text-ink-muted active:scale-95'
@@ -123,7 +123,7 @@ export default function MarketingHeader() {
           ))}
           <Link
             href="/blog"
-            className={`flex-1 flex flex-col items-center justify-center gap-1 rounded-[10px] py-2 text-[10px] font-medium transition-all duration-200 ${
+            className={`flex-1 flex flex-col items-center justify-center gap-1 rounded-control py-2 text-[10px] font-medium transition-all duration-200 ${
               isActive('/blog')
                 ? 'bg-void shadow-sm text-gold'
                 : 'text-ink-subtle hover:text-ink-muted active:scale-95'

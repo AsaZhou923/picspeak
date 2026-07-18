@@ -34,6 +34,11 @@ const config: Config = {
           DEFAULT: 'rgb(var(--color-rust)       / <alpha-value>)',
           light:   'rgb(var(--color-rust-light)  / <alpha-value>)',
         },
+        action: {
+          DEFAULT: 'rgb(var(--color-action) / <alpha-value>)',
+          hover: 'rgb(var(--color-action-hover) / <alpha-value>)',
+          ink: 'rgb(var(--color-action-ink) / <alpha-value>)',
+        },
       },
       fontFamily: {
         display: ['var(--font-display)', 'Georgia', 'serif'],
@@ -43,6 +48,22 @@ const config: Config = {
       fontSize: {
         xs: ['0.8125rem', { lineHeight: '1.2rem' }],
         sm: ['0.9375rem', { lineHeight: '1.4rem' }],
+      },
+      borderRadius: {
+        control: 'var(--radius-control)',
+        card: 'var(--radius-card)',
+        feature: 'var(--radius-feature)',
+      },
+      boxShadow: {
+        'level-1': 'var(--shadow-level-1)',
+        'level-2': 'var(--shadow-level-2)',
+        'level-3': 'var(--shadow-level-3)',
+      },
+      maxWidth: {
+        reading: 'var(--width-reading)',
+        task: 'var(--width-task)',
+        workspace: 'var(--width-workspace)',
+        editorial: 'var(--width-editorial)',
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',

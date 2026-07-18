@@ -55,7 +55,7 @@ export default function PhotoReviewsPage() {
   }, [load]);
 
   return (
-    <div className="pt-14 min-h-screen">
+    <div className="min-h-screen">
       <div className="max-w-2xl mx-auto px-6 py-12 animate-fade-in">
         {/* Back */}
         <button

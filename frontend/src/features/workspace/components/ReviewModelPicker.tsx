@@ -1,4 +1,4 @@
-import { BrainCircuit, Sparkles, Zap } from 'lucide-react';
+import { BrainCircuit, Check, Sparkles, Zap } from 'lucide-react';
 import type { ReviewModel } from '@/lib/types';
 
 function modelCopy(locale: 'zh' | 'en' | 'ja') {
@@ -73,12 +73,12 @@ export function ReviewModelPicker({
             role="radio"
             aria-checked={selected}
             onClick={() => onChange(option.value)}
-            className={`relative rounded-[20px] border p-4 text-left transition-all duration-200 ${
+            className={`relative min-h-40 rounded-card border p-4 text-left transition-all duration-200 ${
               selected
                 ? option.tone === 'sage'
-                  ? 'border-sage/50 bg-sage/10 shadow-[0_12px_36px_rgba(122,154,120,0.12)]'
-                  : 'border-gold/50 bg-gold/10 shadow-[0_12px_36px_rgba(200,162,104,0.12)]'
-                : 'border-border-subtle bg-raised/45 hover:border-border hover:bg-raised/70'
+                  ? 'border-sage/50 bg-sage/10 shadow-level-1'
+                  : 'border-gold/50 bg-gold/10 shadow-level-1'
+                : 'border-border-subtle bg-raised/40 hover:border-border hover:bg-raised'
             }`}
           >
             <div className="flex items-start justify-between gap-3">
@@ -87,10 +87,10 @@ export function ReviewModelPicker({
               }`}>
                 <Icon size={16} />
               </span>
-              <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] ${
+              <span className={`inline-flex items-center gap-1 rounded-control border px-2 py-1 text-[10px] ${
                 option.tone === 'sage' ? 'border-sage/30 text-sage' : 'border-gold/30 text-gold'
               }`}>
-                {option.value === 'gpt-5.5' && <Sparkles size={10} />}
+                {selected ? <Check size={10} aria-hidden="true" /> : option.value === 'gpt-5.5' ? <Sparkles size={10} aria-hidden="true" /> : null}
                 {option.badge}
               </span>
             </div>

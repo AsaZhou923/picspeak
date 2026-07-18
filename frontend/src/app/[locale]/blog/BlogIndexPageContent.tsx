@@ -69,32 +69,32 @@ export default function BlogIndexPageContent({ locale }: { locale?: string }) {
       />
 
       <BlogViewCountProvider locale={pinnedLocale} slugs={postSlugs}>
-        <div className="min-h-screen pt-14">
-          <div className="mx-auto max-w-[1120px] px-6 py-10 sm:py-12">
+        <div className="min-h-screen">
+          <div className="mx-auto max-w-editorial px-6 py-12">
             <section className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.18fr)_340px]">
               <div className="animate-fade-in">
-                <p className="mb-3 text-xs uppercase tracking-[0.32em] text-gold/70">{ui.label}</p>
+                <p className="ui-eyebrow mb-3">{ui.label}</p>
                 <h1 className="max-w-2xl font-display text-4xl text-ink sm:text-5xl">{ui.name}</h1>
                 <p className="mt-4 max-w-2xl text-sm leading-7 text-ink-muted sm:text-base">{ui.introPrimary}</p>
                 <p className="mt-3 max-w-2xl text-sm leading-7 text-ink-muted sm:text-base">{ui.introSecondary}</p>
 
                 <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-2xl border border-border-subtle bg-raised/35 px-4 py-4">
+                  <div className="ui-panel px-4 py-4">
                     <p className="text-[11px] uppercase tracking-[0.22em] text-gold/75">{ui.starterPostsLabel}</p>
                     <p className="mt-2 font-mono text-2xl text-ink">{posts.length}</p>
                   </div>
-                  <div className="rounded-2xl border border-border-subtle bg-raised/35 px-4 py-4">
+                  <div className="ui-panel px-4 py-4">
                     <p className="text-[11px] uppercase tracking-[0.22em] text-gold/75">{ui.primaryTopicsLabel}</p>
                     <p className="mt-2 text-sm leading-6 text-ink-muted">{ui.primaryTopicsText}</p>
                   </div>
-                  <div className="rounded-2xl border border-border-subtle bg-raised/35 px-4 py-4">
+                  <div className="ui-panel px-4 py-4">
                     <p className="text-[11px] uppercase tracking-[0.22em] text-gold/75">{ui.seoDirectionLabel}</p>
                     <p className="mt-2 text-sm leading-6 text-ink-muted">{ui.seoDirectionText}</p>
                   </div>
                 </div>
 
                 {featuredPost ? (
-                  <section className="mt-8 overflow-hidden rounded-[30px] border border-border-subtle bg-[linear-gradient(135deg,rgba(200,162,104,0.11),transparent_38%),rgb(var(--color-surface)/0.78)]">
+                  <section className="ui-feature-panel mt-8 overflow-hidden">
                     <div className="px-6 py-7 lg:px-8">
                       <p className="text-xs uppercase tracking-[0.26em] text-gold/72">{ui.featuredLabel}</p>
                       <h2 className="mt-4 max-w-3xl font-display text-3xl text-ink sm:text-4xl">{featuredPost.title}</h2>
@@ -116,7 +116,7 @@ export default function BlogIndexPageContent({ locale }: { locale?: string }) {
                         ))}
                       </div>
                       <div className="mt-7">
-                        <Link href={`/${pinnedLocale}/blog/${featuredPost.slug}`} className="inline-flex items-center gap-2 rounded-full bg-gold px-5 py-2.5 text-sm font-medium text-void transition-colors hover:bg-gold-light">
+                        <Link href={`/${pinnedLocale}/blog/${featuredPost.slug}`} className="ui-action-primary px-5 py-2.5 text-sm">
                           {ui.readFeaturedCta}
                           <ArrowRight size={14} />
                         </Link>
@@ -126,7 +126,7 @@ export default function BlogIndexPageContent({ locale }: { locale?: string }) {
                 ) : null}
               </div>
 
-              <aside className="rounded-[28px] border border-border-subtle bg-[radial-gradient(circle_at_top_left,rgba(200,171,90,0.14),transparent_34%),rgb(var(--color-surface)/0.82)] p-6 text-ink">
+              <aside className="ui-panel p-6 text-ink">
                 <div className="flex h-11 w-11 items-center justify-center rounded-full border border-gold/25 bg-gold/10 text-gold">
                   <Sparkles size={18} />
                 </div>
@@ -134,7 +134,7 @@ export default function BlogIndexPageContent({ locale }: { locale?: string }) {
                 <p className="mt-3 text-sm leading-7 text-ink-muted">{ui.startIntro}</p>
                 <div className="mt-6 grid gap-3 text-sm text-ink-muted">
                   {posts.map((post, index) => (
-                    <Link key={post.slug} href={`/${pinnedLocale}/blog/${post.slug}`} className="rounded-2xl border border-border-subtle bg-raised/40 px-4 py-3 transition-colors hover:border-gold/30 hover:text-ink">
+                    <Link key={post.slug} href={`/${pinnedLocale}/blog/${post.slug}`} className="rounded-control border border-border-subtle bg-raised/40 px-4 py-3 transition-colors hover:border-gold/30 hover:text-ink">
                       <p className="text-[11px] uppercase tracking-[0.22em] text-gold/75">0{index + 1}</p>
                       <p className="mt-2 leading-6">{post.title}</p>
                     </Link>
@@ -154,7 +154,7 @@ export default function BlogIndexPageContent({ locale }: { locale?: string }) {
 
               <div className="grid gap-5 lg:grid-cols-3">
                 {posts.map((post) => (
-                  <article key={post.slug} className="group rounded-[26px] border border-border-subtle bg-raised/45 p-5 transition-all duration-300 hover:border-gold/30 hover:bg-raised/60">
+                  <article key={post.slug} className="ui-panel group p-5 transition-all duration-300 hover:border-gold/30 hover:bg-raised/60 hover:shadow-level-2">
                     <div className="flex items-center justify-between gap-3 text-xs text-ink-subtle">
                       <span className="rounded-full border border-border-subtle px-2.5 py-1">{post.category}</span>
                       <BlogViewCount slug={post.slug} />

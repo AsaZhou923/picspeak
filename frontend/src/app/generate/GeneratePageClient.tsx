@@ -30,6 +30,7 @@ import {
 } from '@/features/generations/generation-page-copy';
 import GenerateFormPanel from '@/features/generations/components/GenerateFormPanel';
 import GenerationPricingGrid from '@/features/generations/components/GenerationPricingGrid';
+import { PromptExampleGallery } from '@/features/generations/components/PromptExampleGallery';
 import {
   getGenerationPromptExample,
   getLocalizedPromptExampleText,
@@ -346,11 +347,11 @@ export default function GeneratePage() {
   const ctaLabel = t(generationCtaKey({ isGuest, isFreeQualityBlocked, submitting, plan }));
 
   return (
-    <div className="min-h-screen pt-14">
-      <div className="mx-auto max-w-7xl px-6 py-10">
+    <div className="min-h-screen">
+      <div className="mx-auto max-w-workspace px-4 py-8 sm:px-6 sm:py-12">
         <GeneratePageHeader t={t} />
 
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_360px]">
           <GenerateFormPanel
             t={t}
             promptRef={promptRef}
@@ -375,21 +376,22 @@ export default function GeneratePage() {
             onStyleChange={setStyle}
             onNegativePromptChange={setNegativePrompt}
             onToggleNegative={() => setShowNegative((value) => !value)}
-            onPromptExampleApply={handlePromptExampleApply}
           />
 
           <aside className="space-y-5">
-            <section className="rounded-lg border border-border-subtle bg-raised/80 p-5">
+            <section className="ui-panel overflow-hidden p-5" aria-labelledby="generation-cost-heading">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs uppercase tracking-[0.18em] text-ink-subtle">{t('generation_credits_label')}</p>
-                  <p className="mt-1 flex items-baseline gap-2">
-                    <span className="font-display text-3xl text-ink">{credits}</span>
+                  <h2 id="generation-cost-heading" className="text-xs font-semibold uppercase tracking-[0.18em] text-ink-subtle">
+                    {t('generation_credits_label')}
+                  </h2>
+                  <p className="mt-1 flex items-baseline gap-2" aria-live="polite">
+                    <span className="font-display text-4xl text-ink">{creditsReady ? credits : '\u2014'}</span>
                     <span className="text-sm font-medium text-ink-muted">{t('generation_credits_unit')}</span>
                   </p>
                 </div>
-                <div className="rounded-lg border border-gold/30 bg-gold/10 p-3 text-gold">
-                  <ImageIcon size={22} />
+                <div className="flex h-11 w-11 items-center justify-center rounded-control border border-gold/30 bg-gold/10 text-gold">
+                  <ImageIcon size={21} aria-hidden="true" />
                 </div>
               </div>
               <p className="text-sm leading-6 text-ink-muted">
@@ -397,14 +399,14 @@ export default function GeneratePage() {
               </p>
               <p className="mt-2 text-xs leading-5 text-ink-subtle">{t('generation_credits_hint')}</p>
               {isFreeQualityBlocked && (
-                <p className="mt-3 rounded-lg border border-gold/30 bg-gold/10 px-3 py-2 text-xs leading-5 text-gold">
+                <p className="mt-3 rounded-control border border-gold/30 bg-gold/10 px-3 py-2 text-xs leading-5 text-gold">
                   {t('generation_free_quality_hint')}
                 </p>
               )}
               {error && (
-                <div className="mt-3 rounded-lg border border-rust/20 bg-rust/5 px-3 py-2 text-sm text-rust">
+                <div role="alert" className="mt-3 rounded-control border border-rust/30 bg-rust/10 px-3 py-2 text-sm text-rust">
                   <p className="flex gap-2">
-                    <AlertCircle size={14} className="mt-0.5 shrink-0" />
+                    <AlertCircle size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
                     <span>{error}</span>
                   </p>
                   {error.toLowerCase().includes('credit') && plan !== 'guest' && (
@@ -413,7 +415,7 @@ export default function GeneratePage() {
                         type="button"
                         onClick={() => void handleCreditPackCheckout('usd', 'credit_exhausted')}
                         disabled={creditPackCheckout.busy}
-                        className="rounded-full border border-rust/25 bg-void/40 px-3 py-1.5 text-xs text-rust transition-colors hover:bg-rust/10 disabled:opacity-60"
+                        className="min-h-11 rounded-control border border-rust/30 bg-void/40 px-3 py-2 text-xs font-semibold text-rust transition-colors hover:bg-rust/10 disabled:opacity-60"
                       >
                         {t('usage_credit_pack_button')}
                       </button>
@@ -421,7 +423,7 @@ export default function GeneratePage() {
                         <button
                           type="button"
                           onClick={() => void handleGenerationProUpgrade('credit_exhausted')}
-                          className="rounded-full border border-gold/30 bg-gold/10 px-3 py-1.5 text-xs text-gold transition-colors hover:bg-gold/15"
+                          className="min-h-11 rounded-control border border-gold/30 bg-gold/10 px-3 py-2 text-xs font-semibold text-gold transition-colors hover:bg-gold/15"
                         >
                           {t('generation_credit_exhausted_pro_cta')}
                         </button>
@@ -438,7 +440,7 @@ export default function GeneratePage() {
                 <button
                   type="button"
                   disabled
-                  className="mt-5 w-full rounded-full bg-gold px-5 py-3 text-sm font-bold text-void opacity-70 transition-colors disabled:cursor-wait"
+                  className="ui-action-primary mt-5 w-full px-5 text-sm opacity-70 disabled:cursor-wait"
                 >
                   {t('generation_auth_loading_cta')}
                 </button>
@@ -446,7 +448,7 @@ export default function GeneratePage() {
                 <SignInButton mode="modal" fallbackRedirectUrl="/generate">
                   <button
                     type="button"
-                    className="mt-5 w-full rounded-full bg-gold px-5 py-3 text-sm font-bold text-void transition-colors hover:bg-gold-light"
+                    className="ui-action-primary mt-5 w-full px-5 text-sm"
                   >
                     {ctaLabel}
                   </button>
@@ -456,7 +458,8 @@ export default function GeneratePage() {
                   type="button"
                   onClick={isFreeQualityBlocked ? () => void handleGenerationProUpgrade('quality_gate') : handleGenerate}
                   disabled={submitting || !creditsReady || prompt.trim().length < 3}
-                  className="mt-5 w-full rounded-full bg-gold px-5 py-3 text-sm font-bold text-void transition-colors hover:bg-gold-light disabled:cursor-not-allowed disabled:opacity-50"
+                  aria-busy={submitting}
+                  className="ui-action-primary mt-5 w-full px-5 text-sm disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {ctaLabel}
                 </button>
@@ -464,7 +467,7 @@ export default function GeneratePage() {
             </section>
 
             {plan !== 'guest' && (
-              <section className="rounded-lg border border-border-subtle bg-surface/80 p-5">
+              <section className="ui-panel p-5">
                 <h2 className="text-sm font-medium text-ink">
                   {t('usage_credit_pack_title')}
                 </h2>
@@ -476,7 +479,7 @@ export default function GeneratePage() {
                     type="button"
                     onClick={() => void handleCreditPackCheckout('usd', 'sidebar')}
                     disabled={creditPackCheckout.busy}
-                    className="rounded-full border border-gold/30 px-4 py-2 text-xs font-medium text-gold transition-colors hover:bg-gold/10 disabled:opacity-60"
+                    className="ui-action-secondary w-full px-4 text-xs text-gold disabled:opacity-60"
                   >
                     {t('usage_credit_pack_button')}
                   </button>
@@ -485,22 +488,22 @@ export default function GeneratePage() {
                   </p>
                 </div>
                 {creditPackCheckout.message && (
-                  <p className="mt-3 rounded-lg border border-border-subtle bg-void/35 px-3 py-2 text-xs leading-5 text-ink-muted">
+                  <p aria-live="polite" className="mt-3 rounded-control border border-border-subtle bg-void/35 px-3 py-2 text-xs leading-5 text-ink-muted">
                     {creditPackCheckout.message}
                   </p>
                 )}
               </section>
             )}
 
-            <section className="rounded-lg border border-border-subtle bg-surface/80 p-5">
+            <section className="ui-panel p-5">
               <div className="mb-4 flex items-center justify-between">
                 <h2 className="text-sm font-medium text-ink">{t('generation_recent_title')}</h2>
-                <Link href="/account/generations" className="text-xs text-ink-subtle hover:text-gold">
+                <Link href="/account/generations" className="rounded-control px-2 py-1 text-xs text-ink-subtle hover:text-gold">
                   {t('generation_view_all')}
                 </Link>
               </div>
               {history.length === 0 ? (
-                <p className="rounded-lg border border-dashed border-border px-4 py-8 text-center text-sm text-ink-subtle">
+                <p className="rounded-control border border-dashed border-border px-4 py-8 text-center text-sm text-ink-subtle">
                   {t('generation_recent_empty')}
                 </p>
               ) : (
@@ -509,7 +512,7 @@ export default function GeneratePage() {
                     <Link
                       key={item.generation_id}
                       href={`/generations/${item.generation_id}`}
-                      className="group overflow-hidden rounded-lg border border-border-subtle bg-raised"
+                      className="group overflow-hidden rounded-control border border-border-subtle bg-raised transition-all hover:border-gold/35 hover:shadow-level-1"
                     >
                       <div className="relative aspect-square bg-void">
                         <Image
@@ -529,6 +532,10 @@ export default function GeneratePage() {
               )}
             </section>
           </aside>
+        </div>
+
+        <div className="ui-panel mt-8 p-4 sm:p-6">
+          <PromptExampleGallery onApply={handlePromptExampleApply} />
         </div>
 
         <GenerationPricingGrid t={t} />

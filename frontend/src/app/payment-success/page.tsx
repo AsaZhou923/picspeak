@@ -69,7 +69,7 @@ export default function PaymentSuccessPage() {
   const body = isActivated ? t('payment_success_body') : t('payment_success_pending_body');
 
   return (
-    <div className="pt-14 min-h-screen">
+    <div className="min-h-screen">
       <div className="max-w-2xl mx-auto px-6 py-16 animate-fade-in">
         <div className="border border-gold/20 bg-raised rounded-2xl p-8 sm:p-10 shadow-[0_20px_80px_rgba(0,0,0,0.18)]">
           <div className="flex items-center gap-3 text-gold mb-5">

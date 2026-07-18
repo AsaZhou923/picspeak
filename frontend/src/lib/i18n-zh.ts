@@ -18,7 +18,7 @@ export const zhTranslations = {
   plan_guest_label: '游客',
   updates_label: '更新记录',
   updates_hint_home: '查看 GPT-5.6 Terra 复拍教练与模型专属点评更新',
-  updates_hint_latest: '查看 GPT-5.6 Terra 复拍教练与模型专属点评更新',
+  updates_hint_latest: '查看摄影教练式前端与核心工作流重构更新',
 
   generation_badge: 'AI 创作',
   generation_title: 'AI 创作',

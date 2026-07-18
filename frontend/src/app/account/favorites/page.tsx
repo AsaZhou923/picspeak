@@ -65,7 +65,6 @@ function getFavoritesCopy(locale: 'zh' | 'en' | 'ja') {
   };
 }
 
-
 function ScoreBar({ score }: { score: number }) {
   const pct = Math.min(100, Math.max(0, (score / 10) * 100));
   const color = score >= 8 ? 'bg-sage' : score >= 6 ? 'bg-gold' : 'bg-rust';
@@ -178,10 +177,10 @@ export default function FavoritesPage() {
   };
 
   return (
-    <div className="min-h-screen pt-14">
-      <div className="mx-auto max-w-3xl px-6 py-12 animate-fade-in">
+    <div className="min-h-screen">
+      <div className="mx-auto max-w-reading px-6 py-12 animate-fade-in">
         <div className="mb-8 space-y-3">
-          <p className="text-xs uppercase tracking-widest text-gold/70">{copy.label}</p>
+          <p className="ui-eyebrow">{copy.label}</p>
           <h1 className="font-display text-4xl sm:text-5xl">{copy.title}</h1>
           <p className="max-w-2xl text-sm leading-7 text-ink-muted">{copy.intro}</p>
         </div>
@@ -195,7 +194,7 @@ export default function FavoritesPage() {
         {loading ? (
           <SkeletonList />
         ) : items.length === 0 ? (
-          <div className="overflow-hidden rounded-[24px] border border-border-subtle bg-[radial-gradient(circle_at_top_left,rgba(200,171,90,0.18),transparent_34%),rgb(var(--color-surface)/0.8)] px-6 py-12 text-center">
+          <div className="ui-feature-panel overflow-hidden px-6 py-12 text-center">
             <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full border border-rust/25 bg-rust/10 text-rust">
               <Heart size={20} />
             </div>
@@ -203,7 +202,7 @@ export default function FavoritesPage() {
             <p className="mx-auto mt-3 max-w-xl text-sm leading-7 text-ink-muted">{copy.emptyBody}</p>
             <Link
               href="/workspace"
-              className="mt-6 inline-flex items-center gap-2 rounded-full bg-gold px-4 py-2 text-sm font-medium text-void transition-colors hover:bg-gold-light"
+              className="ui-action-primary mt-6 px-4 py-2 text-sm"
             >
               {copy.emptyCta}
               <ChevronRight size={13} />
@@ -225,7 +224,7 @@ export default function FavoritesPage() {
                 return (
                   <div
                     key={item.review_id}
-                    className="flex gap-4 rounded-xl border border-border-subtle bg-raised px-4 py-3"
+                    className="ui-panel flex gap-4 px-4 py-3"
                   >
                     <Link
                       href={`/reviews/${item.review_id}?back=/account/favorites`}
@@ -280,7 +279,7 @@ export default function FavoritesPage() {
                 <button
                   onClick={handleLoadMore}
                   disabled={loadingMore}
-                  className="mx-auto flex items-center gap-2 rounded border border-border px-5 py-2 text-sm text-ink-muted transition-colors hover:border-gold/40 hover:text-ink disabled:opacity-50"
+                  className="ui-action-secondary mx-auto px-5 py-2 text-sm disabled:opacity-50"
                 >
                   {loadingMore && <RefreshCw size={13} className="animate-spin" />}
                   {loadingMore ? copy.loadingMore : copy.loadMore}

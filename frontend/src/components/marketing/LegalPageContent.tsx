@@ -503,7 +503,7 @@ export default function LegalPageContent({ kind }: { kind: LegalPageKind }) {
   const HeroIcon = kind === 'privacy' ? ShieldCheck : Scale;
 
   return (
-    <div className="min-h-screen pt-14">
+    <div className="min-h-screen">
       <div className="mx-auto max-w-6xl px-6 py-14 animate-fade-in">
         <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
           <section className="min-w-0">

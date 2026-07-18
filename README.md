@@ -190,7 +190,8 @@ cd frontend && npm run build && npm run start
 
 ## Documentation
 
-- [Latest Changelog](docs/changelog/CHANGELOG.md#2026-07-17-gpt56-retake-coach)
+- [Latest Changelog](docs/changelog/CHANGELOG.md#2026-07-18-frontend-coach-toolbench-redesign)
+- [Frontend Design System](DESIGN.md)
 - [SEO / GEO Audit](docs/seo/seo-audit-2026-05-01.md)
 - [System Architecture](docs/architecture/系统架构.md)
 - [Google Sign-In Integration Guide](docs/guides/Google登录接入指南.md)

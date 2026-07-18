@@ -21,10 +21,11 @@ import { useReplayContext } from '@/features/workspace/hooks/useReplayContext';
 import { QuotaModal } from '@/features/workspace/components/QuotaModal';
 import { QuotaBanner } from '@/features/workspace/components/QuotaBanner';
 import { ReplayBanner } from '@/features/workspace/components/ReplayBanner';
-import { ModePicker } from '@/features/workspace/components/ModePicker';
-import { ImageTypePicker } from '@/features/workspace/components/ImageTypePicker';
 import { RetakeWorkspaceIntro } from '@/features/workspace/components/RetakeWorkspaceIntro';
-import { ReviewModelPicker } from '@/features/workspace/components/ReviewModelPicker';
+import { WorkspaceSettingsPanel } from '@/features/workspace/components/WorkspaceSettingsPanel';
+import { WorkspaceSubmitPanel } from '@/features/workspace/components/WorkspaceSubmitPanel';
+import { WorkspaceTaskShell } from '@/features/workspace/components/WorkspaceTaskShell';
+import { getWorkspaceTaskFlowCopy, resolveWorkspaceTaskStep } from '@/features/workspace/workspaceTaskFlow';
 
 function isImageType(value: string | null): value is ImageType {
   return ['default', 'landscape', 'portrait', 'street', 'still_life', 'architecture'].includes(value as string);
@@ -260,34 +261,46 @@ function WorkspacePageContent() {
     }
   }, [photo, replayPhotoId, reviewMode, selectedReviewModel, locale, imageType, sourceReviewId, retakeIntent, nextShootAction, nextShootDimension, sourceGenerationId, contentEntrypoint, contentSlug, galleryReviewId, promptExampleId, ensureToken, router, t, token, usage, remainingQuota, setStage, setErrMessage]);
 
+  const flowCopy = getWorkspaceTaskFlowCopy(locale);
+  const hasReadyPhoto = Boolean(photo && (stage === 'ready' || stage === 'reviewing'));
+  const hasSubmitError = Boolean(stage === 'ready' && errMessage);
+  const activeTaskStep = resolveWorkspaceTaskStep(stage, hasReadyPhoto, hasSubmitError);
+  const completedTaskSteps =
+    activeTaskStep === 'submit'
+      ? (['image', 'settings'] as const)
+      : hasReadyPhoto
+        ? (['image'] as const)
+        : [];
+
   return (
-    <div className="pt-14 min-h-screen">
+    <div className="min-h-screen">
       {showQuotaModal && (
         <QuotaModal plan={currentPlan} onClose={() => setShowQuotaModal(false)} t={t} />
       )}
-      <div className="max-w-3xl mx-auto px-6 py-12">
-        <div className="mb-10 animate-fade-in">
-          <p className="text-xs text-gold/70 font-mono mb-3 tracking-widest uppercase">
-            — {isRetakeCoachFlow ? coachCopy.label : t('workspace_label')}
+      <div className="mx-auto max-w-workspace px-4 py-8 sm:px-6 sm:py-12 lg:px-8 lg:py-16">
+        <div className="mb-8 max-w-task animate-fade-in sm:mb-10">
+          <p className="ui-eyebrow mb-3">
+            {isRetakeCoachFlow ? coachCopy.label : t('workspace_label')}
           </p>
-          <h1 className="font-display text-4xl sm:text-5xl mb-4">
+          <h1 className="text-balance font-display text-4xl text-ink sm:text-5xl">
             {isRetakeCoachFlow ? coachCopy.workspaceTitle : t('workspace_headline')}
           </h1>
           {isRetakeCoachFlow && (
-            <p className="mb-5 max-w-2xl text-sm leading-7 text-ink-muted">{coachCopy.workspaceBody}</p>
+            <p className="mt-4 max-w-2xl text-sm leading-7 text-ink-muted">{coachCopy.workspaceBody}</p>
           )}
           <QuotaBanner
             usage={usage}
             usageError={usageError}
             remainingQuota={remainingQuota}
             totalQuota={totalQuota}
+            reviewMode={reviewMode}
             t={t}
           />
         </div>
 
         <div className="animate-slide-up anim-fill-both delay-100">
           {!preview ? (
-            <div className="space-y-5">
+            <div className="space-y-6">
               {isRetakeCoachFlow && (
                 <RetakeWorkspaceIntro
                   copy={coachCopy}
@@ -304,6 +317,9 @@ function WorkspacePageContent() {
                   reviewModel={reviewModel}
                   isGuest={isGuest}
                   stage={stage}
+                  errorMessage={errMessage}
+                  remainingQuota={remainingQuota}
+                  totalQuota={totalQuota}
                   onImageTypeChange={setImageType}
                   onReviewModeChange={setReviewMode}
                   onReviewModelChange={setReviewModel}
@@ -313,180 +329,177 @@ function WorkspacePageContent() {
                 />
               )}
               {canUseNextShootTarget && (
-                <div className="rounded-[24px] border border-gold/25 bg-[radial-gradient(circle_at_top_left,rgba(200,171,90,0.16),transparent_34%),rgb(var(--color-surface)/0.82)] p-5 animate-fade-in">
-                  <p className="mb-2 font-mono text-[11px] uppercase tracking-[0.22em] text-gold/80">{targetCopy.label}</p>
-                  <h2 className="font-display text-2xl text-ink">{targetCopy.title}</h2>
+                <section className="ui-panel max-w-task p-5 animate-fade-in sm:p-6">
+                  <p className="ui-eyebrow mb-2">{targetCopy.label}</p>
+                  <h2 className="font-display text-2xl text-ink sm:text-3xl">{targetCopy.title}</h2>
                   <p className="mt-3 text-sm leading-7 text-ink">{nextShootAction}</p>
                   <div className="mt-4 flex flex-wrap gap-2 text-[11px] text-ink-subtle">
                     {nextShootDimension && (
-                      <span className="rounded-full border border-border-subtle bg-void/30 px-3 py-1">
+                      <span className="rounded-control border border-border-subtle bg-raised/60 px-3 py-1">
                         {targetCopy.dimension}: {nextShootDimension}
                       </span>
                     )}
                     {sourceReviewId && (
-                      <span className="rounded-full border border-border-subtle bg-void/30 px-3 py-1">
+                      <span className="rounded-control border border-border-subtle bg-raised/60 px-3 py-1">
                         {targetCopy.sourceReview}: {sourceReviewId}
                       </span>
                     )}
                     {promptExampleId && (
-                      <span className="rounded-full border border-border-subtle bg-void/30 px-3 py-1">
+                      <span className="rounded-control border border-border-subtle bg-raised/60 px-3 py-1">
                         {targetCopy.sourcePrompt}: {promptExampleId}
                       </span>
                     )}
                     {!promptExampleId && contentSourceLabel && (
-                      <span className="rounded-full border border-border-subtle bg-void/30 px-3 py-1">
+                      <span className="rounded-control border border-border-subtle bg-raised/60 px-3 py-1">
                         {targetCopy.sourceContent}: {contentSourceLabel}
                       </span>
                     )}
                   </div>
                   <p className="mt-4 text-xs leading-5 text-ink-muted">{targetCopy.uploadHint}</p>
-                </div>
+                </section>
               )}
-              {stage === 'error' && errMessage && (
-                <div className="flex items-center gap-2 rounded border border-rust/20 bg-rust/5 px-3 py-2 text-sm text-rust animate-scale-in">
-                  <AlertCircle size={14} className="shrink-0" />
-                  <span>{errMessage}</span>
-                </div>
-              )}
-              {canUploadRetake && (!canReplayWithoutUpload || stage === 'idle' || stage === 'error') && (
-                <ImageUploader
-                  onFileSelected={handleFileSelected}
-                  disabled={stage !== 'idle' && stage !== 'error'}
+              {canUploadRetake && !canReplayWithoutUpload && (
+                <WorkspaceTaskShell
+                  copy={flowCopy}
+                  activeStep="image"
+                  image={
+                    <div className="space-y-4">
+                      {stage === 'error' && errMessage && (
+                        <div role="alert" className="flex items-start gap-2 rounded-control border border-rust/25 bg-rust/10 px-3 py-2.5 text-sm text-rust animate-scale-in">
+                          <AlertCircle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
+                          <span>{errMessage}</span>
+                        </div>
+                      )}
+                      <ImageUploader
+                        onFileSelected={handleFileSelected}
+                        disabled={stage !== 'idle' && stage !== 'error'}
+                      />
+                    </div>
+                  }
                 />
               )}
             </div>
           ) : (
-            <div className="space-y-5 animate-fade-in">
-              {sourceReviewId && replayPhotoUrl && (
-                <div className="rounded-[24px] border border-sage/25 bg-sage/10 p-4">
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <div>
-                      <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-sage">{targetCopy.coachTitle}</p>
-                      <p className="mt-1 text-sm text-ink-muted">{targetCopy.uploadHint}</p>
-                    </div>
-                    <span className="rounded-full border border-sage/30 px-3 py-1 text-[11px] text-sage">GPT-5.6 Terra</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <p className="mb-2 text-xs text-ink-subtle">{targetCopy.originalLabel}</p>
-                      <div className="relative aspect-[4/3] overflow-hidden rounded-xl border border-border bg-raised">
-                        <Image src={replayPhotoUrl} alt={targetCopy.originalLabel} fill className="object-contain" unoptimized />
+            <WorkspaceTaskShell
+              copy={flowCopy}
+              activeStep={activeTaskStep}
+              completedSteps={[...completedTaskSteps]}
+              image={
+                <div className="space-y-4">
+                  <div className="relative overflow-hidden rounded-card border border-border bg-raised">
+                    {sourceReviewId && replayPhotoUrl ? (
+                      <div className="grid grid-cols-2 gap-px bg-border-subtle">
+                        <div className="bg-raised p-2 sm:p-3">
+                          <p className="mb-2 text-xs font-medium text-ink-subtle">{targetCopy.originalLabel}</p>
+                          <div className="relative aspect-[4/3] overflow-hidden rounded-control bg-surface">
+                            <Image src={replayPhotoUrl} alt={targetCopy.originalLabel} fill className="object-contain" unoptimized />
+                          </div>
+                        </div>
+                        <div className="bg-raised p-2 sm:p-3">
+                          <p className="mb-2 text-xs font-medium text-ink-subtle">{targetCopy.retakeLabel}</p>
+                          <div className="relative aspect-[4/3] overflow-hidden rounded-control bg-surface">
+                            <Image src={preview} alt={targetCopy.retakeLabel} fill className="object-contain" unoptimized />
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                    <div>
-                      <p className="mb-2 text-xs text-ink-subtle">{targetCopy.retakeLabel}</p>
-                      <div className="relative aspect-[4/3] overflow-hidden rounded-xl border border-gold/30 bg-raised">
-                        <Image src={preview} alt={targetCopy.retakeLabel} fill className="object-contain" unoptimized />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div className="photo-frame relative aspect-[4/3] rounded-lg overflow-hidden border border-border bg-raised group">
-                <Image
-                  src={preview}
-                  alt="Preview"
-                  fill
-                  className="object-contain transition-transform duration-500 group-hover:scale-[1.02]"
-                  unoptimized
-                />
-                {stage === 'uploading' && (
-                  <div className="absolute inset-0 bg-void/75 backdrop-blur-[2px] flex flex-col items-center justify-center gap-4 transition-all animate-fade-in">
-                    <LoadingSpinner size={32} />
-                    <div className="flex flex-col items-center gap-2">
-                      <p className="text-sm font-medium text-gold drop-shadow-md">{t('stage_uploading')} {uploadProgress}%</p>
-                      <div className="w-48 h-1 bg-white/10 rounded-full overflow-hidden border border-white/5 shadow-inner">
-                        <div
-                          className="h-full bg-[linear-gradient(90deg,rgba(200,162,104,0.8),rgba(200,162,104,1))] rounded-full transition-all duration-300 shadow-[0_0_12px_rgba(200,162,104,0.8)]"
-                          style={{ width: `${uploadProgress}%` }}
+                    ) : (
+                      <div className="photo-frame group relative aspect-[4/3] bg-raised">
+                        <Image
+                          src={preview}
+                          alt="Preview"
+                          fill
+                          className="object-contain transition-transform duration-300 group-hover:scale-[1.01]"
+                          unoptimized
                         />
                       </div>
-                    </div>
-                  </div>
-                )}
-                {stage === 'confirming' && (
-                  <div className="absolute inset-0 bg-void/70 backdrop-blur-[1px] flex flex-col items-center justify-center gap-3 animate-fade-in">
-                    <LoadingSpinner size={32} label={t('stage_confirming')} />
-                  </div>
-                )}
-                {stage === 'reviewing' && (
-                  <div className="absolute inset-0 bg-void/75 backdrop-blur-[2px] flex flex-col items-center justify-center gap-3 animate-fade-in">
-                    <LoadingSpinner size={32} label={t('stage_reviewing')} />
-                  </div>
-                )}
-              </div>
+                    )}
 
-              {selectedFile && (
-                <div className="flex items-center justify-between text-[11px] text-ink-subtle font-mono tracking-tight px-1">
-                  <span className="truncate max-w-[240px] opacity-70 italic">{selectedFile.name}</span>
-                  <span className="bg-void/40 px-2 py-0.5 rounded border border-border-subtle">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</span>
-                </div>
-              )}
-
-              {stage === 'ready' && photo && (
-                <div className="flex items-center gap-2 text-sage text-sm animate-scale-in bg-sage/5 border border-sage/20 px-4 py-2.5 rounded-lg">
-                  <CheckCircle size={14} className="animate-pulse" />
-                  <span className="font-medium">{t('photo_ready_msg')}</span>
-                </div>
-              )}
-
-              {(stage === 'rejected' || stage === 'error') && (
-                <div className="flex items-center gap-2 text-rust text-sm bg-rust/5 border border-rust/20 rounded-lg px-4 py-3 animate-scale-in">
-                  <AlertCircle size={14} className="shrink-0" />
-                  <span>{errMessage}</span>
-                </div>
-              )}
-
-              {stage === 'ready' && photo && (
-                <div className="space-y-6 pt-2 animate-slide-up">
-                  <div className="space-y-3">
-                    <p className="text-xs font-mono uppercase tracking-[0.2em] text-ink-subtle">{t('select_image_type')}</p>
-                    <ImageTypePicker value={imageType} onChange={setImageType} t={t} />
+                    {stage === 'uploading' && (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-void/80 px-6 text-center backdrop-blur-sm animate-fade-in">
+                        <LoadingSpinner size={32} />
+                        <div className="flex w-full max-w-52 flex-col items-center gap-2">
+                          <p className="text-sm font-bold text-gold">{t('stage_uploading')} {uploadProgress}%</p>
+                          <div className="h-1.5 w-full overflow-hidden rounded-full border border-white/10 bg-white/10">
+                            <div
+                              className="h-full rounded-full bg-action transition-[width] duration-300"
+                              style={{ width: `${uploadProgress}%` }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {stage === 'confirming' && (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-void/80 px-6 text-center backdrop-blur-sm animate-fade-in">
+                        <LoadingSpinner size={32} label={t('stage_confirming')} />
+                      </div>
+                    )}
                   </div>
-                  {!isRetakeCoachFlow && (
-                    <div className="space-y-3">
-                      <p className="text-xs font-mono uppercase tracking-[0.2em] text-ink-subtle">
-                        {locale === 'en' ? 'Select review model' : locale === 'ja' ? '講評モデルを選択' : '选择评图模型'}
-                      </p>
-                      <ReviewModelPicker value={reviewModel} onChange={setReviewModel} locale={locale} />
+
+                  {selectedFile && (
+                    <div className="flex items-center justify-between gap-3 rounded-control border border-border-subtle bg-surface/50 px-3 py-2 font-mono text-[11px] text-ink-subtle">
+                      <span className="min-w-0 truncate">{selectedFile.name}</span>
+                      <span className="shrink-0 font-bold text-ink-muted">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</span>
                     </div>
                   )}
-                  <div className="space-y-3">
-                    <p className="text-xs font-mono uppercase tracking-[0.2em] text-ink-subtle">{t('select_mode')}</p>
-                    <ModePicker
-                      value={reviewMode}
-                      onChange={setReviewMode}
-                      isGuest={isGuest}
-                      t={t}
-                    />
-                  </div>
-                  <div className="flex gap-3 pt-4">
-                    <button
-                      onClick={handleReview}
-                      className="btn-gold flex-1 px-6 py-4 bg-gold text-void text-sm font-bold rounded-full hover:bg-gold-light active:scale-[0.97] transition-all duration-300 hover:shadow-[0_12px_40px_rgba(200,162,104,0.4)] shadow-[0_8px_24px_rgba(200,162,104,0.2)]"
-                    >
-                      {t('btn_start_review')} {reviewMode === 'pro' ? 'Pro' : 'Flash'} {t('btn_review_suffix')}
-                    </button>
-                    <button
-                      onClick={handleReset}
-                      className="px-6 py-4 border border-border text-ink-muted text-sm font-medium rounded-full hover:border-gold/40 hover:text-ink active:scale-[0.97] transition-all duration-300"
-                    >
-                      {t('btn_change_photo')}
-                    </button>
-                  </div>
-                </div>
-              )}
 
-              {(stage === 'rejected' || stage === 'error') && (
-                <button
-                  onClick={handleReset}
-                  className="w-full px-6 py-4 border border-border text-ink-muted text-sm font-medium rounded-full hover:border-gold/40 hover:text-ink active:scale-[0.97] transition-all duration-300"
-                >
-                  {t('btn_reupload')}
-                </button>
-              )}
-            </div>
+                  {hasReadyPhoto && (
+                    <div role="status" className="flex items-start gap-2 rounded-control border border-sage/25 bg-sage/10 px-3 py-2.5 text-sm text-sage animate-scale-in">
+                      <CheckCircle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
+                      <span className="font-medium">{t('photo_ready_msg')}</span>
+                    </div>
+                  )}
+
+                  {(stage === 'rejected' || stage === 'error') && (
+                    <div role="alert" className="flex items-start gap-2 rounded-control border border-rust/25 bg-rust/10 px-3 py-2.5 text-sm text-rust animate-scale-in">
+                      <AlertCircle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
+                      <span>{errMessage}</span>
+                    </div>
+                  )}
+
+                  {(stage === 'rejected' || stage === 'error') && (
+                    <button type="button" onClick={handleReset} className="ui-action-secondary min-h-12 w-full px-6 py-3 text-sm">
+                      {t('btn_reupload')}
+                    </button>
+                  )}
+                </div>
+              }
+              settings={
+                stage === 'ready' && photo ? (
+                  <WorkspaceSettingsPanel
+                    imageType={imageType}
+                    reviewMode={reviewMode}
+                    reviewModel={reviewModel}
+                    isGuest={isGuest}
+                    locale={locale}
+                    showReviewModel={!isRetakeCoachFlow}
+                    remainingQuota={remainingQuota}
+                    totalQuota={totalQuota}
+                    onImageTypeChange={setImageType}
+                    onReviewModeChange={setReviewMode}
+                    onReviewModelChange={setReviewModel}
+                    t={t}
+                  />
+                ) : undefined
+              }
+              submit={
+                photo && (stage === 'ready' || stage === 'reviewing') ? (
+                  <WorkspaceSubmitPanel
+                    imageType={imageType}
+                    reviewMode={reviewMode}
+                    reviewModel={selectedReviewModel}
+                    locale={locale}
+                    remainingQuota={remainingQuota}
+                    totalQuota={totalQuota}
+                    isSubmitting={stage === 'reviewing'}
+                    errorMessage={hasSubmitError ? errMessage : undefined}
+                    secondaryLabel={t('btn_change_photo')}
+                    onSubmit={handleReview}
+                    onSecondary={handleReset}
+                    t={t}
+                  />
+                ) : undefined
+              }
+            />
           )}
           <ProPromoCard
             plan={currentPlan}
@@ -502,7 +515,7 @@ function WorkspacePageContent() {
 
 export default function WorkspacePage() {
   return (
-    <Suspense fallback={<div className="min-h-screen pt-14" />}>
+    <Suspense fallback={<div className="min-h-screen" />}>
       <WorkspacePageContent />
     </Suspense>
   );

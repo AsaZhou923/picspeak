@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { AlertCircle, ChevronRight, Info, LayoutGrid, Star, X, Heart } from 'lucide-react';
+import { AlertCircle, ChevronRight, Info, Star, X, Heart } from 'lucide-react';
 import ClerkSignInTrigger from '@/components/auth/ClerkSignInTrigger';
 import ProPromoCard from '@/components/marketing/ProPromoCard';
 import { getPublicGallery, likeGalleryReview, unlikeGalleryReview } from '@/lib/api';
@@ -21,6 +21,7 @@ import { markProductAttributionSource, trackProductEvent } from '@/lib/product-a
 import { PublicGalleryItem } from '@/lib/types';
 import { isInvalidCompletedDate } from '@/lib/date-filters';
 import { localeToIntlLocale } from '@/lib/locale';
+import { useModalFocusTrap } from '@/lib/hooks/useModalFocusTrap';
 import {
   buildGallerySearchParams,
   EMPTY_GALLERY_FILTERS,
@@ -60,6 +61,13 @@ function GalleryPageContent() {
   const [actionError, setActionError] = useState('');
   const [likeBusyId, setLikeBusyId] = useState<string | null>(null);
   const [guestLikePromptOpen, setGuestLikePromptOpen] = useState(false);
+  const guestLikePromptCloseRef = useRef<HTMLButtonElement>(null);
+  const closeGuestLikePrompt = useCallback(() => setGuestLikePromptOpen(false), []);
+  const guestLikePromptRef = useModalFocusTrap<HTMLDivElement>({
+    open: guestLikePromptOpen,
+    onClose: closeGuestLikePrompt,
+    initialFocusRef: guestLikePromptCloseRef,
+  });
 
   const dateLocale = localeToIntlLocale(locale);
   const viewerToken = userInfo?.plan && userInfo.plan !== 'guest' ? token ?? undefined : undefined;
@@ -317,44 +325,50 @@ function GalleryPageContent() {
   const visibleEnd = items.length > 0 ? visibleStart + items.length - 1 : 0;
 
   return (
-    <div className="min-h-screen pt-14">
+    <div className="min-h-screen">
       {guestLikePromptOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center px-6"
-          onClick={() => setGuestLikePromptOpen(false)}
+          onClick={closeGuestLikePrompt}
         >
-          <div className="absolute inset-0 bg-void/95" />
+          <div className="absolute inset-0 bg-void/80 backdrop-blur-sm" />
           <div
-            className="relative w-full max-w-md overflow-hidden rounded-[24px] border border-border bg-surface p-6 shadow-[0_32px_96px_rgba(0,0,0,0.72)] animate-fade-in"
+            ref={guestLikePromptRef}
+            className="relative w-full max-w-md overflow-hidden rounded-feature border border-border bg-raised p-6 shadow-level-3 animate-fade-in"
             onClick={(event) => event.stopPropagation()}
             role="dialog"
             aria-modal="true"
+            aria-labelledby="gallery-like-dialog-title"
+            aria-describedby="gallery-like-dialog-description"
+            tabIndex={-1}
           >
             <button
+              ref={guestLikePromptCloseRef}
               type="button"
-              onClick={() => setGuestLikePromptOpen(false)}
-              className="absolute right-4 top-4 rounded-full border border-border-subtle p-2 text-ink-muted transition-colors hover:border-gold/30 hover:text-gold"
+              onClick={closeGuestLikePrompt}
+              className="absolute right-4 top-4 inline-flex h-11 w-11 items-center justify-center rounded-control border border-border-subtle text-ink-muted transition-colors hover:border-gold/30 hover:text-gold"
+              aria-label={t('quota_modal_close')}
             >
-              <X size={14} />
+              <X size={16} />
             </button>
             <div className="mb-6">
-              <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-gold/20 bg-gold/10 px-3 py-1 text-[11px] uppercase tracking-[0.24em] text-gold/80">
+              <p className="ui-eyebrow mb-3 inline-flex items-center gap-2 pr-12">
                 <Heart size={12} />
                 {t('gallery_like')}
               </p>
-              <h2 className="font-display text-3xl text-ink">{t('gallery_like_signin_title')}</h2>
-              <p className="mt-3 text-sm leading-7 text-ink-muted">{t('gallery_like_signin_body')}</p>
+              <h2 id="gallery-like-dialog-title" className="font-display text-3xl text-ink">{t('gallery_like_signin_title')}</h2>
+              <p id="gallery-like-dialog-description" className="mt-3 text-sm leading-7 text-ink-muted">{t('gallery_like_signin_body')}</p>
             </div>
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <button
                 type="button"
-                onClick={() => setGuestLikePromptOpen(false)}
-                className="rounded-full border border-border px-4 py-2.5 text-sm text-ink-muted transition-colors hover:border-gold/30 hover:text-ink"
+                onClick={closeGuestLikePrompt}
+                className="ui-action-secondary px-4 py-2.5 text-sm"
               >
                 {t('gallery_like_signin_cancel')}
               </button>
               <ClerkSignInTrigger
-                className="rounded-full bg-gold px-5 py-2.5 text-sm font-medium text-void transition-colors hover:bg-gold-light"
+                className="ui-action-primary px-5 py-2.5 text-sm"
                 fallbackRedirectUrl="/gallery"
                 signedInClassName="hidden"
               >
@@ -365,30 +379,19 @@ function GalleryPageContent() {
         </div>
       )}
 
-      <div className="mx-auto max-w-7xl px-6 py-12 animate-fade-in">
-        <section className="relative overflow-hidden rounded-[28px] border border-border-subtle bg-[radial-gradient(circle_at_top_left,rgba(200,171,90,0.18),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(149,113,87,0.16),transparent_36%),rgb(var(--color-surface)/0.78)] px-6 py-8 sm:px-8 sm:py-10">
-          <div className="absolute inset-0 opacity-30 [background-image:linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] [background-size:24px_24px]" />
-          <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-            <div className="max-w-2xl">
-              <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-gold/20 bg-gold/10 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.28em] text-gold/80">
-                <LayoutGrid size={12} />
-                {t('gallery_label')}
-              </p>
-              <h1 className="font-display text-4xl text-ink sm:text-5xl">{t('gallery_headline')}</h1>
-              <p className="mt-3 max-w-2xl text-sm leading-7 text-ink-muted">{t('gallery_intro')}</p>
-              <div className="mt-4 rounded-2xl border border-gold/20 bg-gold/10 px-4 py-3 text-sm leading-7 text-ink-muted">
-                <p className="inline-flex items-center gap-2 font-medium text-gold">
-                  <Info size={14} />
-                  {t('gallery_score_upgrade_badge')}
-                </p>
-                <p className="mt-2">{t('gallery_score_upgrade_body')}</p>
-                <p className="mt-1 text-ink-subtle">{t('gallery_score_upgrade_detail')}</p>
-              </div>
-            </div>
-            <div className="rounded-2xl border border-border-subtle bg-void/55 px-5 py-4 backdrop-blur-sm">
-              <p className="text-[11px] uppercase tracking-[0.22em] text-ink-subtle">{t('gallery_count_label')}</p>
-              <p className="mt-2 font-display text-4xl text-gold">{totalCount}</p>
-            </div>
+      <div className="mx-auto max-w-editorial px-6 pb-12 animate-fade-in">
+        <section className="ui-panel flex flex-col gap-5 p-5 md:flex-row md:items-start md:justify-between">
+          <div className="max-w-3xl text-sm leading-7 text-ink-muted">
+            <p className="inline-flex items-center gap-2 font-medium text-gold">
+              <Info size={14} />
+              {t('gallery_score_upgrade_badge')}
+            </p>
+            <p className="mt-2">{t('gallery_score_upgrade_body')}</p>
+            <p className="mt-1 text-ink-subtle">{t('gallery_score_upgrade_detail')}</p>
+          </div>
+          <div className="shrink-0 rounded-control border border-border-subtle bg-void/45 px-5 py-3 text-center md:text-left">
+            <p className="text-[11px] uppercase tracking-[0.22em] text-ink-subtle">{t('gallery_count_label')}</p>
+            <p className="mt-1 font-display text-3xl text-gold">{totalCount}</p>
           </div>
         </section>
 
@@ -413,11 +416,11 @@ function GalleryPageContent() {
         {loading ? (
           <section className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {Array.from({ length: 8 }).map((_, index) => (
-              <div key={index} className="h-[420px] animate-pulse rounded-[24px] border border-border-subtle bg-raised/45" />
+              <div key={index} className="h-[420px] animate-pulse rounded-card border border-border-subtle bg-raised/45" />
             ))}
           </section>
         ) : items.length === 0 ? (
-          <section className="mt-8 rounded-[24px] border border-border-subtle bg-raised/55 px-6 py-10 text-center">
+          <section className="ui-panel mt-8 px-6 py-10 text-center">
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-gold/20 bg-gold/10 text-gold">
               <Star size={20} />
             </div>
@@ -434,7 +437,7 @@ function GalleryPageContent() {
                   metadata: { entrypoint: 'gallery_practice', empty_gallery: true },
                 });
               }}
-              className="mt-6 inline-flex items-center gap-2 rounded-full border border-gold/30 px-4 py-2 text-sm text-gold transition-colors hover:bg-gold/10"
+              className="ui-action-primary mt-6 px-4 py-2 text-sm"
             >
               {t('gallery_empty_cta')}
               <ChevronRight size={14} />
@@ -471,14 +474,14 @@ function GalleryPageContent() {
           </>
         )}
 
-        <section className="mt-16 rounded-[28px] border border-border-subtle bg-raised/35 px-6 py-8 sm:px-8">
+        <section className="ui-feature-panel mt-16 px-6 py-8 sm:px-8">
           <div className="max-w-4xl">
             <h2 className="font-display text-3xl text-ink sm:text-4xl">{t('gallery_seo_title')}</h2>
             <p className="mt-4 max-w-3xl text-sm leading-7 text-ink-muted">{t('gallery_seo_intro')}</p>
           </div>
           <div className="mt-8 grid gap-4 md:grid-cols-3">
             {GALLERY_SEO_SECTIONS.map((section) => (
-              <article key={section.titleKey} className="rounded-[22px] border border-border-subtle bg-void/35 p-5 transition-all duration-300 hover:border-gold/20">
+              <article key={section.titleKey} className="ui-panel p-5 transition-all duration-300 hover:border-gold/20">
                 <h3 className="font-display text-2xl text-ink">{t(section.titleKey)}</h3>
                 <p className="mt-3 text-sm leading-7 text-ink-muted">{t(section.bodyKey)}</p>
               </article>
@@ -494,7 +497,7 @@ function GalleryPageContent() {
 
 export default function GalleryPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen pt-14 px-6 py-12 mx-auto max-w-7xl"><div className="h-40 animate-pulse rounded-[28px] border border-border-subtle bg-void/40" /></div>}>
+    <Suspense fallback={<div className="mx-auto min-h-screen max-w-editorial px-6 py-12"><div className="ui-feature-panel h-40 animate-pulse" /></div>}>
       <GalleryPageContent />
     </Suspense>
   );

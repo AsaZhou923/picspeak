@@ -1,19 +1,23 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import Image from 'next/image';
 import Link from 'next/link';
 import Script from 'next/script';
-import { ArrowRight, Aperture, Zap, Star, BarChart2, Clock3, FileText, Repeat2, UploadCloud, Wand2 } from 'lucide-react';
-import { getHomeIntentEntrances, type HomeIntent } from '@/lib/content-conversion';
-import ScoreRing from '@/components/ui/ScoreRing';
+import {
+  Aperture,
+  ArrowRight,
+  Clock3,
+  FileText,
+  Repeat2,
+  UploadCloud,
+  Wand2,
+} from 'lucide-react';
 import HomeContactSection from '@/components/home/HomeContactSection';
+import HomeCritiqueArtifact from '@/components/home/HomeCritiqueArtifact';
 import HomeGenerationPricingSection from '@/components/home/HomeGenerationPricingSection';
 import HomeImageCreditRedeem from '@/components/home/HomeImageCreditRedeem';
-import { DEMO_IMAGE_URL, DEMO_REVIEW_ID } from '@/lib/demo-review';
-import { useI18n } from '@/lib/i18n';
-import { markProductAttributionSource, trackProductEvent } from '@/lib/product-analytics';
-import { siteConfig } from '@/lib/site';
+import HomeImprovementLoop from '@/components/home/HomeImprovementLoop';
+import { getHomeIntentEntrances, type HomeIntent } from '@/lib/content-conversion';
 import {
   buildHomeAuthorJsonLd,
   buildHomeFaqJsonLd,
@@ -22,8 +26,11 @@ import {
   shouldRenderHomeFaqJsonLd,
   type HomeStructuredDataScope,
 } from '@/lib/home-structured-data';
+import { useI18n } from '@/lib/i18n';
 import { serializeJsonLd } from '@/lib/json-ld';
+import { markProductAttributionSource, trackProductEvent } from '@/lib/product-analytics';
 import { getRetakeCoachCopy } from '@/lib/retake-coach-copy';
+import { siteConfig } from '@/lib/site';
 
 const HomeAuthWidgets = dynamic(() => import('@/components/home/HomeAuthWidgets'), {
   ssr: false,
@@ -37,20 +44,12 @@ const HomeFaq = dynamic(() => import('@/components/home/HomeFaq'), {
       {Array.from({ length: 4 }, (_, index) => (
         <div
           key={index}
-          className="h-[74px] rounded-lg border border-border-subtle bg-raised/20"
+          className="h-[74px] rounded-card border border-border-subtle bg-raised/20"
         />
       ))}
     </div>
   ),
 });
-
-const DEMO_SCORES_KEYS = [
-  { labelKey: 'score_composition' as const, score: 7 },
-  { labelKey: 'score_lighting' as const, score: 8 },
-  { labelKey: 'score_color' as const, score: 9 },
-  { labelKey: 'score_impact' as const, score: 7 },
-  { labelKey: 'score_technical' as const, score: 6 },
-];
 
 type HomePageProps = {
   structuredDataScope?: HomeStructuredDataScope;
@@ -87,12 +86,6 @@ export function HomePageContent({ structuredDataScope = 'root' }: HomePageProps 
     question: t(q),
     answer: t(a),
   })));
-
-  const FEATURES = [
-    { icon: Zap, title: t('feature_flash_title'), body: t('feature_flash_body') },
-    { icon: Star, title: t('feature_pro_title'), body: t('feature_pro_body') },
-    { icon: BarChart2, title: t('feature_history_title'), body: t('feature_history_body') },
-  ];
 
   const TIERS = [
     {
@@ -138,346 +131,234 @@ export function HomePageContent({ structuredDataScope = 'root' }: HomePageProps 
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(sourceCodeJsonLd) }}
       />
+
       <HomeAuthWidgets />
-      <section className="relative min-h-screen flex flex-col items-center justify-center px-6 pt-24 pb-20 overflow-hidden">
-        <div
-          className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/4 w-[700px] h-[700px] rounded-full pointer-events-none"
-          style={{
-            background:
-              'radial-gradient(ellipse, rgba(200,162,104,0.06) 0%, transparent 70%)',
-          }}
-        />
 
-        <div className="relative flex items-center gap-2 mb-8 px-4 py-1.5 border border-gold/20 rounded-full text-xs text-gold/80 animate-fade-in transition-transform hover:scale-105 duration-300">
-          <Aperture size={11} className="animate-spin-slow opacity-70" />
-          <span>{t('hero_label')}</span>
-        </div>
-
+      <section className="relative overflow-hidden px-5 py-12 sm:px-6 sm:py-16 lg:py-20">
         <div
           aria-hidden="true"
-          className="relative font-display text-5xl sm:text-6xl md:text-7xl text-center leading-[1.08] max-w-3xl text-balance animate-fade-in anim-fill-both delay-100"
-        >
-          {t('hero_headline_1')}
-          <br />
-          <span className="text-gold">{t('hero_headline_2')}</span>
+          className="pointer-events-none absolute -left-40 top-0 h-[34rem] w-[34rem] rounded-full bg-[radial-gradient(circle,rgba(200,162,104,0.1),transparent_68%)]"
+        />
+        <div className="relative mx-auto grid max-w-editorial items-center gap-10 lg:grid-cols-[minmax(0,0.74fr)_minmax(0,1.26fr)] lg:gap-14">
+          <div className="max-w-xl">
+            <div className="ui-eyebrow inline-flex items-center gap-2">
+              <Aperture size={13} aria-hidden="true" />
+              <span>{t('hero_label')}</span>
+            </div>
+
+            <div
+              aria-hidden="true"
+              className="mt-5 text-balance font-display text-[clamp(3.25rem,7vw,6.75rem)] leading-[0.9] tracking-[-0.035em] text-ink"
+            >
+              {t('hero_headline_1')}
+              <span className="mt-1 block text-gold">{t('hero_headline_2')}</span>
+            </div>
+
+            <p className="mt-6 max-w-lg text-base leading-7 text-ink-muted sm:text-lg sm:leading-8">
+              {t('hero_desc')}
+            </p>
+
+            <Link
+              href="/workspace"
+              onClick={() => markProductAttributionSource('home_direct')}
+              className="ui-action-primary mt-8 w-full px-7 py-3.5 text-sm sm:w-auto"
+            >
+              {t('hero_cta_start')}
+              <ArrowRight size={15} aria-hidden="true" />
+            </Link>
+          </div>
+
+          <HomeCritiqueArtifact t={t} />
         </div>
 
-        <p className="relative mt-6 text-ink-muted text-base sm:text-lg text-center max-w-xl leading-relaxed animate-fade-in anim-fill-both delay-200">
-          {t('hero_desc')}
-        </p>
-
-        <div className="relative mt-10 flex flex-col sm:flex-row gap-4 items-center animate-fade-in anim-fill-both delay-300">
-          <Link
-            href="/workspace"
-            onClick={() => markProductAttributionSource('home_direct')}
-            className="btn-gold flex items-center gap-2 px-7 py-3 bg-gold text-void text-sm font-medium rounded hover:bg-gold-light active:scale-[0.98] transition-all duration-200 hover:shadow-[0_0_24px_rgba(200,162,104,0.4)]"
-          >
-            {t('hero_cta_start')}
-            <ArrowRight size={14} />
-          </Link>
-          <Link
-            href="/retake"
-            className="flex items-center gap-2 rounded border border-sage/40 bg-sage/10 px-7 py-3 text-sm font-medium text-sage transition-all duration-200 hover:-translate-y-0.5 hover:bg-sage hover:text-void"
-          >
-            <Repeat2 size={14} />
-            {retakeCopy.homeCta}
-          </Link>
+        <div className="relative mx-auto mt-8 flex max-w-editorial flex-wrap items-center justify-center gap-3 lg:justify-start">
           <div
             id="home-signin-slot"
             className="flex min-h-[46px] items-center justify-center"
-            aria-hidden="true"
           />
           <div
             id="home-signup-slot"
             className="flex min-h-[46px] items-center justify-center"
-            aria-hidden="true"
           />
         </div>
+      </section>
 
-        <Link
-          href="/retake"
-          className="relative mt-8 flex w-full max-w-2xl flex-col gap-4 rounded-[24px] border border-sage/30 bg-[radial-gradient(circle_at_top_left,rgba(122,154,120,0.2),transparent_48%),rgb(var(--color-raised)/0.58)] px-5 py-5 text-left transition-all duration-300 hover:-translate-y-1 hover:border-sage/55 hover:shadow-[0_22px_70px_rgba(122,154,120,0.14)] sm:flex-row sm:items-center sm:justify-between animate-fade-in anim-fill-both delay-300"
-        >
-          <span className="flex min-w-0 items-start gap-3">
-            <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-sage/35 bg-sage/10 text-sage">
-              <Repeat2 size={17} />
-            </span>
-            <span className="min-w-0">
-              <span className="block text-[11px] font-mono uppercase tracking-[0.22em] text-sage">
-                {retakeCopy.label}
-              </span>
-              <span className="mt-1 block font-display text-2xl text-ink">{retakeCopy.homeTitle}</span>
-              <span className="mt-2 block text-sm leading-6 text-ink-muted">{retakeCopy.homeBody}</span>
-            </span>
-          </span>
-          <span className="inline-flex shrink-0 items-center gap-2 text-sm text-sage">
-            {retakeCopy.homeCta}
-            <ArrowRight size={14} />
-          </span>
-        </Link>
+      <HomeImprovementLoop
+        t={t}
+        retakeTitle={retakeCopy.homeTitle}
+        retakeBody={retakeCopy.homeBody}
+      />
 
-        <Link
-          href="/generate"
-          className="relative mt-4 flex w-full max-w-2xl flex-col gap-4 rounded-lg border border-gold/25 bg-[linear-gradient(135deg,rgba(200,162,104,0.16),transparent_46%),rgb(var(--color-raised)/0.58)] px-5 py-4 text-left transition-all duration-300 hover:-translate-y-0.5 hover:border-gold/45 hover:bg-raised/70 sm:flex-row sm:items-center sm:justify-between animate-fade-in anim-fill-both delay-300"
-        >
-          <span className="flex min-w-0 items-start gap-3">
-            <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded border border-gold/30 bg-gold/10 text-gold">
-              <Wand2 size={16} />
-            </span>
-            <span className="min-w-0">
-              <span className="block text-[11px] font-mono uppercase tracking-[0.22em] text-gold/80">
-                {t('home_gpt_image_badge')}
-              </span>
-              <span className="mt-1 block font-display text-xl text-ink">
+      <section className="border-t border-border-subtle px-5 py-16 sm:px-6 sm:py-24">
+        <div className="mx-auto max-w-editorial">
+          <div className="grid gap-5 lg:grid-cols-2">
+            <article className="ui-feature-panel flex flex-col overflow-hidden p-6 sm:p-8">
+              <div className="flex h-11 w-11 items-center justify-center rounded-control border border-sage/35 bg-sage/10 text-sage">
+                <Repeat2 size={18} aria-hidden="true" />
+              </div>
+              <p className="ui-eyebrow mt-6 text-sage">{t('nav_workspace')}</p>
+              <h2 className="mt-3 font-display text-3xl leading-tight text-ink sm:text-4xl">
+                {retakeCopy.homeTitle}
+              </h2>
+              <p className="mt-4 flex-1 text-sm leading-7 text-ink-muted">{retakeCopy.homeBody}</p>
+              <Link href="/retake" className="ui-action-secondary mt-7 w-fit px-5 py-3 text-sm">
+                {retakeCopy.homeCta}
+                <ArrowRight size={14} aria-hidden="true" />
+              </Link>
+            </article>
+
+            <article className="ui-panel flex flex-col p-6 sm:p-8">
+              <div className="flex h-11 w-11 items-center justify-center rounded-control border border-gold/30 bg-gold/10 text-gold">
+                <Wand2 size={18} aria-hidden="true" />
+              </div>
+              <p className="ui-eyebrow mt-6">{t('nav_generate')}</p>
+              <h2 className="mt-3 font-display text-3xl leading-tight text-ink sm:text-4xl">
                 {t('home_gpt_image_title')}
-              </span>
-              <span className="mt-1 block text-sm leading-6 text-ink-muted">
+              </h2>
+              <p className="mt-4 flex-1 text-sm leading-7 text-ink-muted">
                 {t('home_gpt_image_body')}
-              </span>
-            </span>
-          </span>
-          <span className="inline-flex shrink-0 items-center gap-2 text-sm text-gold">
-            {t('home_gpt_image_cta')}
-            <ArrowRight size={14} />
-          </span>
-        </Link>
-
-        <HomeImageCreditRedeem />
-
-        <div className="relative mt-20 w-full max-w-2xl animate-slide-up anim-fill-both delay-400">
-          <div className="border border-border-subtle rounded-lg bg-raised/60 backdrop-blur-sm overflow-hidden hover:border-gold/30 hover:shadow-[0_24px_64px_rgba(0,0,0,0.2)] transition-all duration-500 group">
-            <div className="flex items-stretch">
-              <div className="relative w-28 sm:w-36 shrink-0 overflow-hidden">
-                <Image
-                  src={DEMO_IMAGE_URL}
-                  alt={t('demo_image_alt')}
-                  fill
-                  className="object-cover transition-transform duration-1000 group-hover:scale-110"
-                  sizes="(min-width: 640px) 144px, 112px"
-                />
-              </div>
-              <div className="flex-1 p-5 flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-xs text-ink-subtle mb-1 font-mono">{t('demo_label')}</p>
-                  <p className="font-display text-2xl text-gold">7.4</p>
-                  <p className="text-xs text-ink-muted mt-0.5">{t('demo_final_score')}</p>
-                </div>
-                <div className="flex flex-wrap gap-2 justify-end score-stagger">
-                  {DEMO_SCORES_KEYS.map((d, i) => (
-                    <div
-                      key={d.labelKey}
-                      className="animate-scale-in anim-fill-both"
-                      style={{ animationDelay: `${500 + i * 100}ms` }}
-                    >
-                      <ScoreRing
-                        score={d.score}
-                        size={54}
-                        strokeWidth={3}
-                        label={t(d.labelKey)}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-            <div className="border-t border-border-subtle px-5 py-4 space-y-2 text-sm text-ink-muted leading-relaxed">
-              <p>
-                <span className="text-sage font-medium">{t('demo_advantage')}</span> {t('demo_advantage_body')}
               </p>
-              <p>
-                <span className="text-gold font-medium">{t('demo_suggestion')}</span> {t('demo_suggestion_body')}
-              </p>
-              <div className="pt-1">
-                <Link
-                  href={`/reviews/${DEMO_REVIEW_ID}`}
-                  className="inline-flex items-center gap-1 text-xs text-gold/60 hover:text-gold transition-colors"
-                >
-                  {t('demo_view_example')}
-                  <ArrowRight size={11} className="transition-transform group-hover:translate-x-0.5" />
-                </Link>
-              </div>
+              <Link href="/generate" className="ui-action-secondary mt-7 w-fit px-5 py-3 text-sm">
+                {t('home_gpt_image_cta')}
+                <ArrowRight size={14} aria-hidden="true" />
+              </Link>
+            </article>
+          </div>
+
+          <div className="ui-panel mt-6 p-5 sm:p-6">
+            <p className="ui-eyebrow">
+              {locale === 'en' ? 'Start by intent' : locale === 'ja' ? '目的別の入口' : '按目的开始'}
+            </p>
+            <div className="mt-4 grid gap-2 md:grid-cols-3">
+              {homeIntentEntrances.map((entry) => {
+                const IntentIcon = homeIntentIcons[entry.intent];
+                return (
+                  <Link
+                    key={entry.intent}
+                    href={entry.href}
+                    onClick={() => {
+                      markProductAttributionSource(entry.source);
+                      if (entry.entrypoint) {
+                        void trackProductEvent('content_workspace_clicked', {
+                          source: entry.source,
+                          pagePath: '/',
+                          locale,
+                          metadata: { entrypoint: entry.entrypoint, home_intent: entry.intent },
+                        });
+                      }
+                    }}
+                    className="group flex items-start gap-3 rounded-control border border-transparent p-3 transition-colors hover:border-border-subtle hover:bg-raised/65"
+                  >
+                    <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-control border border-gold/25 bg-gold/10 text-gold">
+                      <IntentIcon size={15} aria-hidden="true" />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-xs font-semibold text-gold">{entry.label}</span>
+                      <span className="mt-1 block text-sm font-semibold text-ink">{entry.title}</span>
+                      <span className="mt-1 block text-xs leading-5 text-ink-muted">{entry.cta}</span>
+                    </span>
+                  </Link>
+                );
+              })}
             </div>
+          </div>
+
+          <div className="mt-7 flex justify-center">
+            <HomeImageCreditRedeem />
           </div>
         </div>
       </section>
 
-      <section className="px-6 py-20 border-t border-border-subtle">
+      <section className="border-t border-border-subtle px-5 py-16 sm:px-6 sm:py-24">
         <div className="mx-auto max-w-5xl">
-          <p className="mb-4 text-xs uppercase tracking-[0.28em] text-gold/70">
-            {locale === 'en' ? 'Start by intent' : locale === 'ja' ? '目的別の入口' : '按目的开始'}
-          </p>
-          <h2 className="max-w-2xl font-display text-3xl text-ink sm:text-4xl">
-            {locale === 'en'
-              ? 'Choose the path that matches why you came here'
-              : locale === 'ja'
-                ? '来訪目的に合わせて入口を選ぶ'
-                : '按你这次来的目的进入'}
+          <p className="ui-eyebrow">{t('quota_label')}</p>
+          <h2 className="mt-4 max-w-3xl font-display text-4xl leading-tight text-ink sm:text-5xl">
+            {t('quota_headline')}
           </h2>
-          <div className="mt-8 grid gap-4 md:grid-cols-3">
-            {homeIntentEntrances.map((entry) => {
-              const IntentIcon = homeIntentIcons[entry.intent];
-              return (
-                <Link
-                  key={entry.intent}
-                  href={entry.href}
-                  onClick={() => {
-                    markProductAttributionSource(entry.source);
-                    if (entry.entrypoint) {
-                      void trackProductEvent('content_workspace_clicked', {
-                        source: entry.source,
-                        pagePath: '/',
-                        locale,
-                        metadata: { entrypoint: entry.entrypoint, home_intent: entry.intent },
-                      });
-                    }
-                  }}
-                  className="group rounded-lg border border-border-subtle bg-raised/35 p-5 transition-all duration-300 hover:-translate-y-1 hover:border-gold/30 hover:bg-raised/55"
-                >
-                  <span className="flex h-10 w-10 items-center justify-center rounded border border-gold/25 bg-gold/10 text-gold">
-                    <IntentIcon size={16} />
-                  </span>
-                  <p className="mt-5 text-xs uppercase tracking-[0.22em] text-gold/70">{entry.label}</p>
-                  <h3 className="mt-2 font-display text-2xl text-ink">{entry.title}</h3>
-                  <p className="mt-3 text-sm leading-7 text-ink-muted">{entry.body}</p>
-                  <span className="mt-5 inline-flex items-center gap-2 text-sm text-gold transition-colors group-hover:text-gold-light">
-                    {entry.cta}
-                    <ArrowRight size={14} className="transition-transform group-hover:translate-x-0.5" />
-                  </span>
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-      </section>
+          <p className="mt-5 max-w-2xl text-sm leading-7 text-ink-muted">{t('quota_subhead')}</p>
 
-      <section className="px-6 py-24 border-t border-border-subtle">
-        <div className="max-w-5xl mx-auto">
-          <p className="text-xs text-gold/70 font-mono mb-4 tracking-widest uppercase">
-            {t('features_label')}
-          </p>
-          <h2 className="font-display text-3xl sm:text-4xl mb-16 max-w-md">
-            {t('features_headline')}
-          </h2>
-
-          <div className="grid md:grid-cols-3 gap-px bg-border-subtle">
-            {FEATURES.map((f) => (
-              <div key={f.title} className="bg-void p-8 space-y-4 transition-all duration-300 hover:bg-raised/50 group">
-                <div className="w-10 h-10 border border-border rounded flex items-center justify-center transition-all duration-300 group-hover:border-gold/40 group-hover:shadow-[0_0_12px_rgba(200,162,104,0.15)]">
-                  <f.icon size={16} className="text-gold" />
-                </div>
-                <h3 className="font-display text-xl">{f.title}</h3>
-                <p className="text-sm text-ink-muted leading-relaxed">{f.body}</p>
-              </div>
+          <div className="mt-10 grid items-stretch gap-4 sm:grid-cols-3">
+            {TIERS.map((tier) => (
+              <article
+                key={tier.plan}
+                className={`relative flex h-full flex-col overflow-hidden rounded-card border p-6 sm:p-7 ${
+                  tier.highlight
+                    ? 'border-gold/45 bg-raised shadow-level-1'
+                    : 'border-border-subtle bg-surface/45'
+                }`}
+              >
+                {tier.highlight && (
+                  <span className="mb-4 w-fit rounded-full bg-action px-3 py-1 text-xs font-semibold text-action-ink">
+                    {t('pro_offer_highlight')}
+                  </span>
+                )}
+                <h3 className="font-display text-2xl text-ink">{tier.plan}</h3>
+                {tier.priceLabel && (
+                  <div className="mt-2 space-y-2">
+                    <div className="flex flex-wrap items-end gap-2">
+                      <p className="font-mono text-xs font-semibold tracking-wide text-gold">
+                        {tier.priceLabel}
+                      </p>
+                      {tier.highlight && t('pro_offer_original_price_label') && (
+                        <p className="font-mono text-[11px] text-ink-subtle line-through">
+                          {t('pro_offer_original_price_label')}
+                        </p>
+                      )}
+                    </div>
+                    {tier.highlight && t('pro_offer_label') && (
+                      <p className="w-fit rounded-full border border-gold/25 bg-gold/10 px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-gold">
+                        {t('pro_offer_label')}
+                      </p>
+                    )}
+                  </div>
+                )}
+                <p className="mt-4 text-lg font-semibold leading-7 text-ink-muted">
+                  {tier.quotaLabel}
+                </p>
+                <ul className="mt-6 flex-1 space-y-3">
+                  {tier.features.map((feature) => (
+                    <li key={feature} className="flex items-start gap-2 text-sm leading-6 text-ink-muted">
+                      <span
+                        aria-hidden="true"
+                        className={`mt-2 h-1.5 w-1.5 shrink-0 rounded-full ${tier.highlight ? 'bg-gold' : 'bg-ink-subtle'}`}
+                      />
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
+                {tier.highlight && (
+                  <div className="mt-7 border-t border-border-subtle pt-6">
+                    <div id="home-checkout-slot" className="min-h-[46px] w-full" />
+                  </div>
+                )}
+              </article>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="px-6 py-24 border-t border-border-subtle">
-        <div className="max-w-5xl mx-auto">
-          <p className="text-xs text-gold/70 font-mono mb-4 tracking-widest uppercase">
-            {t('quota_label')}
-          </p>
-          <h2 className="font-display text-3xl sm:text-4xl mb-4">{t('quota_headline')}</h2>
-          <p className="text-sm text-ink-muted max-w-2xl mb-12 leading-relaxed">
-            {t('quota_subhead')}
-          </p>
-
-	          <div className="grid sm:grid-cols-3 gap-4 items-start">
-	            {TIERS.map((tier) => (
-	              <div
-	                key={tier.plan}
-	                className={`relative rounded-lg border overflow-hidden transition-all duration-500 h-full ${
-	                  tier.highlight
-	                    ? 'bg-raised border-gold/50 shadow-[0_0_48px_rgba(200,162,104,0.18)] ring-1 ring-gold/20 sm:scale-[1.05] sm:z-10'
-	                    : 'bg-raised/20 border-border-subtle hover:border-gold/20'
-	                }`}
-	              >
-                {tier.highlight && (
-                  <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-gold to-transparent" />
-                )}
-	                <div className="p-8 h-full min-h-[22rem] flex flex-col">
-	                  {tier.highlight && (
-	                    <span className="inline-block mb-3 text-xs text-void bg-gold rounded-full px-2.5 py-0.5 font-medium tracking-wide">
-	                      {t('pro_offer_highlight')}
-	                    </span>
-	                  )}
-	                  <p
-	                    className={`font-display text-2xl mb-1 ${
-	                      tier.highlight ? 'text-gold' : 'text-ink'
-	                    }`}
-	                  >
-	                    {tier.plan}
-	                  </p>
-	                  {tier.priceLabel && (
-                      <div className="mb-3 space-y-2">
-                        <div className="flex items-end gap-2">
-                          <p className="text-xs font-mono tracking-wide text-gold/85">
-                            {tier.priceLabel}
-                          </p>
-                          {tier.highlight && t('pro_offer_original_price_label') && (
-                            <p className="text-[11px] font-mono text-ink-subtle line-through">
-                              {t('pro_offer_original_price_label')}
-                            </p>
-                          )}
-                        </div>
-                        {tier.highlight && t('pro_offer_label') && (
-                          <p className="inline-flex rounded-full border border-gold/25 bg-gold/10 px-2.5 py-1 text-[11px] uppercase tracking-[0.22em] text-gold/80">
-                            {t('pro_offer_label')}
-                          </p>
-                        )}
-                      </div>
-	                  )}
-	                  <p className={`text-3xl font-display mb-6 ${tier.highlight ? 'text-ink' : 'text-ink-muted'}`}>
-	                    {tier.quotaLabel}
-	                  </p>
-	                  <ul className="space-y-2.5 flex-1">
-	                    {tier.features.map((f) => (
-	                      <li key={f} className="text-sm text-ink-muted flex items-center gap-2">
-	                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${tier.highlight ? 'bg-gold' : 'bg-gold/40'}`} />
-	                        {f}
-	                      </li>
-	                    ))}
-	                  </ul>
-	                  {tier.highlight && (
-	                    <div className="mt-8 pt-2">
-                        <div
-                          id="home-checkout-slot"
-                          className="w-full min-h-[46px]"
-                          aria-hidden="true"
-                        />
-	                    </div>
-	                  )}
-	                </div>
-	              </div>
-	            ))}
-	          </div>
-	        </div>
-      </section>
-
       <HomeGenerationPricingSection t={t} />
 
-      <section className="px-6 py-24 border-t border-border-subtle">
-        <div className="max-w-2xl mx-auto text-center space-y-8 animate-fade-in">
-          <h2 className="font-display text-4xl sm:text-5xl">{t('hero_cta_start')}</h2>
+      <section className="border-t border-border-subtle px-5 py-16 sm:px-6 sm:py-24">
+        <div className="mx-auto max-w-reading text-center">
+          <h2 className="font-display text-4xl text-ink sm:text-5xl">{t('hero_cta_start')}</h2>
           <Link
             href="/workspace"
             onClick={() => markProductAttributionSource('home_direct')}
-            className="inline-flex items-center gap-2 px-8 py-3.5 bg-gold text-void text-sm font-medium rounded hover:bg-gold-light transition-all active:scale-95"
+            className="ui-action-primary mt-8 px-8 py-3.5 text-sm"
           >
             {t('hero_cta_start')}
-            <ArrowRight size={14} />
+            <ArrowRight size={14} aria-hidden="true" />
           </Link>
         </div>
       </section>
 
-      <section id="faq" className="px-6 py-24 border-t border-border-subtle">
-        <div className="max-w-3xl mx-auto">
-          <p className="text-xs text-gold/70 font-mono mb-4 tracking-widest uppercase">
-            {t('faq_label')}
-          </p>
-          <h2 className="font-display text-3xl sm:text-4xl mb-12">{t('faq_headline')}</h2>
-
+      <section id="faq" className="border-t border-border-subtle px-5 py-16 sm:px-6 sm:py-24">
+        <div className="mx-auto max-w-reading">
+          <p className="ui-eyebrow">{t('faq_label')}</p>
+          <h2 className="mt-4 mb-10 font-display text-4xl text-ink sm:text-5xl">
+            {t('faq_headline')}
+          </h2>
           <HomeFaq />
         </div>
       </section>

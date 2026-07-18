@@ -55,7 +55,7 @@ function DateFilterField({
           value={value}
           onChange={(event) => onChange(normalizeDateDisplay(event.target.value))}
           aria-invalid={Boolean(error)}
-          className={`w-full min-w-0 rounded-xl border bg-void/60 px-3 py-2.5 pr-10 text-[13px] text-ink [font-variant-numeric:tabular-nums] outline-none transition-colors placeholder:text-ink-subtle ${
+          className={`min-h-11 w-full min-w-0 rounded-control border bg-void/60 px-3 py-2.5 pr-10 text-[13px] text-ink [font-variant-numeric:tabular-nums] outline-none transition-colors placeholder:text-ink-subtle ${
             error ? 'border-rust/60 focus:border-rust' : 'border-border focus:border-gold/40'
           }`}
         />
@@ -121,14 +121,14 @@ export default function GalleryFilters({
   ];
 
   return (
-    <section className="mt-6 rounded-[24px] border border-border-subtle bg-[radial-gradient(circle_at_top_left,rgba(200,171,90,0.14),transparent_35%),rgb(var(--color-surface)/0.72)] p-5 transition-all duration-300 hover:border-gold/20">
+    <section className="ui-panel mt-6 p-5 transition-all duration-300 hover:border-gold/20">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-2 text-sm text-ink">
           <SlidersHorizontal size={15} className="text-gold" />
           <span>{t('filter_label')}</span>
         </div>
 
-        <div className="flex flex-wrap gap-1.5 rounded-2xl bg-void/40 p-1.5 border border-border/40">
+        <div className="flex flex-wrap gap-1.5 rounded-control border border-border/40 bg-void/40 p-1.5">
           {sortOptions.map((opt) => {
             const Icon = opt.icon;
             const active = draftFilters.sort === opt.id;
@@ -137,9 +137,9 @@ export default function GalleryFilters({
                 key={opt.id}
                 type="button"
                 onClick={() => onSortChange(opt.id)}
-                className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium transition-all active:scale-95 ${
+                className={`flex min-h-11 items-center gap-1.5 rounded-control px-3 py-1.5 text-xs font-medium transition-all active:scale-95 ${
                   active
-                    ? 'bg-gold text-void shadow-lg shadow-gold/10'
+                    ? 'bg-action text-action-ink shadow-level-1'
                     : 'text-ink-muted hover:bg-gold/10 hover:text-gold'
                 }`}
               >
@@ -185,7 +185,7 @@ export default function GalleryFilters({
             onChange={(event) =>
               setDraftFilters((prev) => ({ ...prev, minScore: event.target.value }))
             }
-            className="w-full min-w-0 rounded-xl border border-border bg-void/60 px-3 py-2.5 text-sm text-ink outline-none transition-colors focus:border-gold/40"
+            className="min-h-11 w-full min-w-0 rounded-control border border-border bg-void/60 px-3 py-2.5 text-sm text-ink outline-none transition-colors focus:border-gold/40"
           />
         </label>
 
@@ -200,7 +200,7 @@ export default function GalleryFilters({
             onChange={(event) =>
               setDraftFilters((prev) => ({ ...prev, maxScore: event.target.value }))
             }
-            className="w-full min-w-0 rounded-xl border border-border bg-void/60 px-3 py-2.5 text-sm text-ink outline-none transition-colors focus:border-gold/40"
+            className="min-h-11 w-full min-w-0 rounded-control border border-border bg-void/60 px-3 py-2.5 text-sm text-ink outline-none transition-colors focus:border-gold/40"
           />
         </label>
 
@@ -214,7 +214,7 @@ export default function GalleryFilters({
                 imageType: event.target.value as '' | ImageType,
               }))
             }
-            className="w-full min-w-0 rounded-xl border border-border bg-void/60 px-3 py-2.5 text-sm text-ink outline-none transition-colors focus:border-gold/40"
+            className="min-h-11 w-full min-w-0 rounded-control border border-border bg-void/60 px-3 py-2.5 text-sm text-ink outline-none transition-colors focus:border-gold/40"
           >
             <option value="">{t('filter_all_types')}</option>
             {(['default', 'landscape', 'portrait', 'street', 'still_life', 'architecture'] as ImageType[]).map((type) => (
@@ -231,14 +231,14 @@ export default function GalleryFilters({
           type="button"
           onClick={onApply}
           disabled={hasInvalidDate}
-          className="rounded-full bg-gold px-4 py-2 text-sm font-medium text-void transition-colors hover:bg-gold-light disabled:cursor-not-allowed disabled:opacity-50 active:scale-95"
+          className="ui-action-primary px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50 active:scale-95"
         >
           {t('filter_apply')}
         </button>
         <button
           type="button"
           onClick={onReset}
-          className="rounded-full border border-border px-4 py-2 text-sm text-ink-muted transition-colors hover:border-gold/30 hover:text-ink active:scale-95"
+          className="ui-action-secondary px-4 py-2 text-sm active:scale-95"
         >
           {t('filter_reset')}
         </button>

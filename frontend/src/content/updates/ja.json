@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-07-18-frontend-coach-toolbench-redesign",
+    "date": "2026-07-18",
+    "title": "写真コーチ型フロントエンドと主要ワークフローの再設計",
+    "summary": "PicSpeak は「プロの写真コーチ × 効率的な AI ツール」として一貫した体験になりました。Home は実際のレビュー成果を示し、Workspace、Review、Retake、AI Create が連続した練習ループを作り、補助ページ、レスポンシブ、アクセシビリティ、流入計測も同じ設計に統一しました。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-07-18-frontend-coach-toolbench-redesign",
+    "sections": [
+      {
+        "title": "主要な練習ループ",
+        "items": [
+          "Home で写真、5 項目のスコア、実行可能な提案を含むレビュー成果を示します",
+          "Workspace は画像、意図と設定、送信の 3 段階を明確に分けました",
+          "Review、Retake、AI Create が次の撮影、比較、ビジュアルリファレンスをつなぎます"
+        ]
+      },
+      {
+        "title": "デザインシステムと信頼性",
+        "items": [
+          "DESIGN.md と共通のセマンティックカラー、パネル、操作、角丸、階層ルールを追加しました",
+          "デスクトップとモバイルのナビ、補助ページ、タスク状態を同じレスポンシブ階層に統一しました",
+          "コントラスト、動きの削減、モーダルフォーカス、Portal アクセシビリティ、流入計測の契約テストを強化しました"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-07-17-gpt56-retake-coach",
     "date": "2026-07-17",
     "title": "GPT-5.6 Terra 撮り直しコーチとモデル別レビュー",

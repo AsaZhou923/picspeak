@@ -144,7 +144,7 @@ export function PromptExampleGallery({ onApply }: PromptExampleGalleryProps) {
               tabIndex={activeCategory === category ? 0 : -1}
               onClick={() => setActiveCategory(category)}
               onKeyDown={(event) => handleCategoryKeyDown(event, category)}
-              className={`inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border px-3 text-xs font-medium transition-colors ${
+              className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-control border px-3 text-xs font-medium transition-colors ${
                 activeCategory === category
                   ? 'border-gold/45 bg-gold/10 text-gold'
                   : 'border-border-subtle bg-surface/70 text-ink-muted hover:border-gold/30 hover:text-ink'
@@ -166,7 +166,7 @@ export function PromptExampleGallery({ onApply }: PromptExampleGalleryProps) {
             return (
               <article
                 key={example.id}
-                className="group grid overflow-hidden rounded-lg border border-border-subtle bg-surface/90 transition-colors hover:border-gold/35"
+                className="group grid overflow-hidden rounded-card border border-border-subtle bg-surface/90 transition-all hover:border-gold/35 hover:shadow-level-1"
               >
                 <div className="relative aspect-[4/3] bg-void/75 p-2">
                   <Image
@@ -174,9 +174,9 @@ export function PromptExampleGallery({ onApply }: PromptExampleGalleryProps) {
                     alt={title}
                     fill
                     sizes="(min-width: 1280px) 260px, (min-width: 640px) 45vw, 100vw"
-                    className="rounded-md object-contain p-2 transition-transform duration-500 group-hover:scale-[1.02]"
+                    className="rounded-control object-contain p-2 transition-transform duration-500 group-hover:scale-[1.02]"
                   />
-                  <div className="absolute left-3 top-3 rounded-md border border-void/30 bg-void/80 px-2.5 py-1 text-[11px] font-medium text-ink shadow-sm backdrop-blur">
+                  <div className="absolute left-3 top-3 rounded-control border border-void/30 bg-void/80 px-2.5 py-1 text-[11px] font-medium text-ink shadow-level-1 backdrop-blur">
                     {t(CATEGORY_LABEL_KEYS[example.category])}
                   </div>
                 </div>
@@ -192,7 +192,7 @@ export function PromptExampleGallery({ onApply }: PromptExampleGalleryProps) {
                         rel="noopener noreferrer"
                         title={t('generation_examples_source')}
                         aria-label={t('generation_examples_source')}
-                        className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border-subtle text-ink-subtle transition-colors hover:border-gold/30 hover:text-gold"
+                        className="mt-0.5 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-control border border-border-subtle text-ink-subtle transition-colors hover:border-gold/30 hover:text-gold"
                       >
                         <ExternalLink size={13} />
                       </a>
@@ -208,7 +208,7 @@ export function PromptExampleGallery({ onApply }: PromptExampleGalleryProps) {
                     <button
                       type="button"
                       onClick={() => onApply(example)}
-                      className="inline-flex h-9 min-w-0 items-center justify-center gap-2 rounded-lg bg-gold px-3 text-xs font-bold text-void transition-colors hover:bg-gold-light"
+                      className="ui-action-primary min-w-0 px-3 text-xs"
                     >
                       <Wand2 size={13} />
                       <span className="truncate">{t('generation_examples_apply')}</span>
@@ -218,7 +218,7 @@ export function PromptExampleGallery({ onApply }: PromptExampleGalleryProps) {
                       onClick={() => void copyPrompt(example)}
                       title={copied ? t('generation_examples_copied') : t('generation_examples_copy')}
                       aria-label={copied ? t('generation_examples_copied') : t('generation_examples_copy')}
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border text-ink-muted transition-colors hover:border-gold/30 hover:text-gold"
+                      className="inline-flex h-11 w-11 items-center justify-center rounded-control border border-border bg-raised/70 text-ink-muted transition-colors hover:border-gold/30 hover:text-gold"
                     >
                       {copied ? <Check size={14} /> : <Copy size={14} />}
                     </button>

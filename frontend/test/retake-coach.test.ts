@@ -38,10 +38,12 @@ test('retake entry keeps only completed sources and carries the selected review 
 test('normal workspace exposes GPT-5.5 while retake flow stays locked to GPT-5.6 Terra', async () => {
   const source = await readFile('src/app/workspace/page.tsx', 'utf8');
   const picker = await readFile('src/features/workspace/components/ReviewModelPicker.tsx', 'utf8');
+  const settings = await readFile('src/features/workspace/components/WorkspaceSettingsPanel.tsx', 'utf8');
 
   assert.match(source, /review_model: selectedReviewModel/);
   assert.match(source, /isRetakeCoachFlow \? 'gpt-5\.6-terra' : reviewModel/);
-  assert.match(source, /<ReviewModelPicker/);
+  assert.match(source, /<WorkspaceSettingsPanel/);
+  assert.match(settings, /<ReviewModelPicker/);
   assert.match(picker, /Qwen 3\.5/);
   assert.match(picker, /GPT-5\.5/);
 });

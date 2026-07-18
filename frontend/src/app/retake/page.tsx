@@ -11,6 +11,7 @@ import {
   Repeat2,
   ScanSearch,
   Sparkles,
+  Target,
 } from 'lucide-react';
 import { getMyReviews } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
@@ -18,7 +19,15 @@ import { formatUserFacingError } from '@/lib/error-utils';
 import { useI18n } from '@/lib/i18n';
 import { getRetakeCoachCopy } from '@/lib/retake-coach-copy';
 import { buildRetakeWorkspaceHref, getEligibleRetakeSources } from '@/lib/retake-coach';
-import type { ReviewHistoryItem } from '@/lib/types';
+import type { RetakeDimensionKey, ReviewHistoryItem } from '@/lib/types';
+
+const DIMENSIONS: RetakeDimensionKey[] = ['composition', 'lighting', 'color', 'impact', 'technical'];
+
+function getWeakestDimension(item: ReviewHistoryItem): RetakeDimensionKey {
+  return DIMENSIONS.reduce((weakest, key) => (
+    item.scores[key] < item.scores[weakest] ? key : weakest
+  ), DIMENSIONS[0]);
+}
 
 function SourceCard({ item }: { item: ReviewHistoryItem }) {
   const { locale } = useI18n();
@@ -27,12 +36,13 @@ function SourceCard({ item }: { item: ReviewHistoryItem }) {
     locale === 'zh' ? 'zh-CN' : locale === 'ja' ? 'ja-JP' : 'en-US',
     { year: 'numeric', month: 'short', day: 'numeric' }
   );
+  const targetDimension = getWeakestDimension(item);
 
   return (
     <Link
       href={buildRetakeWorkspaceHref(item)}
       prefetch={false}
-      className="group overflow-hidden rounded-[24px] border border-border-subtle bg-raised/65 transition-all duration-300 hover:-translate-y-1 hover:border-sage/45 hover:shadow-[0_24px_70px_rgba(0,0,0,0.16)]"
+      className="group overflow-hidden rounded-feature border border-border-subtle bg-raised/65 shadow-level-1 transition-all duration-300 hover:-translate-y-1 hover:border-sage/45 hover:shadow-level-2"
     >
       <div className="relative aspect-[4/3] overflow-hidden bg-void/50">
         {item.photo_url ? (
@@ -61,12 +71,16 @@ function SourceCard({ item }: { item: ReviewHistoryItem }) {
         )}
       </div>
       <div className="p-4">
+        <p className="mb-3 flex items-center gap-2 rounded-control border border-border-subtle bg-surface/70 px-3 py-2 text-xs text-ink-muted">
+          <Target size={13} className="shrink-0 text-gold" aria-hidden="true" />
+          <span><span className="font-semibold text-ink">{copy.target}:</span> {copy.dimensions[targetDimension]}</span>
+        </p>
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-[11px] uppercase tracking-[0.18em] text-ink-subtle">{date}</p>
             <p className="mt-1 text-sm text-ink-muted">{item.image_type.replace('_', ' ')}</p>
           </div>
-          <span className="inline-flex items-center gap-2 rounded-full border border-sage/30 bg-sage/10 px-3 py-2 text-xs font-medium text-sage transition-colors group-hover:bg-sage group-hover:text-void">
+          <span className="inline-flex min-h-11 items-center gap-2 rounded-control border border-sage/30 bg-sage/10 px-3 py-2 text-xs font-semibold text-sage transition-colors group-hover:bg-sage group-hover:text-void">
             {copy.select}
             <ArrowRight size={12} />
           </span>
@@ -78,7 +92,7 @@ function SourceCard({ item }: { item: ReviewHistoryItem }) {
 
 function SourceSkeleton() {
   return (
-    <div className="overflow-hidden rounded-[24px] border border-border-subtle bg-raised/45">
+    <div className="overflow-hidden rounded-feature border border-border-subtle bg-raised/45">
       <div className="aspect-[4/3] shimmer" />
       <div className="space-y-3 p-4">
         <div className="h-3 w-24 rounded shimmer" />
@@ -117,11 +131,9 @@ export default function RetakeCoachPage() {
   const sources = useMemo(() => getEligibleRetakeSources(items), [items]);
 
   return (
-    <div className="min-h-screen pt-14">
-      <section className="relative overflow-hidden border-b border-border-subtle px-6 py-14 sm:py-20">
-        <div className="pointer-events-none absolute -right-32 -top-48 h-[520px] w-[520px] rounded-full bg-sage/10 blur-[100px]" />
-        <div className="pointer-events-none absolute -left-48 bottom-[-260px] h-[480px] w-[480px] rounded-full bg-gold/10 blur-[110px]" />
-        <div className="relative mx-auto max-w-5xl">
+    <div className="min-h-screen">
+      <section className="border-b border-border-subtle px-5 py-14 sm:px-6 sm:py-20">
+        <div className="mx-auto max-w-workspace">
           <div className="flex flex-wrap items-center gap-3">
             <span className="inline-flex items-center gap-2 rounded-full border border-sage/30 bg-sage/10 px-3 py-1.5 text-[11px] font-mono uppercase tracking-[0.2em] text-sage">
               <ScanSearch size={13} />
@@ -137,15 +149,20 @@ export default function RetakeCoachPage() {
           </h1>
           <p className="mt-6 max-w-2xl text-base leading-8 text-ink-muted sm:text-lg">{copy.body}</p>
 
-          <ol className="mt-10 grid gap-px overflow-hidden rounded-[24px] border border-border-subtle bg-border-subtle sm:grid-cols-3">
+          <ol className="mt-10 grid gap-px overflow-hidden rounded-feature border border-border-subtle bg-border-subtle sm:grid-cols-2 lg:grid-cols-4" aria-label={copy.title}>
             {copy.steps.map((step, index) => (
-              <li key={step} className="flex items-center gap-4 bg-void/90 px-5 py-4">
-                <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-xs font-mono ${
+              <li key={step} className="flex items-center gap-3 bg-surface px-5 py-4">
+                <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border text-xs font-mono ${
                   index === 0 ? 'border-sage/40 bg-sage/15 text-sage' : 'border-border bg-raised text-ink-subtle'
-                }`}>
-                  {index === 0 ? <Check size={13} /> : `0${index + 1}`}
+                }`} aria-hidden="true">
+                  {index === 0 ? <Check size={14} /> : `0${index + 1}`}
                 </span>
-                <span className="text-sm text-ink">{step}</span>
+                <span>
+                  <span className="block text-sm font-semibold text-ink">{step}</span>
+                  <span className="mt-0.5 block text-[11px] text-ink-subtle">
+                    {index === 0 ? copy.currentStep : copy.upcomingStep}
+                  </span>
+                </span>
               </li>
             ))}
           </ol>
@@ -153,11 +170,11 @@ export default function RetakeCoachPage() {
       </section>
 
       <section className="px-6 py-12 sm:py-16">
-        <div className="mx-auto max-w-5xl">
+        <div className="mx-auto max-w-workspace">
           <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
             <div>
-              <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-gold/75">01 / Original</p>
-              <h2 className="mt-2 font-display text-3xl text-ink sm:text-4xl">{copy.sourceTitle}</h2>
+              <p className="ui-eyebrow">01 / Original</p>
+              <h2 className="mt-2 text-3xl font-semibold text-ink sm:text-4xl">{copy.sourceTitle}</h2>
               <p className="mt-3 max-w-2xl text-sm leading-7 text-ink-muted">{copy.sourceBody}</p>
             </div>
             {!loading && !error && sources.length > 0 && (
@@ -173,25 +190,25 @@ export default function RetakeCoachPage() {
               {Array.from({ length: 6 }, (_, index) => <SourceSkeleton key={index} />)}
             </div>
           ) : error ? (
-            <div className="rounded-[24px] border border-rust/25 bg-rust/5 px-6 py-10 text-center">
+            <div role="alert" className="rounded-feature border border-rust/25 bg-rust/5 px-6 py-10 text-center">
               <p className="text-sm text-rust">{error}</p>
               <button
                 type="button"
                 onClick={() => void loadSources()}
-                className="mt-5 inline-flex items-center gap-2 rounded-full border border-rust/30 px-4 py-2 text-sm text-rust transition-colors hover:bg-rust/10"
+                className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-control border border-rust/30 px-4 py-2 text-sm font-semibold text-rust transition-colors hover:bg-rust/10"
               >
                 <RefreshCw size={13} />
                 {copy.retry}
               </button>
             </div>
           ) : sources.length === 0 ? (
-            <div className="rounded-[28px] border border-border-subtle bg-raised/45 px-6 py-14 text-center">
+            <div className="ui-feature-panel px-6 py-14 text-center">
               <Repeat2 size={26} className="mx-auto text-gold" />
               <h2 className="mt-5 font-display text-3xl text-ink">{copy.emptyTitle}</h2>
               <p className="mx-auto mt-3 max-w-lg text-sm leading-7 text-ink-muted">{copy.emptyBody}</p>
               <Link
                 href="/workspace"
-                className="btn-gold mt-6 inline-flex items-center gap-2 rounded-full bg-gold px-5 py-3 text-sm font-medium text-void hover:bg-gold-light"
+                className="ui-action-primary mt-6 px-5 py-3 text-sm"
               >
                 {copy.firstReview}
                 <ArrowRight size={13} />

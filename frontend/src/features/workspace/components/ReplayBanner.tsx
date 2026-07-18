@@ -1,11 +1,12 @@
 import Image from 'next/image';
 import { ImageType, ReviewModel } from '@/lib/types';
 import { Stage } from '../hooks/useUploadFlow';
-import { ImageTypePicker } from './ImageTypePicker';
-import { ModePicker } from './ModePicker';
 import { type Translator, useI18n } from '@/lib/i18n';
 import { getReplayIntentCopy } from '@/lib/replay-intent-copy';
-import { ReviewModelPicker } from './ReviewModelPicker';
+import { WorkspaceSettingsPanel } from './WorkspaceSettingsPanel';
+import { WorkspaceSubmitPanel } from './WorkspaceSubmitPanel';
+import { WorkspaceTaskShell } from './WorkspaceTaskShell';
+import { getWorkspaceTaskFlowCopy } from '../workspaceTaskFlow';
 
 interface ReplayBannerProps {
   replayPhotoUrl: string | null;
@@ -14,6 +15,9 @@ interface ReplayBannerProps {
   reviewModel: ReviewModel;
   isGuest: boolean;
   stage: Stage;
+  errorMessage: string;
+  remainingQuota: number | null;
+  totalQuota: number | null;
   onImageTypeChange: (type: ImageType) => void;
   onReviewModeChange: (mode: 'flash' | 'pro') => void;
   onReviewModelChange: (model: ReviewModel) => void;
@@ -29,6 +33,9 @@ export function ReplayBanner({
   reviewModel,
   isGuest,
   stage,
+  errorMessage,
+  remainingQuota,
+  totalQuota,
   onImageTypeChange,
   onReviewModeChange,
   onReviewModelChange,
@@ -38,82 +45,77 @@ export function ReplayBanner({
 }: ReplayBannerProps) {
   const { locale } = useI18n();
   const copy = getReplayIntentCopy(locale);
+  const flowCopy = getWorkspaceTaskFlowCopy(locale);
+  const hasSubmitError = Boolean(stage === 'ready' && errorMessage);
+  const activeStep = stage === 'reviewing' || hasSubmitError ? 'submit' : 'settings';
 
   return (
-    <div className="overflow-hidden rounded-[24px] border border-border-subtle bg-[radial-gradient(circle_at_top_left,rgba(200,171,90,0.16),transparent_34%),rgb(var(--color-surface)/0.82)] p-5 animate-fade-in">
-      <div className="grid gap-5 md:grid-cols-[180px_1fr]">
-        <div className="space-y-3">
-          <div className="relative aspect-[4/3] overflow-hidden rounded-xl border border-border bg-raised">
-            {replayPhotoUrl ? (
-              <Image
-                src={replayPhotoUrl}
-                alt={t('replay_current_photo')}
-                fill
-                className="object-cover"
-                unoptimized
-              />
-            ) : (
-              <div className="flex h-full items-center justify-center px-4 text-center text-xs text-ink-subtle">
-                {copy.currentPhotoLabel}
-              </div>
-            )}
-          </div>
-          <div className="rounded-full border border-gold/30 bg-gold/10 px-3 py-1 text-center text-[11px] uppercase tracking-[0.22em] text-gold/85">
-            {copy.currentPhotoLabel}
-          </div>
-        </div>
-
-        <div className="space-y-5">
-          <div className="space-y-2">
-            <h2 className="font-display text-2xl text-ink">{copy.workspaceTitle}</h2>
-            <p className="text-sm leading-7 text-ink-muted">{copy.workspaceBody}</p>
-            <div className="inline-flex rounded-full border border-gold/25 bg-gold/8 px-3 py-1 text-[11px] text-gold/85">
-              {copy.verificationHint}
+    <div className="animate-fade-in">
+      <WorkspaceTaskShell
+        copy={flowCopy}
+        activeStep={activeStep}
+        completedSteps={activeStep === 'submit' ? ['image', 'settings'] : ['image']}
+        image={
+          <div className="space-y-4">
+            <div>
+              <h2 className="font-display text-2xl text-ink">{copy.workspaceTitle}</h2>
+              <p className="mt-2 text-sm leading-7 text-ink-muted">{copy.workspaceBody}</p>
+            </div>
+            <div className="relative aspect-[4/3] overflow-hidden rounded-card border border-border bg-raised">
+              {replayPhotoUrl ? (
+                <Image
+                  src={replayPhotoUrl}
+                  alt={t('replay_current_photo')}
+                  fill
+                  className="object-cover"
+                  unoptimized
+                />
+              ) : (
+                <div className="flex h-full items-center justify-center px-4 text-center text-xs text-ink-subtle">
+                  {copy.currentPhotoLabel}
+                </div>
+              )}
+            </div>
+            <div className="flex items-center justify-between gap-3 rounded-control border border-sage/25 bg-sage/10 px-3 py-2 text-xs">
+              <span className="font-bold text-sage">{copy.currentPhotoLabel}</span>
+              <span className="text-ink-muted">{copy.verificationHint}</span>
             </div>
           </div>
-
-          <div>
-            <p className="mb-3 text-xs text-ink-muted">{t('select_image_type')}</p>
-            <ImageTypePicker value={imageType} onChange={onImageTypeChange} variant="compact" t={t} />
-          </div>
-
-          <div>
-            <p className="mb-3 text-xs text-ink-muted">
-              {locale === 'en' ? 'Select review model' : locale === 'ja' ? '講評モデルを選択' : '选择评图模型'}
-            </p>
-            <ReviewModelPicker value={reviewModel} onChange={onReviewModelChange} locale={locale} />
-          </div>
-
-          <div>
-            <p className="mb-3 text-xs text-ink-muted">{t('select_mode')}</p>
-            <ModePicker
-              value={reviewMode}
-              onChange={onReviewModeChange}
+        }
+        settings={
+          stage !== 'reviewing' ? (
+            <WorkspaceSettingsPanel
+              imageType={imageType}
+              reviewMode={reviewMode}
+              reviewModel={reviewModel}
               isGuest={isGuest}
-              variant="compact"
+              locale={locale}
+              remainingQuota={remainingQuota}
+              totalQuota={totalQuota}
+              onImageTypeChange={onImageTypeChange}
+              onReviewModeChange={onReviewModeChange}
+              onReviewModelChange={onReviewModelChange}
               t={t}
             />
-          </div>
-
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={onStartReview}
-              disabled={stage === 'reviewing'}
-              className="btn-gold flex-1 rounded bg-gold px-6 py-3 text-sm font-medium text-void transition-all duration-200 hover:bg-gold-light hover:shadow-[0_0_24px_rgba(200,162,104,0.35)] active:scale-[0.98] disabled:cursor-wait disabled:opacity-70"
-            >
-              {t('btn_start_review')} {reviewMode === 'pro' ? 'Pro' : 'Flash'} {t('btn_review_suffix')}
-            </button>
-            <button
-              type="button"
-              onClick={onUploadNew}
-              className="rounded border border-border px-4 py-3 text-sm text-ink-muted transition-all duration-200 hover:border-gold/40 hover:text-ink active:scale-[0.98]"
-            >
-              {copy.uploadNewLabel}
-            </button>
-          </div>
-        </div>
-      </div>
+          ) : undefined
+        }
+        submit={
+          <WorkspaceSubmitPanel
+            imageType={imageType}
+            reviewMode={reviewMode}
+            reviewModel={reviewModel}
+            locale={locale}
+            remainingQuota={remainingQuota}
+            totalQuota={totalQuota}
+            isSubmitting={stage === 'reviewing'}
+            errorMessage={hasSubmitError ? errorMessage : undefined}
+            secondaryLabel={copy.uploadNewLabel}
+            onSubmit={onStartReview}
+            onSecondary={onUploadNew}
+            t={t}
+          />
+        }
+      />
     </div>
   );
 }

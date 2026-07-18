@@ -198,6 +198,7 @@ Frontend values live in `frontend/.env.local`; `NEXT_PUBLIC_API_URL` and site/pu
 - Retake deltas must always be calculated from the two scores produced inside the same paired request; never subtract a stored Qwen score from a GPT-5.6 Terra score.
 - When touching public pages, update localized copy and SEO tests together.
 - Use `serializeJsonLd()` for inline JSON-LD scripts, and reuse shared date, locale, and checkout helpers before reintroducing page-local copies.
+- Treat root `DESIGN.md` as the frontend product and UI decision baseline; preserve the professional photography coach plus efficient AI tool hierarchy when changing public or workflow pages.
 - Header visibility is intentionally split: `showUsageNav` and `showMobileTabs` are public navigation, while authenticated account controls still wait for hydrated non-guest user state.
 - Follow `docs/changelog/CHANGELOG_WORKFLOW.md`; keep `docs/changelog/CHANGELOG.md`, `/updates` docPath anchors, homepage update hints, README links, and the external Update Logs mirror synchronized for user-facing feature work.
 

@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { AlertCircle, CheckCircle2, Clock, Cpu, Palette, Save, Sparkles } from 'lucide-react';
+import { AlertCircle, ArrowLeft, CheckCircle2, Clock, Cpu, Palette, Save, Sparkles } from 'lucide-react';
 import { getGenerationTask, isAbortError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { ApiException, GenerationTaskStatusResponse } from '@/lib/types';
@@ -154,12 +155,12 @@ export default function GenerationTaskPage() {
   const creditExhausted = failed && task?.error?.code === 'IMAGE_GENERATION_CREDITS_EXHAUSTED';
   const showWaitingBlog = !failed && !error;
   const waitingLayoutClass = showWaitingBlog
-    ? 'max-w-6xl lg:grid-cols-[minmax(0,560px)_360px]'
-    : 'max-w-lg';
+    ? 'lg:grid-cols-[minmax(0,1fr)_360px]'
+    : 'max-w-task';
   const statusTitle =
     task?.status === 'SUCCEEDED'
       ? t('generation_task_opening')
-      : task?.status === 'PENDING'
+      : !task || task.status === 'PENDING'
         ? t('generation_task_queued')
         : t('generation_task_generating');
   const waitNote = GENERATION_WAIT_NOTES[Math.min(activeStep, GENERATION_WAIT_NOTES.length - 1)];
@@ -187,110 +188,152 @@ export default function GenerationTaskPage() {
   }
 
   return (
-    <div className="min-h-screen px-6 pb-12 pt-20 lg:flex lg:items-center lg:pt-14">
-      <div className={`mx-auto grid w-full items-center justify-items-center gap-6 lg:justify-items-stretch ${waitingLayoutClass}`}>
-        <div className="mx-auto w-full max-w-lg space-y-9 text-center">
-        <p className="font-mono text-xs text-ink-subtle">{t('generation_task_id_label')} {taskId}</p>
-        <div className="relative">
-          <div className="absolute left-10 right-10 top-5 h-px bg-border" />
-          <div
-            className="absolute left-10 top-5 h-px bg-gold transition-all duration-700"
-            style={{ width: `calc((100% - 5rem) * ${activeStep / (steps.length - 1)})` }}
-          />
-          <div className="relative flex justify-between">
-            {steps.map((step, index) => {
-              const Icon = step.icon;
-              const active = index <= activeStep;
-              return (
-                <div key={step.label} className="flex flex-col items-center gap-2">
-                  <div className={`flex h-10 w-10 items-center justify-center rounded-full border ${active ? 'border-gold bg-gold/10 text-gold' : 'border-border bg-raised text-ink-subtle'}`}>
-                    <Icon size={16} />
-                  </div>
-                  <span className="font-mono text-xs text-ink-muted">{step.label}</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {failed ? (
-          <div className="space-y-4">
-            <AlertCircle size={44} className="mx-auto text-rust" />
-            <h1 className="font-display text-3xl text-ink">{t('generation_task_failed_title')}</h1>
-            <p className="text-sm leading-7 text-ink-muted">
-              {task?.error?.message ?? t('generation_task_failed_body')}
-            </p>
-            {creditExhausted && (
-              <div className="mx-auto max-w-sm rounded-lg border border-rust/20 bg-rust/5 p-4">
-                <button
-                  type="button"
-                  onClick={() => void handleCreditPackCheckout()}
-                  disabled={creditPackCheckout.busy}
-                  className="w-full rounded-full border border-rust/25 bg-void/40 px-4 py-2.5 text-sm font-medium text-rust transition-colors hover:bg-rust/10 disabled:opacity-60"
-                >
-                  {t('usage_credit_pack_button')}
-                </button>
-                <p className="mt-2 text-xs leading-5 text-ink-subtle">{t('usage_credit_pack_payment_hint')}</p>
-                {creditPackCheckout.message && (
-                  <p className="mt-3 rounded-md border border-border-subtle bg-void/30 px-3 py-2 text-xs leading-5 text-ink-muted">
-                    {creditPackCheckout.message}
+    <div className="min-h-screen">
+      <div className="mx-auto max-w-workspace px-4 py-8 sm:px-6 sm:py-12">
+        <div className={`mx-auto grid w-full items-start gap-6 ${waitingLayoutClass}`}>
+          <div className="min-w-0 space-y-6">
+            <section className="ui-feature-panel p-5 sm:p-8" aria-labelledby="generation-task-status">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="ui-eyebrow">{t('generation_wait_label')}</p>
+                  <h1 id="generation-task-status" aria-live="polite" className="mt-2 text-3xl font-semibold tracking-tight text-ink">
+                    {failed ? t('generation_task_failed_title') : statusTitle}
+                  </h1>
+                  <p className="mt-3 break-all font-mono text-xs text-ink-subtle">
+                    {t('generation_task_id_label')} {taskId}
                   </p>
-                )}
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <h1 className="font-display text-3xl text-ink">
-              {statusTitle}
-            </h1>
-            <div className="h-1 overflow-hidden rounded-full bg-border">
-              <div className="h-full rounded-full bg-gold transition-all duration-700" style={{ width: `${progress}%` }} />
-            </div>
-            <p className="font-mono text-xs text-ink-subtle">{progress}%</p>
-          </div>
-        )}
-
-        {!failed && !error && (
-          <section className="rounded-lg border border-border-subtle bg-surface/70 p-4 text-left shadow-[0_18px_50px_rgba(0,0,0,0.12)]">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-gold/80">{t('generation_wait_label')}</p>
-                <h2 className="mt-1 text-sm font-medium text-ink">{t(waitNote.title)}</h2>
-              </div>
-              <Sparkles size={18} className="shrink-0 animate-pulse text-gold/80" />
-            </div>
-            <p className="text-xs leading-6 text-ink-muted">{t(waitNote.body)}</p>
-            <div className="mt-4 grid grid-cols-4 gap-1.5">
-              {GENERATION_DIMENSIONS.map((dimension, index) => (
-                <div
-                  key={dimension}
-                  className={`rounded-md border px-2 py-2 text-center text-[10px] transition-all ${
-                    index <= dimensionActiveIdx
-                      ? 'border-gold/35 bg-gold/10 text-gold'
-                      : 'border-border bg-raised/45 text-ink-subtle'
+                </div>
+                <span
+                  className={`inline-flex min-h-9 items-center rounded-full border px-3 py-1 font-mono text-xs font-semibold ${
+                    failed
+                      ? 'border-rust/35 bg-rust/10 text-rust'
+                      : 'border-gold/35 bg-gold/10 text-gold'
                   }`}
                 >
-                  {t(dimension)}
-                </div>
-              ))}
-            </div>
-            <p className="mt-4 flex items-start gap-2 rounded-md border border-sage/20 bg-sage/5 px-3 py-2 text-xs leading-5 text-sage">
-              <Palette size={13} className="mt-0.5 shrink-0" />
-              <span>{t('generation_wait_prompt')}</span>
-            </p>
-          </section>
-        )}
+                  {task?.status ?? 'PENDING'}
+                </span>
+              </div>
 
-        {error && (
-          <p className="rounded-lg border border-rust/20 bg-rust/5 px-4 py-3 text-sm text-rust">{error}</p>
-        )}
-      </div>
-      {showWaitingBlog && (
-        <div className="mx-auto w-full max-w-md lg:max-w-none">
-          <WaitingBlogWindow variant="generation" />
+              <div className="mt-7">
+                <div
+                  role="progressbar"
+                  aria-label={statusTitle}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={progress}
+                  className="h-2 overflow-hidden rounded-full bg-border"
+                >
+                  <div className="h-full rounded-full bg-gold transition-all duration-700" style={{ width: `${progress}%` }} />
+                </div>
+                <p className="mt-2 text-right font-mono text-xs text-ink-subtle">{progress}%</p>
+              </div>
+
+              <div className="relative mt-7">
+                <div className="absolute left-5 right-5 top-5 h-px bg-border" aria-hidden="true" />
+                <div
+                  className="absolute left-5 top-5 h-px bg-gold transition-all duration-700"
+                  style={{ width: `calc((100% - 2.5rem) * ${activeStep / (steps.length - 1)})` }}
+                  aria-hidden="true"
+                />
+                <ol className="relative grid grid-cols-4 gap-1">
+                  {steps.map((step, index) => {
+                    const Icon = step.icon;
+                    const active = index <= activeStep;
+                    return (
+                      <li key={step.label} className="flex min-w-0 flex-col items-center gap-2 text-center" aria-current={index === activeStep ? 'step' : undefined}>
+                        <span className={`flex h-10 w-10 items-center justify-center rounded-full border ${active ? 'border-gold bg-gold/10 text-gold' : 'border-border bg-raised text-ink-subtle'}`}>
+                          <Icon size={16} aria-hidden="true" />
+                        </span>
+                        <span className="text-[10px] font-medium leading-4 text-ink-muted sm:text-xs">{step.label}</span>
+                      </li>
+                    );
+                  })}
+                </ol>
+              </div>
+
+              {failed && (
+                <div role="alert" className="mt-7 border-t border-border-subtle pt-6">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle size={22} className="mt-0.5 shrink-0 text-rust" aria-hidden="true" />
+                    <p className="text-sm leading-7 text-ink-muted">
+                      {task?.error?.message ?? t('generation_task_failed_body')}
+                    </p>
+                  </div>
+                  <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                    {creditExhausted && (
+                      <button
+                        type="button"
+                        onClick={() => void handleCreditPackCheckout()}
+                        disabled={creditPackCheckout.busy}
+                        className="ui-action-primary w-full px-4 text-sm disabled:opacity-60"
+                      >
+                        {t('usage_credit_pack_button')}
+                      </button>
+                    )}
+                    <Link
+                      href="/generate"
+                      className={`ui-action-secondary w-full px-4 text-sm ${creditExhausted ? '' : 'sm:col-span-2'}`}
+                    >
+                      <ArrowLeft size={15} aria-hidden="true" />
+                      {t('generation_detail_back_generate')}
+                    </Link>
+                  </div>
+                  {creditExhausted && (
+                    <p className="mt-3 text-xs leading-5 text-ink-subtle">{t('usage_credit_pack_payment_hint')}</p>
+                  )}
+                  {creditPackCheckout.message && (
+                    <p aria-live="polite" className="mt-3 rounded-control border border-border-subtle bg-void/30 px-3 py-2 text-xs leading-5 text-ink-muted">
+                      {creditPackCheckout.message}
+                    </p>
+                  )}
+                </div>
+              )}
+            </section>
+
+            {!failed && !error && (
+              <section className="ui-panel p-5 text-left sm:p-6">
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="ui-eyebrow text-[10px]">{t('generation_wait_label')}</p>
+                    <h2 className="mt-1 text-base font-semibold text-ink">{t(waitNote.title)}</h2>
+                  </div>
+                  <Sparkles size={20} className="shrink-0 animate-pulse text-gold" aria-hidden="true" />
+                </div>
+                <p className="text-sm leading-7 text-ink-muted">{t(waitNote.body)}</p>
+                <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {GENERATION_DIMENSIONS.map((dimension, index) => (
+                    <div
+                      key={dimension}
+                      className={`rounded-control border px-2 py-2.5 text-center text-xs font-medium transition-all ${
+                        index <= dimensionActiveIdx
+                          ? 'border-gold/35 bg-gold/10 text-gold'
+                          : 'border-border bg-raised/45 text-ink-subtle'
+                      }`}
+                    >
+                      {t(dimension)}
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-4 flex items-start gap-2 rounded-control border border-sage/25 bg-sage/10 px-3 py-3 text-xs leading-5 text-sage">
+                  <Palette size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
+                  <span>{t('generation_wait_prompt')}</span>
+                </p>
+              </section>
+            )}
+
+            {error && (
+              <p role="status" className="rounded-card border border-rust/30 bg-rust/10 px-4 py-3 text-sm text-rust">
+                {error}
+              </p>
+            )}
+          </div>
+
+          {showWaitingBlog && (
+            <aside className="mx-auto w-full max-w-md lg:max-w-none">
+              <WaitingBlogWindow variant="generation" />
+            </aside>
+          )}
         </div>
-      )}
       </div>
     </div>
   );

@@ -26,19 +26,21 @@ export default function GenerationPricingGrid({ t }: GenerationPricingGridProps)
   ];
 
   return (
-    <section className="mt-8">
+    <section className="mt-10" aria-labelledby="generation-pricing-heading">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="font-mono text-xs uppercase tracking-[0.22em] text-gold/70">
             {t('home_generation_pricing_label')}
           </p>
-          <h2 className="mt-2 font-display text-2xl text-ink">{t('home_generation_pricing_headline')}</h2>
+          <h2 id="generation-pricing-heading" className="mt-2 text-xl font-semibold text-ink sm:text-2xl">
+            {t('home_generation_pricing_headline')}
+          </h2>
         </div>
         <p className="max-w-2xl text-sm leading-6 text-ink-muted">{t('home_generation_pricing_body')}</p>
       </div>
       <div className="mt-4 grid gap-3 md:grid-cols-3">
         {pricingItems.map((item) => (
-          <article key={item.title} className="rounded-lg border border-border-subtle bg-surface/80 p-4">
+          <article key={item.title} className="rounded-card border border-border-subtle bg-surface/80 p-4">
             <div className="flex items-start justify-between gap-3">
               <h3 className="text-sm font-semibold text-ink">{item.title}</h3>
               <span className="rounded-full border border-gold/25 bg-gold/10 px-2.5 py-1 text-[11px] font-medium text-gold">
@@ -49,7 +51,7 @@ export default function GenerationPricingGrid({ t }: GenerationPricingGridProps)
           </article>
         ))}
       </div>
-      <p className="mt-3 rounded-lg border border-border-subtle bg-raised/70 px-4 py-3 text-xs leading-5 text-ink-muted">
+      <p className="mt-3 rounded-control border border-border-subtle bg-raised/70 px-4 py-3 text-xs leading-5 text-ink-muted">
         {t('home_generation_pricing_model_note')}
       </p>
     </section>

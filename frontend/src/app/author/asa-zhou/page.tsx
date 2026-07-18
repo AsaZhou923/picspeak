@@ -110,7 +110,7 @@ export default function AsaZhouAuthorPage() {
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(profileJsonLd) }}
       />
 
-      <main className="min-h-screen pt-14">
+      <div className="min-h-screen pt-10">
         <section className="mx-auto grid max-w-[1120px] gap-8 px-6 py-12 lg:grid-cols-[minmax(0,1fr)_340px] lg:py-16">
           <div>
             <p className="mb-3 text-xs uppercase tracking-[0.32em] text-gold/70">Author</p>
@@ -192,7 +192,7 @@ export default function AsaZhouAuthorPage() {
             </div>
           </aside>
         </section>
-      </main>
+      </div>
     </>
   );
 }

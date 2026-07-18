@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-07-18-frontend-coach-toolbench-redesign",
+    "date": "2026-07-18",
+    "title": "Photography-coach frontend and core workflow redesign",
+    "summary": "PicSpeak now presents one coherent professional photography coach and efficient AI tool experience. Home shows a real critique artifact, Workspace, Review, Retake, and AI Create form a continuous practice loop, and supporting pages, responsive behavior, accessibility, and attribution follow the same system.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-07-18-frontend-coach-toolbench-redesign",
+    "sections": [
+      {
+        "title": "Core practice loop",
+        "items": [
+          "Home demonstrates critique value with a photo, five scores, and actionable guidance",
+          "Workspace now separates image, intent and settings, and submit into three visible stages",
+          "Review, Retake, and AI Create connect the next shoot, comparison, and visual-reference paths"
+        ]
+      },
+      {
+        "title": "Design system and reliability",
+        "items": [
+          "Added DESIGN.md plus shared semantic color, panel, action, radius, and elevation rules",
+          "Desktop and mobile navigation, supporting pages, and task states now share one responsive hierarchy",
+          "Improved contrast, reduced motion, modal focus, Portal accessibility, and attribution contract coverage"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-07-17-gpt56-retake-coach",
     "date": "2026-07-17",
     "title": "GPT-5.6 Terra Retake Coach and model-specific critique",

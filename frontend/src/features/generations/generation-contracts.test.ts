@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   GENERATION_TEMPLATES,
   GENERATION_SIZE_OPTIONS,
@@ -133,6 +134,12 @@ const _creditsTable: GenerationCreditsTable = {
     '1024x1536': 8,
   },
 };
+
+const generatePageSource = readFileSync(new URL('../../app/generate/GeneratePageClient.tsx', import.meta.url), 'utf8');
+const generateFormSource = readFileSync(new URL('./components/GenerateFormPanel.tsx', import.meta.url), 'utf8');
+const generationTaskSource = readFileSync(new URL('../../app/generation-tasks/[taskId]/page.tsx', import.meta.url), 'utf8');
+const generationDetailSource = readFileSync(new URL('../../app/generations/[generationId]/page.tsx', import.meta.url), 'utf8');
+
 test('generation create contract includes async task handoff fields', () => {
   assert.equal(_request.async, true);
   assert.equal(_response.status, 'PENDING');
@@ -164,4 +171,38 @@ test('usage and activation-code contracts expose quota and Pro grant fields', ()
   assert.equal(_activationCodeResponse.status, 'redeemed');
   assert.equal(_activationCodeResponse.plan, 'pro');
   assert.match(_activationCodeResponse.activated_until, /^2026-05-25/);
+});
+
+test('generation toolbench keeps prompt and settings ahead of supporting examples', () => {
+  assert.match(generateFormSource, /ui-feature-panel/);
+  assert.match(generateFormSource, /id="generation-prompt"/);
+  assert.ok(generatePageSource.indexOf('<GenerateFormPanel') < generatePageSource.indexOf('generation-cost-heading'));
+  assert.ok(generatePageSource.indexOf('generation-cost-heading') < generatePageSource.indexOf('<PromptExampleGallery'));
+});
+
+test('generation routes use the shared landmark and header-offset contracts', () => {
+  for (const source of [generatePageSource, generateFormSource, generationTaskSource, generationDetailSource]) {
+    assert.doesNotMatch(source, /<main\b/);
+  }
+  for (const source of [generatePageSource, generationTaskSource, generationDetailSource]) {
+    assert.doesNotMatch(source, /\bpt-(?:14|20)\b/);
+  }
+});
+
+test('generation analytics, idempotency and destinations remain wired', () => {
+  for (const eventName of [
+    'generation_page_viewed',
+    'generation_prompt_opened',
+    'generation_template_selected',
+    'generation_prompt_example_applied',
+    'generation_requested',
+    'generation_credit_exhausted',
+  ]) {
+    assert.match(generatePageSource, new RegExp(`'${eventName}'`));
+  }
+  assert.match(generatePageSource, /idempotency_key:/);
+  assert.match(generatePageSource, /router\.push\(`\/generation-tasks\/\$\{result\.task_id\}`\)/);
+  assert.match(generationTaskSource, /router\.replace\(destination\)/);
+  assert.match(generationTaskSource, /source_review_id: nextTask\.source_review_id/);
+  assert.match(generationDetailSource, /router\.push\(`\/workspace\?\$\{params\.toString\(\)\}`\)/);
 });

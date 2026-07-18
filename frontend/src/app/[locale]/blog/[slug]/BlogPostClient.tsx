@@ -115,7 +115,7 @@ function BlogPostContent({ slug }: { slug: string }) {
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbJsonLd) }}
       />
 
-      <article className="min-h-screen pt-14">
+      <article className="min-h-screen">
         <div className="mx-auto max-w-4xl px-6 py-14">
           <Link href={`/${locale}/blog`} className="inline-flex items-center gap-2 text-sm text-ink-muted transition-colors hover:text-gold">
             <ArrowLeft size={14} />

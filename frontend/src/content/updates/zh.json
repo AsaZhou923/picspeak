@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-07-18-frontend-coach-toolbench-redesign",
+    "date": "2026-07-18",
+    "title": "摄影教练式前端与核心工作流重构",
+    "summary": "PicSpeak 统一为“专业摄影教练 × 高效 AI 工具”的前端体验：首页展示真实点评产物，Workspace、Review、Retake 和 AI Create 形成连续练习链路，支撑页面、响应式布局、无障碍与转化归因也同步收敛。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-07-18-frontend-coach-toolbench-redesign",
+    "sections": [
+      {
+        "title": "核心练习链路",
+        "items": [
+          "首页用照片、五维评分和行动建议直接展示点评价值",
+          "Workspace 重构为图片、意图与设置、提交三阶段任务流",
+          "Review、Retake 和 AI Create 明确连接下一拍、对比和视觉参考图"
+        ]
+      },
+      {
+        "title": "设计系统与可靠性",
+        "items": [
+          "新增 DESIGN.md 与统一的语义色、面板、操作、圆角和阴影规则",
+          "桌面与移动导航、支撑页面和任务状态采用同一响应式层级",
+          "补强色彩对比、减少动效、弹窗焦点、Portal 可访问性和归因契约测试"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-07-17-gpt56-retake-coach",
     "date": "2026-07-17",
     "title": "GPT-5.6 Terra 复拍教练与模型专属点评",
