@@ -52,6 +52,30 @@ test('update content bundles keep the same ids across locales', () => {
   }
 });
 
+test('update entries point to existing unified changelog anchors in newest-first order', () => {
+  const entries = readJson<UpdateEntry[]>('src/content/updates/en.json');
+  const changelog = readFileSync(
+    path.join(TEST_DIR, '..', '..', 'docs', 'changelog', 'CHANGELOG.md'),
+    'utf8',
+  );
+
+  for (const [index, entry] of entries.entries()) {
+    const [docPath, anchor] = entry.docPath.split('#');
+
+    assert.equal(docPath, 'docs/changelog/CHANGELOG.md');
+    assert.ok(anchor);
+    assert.ok(changelog.includes(`<a id="${anchor}"></a>`));
+
+    if (index === 0) {
+      assert.equal(anchor, entry.id);
+    }
+
+    if (index > 0) {
+      assert.ok(entries[index - 1].date >= entry.date);
+    }
+  }
+});
+
 test('review dimension descriptions cover every locale, image type, and score dimension', () => {
   const descriptions = readJson<DimDescriptions>('src/content/review/dim-descriptions.json');
   const imageTypes = ['default', 'landscape', 'portrait', 'street', 'still_life', 'architecture'] as const;

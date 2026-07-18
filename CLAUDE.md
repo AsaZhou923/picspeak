@@ -14,6 +14,7 @@ Core product areas:
 - AI image generation with templates, tasks, generated image detail pages, history, credits, and credit-pack billing
 - Review-to-generation loop for composition, lighting, color, and retake reference images
 - Review-to-workspace retake targets, history practice themes, and in-task Blog reading during critique/generation waits
+- Original-to-retake comparison with GPT-5.6 Terra, deterministic score deltas, evidence-backed next-shoot actions, and same-chain progress tracking
 - Operational health snapshots for task status, AI costs, credits, payments, and public-content audits
 
 ## Architecture
@@ -22,7 +23,7 @@ Core product areas:
 - **Backend**: FastAPI, SQLAlchemy 2.x, Alembic, Uvicorn
 - **Database**: PostgreSQL
 - **Object storage**: Cloudflare R2 / S3-compatible storage
-- **AI critique**: OpenAI-compatible vision LLM endpoints, with Flash and Pro model settings
+- **AI critique**: Qwen-compatible single-photo critique by default, optional GPT-5.5 single-photo review through OpenAI Responses, and GPT-5.6 Terra paired original/retake comparison
 - **AI generation**: OpenAI-compatible image generation endpoint, task queue, credit pricing, and object-storage persistence
 - **Task processing**: In-process async worker by default, optional standalone worker and Cloud Tasks configuration
 - **Authentication**: Clerk plus legacy Google OAuth/guest JWT support
@@ -98,6 +99,7 @@ npm run test
 - `db/models.py` - SQLAlchemy models for users, photos, reviews, tasks, gallery, billing, usage, analytics, and generated images
 - `db/bootstrap.py` - Runtime schema bootstrap helpers
 - `services/ai.py` and `services/ai_prompts.py` - Vision critique client and prompt construction
+- `services/retake_comparison.py` - GPT-5.6 Terra paired-image schema, Responses API client, deterministic deltas, and comparison normalization
 - `services/review_task_processor.py` - Photo review task execution
 - `services/image_generation*.py` - Generation client, prompt building, pricing, and task execution
 - `services/object_storage.py` - Presigned upload/download and generated image persistence
@@ -115,9 +117,9 @@ npm run test
 
 ### Frontend (`frontend/src/`)
 
-- `app/` - App Router routes, including workspace, reviews, tasks, gallery, generate, generation tasks/details, account pages, blog, updates, localized pages, robots, sitemap, and llms.txt routes
-- `features/workspace/` - Upload flow, quota display, mode/image type pickers, and replay context
-- `features/reviews/` - Review detail hooks and UI panels, including action bar, gallery publishing, growth loop, retake target handoff, and reference generation
+- `app/` - App Router routes, including workspace, retake coach, reviews, tasks, gallery, generate, generation tasks/details, account pages, blog, updates, localized pages, robots, sitemap, and llms.txt routes
+- `features/workspace/` - Upload flow, quota display, mode/image type/model pickers, retake source handoff, and replay context
+- `features/reviews/` - Review detail hooks and UI panels, including action bar, gallery publishing, growth loop, paired retake comparison/progress, retake target handoff, and reference generation
 - `features/generations/` - Generation contracts, config, and prompt example UI
 - `components/` - Shared auth, billing, blog, gallery, home, layout, marketing, provider, upload, and UI components
 - `content/` - Blog, updates, generation prompt examples, and review copy/content bundles
@@ -141,6 +143,17 @@ npm run test
 3. Worker executes the OpenAI-compatible image generation request, stores the result in object storage, and writes generated image records.
 4. Frontend routes through `/generation-tasks/[taskId]` to `/generations/[generationId]`.
 5. Users can download, copy prompts, reuse settings, view account history, or send a result back to the workspace as retake inspiration.
+
+### Retake Coach
+
+1. User opens `/retake`, selects a completed source critique, and continues to the workspace with its source review and target context.
+2. The workspace uploads a new photo and creates a review with `analysis_type=retake_compare` and the source review id.
+3. Backend resolves both stored images and sends them together to the OpenAI Responses API with `model=gpt-5.6-terra` and a strict paired-comparison schema.
+4. GPT-5.6 Terra scores both images under one rubric; the server calculates every dimension and overall delta before persisting `Review.result_json.comparison`.
+5. Comparable results appear in `RetakeComparisonPanel` and the same-chain `RetakeProgressPanel`; non-comparable results keep their caveat but do not count as progress.
+6. The paired diagnosis can feed the existing GPT Image 2 `review_linked` / `retake_reference` flow, but generated images never affect comparison scores.
+
+Normal single-photo review is a separate path: Qwen 3.5 remains the compatibility default, while an explicit GPT-5.5 selection uses the OpenAI Responses API. Do not reuse one model's completed review for another model choice.
 
 ### Auth and quota
 
@@ -167,6 +180,7 @@ Backend values live in `backend/.env` and are documented by `backend/.env.exampl
 - Security/auth: `APP_SECRET`, `OAUTH_JWT_SECRET`, Clerk secrets, Google OAuth values
 - Storage: `OBJECT_*`
 - Critique AI: `AI_API_BASE_URL`, `AI_API_KEY`, `AI_MODEL_NAME`, `FLASH_MODEL_NAME`, `PRO_MODEL_NAME`
+- OpenAI review routing: `OPENAI_API_KEY`, `OPENAI_API_BASE_URL`, `OPENAI_REVIEW_*`, `RETAKE_ANALYSIS_*`
 - Generation AI: `IMAGE_GENERATION_API_KEY`, `IMAGE_GENERATION_*`
 - Workers/queue: `RUN_EMBEDDED_WORKER`, `REVIEW_WORKER_*`, `CLOUD_TASKS_*`
 - Billing: `LEMONSQUEEZY_*`
@@ -180,10 +194,12 @@ Frontend values live in `frontend/.env.local`; `NEXT_PUBLIC_API_URL` and site/pu
 - Keep backend task state changes transactional and idempotent.
 - Do not bypass quota, credit, or guest/auth helpers when adding new creation endpoints.
 - When touching image generation, update pricing, task processor, API schemas, frontend contracts, and tests together.
+- Keep normal GPT review pinned to GPT-5.5 and `retake_compare` pinned to GPT-5.6 Terra unless model-specific contract tests and redacted live routing evidence are updated together.
+- Retake deltas must always be calculated from the two scores produced inside the same paired request; never subtract a stored Qwen score from a GPT-5.6 Terra score.
 - When touching public pages, update localized copy and SEO tests together.
 - Use `serializeJsonLd()` for inline JSON-LD scripts, and reuse shared date, locale, and checkout helpers before reintroducing page-local copies.
 - Header visibility is intentionally split: `showUsageNav` and `showMobileTabs` are public navigation, while authenticated account controls still wait for hydrated non-guest user state.
-- Keep `docs/changelog/CHANGELOG.md`, `/updates` docPath anchors, and the external Update Logs mirror synchronized for user-facing feature work.
+- Follow `docs/changelog/CHANGELOG_WORKFLOW.md`; keep `docs/changelog/CHANGELOG.md`, `/updates` docPath anchors, homepage update hints, README links, and the external Update Logs mirror synchronized for user-facing feature work.
 
 ## Verification Checklist
 

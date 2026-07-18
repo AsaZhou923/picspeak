@@ -32,6 +32,7 @@
 - `提示词案例库` — 浏览 50 个可索引的 GPT Image 2 提示词案例，包含示例图、来源署名、本地化标题、静态详情页，并可带入工作台做复拍练习
 - `复拍参考` — 在点评详情里把改进建议转成构图、光线、色彩或复拍方向的 AI 参考图
 - `复拍练习闭环` — 把点评里的下一轮动作带回工作台，并保留来源点评与目标维度上下文
+- `GPT-5.6 Terra 复拍教练` — 在同一次 GPT-5.6 Terra 视觉请求中比较原片与复拍，展示五维分数变化、可见证据、下一轮动作与连续进步记录
 - `生成历史` — 查看生成结果、下载图片、复制提示词、再次生成，并可带回工作台作为复拍灵感
 - `生图额度` — 展示每月 AI 生图点数，支持兑换码加点和购买额外点数包
 - `使用额度` — 按日 / 按月控额，游客与注册用户独立计量
@@ -42,6 +43,41 @@
 - `收藏功能` — 收藏喜欢的评图结果，独立收藏页面集中管理
 - `影像长廊` — 展示社区精选作品，并提供服务端可见的点评摘要，便于公开浏览与搜索抓取
 - `等待页阅读` — 评图和生图等待时可在任务页右侧直接阅读完整镜头手记文章
+
+## OpenAI Build Week 2026
+
+PicSpeak 在 Build Week 提交窗口前已经存在。本次参赛贡献是在原有单张照片点评基础上新增可审计的复拍进步闭环，而不是只替换模型名称。活动前基线为 2026-07-01 的提交 [`b74ddfb`](https://github.com/AsaZhou923/picspeak/commit/b74ddfb88ae32e37965ba8b29f40c9ebcbbf77fc)。
+
+| Build Week 前 | Build Week 期间新增 |
+|---|---|
+| 单张照片点评 | 在同一次 GPT-5.6 Terra 请求中配对评估原片与复拍 |
+| 五个独立分数 | before / after 分数、后端确定性 delta 与可见证据 |
+| 另一张上传图的来源点评链接 | 专用 `retake_compare` 请求与持久化比较结果 |
+| 基于单次点评推断的建议 | 带可观察成功条件的下一轮拍摄动作 |
+| 最近记录与历史平均值 | 只聚合同一复拍链的进步曲线 |
+| 点评关联 GPT Image 2 提示词 | 把 GPT-5.6 Terra 配对诊断变成下一轮视觉目标 |
+
+普通单张点评工作台现在提供 Qwen 3.5 / GPT-5.5 模型选择。选择 GPT-5.5 后，真实照片会通过 OpenAI Responses API 和严格 Structured Outputs 完成分析；Qwen 仍是兼容默认值。Retake Coach 的配对比较固定使用 GPT-5.6 Terra。
+
+```text
+工作台上传复拍
+  -> POST /reviews (analysis_type=retake_compare)
+  -> backend/app/services/review_task_processor.py
+  -> backend/app/services/retake_comparison.py
+  -> POST https://api.openai.com/v1/responses (model=gpt-5.6-terra)
+  -> 两个 input_image + strict JSON Schema
+  -> Review.result_json.comparison
+  -> 复拍对比 / 进步曲线 / GPT Image 2 视觉参考
+```
+
+贡献边界、实现决策与验证证据：
+
+- [Build Week 贡献日志](docs/build-week/BUILD-WEEK-LOG.md)
+- [活动前基线证据](docs/build-week/BASELINE-EVIDENCE.md)
+- [脱敏 GPT-5.5 / GPT-5.6 Terra 路由证据](docs/build-week/evidence/live-gpt55-terra-routing-test-2026-07-17.json)
+- [英文演示脚本](docs/build-week/DEMO-SCRIPT.md)
+- [评委测试说明](docs/build-week/JUDGE-TESTING-INSTRUCTIONS.md)
+- [Devpost 提交文案](docs/build-week/SUBMISSION-COPY.md)
 
 ## 技术栈
 
@@ -61,6 +97,7 @@
 - PostgreSQL 14+
 - S3 兼容对象存储（如 Cloudflare R2、MinIO）
 - AI API Key（兼容 OpenAI 协议）
+- 具备 GPT-5.6 Terra 访问权限的 OpenAI API Key（用于复拍教练）
 - 可选：OpenAI 兼容生图端点，以及 Lemon Squeezy Pro 和生图点数包结账链接
 
 ### 1. 克隆仓库
@@ -75,6 +112,21 @@ cd picspeak
 ```bash
 cp backend/.env.example backend/.env
 # 编辑 backend/.env，按需填入数据库、对象存储、AI API、生图和计费配置
+```
+
+普通 GPT 点评与 Retake Coach 使用独立的 OpenAI Responses API 配置：
+
+```dotenv
+OPENAI_API_KEY=
+OPENAI_API_BASE_URL=https://api.openai.com/v1
+OPENAI_REVIEW_MODEL=gpt-5.5
+OPENAI_REVIEW_REASONING_EFFORT=medium
+OPENAI_REVIEW_TIMEOUT_SECONDS=180
+# 可选：完整 endpoint；留空时会在 base URL 后追加 /responses。
+RETAKE_ANALYSIS_API_URL=
+RETAKE_ANALYSIS_MODEL=gpt-5.6-terra
+RETAKE_ANALYSIS_REASONING_EFFORT=medium
+RETAKE_ANALYSIS_TIMEOUT_SECONDS=180
 ```
 
 ### 3. 安装后端依赖并运行迁移
@@ -125,7 +177,7 @@ cd frontend && npm run build && npm run start
 
 ## 文档
 
-- [最新更新日志](docs/changelog/CHANGELOG.md#2026-07-01-header-usage-nav-visibility)
+- [最新更新日志](docs/changelog/CHANGELOG.md#2026-07-17-gpt56-retake-coach)
 - [SEO / GEO 审计报告](docs/seo/seo-audit-2026-05-01.md)
 - [系统架构说明](docs/architecture/系统架构.md)
 - [Google 登录接入指南](docs/guides/Google登录接入指南.md)

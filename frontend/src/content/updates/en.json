@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-07-17-gpt56-retake-coach",
+    "date": "2026-07-17",
+    "title": "GPT-5.6 Terra Retake Coach and model-specific critique",
+    "summary": "PicSpeak now turns a single-photo critique into a measurable original-versus-retake loop. GPT-5.6 Terra compares both images in one request while the server calculates five-dimensional progress and saves evidence plus next-shoot actions; normal critique now exposes an explicit Qwen 3.5 / GPT-5.5 choice.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-07-17-gpt56-retake-coach",
+    "sections": [
+      {
+        "title": "Measurable retake progress",
+        "items": [
+          "A dedicated /retake entry lets users choose a completed source critique and upload a new attempt",
+          "GPT-5.6 Terra scores the original and retake under one rubric with visible evidence and next-shoot actions",
+          "The server calculates every delta deterministically, and non-comparable results stay out of the progress curve"
+        ]
+      },
+      {
+        "title": "Model routing and visual loop",
+        "items": [
+          "The normal workspace now offers Qwen 3.5 or GPT-5.5 while paired retake analysis stays pinned to GPT-5.6 Terra",
+          "Comparison data reuses source_review_id and result_json.comparison to preserve the full practice chain",
+          "The paired diagnosis can continue into a GPT Image 2 visual reference for the next shoot"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-07-01-header-usage-nav-visibility",
     "date": "2026-07-01",
     "title": "Fixed usage nav in the header and mobile tabs",

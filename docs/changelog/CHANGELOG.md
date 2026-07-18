@@ -2,6 +2,107 @@
 
 本文件汇总了原 `docs/changelog/update-log-*.md` 的全部更新记录。新增 release 请追加到顶部，并为每条记录保留稳定锚点，供 `/updates` 的 `docPath` 和 README 链接定位。
 
+<a id="2026-07-17-gpt56-retake-coach"></a>
+
+## 2026-07-17 - GPT-5.6 Terra retake coach
+
+日期：2026-07-17
+
+### 概览
+
+这次更新把原有的单张照片点评扩展成可审计的“原片 -> 复拍 -> 对比 -> 下一轮行动”练习闭环，并把普通点评与复拍对比的模型选择明确分开。
+
+- 新增独立 `/retake` 入口，用户可以从已完成点评中选择原片，再上传复拍照片进入配对分析。
+- Retake Coach 在同一次 GPT-5.6 Terra Responses API 请求中重新评估原片与复拍，后端确定性计算五个维度和总分的变化。
+- 普通点评新增 Qwen 3.5 / GPT-5.5 显式选择；`retake_compare` 始终固定使用 GPT-5.6 Terra，避免模型路径混淆。
+- 对比结果包含可见证据、下一轮拍摄动作、可验证成功条件和 GPT Image 2 视觉参考提示词，并沿现有 Review 链持久化。
+- Build Week 基线、贡献日志、演示脚本、评委测试说明与脱敏在线调用证据一并纳入仓库。
+
+### 可衡量的复拍进步
+
+- `/retake` 页面先选择一条已完成的来源点评，再把 `source_review_id`、目标维度和复拍上下文带入工作台。
+- `analysis_type=retake_compare` 会把原片与复拍图放进同一请求，由 GPT-5.6 Terra 在统一评分口径下返回五维 before / after 分数、可见证据和下一轮动作。
+- 所有维度 delta 与 overall delta 都由服务端计算，不采信模型生成的算术结果，也不会把历史 Qwen 分数与 GPT-5.6 Terra 分数直接相减。
+- 非同一场景或不可比图片仍会保留结果和 caveat，但不会展示进步徽章，也不会进入复拍进度曲线。
+- `RetakeComparisonPanel` 展示本次配对证据和动作，`RetakeProgressPanel` 只聚合同一来源链中的可比结果。
+
+### 模型路由与持久化
+
+- 普通工作台新增 Qwen 3.5 / GPT-5.5 模型选择器；Qwen 保持兼容默认值，GPT-5.5 通过 OpenAI Responses API 与严格 Structured Outputs 处理真实照片。
+- 复拍请求在前后端都归一化为 `retake_compare` + GPT-5.6 Terra，并通过模型相关的复用边界避免误返回旧模型点评。
+- 配对结果复用现有 `Review.source_review_id` 与 `Review.result_json.comparison`，无需新增数据表或迁移。
+- GPT-5.6 Terra 返回的 `visual_reference_prompt` 进入既有 `review_linked` / `retake_reference` 生图流程；生成图只作为下一轮视觉目标，不参与进步评分。
+
+### 产品入口与 Build Week 证据
+
+- 桌面和移动导航、首页、点评历史、点评详情与标准工作台都提供 Retake Coach 的可见入口，不依赖隐藏 query parameter。
+- `README.md` 记录 Build Week 前后边界、GPT-5.5 / GPT-5.6 Terra 调用路径、环境变量和验证证据。
+- `docs/build-week/` 新增基线证据、贡献日志、授权样例清单、演示脚本、评委测试说明、提交文案和脱敏在线调用结果。
+- `backend/.env.example` 新增普通 OpenAI 点评与复拍分析的独立 endpoint、模型、reasoning effort 和 timeout 配置。
+
+### 首页更新记录同步
+
+- `/updates` 中、英、日三语数据新增本条记录，`docPath` 统一指向 `docs/changelog/CHANGELOG.md#2026-07-17-gpt56-retake-coach`。
+- 首页联系区的三语“更新记录”提示改为 GPT-5.6 Terra Retake Coach 主题。
+- `README.md`、`README.zh-CN.md` 的最新 changelog 链接同步到本条锚点。
+- `CLAUDE.md` 补充模型路由、复拍比较流程、关键文件与配置约束。
+
+### 影响文件
+
+#### 后端
+
+- `backend/.env.example`
+- `backend/app/api/routers/review_create.py`
+- `backend/app/api/routers/review_support.py`
+- `backend/app/core/config.py`
+- `backend/app/schemas.py`
+- `backend/app/services/ai.py`
+- `backend/app/services/retake_comparison.py`
+- `backend/app/services/review_task_processor.py`
+- `backend/tests/test_guest_quota_scope.py`
+- `backend/tests/test_openai_photo_review.py`
+- `backend/tests/test_retake_comparison.py`
+- `backend/tests/test_retake_review_contract.py`
+
+#### 前端
+
+- `frontend/src/app/retake/`
+- `frontend/src/app/workspace/page.tsx`
+- `frontend/src/app/account/reviews/page.tsx`
+- `frontend/src/app/reviews/[reviewId]/page.tsx`
+- `frontend/src/components/home/HomePageClient.tsx`
+- `frontend/src/components/layout/{Header,HeaderControls,MarketingHeader}.tsx`
+- `frontend/src/features/reviews/components/{RetakeComparisonPanel,RetakeProgressPanel}.tsx`
+- `frontend/src/features/workspace/components/{ReplayBanner,RetakeWorkspaceIntro,ReviewModelPicker}.tsx`
+- `frontend/src/features/workspace/hooks/useReplayContext.ts`
+- `frontend/src/lib/{content-conversion,retake-coach-copy,retake-coach,retake-progress,types}.ts`
+- `frontend/test/{content-conversion,retake-coach,retake-progress}.test.ts`
+
+#### 文档与证据
+
+- `.gitignore`
+- `README.md`
+- `README.zh-CN.md`
+- `CLAUDE.md`
+- `docs/build-week/`
+- `docs/changelog/CHANGELOG.md`
+- `docs/changelog/CHANGELOG_WORKFLOW.md`
+- `frontend/src/content/updates/{zh,en,ja}.json`
+- `frontend/src/lib/i18n-{zh,en,ja}.ts`
+- `frontend/test/content-bundles.test.ts`
+
+### 验证
+
+- 原功能提交 `2a626aabab30d5cdb45ca0450fdd1ce7a5387b4c` 记录：208 个 backend tests 与 11 个 subtests、97 个 frontend tests、typecheck、lint、121 页面 production build，以及 GPT-5.5 / GPT-5.6 Terra 在线图片调用均已通过。
+- 三语 updates JSON 通过 `JSON.parse`。
+- `cd frontend && npm test -- content-bundles.test.ts` -> 98 passed；新增回归断言会检查三语 ID 对齐、实际 changelog 锚点存在、最新条目 ID 与锚点一致及日期倒序。
+- `cd frontend && npm run typecheck` 通过。
+- `cd frontend && npm run lint` 通过。
+- `cd frontend && npm run build` 通过，生成 121 个静态页面。
+- `git diff --check`、changelog / workflow 外部镜像 SHA256 对比与旧拆分路径扫描通过。
+
+---
+
 <a id="2026-07-01-header-usage-nav-visibility"></a>
 
 ## 2026-07-01 - header usage nav visibility
