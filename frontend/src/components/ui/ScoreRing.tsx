@@ -12,9 +12,9 @@ interface ScoreRingProps {
 }
 
 function scoreColor(score: number): string {
-  if (score >= 8) return '#7a9a78'; // sage
-  if (score >= 6) return '#c8a268'; // gold
-  return '#b07265'; // rust
+  if (score >= 8) return 'rgb(var(--color-sage))';
+  if (score >= 6) return 'rgb(var(--color-gold))';
+  return 'rgb(var(--color-rust))';
 }
 
 const ScoreRing = memo(function ScoreRing({
@@ -44,14 +44,14 @@ const ScoreRing = memo(function ScoreRing({
   return (
     <div className="flex flex-col items-center gap-1.5">
       <div className="relative" style={{ width: size, height: size }}>
-        <svg width={size} height={size} className="-rotate-90">
+        <svg width={size} height={size} className="-rotate-90" aria-hidden="true">
           {/* Track */}
           <circle
             cx={size / 2}
             cy={size / 2}
             r={radius}
             fill="none"
-            stroke="#1e1e1e"
+            stroke="rgb(var(--color-border-subtle))"
             strokeWidth={strokeWidth}
           />
           {/* Progress */}

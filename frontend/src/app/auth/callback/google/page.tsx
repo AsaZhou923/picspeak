@@ -110,7 +110,7 @@ function GoogleCallbackInner() {
       : t('auth_migrate_done').replace('{count}', String(migratedCount));
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-6 pt-14">
+    <div className="flex min-h-screen items-center justify-center px-6">
       <div className="w-full max-w-sm text-center space-y-6 animate-fade-in">
         {status === 'processing' && (
           <>

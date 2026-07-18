@@ -97,7 +97,7 @@ export default function PromptExampleContent({ example }: { example: GenerationP
   };
 
   return (
-    <main className="min-h-screen px-6 pb-20 pt-24">
+    <div className="min-h-screen px-6 pb-20 pt-16">
       <article className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
         <div className="min-w-0">
           <Link href="/generate/prompts" className="text-sm text-gold transition-colors hover:text-gold-light">
@@ -168,6 +168,6 @@ export default function PromptExampleContent({ example }: { example: GenerationP
           {prompt}
         </p>
       </section>
-    </main>
+    </div>
   );
 }

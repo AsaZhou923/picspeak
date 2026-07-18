@@ -69,7 +69,7 @@ function ErrorContent() {
   const config = ERROR_CONFIGS[code] ?? ERROR_CONFIGS['unknown'];
 
   return (
-    <div className="pt-14 min-h-screen flex items-start justify-center px-6">
+    <div className="flex min-h-screen items-start justify-center px-6">
       <div className="w-full max-w-md py-20 space-y-8 animate-fade-in">
         {/* Icon */}
         <div className="flex justify-center">

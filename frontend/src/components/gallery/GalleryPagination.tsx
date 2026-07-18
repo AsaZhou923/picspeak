@@ -64,7 +64,7 @@ const GalleryPagination = memo(function GalleryPagination({
   const hasNextPage = pageIndex < totalPages - 1;
 
   return (
-    <div className="mt-8 flex flex-col gap-4 rounded-[24px] border border-border-subtle bg-[linear-gradient(180deg,rgba(248,244,238,0.72),rgba(236,230,221,0.92))] px-4 py-4 shadow-[0_14px_34px_rgba(120,96,68,0.08)] sm:flex-row sm:items-center sm:justify-between dark:border-[rgba(208,186,146,0.12)] dark:bg-[linear-gradient(180deg,rgba(31,28,24,0.9),rgba(18,17,15,0.96))] dark:shadow-[0_14px_40px_rgba(0,0,0,0.18)]">
+    <div className="ui-panel mt-8 flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex flex-col items-center gap-2 text-center sm:items-start sm:text-left">
         <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
           <span className="rounded-full border border-gold/25 bg-gold/10 px-3 py-1 text-sm font-medium text-gold">
@@ -84,12 +84,12 @@ const GalleryPagination = memo(function GalleryPagination({
         </p>
       </div>
       <div className="flex flex-col items-center gap-3 sm:items-end">
-        <div className="flex items-center justify-center gap-2 sm:justify-end">
+        <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-end">
           <button
             type="button"
             onClick={() => void goToPage(0)}
             disabled={pageIndex === 0 || paging}
-            className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm text-ink-muted transition-colors hover:border-gold/40 hover:text-ink disabled:opacity-40"
+            className="ui-action-secondary px-4 py-2 text-sm disabled:opacity-40"
           >
             <ChevronLeft size={14} />
             {t('pagination_first')}
@@ -98,7 +98,7 @@ const GalleryPagination = memo(function GalleryPagination({
             type="button"
             onClick={handlePrevPage}
             disabled={!hasPrevPage || paging}
-            className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm text-ink-muted transition-colors hover:border-gold/40 hover:text-ink disabled:opacity-40"
+            className="ui-action-secondary px-4 py-2 text-sm disabled:opacity-40"
           >
             <ChevronLeft size={14} />
             {t('pagination_previous')}
@@ -107,7 +107,7 @@ const GalleryPagination = memo(function GalleryPagination({
             type="button"
             onClick={() => void handleNextPage()}
             disabled={!hasNextPage || paging}
-            className="inline-flex items-center gap-2 rounded-full border border-gold/30 px-4 py-2 text-sm text-gold transition-colors hover:bg-gold/10 disabled:opacity-40"
+            className="ui-action-primary px-4 py-2 text-sm disabled:opacity-40"
           >
             {paging ? t('reviews_loading_more') : t('pagination_next')}
             <ChevronRight size={14} />
@@ -116,7 +116,7 @@ const GalleryPagination = memo(function GalleryPagination({
             type="button"
             onClick={() => void goToPage(totalPages - 1)}
             disabled={pageIndex === totalPages - 1 || paging}
-            className="inline-flex items-center gap-2 rounded-full border border-gold/30 px-4 py-2 text-sm text-gold transition-colors hover:bg-gold/10 disabled:opacity-40"
+            className="ui-action-secondary px-4 py-2 text-sm disabled:opacity-40"
           >
             {t('pagination_last')}
             <ChevronRight size={14} />
@@ -138,9 +138,9 @@ const GalleryPagination = memo(function GalleryPagination({
                 onClick={() => void goToPage(slot)}
                 disabled={paging}
                 aria-current={slot === pageIndex ? 'page' : undefined}
-                className={`inline-flex h-10 min-w-10 items-center justify-center rounded-full border px-3 text-sm transition-colors disabled:opacity-40 ${
+                className={`inline-flex h-11 min-w-11 items-center justify-center rounded-control border px-3 text-sm transition-colors disabled:opacity-40 ${
                   slot === pageIndex
-                    ? 'border-gold/35 bg-gold text-void shadow-[0_10px_24px_rgba(200,162,104,0.22)]'
+                    ? 'border-action bg-action text-action-ink shadow-level-1'
                     : 'border-border bg-void/35 text-ink-muted hover:border-gold/35 hover:text-gold'
                 }`}
               >

@@ -2,6 +2,190 @@
 
 本文件汇总了原 `docs/changelog/update-log-*.md` 的全部更新记录。新增 release 请追加到顶部，并为每条记录保留稳定锚点，供 `/updates` 的 `docPath` 和 README 链接定位。
 
+<a id="2026-07-18-frontend-coach-toolbench-redesign"></a>
+
+## 2026-07-18 - frontend coach toolbench redesign
+
+日期：2026-07-18
+
+### 概览
+
+这次更新把 PicSpeak 前端统一为“专业摄影教练 × 高效 AI 工具”的产品体验，并把首页、上传点评、结果阅读、复拍比较和 AI 参考图生成串成一条清晰的摄影练习链路。
+
+- 首页以真实点评产物说明价值，主行动收敛为开始点评，并把 Retake / AI Create 放到后续练习路径。
+- Workspace 重构为 `Image -> Intent & settings -> Submit` 三阶段任务流，Review 按照片、结果、最强发现、下一步行动组织首屏阅读顺序。
+- Retake Coach 明确展示 `Original -> Target -> Retake -> Compare`，AI Create 改为以 prompt、设置、积分成本和生成行动为核心的工具台。
+- Gallery、Account、Blog、Updates、任务状态页和生成结果页统一使用新的面板、间距、操作层级和响应式规则。
+- 全局补强色彩对比、减少动效、sticky header、弹窗焦点管理、Portal 操作可访问性和归因连续性，并新增契约测试锁定关键行为。
+
+### 设计系统与首页
+
+- 新增根目录 `DESIGN.md`，定义暖色摄影编辑风格、语义色、圆角、阴影、布局宽度、主次操作和减少动效规则。
+- 全局背景移除通用紫色/青色 AI 光晕与星点，改为更克制的暖色摄影光感。
+- 首页首屏加入照片、总分、五维评分、优势和可执行建议组成的点评产物，并补充连续改进链路。
+- 登录、注册与结账 Portal slot 保持在辅助技术树中，避免关键操作可聚焦但无法被屏幕阅读器识别。
+
+### 点评、复拍与生成工作流
+
+- Workspace 将图片准备、点评意图/模型/类型设置和最终提交拆成可见阶段，同时保留额度、来源点评、幂等键和任务路由。
+- Review 新增确定性的下一步行动面板，继续支持上传新一轮、进入 Retake 和生成参考图；内部跳转为桌面与移动 sticky header 预留滚动偏移。
+- Retake 对进步、退步、持平和不可比状态增加非颜色文字标签，继续使用同一来源链聚合比较结果。
+- AI Create 把预计积分成本和生成行动提前，任务页与结果页强化等待、处理、成功、失败、下载、复用和回到复拍的层级。
+
+### 支撑页面、归因与无障碍
+
+- Gallery 保留一个服务端可见 H1，主 CTA 延续 `gallery` 归因 query、`markProductAttributionSource` 和 `content_workspace_clicked`。
+- Gallery 登录弹窗与 Billing Contact 弹窗补齐 `role="dialog"`、`aria-modal`、焦点陷阱、Escape 关闭和关闭后焦点恢复。
+- Header 从覆盖页面的 fixed 布局改为正常文档流中的 sticky 导航，并清理各路由遗留的 `pt-14` 顶部补偿。
+- ScoreRing 改为主题感知；评分、趋势和任务状态增加文字/结构表达，不再只依赖颜色。
+
+### 行为连续性与回归保护
+
+- 保留首页 `content_workspace_clicked`、Workspace `start_review_clicked` / `review_requested`、Review `next_shoot_action_clicked` 和 Generate 全套事件。
+- 保留 `source_review_id`、workspace attribution query、review/generation idempotency、额度检查及 task/detail 路由。
+- 新增设计契约、Workspace 任务流、Review 核心循环和 Generate 行为契约测试，防止后续视觉重构误删参数、事件或目的地。
+
+### 首页更新记录同步
+
+- `/updates` 中、英、日三语数据新增本条记录，`docPath` 指向 `docs/changelog/CHANGELOG.md#2026-07-18-frontend-coach-toolbench-redesign`。
+- 首页联系区三语“更新记录”提示同步到本次摄影教练式前端与核心工作流重构。
+- `README.md`、`README.zh-CN.md` 的最新 changelog 链接同步到本条锚点，并加入 `DESIGN.md` 入口。
+- `CLAUDE.md` 补充 `DESIGN.md` 作为前端产品与 UI 决策基线的维护约束。
+
+### 影响文件
+
+#### 前端
+
+- `frontend/src/app/{workspace,reviews,retake,generate,generation-tasks,generations,gallery,account}/`
+- `frontend/src/components/{home,layout,gallery,account,marketing,ui}/`
+- `frontend/src/features/{workspace,reviews,generations}/`
+- `frontend/src/app/globals.css`
+- `frontend/tailwind.config.ts`
+- `frontend/test/{design-contracts,review-core-loop,workspace-task-flow}.test.ts`
+- `frontend/src/features/generations/generation-contracts.test.ts`
+- `frontend/src/content/updates/{zh,en,ja}.json`
+- `frontend/src/lib/i18n-{zh,en,ja}.ts`
+
+#### 文档
+
+- `DESIGN.md`
+- `README.md`
+- `README.zh-CN.md`
+- `CLAUDE.md`
+- `docs/changelog/CHANGELOG.md`
+
+### 验证
+
+- `cd frontend && npm run typecheck` 通过。
+- `cd frontend && npm run lint` 通过。
+- `cd frontend && node --test test/*.test.ts` 通过，108 / 108 tests passed。
+- `cd frontend && npm run build` 通过，生成 121 / 121 个静态页面。
+- `git diff --check` 通过。
+- Playwright 抽查首页、Workspace、Retake、AI Create、Gallery 和 Account Usage 的 1440px / 390px 布局；本地后端未启动，因此 Review 真实数据链路和额度/历史接口未作为端到端通过项。
+
+---
+
+<a id="2026-07-17-gpt56-retake-coach"></a>
+
+## 2026-07-17 - GPT-5.6 Terra retake coach
+
+日期：2026-07-17
+
+### 概览
+
+这次更新把原有的单张照片点评扩展成可审计的“原片 -> 复拍 -> 对比 -> 下一轮行动”练习闭环，并把普通点评与复拍对比的模型选择明确分开。
+
+- 新增独立 `/retake` 入口，用户可以从已完成点评中选择原片，再上传复拍照片进入配对分析。
+- Retake Coach 在同一次 GPT-5.6 Terra Responses API 请求中重新评估原片与复拍，后端确定性计算五个维度和总分的变化。
+- 普通点评新增 Qwen 3.5 / GPT-5.5 显式选择；`retake_compare` 始终固定使用 GPT-5.6 Terra，避免模型路径混淆。
+- 对比结果包含可见证据、下一轮拍摄动作、可验证成功条件和 GPT Image 2 视觉参考提示词，并沿现有 Review 链持久化。
+- Build Week 基线、贡献日志、演示脚本、评委测试说明与脱敏在线调用证据一并纳入仓库。
+
+### 可衡量的复拍进步
+
+- `/retake` 页面先选择一条已完成的来源点评，再把 `source_review_id`、目标维度和复拍上下文带入工作台。
+- `analysis_type=retake_compare` 会把原片与复拍图放进同一请求，由 GPT-5.6 Terra 在统一评分口径下返回五维 before / after 分数、可见证据和下一轮动作。
+- 所有维度 delta 与 overall delta 都由服务端计算，不采信模型生成的算术结果，也不会把历史 Qwen 分数与 GPT-5.6 Terra 分数直接相减。
+- 非同一场景或不可比图片仍会保留结果和 caveat，但不会展示进步徽章，也不会进入复拍进度曲线。
+- `RetakeComparisonPanel` 展示本次配对证据和动作，`RetakeProgressPanel` 只聚合同一来源链中的可比结果。
+
+### 模型路由与持久化
+
+- 普通工作台新增 Qwen 3.5 / GPT-5.5 模型选择器；Qwen 保持兼容默认值，GPT-5.5 通过 OpenAI Responses API 与严格 Structured Outputs 处理真实照片。
+- 复拍请求在前后端都归一化为 `retake_compare` + GPT-5.6 Terra，并通过模型相关的复用边界避免误返回旧模型点评。
+- 配对结果复用现有 `Review.source_review_id` 与 `Review.result_json.comparison`，无需新增数据表或迁移。
+- GPT-5.6 Terra 返回的 `visual_reference_prompt` 进入既有 `review_linked` / `retake_reference` 生图流程；生成图只作为下一轮视觉目标，不参与进步评分。
+
+### 产品入口与 Build Week 证据
+
+- 桌面和移动导航、首页、点评历史、点评详情与标准工作台都提供 Retake Coach 的可见入口，不依赖隐藏 query parameter。
+- `README.md` 记录 Build Week 前后边界、GPT-5.5 / GPT-5.6 Terra 调用路径、环境变量和验证证据。
+- `docs/build-week/` 新增基线证据、贡献日志、授权样例清单、演示脚本、评委测试说明、提交文案和脱敏在线调用结果。
+- `backend/.env.example` 新增普通 OpenAI 点评与复拍分析的独立 endpoint、模型、reasoning effort 和 timeout 配置。
+
+### 首页更新记录同步
+
+- `/updates` 中、英、日三语数据新增本条记录，`docPath` 统一指向 `docs/changelog/CHANGELOG.md#2026-07-17-gpt56-retake-coach`。
+- 首页联系区的三语“更新记录”提示改为 GPT-5.6 Terra Retake Coach 主题。
+- `README.md`、`README.zh-CN.md` 的最新 changelog 链接同步到本条锚点。
+- `CLAUDE.md` 补充模型路由、复拍比较流程、关键文件与配置约束。
+
+### 影响文件
+
+#### 后端
+
+- `backend/.env.example`
+- `backend/app/api/routers/review_create.py`
+- `backend/app/api/routers/review_support.py`
+- `backend/app/core/config.py`
+- `backend/app/schemas.py`
+- `backend/app/services/ai.py`
+- `backend/app/services/retake_comparison.py`
+- `backend/app/services/review_task_processor.py`
+- `backend/tests/test_guest_quota_scope.py`
+- `backend/tests/test_openai_photo_review.py`
+- `backend/tests/test_retake_comparison.py`
+- `backend/tests/test_retake_review_contract.py`
+
+#### 前端
+
+- `frontend/src/app/retake/`
+- `frontend/src/app/workspace/page.tsx`
+- `frontend/src/app/account/reviews/page.tsx`
+- `frontend/src/app/reviews/[reviewId]/page.tsx`
+- `frontend/src/components/home/HomePageClient.tsx`
+- `frontend/src/components/layout/{Header,HeaderControls,MarketingHeader}.tsx`
+- `frontend/src/features/reviews/components/{RetakeComparisonPanel,RetakeProgressPanel}.tsx`
+- `frontend/src/features/workspace/components/{ReplayBanner,RetakeWorkspaceIntro,ReviewModelPicker}.tsx`
+- `frontend/src/features/workspace/hooks/useReplayContext.ts`
+- `frontend/src/lib/{content-conversion,retake-coach-copy,retake-coach,retake-progress,types}.ts`
+- `frontend/test/{content-conversion,retake-coach,retake-progress}.test.ts`
+
+#### 文档与证据
+
+- `.gitignore`
+- `README.md`
+- `README.zh-CN.md`
+- `CLAUDE.md`
+- `docs/build-week/`
+- `docs/changelog/CHANGELOG.md`
+- `docs/changelog/CHANGELOG_WORKFLOW.md`
+- `frontend/src/content/updates/{zh,en,ja}.json`
+- `frontend/src/lib/i18n-{zh,en,ja}.ts`
+- `frontend/test/content-bundles.test.ts`
+
+### 验证
+
+- 原功能提交 `2a626aabab30d5cdb45ca0450fdd1ce7a5387b4c` 记录：208 个 backend tests 与 11 个 subtests、97 个 frontend tests、typecheck、lint、121 页面 production build，以及 GPT-5.5 / GPT-5.6 Terra 在线图片调用均已通过。
+- 三语 updates JSON 通过 `JSON.parse`。
+- `cd frontend && npm test -- content-bundles.test.ts` -> 98 passed；新增回归断言会检查三语 ID 对齐、实际 changelog 锚点存在、最新条目 ID 与锚点一致及日期倒序。
+- `cd frontend && npm run typecheck` 通过。
+- `cd frontend && npm run lint` 通过。
+- `cd frontend && npm run build` 通过，生成 121 个静态页面。
+- `git diff --check`、changelog / workflow 外部镜像 SHA256 对比与旧拆分路径扫描通过。
+
+---
+
 <a id="2026-07-01-header-usage-nav-visibility"></a>
 
 ## 2026-07-01 - header usage nav visibility

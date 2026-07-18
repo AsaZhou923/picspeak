@@ -59,15 +59,15 @@ export default function UpdatesPageContent({ homeHref }: UpdatesPageContentProps
   if (!latest) return null;
 
   return (
-    <div className="min-h-screen pt-14">
-      <div className="mx-auto max-w-6xl px-6 py-14 animate-fade-in">
+    <div className="min-h-screen">
+      <div className="mx-auto max-w-editorial px-6 py-12 animate-fade-in">
         <div className="mb-10 max-w-3xl">
-          <p className="mb-3 text-xs uppercase tracking-[0.32em] text-gold/70">{copy.label}</p>
+          <p className="ui-eyebrow mb-3">{copy.label}</p>
           <h1 className="font-display text-4xl text-ink sm:text-5xl">{copy.title}</h1>
           <p className="mt-4 text-sm leading-7 text-ink-muted">{copy.intro}</p>
         </div>
 
-        <section className="overflow-hidden rounded-[28px] border border-border-subtle bg-[radial-gradient(circle_at_top_left,rgba(200,171,90,0.14),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(149,113,87,0.1),transparent_38%),rgb(var(--color-surface)/0.8)]">
+        <section className="ui-feature-panel overflow-hidden">
           <div className="border-b border-border-subtle px-6 py-5">
             <div className="flex flex-wrap items-center justify-between gap-4 text-sm text-ink">
               <div className="flex items-center gap-3">
@@ -96,7 +96,7 @@ export default function UpdatesPageContent({ homeHref }: UpdatesPageContentProps
                     {latest.sections.map((section) => (
                       <article
                         key={section.title}
-                        className="rounded-[22px] border border-border-subtle bg-raised/55 p-5"
+                        className="ui-panel p-5"
                       >
                         <h3 className="font-display text-2xl text-ink">{section.title}</h3>
                         <div className="mt-4 space-y-3">
@@ -113,7 +113,7 @@ export default function UpdatesPageContent({ homeHref }: UpdatesPageContentProps
                 )}
               </div>
 
-              <aside className="rounded-[22px] border border-border-subtle bg-raised/45 p-5">
+              <aside className="ui-panel p-5">
                 <div className="flex items-center gap-2 text-sm text-ink">
                   <FileText size={14} className="text-gold" />
                   <span>{copy.docLabel}</span>
@@ -124,7 +124,7 @@ export default function UpdatesPageContent({ homeHref }: UpdatesPageContentProps
                 <div className="mt-6">
                   <Link
                     href={homeHref}
-                    className="inline-flex items-center gap-2 rounded-full bg-gold px-4 py-2 text-sm font-medium text-void transition-colors hover:bg-gold-light"
+                    className="ui-action-primary px-4 py-2 text-sm"
                   >
                     {copy.backHome}
                     <ArrowRight size={13} />
@@ -145,7 +145,7 @@ export default function UpdatesPageContent({ homeHref }: UpdatesPageContentProps
             {updates.map((entry, index) => (
               <article
                 key={entry.id}
-                className="rounded-[22px] border border-border-subtle bg-raised/45 p-5 transition-colors hover:border-gold/25"
+                className="ui-panel p-5 transition-colors hover:border-gold/25 hover:shadow-level-2"
               >
                 <div className="flex items-center justify-between gap-3">
                   <p className="font-mono text-xs text-ink-subtle">{entry.date}</p>
@@ -157,7 +157,7 @@ export default function UpdatesPageContent({ homeHref }: UpdatesPageContentProps
                 </div>
                 <h3 className="mt-4 font-display text-2xl text-ink">{entry.title}</h3>
                 <p className="mt-3 text-sm leading-7 text-ink-muted">{entry.summary}</p>
-                <div className="mt-5 rounded-2xl border border-border-subtle bg-void/30 px-3 py-3">
+                <div className="mt-5 rounded-control border border-border-subtle bg-void/30 px-3 py-3">
                   <p className="text-[10px] uppercase tracking-[0.18em] text-ink-subtle">{copy.docLabel}</p>
                   <p className="mt-2 break-all font-mono text-xs leading-6 text-ink-muted">{entry.docPath}</p>
                 </div>

@@ -19,14 +19,30 @@
   --color-border-subtle:204 197 187;
   --color-border:       180 172 164;
 
-  /* ── Accent colors — identical in both themes ── */
-  --color-gold:         200 162 104;
-  --color-gold-light:   224 186 136;
-  --color-gold-dim:     138 110 67;
-  --color-sage:         122 154 120;
-  --color-sage-light:   156 191 154;
-  --color-rust:         176 114 101;
-  --color-rust-light:   204 143 130;
+  /* ── Semantic accent roles ── */
+  --color-gold:         132 88  32;
+  --color-gold-light:   164 116 54;
+  --color-gold-dim:     104 75  39;
+  --color-sage:         66  107 70;
+  --color-sage-light:   88  132 91;
+  --color-rust:         139 70  57;
+  --color-rust-light:   166 91  76;
+  --color-action:       194 150 86;
+  --color-action-hover: 210 169 108;
+  --color-action-ink:   28  23  18;
+  --color-focus:        115 76  26;
+
+  /* ── Shape, elevation and layout contracts ── */
+  --radius-control: 0.75rem;
+  --radius-card: 1.25rem;
+  --radius-feature: 1.75rem;
+  --shadow-level-1: 0 10px 30px rgba(55, 43, 30, 0.08);
+  --shadow-level-2: 0 24px 70px rgba(55, 43, 30, 0.13);
+  --shadow-level-3: 0 32px 100px rgba(35, 28, 22, 0.2);
+  --width-reading: 45rem;
+  --width-task: 50rem;
+  --width-workspace: 73.75rem;
+  --width-editorial: 80rem;
 }
 
 .dark {
@@ -39,6 +55,20 @@
   --color-ink-subtle:   116 108 100;
   --color-border-subtle:44  40  36;
   --color-border:       64  58  52;
+  --color-gold:         220 182 122;
+  --color-gold-light:   237 207 160;
+  --color-gold-dim:     168 132 82;
+  --color-sage:         157 193 157;
+  --color-sage-light:   185 216 183;
+  --color-rust:         214 145 130;
+  --color-rust-light:   232 174 160;
+  --color-action:       207 166 104;
+  --color-action-hover: 226 190 135;
+  --color-action-ink:   27  22  17;
+  --color-focus:        235 198 139;
+  --shadow-level-1: 0 12px 34px rgba(0, 0, 0, 0.22);
+  --shadow-level-2: 0 26px 76px rgba(0, 0, 0, 0.34);
+  --shadow-level-3: 0 36px 110px rgba(0, 0, 0, 0.48);
 }
 
 /* ─── Base Reset & Body ───────────────────────────────────────────────────── */
@@ -114,8 +144,8 @@ h3 {
 
 /* ─── Focus States ────────────────────────────────────────────────────────── */
 :focus-visible {
-  outline: 1px solid #c8a268;
-  outline-offset: 2px;
+  outline: 2px solid rgb(var(--color-focus));
+  outline-offset: 3px;
 }
 
 .skip-link {
@@ -176,6 +206,72 @@ h3 {
   }
 }
 
+@layer components {
+  .ui-panel {
+    border: 1px solid rgb(var(--color-border-subtle));
+    border-radius: var(--radius-card);
+    background: rgb(var(--color-surface) / 0.78);
+    box-shadow: var(--shadow-level-1);
+  }
+
+  .ui-feature-panel {
+    border: 1px solid rgb(var(--color-border-subtle));
+    border-radius: var(--radius-feature);
+    background: rgb(var(--color-raised) / 0.76);
+    box-shadow: var(--shadow-level-2);
+  }
+
+  .ui-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    line-height: 1.2;
+    text-transform: uppercase;
+    color: rgb(var(--color-gold));
+  }
+
+  .ui-action-primary {
+    display: inline-flex;
+    min-height: 2.75rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: var(--radius-control);
+    background: rgb(var(--color-action));
+    color: rgb(var(--color-action-ink));
+    font-weight: 700;
+    box-shadow: var(--shadow-level-1);
+    transition: background-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+  }
+
+  .ui-action-primary:hover {
+    background: rgb(var(--color-action-hover));
+    box-shadow: var(--shadow-level-2);
+    transform: translateY(-1px);
+  }
+
+  .ui-action-secondary {
+    display: inline-flex;
+    min-height: 2.75rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border: 1px solid rgb(var(--color-border));
+    border-radius: var(--radius-control);
+    background: rgb(var(--color-raised) / 0.72);
+    color: rgb(var(--color-ink));
+    font-weight: 650;
+    transition: border-color 180ms ease, background-color 180ms ease, transform 180ms ease;
+  }
+
+  .ui-action-secondary:hover {
+    border-color: rgb(var(--color-gold) / 0.55);
+    background: rgb(var(--color-raised));
+    transform: translateY(-1px);
+  }
+}
+
 /* ─── Theme-aware utility overrides ──────────────────────────────────────── */
 /* Ensures Tailwind's compiled classes follow CSS variables in both themes.  */
 @layer utilities {
@@ -213,12 +309,11 @@ h3 {
   animation: ring-fill 1s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
-/* ─── Background Effects (aurora orbs + star particles) ───────────────────── */
+/* ─── Background Effects (restrained photographic light) ─────────────────── */
 .bg-orb {
   position: absolute;
   border-radius: 50%;
-  filter: blur(65px);
-  will-change: transform;
+  filter: blur(90px);
 }
 
 .bg-orb-gold {
@@ -226,62 +321,21 @@ h3 {
   height: 900px;
   top: -15%;
   left: -8%;
-  background: radial-gradient(circle, rgba(200,162,104,0.32) 0%, rgba(200,162,104,0.10) 40%, transparent 65%);
-  animation: orb-drift-1 28s ease-in-out infinite;
+  background: radial-gradient(circle, rgb(var(--color-action) / 0.18) 0%, rgb(var(--color-action) / 0.06) 42%, transparent 68%);
 }
 
-.bg-orb-indigo {
-  width: 700px;
-  height: 700px;
-  top: 10%;
-  right: -12%;
-  background: radial-gradient(circle, rgba(100,70,220,0.24) 0%, rgba(80,55,160,0.08) 45%, transparent 65%);
-  animation: orb-drift-2 34s ease-in-out infinite;
-  animation-delay: -9s;
-}
-
-.bg-orb-teal {
+.bg-orb-paper {
   width: 800px;
   height: 800px;
-  bottom: -18%;
-  left: 20%;
-  background: radial-gradient(circle, rgba(36,140,180,0.20) 0%, rgba(36,108,152,0.06) 45%, transparent 65%);
-  animation: orb-drift-3 42s ease-in-out infinite;
-  animation-delay: -18s;
+  top: 18%;
+  right: -16%;
+  background: radial-gradient(circle, rgb(var(--color-overlay) / 0.7) 0%, rgb(var(--color-raised) / 0.22) 42%, transparent 68%);
 }
 
-@keyframes orb-drift-1 {
-  0%, 100% { transform: translate(0px,  0px); }
-  33%       { transform: translate(70px, -55px); }
-  66%       { transform: translate(-45px, 65px); }
-}
-
-@keyframes orb-drift-2 {
-  0%, 100% { transform: translate(0px,  0px); }
-  33%       { transform: translate(-75px, 70px); }
-  66%       { transform: translate(65px, -45px); }
-}
-
-@keyframes orb-drift-3 {
-  0%, 100% { transform: translate(0px,  0px); }
-  40%       { transform: translate(55px, -60px); }
-  80%       { transform: translate(-55px, 50px); }
-}
-
-.bg-star {
+.bg-vignette {
   position: absolute;
-  border-radius: 50%;
-  animation-name: star-pulse;
-  animation-duration: var(--duration, 4s);
-  animation-timing-function: ease-in-out;
-  animation-delay: var(--delay, 0s);
-  animation-iteration-count: infinite;
-  animation-fill-mode: both;
-}
-
-@keyframes star-pulse {
-  0%, 100% { opacity: var(--lo, 0.10); transform: scale(1); }
-  50%       { opacity: var(--hi, 0.55); transform: scale(2.5); }
+  inset: 0;
+  background: linear-gradient(180deg, transparent 0%, rgb(var(--color-void) / 0.18) 70%, rgb(var(--color-void) / 0.5) 100%);
 }
 
 /* ─── Upload Drop Zone ────────────────────────────────────────────────────── */
@@ -353,6 +407,25 @@ h3 {
 .delay-400 { animation-delay: 400ms; }
 .delay-500 { animation-delay: 500ms; }
 .anim-fill-both { animation-fill-mode: both; }
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .animate-marquee,
+  .shimmer,
+  .ring-animate,
+  .btn-gold::after {
+    animation: none !important;
+    transform: none !important;
+  }
+}
 
 .date-field {
   color-scheme: light;

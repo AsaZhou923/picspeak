@@ -27,9 +27,14 @@ import { useReviewActions } from '@/features/reviews/hooks/useReviewActions';
 import { useReviewUsage } from '@/features/reviews/hooks/useReviewUsage';
 import { CritiqueSection } from '@/features/reviews/components/CritiqueSection';
 import { GalleryConfirmDialog } from '@/features/reviews/components/GalleryConfirmDialog';
-import { ReviewScorePanel } from '@/features/reviews/components/ReviewScorePanel';
+import {
+  ReviewMetadataPanel,
+  ReviewPhotoPanel,
+  ReviewScorePanel,
+} from '@/features/reviews/components/ReviewScorePanel';
 import { ReviewActionBar } from '@/features/reviews/components/ReviewActionBar';
 import { ReviewGrowthLoopPanel } from '@/features/reviews/components/ReviewGrowthLoopPanel';
+import { ReviewNextActionPanel } from '@/features/reviews/components/ReviewNextActionPanel';
 import { ReviewReferenceGenerationPanel } from '@/features/reviews/components/ReviewReferenceGenerationPanel';
 import { ReviewGalleryPanel } from '@/features/reviews/components/ReviewGalleryPanel';
 import { ImageZoomOverlay } from '@/features/reviews/components/ImageZoomOverlay';
@@ -37,6 +42,7 @@ import { RetakeComparisonPanel } from '@/features/reviews/components/RetakeCompa
 import { buildNextShootChecklist, type NextShootChecklistItem } from '@/lib/review-growth';
 import { getProUpgradeTriggerCopy, type ProUpgradeTrigger } from '@/lib/pro-conversion';
 import { trackProductEvent } from '@/lib/product-analytics';
+import { getReviewContinuationPlan } from '@/features/reviews/hooks/reviewContinuationSupport';
 
 function getReviewSourceContextCopy(locale: 'zh' | 'en' | 'ja') {
   if (locale === 'ja') {
@@ -63,6 +69,37 @@ function getReviewSourceContextCopy(locale: 'zh' | 'en' | 'ja') {
     body: '你可以回到来源点评，对照这次复拍或同图修正是否推进了上一轮目标。',
     sourceReview: '来源点评',
     openSource: '查看来源点评',
+  };
+}
+
+function getReviewHierarchyCopy(locale: 'zh' | 'en' | 'ja') {
+  if (locale === 'ja') {
+    return {
+      strongestLabel: 'Strongest finding',
+      strongestTitle: '最初に直すべきこと',
+      evidenceLabel: 'Detailed evidence',
+      evidenceTitle: '評価の根拠を確認する',
+      secondaryLabel: 'Review record',
+      secondaryTitle: '記録、共有、その他の操作',
+    };
+  }
+  if (locale === 'en') {
+    return {
+      strongestLabel: 'Strongest finding',
+      strongestTitle: 'The first thing to address',
+      evidenceLabel: 'Detailed evidence',
+      evidenceTitle: 'Inspect the critique evidence',
+      secondaryLabel: 'Review record',
+      secondaryTitle: 'Record, share, and secondary actions',
+    };
+  }
+  return {
+    strongestLabel: '最强发现',
+    strongestTitle: '最先要处理的问题',
+    evidenceLabel: '详细依据',
+    evidenceTitle: '查看评分与点评依据',
+    secondaryLabel: '点评记录',
+    secondaryTitle: '记录、分享与次要操作',
   };
 }
 
@@ -127,7 +164,7 @@ export default function ReviewPage() {
 
   if (loading) {
     return (
-      <div className="pt-14 min-h-screen">
+      <div className="min-h-screen">
         <div className="max-w-6xl mx-auto px-6 py-12">
           <SkeletonBlock className="h-6 w-32 mb-8" />
           <div className="grid lg:grid-cols-[45%_1fr] gap-8">
@@ -147,7 +184,7 @@ export default function ReviewPage() {
 
   if (error) {
     return (
-      <div className="pt-14 min-h-screen flex items-center justify-center px-6">
+      <div className="flex min-h-screen items-center justify-center px-6">
         <div className="text-center space-y-4">
           <AlertCircle size={40} className="text-rust mx-auto" />
           <p className="text-rust text-sm">{error}</p>
@@ -204,6 +241,15 @@ export default function ReviewPage() {
       ].join('\n')
     : displaySuggestions;
   const sourceContextCopy = getReviewSourceContextCopy(locale);
+  const hierarchyCopy = getReviewHierarchyCopy(locale);
+  const strongestFinding = r.comparison?.summary || displayCritique;
+  const continuationPlan = getReviewContinuationPlan({
+    viewerIsOwner: canManageReview,
+    hasSourceReview: Boolean(activeReview.source_review_id),
+    isComparison: Boolean(r.comparison),
+    retakeAvailable: showOwnerActions,
+    generateAvailable: showOwnerActions,
+  });
 
   function handleUploadNewRound() {
     const primaryAction = nextShootChecklist[0];
@@ -266,6 +312,13 @@ export default function ReviewPage() {
     router.push(`/workspace?${nextParams.toString()}`);
   }
 
+  function handleGenerateSetup() {
+    document.getElementById('review-reference-generator')?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    });
+  }
+
   const reviewPromoTrigger: ProUpgradeTrigger =
     plan === 'guest'
       ? 'guest_save'
@@ -279,7 +332,7 @@ export default function ReviewPage() {
   });
 
   return (
-    <div className="pt-14 min-h-screen">
+    <div className="min-h-screen">
       {galleryConfirmOpen && (
         <GalleryConfirmDialog
           onClose={() => setGalleryConfirmOpen(false)}
@@ -288,126 +341,145 @@ export default function ReviewPage() {
           galleryActionCopy={galleryActionCopy}
         />
       )}
-      <div className="mx-auto max-w-7xl px-6 py-12 animate-fade-in">
+
+      <div className="mx-auto max-w-workspace px-5 py-10 sm:px-6 sm:py-12">
         <button
+          type="button"
           onClick={handleBackNavigation}
-          className="flex items-center gap-1.5 text-xs text-ink-subtle hover:text-ink-muted transition-colors mb-6"
+          className="mb-6 flex min-h-11 items-center gap-2 rounded-control px-2 text-sm text-ink-muted transition-colors hover:text-ink"
         >
-          <ArrowLeft size={12} />
+          <ArrowLeft size={15} aria-hidden="true" />
           {backLabel}
         </button>
 
         {usageError && (
-          <div className="mb-6 flex items-center gap-2 text-rust text-sm bg-rust/5 border border-rust/20 rounded px-4 py-3">
-            <AlertCircle size={14} className="shrink-0" />
+          <div role="status" className="mb-6 flex items-center gap-2 rounded-control border border-rust/25 bg-rust/5 px-4 py-3 text-sm text-rust">
+            <AlertCircle size={16} className="shrink-0" aria-hidden="true" />
             <span>{usageError}</span>
           </div>
         )}
 
-        <div className="mb-6 rounded-xl border border-border-subtle bg-raised/50 px-6 py-5 flex items-center gap-5">
-          <FinalScoreRing score={r.final_score} />
-          <div className="min-w-0">
-            <div className={`font-display text-2xl leading-none ${scoreLabelColor}`}>{scoreLabel}</div>
-            <div className="text-xs text-ink-muted mt-1.5 leading-relaxed">{t('review_score_dims_basis')}</div>
-          </div>
-          <div className="ml-auto hidden sm:flex items-center gap-1.5 text-xs text-ink-subtle">
-            <TrendingDown size={11} className="text-rust shrink-0" />
-            <span>{t('review_score_lowest')}:</span>
-            <span className="text-rust/70 ml-0.5">{weakestDim.label}</span>
-          </div>
-        </div>
-
-        <div className="grid items-start gap-6 lg:grid-cols-[340px_minmax(0,1fr)] xl:gap-8">
-          <ReviewScorePanel
-            review={review}
+        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] xl:gap-8">
+          <ReviewPhotoPanel
             photoUrl={photoUrl}
             photoError={photoError}
-            imgNaturalSize={imgNaturalSize}
-            activeDim={activeDim}
             onImgLoad={setImgNaturalSize}
             onPhotoError={handlePhotoError}
             onZoomOpen={() => { setZoomMounted(true); setZoomOpen(true); }}
-            onDimClick={handleDimClick}
           />
 
           <div className="min-w-0 space-y-5">
-            <div>
-              <p className="text-xs text-gold/70 font-mono mb-2 tracking-widest uppercase">— {t('review_page_label')}</p>
-              <h1 className="font-display text-3xl sm:text-4xl mb-2">{t('review_page_headline')}</h1>
-              <p className="text-sm text-ink-muted mb-3 leading-relaxed">{scoreSummary}</p>
-              <div className="flex items-center gap-2 text-xs text-ink-subtle">
-                <span className={review.mode === 'pro' ? 'text-gold font-medium' : 'text-ink-muted'}>
-                  {review.mode === 'pro' ? 'Pro' : 'Flash'}
-                </span>
-                <span>·</span>
-                <span className="text-sage">{t('status_succeeded')}</span>
-                <span>·</span>
-                <span>{new Date(review.created_at).toLocaleDateString(locale)}</span>
+            <header>
+              <p className="ui-eyebrow">{t('review_page_label')}</p>
+              <h1 className="mt-2 text-3xl font-semibold leading-tight text-ink sm:text-4xl">
+                {t('review_page_headline')}
+              </h1>
+              <div className="mt-4 ui-panel flex items-center gap-4 p-4 sm:p-5">
+                <FinalScoreRing score={r.final_score} />
+                <div className="min-w-0">
+                  <p className={`text-xl font-semibold leading-none ${scoreLabelColor}`}>{scoreLabel}</p>
+                  <p className="mt-2 text-sm leading-6 text-ink-muted">{scoreSummary}</p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-ink-subtle">
+                    <span className={review.mode === 'pro' ? 'font-medium text-gold' : 'text-ink-muted'}>
+                      {review.mode === 'pro' ? 'Pro' : 'Flash'}
+                    </span>
+                    <span aria-hidden="true">·</span>
+                    <span className="inline-flex items-center gap-1.5 font-medium text-sage">
+                      <span aria-hidden="true">✓</span>{t('status_succeeded')}
+                    </span>
+                    <span aria-hidden="true">·</span>
+                    <span>{new Date(review.created_at).toLocaleDateString(locale)}</span>
+                  </div>
+                </div>
+              </div>
+            </header>
+
+            <section className="ui-panel border-l-4 border-l-rust p-5" aria-labelledby="review-strongest-finding-title">
+              <div className="flex items-center gap-2 text-rust">
+                <TrendingDown size={16} aria-hidden="true" />
+                <p className="text-xs font-semibold uppercase tracking-[0.16em]">{hierarchyCopy.strongestLabel}</p>
+              </div>
+              <h2 id="review-strongest-finding-title" className="mt-2 text-xl font-semibold text-ink">
+                {hierarchyCopy.strongestTitle}
+              </h2>
+              <p className="mt-2 text-sm leading-7 text-ink-muted">{strongestFinding}</p>
+              <p className="mt-3 text-xs text-ink-subtle">
+                {t('review_score_lowest')}: <span className="font-medium text-rust">{weakestDim.label}</span>
+              </p>
+            </section>
+
+            <ReviewNextActionPanel
+              locale={locale}
+              plan={continuationPlan}
+              onRetake={handleUploadNewRound}
+              onGenerate={handleGenerateSetup}
+            />
+          </div>
+        </div>
+
+        {activeReview.source_review_id && !r.comparison && (
+          <section className="mt-6 rounded-card border border-sage/25 bg-sage/10 p-5" aria-labelledby="review-source-context-title">
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-sage">
+              <History size={15} aria-hidden="true" />
+              <span>{sourceContextCopy.label}</span>
+            </div>
+            <h2 id="review-source-context-title" className="mt-2 text-xl font-semibold text-ink">{sourceContextCopy.title}</h2>
+            <p className="mt-2 text-sm leading-6 text-ink-muted">{sourceContextCopy.body}</p>
+            <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
+              <span className="rounded-full border border-border-subtle bg-surface/70 px-3 py-1.5 text-ink-subtle">
+                {sourceContextCopy.sourceReview}: {activeReview.source_review_id}
+              </span>
+              <Link
+                href={`/reviews/${activeReview.source_review_id}?back=/reviews/${activeReview.review_id}`}
+                className="inline-flex min-h-11 items-center rounded-control border border-sage/35 px-3 py-2 font-semibold text-sage transition-colors hover:bg-sage/10"
+              >
+                {sourceContextCopy.openSource}
+              </Link>
+            </div>
+          </section>
+        )}
+
+        <section className="mt-12" aria-labelledby="review-evidence-title">
+          <p className="ui-eyebrow">{hierarchyCopy.evidenceLabel}</p>
+          <h2 id="review-evidence-title" className="mt-2 text-2xl font-semibold text-ink sm:text-3xl">
+            {hierarchyCopy.evidenceTitle}
+          </h2>
+
+          <div className="mt-6 space-y-6">
+            {r.comparison && <RetakeComparisonPanel review={activeReview} locale={locale} />}
+
+            <div className="grid items-start gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
+              <ReviewScorePanel
+                review={review}
+                activeDim={activeDim}
+                onDimClick={handleDimClick}
+              />
+
+              <div className="min-w-0 space-y-6">
+                <div className="grid gap-5 xl:grid-cols-2">
+                  <CritiqueSection
+                    accent="text-sage" borderColor="border-sage" bgColor="bg-sage/5"
+                    icon={<ThumbsUp size={13} />} title={t('review_advantage')}
+                    body={displayAdvantage} isPro={isPro}
+                  />
+                  <CritiqueSection
+                    accent="text-rust" borderColor="border-rust" bgColor="bg-rust/5"
+                    icon={<ThumbsDown size={13} />} title={t('review_critique')}
+                    body={displayCritique} isPro={isPro}
+                  />
+                </div>
+
+                <CritiqueSection
+                  accent="text-gold" borderColor="border-gold" bgColor="bg-gold/5"
+                  icon={<Lightbulb size={13} />} title={t('review_suggestions')}
+                  body={displaySuggestions} showTags showFeedback isPro={isPro}
+                  highlightTop={2} highlightedId={highlightedCardId}
+                />
               </div>
             </div>
 
-            {r.comparison && <RetakeComparisonPanel review={activeReview} locale={locale} />}
-
-            {activeReview.source_review_id && !r.comparison && (
-              <div className="rounded-2xl border border-sage/25 bg-sage/10 px-4 py-3">
-                <div className="mb-2 flex items-center gap-2 text-xs font-medium text-sage">
-                  <History size={14} />
-                  <span>{sourceContextCopy.label}</span>
-                </div>
-                <h2 className="font-display text-xl text-ink">{sourceContextCopy.title}</h2>
-                <p className="mt-2 text-sm leading-6 text-ink-muted">{sourceContextCopy.body}</p>
-                <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-                  <span className="rounded-full border border-border-subtle bg-void/30 px-3 py-1 text-ink-subtle">
-                    {sourceContextCopy.sourceReview}: {activeReview.source_review_id}
-                  </span>
-                  <Link
-                    href={`/reviews/${activeReview.source_review_id}?back=/reviews/${activeReview.review_id}`}
-                    className="rounded-full border border-sage/30 px-3 py-1 font-medium text-sage transition-colors hover:bg-sage/10"
-                  >
-                    {sourceContextCopy.openSource}
-                  </Link>
-                </div>
-              </div>
-            )}
-
             {showOwnerActions && (
-              <ReviewActionBar
-                review={review}
-                showOwnerActions={showOwnerActions}
-                showGuestHistoryLink={userInfo?.plan === 'guest'}
-                linkCopied={linkCopied}
-                actionBusy={actionBusy}
-                favoriteCopy={favoriteCopy}
-                onFavoriteToggle={handleFavoriteToggle}
-                onShareLink={handleBackendShareLink}
-                onExportSummary={handleBackendExportSummary}
-                t={t}
-              />
-            )}
-
-            {(actionFeedback || actionError) && (
-              <div className={`rounded-lg border px-4 py-3 text-sm ${actionError ? 'border-rust/20 bg-rust/5 text-rust' : 'border-sage/20 bg-sage/5 text-sage'}`}>
-                {actionError || actionFeedback}
-              </div>
-            )}
-
-            <div className="border-t border-border-subtle" />
-
-            <div className="space-y-5">
-              <div className="grid gap-5 xl:grid-cols-2">
-                <CritiqueSection
-                  accent="text-sage" borderColor="border-sage" bgColor="bg-sage/5"
-                  icon={<ThumbsUp size={13} />} title={t('review_advantage')}
-                  body={displayAdvantage} isPro={isPro}
-                />
-                <CritiqueSection
-                  accent="text-rust" borderColor="border-rust" bgColor="bg-rust/5"
-                  icon={<ThumbsDown size={13} />} title={t('review_critique')}
-                  body={displayCritique} isPro={isPro}
-                />
-              </div>
-
-              {showOwnerActions && (
+              <div id="review-reference-generator" className="scroll-mt-32 md:scroll-mt-20">
                 <ReviewReferenceGenerationPanel
                   reviewId={activeReview.review_id}
                   photoId={activeReview.photo_id}
@@ -417,15 +489,8 @@ export default function ReviewPage() {
                   locale={locale}
                   sourceAspect={imgNaturalSize}
                 />
-              )}
-
-              <CritiqueSection
-                accent="text-gold" borderColor="border-gold" bgColor="bg-gold/5"
-                icon={<Lightbulb size={13} />} title={t('review_suggestions')}
-                body={displaySuggestions} showTags showFeedback isPro={isPro}
-                highlightTop={2} highlightedId={highlightedCardId}
-              />
-            </div>
+              </div>
+            )}
 
             {showOwnerActions && (
               <ReviewGrowthLoopPanel
@@ -438,8 +503,42 @@ export default function ReviewPage() {
                 t={t}
               />
             )}
+          </div>
+        </section>
 
-            {showOwnerActions && (
+        <section className="mt-12 border-t border-border-subtle pt-10" aria-labelledby="review-secondary-title">
+          <p className="ui-eyebrow">{hierarchyCopy.secondaryLabel}</p>
+          <h2 id="review-secondary-title" className="mt-2 text-2xl font-semibold text-ink">
+            {hierarchyCopy.secondaryTitle}
+          </h2>
+
+          <div className="mt-6 grid items-start gap-6 lg:grid-cols-2">
+            <ReviewMetadataPanel review={review} imgNaturalSize={imgNaturalSize} />
+            <div className="space-y-4">
+              {showOwnerActions && (
+                <ReviewActionBar
+                  review={review}
+                  showOwnerActions={showOwnerActions}
+                  showGuestHistoryLink={userInfo?.plan === 'guest'}
+                  linkCopied={linkCopied}
+                  actionBusy={actionBusy}
+                  favoriteCopy={favoriteCopy}
+                  onFavoriteToggle={handleFavoriteToggle}
+                  onShareLink={handleBackendShareLink}
+                  onExportSummary={handleBackendExportSummary}
+                  t={t}
+                />
+              )}
+              {(actionFeedback || actionError) && (
+                <div role={actionError ? 'alert' : 'status'} className={`rounded-control border px-4 py-3 text-sm ${actionError ? 'border-rust/25 bg-rust/5 text-rust' : 'border-sage/25 bg-sage/5 text-sage'}`}>
+                  {actionError || actionFeedback}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {showOwnerActions && (
+            <div className="mt-6">
               <ReviewGalleryPanel
                 review={review}
                 gallerySaved={gallerySaved}
@@ -448,24 +547,24 @@ export default function ReviewPage() {
                 onGalleryToggle={handleGalleryToggle}
                 t={t}
               />
-            )}
+            </div>
+          )}
 
-            <p className="text-xs text-ink-subtle pt-2 border-t border-border-subtle">
-              {t('review_ai_disclaimer')}
-            </p>
+          <p className="mt-6 border-t border-border-subtle pt-4 text-xs leading-5 text-ink-subtle">
+            {t('review_ai_disclaimer')}
+          </p>
 
-            {showPersonalActions && (
-              <ProPromoCard
-                plan={plan === 'guest' ? 'guest' : plan === 'pro' ? 'pro' : 'free'}
-                scene="review"
-                title={plan === 'pro' ? undefined : reviewPromoCopy.title}
-                body={plan === 'pro' ? undefined : reviewPromoCopy.body}
-                fallbackRedirectUrl={`/reviews/${review.review_id}`}
-                className="mt-2"
-              />
-            )}
-          </div>
-        </div>
+          {showPersonalActions && (
+            <ProPromoCard
+              plan={plan === 'guest' ? 'guest' : plan === 'pro' ? 'pro' : 'free'}
+              scene="review"
+              title={plan === 'pro' ? undefined : reviewPromoCopy.title}
+              body={plan === 'pro' ? undefined : reviewPromoCopy.body}
+              fallbackRedirectUrl={`/reviews/${review.review_id}`}
+              className="mt-6"
+            />
+          )}
+        </section>
       </div>
 
       <ImageZoomOverlay

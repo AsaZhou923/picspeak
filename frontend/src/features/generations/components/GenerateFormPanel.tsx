@@ -14,8 +14,6 @@ import {
   STYLE_OPTIONS,
   templateCopyKey,
 } from '@/features/generations/generation-page-copy';
-import { PromptExampleGallery } from '@/features/generations/components/PromptExampleGallery';
-import type { GenerationPromptExample } from '@/content/generation/prompt-examples';
 
 type GenerateFormPanelProps = {
   t: Translator;
@@ -35,7 +33,6 @@ type GenerateFormPanelProps = {
   onStyleChange: (value: string) => void;
   onNegativePromptChange: (value: string) => void;
   onToggleNegative: () => void;
-  onPromptExampleApply: (example: GenerationPromptExample) => void;
 };
 
 export default function GenerateFormPanel({
@@ -56,67 +53,38 @@ export default function GenerateFormPanel({
   onStyleChange,
   onNegativePromptChange,
   onToggleNegative,
-  onPromptExampleApply,
 }: GenerateFormPanelProps) {
   return (
-    <main className="min-w-0 space-y-5">
-      <section className="rounded-lg border border-border-subtle bg-surface/80 p-3 sm:p-5">
-        <div className="mb-3 flex items-center gap-2 text-sm text-ink sm:mb-4">
-          <Sparkles size={16} className="text-gold" />
-          <span>{t('generation_templates_title')}</span>
+    <div className="min-w-0 space-y-5">
+      <section className="ui-feature-panel p-4 sm:p-6" aria-labelledby="generation-prompt-heading">
+        <div className="mb-4 flex items-center gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-control border border-gold/30 bg-gold/10 text-gold">
+            <Sparkles size={18} aria-hidden="true" />
+          </span>
+          <label id="generation-prompt-heading" htmlFor="generation-prompt" className="text-base font-semibold text-ink">
+            {t('generation_prompt_label')}
+          </label>
         </div>
-        <div className="-mx-3 flex snap-x gap-2 overflow-x-auto px-3 pb-1 sm:mx-0 sm:grid sm:snap-none sm:grid-cols-2 sm:gap-3 sm:overflow-visible sm:px-0 sm:pb-0 xl:grid-cols-3">
-          {GENERATION_TEMPLATES.map((template) => {
-            const copyKeys = templateCopyKey(template.key);
-            return (
-              <button
-                key={template.key}
-                type="button"
-                aria-pressed={templateKey === template.key}
-                onClick={() => onTemplateSelect(template.key)}
-                className={`min-w-[176px] max-w-[176px] snap-start rounded-lg border p-3 text-left transition-all sm:min-h-[128px] sm:min-w-0 sm:max-w-none sm:p-4 ${
-                  templateKey === template.key
-                    ? 'border-gold/50 bg-gold/10 text-ink'
-                    : 'border-border-subtle bg-raised/70 text-ink-muted hover:border-gold/30 hover:text-ink'
-                }`}
-              >
-                <div className="mb-1.5 flex items-center justify-between gap-2 sm:mb-2">
-                  <span className="text-sm font-medium text-ink">{t(copyKeys.label)}</span>
-                  <Wand2
-                    size={15}
-                    className={templateKey === template.key ? 'shrink-0 text-gold' : 'shrink-0 text-transparent'}
-                  />
-                </div>
-                <p className="line-clamp-2 text-xs leading-5 text-ink-muted sm:line-clamp-none">
-                  {t(copyKeys.description)}
-                </p>
-              </button>
-            );
-          })}
-        </div>
-      </section>
-
-      <section className="rounded-lg border border-border-subtle bg-surface/80 p-4 sm:p-5">
-        <label className="block">
-          <span className="mb-3 block text-sm text-ink">{t('generation_prompt_label')}</span>
+        <div>
           <textarea
+            id="generation-prompt"
             ref={promptRef}
             value={prompt}
             onChange={(event) => onPromptChange(event.target.value)}
             onFocus={onPromptFocus}
-            rows={6}
-            className="w-full resize-none rounded-lg border border-border bg-void/70 px-4 py-3 text-sm leading-7 text-ink outline-none transition-colors placeholder:text-ink-subtle focus:border-gold/40"
+            rows={7}
+            className="min-h-48 w-full resize-y rounded-control border border-border bg-void/70 px-4 py-3 text-sm leading-7 text-ink outline-none transition-colors placeholder:text-ink-subtle focus:border-gold/50"
             placeholder={t('generation_prompt_placeholder')}
           />
-        </label>
+        </div>
 
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
+        <div className="mt-5 grid gap-3 md:grid-cols-3">
           <label className="space-y-2 text-xs text-ink-muted">
             <span>{t('generation_quality_label')}</span>
             <select
               value={quality}
               onChange={(event) => onQualityChange(event.target.value as GenerationQuality)}
-              className="w-full rounded-lg border border-border bg-void/70 px-3 py-2.5 text-sm text-ink outline-none focus:border-gold/40"
+              className="min-h-11 w-full rounded-control border border-border bg-void/70 px-3 py-2.5 text-sm text-ink outline-none focus:border-gold/50"
             >
               {(Object.keys(QUALITY_COPY_KEYS) as GenerationQuality[]).map((value) => (
                 <option key={value} value={value}>
@@ -130,7 +98,7 @@ export default function GenerateFormPanel({
             <select
               value={size}
               onChange={(event) => onSizeChange(event.target.value as GenerationSize)}
-              className="w-full rounded-lg border border-border bg-void/70 px-3 py-2.5 text-sm text-ink outline-none focus:border-gold/40"
+              className="min-h-11 w-full rounded-control border border-border bg-void/70 px-3 py-2.5 text-sm text-ink outline-none focus:border-gold/50"
             >
               {GENERATION_SIZE_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -144,7 +112,7 @@ export default function GenerateFormPanel({
             <select
               value={style}
               onChange={(event) => onStyleChange(event.target.value)}
-              className="w-full rounded-lg border border-border bg-void/70 px-3 py-2.5 text-sm text-ink outline-none focus:border-gold/40"
+              className="min-h-11 w-full rounded-control border border-border bg-void/70 px-3 py-2.5 text-sm text-ink outline-none focus:border-gold/50"
             >
               {STYLE_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -158,27 +126,64 @@ export default function GenerateFormPanel({
         <div className="mt-4">
           <button
             type="button"
+            aria-expanded={showNegative}
+            aria-controls="generation-negative-prompt"
             onClick={onToggleNegative}
-            className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-xs text-ink-muted transition-colors hover:border-gold/30 hover:text-ink"
+            className="inline-flex min-h-11 items-center gap-2 rounded-control border border-border bg-raised/60 px-3 py-2 text-xs text-ink-muted transition-colors hover:border-gold/40 hover:text-ink"
           >
-            <Copy size={12} />
+            <Copy size={13} aria-hidden="true" />
             {t('generation_negative_toggle')}
           </button>
           {showNegative && (
             <textarea
+              id="generation-negative-prompt"
+              aria-label={t('generation_negative_toggle')}
               value={negativePrompt}
               onChange={(event) => onNegativePromptChange(event.target.value)}
               rows={3}
-              className="mt-3 w-full resize-none rounded-lg border border-border bg-void/70 px-4 py-3 text-sm leading-6 text-ink outline-none focus:border-gold/40"
+              className="mt-3 w-full resize-y rounded-control border border-border bg-void/70 px-4 py-3 text-sm leading-6 text-ink outline-none focus:border-gold/50"
               placeholder="no text, no watermark, no distorted face"
             />
           )}
         </div>
+      </section>
 
-        <div className="mt-5 border-t border-border-subtle pt-5">
-          <PromptExampleGallery onApply={onPromptExampleApply} />
+      <section className="ui-panel p-3 sm:p-5" aria-labelledby="generation-template-heading">
+        <div className="mb-3 flex items-center gap-2 text-sm text-ink sm:mb-4">
+          <Wand2 size={16} className="text-gold" aria-hidden="true" />
+          <h2 id="generation-template-heading" className="font-semibold">{t('generation_templates_title')}</h2>
+        </div>
+        <div className="-mx-3 flex snap-x gap-2 overflow-x-auto px-3 pb-1 sm:mx-0 sm:grid sm:snap-none sm:grid-cols-2 sm:gap-3 sm:overflow-visible sm:px-0 sm:pb-0 xl:grid-cols-3">
+          {GENERATION_TEMPLATES.map((template) => {
+            const copyKeys = templateCopyKey(template.key);
+            return (
+              <button
+                key={template.key}
+                type="button"
+                aria-pressed={templateKey === template.key}
+                onClick={() => onTemplateSelect(template.key)}
+                className={`min-h-24 min-w-[176px] max-w-[176px] snap-start rounded-control border p-3 text-left transition-all sm:min-w-0 sm:max-w-none ${
+                  templateKey === template.key
+                    ? 'border-gold/50 bg-gold/10 text-ink shadow-level-1'
+                    : 'border-border-subtle bg-raised/60 text-ink-muted hover:border-gold/30 hover:bg-raised hover:text-ink'
+                }`}
+              >
+                <div className="mb-1.5 flex items-center justify-between gap-2">
+                  <span className="text-sm font-semibold text-ink">{t(copyKeys.label)}</span>
+                  <Wand2
+                    size={15}
+                    aria-hidden="true"
+                    className={templateKey === template.key ? 'shrink-0 text-gold' : 'shrink-0 text-transparent'}
+                  />
+                </div>
+                <p className="line-clamp-2 text-xs leading-5 text-ink-muted">
+                  {t(copyKeys.description)}
+                </p>
+              </button>
+            );
+          })}
         </div>
       </section>
-    </main>
+    </div>
   );
 }

@@ -27,9 +27,9 @@ function GenerationCard({ item }: { item: GeneratedImageItem }) {
   return (
     <Link
       href={`/generations/${item.generation_id}`}
-      className="group grid gap-4 rounded-lg border border-border-subtle bg-raised p-3 transition-colors hover:border-gold/40 sm:grid-cols-[112px_minmax(0,1fr)_24px]"
+      className="ui-panel group grid gap-4 p-3 transition-colors hover:border-gold/40 hover:shadow-level-2 sm:grid-cols-[112px_minmax(0,1fr)_24px]"
     >
-      <div className="relative aspect-square overflow-hidden rounded-lg bg-void">
+      <div className="relative aspect-square overflow-hidden rounded-control bg-void">
         <Image
           src={item.image_url}
           alt={item.prompt}
@@ -90,14 +90,14 @@ export default function GenerationHistoryPage() {
   };
 
   return (
-    <div className="min-h-screen pt-14">
-      <div className="mx-auto max-w-4xl px-6 py-12">
+    <div className="min-h-screen">
+      <div className="mx-auto max-w-task px-6 py-12">
         <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="mb-2 font-mono text-xs uppercase tracking-[0.24em] text-gold/70">{t('generation_history_badge')}</p>
+            <p className="ui-eyebrow mb-2">{t('generation_history_badge')}</p>
             <h1 className="font-display text-4xl text-ink sm:text-5xl">{t('generation_history_title')}</h1>
           </div>
-          <Link href="/generate" className="rounded-full border border-border px-4 py-2 text-sm text-ink-muted transition-colors hover:border-gold/30 hover:text-gold">
+          <Link href="/generate" className="ui-action-secondary px-4 py-2 text-sm">
             {t('generation_history_new')}
           </Link>
         </div>
@@ -105,7 +105,7 @@ export default function GenerationHistoryPage() {
         {loading ? (
           <div className="space-y-3">
             {Array.from({ length: 4 }).map((_, index) => (
-              <div key={index} className="h-36 animate-pulse rounded-lg border border-border-subtle bg-raised" />
+              <div key={index} className="ui-panel h-36 animate-pulse" />
             ))}
           </div>
         ) : error ? (
@@ -114,9 +114,9 @@ export default function GenerationHistoryPage() {
             {error}
           </div>
         ) : items.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-border px-6 py-20 text-center">
+          <div className="ui-panel border-dashed px-6 py-20 text-center">
             <p className="text-sm text-ink-subtle">{t('generation_history_empty')}</p>
-            <Link href="/generate" className="mt-4 inline-flex rounded-full bg-gold px-5 py-2.5 text-sm font-bold text-void hover:bg-gold-light">
+            <Link href="/generate" className="ui-action-primary mt-4 px-5 py-2.5 text-sm">
               {t('generation_history_start')}
             </Link>
           </div>
@@ -133,7 +133,7 @@ export default function GenerationHistoryPage() {
                   type="button"
                   onClick={handleLoadMore}
                   disabled={loadingMore}
-                  className="inline-flex items-center gap-2 rounded-full border border-border px-5 py-2 text-sm text-ink-muted transition-colors hover:border-gold/30 hover:text-ink disabled:opacity-50"
+                  className="ui-action-secondary px-5 py-2 text-sm disabled:opacity-50"
                 >
                   {loadingMore && <RefreshCw size={13} className="animate-spin" />}
                   {t('generation_load_more')}

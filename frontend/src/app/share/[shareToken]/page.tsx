@@ -68,7 +68,7 @@ export default function SharedReviewPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen pt-14">
+      <div className="min-h-screen">
         <div className="mx-auto max-w-5xl px-6 py-12">
           <SkeletonBlock className="mb-8 h-8 w-52" />
           <div className="grid gap-8 lg:grid-cols-[360px_1fr]">
@@ -87,7 +87,7 @@ export default function SharedReviewPage() {
 
   if (error || !review) {
     return (
-      <div className="flex min-h-screen items-center justify-center px-6 pt-14">
+      <div className="flex min-h-screen items-center justify-center px-6">
         <div className="space-y-4 text-center">
           <AlertCircle size={40} className="mx-auto text-rust" />
           <p className="text-sm text-rust">{error || t('review_err_fetch')}</p>
@@ -107,7 +107,7 @@ export default function SharedReviewPage() {
   const result = review.result;
 
   return (
-    <div className="min-h-screen pt-14">
+    <div className="min-h-screen">
       <div className="mx-auto max-w-5xl px-6 py-12 animate-fade-in">
         <div className="mb-8">
           <p className="mb-2 inline-flex items-center gap-2 rounded-full border border-gold/20 bg-gold/10 px-3 py-1 text-[11px] uppercase tracking-[0.26em] text-gold/80">

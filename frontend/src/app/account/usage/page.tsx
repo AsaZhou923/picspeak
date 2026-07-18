@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AlertCircle, ArrowRight, Camera, CheckCircle2, ClipboardCheck, LineChart } from 'lucide-react';
@@ -68,7 +68,7 @@ function UsageDecisionPanel({
   const differenceIcons = [Camera, ClipboardCheck, LineChart] as const;
 
   return (
-    <section className="rounded-[24px] border border-gold/20 bg-[radial-gradient(circle_at_top_left,rgba(200,171,90,0.14),transparent_36%),rgb(var(--color-surface)/0.72)] p-5">
+    <section className="ui-panel border-gold/20 p-5">
       <div className="mb-5">
         <p className="mb-2 text-[11px] font-mono uppercase tracking-[0.22em] text-gold/75">
           {decisionCopy.label}
@@ -145,6 +145,7 @@ export default function UsagePage() {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
   const [activationModalOpen, setActivationModalOpen] = useState(false);
+  const closeBillingModal = useCallback(() => setBillingModalOpen(false), []);
   const creditPackCheckout = useCreditPackCheckout({
     ensureToken,
     locale,
@@ -273,10 +274,10 @@ export default function UsagePage() {
   };
 
   return (
-    <div className="pt-14 min-h-screen">
-      <div className="max-w-2xl mx-auto px-6 py-12 animate-fade-in">
+    <div className="min-h-screen">
+      <div className="mx-auto max-w-reading px-6 py-12 animate-fade-in">
         <div className="mb-10">
-          <p className="text-xs text-gold/70 font-mono mb-2 tracking-widest uppercase">
+          <p className="ui-eyebrow mb-2">
             {t('usage_label')}
           </p>
           <h1 className="font-display text-4xl sm:text-5xl">{t('usage_headline')}</h1>
@@ -288,13 +289,13 @@ export default function UsagePage() {
             <SkeletonBlock className="h-44 w-full" />
           </div>
         ) : error ? (
-          <div className="flex items-center gap-2 text-rust text-sm bg-rust/5 border border-rust/20 rounded px-4 py-3">
+          <div className="flex items-center gap-2 rounded-control border border-rust/20 bg-rust/5 px-4 py-3 text-sm text-rust">
             <AlertCircle size={14} />
             {error}
           </div>
         ) : usage ? (
           <div className="space-y-4">
-            <div className="border border-border-subtle rounded-lg bg-raised p-6">
+            <div className="ui-panel p-6">
               <p className="text-xs text-ink-muted mb-3">{t('usage_identity')}</p>
               <div className="flex items-center justify-between gap-4">
                 <div>
@@ -321,7 +322,7 @@ export default function UsagePage() {
                 </div>
                 {usage.plan === 'guest' ? (
                   <ClerkSignInTrigger
-                    className="flex items-center gap-1.5 text-xs text-gold border border-gold/30 rounded px-3 py-1.5 hover:bg-gold/10 transition-colors"
+                    className="ui-action-secondary px-3 py-1.5 text-xs text-gold"
                     signedInClassName="shrink-0 inline-flex items-center"
                   >
                     {t('usage_login_now')}
@@ -333,7 +334,7 @@ export default function UsagePage() {
                       type="button"
                       onClick={handleCheckout}
                       disabled={checkoutLoading}
-                      className="flex items-center gap-1.5 text-xs text-gold border border-gold/30 rounded px-3 py-1.5 hover:bg-gold/10 transition-colors disabled:opacity-60"
+                      className="ui-action-secondary px-3 py-1.5 text-xs text-gold disabled:opacity-60"
                     >
                       {checkoutLoading
                         ? t('usage_checkout_loading')
@@ -347,7 +348,7 @@ export default function UsagePage() {
                       <button
                         type="button"
                         onClick={handleCheckout}
-                        className="flex items-center gap-1.5 text-xs text-gold border border-gold/30 rounded px-3 py-1.5 hover:bg-gold/10 transition-colors"
+                        className="ui-action-secondary px-3 py-1.5 text-xs text-gold"
                       >
                         {t('usage_checkout_pro')}
                         <ArrowRight size={11} />
@@ -358,7 +359,7 @@ export default function UsagePage() {
                       type="button"
                       onClick={handleManageSubscription}
                       disabled={portalLoading}
-                      className="flex items-center gap-1.5 text-xs text-gold border border-gold/30 rounded px-3 py-1.5 hover:bg-gold/10 transition-colors disabled:opacity-60"
+                      className="ui-action-secondary px-3 py-1.5 text-xs text-gold disabled:opacity-60"
                     >
                       {portalLoading ? t('usage_manage_loading') : t('usage_manage_subscription')}
                       <ArrowRight size={11} />
@@ -389,7 +390,7 @@ export default function UsagePage() {
             <UsageDecisionPanel locale={locale} plan={usage.plan} />
 
             {usage.plan === 'guest' && (
-              <div className="border border-gold/15 rounded-lg bg-gold/5 p-5 space-y-3">
+              <div className="ui-panel space-y-3 border-gold/15 bg-gold/5 p-5">
                 <p className="text-sm text-gold font-medium">{t('usage_login_unlock_title')}</p>
                 <p className="text-xs text-ink-muted leading-relaxed">
                   {t('usage_login_unlock_body')}
@@ -406,20 +407,20 @@ export default function UsagePage() {
             {isZhLocale && (
               <div
                 id="activation-code"
-                className="border border-gold/15 rounded-lg bg-gold/5 p-5 space-y-4"
+                className="ui-panel space-y-4 border-gold/15 bg-gold/5 p-5"
               >
                 <div className="space-y-2">
                   <p className="text-sm text-gold font-medium">{activationUiCopy.zh.title}</p>
                   <p className="text-xs text-ink-muted leading-relaxed">{activationUiCopy.zh.body}</p>
                 </div>
                 <div className="grid gap-2 text-xs text-ink-muted sm:grid-cols-3">
-                  <div className="rounded-md border border-border-subtle px-3 py-3">
+                  <div className="rounded-control border border-border-subtle px-3 py-3">
                     1. {activationUiCopy.zh.stepBuy}
                   </div>
-                  <div className="rounded-md border border-border-subtle px-3 py-3">
+                  <div className="rounded-control border border-border-subtle px-3 py-3">
                     2. {activationUiCopy.zh.stepReceive}
                   </div>
-                  <div className="rounded-md border border-border-subtle px-3 py-3">
+                  <div className="rounded-control border border-border-subtle px-3 py-3">
                     3. {activationUiCopy.zh.stepRedeem}
                   </div>
                 </div>
@@ -427,7 +428,7 @@ export default function UsagePage() {
                   {usage.plan === 'guest' ? (
                     <ClerkSignInTrigger
                       fallbackRedirectUrl="/account/usage"
-                      className="inline-flex items-center justify-center gap-2 rounded-full bg-gold px-5 py-3 text-sm font-medium text-void transition-colors hover:bg-gold-light"
+                      className="ui-action-primary px-5 py-3 text-sm"
                       signedInClassName="hidden"
                     >
                       {t('usage_login_now')}
@@ -437,7 +438,7 @@ export default function UsagePage() {
                     <button
                       type="button"
                       onClick={handleCheckout}
-                      className="inline-flex items-center justify-center gap-2 rounded-full bg-gold px-5 py-3 text-sm font-medium text-void transition-colors hover:bg-gold-light"
+                      className="ui-action-primary px-5 py-3 text-sm"
                     >
                       {t('usage_checkout_pro')}
                       <ArrowRight size={14} />
@@ -447,8 +448,8 @@ export default function UsagePage() {
                 <div className="flex flex-col gap-3 sm:flex-row">
                   {usage.plan === 'guest' ? (
                     <ClerkSignInTrigger
-                      className="inline-flex items-center justify-center gap-2 rounded-full border border-gold/30 px-5 py-3 text-sm font-medium text-gold transition-colors hover:bg-gold/10"
-                      signedInClassName="inline-flex items-center justify-center gap-2 rounded-full border border-gold/30 px-5 py-3 text-sm font-medium text-gold transition-colors hover:bg-gold/10"
+                      className="ui-action-secondary px-5 py-3 text-sm text-gold"
+                      signedInClassName="ui-action-secondary px-5 py-3 text-sm text-gold"
                     >
                       {activationUiCopy.zh.signInFirst}
                       <ArrowRight size={14} />
@@ -459,7 +460,7 @@ export default function UsagePage() {
                       onClick={() => {
                         setActivationModalOpen(true);
                       }}
-                      className="inline-flex items-center justify-center gap-2 rounded-full border border-gold/30 px-5 py-3 text-sm font-medium text-gold transition-colors hover:bg-gold/10"
+                      className="ui-action-secondary px-5 py-3 text-sm text-gold"
                     >
                       {activationUiCopy.zh.redeemCta}
                     </button>
@@ -502,7 +503,7 @@ export default function UsagePage() {
         <BillingContactModal
           t={t}
           message={billingMessage}
-          onClose={() => setBillingModalOpen(false)}
+          onClose={closeBillingModal}
         />
       )}
     </div>

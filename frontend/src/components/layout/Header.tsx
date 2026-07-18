@@ -35,8 +35,8 @@ export default function Header() {
       : 'text-ink-muted hover:text-ink';
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 border-b border-border-subtle bg-void/90 backdrop-blur-md">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+    <header className="sticky top-0 z-50 border-b border-border-subtle bg-void/90 backdrop-blur-xl">
+      <div className="max-w-editorial mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
         {/* Left side: Logo and Mobile Home */}
         <div className="flex items-center gap-3">
           <Link
@@ -98,10 +98,10 @@ export default function Header() {
 
       {headerVisibility.showMobileTabs && (
         <div className="md:hidden border-t border-border-subtle/40 px-3 py-2">
-          <nav className="flex items-stretch bg-surface/70 rounded-xl p-1 gap-0.5">
+          <nav className="flex items-stretch bg-surface/70 rounded-card p-1 gap-0.5">
             <Link
               href="/workspace"
-              className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-[10px] text-[10px] font-medium transition-all duration-200 ${
+              className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-control text-[10px] font-medium transition-all duration-200 ${
                 pathname === '/workspace'
                   ? 'bg-void shadow-sm text-gold'
                   : 'text-ink-subtle hover:text-ink-muted active:scale-95'
@@ -112,7 +112,7 @@ export default function Header() {
             </Link>
             <Link
               href="/gallery"
-              className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-[10px] text-[10px] font-medium transition-all duration-200 ${
+              className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-control text-[10px] font-medium transition-all duration-200 ${
                 pathname === '/gallery'
                   ? 'bg-void shadow-sm text-gold'
                   : 'text-ink-subtle hover:text-ink-muted active:scale-95'
@@ -123,7 +123,7 @@ export default function Header() {
             </Link>
             <Link
               href="/retake"
-              className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-[10px] text-[10px] font-medium transition-all duration-200 ${
+              className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-control text-[10px] font-medium transition-all duration-200 ${
                 pathname === '/retake'
                   ? 'bg-void shadow-sm text-sage'
                   : 'text-ink-subtle hover:text-ink-muted active:scale-95'
@@ -134,7 +134,7 @@ export default function Header() {
             </Link>
             <Link
               href="/generate"
-              className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-[10px] text-[10px] font-medium transition-all duration-200 ${
+              className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-control text-[10px] font-medium transition-all duration-200 ${
                 pathname === '/generate'
                   ? 'bg-void shadow-sm text-gold'
                   : 'text-ink-subtle hover:text-ink-muted active:scale-95'
@@ -145,7 +145,7 @@ export default function Header() {
             </Link>
             <Link
               href="/account/usage"
-              className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-[10px] text-[10px] font-medium transition-all duration-200 ${
+              className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-control text-[10px] font-medium transition-all duration-200 ${
                 pathname === '/account/usage'
                   ? 'bg-void shadow-sm text-gold'
                   : 'text-ink-subtle hover:text-ink-muted active:scale-95'

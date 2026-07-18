@@ -56,7 +56,7 @@ export default function PromptLibraryContent() {
   ) as Record<(typeof GENERATION_PROMPT_EXAMPLE_CATEGORIES)[number], number>;
 
   return (
-    <main className="min-h-screen px-6 pb-20 pt-24">
+    <div className="min-h-screen px-6 pb-20 pt-16">
       <section className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:items-end">
         <div>
           <p className="text-xs uppercase tracking-[0.28em] text-gold/75">{copy.eyebrow}</p>
@@ -129,6 +129,6 @@ export default function PromptLibraryContent() {
           );
         })}
       </section>
-    </main>
+    </div>
   );
 }
