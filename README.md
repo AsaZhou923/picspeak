@@ -8,6 +8,17 @@
 
 **PicSpeak** is an AI-powered web application for photography critique and visual-reference creation. Upload a photo and receive professional AI feedback on composition, lighting, and color within seconds, then generate GPT Image 2 visual references for the next shoot. No registration is required. You can start immediately as a guest.
 
+## OpenAI Build Week submission
+
+| Submission item | Value |
+|---|---|
+| Project | PicSpeak Retake Coach |
+| Track | Apps for Your Life |
+| Live entry | [https://www.picspeak.art/retake](https://www.picspeak.art/retake) |
+| Demo video | English 2:16 master ready; replace this text with the public YouTube URL before Devpost submission |
+
+Retake Coach asks a more useful question than another standalone critique: **did the next shot actually improve?** It keeps the original critique and shooting target attached, evaluates the original and retake together with GPT-5.6 Terra, calculates score changes deterministically, and turns the remaining gaps into the next shoot's actions and success checks.
+
 ---
 
 ## Screenshots
@@ -19,6 +30,14 @@
 | Gallery | Mobile |
 |---------|--------|
 | ![Gallery](docs/assets/screenshots/gallery.jpg) | ![Mobile](docs/assets/screenshots/mobile.jpg) |
+
+### Build Week Retake Coach sample
+
+The pair below is synthetic and public-safe. It is included so judges can exercise the upload flow without private photos or third-party rights concerns.
+
+| Original | Retake |
+|---|---|
+| ![Synthetic original with tight framing and green cafe light](samples/retake-coach/original.png) | ![Synthetic retake with cleaner framing and neutral side light](samples/retake-coach/retake.png) |
 
 ---
 
@@ -61,7 +80,7 @@ PicSpeak existed before the Build Week submission window. The competition contri
 
 ### GPT-5.6 call path
 
-The normal one-photo workspace exposes a Qwen 3.5 / GPT-5.5 model picker. Choosing GPT-5.5 sends the real image through the OpenAI Responses API with strict Structured Outputs; Qwen remains the backward-compatible default. Retake Coach always locks paired comparison to GPT-5.6 Terra.
+The normal one-photo workspace exposes a Qwen 3.5 / GPT-5.5 model picker. Choosing GPT-5.5 sends the real image through the Responses API contract with strict Structured Outputs; Qwen remains the backward-compatible default. Retake Coach always locks paired comparison to GPT-5.6 Terra.
 
 ```text
 workspace retake upload
@@ -70,7 +89,8 @@ workspace retake upload
   -> backend/app/api/routers/review_create.py
   -> backend/app/services/review_task_processor.py
   -> backend/app/services/retake_comparison.py::run_retake_comparison
-  -> POST https://api.openai.com/v1/responses (model=gpt-5.6-terra)
+  -> POST {OPENAI_API_BASE_URL}/responses (defaults to https://api.openai.com/v1/responses)
+     model=gpt-5.6-terra
   -> two input_image blocks + strict JSON Schema
   -> Review.result_json.comparison
   -> RetakeComparisonPanel / RetakeProgressPanel / GPT Image 2 reference generation
@@ -78,18 +98,47 @@ workspace retake upload
 
 The model scores both photos inside the same request. The server—not the model—calculates every dimension delta and overall delta before saving the result. Unrelated images are marked non-comparable and are excluded from the progress curve.
 
-Key engineering decisions, the timestamped contribution log, and the eventual Codex `/feedback` Session ID are tracked in [Build Week Log](docs/build-week/BUILD-WEEK-LOG.md).
+### How we collaborated with Codex
 
-Submission and verification artifacts:
+Codex was the primary Build Week development environment. It mapped PicSpeak's existing upload, asynchronous review, history, and image-generation paths before implementation; helped define the paired comparison schema and ownership boundaries; implemented the backend service and responsive interface; preserved the existing single-photo flow; added contract and regression tests; and drove desktop/mobile browser QA.
 
-- [Before Build Week baseline evidence](docs/build-week/BASELINE-EVIDENCE.md)
-- [Redacted live GPT-5.6 call evidence](docs/build-week/evidence/live-gpt56-retake-call-2026-07-16.json)
-- [Redacted normal-review and retake model-path evidence](docs/build-week/evidence/live-gpt56-model-choice-test-2026-07-17.json)
-- [Redacted GPT-5.5 / GPT-5.6 Terra routing evidence](docs/build-week/evidence/live-gpt55-terra-routing-test-2026-07-17.json)
-- [2:50 English demo script](docs/build-week/DEMO-SCRIPT.md)
-- [Judge testing instructions](docs/build-week/JUDGE-TESTING-INSTRUCTIONS.md)
-- [Devpost submission copy](docs/build-week/SUBMISSION-COPY.md)
-- [Authorized sample manifest](docs/build-week/AUTHORIZED-SAMPLE-MANIFEST.md)
+The important decisions remained explicit and reviewable:
+
+- **Rescore the pair together.** The original may have been reviewed by an older provider, so GPT-5.6 scores both images under one rubric instead of mixing scoring systems.
+- **Keep arithmetic deterministic.** GPT-5.6 supplies before/after scores and visible evidence; Python calculates all dimension deltas, means, and trend states.
+- **Reuse the existing Review relationship.** `Review.source_review_id` and `result_json.comparison` keep the feature transactional without a deadline-driven parallel data model.
+- **Treat uncertainty as product behavior.** Low-confidence or unrelated pairs stay reviewable but never receive an improvement badge or enter a progress curve.
+- **Avoid an unnecessary SDK dependency.** The implementation reuses the existing pooled HTTP client and validates a strict schema at the application boundary.
+
+Core implementation landed in [`2a626aa`](https://github.com/AsaZhou923/picspeak/commit/2a626aabab30d5cdb45ca0450fdd1ce7a5387b4c) on July 17, 2026. The pre-event baseline remains [`b74ddfb`](https://github.com/AsaZhou923/picspeak/commit/b74ddfb88ae32e37965ba8b29f40c9ebcbbf77fc) from July 1.
+
+Detailed submission records, redacted model-call evidence, the video source, and the eventual Codex `/feedback` Session ID are maintained in the external PicSpeak project documentation rather than in this source repository. The immutable implementation boundary remains auditable through the linked baseline and Build Week commits above.
+
+### How judges can test Retake Coach
+
+1. Open the [live Retake Coach](https://www.picspeak.art/retake) and sign in with the private judge account supplied in Devpost.
+2. Select the preloaded completed original critique.
+3. Upload [`retake.png`](samples/retake-coach/retake.png). The matching original is [`original.png`](samples/retake-coach/original.png).
+4. Confirm that the workspace labels the source as **Original**, the new upload as **Retake**, and the review model as **GPT-5.6 Terra**.
+5. Run the comparison and inspect the overall change, all five dimensions, visible evidence, remaining gaps, and success checks.
+6. Open the visual-reference action and confirm that its prompt is derived from the paired diagnosis.
+7. Open Review History and confirm that a reliable attempt enters the same-source retake chain.
+
+The Devpost testing field must contain the private account credentials and fallback result URL. Do not commit passwords or access tokens to this repository.
+
+### Verification commands
+
+```bash
+# Backend
+./.venv/bin/python -m pytest backend/tests
+
+# Frontend
+cd frontend
+npm run typecheck
+npm run lint
+node --test test/*.test.ts
+npm run build
+```
 
 ## Tech Stack
 
@@ -159,7 +208,8 @@ cd ..
 ### 4. Start the backend
 
 ```bash
-uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
+cd backend
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ### 5. Configure and start the frontend
@@ -181,8 +231,9 @@ Both the backend and frontend can be deployed in containers. The backend `Docker
 
 ```bash
 # Backend
-uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
-python -m backend.app.worker_main   # Optional: run a separate worker process
+cd backend
+uvicorn app.main:app --host 0.0.0.0 --port 8000
+python -m app.worker_main   # Optional: run a separate worker process
 
 # Frontend
 cd frontend && npm run build && npm run start

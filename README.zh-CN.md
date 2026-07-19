@@ -70,14 +70,7 @@ PicSpeak 在 Build Week 提交窗口前已经存在。本次参赛贡献是在�
   -> 复拍对比 / 进步曲线 / GPT Image 2 视觉参考
 ```
 
-贡献边界、实现决策与验证证据：
-
-- [Build Week 贡献日志](docs/build-week/BUILD-WEEK-LOG.md)
-- [活动前基线证据](docs/build-week/BASELINE-EVIDENCE.md)
-- [脱敏 GPT-5.5 / GPT-5.6 Terra 路由证据](docs/build-week/evidence/live-gpt55-terra-routing-test-2026-07-17.json)
-- [英文演示脚本](docs/build-week/DEMO-SCRIPT.md)
-- [评委测试说明](docs/build-week/JUDGE-TESTING-INSTRUCTIONS.md)
-- [Devpost 提交文案](docs/build-week/SUBMISSION-COPY.md)
+完整贡献日志、脱敏模型调用证据、演示视频源文件、评委测试说明和 Devpost 文案统一保存在仓库外的 PicSpeak 项目文档库中；仓库通过活动前基线提交和 Build Week 功能提交保留不可变的实现边界。
 
 ## 技术栈
 

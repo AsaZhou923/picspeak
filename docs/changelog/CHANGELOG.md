@@ -120,7 +120,7 @@
 
 - 桌面和移动导航、首页、点评历史、点评详情与标准工作台都提供 Retake Coach 的可见入口，不依赖隐藏 query parameter。
 - `README.md` 记录 Build Week 前后边界、GPT-5.5 / GPT-5.6 Terra 调用路径、环境变量和验证证据。
-- `docs/build-week/` 新增基线证据、贡献日志、授权样例清单、演示脚本、评委测试说明、提交文案和脱敏在线调用结果。
+- Build Week 基线证据、贡献日志、授权样例清单、演示脚本、评委测试说明、提交文案和脱敏在线调用结果已统一迁移到仓库外的 PicSpeak 项目文档库 `11 - OpenAI Build Week 2026/`。
 - `backend/.env.example` 新增普通 OpenAI 点评与复拍分析的独立 endpoint、模型、reasoning effort 和 timeout 配置。
 
 ### 首页更新记录同步
@@ -167,7 +167,7 @@
 - `README.md`
 - `README.zh-CN.md`
 - `CLAUDE.md`
-- `docs/build-week/`
+- 仓库外 PicSpeak 项目文档库：`11 - OpenAI Build Week 2026/`
 - `docs/changelog/CHANGELOG.md`
 - `docs/changelog/CHANGELOG_WORKFLOW.md`
 - `frontend/src/content/updates/{zh,en,ja}.json`
