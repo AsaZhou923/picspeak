@@ -42,27 +42,29 @@
   "posts": [
     {
       "slug": "ai-photo-critique-daily-practice",
-      "title": "Why AI photo critique works best as daily practice, not just emergency repair",
-      "description": "AI critique becomes more useful when it is part of a repeatable training loop. This article explores the psychology of deliberate practice and how high-frequency review accelerates growth.",
-      "excerpt": "The bigger gains usually come from consistent post-shoot review. When AI critique becomes part of your routine, repeated weaknesses show up much faster — and you start fixing them before they become permanent habits.",
+      "title": "Why AI photo critique should become a shoot-review-retake-compare habit",
+      "description": "AI photo critique is most useful when the original, a clear shooting target, the retake, and a same-rubric comparison form one repeatable practice loop. Learn how short review cycles expose recurring weaknesses and produce visible evidence that the next photo actually improved.",
+      "excerpt": "The bigger gains come from completing a consistent shoot-review-retake-compare loop. Keep one target and an observable success condition so you can tell whether the advice really changed the next frame.",
       "category": "AI Critique",
-      "readingTime": "5 min read",
+      "readingTime": "6 min read",
       "publishedAt": "2026-04-11",
-      "updatedAt": "2026-04-11",
+      "updatedAt": "2026-07-27",
       "keywords": [
         "AI photo critique",
         "post-shoot review",
         "photography practice",
         "deliberate practice photography",
-        "photo improvement routine"
+        "photo improvement routine",
+        "AI retake critique",
+        "Retake Coach"
       ],
-      "intro": "If you use critique only after obvious failures, you miss most of its value. The harder problem is usually repeating the same visual mistake for weeks without noticing it. This article explains — from a training psychology perspective — why daily critique beats occasional deep review.",
+      "intro": "If you use critique only after obvious failures, you miss most of its value. The harder problem is repeating the same visual mistake for weeks without noticing it. A useful routine carries one clear target back to a comparable scene, creates a retake, and evaluates both frames under the same rubric. That turns advice into a progress chain supported by visible evidence.",
       "takeawayTitle": "Core takeaway",
       "takeawayItems": [
-        "High-frequency review beats low-frequency deep review.",
-        "Feedback matters only when it turns into an actionable task.",
-        "Repeated issues should become your next training target, not be ignored.",
-        "Focus on only 1–2 improvements per session — don't overload."
+        "Frequent short loops beat occasional heavy review.",
+        "Feedback needs both a next-shoot action and an observable success condition.",
+        "Rescore the original and retake under one rubric instead of mixing historical scores.",
+        "Focus on only 1–2 improvements and preserve uncertain or non-comparable results."
       ],
       "sections": [
         {
@@ -74,37 +76,45 @@
           ]
         },
         {
-          "title": "2. Daily practice needs a short loop",
-          "paragraphs": [
-            "After each shoot, spend ten minutes choosing one to three representative frames. Review them, then reduce the result to one or two actions for the next session. The shorter and more frequent this loop, the more stable your progress.",
-            "The real pain point for most learners is not lack of knowledge — it's lack of feedback frequency. You might read 100 composition tutorials, but if you only shoot 5 times in two months and never compare results to previous feedback, that knowledge never becomes internalized."
-          ],
-          "bullets": [
-            "Pick representative frames, not every similar miss — the act of selecting is itself training.",
-            "Keep only one or two corrections for next time to prevent memory overload.",
-            "Use the next shoot to test whether the old problem improved before chasing new goals."
+        "title": "2. Use an original → target → retake → compare loop",
+        "paragraphs": [
+          "After each shoot, spend ten minutes choosing one to three representative frames. Reduce the critique to one or two actions, return to a similar scene, and make a retake. Compare the original and retake together instead of judging progress from the new image's standalone score.",
+          "The real pain point for most learners is not lack of knowledge — it is missing feedback frequency and verification. You might read 100 composition tutorials, but if you never retake with the previous target or check whether the old problem decreased, that knowledge never becomes internalized."
+        ],
+        "bullets": [
+          "Pick representative frames, not every similar miss — the act of selecting is itself training.",
+          "Keep one or two corrections and give each an observable success condition.",
+          "Test the old issue before chasing new goals, and do not force a comparison when the scenes are too different."
           ]
         },
         {
-          "title": "3. From \"knowing\" to \"doing\" — a deliberate practice perspective",
-          "paragraphs": [
-            "Sports science has a concept called \"deliberate practice\": not repeating what you already do well, but repeatedly challenging yourself in the zone where you barely manage. AI critique can help you locate this zone precisely — the dimension where you consistently score lowest is the one most worth training.",
-            "For example, if your \"composition\" has hovered around 6/10 for three weeks while \"color\" already sits at 8, your next training phase should focus on composition, not more color grading. This precise targeting can significantly shorten the improvement cycle."
+        "title": "3. From \"knowing\" to \"doing\" — a deliberate practice perspective",
+        "paragraphs": [
+          "Sports science has a concept called \"deliberate practice\": not repeating what you already do well, but repeatedly challenging yourself near the edge of your ability. AI critique can help locate that zone, but a single low score is only a clue. A stronger signal is the same weakness appearing across several comparable retakes.",
+          "If composition keeps surfacing, limit the next session to subject placement, edge control, or visual flow. When comparing, have one model rescore both frames in the same request and let the system calculate the deltas. That avoids subtracting a historical 6 from a new-model 8 as if the scales were identical."
           ]
         },
         {
-          "title": "4. How to build your daily critique routine",
-          "paragraphs": [
-            "Step 1: Right after the shoot, start culling while importing. Don't wait until you \"have time\" — by then you'll have forgotten your on-site decisions.",
-            "Step 2: Select 1–3 most representative photos and upload them for critique. If you shot the same scene, choosing one best and one worst frame for comparison is the most valuable approach.",
-            "Step 3: After reviewing the critique, write one sentence: \"Next time I need to pay attention to ______.\" That sentence becomes your next training goal."
-          ],
-          "bullets": [
-            "Tool: phone notes, Notion, even paper — what matters is consistency.",
-            "Frequency: at least 2–3 times per week; casual phone photos count too.",
-            "Monthly review: spend 15 minutes looking at past critiques to track your progress trend."
-          ]
-        }
+        "title": "4. How to build a daily retake routine",
+        "paragraphs": [
+          "Step 1: Immediately select one to three representative frames and request critique while your on-location decisions are still fresh.",
+          "Step 2: Choose one target and write it as an action plus a success condition, such as: \"Move half a step left so the road sign no longer intersects the subject's head.\"",
+          "Step 3: Make a retake under reasonably similar light, position, or subject conditions. In PicSpeak Retake Coach, choose the source review and upload the retake; both images are rescored under one rubric with five-dimensional changes, visible evidence, and next actions.",
+          "Step 4: Add the result to your progress history only when the pair is genuinely comparable and the evidence supports improvement. If the scene is unrelated or confidence is low, treat it as a new practice baseline."
+        ],
+        "bullets": [
+          "Record the original, target, retake, and comparison — not just a copied score.",
+          "Frequency: at least 2–3 times per week; casual phone photos count too.",
+          "Monthly review: inspect one retake chain and ask whether the repeated issue is actually disappearing."
+        ]
+      },
+      {
+        "title": "5. Scores are navigation, not the conclusion",
+        "paragraphs": [
+          "A composition change from 6.0 to 7.2 is easy to scan, but the visible evidence matters more: did the background distraction disappear, did the subject read more clearly, and were facial highlights preserved? Scores help you prioritize; they do not replace looking at the photograph.",
+          "Do not change composition, light, focal length, and editing all at once just to chase a higher number. The more variables you change, the harder it becomes to learn which action worked. Limit each round to one or two controllable changes."
+        ]
+      }
       ]
     },
     {
@@ -185,26 +195,28 @@
     {
       "slug": "turn-photo-feedback-into-shooting-checklist",
       "title": "Turn photo feedback into a checklist for your next shoot",
-      "description": "Feedback becomes useful when translated into concrete actions you can test on the next session. Includes genre-specific checklist templates.",
-      "excerpt": "Understanding feedback and actually fixing the problem are different skills. Once feedback becomes a short checklist, critique turns into practice.",
+      "description": "Turn abstract photo feedback into a short next-shoot checklist, add an observable success condition to every action, and verify the result with a same-rubric retake comparison. Includes practical translation patterns, genre templates, and evidence-based progress checks.",
+      "excerpt": "Understanding feedback and fixing the problem are different skills. Translate \"cluttered\" into a field action, then use visible evidence from the original and retake to verify the change.",
       "category": "Workflow",
-      "readingTime": "5 min read",
+      "readingTime": "6 min read",
       "publishedAt": "2026-04-11",
-      "updatedAt": "2026-04-11",
+      "updatedAt": "2026-07-27",
       "keywords": [
         "photo feedback checklist",
         "photography workflow",
         "shooting checklist",
         "photo improvement method",
-        "critique to action"
+        "critique to action",
+        "retake comparison",
+        "Retake Coach"
       ],
-      "intro": "A lot of learning stops at \"I understand the issue now.\" The real shift happens when that issue becomes something you can execute in the field. This article provides a methodology for translating abstract critiques into on-site actions, plus genre-specific checklist templates.",
+      "intro": "A lot of learning stops at \"I understand the issue now.\" The real shift happens when that issue becomes a field action with an observable success condition, followed by a comparable retake. This guide covers the full path from abstract critique to on-location action and same-rubric verification.",
       "takeawayTitle": "Rules for turning feedback into action",
       "takeawayItems": [
         "Abstract comments need to become field decisions — \"cluttered\" isn't an action; \"crop the sign at the edge\" is.",
         "Short checklists are easier to execute — three items max per session.",
-        "One checklist should support one kind of shoot.",
-        "After each shoot, verify whether last session's checklist was actually followed."
+        "Give every action a success condition that will be visible in the next photo.",
+        "Compare the original and retake under one rubric, and preserve a non-comparable verdict when needed."
       ],
       "sections": [
         {
@@ -221,10 +233,10 @@
           ]
         },
         {
-          "title": "2. Build a short checklist and verify it",
-          "paragraphs": [
-            "Compress the last review into three reminders or fewer, look at them before you leave, and check after the shoot whether you actually used them. That is how feedback becomes a training loop.",
-            "Why three or fewer? Because on location you're already processing light, scene, subject state, composition, and camera settings simultaneously. Working memory is limited. If you carry 10 items out the door, you'll likely remember zero."
+        "title": "2. Add a success condition to every action",
+        "paragraphs": [
+          "Compress the last review into three reminders or fewer, then give each a condition you can directly see in the next frame. For example, \"move to avoid the background sign\" becomes \"no bright text or intersecting line touches the subject's outline.\"",
+          "Why three or fewer? On location you are already processing light, scene, subject, composition, and camera settings. Working memory is limited. Ten checklist items will probably become zero remembered items; without success conditions, the post-shoot verdict also becomes a vague \"it feels better.\""
           ]
         },
         {
@@ -241,13 +253,20 @@
           ]
         },
         {
-          "title": "4. Case study: a complete feedback loop in practice",
-          "paragraphs": [
-            "Suppose your last street shoot received: \"Composition 6/10. Main issue: background too cluttered, subject lost in the environment.\" Translation into an action checklist: ① Next time find cleaner backgrounds (solid-color walls, sky) ② Use 50mm+ to compress the background ③ Wait until the subject passes through a clean zone before pressing the shutter.",
-            "On the next shoot, go out with those 3 items. Then upload the new results and check whether those specific points improved. If composition rises to 7.5+, the direction is right; if it stays flat, adjust the strategy.",
-            "This \"feedback → translate → execute → verify\" cycle is the key to turning AI critique into a real training system."
-          ]
-        }
+        "title": "4. Case study: a verifiable feedback loop",
+        "paragraphs": [
+          "Suppose the last street critique says: \"The background is too cluttered and the subject is lost in the environment.\" Translate it into: ① Find a solid wall or open sky ② Use 50mm+ to compress the background ③ Wait until the subject enters a clean zone. The success condition is an intact subject outline with no bright sign or overlapping person around it.",
+          "After the retake, select the original review in PicSpeak Retake Coach and upload the new frame. One GPT-5.6 Terra comparison rescores both images, shows before/after changes across five dimensions, cites visible evidence, and proposes the next action. The server calculates the deltas rather than asking the model to do arithmetic.",
+          "If the images pursue different goals or the scenes are too different, the analysis remains available but is marked non-comparable and excluded from the progress curve. This feedback → translate → execute → evidence cycle is what turns critique into training."
+        ]
+      },
+      {
+        "title": "5. What counts as real improvement",
+        "paragraphs": [
+          "First check whether the stated success condition appears, then see whether the relevant score moved in the same direction, and finally read the visible evidence. When all three agree, keep the action. If only the number rises, do not call the experiment successful yet.",
+          "A flat result is still useful. The action may have been too subtle, the pair may not be comparable, or the strategy may be wrong. Change one variable in the next round and keep using the same source-review chain so the useful signal remains legible."
+        ]
+      }
       ]
     },
     {
