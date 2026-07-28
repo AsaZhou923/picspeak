@@ -32,6 +32,15 @@ type BlogBundle = {
     title: string;
     description: string;
     keywords: string[];
+    label: string;
+    starterPostsLabel: string;
+    primaryTopicsLabel: string;
+    seoDirectionLabel: string;
+    featuredLabel: string;
+    allPostsLabel: string;
+    nextStepLabel: string;
+    relatedLabel: string;
+    updatedLabel: string;
   };
   posts: BlogPost[];
 };
@@ -68,6 +77,58 @@ test('blog content bundles keep the same slug order across locales', () => {
       bundles[locale].posts.map((post) => post.slug),
       canonicalSlugs,
     );
+  }
+});
+
+test('the two refreshed guides expose their update date in every locale', () => {
+  const refreshedSlugs = [
+    'ai-photo-critique-daily-practice',
+    'turn-photo-feedback-into-shooting-checklist',
+  ];
+
+  for (const locale of LOCALES) {
+    const bundle = readBundle(locale);
+    assert.ok(bundle.ui.updatedLabel);
+
+    for (const slug of refreshedSlugs) {
+      const post = bundle.posts.find((entry) => entry.slug === slug);
+      assert.ok(post, `${locale}/${slug} should exist`);
+      assert.equal(post.updatedAt, '2026-07-27');
+    }
+  }
+});
+
+test('Chinese and Japanese blog chrome is fully localized', () => {
+  const expectedLabels = {
+    zh: {
+      label: '镜头手记',
+      starterPostsLabel: '入门文章',
+      primaryTopicsLabel: '核心主题',
+      seoDirectionLabel: '内容方向',
+      featuredLabel: '精选文章',
+      allPostsLabel: '全部文章',
+      nextStepLabel: '下一步',
+      relatedLabel: '相关文章',
+      updatedLabel: '更新于',
+    },
+    ja: {
+      label: 'レンズノート',
+      starterPostsLabel: '入門記事',
+      primaryTopicsLabel: '主なテーマ',
+      seoDirectionLabel: 'コンテンツの方向性',
+      featuredLabel: '注目の記事',
+      allPostsLabel: 'すべての記事',
+      nextStepLabel: '次のステップ',
+      relatedLabel: '関連記事',
+      updatedLabel: '更新',
+    },
+  } as const;
+
+  for (const locale of ['zh', 'ja'] as const) {
+    const ui = readBundle(locale).ui;
+    for (const [key, value] of Object.entries(expectedLabels[locale])) {
+      assert.equal(ui[key as keyof typeof expectedLabels.zh], value);
+    }
   }
 });
 
@@ -113,15 +174,26 @@ test('blog index keeps static article data server-rendered with a small client v
     'utf8',
   );
   const defaultPageSource = readFileSync(path.join(TEST_DIR, '..', 'src', 'app', 'blog', 'page.tsx'), 'utf8');
+  const defaultPostSource = readFileSync(
+    path.join(TEST_DIR, '..', 'src', 'app', 'blog', '[slug]', 'page.tsx'),
+    'utf8',
+  );
   const localizedPageSource = readFileSync(path.join(TEST_DIR, '..', 'src', 'app', '[locale]', 'blog', 'page.tsx'), 'utf8');
 
   assert.doesNotMatch(blogContentSource, /^'use client';/m);
   assert.match(blogContentSource, /getBlogPosts\(pinnedLocale\)/);
+  assert.match(blogContentSource, /\.sort\(\(left, right\) => right\.updatedAt\.localeCompare\(left\.updatedAt\)\)/);
+  assert.match(blogContentSource, /ui\.updatedLabel/);
   assert.match(blogContentSource, /BlogViewCountProvider/);
   assert.doesNotMatch(blogContentSource, /useEffect|useState|getBlogViewCounts/);
   assert.match(viewCountSource, /^'use client';/m);
   assert.match(viewCountSource, /getBlogViewCounts/);
-  assert.match(defaultPageSource, /BlogIndexPageContent/);
+  assert.match(defaultPageSource, /headers\(\)/);
+  assert.match(defaultPageSource, /x-picspeak-locale/);
+  assert.match(defaultPageSource, /<BlogIndexPageContent locale=\{locale\} \/>/);
+  assert.match(defaultPostSource, /headers\(\)/);
+  assert.match(defaultPostSource, /<BlogPostClient locale=\{locale\} slug=\{slug\} \/>/);
+  assert.doesNotMatch(defaultPostSource, /generateStaticParams/);
   assert.match(localizedPageSource, /BlogIndexPageContent/);
 });
 

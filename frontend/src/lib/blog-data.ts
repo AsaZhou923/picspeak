@@ -47,6 +47,7 @@ export interface BlogUiCopy {
   featuredLabel: string;
   allPostsLabel: string;
   allPostsHeading: string;
+  updatedLabel: string;
   readFeaturedCta: string;
   readMoreCta: string;
   backToBlog: string;

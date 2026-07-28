@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-07-28-lens-notes-i18n-update-visibility",
+    "date": "2026-07-28",
+    "title": "镜头手记多语言与文章更新可见性",
+    "summary": "PicSpeak 修复了导航已切换语言但镜头手记仍显示英文的问题，并完整本地化中文与日文页面标签。两篇围绕“拍—评—复拍—比较”和反馈清单的文章现已排在列表前两位，并明确显示更新日期。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-07-28-lens-notes-i18n-update-visibility",
+    "sections": [
+      {
+        "title": "多语言页面",
+        "items": [
+          "无前缀 /blog 与 /blog/[slug] 会按当前请求语言输出正文、metadata 和 canonical",
+          "中文与日文页面移除 Starter posts、Featured Article、Next Step 等残留英文标签",
+          "正式 /zh、/en、/ja Blog 路由继续静态生成，无前缀入口按请求动态渲染"
+        ]
+      },
+      {
+        "title": "两篇文章更新",
+        "items": [
+          "日常 AI 点评文章升级为原片、目标、复拍和同口径比较的完整训练闭环",
+          "反馈清单文章新增可观察成功条件、配对复拍证据和不可比结果处理",
+          "两篇文章按 updatedAt 排在前两位，并显示“更新于 2026-07-27”"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-07-18-frontend-coach-toolbench-redesign",
     "date": "2026-07-18",
     "title": "摄影教练式前端与核心工作流重构",

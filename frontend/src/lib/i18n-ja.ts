@@ -21,7 +21,7 @@ export const jaTranslations = {
     pro_offer_highlight: 'Pro',
     updates_label: '更新履歴',
     updates_hint_home: 'GPT-5.6 Terra 撮り直しコーチとモデル別レビューの更新を見る',
-    updates_hint_latest: '写真コーチ型フロントエンドと主要ワークフロー再設計の更新を見る',
+    updates_hint_latest: 'レンズノートの多言語表示と記事更新の可視化を見る',
     contact_label: 'コンタクト',
     contact_headline: 'お問い合わせ',
     photo_ready_msg_short: 'アップロード完了',

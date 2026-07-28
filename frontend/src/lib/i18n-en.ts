@@ -217,7 +217,7 @@ export const enTranslations = {
     pro_offer_highlight: 'Pro',
     updates_label: 'Updates',
     updates_hint_home: 'See the GPT-5.6 Terra Retake Coach and model-specific critique update',
-    updates_hint_latest: 'See the photography-coach frontend and core workflow redesign update',
+    updates_hint_latest: 'See the Lens Notes localization and update visibility fix',
     contact_label: 'Contact',
     contact_headline: 'Get in Touch',
 

@@ -2,6 +2,76 @@
 
 本文件汇总了原 `docs/changelog/update-log-*.md` 的全部更新记录。新增 release 请追加到顶部，并为每条记录保留稳定锚点，供 `/updates` 的 `docPath` 和 README 链接定位。
 
+<a id="2026-07-28-lens-notes-i18n-update-visibility"></a>
+
+## 2026-07-28 - lens notes i18n and update visibility
+
+日期：2026-07-28
+
+### 概览
+
+这次更新修复了“导航语言已经切换，但镜头手记仍显示英文”的多语言断层，并让两篇刚完成内容升级的摄影练习文章在列表中清楚可见。
+
+- 无语言前缀的 `/blog` 与 `/blog/[slug]` 现在会读取当前请求语言，并用同一语言输出页面正文、metadata、canonical 与社交预览信息。
+- 中文与日文镜头手记移除 `Starter posts`、`Featured Article`、`Next Step` 等残留英文界面标签。
+- 《为什么 AI 摄影点评要变成「拍—评—复拍—比较」的日常练习》和《拍照后不知道怎么改？把照片反馈翻译成下一次拍摄清单》完成中、英、日三语内容升级。
+- 列表按 `updatedAt` 倒序排列，两篇更新文章位于前两位，并显示本地化的“更新于 / Updated / 更新”日期。
+- 正式的 `/zh`、`/en`、`/ja` Blog 路由继续静态生成，无前缀入口则按请求语言动态渲染，避免生产首屏固化为英文。
+
+### 多语言路由与页面文案
+
+- 默认 Blog 列表页从中间件注入的 `x-picspeak-locale` 解析当前语言，并把同一语言传入服务端内容渲染和 metadata。
+- 默认文章详情页取消静态固化，按请求语言选择文章、页面标题、Open Graph URL 与图片路径。
+- 中文界面统一使用“镜头手记、入门文章、核心主题、内容方向、精选文章、下一步、相关文章”等标签。
+- 日文界面统一使用“レンズノート、入門記事、主なテーマ、注目の記事、次のステップ、関連記事”等标签。
+- 回归测试锁定无前缀路由的语言读取、三语更新时间、中文/日文界面标签及 Blog 服务端渲染边界。
+
+### 两篇文章更新与可见性
+
+- 日常 AI 点评文章改为完整的“原片 → 目标 → 复拍 → 比较”训练闭环，补充可观察成功条件、同口径重评和不可比结果处理。
+- 反馈清单文章补充“现场动作 + 成功条件 + 配对复拍证据”的验证方法，并说明 Retake Coach 的五维比较与服务端确定性分差。
+- 两篇文章保留原 slug 和既有 SEO 链接，`updatedAt` 统一为 `2026-07-27`，阅读时长更新为约 6 分钟。
+- Blog 精选区、入门列表和全部文章列表都会优先展示这两篇内容，并明确标记更新时间。
+
+### 首页更新记录同步
+
+- `/updates` 中、英、日三语数据新增本条记录，`docPath` 指向 `docs/changelog/CHANGELOG.md#2026-07-28-lens-notes-i18n-update-visibility`。
+- 首页联系区三语“更新记录”提示同步到镜头手记多语言与文章更新可见性修复。
+- `README.md` 与 `README.zh-CN.md` 的最新 changelog 链接同步到本条锚点。
+- 外部 Update Logs 目录同步仓库内统一 changelog 与 workflow 镜像。
+
+### 影响文件
+
+#### 前端
+
+- `frontend/src/app/blog/page.tsx`
+- `frontend/src/app/blog/[slug]/page.tsx`
+- `frontend/src/app/[locale]/blog/BlogIndexPageContent.tsx`
+- `frontend/src/app/[locale]/blog/[slug]/BlogPostClient.tsx`
+- `frontend/src/content/blog/{zh,en,ja}.json`
+- `frontend/src/content/updates/{zh,en,ja}.json`
+- `frontend/src/lib/blog-data.ts`
+- `frontend/src/lib/i18n-{zh,en,ja}.ts`
+- `frontend/test/blog-content.test.ts`
+
+#### 文档
+
+- `docs/changelog/CHANGELOG.md`
+- `README.md`
+- `README.zh-CN.md`
+
+### 验证
+
+- `cd frontend && node --test test/content-bundles.test.ts test/blog-content.test.ts` 通过，10 / 10 tests passed，覆盖三语更新 ID、changelog 锚点、日期倒序与 Blog 内容。
+- `cd frontend && npm run typecheck` 通过。
+- `cd frontend && npm run lint` 通过。
+- `cd frontend && npm run build` 通过；正式三语 Blog 路由保持 SSG，无前缀 Blog 列表与详情为按请求渲染。
+- Playwright 在 production build 下验证中文、英文、日文 `/blog`，以及中文 `/blog/[slug]` 的 title、正文、排序与更新时间。
+- `cd frontend && npm test` 已执行，113 / 115 tests passed；`design-contracts.test.ts` 与 `workspace-task-flow.test.ts` 仍因既有 Windows 路径规范化问题失败，与本次 Blog 改动无关。
+- `git diff --check` 通过。
+
+---
+
 <a id="2026-07-18-frontend-coach-toolbench-redesign"></a>
 
 ## 2026-07-18 - frontend coach toolbench redesign
