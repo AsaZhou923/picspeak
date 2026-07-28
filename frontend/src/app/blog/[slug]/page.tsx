@@ -1,7 +1,10 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 import BlogPostClient from '../../[locale]/blog/[slug]/BlogPostClient';
-import { getBlogPost, getBlogSlugs, blogConfig } from '@/lib/blog-data';
+import { getBlogPost, getBlogSlugs, getBlogUi } from '@/lib/blog-data';
+import type { Locale } from '@/lib/i18n';
+import { normalizeLocale } from '@/lib/locale';
 import { INDEXABLE_ROBOTS } from '@/lib/seo';
 import { siteConfig } from '@/lib/site';
 
@@ -9,25 +12,29 @@ type Props = {
   params: Promise<{ slug: string }>;
 };
 
-export function generateStaticParams() {
-  return getBlogSlugs().map((slug) => ({ slug }));
+async function getRequestLocale(): Promise<Locale> {
+  const requestHeaders = await headers();
+  return normalizeLocale(requestHeaders.get('x-picspeak-locale'));
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const post = getBlogPost('en', slug);
+  const locale = await getRequestLocale();
+  const post = getBlogPost(locale, slug);
 
   if (!post) {
     return {};
   }
 
+  const ui = getBlogUi(locale);
+
   return {
-    title: `${post.title} | ${blogConfig.name}`,
+    title: `${post.title} | ${ui.name}`,
     description: post.description,
     keywords: [...post.keywords],
     robots: INDEXABLE_ROBOTS,
     alternates: {
-      canonical: `/en/blog/${post.slug}`,
+      canonical: `/${locale}/blog/${post.slug}`,
       languages: {
         'zh-CN': `/zh/blog/${post.slug}`,
         en: `/en/blog/${post.slug}`,
@@ -37,7 +44,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     },
     openGraph: {
       type: 'article',
-      url: `${siteConfig.url}/en/blog/${post.slug}`,
+      url: `${siteConfig.url}/${locale}/blog/${post.slug}`,
       title: post.title,
       description: post.description,
       siteName: siteConfig.name,
@@ -49,17 +56,18 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       card: 'summary_large_image',
       title: post.title,
       description: post.description,
-      images: [`/blog/${post.slug}/opengraph-image`],
+      images: [`/${locale}/blog/${post.slug}/opengraph-image`],
     },
   };
 }
 
 export default async function BlogPostPage({ params }: Props) {
   const { slug } = await params;
+  const locale = await getRequestLocale();
 
   if (!getBlogSlugs().includes(slug)) {
     notFound();
   }
 
-  return <BlogPostClient slug={slug} />;
+  return <BlogPostClient locale={locale} slug={slug} />;
 }

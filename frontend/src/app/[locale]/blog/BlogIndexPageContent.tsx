@@ -14,7 +14,8 @@ function resolveBlogLocale(locale?: string): Locale {
 export default function BlogIndexPageContent({ locale }: { locale?: string }) {
   const pinnedLocale = resolveBlogLocale(locale);
   const ui = getBlogUi(pinnedLocale);
-  const posts = getBlogPosts(pinnedLocale);
+  const posts = [...getBlogPosts(pinnedLocale)]
+    .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
   const featuredPost = posts[0];
   const postSlugs = posts.map((post) => post.slug);
 
@@ -101,7 +102,11 @@ export default function BlogIndexPageContent({ locale }: { locale?: string }) {
                       <p className="mt-4 max-w-3xl text-sm leading-7 text-ink-muted sm:text-base">{featuredPost.excerpt}</p>
                       <div className="mt-6 flex flex-wrap gap-3 text-xs text-ink-subtle">
                         <span className="rounded-full border border-border-subtle px-3 py-1">{featuredPost.category}</span>
-                        <span className="rounded-full border border-border-subtle px-3 py-1">{featuredPost.publishedAt}</span>
+                        <span className="rounded-full border border-border-subtle px-3 py-1">
+                          {featuredPost.updatedAt !== featuredPost.publishedAt
+                            ? `${ui.updatedLabel} ${featuredPost.updatedAt}`
+                            : featuredPost.publishedAt}
+                        </span>
                         <span className="rounded-full border border-border-subtle px-3 py-1">{featuredPost.readingTime}</span>
                         <BlogViewCount
                           slug={featuredPost.slug}
@@ -162,7 +167,11 @@ export default function BlogIndexPageContent({ locale }: { locale?: string }) {
                     <h3 className="mt-4 font-display text-2xl text-ink">{post.title}</h3>
                     <p className="mt-3 text-sm leading-7 text-ink-muted">{post.excerpt}</p>
                     <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-ink-subtle">
-                      <span>{post.publishedAt}</span>
+                      <span>
+                        {post.updatedAt !== post.publishedAt
+                          ? `${ui.updatedLabel} ${post.updatedAt}`
+                          : post.publishedAt}
+                      </span>
                       <span className="h-1 w-1 rounded-full bg-gold/80" />
                       <Clock3 size={13} className="text-gold/85" />
                       <span>{post.readingTime}</span>

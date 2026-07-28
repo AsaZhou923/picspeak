@@ -127,7 +127,11 @@ function BlogPostContent({ slug }: { slug: string }) {
             <h1 className="mt-4 font-display text-4xl text-ink sm:text-5xl">{post.title}</h1>
             <p data-speakable="blog-intro" className="mt-5 text-sm leading-8 text-ink-muted sm:text-base">{post.intro}</p>
             <div className="mt-6 flex flex-wrap items-center gap-4 text-sm text-ink-subtle">
-              <span>{post.publishedAt}</span>
+              <span>
+                {post.updatedAt !== post.publishedAt
+                  ? `${ui.updatedLabel} ${post.updatedAt}`
+                  : post.publishedAt}
+              </span>
               <span className="h-1 w-1 rounded-full bg-gold/80" />
               <span className="inline-flex items-center gap-2">
                 <Eye size={14} className="text-gold/85" />
