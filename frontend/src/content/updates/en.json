@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-07-28-lens-notes-i18n-update-visibility",
+    "date": "2026-07-28",
+    "title": "Lens Notes localization and update visibility",
+    "summary": "PicSpeak now keeps Lens Notes aligned with the selected language, including fully localized Chinese and Japanese page chrome. The two refreshed guides about shoot-review-retake comparison and actionable feedback checklists appear first and expose their modification date.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-07-28-lens-notes-i18n-update-visibility",
+    "sections": [
+      {
+        "title": "Locale-aware pages",
+        "items": [
+          "Unprefixed /blog and /blog/[slug] now use the request locale for content, metadata, and canonical URLs",
+          "Chinese and Japanese pages no longer leak labels such as Starter posts, Featured Article, or Next Step",
+          "Canonical /zh, /en, and /ja Blog routes remain statically generated while unprefixed entries render per request"
+        ]
+      },
+      {
+        "title": "Two refreshed guides",
+        "items": [
+          "The daily AI critique guide now covers the full original-target-retake-compare practice loop",
+          "The feedback checklist guide adds observable success criteria, paired evidence, and non-comparable outcomes",
+          "Both guides sort first by updatedAt and display Updated 2026-07-27"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-07-18-frontend-coach-toolbench-redesign",
     "date": "2026-07-18",
     "title": "Photography-coach frontend and core workflow redesign",
