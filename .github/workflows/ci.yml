@@ -50,3 +50,5 @@ jobs:
         run: npm run test
       - name: Build
         run: npm run build
+      - name: Production Blog routing regression
+        run: npm run test:production-blog

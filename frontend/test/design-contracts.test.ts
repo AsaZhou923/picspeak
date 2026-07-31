@@ -78,9 +78,10 @@ test('global design tokens and reduced-motion behavior remain defined', () => {
 
 test('shared chrome participates in normal flow and owns the route main landmark', () => {
   const siteChrome = read('src/components/layout/SiteChrome.tsx');
+  const marketingHeader = read('src/components/layout/MarketingHeader.tsx');
   const headers = [
     read('src/components/layout/Header.tsx'),
-    read('src/components/layout/MarketingHeader.tsx'),
+    marketingHeader,
   ];
 
   assert.match(siteChrome, /<main id="main-content"/);
@@ -90,6 +91,9 @@ test('shared chrome participates in normal flow and owns the route main landmark
     assert.match(header, /<header className="sticky top-0/);
     assert.doesNotMatch(header, /<header className="fixed top-0/);
   }
+
+  assert.match(marketingHeader, /href=\{`\/\$\{locale\}\/blog`\}/);
+  assert.doesNotMatch(marketingHeader, /href="\/blog"/);
 });
 
 test('route content does not introduce a second main landmark', () => {

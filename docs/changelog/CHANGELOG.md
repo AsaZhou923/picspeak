@@ -2,6 +2,96 @@
 
 本文件汇总了原 `docs/changelog/update-log-*.md` 的全部更新记录。新增 release 请追加到顶部，并为每条记录保留稳定锚点，供 `/updates` 的 `docPath` 和 README 链接定位。
 
+<a id="2026-07-31-blog-locale-routing-cache-hardening"></a>
+
+## 2026-07-31 - blog locale routing and cache hardening
+
+日期：2026-07-31
+
+### 概览
+
+这次更新修复了最新一轮代码深度审查发现的 Blog 多语言缓存、请求语言信任边界、Open Graph 图片、sitemap 新鲜度和编辑排序耦合问题。
+
+- 无语言前缀的 `/blog` 与 `/blog/[slug]` 不再直接输出随 Cookie 变化的可索引 HTML，而是通过 `307` 临时跳转进入唯一、稳定的语言前缀 URL。
+- 跳转响应明确使用 `private, no-store`，查询参数保持不变；`/zh`、`/en`、`/ja` Blog 正式路由仍可按 URL 安全共享缓存。
+- 代理会先移除外部传入的 `x-picspeak-locale`，并且只接受路径或 Cookie 中精确匹配的 `zh`、`en`、`ja`。
+- Blog 正文、canonical、Open Graph 与 Twitter 图片现在统一由语言前缀路由负责，删除会强制生成英文卡片的无前缀 OG 处理器。
+- 普通 sitemap 不再提交只负责跳转的 Blog 别名，Blog `x-default` 统一指向英文正式 URL。
+- Marketing Header 和 IndexNow 默认提交列表直接使用语言前缀 Blog URL，不再主动制造一次别名跳转。
+- 普通 sitemap 与 News sitemap 复用同一个最新产品更新日期，避免同一更新页出现冲突的 `lastmod`。
+- 精选文章与“从这里开始”顺序改为显式编辑配置；`updatedAt` 只负责全部文章的新鲜度排序和 SEO 修改时间。
+
+### 路由、缓存与信任边界
+
+- `frontend/src/lib/locale.ts` 新增可独立测试的路径语言解析、严格请求语言解析和 Blog 别名目标构造函数。
+- `frontend/src/proxy.ts` 对无前缀 Blog 入口执行语言跳转，保留原查询字符串，并阻止伪造或非精确语言值进入内部请求头。
+- `frontend/next.config.mjs` 移除 `/blog` 与 `/blog/:slug*` 的公共共享缓存规则，只保留语言前缀 Blog 页面的公共缓存。
+- 无前缀页面文件保留英文跳转作为中间件绕过时的确定性兜底，不再复制正文和 metadata 生成逻辑。
+
+### SEO、内容排序与数据一致性
+
+- 删除 `frontend/src/app/blog/[slug]/opengraph-image.tsx`；文章的 Open Graph 与 Twitter metadata 都指向 `/{locale}/blog/{slug}/opengraph-image`。
+- `frontend/src/app/sitemap.ts` 删除无前缀 Blog 条目，所有 Blog hreflang 组的 `x-default` 改为 `/en/blog` 或对应英文文章。
+- `frontend/src/lib/updates-data.ts` 提供统一的最新更新选择器，普通 sitemap 与 News sitemap 不再分别维护日期。
+- `frontend/src/lib/blog-data.ts` 分离“按更新时间排序”“精选文章”“入门阅读顺序”三类选择器，避免文字修订意外改变编辑推荐。
+
+### 回归覆盖与文档同步
+
+- 新增生产构建 HTTP 回归测试，覆盖语言 Cookie、伪造请求头、查询参数保持、私有跳转缓存、文档语言、canonical、社交图片和 sitemap。
+- CI 在前端生产构建后执行 `npm run test:production-blog`，保证真实 `next start` 边界持续受保护。
+- 快速单元测试新增严格语言解析、公共缓存边界、Blog 编辑排序和更新日期单一来源契约。
+- 修正 2026-07-28 更新记录中把无前缀入口描述为直接动态渲染的错误；构建摘要仍因 `generateStaticParams` 标记语言前缀 Blog 为 `●`，但实际 `prerender-manifest` 没有 Blog 条目，因此文档不再把摘要标记等同于可复用的预渲染产物。
+- `README.md`、`README.zh-CN.md`、三语 `/updates` 数据、首页更新提示、外部项目入口、SEO/GEO 审计和外部 changelog 镜像同步更新。
+
+### 影响文件
+
+#### 前端
+
+- `frontend/src/proxy.ts`
+- `frontend/next.config.mjs`
+- `frontend/src/lib/locale.ts`
+- `frontend/src/lib/blog-data.ts`
+- `frontend/src/lib/updates-data.ts`
+- `frontend/src/lib/news-sitemap.ts`
+- `frontend/src/app/sitemap.ts`
+- `frontend/src/app/blog/page.tsx`
+- `frontend/src/app/blog/[slug]/page.tsx`
+- `frontend/src/app/[locale]/blog/BlogIndexPageContent.tsx`
+- `frontend/src/app/[locale]/blog/[slug]/page.tsx`
+- `frontend/src/components/home/HomeContactSection.tsx`
+- `frontend/src/components/layout/MarketingHeader.tsx`
+- `frontend/scripts/submit-indexnow.mjs`
+- `frontend/src/content/updates/{zh,en,ja}.json`
+- `frontend/src/lib/i18n-{zh,en,ja}.ts`
+- `frontend/test/blog-routing.production.test.mjs`
+- `frontend/test/{locale-default,blog-content,content-bundles,security-headers,seo-assets}.test.ts`
+- `frontend/test/{design-contracts,indexnow}.test.ts`
+
+#### CI
+
+- `.github/workflows/ci.yml`
+
+#### 文档
+
+- `docs/changelog/CHANGELOG.md`
+- `README.md`
+- `README.zh-CN.md`
+- 外部 `PicSpeak/10 - Reviews/PicSpeak 最新代码深度审查与修复报告 2026-07-31.md`
+- 外部 `PicSpeak/07 - Analytics/2026-05-27 GEO-SEO 全面审查报告.md`
+- 外部 `PicSpeak/PicSpeak.md`
+
+### 验证
+
+- `cd frontend && npm test`
+- `cd frontend && npm run typecheck`
+- `cd frontend && npm run lint`
+- `cd frontend && npm run build`
+- `cd frontend && npm run test:production-blog`
+- `git diff --check`
+- 仓库 changelog 与外部 Update Logs 镜像执行 SHA-256 一致性校验
+
+---
+
 <a id="2026-07-28-lens-notes-i18n-update-visibility"></a>
 
 ## 2026-07-28 - lens notes i18n and update visibility
@@ -12,26 +102,26 @@
 
 这次更新修复了“导航语言已经切换，但镜头手记仍显示英文”的多语言断层，并让两篇刚完成内容升级的摄影练习文章在列表中清楚可见。
 
-- 无语言前缀的 `/blog` 与 `/blog/[slug]` 现在会读取当前请求语言，并用同一语言输出页面正文、metadata、canonical 与社交预览信息。
+- 无语言前缀的 `/blog` 与 `/blog/[slug]` 会读取精确匹配的请求语言，并跳转到同一语言的稳定前缀 URL；正文、metadata、canonical 与社交预览由目标路由统一输出。
 - 中文与日文镜头手记移除 `Starter posts`、`Featured Article`、`Next Step` 等残留英文界面标签。
 - 《为什么 AI 摄影点评要变成「拍—评—复拍—比较」的日常练习》和《拍照后不知道怎么改？把照片反馈翻译成下一次拍摄清单》完成中、英、日三语内容升级。
 - 列表按 `updatedAt` 倒序排列，两篇更新文章位于前两位，并显示本地化的“更新于 / Updated / 更新”日期。
-- 正式的 `/zh`、`/en`、`/ja` Blog 路由继续静态生成，无前缀入口则按请求语言动态渲染，避免生产首屏固化为英文。
+- 正式的 `/zh`、`/en`、`/ja` Blog 路由是本地化正文和 metadata 的唯一所有者；无前缀入口只负责私有临时跳转，避免共享缓存与 canonical 随 Cookie 改变。
 
 ### 多语言路由与页面文案
 
-- 默认 Blog 列表页从中间件注入的 `x-picspeak-locale` 解析当前语言，并把同一语言传入服务端内容渲染和 metadata。
-- 默认文章详情页取消静态固化，按请求语言选择文章、页面标题、Open Graph URL 与图片路径。
+- 中间件从精确路径或 Cookie 解析语言，移除外部伪造的 `x-picspeak-locale`，再把无前缀 Blog 入口跳转到语言前缀路由。
+- 默认列表与文章页面只保留确定性的英文跳转兜底，不再复制本地化正文、metadata 或 Open Graph 的所有权。
 - 中文界面统一使用“镜头手记、入门文章、核心主题、内容方向、精选文章、下一步、相关文章”等标签。
 - 日文界面统一使用“レンズノート、入門記事、主なテーマ、注目の記事、次のステップ、関連記事”等标签。
-- 回归测试锁定无前缀路由的语言读取、三语更新时间、中文/日文界面标签及 Blog 服务端渲染边界。
+- 回归测试锁定无前缀路由的私有跳转、严格语言解析、三语更新时间、中文/日文界面标签及 Blog 服务端渲染边界。
 
 ### 两篇文章更新与可见性
 
 - 日常 AI 点评文章改为完整的“原片 → 目标 → 复拍 → 比较”训练闭环，补充可观察成功条件、同口径重评和不可比结果处理。
 - 反馈清单文章补充“现场动作 + 成功条件 + 配对复拍证据”的验证方法，并说明 Retake Coach 的五维比较与服务端确定性分差。
 - 两篇文章保留原 slug 和既有 SEO 链接，`updatedAt` 统一为 `2026-07-27`，阅读时长更新为约 6 分钟。
-- Blog 精选区、入门列表和全部文章列表都会优先展示这两篇内容，并明确标记更新时间。
+- 全部文章列表按 `updatedAt` 展示新鲜内容并明确标记更新时间；精选区和入门列表使用独立的编辑顺序，避免后续小修订改变推荐结构。
 
 ### 首页更新记录同步
 
@@ -65,7 +155,7 @@
 - `cd frontend && node --test test/content-bundles.test.ts test/blog-content.test.ts` 通过，10 / 10 tests passed，覆盖三语更新 ID、changelog 锚点、日期倒序与 Blog 内容。
 - `cd frontend && npm run typecheck` 通过。
 - `cd frontend && npm run lint` 通过。
-- `cd frontend && npm run build` 通过；正式三语 Blog 路由保持 SSG，无前缀 Blog 列表与详情为按请求渲染。
+- `cd frontend && npm run build` 通过；正式三语 Blog 路由保持稳定语言 URL，无前缀 Blog 列表与详情由中间件按请求语言跳转。
 - Playwright 在 production build 下验证中文、英文、日文 `/blog`，以及中文 `/blog/[slug]` 的 title、正文、排序与更新时间。
 - `cd frontend && npm test` 已执行，113 / 115 tests passed；`design-contracts.test.ts` 与 `workspace-task-flow.test.ts` 仍因既有 Windows 路径规范化问题失败，与本次 Blog 改动无关。
 - `git diff --check` 通过。

@@ -1,5 +1,31 @@
 [
   {
+    "id": "2026-07-31-blog-locale-routing-cache-hardening",
+    "date": "2026-07-31",
+    "title": "ブログの多言語ルーティングとキャッシュ強化",
+    "summary": "PicSpeak は、言語プレフィックスなしのレンズノート URL を private リダイレクトで一意かつ安定した言語別 URL に解決するようになりました。共有キャッシュの言語混在を防ぎ、偽装された言語ヘッダーを拒否し、SNS プレビューを対象言語に揃え、編集上の掲載順を記事更新日から分離します。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-07-31-blog-locale-routing-cache-hardening",
+    "sections": [
+      {
+        "title": "安定した多言語ルーティング",
+        "items": [
+          "言語プレフィックスなしの /blog は private、no-store の 307 リダイレクトで /zh、/en、/ja に移動し、クエリパラメータも保持します",
+          "プロキシは呼び出し元の x-picspeak-locale を削除し、パスまたは Cookie の完全一致する対応言語だけを受け入れます",
+          "言語プレフィックス付き記事ルートが Blog 本文、canonical metadata、Open Graph 画像の唯一の所有者になりました"
+        ]
+      },
+      {
+        "title": "SEO と編集順の一貫性",
+        "items": [
+          "通常 sitemap と共有公開キャッシュからリダイレクト別名を除外し、x-default を /en/blog に統一しました",
+          "Marketing ナビゲーションと IndexNow は言語プレフィックス付き Blog URL を直接参照します",
+          "通常 sitemap と News sitemap は最新プロダクト更新日を同じデータから参照します",
+          "注目記事と Start here の順序を updatedAt から分離し、全記事一覧だけを更新日の新しい順に保ちます"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-07-28-lens-notes-i18n-update-visibility",
     "date": "2026-07-28",
     "title": "レンズノートの多言語表示と記事更新の可視化",
@@ -9,9 +35,9 @@
       {
         "title": "多言語ページ",
         "items": [
-          "言語プレフィックスなしの /blog と /blog/[slug] は、本文、metadata、canonical をリクエスト言語に合わせます",
+          "言語プレフィックスなしの /blog と /blog/[slug] は完全一致するリクエスト言語を解決し、対応する安定した言語別 URL にリダイレクトします",
           "中国語と日本語ページに残っていた Starter posts、Featured Article、Next Step などの英語ラベルを解消しました",
-          "正式な /zh、/en、/ja Blog ルートは静的生成を保ち、プレフィックスなしの入口はリクエストごとに描画します"
+          "正式な /zh、/en、/ja Blog ルートがローカライズ本文と metadata の唯一の所有者です"
         ]
       },
       {
@@ -19,7 +45,7 @@
         "items": [
           "日常 AI 講評の記事を、元写真・目標・撮り直し・同一基準の比較まで含む練習ループへ更新しました",
           "フィードバックチェックリストの記事に、観察可能な成功条件、ペア比較の根拠、比較不能な結果の扱いを追加しました",
-          "2 本を updatedAt 順で先頭に表示し、更新 2026-07-27 を明示します"
+          "2 本を更新日の新しい全記事一覧の上位に表示し、更新 2026-07-27 を明示します"
         ]
       }
     ]

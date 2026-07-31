@@ -93,8 +93,6 @@ const cacheablePublicPageSources = [
   '/',
   '/:locale(zh|en|ja)',
   '/gallery',
-  '/blog',
-  '/blog/:slug*',
   '/:locale(zh|en|ja)/blog',
   '/:locale(zh|en|ja)/blog/:slug*',
   '/updates',
@@ -133,7 +131,6 @@ const nextConfig = {
     remotePatterns: buildRemotePatterns(),
   },
   outputFileTracingIncludes: {
-    '/blog/[slug]/opengraph-image': ogFontFiles,
     '/[locale]/blog/[slug]/opengraph-image': ogFontFiles,
   },
   async headers() {

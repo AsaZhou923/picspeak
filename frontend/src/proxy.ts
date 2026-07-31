@@ -1,7 +1,11 @@
 import { clerkMiddleware } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 
-import { isSupportedLocale, LOCALE_COOKIE_NAME, type SupportedLocale } from '@/lib/locale';
+import {
+  getLocalizedBlogRedirectPath,
+  LOCALE_COOKIE_NAME,
+  resolveRequestLocale,
+} from '@/lib/locale';
 import { siteConfig } from '@/lib/site';
 
 const productionOrigin = new URL(siteConfig.url).origin;
@@ -16,20 +20,27 @@ const developmentOrigins =
 
 const authorizedParties = Array.from(new Set([...developmentOrigins, productionOrigin, productionWwwOrigin]));
 
-function localeFromPathname(pathname: string): SupportedLocale | null {
-  const firstSegment = pathname.split('/').filter(Boolean)[0];
-  if (isSupportedLocale(firstSegment)) {
-    return firstSegment;
-  }
-  return null;
-}
-
 export default clerkMiddleware(
   (_auth, request) => {
     const requestHeaders = new Headers(request.headers);
-    const pathLocale = localeFromPathname(request.nextUrl.pathname);
+    requestHeaders.delete('x-picspeak-locale');
+
     const cookieLocale = request.cookies.get(LOCALE_COOKIE_NAME)?.value;
-    const locale = pathLocale ?? (isSupportedLocale(cookieLocale) ? cookieLocale : null);
+    const locale = resolveRequestLocale(request.nextUrl.pathname, cookieLocale);
+    const blogRedirectPath = getLocalizedBlogRedirectPath(
+      request.nextUrl.pathname,
+      locale ?? 'en',
+    );
+
+    if (blogRedirectPath) {
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = blogRedirectPath;
+      const response = NextResponse.redirect(redirectUrl, 307);
+      response.headers.set('Cache-Control', 'private, no-store, max-age=0, must-revalidate');
+      response.headers.set('Vary', 'Cookie');
+      return response;
+    }
+
     if (locale) {
       requestHeaders.set('x-picspeak-locale', locale);
     }

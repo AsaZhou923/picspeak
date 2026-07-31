@@ -1,7 +1,7 @@
-import enBlogBundle from '@/content/blog/en.json';
-import jaBlogBundle from '@/content/blog/ja.json';
-import zhBlogBundle from '@/content/blog/zh.json';
-import type { Locale } from '@/lib/i18n';
+import enBlogBundle from '../content/blog/en.json' with { type: 'json' };
+import jaBlogBundle from '../content/blog/ja.json' with { type: 'json' };
+import zhBlogBundle from '../content/blog/zh.json' with { type: 'json' };
+import type { Locale } from './i18n.ts';
 
 export interface BlogPostSection {
   title: string;
@@ -72,6 +72,16 @@ const BLOG_BUNDLES = {
 } satisfies Record<Locale, BlogLocaleBundle>;
 
 const BLOG_SLUGS = BLOG_BUNDLES.en.posts.map((post) => post.slug);
+const FEATURED_BLOG_SLUG = 'ai-photo-critique-daily-practice';
+const STARTER_BLOG_SLUGS = [
+  'ai-photo-critique-daily-practice',
+  'five-photo-composition-checks',
+  'turn-photo-feedback-into-shooting-checklist',
+  'lighting-mistakes-ai-catches',
+  'color-grading-photography-guide',
+  'street-photography-ai-review-workflow',
+  'gpt-image-2-prompt-examples-workflow',
+] as const;
 
 const BLOG_POSTS_BY_LOCALE: Record<Locale, Map<string, BlogPost>> = {
   zh: new Map(BLOG_BUNDLES.zh.posts.map((post) => [post.slug, post])),
@@ -87,6 +97,24 @@ export function getBlogUi(locale: Locale): BlogUiCopy {
 
 export function getBlogPosts(locale: Locale): BlogPost[] {
   return BLOG_BUNDLES[locale].posts;
+}
+
+export function getBlogPostsByFreshness(locale: Locale): BlogPost[] {
+  return [...getBlogPosts(locale)].sort((left, right) =>
+    right.updatedAt.localeCompare(left.updatedAt),
+  );
+}
+
+export function getFeaturedBlogPost(locale: Locale): BlogPost | undefined {
+  return BLOG_POSTS_BY_LOCALE[locale].get(FEATURED_BLOG_SLUG);
+}
+
+export function getStarterBlogPosts(locale: Locale): BlogPost[] {
+  const postsBySlug = BLOG_POSTS_BY_LOCALE[locale];
+  return STARTER_BLOG_SLUGS.flatMap((slug) => {
+    const post = postsBySlug.get(slug);
+    return post ? [post] : [];
+  });
 }
 
 export function getBlogPost(locale: Locale, slug: string): BlogPost | undefined {

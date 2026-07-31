@@ -17,6 +17,7 @@ import {
 } from '../src/lib/news-sitemap.ts';
 import { getLlmsText } from '../src/lib/llms.ts';
 import { siteConfig } from '../src/lib/site.ts';
+import { getLatestProductUpdateDate } from '../src/lib/updates-data.ts';
 import robots from '../src/app/robots.ts';
 
 const TEST_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -122,9 +123,20 @@ test('news sitemap publishes recent updates with Google News metadata', () => {
   assert.ok(entries.length > 0);
   assert.ok(entries.length <= 1000);
   assert.equal(entries[0].loc, `${siteConfig.url}/updates`);
+  assert.equal(entries[0].publicationDate, getLatestProductUpdateDate());
   assert.match(xml, /xmlns:news="http:\/\/www\.google\.com\/schemas\/sitemap-news\/0\.9"/);
   assert.match(xml, /<news:name>PicSpeak Updates<\/news:name>/);
   assert.match(xml, /<news:language>en<\/news:language>/);
+});
+
+test('regular sitemap keeps Blog aliases out and shares update freshness data', () => {
+  const sitemapSource = readFileSync(path.join(FRONTEND_DIR, 'src', 'app', 'sitemap.ts'), 'utf8');
+
+  assert.match(sitemapSource, /getLatestProductUpdateDate/);
+  assert.doesNotMatch(sitemapSource, /new Date\('2026-04-11'\)/);
+  assert.doesNotMatch(sitemapSource, /url: `\$\{siteConfig\.url\}\/blog/);
+  assert.match(sitemapSource, /'\/en\/blog'/);
+  assert.match(sitemapSource, /`\/en\/blog\/\$\{post\.slug\}`/);
 });
 
 test('Asa Zhou author page is crawlable and wired into SEO discovery paths', () => {

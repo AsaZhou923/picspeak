@@ -216,8 +216,8 @@ export const enTranslations = {
     pro_offer_label: '',
     pro_offer_highlight: 'Pro',
     updates_label: 'Updates',
-    updates_hint_home: 'See the GPT-5.6 Terra Retake Coach and model-specific critique update',
-    updates_hint_latest: 'See the Lens Notes localization and update visibility fix',
+    updates_hint_home: 'See the Blog locale routing and cache hardening update',
+    updates_hint_latest: 'See the Blog locale routing and cache hardening update',
     contact_label: 'Contact',
     contact_headline: 'Get in Touch',
 

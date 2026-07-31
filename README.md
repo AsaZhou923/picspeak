@@ -241,7 +241,7 @@ cd frontend && npm run build && npm run start
 
 ## Documentation
 
-- [Latest Changelog](docs/changelog/CHANGELOG.md#2026-07-28-lens-notes-i18n-update-visibility)
+- [Latest Changelog](docs/changelog/CHANGELOG.md#2026-07-31-blog-locale-routing-cache-hardening)
 - [Frontend Design System](DESIGN.md)
 - [SEO / GEO Audit](docs/seo/seo-audit-2026-05-01.md)
 - [System Architecture](docs/architecture/系统架构.md)

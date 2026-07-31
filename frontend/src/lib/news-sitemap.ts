@@ -1,5 +1,5 @@
 import { siteConfig } from './site.ts';
-import enUpdates from '../content/updates/en.json' with { type: 'json' };
+import { getLatestProductUpdate } from './updates-data.ts';
 
 export const NEWS_SITEMAP_PATH = '/sitemap-news.xml';
 
@@ -20,14 +20,17 @@ function escapeXml(value: string): string {
 }
 
 export function buildNewsSitemapEntries(): NewsSitemapEntry[] {
-  return enUpdates
-    .slice(0, 1)
-    .map((entry) => ({
-      loc: `${siteConfig.url}/updates`,
-      title: entry.title,
-      publicationDate: entry.date,
-      language: 'en' as const,
-    }));
+  const latestUpdate = getLatestProductUpdate('en');
+  return latestUpdate
+    ? [
+      {
+        loc: `${siteConfig.url}/updates`,
+        title: latestUpdate.title,
+        publicationDate: latestUpdate.date,
+        language: 'en' as const,
+      },
+    ]
+    : [];
 }
 
 export function buildNewsSitemapXml(entries = buildNewsSitemapEntries()): string {

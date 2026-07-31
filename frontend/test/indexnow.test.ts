@@ -16,14 +16,14 @@ const VALID_KEY = 'indexnow-test-key';
 
 test('IndexNow URL builder normalizes own relative URLs and rejects external URLs', () => {
   const urlList = buildIndexNowUrlList([
-    '/blog',
+    '/en/blog',
     'https://www.picspeak.art/gallery#featured',
     'https://example.com/not-owned',
     ' ',
-    '/blog',
+    '/en/blog',
   ]);
 
-  assert.deepEqual(urlList, ['https://www.picspeak.art/blog', 'https://www.picspeak.art/gallery']);
+  assert.deepEqual(urlList, ['https://www.picspeak.art/en/blog', 'https://www.picspeak.art/gallery']);
 });
 
 test('IndexNow payload includes host, key location, and deduped URL list', () => {
@@ -70,6 +70,10 @@ test('IndexNow automation is available as a deploy-safe script and workflow hook
   const workflowSource = readFileSync(path.join(FRONTEND_DIR, '..', '.github', 'workflows', 'indexnow.yml'), 'utf8');
 
   assert.equal(packageJson.scripts['indexnow:submit'], 'node scripts/submit-indexnow.mjs');
+  assert.match(scriptSource, /'\/zh\/blog'/);
+  assert.match(scriptSource, /'\/en\/blog'/);
+  assert.match(scriptSource, /'\/ja\/blog'/);
+  assert.doesNotMatch(scriptSource, /^\s*'\/blog',?$/m);
   assert.match(scriptSource, /sitemap-images\.xml/);
   assert.match(scriptSource, /author\/asa-zhou/);
   assert.match(workflowSource, /deployment_status:/);

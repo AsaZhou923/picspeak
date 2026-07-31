@@ -79,7 +79,7 @@ export default function HomeContactSection({ locale, t }: HomeContactSectionProp
               className="inline-flex items-center gap-2 text-xs text-ink-subtle transition-colors hover:text-gold group"
             >
               <span>{t('updates_label')}</span>
-              <span className="hidden sm:inline opacity-60 group-hover:opacity-100 transition-opacity">{t('updates_hint_latest')}</span>
+              <span className="hidden sm:inline opacity-60 group-hover:opacity-100 transition-opacity">{t('updates_hint_home')}</span>
               <ArrowRight size={11} className="transition-transform group-hover:translate-x-0.5" />
             </Link>
           </div>

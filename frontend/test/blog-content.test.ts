@@ -1,8 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  getBlogPostsByFreshness,
+  getFeaturedBlogPost,
+  getStarterBlogPosts,
+} from '../src/lib/blog-data.ts';
 import { buildBlogPostingJsonLd, estimateBlogPostWordCount } from '../src/lib/seo.ts';
 import { siteConfig } from '../src/lib/site.ts';
 
@@ -98,6 +103,27 @@ test('the two refreshed guides expose their update date in every locale', () => 
   }
 });
 
+test('Blog freshness and editorial curation are independent contracts', () => {
+  const expectedStarterSlugs = readBundle('en').posts.map((post) => post.slug);
+
+  for (const locale of LOCALES) {
+    const freshPosts = getBlogPostsByFreshness(locale);
+    const featuredPost = getFeaturedBlogPost(locale);
+    const starterPosts = getStarterBlogPosts(locale);
+
+    assert.ok(featuredPost);
+    assert.equal(featuredPost.slug, 'ai-photo-critique-daily-practice');
+    assert.deepEqual(
+      starterPosts.map((post) => post.slug),
+      expectedStarterSlugs,
+    );
+
+    for (let index = 1; index < freshPosts.length; index += 1) {
+      assert.ok(freshPosts[index - 1].updatedAt >= freshPosts[index].updatedAt);
+    }
+  }
+});
+
 test('Chinese and Japanese blog chrome is fully localized', () => {
   const expectedLabels = {
     zh: {
@@ -181,19 +207,23 @@ test('blog index keeps static article data server-rendered with a small client v
   const localizedPageSource = readFileSync(path.join(TEST_DIR, '..', 'src', 'app', '[locale]', 'blog', 'page.tsx'), 'utf8');
 
   assert.doesNotMatch(blogContentSource, /^'use client';/m);
-  assert.match(blogContentSource, /getBlogPosts\(pinnedLocale\)/);
-  assert.match(blogContentSource, /\.sort\(\(left, right\) => right\.updatedAt\.localeCompare\(left\.updatedAt\)\)/);
+  assert.match(blogContentSource, /getBlogPostsByFreshness\(pinnedLocale\)/);
+  assert.match(blogContentSource, /getFeaturedBlogPost\(pinnedLocale\)/);
+  assert.match(blogContentSource, /getStarterBlogPosts\(pinnedLocale\)/);
   assert.match(blogContentSource, /ui\.updatedLabel/);
   assert.match(blogContentSource, /BlogViewCountProvider/);
   assert.doesNotMatch(blogContentSource, /useEffect|useState|getBlogViewCounts/);
   assert.match(viewCountSource, /^'use client';/m);
   assert.match(viewCountSource, /getBlogViewCounts/);
-  assert.match(defaultPageSource, /headers\(\)/);
-  assert.match(defaultPageSource, /x-picspeak-locale/);
-  assert.match(defaultPageSource, /<BlogIndexPageContent locale=\{locale\} \/>/);
-  assert.match(defaultPostSource, /headers\(\)/);
-  assert.match(defaultPostSource, /<BlogPostClient locale=\{locale\} slug=\{slug\} \/>/);
+  assert.match(defaultPageSource, /redirect\('\/en\/blog'\)/);
+  assert.doesNotMatch(defaultPageSource, /headers\(\)|generateMetadata|BlogIndexPageContent/);
+  assert.match(defaultPostSource, /redirect\(`\/en\/blog\/\$\{slug\}`\)/);
+  assert.doesNotMatch(defaultPostSource, /headers\(\)|generateMetadata|BlogPostClient/);
   assert.doesNotMatch(defaultPostSource, /generateStaticParams/);
+  assert.equal(
+    existsSync(path.join(TEST_DIR, '..', 'src', 'app', 'blog', '[slug]', 'opengraph-image.tsx')),
+    false,
+  );
   assert.match(localizedPageSource, /BlogIndexPageContent/);
 });
 

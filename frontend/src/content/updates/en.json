@@ -1,5 +1,31 @@
 [
   {
+    "id": "2026-07-31-blog-locale-routing-cache-hardening",
+    "date": "2026-07-31",
+    "title": "Blog locale routing and cache hardening",
+    "summary": "PicSpeak now resolves unprefixed Lens Notes links with a private redirect to one stable locale-prefixed URL. The change removes shared-cache ambiguity, rejects forged locale headers, keeps social previews in the target language, and separates editorial curation from article modification dates.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-07-31-blog-locale-routing-cache-hardening",
+    "sections": [
+      {
+        "title": "Stable locale routing",
+        "items": [
+          "Unprefixed /blog aliases return private, no-store 307 redirects to exact /zh, /en, or /ja routes while preserving query parameters",
+          "The proxy removes caller-supplied x-picspeak-locale values and accepts only exact supported path or cookie locales",
+          "Locale-prefixed article routes are now the sole owners of Blog content, canonical metadata, and Open Graph images"
+        ]
+      },
+      {
+        "title": "SEO and editorial consistency",
+        "items": [
+          "Redirect aliases were removed from the regular sitemap and shared public-cache rules; x-default now points to /en/blog",
+          "Marketing navigation and IndexNow now target locale-prefixed Blog URLs directly",
+          "Regular and News sitemaps now share the latest product-update date",
+          "Featured and Start here order is curated independently from updatedAt while the all-articles list remains freshness-sorted"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-07-28-lens-notes-i18n-update-visibility",
     "date": "2026-07-28",
     "title": "Lens Notes localization and update visibility",
@@ -9,9 +35,9 @@
       {
         "title": "Locale-aware pages",
         "items": [
-          "Unprefixed /blog and /blog/[slug] now use the request locale for content, metadata, and canonical URLs",
+          "Unprefixed /blog and /blog/[slug] resolve the exact request locale and redirect to the corresponding stable locale-prefixed URL",
           "Chinese and Japanese pages no longer leak labels such as Starter posts, Featured Article, or Next Step",
-          "Canonical /zh, /en, and /ja Blog routes remain statically generated while unprefixed entries render per request"
+          "Canonical /zh, /en, and /ja Blog routes remain the single owners of localized content and metadata"
         ]
       },
       {
@@ -19,7 +45,7 @@
         "items": [
           "The daily AI critique guide now covers the full original-target-retake-compare practice loop",
           "The feedback checklist guide adds observable success criteria, paired evidence, and non-comparable outcomes",
-          "Both guides sort first by updatedAt and display Updated 2026-07-27"
+          "Both guides lead the freshness-sorted all-articles list and display Updated 2026-07-27"
         ]
       }
     ]

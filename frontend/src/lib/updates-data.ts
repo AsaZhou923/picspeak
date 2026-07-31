@@ -1,6 +1,6 @@
-import enUpdates from '@/content/updates/en.json';
-import jaUpdates from '@/content/updates/ja.json';
-import zhUpdates from '@/content/updates/zh.json';
+import enUpdates from '../content/updates/en.json' with { type: 'json' };
+import jaUpdates from '../content/updates/ja.json' with { type: 'json' };
+import zhUpdates from '../content/updates/zh.json' with { type: 'json' };
 
 export type UpdateLocale = 'zh' | 'en' | 'ja';
 
@@ -32,4 +32,19 @@ export function getProductUpdates(locale: UpdateLocale): ProductUpdateEntry[] {
       items: [...section.items],
     })),
   }));
+}
+
+export function getLatestProductUpdate(locale: UpdateLocale): ProductUpdateEntry | undefined {
+  return getProductUpdates(locale).reduce<ProductUpdateEntry | undefined>(
+    (latest, entry) => (!latest || entry.date > latest.date ? entry : latest),
+    undefined,
+  );
+}
+
+export function getLatestProductUpdateDate(): string {
+  const latest = getLatestProductUpdate('en');
+  if (!latest) {
+    throw new Error('At least one product update is required');
+  }
+  return latest.date;
 }

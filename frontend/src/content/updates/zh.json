@@ -1,5 +1,31 @@
 [
   {
+    "id": "2026-07-31-blog-locale-routing-cache-hardening",
+    "date": "2026-07-31",
+    "title": "博客多语言路由与缓存加固",
+    "summary": "PicSpeak 现在会把无语言前缀的镜头手记链接通过私有跳转解析到唯一、稳定的语言前缀 URL。此次修复消除了共享缓存中的语言歧义，拒绝伪造的语言请求头，保证社交预览与目标语言一致，并将编辑精选顺序与文章更新时间解耦。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-07-31-blog-locale-routing-cache-hardening",
+    "sections": [
+      {
+        "title": "稳定的多语言路由",
+        "items": [
+          "无前缀 /blog 入口返回 private、no-store 的 307 跳转，按精确语言进入 /zh、/en 或 /ja 路由并保留查询参数",
+          "代理会移除调用方传入的 x-picspeak-locale，只接受路径或 Cookie 中精确支持的语言值",
+          "语言前缀文章路由成为 Blog 正文、canonical metadata 与 Open Graph 图片的唯一所有者"
+        ]
+      },
+      {
+        "title": "SEO 与编辑一致性",
+        "items": [
+          "普通 sitemap 和公共共享缓存规则不再包含跳转别名，x-default 统一指向 /en/blog",
+          "Marketing 导航与 IndexNow 现在直接使用语言前缀 Blog URL",
+          "普通 sitemap 与 News sitemap 现在复用同一个最新产品更新日期",
+          "精选与入门顺序不再由 updatedAt 隐式决定，全部文章列表仍按新鲜度排序"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-07-28-lens-notes-i18n-update-visibility",
     "date": "2026-07-28",
     "title": "镜头手记多语言与文章更新可见性",
@@ -9,9 +35,9 @@
       {
         "title": "多语言页面",
         "items": [
-          "无前缀 /blog 与 /blog/[slug] 会按当前请求语言输出正文、metadata 和 canonical",
+          "无前缀 /blog 与 /blog/[slug] 会解析精确请求语言，并跳转到对应的稳定语言前缀 URL",
           "中文与日文页面移除 Starter posts、Featured Article、Next Step 等残留英文标签",
-          "正式 /zh、/en、/ja Blog 路由继续静态生成，无前缀入口按请求动态渲染"
+          "正式 /zh、/en、/ja Blog 路由继续作为本地化正文与 metadata 的唯一所有者"
         ]
       },
       {
@@ -19,7 +45,7 @@
         "items": [
           "日常 AI 点评文章升级为原片、目标、复拍和同口径比较的完整训练闭环",
           "反馈清单文章新增可观察成功条件、配对复拍证据和不可比结果处理",
-          "两篇文章按 updatedAt 排在前两位，并显示“更新于 2026-07-27”"
+          "两篇文章位于按新鲜度排序的全部文章列表前列，并显示“更新于 2026-07-27”"
         ]
       }
     ]

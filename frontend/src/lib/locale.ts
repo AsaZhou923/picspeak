@@ -7,6 +7,29 @@ export function isSupportedLocale(locale: string | null | undefined): locale is 
   return Boolean(locale && (SUPPORTED_LOCALES as readonly string[]).includes(locale));
 }
 
+export function localeFromPathname(pathname: string): SupportedLocale | null {
+  const firstSegment = pathname.split('/').filter(Boolean)[0];
+  return isSupportedLocale(firstSegment) ? firstSegment : null;
+}
+
+export function resolveRequestLocale(
+  pathname: string,
+  cookieLocale: string | null | undefined,
+): SupportedLocale | null {
+  return localeFromPathname(pathname) ?? (isSupportedLocale(cookieLocale) ? cookieLocale : null);
+}
+
+export function getLocalizedBlogRedirectPath(
+  pathname: string,
+  locale: SupportedLocale,
+): string | null {
+  if (pathname !== '/blog' && !pathname.startsWith('/blog/')) {
+    return null;
+  }
+
+  return `/${locale}${pathname}`;
+}
+
 export function normalizeLocale(locale: string | null | undefined): SupportedLocale {
   const normalized = (locale ?? '').trim().toLowerCase();
   if (normalized.startsWith('zh')) return 'zh';

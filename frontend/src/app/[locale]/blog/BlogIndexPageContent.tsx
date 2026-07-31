@@ -1,6 +1,11 @@
 import Link from 'next/link';
 import { ArrowRight, Clock3, Sparkles } from 'lucide-react';
-import { getBlogPosts, getBlogUi } from '@/lib/blog-data';
+import {
+  getBlogPostsByFreshness,
+  getBlogUi,
+  getFeaturedBlogPost,
+  getStarterBlogPosts,
+} from '@/lib/blog-data';
 import type { Locale } from '@/lib/i18n';
 import { serializeJsonLd } from '@/lib/json-ld';
 import { siteConfig } from '@/lib/site';
@@ -14,9 +19,9 @@ function resolveBlogLocale(locale?: string): Locale {
 export default function BlogIndexPageContent({ locale }: { locale?: string }) {
   const pinnedLocale = resolveBlogLocale(locale);
   const ui = getBlogUi(pinnedLocale);
-  const posts = [...getBlogPosts(pinnedLocale)]
-    .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
-  const featuredPost = posts[0];
+  const posts = getBlogPostsByFreshness(pinnedLocale);
+  const featuredPost = getFeaturedBlogPost(pinnedLocale);
+  const starterPosts = getStarterBlogPosts(pinnedLocale);
   const postSlugs = posts.map((post) => post.slug);
 
   const collectionJsonLd = {
@@ -82,7 +87,7 @@ export default function BlogIndexPageContent({ locale }: { locale?: string }) {
                 <div className="mt-6 grid gap-3 sm:grid-cols-3">
                   <div className="ui-panel px-4 py-4">
                     <p className="text-[11px] uppercase tracking-[0.22em] text-gold/75">{ui.starterPostsLabel}</p>
-                    <p className="mt-2 font-mono text-2xl text-ink">{posts.length}</p>
+                    <p className="mt-2 font-mono text-2xl text-ink">{starterPosts.length}</p>
                   </div>
                   <div className="ui-panel px-4 py-4">
                     <p className="text-[11px] uppercase tracking-[0.22em] text-gold/75">{ui.primaryTopicsLabel}</p>
@@ -138,7 +143,7 @@ export default function BlogIndexPageContent({ locale }: { locale?: string }) {
                 <h2 className="mt-5 font-display text-3xl">{ui.startTitle}</h2>
                 <p className="mt-3 text-sm leading-7 text-ink-muted">{ui.startIntro}</p>
                 <div className="mt-6 grid gap-3 text-sm text-ink-muted">
-                  {posts.map((post, index) => (
+                  {starterPosts.map((post, index) => (
                     <Link key={post.slug} href={`/${pinnedLocale}/blog/${post.slug}`} className="rounded-control border border-border-subtle bg-raised/40 px-4 py-3 transition-colors hover:border-gold/30 hover:text-ink">
                       <p className="text-[11px] uppercase tracking-[0.22em] text-gold/75">0{index + 1}</p>
                       <p className="mt-2 leading-6">{post.title}</p>

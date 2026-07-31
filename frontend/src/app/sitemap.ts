@@ -3,6 +3,7 @@ import { GENERATION_PROMPT_EXAMPLES } from '@/content/generation/prompt-examples
 import { DEMO_REVIEW_ID } from '@/lib/demo-review';
 import { getBlogPosts } from '@/lib/blog-data';
 import { siteConfig } from '@/lib/site';
+import { getLatestProductUpdateDate } from '@/lib/updates-data';
 
 const LOCALES = ['zh', 'en', 'ja'] as const;
 type Locale = (typeof LOCALES)[number];
@@ -36,6 +37,7 @@ function singleUrlAlternates(path: string) {
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
+  const latestProductUpdateDate = new Date(getLatestProductUpdateDate());
 
   return [
     // Root page is still reachable for users, but /en is the x-default canonical SEO target.
@@ -125,27 +127,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.58,
       alternates: singleUrlAlternates(`/generate/prompts/${example.id}`),
     })),
-    {
-      url: `${siteConfig.url}/blog`,
-      lastModified: now,
-      changeFrequency: 'weekly',
-      priority: 0.7,
-      alternates: localizedAlternates((locale) => `/${locale}/blog`, '/blog'),
-    },
     // Blog index — one entry per locale
     ...LOCALES.map((locale) => ({
       url: `${siteConfig.url}/${locale}/blog`,
       lastModified: now,
       changeFrequency: 'weekly' as const,
       priority: 0.7,
-      alternates: localizedAlternates((entryLocale) => `/${entryLocale}/blog`, '/blog'),
-    })),
-    ...getBlogPosts('en').map((post) => ({
-      url: `${siteConfig.url}/blog/${post.slug}`,
-      lastModified: new Date(post.updatedAt),
-      changeFrequency: 'monthly' as const,
-      priority: 0.65,
-      alternates: localizedAlternates((locale) => `/${locale}/blog/${post.slug}`, `/blog/${post.slug}`),
+      alternates: localizedAlternates((entryLocale) => `/${entryLocale}/blog`, '/en/blog'),
     })),
     // Blog posts — one entry per locale × slug
     ...LOCALES.flatMap((locale) =>
@@ -154,19 +142,22 @@ export default function sitemap(): MetadataRoute.Sitemap {
         lastModified: new Date(post.updatedAt),
         changeFrequency: 'monthly' as const,
         priority: 0.65,
-        alternates: localizedAlternates((entryLocale) => `/${entryLocale}/blog/${post.slug}`, `/blog/${post.slug}`),
+        alternates: localizedAlternates(
+          (entryLocale) => `/${entryLocale}/blog/${post.slug}`,
+          `/en/blog/${post.slug}`,
+        ),
       }))
     ),
     ...LOCALES.map((locale) => ({
       url: `${siteConfig.url}/${locale}/updates`,
-      lastModified: new Date('2026-04-11'),
+      lastModified: latestProductUpdateDate,
       changeFrequency: 'monthly' as const,
       priority: 0.6,
       alternates: localizedAlternates((entryLocale) => `/${entryLocale}/updates`, '/updates'),
     })),
     {
       url: `${siteConfig.url}/updates`,
-      lastModified: new Date('2026-04-11'),
+      lastModified: latestProductUpdateDate,
       changeFrequency: 'monthly',
       priority: 0.6,
       alternates: localizedAlternates((locale) => `/${locale}/updates`, '/updates'),

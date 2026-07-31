@@ -14,14 +14,15 @@ import { getRetakeCoachCopy } from '@/lib/retake-coach-copy';
 
 const MARKETING_LINKS: Array<
   | { href: string; key: 'nav_home' | 'nav_workspace' | 'nav_generate' | 'nav_gallery' | 'nav_usage' }
-  | { href: string; kind: 'retake' | 'blog' }
+  | { href: string; kind: 'retake' }
+  | { kind: 'blog' }
 > = [
   { href: '/', key: 'nav_home' },
   { href: '/workspace', key: 'nav_workspace' },
   { href: '/retake', kind: 'retake' },
   { href: '/generate', key: 'nav_generate' },
   { href: '/gallery', key: 'nav_gallery' },
-  { href: '/blog', kind: 'blog' },
+  { kind: 'blog' },
   { href: '/account/usage', key: 'nav_usage' },
 ];
 
@@ -96,11 +97,17 @@ export default function MarketingHeader() {
         </div>
 
         <nav className="hidden md:flex items-center gap-4 text-[13px] lg:gap-6 lg:text-sm">
-          {MARKETING_LINKS.map((link) => (
-            <Link key={link.href} href={link.href} className={`transition-colors ${activeClass(link.href)}`}>
-              {'key' in link ? t(link.key) : link.kind === 'retake' ? retakeCopy.nav : blogUi.navLabel}
-            </Link>
-          ))}
+          {MARKETING_LINKS.map((link) => {
+            const href =
+              'kind' in link && link.kind === 'blog' ? `/${locale}/blog` : link.href;
+            const activeHref =
+              'kind' in link && link.kind === 'blog' ? '/blog' : link.href;
+            return (
+              <Link key={href} href={href} className={`transition-colors ${activeClass(activeHref)}`}>
+                {'key' in link ? t(link.key) : link.kind === 'retake' ? retakeCopy.nav : blogUi.navLabel}
+              </Link>
+            );
+          })}
         </nav>
 
         <HeaderRightControls headerVisibility={headerVisibility} className="shrink-0" />
@@ -122,7 +129,7 @@ export default function MarketingHeader() {
             </Link>
           ))}
           <Link
-            href="/blog"
+            href={`/${locale}/blog`}
             className={`flex-1 flex flex-col items-center justify-center gap-1 rounded-control py-2 text-[10px] font-medium transition-all duration-200 ${
               isActive('/blog')
                 ? 'bg-void shadow-sm text-gold'
