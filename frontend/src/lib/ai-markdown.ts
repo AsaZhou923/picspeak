@@ -18,7 +18,7 @@ export const AI_MARKDOWN_CONTENT_PAGES: readonly AiMarkdownContentPage[] = [
   {
     slug: 'home',
     markdownPath: '/ai-content/home.md',
-    sourcePath: '/',
+    sourcePath: '/en',
     title: 'PicSpeak product overview',
     description:
       'A concise markdown overview of PicSpeak, its AI photo critique workflow, plan boundaries, and public citation guidance.',

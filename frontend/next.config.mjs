@@ -95,7 +95,7 @@ const aiDiscoveryIndexHeaders = [
 ];
 
 const aiContentCanonicalHeaders = [
-  ['/ai-content/home.md', 'https://www.picspeak.art'],
+  ['/ai-content/home.md', 'https://www.picspeak.art/en'],
   ['/ai-content/lens-notes.md', 'https://www.picspeak.art/en/blog'],
   ['/ai-content/prompt-library.md', 'https://www.picspeak.art/generate/prompts'],
   ['/ai-content/gallery.md', 'https://www.picspeak.art/gallery'],
@@ -111,10 +111,8 @@ const cacheablePublicPageSources = [
   '/:locale(zh|en|ja)/blog/:slug*',
   '/updates',
   '/:locale(zh|en|ja)/updates',
-  '/generate',
   '/generate/prompts',
   '/generate/prompts/:id*',
-  '/retake',
   '/reviews/rev_8424d4fbde054759',
   '/privacy',
   '/terms',

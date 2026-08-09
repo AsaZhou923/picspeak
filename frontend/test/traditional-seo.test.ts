@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { getBlogPosts } from '../src/lib/blog-data.ts';
 import { buildDemoReviewJsonLd } from '../src/lib/demo-review.ts';
 import { buildGalleryCollectionJsonLd } from '../src/lib/gallery-schema.ts';
+import { AI_MARKDOWN_CONTENT_PAGES, buildAiMarkdownContent } from '../src/lib/ai-markdown.ts';
 import { siteConfig } from '../src/lib/site.ts';
 
 const TEST_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -29,17 +30,18 @@ test('English Lens Notes metadata stays concise without shortening visible artic
   }
 });
 
-test('Retake Coach is an indexable product landing page with sitemap and cache coverage', () => {
+test('Retake Coach is indexable without cookie-unsafe shared cache coverage', () => {
   const layout = source('src', 'app', 'retake', 'layout.tsx');
   const sitemap = source('src', 'app', 'sitemap.ts');
   const nextConfig = source('next.config.mjs');
+  const cacheSources = nextConfig.match(/const cacheablePublicPageSources = \[([\s\S]*?)\];/)?.[1] ?? '';
 
   assert.match(layout, /INDEXABLE_ROBOTS/);
   assert.match(layout, /singlePageAlternates\(RETAKE_PATH\)/);
   assert.match(layout, /SoftwareApplication/);
   assert.match(layout, /BreadcrumbList|buildPublicBreadcrumbJsonLd/);
   assert.match(sitemap, /siteConfig\.url\}\/retake/);
-  assert.match(nextConfig, /'\/retake'/);
+  assert.doesNotMatch(cacheSources, /['"]\/retake['"]/);
 });
 
 test('legacy demo review URLs consolidate into one canonical indexable example', () => {
@@ -63,6 +65,10 @@ test('AI discovery mirrors remain crawlable but cannot compete with canonical HT
   assert.match(markdownRoute, /rel=\"canonical\"/);
   assert.match(llmsRoute, /'X-Robots-Tag': 'noindex, follow'/);
   assert.match(wellKnownRoute, /'X-Robots-Tag': 'noindex, follow'/);
+
+  const homeMirror = AI_MARKDOWN_CONTENT_PAGES.find((page) => page.slug === 'home');
+  assert.equal(homeMirror?.sourcePath, '/en');
+  assert.match(buildAiMarkdownContent(homeMirror!), /Source page: https:\/\/www\.picspeak\.art\/en/);
 });
 
 test('public schemas reuse the canonical website and organization entity IDs', () => {

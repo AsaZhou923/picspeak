@@ -34,7 +34,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
       'Content-Type': 'text/markdown; charset=utf-8',
       'Cache-Control': 'public, max-age=3600',
       'X-Robots-Tag': 'noindex, follow',
-      Link: `<${siteConfig.url}${page.sourcePath === '/' ? '' : page.sourcePath}>; rel="canonical"`,
+      Link: `<${siteConfig.url}${page.sourcePath}>; rel="canonical"`,
     },
   });
 }

@@ -44,7 +44,7 @@
 - Affiliate page: https://www.picspeak.art/affiliate
 
 ## Markdown content mirrors
-- PicSpeak product overview: https://www.picspeak.art/ai-content/home.md (source: https://www.picspeak.art)
+- PicSpeak product overview: https://www.picspeak.art/ai-content/home.md (source: https://www.picspeak.art/en)
 - Lens Notes blog overview: https://www.picspeak.art/ai-content/lens-notes.md (source: https://www.picspeak.art/en/blog)
 - GPT Image 2 prompt library overview: https://www.picspeak.art/ai-content/prompt-library.md (source: https://www.picspeak.art/generate/prompts)
 - PicSpeak public gallery overview: https://www.picspeak.art/ai-content/gallery.md (source: https://www.picspeak.art/gallery)

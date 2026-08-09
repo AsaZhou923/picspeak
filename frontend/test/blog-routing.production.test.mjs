@@ -371,16 +371,23 @@ test('search-result titles stay unique, concise, and free of duplicated brand su
   assert.equal(new Set(titles).size, titles.length);
 });
 
-test('indexable interactive pages expose one primary heading, canonical metadata, and public cache', async () => {
-  const generateResponse = await fetch(`${baseUrl}/generate`);
+test('indexable interactive pages avoid cookie-unsafe shared caching', async () => {
+  const generateResponse = await fetch(`${baseUrl}/generate`, {
+    headers: { cookie: 'picspeak-locale=zh' },
+  });
   assert.equal(generateResponse.status, 200);
-  assert.match(generateResponse.headers.get('cache-control') ?? '', /\bpublic\b/);
-  assert.equal(headingCount(await generateResponse.text(), 1), 1);
+  assert.doesNotMatch(generateResponse.headers.get('cache-control') ?? '', /\bs-maxage=/);
+  const generateHtml = await generateResponse.text();
+  assert.match(generateHtml, /<html[^>]+lang="zh-CN"/i);
+  assert.equal(headingCount(generateHtml, 1), 1);
 
-  const retakeResponse = await fetch(`${baseUrl}/retake`);
+  const retakeResponse = await fetch(`${baseUrl}/retake`, {
+    headers: { cookie: 'picspeak-locale=ja' },
+  });
   assert.equal(retakeResponse.status, 200);
-  assert.match(retakeResponse.headers.get('cache-control') ?? '', /\bs-maxage=3600\b/);
+  assert.doesNotMatch(retakeResponse.headers.get('cache-control') ?? '', /\bs-maxage=/);
   const retakeHtml = await retakeResponse.text();
+  assert.match(retakeHtml, /<html[^>]+lang="ja"/i);
   assert.equal(headingCount(retakeHtml, 1), 1);
   assert.match(metadataUrl(retakeHtml, 'name', 'robots'), /index, follow/i);
   assert.equal(new URL(metadataUrl(retakeHtml, 'rel', 'canonical'), baseUrl).pathname, '/retake');
@@ -409,7 +416,7 @@ test('AI discovery text remains crawlable while canonical HTML owns search index
   assert.equal(markdownResponse.status, 200);
   assert.match(markdownResponse.headers.get('content-type') ?? '', /^text\/markdown/i);
   assert.match(markdownResponse.headers.get('x-robots-tag') ?? '', /noindex, follow/i);
-  assert.match(markdownResponse.headers.get('link') ?? '', /<https:\/\/www\.picspeak\.art>; rel="canonical"/);
+  assert.match(markdownResponse.headers.get('link') ?? '', /<https:\/\/www\.picspeak\.art\/en>; rel="canonical"/);
 
   for (const pathName of ['/llms.txt', '/.well-known/llms.txt']) {
     const response = await fetch(`${baseUrl}${pathName}`);

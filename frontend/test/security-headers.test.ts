@@ -90,7 +90,7 @@ test('public responses advertise language variance and third-party preconnects',
   assert.equal(headers.get('X-Frame-Options'), 'DENY');
 });
 
-test('only locale-pinned Blog pages receive shared public-cache headers', async () => {
+test('cookie-localized interactive pages stay out of shared public-cache headers', async () => {
   const nextConfigModule = await import('../next.config.mjs');
   const nextConfig = nextConfigModule.default as {
     headers: () => Promise<Array<{ source: string; headers: Array<{ key: string; value: string }> }>>;
@@ -109,6 +109,21 @@ test('only locale-pinned Blog pages receive shared public-cache headers', async 
   assert.ok(publiclyCachedSources.includes('/:locale(zh|en|ja)/blog/:slug*'));
   assert.ok(!publiclyCachedSources.includes('/blog'));
   assert.ok(!publiclyCachedSources.includes('/blog/:slug*'));
+  assert.ok(!publiclyCachedSources.includes('/generate'));
+  assert.ok(!publiclyCachedSources.includes('/retake'));
+});
+
+test('the home AI mirror points directly to the canonical English homepage', async () => {
+  const nextConfigModule = await import('../next.config.mjs');
+  const nextConfig = nextConfigModule.default as {
+    headers: () => Promise<Array<{ source: string; headers: Array<{ key: string; value: string }> }>>;
+  };
+
+  const routes = await nextConfig.headers();
+  const homeMirrorRoute = routes.find((route) => route.source === '/ai-content/home.md');
+  const canonical = homeMirrorRoute?.headers.find((header) => header.key === 'Link')?.value;
+
+  assert.equal(canonical, '<https://www.picspeak.art/en>; rel="canonical"');
 });
 
 test('proxy scrubs forged locale headers and makes locale redirects private', () => {
