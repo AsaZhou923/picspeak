@@ -78,7 +78,7 @@ export function getIndexNowKey(rawKey = process.env.INDEXNOW_KEY) {
   return INDEXNOW_KEY_PATTERN.test(key) ? key : null;
 }
 
-export function normalizeIndexNowUrls(rawUrls, siteUrl = process.env.NEXT_PUBLIC_SITE_URL || DEFAULT_SITE_URL) {
+export function normalizeIndexNowUrls(rawUrls, siteUrl = DEFAULT_SITE_URL) {
   const siteHost = new URL(siteUrl).host;
   const ownUrls = new Set();
 
@@ -103,13 +103,12 @@ export function normalizeIndexNowUrls(rawUrls, siteUrl = process.env.NEXT_PUBLIC
   return [...ownUrls].slice(0, INDEXNOW_URL_LIMIT);
 }
 
-export function buildIndexNowPayload(rawUrls, rawKey = process.env.INDEXNOW_KEY) {
+export function buildIndexNowPayload(rawUrls, rawKey = process.env.INDEXNOW_KEY, siteUrl = DEFAULT_SITE_URL) {
   const key = getIndexNowKey(rawKey);
   if (!key) {
     return null;
   }
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || DEFAULT_SITE_URL;
   const urlList = normalizeIndexNowUrls(rawUrls, siteUrl);
   if (urlList.length === 0) {
     return null;
