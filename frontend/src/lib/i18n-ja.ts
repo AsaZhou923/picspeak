@@ -20,8 +20,8 @@ export const jaTranslations = {
     pro_offer_label: '',
     pro_offer_highlight: 'Pro',
     updates_label: '更新履歴',
-    updates_hint_home: 'ブログの多言語ルーティングとキャッシュ強化を見る',
-    updates_hint_latest: 'ブログの多言語ルーティングとキャッシュ強化を見る',
+    updates_hint_home: 'SEO/GEO の信頼性と発見性強化を見る',
+    updates_hint_latest: 'SEO/GEO の信頼性と発見性強化を見る',
     contact_label: 'コンタクト',
     contact_headline: 'お問い合わせ',
     photo_ready_msg_short: 'アップロード完了',
@@ -230,6 +230,7 @@ export const jaTranslations = {
     footer_usage: 'クォータ',
     footer_privacy: 'プライバシー',
     footer_terms: '規約',
+    footer_editorial_policy: '編集ポリシー',
 
     // Affiliate page
     affiliate_badge: 'Affiliate Program',

@@ -1,5 +1,38 @@
 [
   {
+    "id": "2026-08-09-seo-geo-authority-discovery",
+    "date": "2026-08-09",
+    "title": "SEO/GEO の信頼性と発見性を強化",
+    "summary": "PicSpeak は従来型 SEO と GEO を分けて全面監査し、クロール、検索結果表示、Schema、信頼性のローカル課題を解消しました。無効 URL は実際の 404 を返し、title、description、H1、Retake の index、内部リンク、cache を改善し、ページ entity と AI 向けファイルの出典関係も明確にしました。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-08-09-seo-geo-authority-discovery",
+    "sections": [
+      {
+        "title": "検索発見と鮮度",
+        "items": [
+          "未知の公開ルートや無効な Blog・Prompt slug は、ストリーミング前に実際の 404 を返し、ソフト 404 を防ぎます",
+          "通常 sitemap からルート別名と架空の現在日付を除き、News sitemap は直近 2 日以内の更新だけを掲載します",
+          "IndexNow は 3 言語 Blog、Prompt 詳細、Updates、編集ポリシー、法的ページの URL を同一オリジンで重複排除して送信します"
+        ]
+      },
+      {
+        "title": "ページ SEO と検索結果表示",
+        "items": [
+          "重複したブランド title を除去し、英語 Lens Notes の SEO title・description を短くし、公開ページのサーバー HTML に H1 を 1 つだけ配置しました",
+          "Retake Coach に canonical、sitemap、public cache、ページ Schema を追加して index 可能にし、AI Markdown mirror は noindex と canonical HTTP Link で重複 index を防ぎます",
+          "50 ページの production crawl で title、description、canonical、OG、Twitter、lang、alt、index、cache の全契約を確認しました"
+        ]
+      },
+      {
+        "title": "エンティティと編集上の信頼",
+        "items": [
+          "サーバー出力の Home JSON-LD が Organization、WebSite、Person、製品、FAQ、ソースコード、パンくずを安定した ID で関連付け、Home FAQ を子ページへ混在させません",
+          "編集・訂正ポリシーと詳細な著者ページを追加し、Blog に著者表示、出典、BlogPosting citation を追加しました",
+          "Prompt provenance、AI markdown、llms.txt、ページ Schema、パンくずで、出典、確認日、発行者、引用範囲を明確にしました"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-07-31-blog-locale-routing-cache-hardening",
     "date": "2026-07-31",
     "title": "ブログの多言語ルーティングとキャッシュ強化",

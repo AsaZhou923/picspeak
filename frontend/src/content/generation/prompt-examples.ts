@@ -269,7 +269,7 @@ export function getGenerationPromptExample(id: string): GenerationPromptExample 
 
 export function buildPromptExampleCreativeWorkJsonLd(
   example: GenerationPromptExample,
-  site: { siteUrl: string; siteName: string },
+  site: { siteUrl: string; organizationId?: string },
 ) {
   const title = getLocalizedPromptExampleTitle(example, 'en');
   const prompt = getLocalizedPromptExampleText(example.prompt, 'en');
@@ -298,14 +298,10 @@ export function buildPromptExampleCreativeWorkJsonLd(
       url: example.sourceUrl,
     },
     isPartOf: {
-      '@type': 'CollectionPage',
-      name: `${site.siteName} GPT Image 2 Prompt Examples`,
-      url: `${site.siteUrl}/generate/prompts`,
+      '@id': `${site.siteUrl}/generate/prompts#collection`,
     },
     publisher: {
-      '@type': 'Organization',
-      name: site.siteName,
-      url: site.siteUrl,
+      '@id': site.organizationId ?? `${site.siteUrl}/#organization`,
     },
   };
 }

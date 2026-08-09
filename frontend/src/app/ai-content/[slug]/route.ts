@@ -3,6 +3,7 @@ import {
   buildAiMarkdownContent,
   getAiMarkdownContentPage,
 } from '@/lib/ai-markdown';
+import { siteConfig } from '@/lib/site';
 
 type RouteContext = {
   params: Promise<{ slug: string }>;
@@ -32,6 +33,8 @@ export async function GET(_request: Request, { params }: RouteContext) {
     headers: {
       'Content-Type': 'text/markdown; charset=utf-8',
       'Cache-Control': 'public, max-age=3600',
+      'X-Robots-Tag': 'noindex, follow',
+      Link: `<${siteConfig.url}${page.sourcePath}>; rel="canonical"`,
     },
   });
 }

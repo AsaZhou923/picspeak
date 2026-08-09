@@ -166,11 +166,15 @@ Normal single-photo review is a separate path: Qwen 3.5 remains the compatibilit
 
 - English, Chinese, and Japanese content is represented across `i18n-*.ts`, localized routes, blog/update JSON files, and SEO helpers.
 - `/generate/prompts` and `/generate/prompts/[id]` are crawlable GPT Image 2 prompt-example pages backed by `content/generation/prompt-examples.ts`; keep static params, metadata, JSON-LD, localized visible titles, and sitemap entries aligned.
+- `/retake` is an indexable public product page with canonical metadata, sitemap coverage, public caching, and WebPage/SoftwareApplication/BreadcrumbList schema. Arbitrary private review pages remain `noindex` and private; only the canonical demo review ID may be indexed and cached publicly, while legacy demo IDs permanently redirect to it.
+- `frontend/src/lib/app-route-roots.ts` is the early 404 manifest for public routes. Adding a top-level App route, Lens Notes slug, or Prompt example ID requires updating this manifest; `locale-default.test.ts` locks it to the source content collections.
+- Homepage Organization/Product/WebSite/Person/FAQ schema belongs to the server-rendered `HomeStructuredData`; `[locale]/layout.tsx` must stay schema-neutral so Blog and Updates do not inherit homepage FAQ or breadcrumbs.
 - `/gallery` intentionally renders a server-visible SEO summary before the client gallery loads; keep `GallerySeoHero`, `gallery-seo-copy.ts`, and gallery metadata in sync when editing public gallery positioning.
 - `frontend/public/og-product.png` is the primary 1200x630 product social preview for AI critique, AI Create, and gallery examples; update `siteConfig` and `seo-assets` coverage together if replacing it.
-- `robots.ts`, `sitemap.ts`, `/sitemap-images.xml`, `/sitemap-news.xml`, `llms.txt` routes, `.well-known/llms.txt`, `frontend/public/llms.txt`, `/ai-content/*.md` Markdown mirrors, and the `/generate` SEO fallback are part of the AI-search/GEO surface.
+- `robots.ts`, `sitemap.ts`, `/sitemap-images.xml`, `/sitemap-news.xml`, `llms.txt` routes, `.well-known/llms.txt`, `frontend/public/llms.txt`, `/ai-content/*.md` Markdown mirrors, and the `/generate` SEO fallback are part of the AI-search/GEO surface. AI Markdown mirrors stay crawler-accessible but use `X-Robots-Tag: noindex, follow` plus a canonical HTTP Link to the source HTML page.
+- Keep the public author profile, Editorial & Corrections Policy, Lens Notes bylines/citations, Prompt provenance, and AI markdown trust fields aligned; do not imply unsupported credentials or third-party license rights.
 - `/generation-tasks/[taskId]` and `/generations/[generationId]` are private generation-flow surfaces and should remain `noindex`.
-- Keep canonical URLs, locale alternates, structured data, and content bundle tests aligned when editing public pages.
+- Keep metadata titles topic-only where the root title template appends the PicSpeak brand; keep canonical URLs, locale alternates, one visible/semantic H1, structured data, and content bundle tests aligned when editing public pages.
 
 ## Environment Configuration
 
@@ -211,5 +215,6 @@ Use the smallest verification set that proves the change:
 - Frontend lint-sensitive changes: `npm run lint`
 - Content/SEO/i18n changes: `node --test test/*.test.ts` or targeted files under `frontend/test`
 - Production-facing frontend changes: `npm run build`
+- Public routing, cache, metadata, schema, or sitemap changes: `npm run test:production-blog` after a successful build
 
 If a command cannot be run locally, report exactly which command was skipped and why.

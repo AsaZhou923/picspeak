@@ -2,7 +2,6 @@
 
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import Script from 'next/script';
 import {
   Aperture,
   ArrowRight,
@@ -18,19 +17,9 @@ import HomeGenerationPricingSection from '@/components/home/HomeGenerationPricin
 import HomeImageCreditRedeem from '@/components/home/HomeImageCreditRedeem';
 import HomeImprovementLoop from '@/components/home/HomeImprovementLoop';
 import { getHomeIntentEntrances, type HomeIntent } from '@/lib/content-conversion';
-import {
-  buildHomeAuthorJsonLd,
-  buildHomeFaqJsonLd,
-  buildHomeSoftwareJsonLd,
-  buildHomeSourceCodeJsonLd,
-  shouldRenderHomeFaqJsonLd,
-  type HomeStructuredDataScope,
-} from '@/lib/home-structured-data';
 import { useI18n } from '@/lib/i18n';
-import { serializeJsonLd } from '@/lib/json-ld';
 import { markProductAttributionSource, trackProductEvent } from '@/lib/product-analytics';
 import { getRetakeCoachCopy } from '@/lib/retake-coach-copy';
-import { siteConfig } from '@/lib/site';
 
 const HomeAuthWidgets = dynamic(() => import('@/components/home/HomeAuthWidgets'), {
   ssr: false,
@@ -51,13 +40,8 @@ const HomeFaq = dynamic(() => import('@/components/home/HomeFaq'), {
   ),
 });
 
-type HomePageProps = {
-  structuredDataScope?: HomeStructuredDataScope;
-};
-
-export function HomePageContent({ structuredDataScope = 'root' }: HomePageProps = {}) {
+export function HomePageContent() {
   const { t, locale } = useI18n();
-  const renderFaqJsonLd = shouldRenderHomeFaqJsonLd(structuredDataScope);
   const homeIntentEntrances = getHomeIntentEntrances(locale);
   const retakeCopy = getRetakeCoachCopy(locale);
   const homeIntentIcons: Record<HomeIntent, typeof UploadCloud> = {
@@ -65,27 +49,6 @@ export function HomePageContent({ structuredDataScope = 'root' }: HomePageProps 
     returning_user: Clock3,
     content_reader: FileText,
   };
-
-  const FAQ_KEYS = [
-    { q: 'faq_q1' as const, a: 'faq_a1' as const },
-    { q: 'faq_q2' as const, a: 'faq_a2' as const },
-    { q: 'faq_q3' as const, a: 'faq_a3' as const },
-    { q: 'faq_q4' as const, a: 'faq_a4' as const },
-    { q: 'faq_q5' as const, a: 'faq_a5' as const },
-    { q: 'faq_q6' as const, a: 'faq_a6' as const },
-    { q: 'faq_q7' as const, a: 'faq_a7' as const },
-    { q: 'faq_q8' as const, a: 'faq_a8' as const },
-    { q: 'faq_q9' as const, a: 'faq_a9' as const },
-    { q: 'faq_q10' as const, a: 'faq_a10' as const },
-  ];
-
-  const softwareJsonLd = buildHomeSoftwareJsonLd(siteConfig);
-  const authorJsonLd = buildHomeAuthorJsonLd(siteConfig);
-  const sourceCodeJsonLd = buildHomeSourceCodeJsonLd(siteConfig);
-  const faqJsonLd = buildHomeFaqJsonLd(FAQ_KEYS.map(({ q, a }) => ({
-    question: t(q),
-    answer: t(a),
-  })));
 
   const TIERS = [
     {
@@ -109,29 +72,6 @@ export function HomePageContent({ structuredDataScope = 'root' }: HomePageProps 
 
   return (
     <>
-      <Script
-        id="picspeak-structured-data"
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: serializeJsonLd(softwareJsonLd) }}
-      />
-      {renderFaqJsonLd && (
-        <Script
-          id="picspeak-faq-structured-data"
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: serializeJsonLd(faqJsonLd) }}
-        />
-      )}
-      <Script
-        id="picspeak-author-structured-data"
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: serializeJsonLd(authorJsonLd) }}
-      />
-      <Script
-        id="picspeak-source-code-structured-data"
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: serializeJsonLd(sourceCodeJsonLd) }}
-      />
-
       <HomeAuthWidgets />
 
       <section className="relative overflow-hidden px-5 py-12 sm:px-6 sm:py-16 lg:py-20">

@@ -1,15 +1,19 @@
-export type HomeStructuredDataScope = 'root' | 'locale';
-
 type HomeStructuredDataSite = {
   name: string;
   url: string;
   description: string;
   ogImage: string;
   logoImage: string;
+  logoImageWidth: number;
+  logoImageHeight: number;
   repositoryUrl: string;
+  organizationId: string;
+  websiteId: string;
+  editorialPolicyPath: string;
   social: {
     x: string;
     githubProfile: string;
+    productHunt: string;
   };
   author: {
     id: string;
@@ -18,6 +22,7 @@ type HomeStructuredDataSite = {
     jobTitle: string;
     description: string;
     email: string;
+    knowsAbout: string | readonly string[];
   };
 };
 
@@ -26,11 +31,37 @@ type FaqPair = {
   answer: string;
 };
 
-export function shouldRenderHomeFaqJsonLd(scope: HomeStructuredDataScope): boolean {
-  return scope === 'root';
+type HomePageContext = {
+  pageUrl: string;
+  language: string;
+  description: string;
+  featureList?: string[];
+};
+
+export function buildHomeOrganizationJsonLd(site: HomeStructuredDataSite) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    '@id': site.organizationId,
+    name: site.name,
+    url: site.url,
+    description: site.description,
+    logo: {
+      '@type': 'ImageObject',
+      url: `${site.url}${site.logoImage}`,
+      width: site.logoImageWidth,
+      height: site.logoImageHeight,
+    },
+    founder: {
+      '@id': site.author.id,
+    },
+    sameAs: [site.social.x, site.social.githubProfile, site.social.productHunt, site.repositoryUrl],
+    knowsAbout: site.author.knowsAbout,
+    publishingPrinciples: `${site.url}${site.editorialPolicyPath}`,
+  };
 }
 
-export function buildHomeSoftwareJsonLd(site: HomeStructuredDataSite) {
+export function buildHomeSoftwareJsonLd(site: HomeStructuredDataSite, context?: HomePageContext) {
   return {
     '@context': 'https://schema.org',
     '@type': 'SoftwareApplication',
@@ -38,30 +69,24 @@ export function buildHomeSoftwareJsonLd(site: HomeStructuredDataSite) {
     name: site.name,
     applicationCategory: 'PhotographyApplication',
     operatingSystem: 'Web',
-    url: site.url,
-    description: site.description,
+    url: context?.pageUrl ?? site.url,
+    inLanguage: context?.language,
+    description: context?.description ?? site.description,
     image: `${site.url}${site.ogImage}`,
-    sameAs: [site.social.x, site.repositoryUrl],
+    sameAs: [site.social.x, site.social.githubProfile, site.social.productHunt, site.repositoryUrl],
     isAccessibleForFree: true,
     creator: {
       '@id': site.author.id,
     },
     publisher: {
-      '@type': 'Organization',
-      '@id': `${site.url}/#organization`,
-      name: site.name,
-      url: site.url,
-      logo: {
-        '@type': 'ImageObject',
-        url: `${site.url}${site.logoImage}`,
-      },
+      '@id': site.organizationId,
     },
     offers: {
       '@type': 'Offer',
       price: '0',
       priceCurrency: 'USD',
     },
-    featureList: [
+    featureList: context?.featureList ?? [
       'AI photo critique across composition, lighting, color, impact, and technique',
       'GPT Image 2 visual reference generation',
       'Curated AI prompt example library',
@@ -83,6 +108,11 @@ export function buildHomeAuthorJsonLd(site: HomeStructuredDataSite) {
     description: site.author.description,
     email: site.author.email,
     sameAs: [site.social.x, site.social.githubProfile],
+    knowsAbout: site.author.knowsAbout,
+    worksFor: {
+      '@id': site.organizationId,
+    },
+    publishingPrinciples: `${site.url}${site.editorialPolicyPath}`,
   };
 }
 
@@ -99,17 +129,16 @@ export function buildHomeSourceCodeJsonLd(site: HomeStructuredDataSite) {
       '@id': site.author.id,
     },
     publisher: {
-      '@type': 'Organization',
-      name: site.name,
-      url: site.url,
+      '@id': site.organizationId,
     },
   };
 }
 
-export function buildHomeFaqJsonLd(items: FaqPair[]) {
+export function buildHomeFaqJsonLd(items: FaqPair[], pageUrl?: string) {
   return {
     '@context': 'https://schema.org',
     '@type': 'FAQPage',
+    ...(pageUrl ? { '@id': `${pageUrl}#faq` } : {}),
     mainEntity: items.map(({ question, answer }) => ({
       '@type': 'Question',
       name: question,
@@ -118,5 +147,21 @@ export function buildHomeFaqJsonLd(items: FaqPair[]) {
         text: answer,
       },
     })),
+  };
+}
+
+export function buildHomeBreadcrumbJsonLd(site: HomeStructuredDataSite, pageUrl: string, homeName: string) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    '@id': `${pageUrl}#breadcrumb`,
+    itemListElement: [
+      {
+        '@type': 'ListItem',
+        position: 1,
+        name: homeName,
+        item: pageUrl,
+      },
+    ],
   };
 }

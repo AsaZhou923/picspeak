@@ -44,7 +44,7 @@ test('review continuation availability is deterministic from structured capabili
 test('review first-reading DOM order is photo, result, strongest finding, then next action', async () => {
   const source = await readFile('src/app/reviews/[reviewId]/page.tsx', 'utf8');
   const photo = source.indexOf('<ReviewPhotoPanel');
-  const result = source.indexOf("<h1 className=\"mt-2 text-3xl");
+  const result = source.indexOf("<ReviewResultHeading className=\"mt-2 text-3xl");
   const strongest = source.indexOf('review-strongest-finding-title');
   const nextAction = source.indexOf('<ReviewNextActionPanel');
 

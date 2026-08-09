@@ -6,6 +6,7 @@ export type GallerySeoHeroCopy = {
   body: string;
   primaryCta: string;
   secondaryCta: string;
+  exampleCta: string;
   highlights: Array<{
     title: string;
     body: string;
@@ -20,6 +21,7 @@ const GALLERY_SEO_HERO_COPY: Record<SupportedLocale, GallerySeoHeroCopy> = {
       '这个公开长廊为搜索引擎和读者提供服务端可见的点评档案摘要：五维评分、改进语言，以及把 AI 反馈连接到可重复摄影练习的真实案例。',
     primaryCta: '开始点评',
     secondaryCta: '查看提示词案例',
+    exampleCta: '查看完整点评示例',
     highlights: [
       {
         title: 'AI 点评评分卡',
@@ -42,6 +44,7 @@ const GALLERY_SEO_HERO_COPY: Record<SupportedLocale, GallerySeoHeroCopy> = {
       'This public gallery gives crawlers and readers a server-rendered summary of the critique archive: five-dimension scoring, improvement language, and examples that connect AI feedback with repeatable photography practice.',
     primaryCta: 'Start a critique',
     secondaryCta: 'Explore prompt examples',
+    exampleCta: 'View a full critique example',
     highlights: [
       {
         title: 'AI critique scorecards',
@@ -64,6 +67,7 @@ const GALLERY_SEO_HERO_COPY: Record<SupportedLocale, GallerySeoHeroCopy> = {
       'この公開ギャラリーは、クローラーと読者に向けて、5 項目スコア、改善の言語化、AI フィードバックを反復練習につなげる実例をサーバー側で表示します。',
     primaryCta: '講評を始める',
     secondaryCta: 'プロンプト例を見る',
+    exampleCta: '講評の完全な例を見る',
     highlights: [
       {
         title: 'AI 講評スコアカード',

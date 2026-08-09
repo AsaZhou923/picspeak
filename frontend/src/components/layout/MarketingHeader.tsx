@@ -44,6 +44,7 @@ export default function MarketingHeader() {
   const { t, locale } = useI18n();
   const blogUi = getBlogUi(locale);
   const retakeCopy = getRetakeCoachCopy(locale);
+  const homeHref = `/${locale}`;
   const [hasHydrated, setHasHydrated] = useState(false);
   const normalizedPathname = pathname?.replace(/^\/(zh|en|ja)(?=\/|$)/, '') || '/';
 
@@ -71,7 +72,7 @@ export default function MarketingHeader() {
       <div className="max-w-editorial mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link
-            href="/"
+            href={homeHref}
             className="flex items-center gap-2 text-ink hover:text-gold transition-colors shrink-0"
           >
             <Image
@@ -85,7 +86,7 @@ export default function MarketingHeader() {
             <span className="font-display text-lg tracking-wide hidden lg:inline">PicSpeak</span>
           </Link>
           <Link
-            href="/"
+            href={homeHref}
             className={`md:hidden flex h-7 items-center rounded-full px-3 text-xs font-medium transition-colors ${
               isActive('/')
                 ? 'bg-gold/10 text-gold'
@@ -99,7 +100,11 @@ export default function MarketingHeader() {
         <nav className="hidden md:flex items-center gap-4 text-[13px] lg:gap-6 lg:text-sm">
           {MARKETING_LINKS.map((link) => {
             const href =
-              'kind' in link && link.kind === 'blog' ? `/${locale}/blog` : link.href;
+              'kind' in link && link.kind === 'blog'
+                ? `/${locale}/blog`
+                : link.href === '/'
+                  ? homeHref
+                  : link.href;
             const activeHref =
               'kind' in link && link.kind === 'blog' ? '/blog' : link.href;
             return (

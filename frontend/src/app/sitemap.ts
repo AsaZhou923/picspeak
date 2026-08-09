@@ -7,6 +7,7 @@ import { getLatestProductUpdateDate } from '@/lib/updates-data';
 
 const LOCALES = ['zh', 'en', 'ja'] as const;
 type Locale = (typeof LOCALES)[number];
+const SEO_CONTENT_LAST_MODIFIED = new Date('2026-08-09');
 
 const LANGUAGE_CODES: Record<Locale, string> = {
   zh: 'zh-CN',
@@ -35,37 +36,35 @@ function singleUrlAlternates(path: string) {
   };
 }
 
+function latestBlogPostUpdatedDate(locale: Locale): Date | undefined {
+  return getBlogPosts(locale).reduce<Date | undefined>((latestDate, post) => {
+    const updatedAt = new Date(post.updatedAt);
+    return !latestDate || updatedAt > latestDate ? updatedAt : latestDate;
+  }, undefined);
+}
+
 export default function sitemap(): MetadataRoute.Sitemap {
-  const now = new Date();
   const latestProductUpdateDate = new Date(getLatestProductUpdateDate());
 
   return [
-    // Root page is still reachable for users, but /en is the x-default canonical SEO target.
-    {
-      url: siteConfig.url,
-      lastModified: now,
-      changeFrequency: 'weekly',
-      priority: 1,
-      alternates: localizedAlternates((locale) => `/${locale}`, '/en'),
-    },
     // Locale-prefixed home pages — same content, pinned language for SEO
     {
       url: `${siteConfig.url}/zh`,
-      lastModified: now,
+      lastModified: SEO_CONTENT_LAST_MODIFIED,
       changeFrequency: 'weekly',
       priority: 1,
       alternates: localizedAlternates((locale) => `/${locale}`, '/en'),
     },
     {
       url: `${siteConfig.url}/en`,
-      lastModified: now,
+      lastModified: SEO_CONTENT_LAST_MODIFIED,
       changeFrequency: 'weekly',
       priority: 1,
       alternates: localizedAlternates((locale) => `/${locale}`, '/en'),
     },
     {
       url: `${siteConfig.url}/ja`,
-      lastModified: now,
+      lastModified: SEO_CONTENT_LAST_MODIFIED,
       changeFrequency: 'weekly',
       priority: 1,
       alternates: localizedAlternates((locale) => `/${locale}`, '/en'),
@@ -73,56 +72,63 @@ export default function sitemap(): MetadataRoute.Sitemap {
     // Public single-URL pages. They are multilingual/mixed-language pages, not locale alternates.
     {
       url: `${siteConfig.url}/affiliate`,
-      lastModified: now,
+      lastModified: SEO_CONTENT_LAST_MODIFIED,
       changeFrequency: 'weekly',
       priority: 0.8,
       alternates: singleUrlAlternates('/affiliate'),
     },
     {
       url: `${siteConfig.url}/privacy`,
-      lastModified: now,
+      lastModified: new Date('2026-05-14'),
       changeFrequency: 'yearly',
       priority: 0.45,
       alternates: singleUrlAlternates('/privacy'),
     },
     {
       url: `${siteConfig.url}/terms`,
-      lastModified: now,
+      lastModified: new Date('2026-05-14'),
       changeFrequency: 'yearly',
       priority: 0.45,
       alternates: singleUrlAlternates('/terms'),
     },
     {
       url: `${siteConfig.url}/gallery`,
-      lastModified: now,
+      lastModified: SEO_CONTENT_LAST_MODIFIED,
       changeFrequency: 'daily',
       priority: 0.8,
       alternates: singleUrlAlternates('/gallery'),
     },
     {
       url: `${siteConfig.url}/author/asa-zhou`,
-      lastModified: now,
+      lastModified: SEO_CONTENT_LAST_MODIFIED,
       changeFrequency: 'monthly',
       priority: 0.62,
       alternates: singleUrlAlternates('/author/asa-zhou'),
     },
     {
+      url: `${siteConfig.url}/editorial-policy`,
+      lastModified: SEO_CONTENT_LAST_MODIFIED,
+      changeFrequency: 'monthly',
+      priority: 0.55,
+      alternates: singleUrlAlternates('/editorial-policy'),
+    },
+    {
       url: `${siteConfig.url}/generate`,
-      lastModified: now,
+      lastModified: SEO_CONTENT_LAST_MODIFIED,
       changeFrequency: 'weekly',
       priority: 0.85,
       alternates: singleUrlAlternates('/generate'),
     },
     {
       url: `${siteConfig.url}/generate/prompts`,
-      lastModified: now,
+      lastModified: SEO_CONTENT_LAST_MODIFIED,
       changeFrequency: 'weekly',
       priority: 0.76,
       alternates: singleUrlAlternates('/generate/prompts'),
     },
     ...GENERATION_PROMPT_EXAMPLES.map((example) => ({
       url: `${siteConfig.url}/generate/prompts/${example.id}`,
-      lastModified: now,
+      lastModified: SEO_CONTENT_LAST_MODIFIED,
       changeFrequency: 'monthly' as const,
       priority: 0.58,
       alternates: singleUrlAlternates(`/generate/prompts/${example.id}`),
@@ -130,7 +136,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     // Blog index — one entry per locale
     ...LOCALES.map((locale) => ({
       url: `${siteConfig.url}/${locale}/blog`,
-      lastModified: now,
+      lastModified: latestBlogPostUpdatedDate(locale),
       changeFrequency: 'weekly' as const,
       priority: 0.7,
       alternates: localizedAlternates((entryLocale) => `/${entryLocale}/blog`, '/en/blog'),
@@ -161,6 +167,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: 'monthly',
       priority: 0.6,
       alternates: localizedAlternates((locale) => `/${locale}/updates`, '/updates'),
+    },
+    {
+      url: `${siteConfig.url}/retake`,
+      lastModified: SEO_CONTENT_LAST_MODIFIED,
+      changeFrequency: 'monthly',
+      priority: 0.78,
+      alternates: singleUrlAlternates('/retake'),
     },
     {
       // Canonical public example of an AI photo critique result

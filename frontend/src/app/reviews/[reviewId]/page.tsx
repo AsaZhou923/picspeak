@@ -205,6 +205,7 @@ export default function ReviewPage() {
   const r = activeReview.result;
   const isPro = activeReview.mode === 'pro';
   const isDemoReview = isDemoReviewId(reviewId);
+  const ReviewResultHeading = isDemoReview ? 'h2' : 'h1';
   const displayAdvantage   = isDemoReview ? t('demo_review_advantage') : r.advantage;
   const displayCritique    = isDemoReview ? t('demo_review_critique') : r.critique;
   const displaySuggestions = isDemoReview ? t('demo_review_suggestions') : r.suggestions;
@@ -371,9 +372,9 @@ export default function ReviewPage() {
           <div className="min-w-0 space-y-5">
             <header>
               <p className="ui-eyebrow">{t('review_page_label')}</p>
-              <h1 className="mt-2 text-3xl font-semibold leading-tight text-ink sm:text-4xl">
+              <ReviewResultHeading className="mt-2 text-3xl font-semibold leading-tight text-ink sm:text-4xl">
                 {t('review_page_headline')}
-              </h1>
+              </ReviewResultHeading>
               <div className="mt-4 ui-panel flex items-center gap-4 p-4 sm:p-5">
                 <FinalScoreRing score={r.final_score} />
                 <div className="min-w-0">

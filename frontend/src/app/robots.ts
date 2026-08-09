@@ -34,13 +34,11 @@ export default function robots(): MetadataRoute.Robots {
         userAgent: '*',
         allow: '/',
         disallow: publicDisallow,
-        crawlDelay: 5,
       },
       ...AI_AND_SEARCH_CRAWLERS.map((userAgent) => ({
         userAgent,
         allow: '/',
         disallow: publicDisallow,
-        crawlDelay: 5,
       })),
     ],
     sitemap: [

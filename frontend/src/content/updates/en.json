@@ -1,5 +1,38 @@
 [
   {
+    "id": "2026-08-09-seo-geo-authority-discovery",
+    "date": "2026-08-09",
+    "title": "SEO/GEO authority and discovery hardening",
+    "summary": "PicSpeak completed separate traditional SEO and GEO audits and closed local crawl, SERP presentation, schema, and trust gaps. Invalid URLs return real 404s; titles, descriptions, H1s, Retake indexing, internal links, and caching are tightened; page entities and AI-discovery files expose stronger provenance.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-08-09-seo-geo-authority-discovery",
+    "sections": [
+      {
+        "title": "Search discovery and freshness",
+        "items": [
+          "Unknown public routes and invalid Blog or Prompt slugs now return a real 404 before streamed rendering can produce a soft 404",
+          "The canonical sitemap no longer lists the root alias or synthetic current dates, while the News sitemap keeps only updates from the last two days",
+          "IndexNow now submits localized Blog posts, prompt details, Updates, policy, and legal leaf URLs with same-origin deduplication and the protocol URL limit"
+        ]
+      },
+      {
+        "title": "On-page SEO and search presentation",
+        "items": [
+          "Removed duplicate brand titles, shortened English Lens Notes SEO titles and descriptions, and enforced one server-visible H1 on public pages",
+          "Made Retake Coach indexable with a canonical, sitemap entry, public cache, and page schema while AI Markdown mirrors use noindex and canonical HTTP Links to prevent duplicate indexing",
+          "A 50-page production crawl passed every title, description, canonical, OG, Twitter, lang, alt, indexability, and cache contract"
+        ]
+      },
+      {
+        "title": "Entity and editorial trust",
+        "items": [
+          "Server-rendered home JSON-LD defines stable Organization, WebSite, Person, product, FAQ, source-code, and breadcrumb relationships without leaking home FAQ into child pages",
+          "Added an editorial and corrections policy plus a deeper author profile, visible Blog bylines and sources, and BlogPosting citation data",
+          "Prompt provenance, AI markdown mirrors, llms.txt, page-level schemas, and breadcrumbs now expose clearer source, review, publisher, and citation boundaries"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-07-31-blog-locale-routing-cache-hardening",
     "date": "2026-07-31",
     "title": "Blog locale routing and cache hardening",

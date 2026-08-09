@@ -5,12 +5,12 @@ import {
   getLocalizedPromptExampleTitle,
 } from '@/content/generation/prompt-examples';
 import { serializeJsonLd } from '@/lib/json-ld';
-import { INDEXABLE_ROBOTS, singlePageAlternates } from '@/lib/seo';
+import { buildPublicBreadcrumbJsonLd, INDEXABLE_ROBOTS, singlePageAlternates } from '@/lib/seo';
 import { siteConfig } from '@/lib/site';
 import PromptLibraryContent from './PromptLibraryContent';
 
 export const metadata: Metadata = {
-  title: 'GPT Image 2 Prompt Examples and AI Visual Reference Library',
+  title: 'GPT Image 2 Prompt Examples and Visual References',
   description:
     'Browse PicSpeak AI Create prompt examples for GPT Image 2: photography references, posters, product scenes, UI concepts, moodboards, and experimental visual prompts.',
   keywords: [
@@ -52,14 +52,16 @@ export const metadata: Metadata = {
 const promptLibraryJsonLd = {
   '@context': 'https://schema.org',
   '@type': 'CollectionPage',
+  '@id': `${siteConfig.url}/generate/prompts#collection`,
   name: 'PicSpeak GPT Image 2 Prompt Examples',
   url: `${siteConfig.url}/generate/prompts`,
   description:
     'A crawlable prompt example library for PicSpeak AI Create, covering GPT Image 2 photography references, posters, product scenes, UI concepts, and experimental visuals.',
   isPartOf: {
-    '@type': 'WebSite',
-    name: siteConfig.name,
-    url: siteConfig.url,
+    '@id': siteConfig.websiteId,
+  },
+  publisher: {
+    '@id': siteConfig.organizationId,
   },
   hasPart: GENERATION_PROMPT_EXAMPLES.slice(0, 12).map((example) => ({
     '@type': 'CreativeWork',
@@ -69,12 +71,25 @@ const promptLibraryJsonLd = {
   })),
 };
 
+const promptLibraryBreadcrumbJsonLd = buildPublicBreadcrumbJsonLd({
+  site: siteConfig,
+  items: [
+    { name: siteConfig.name, path: '/en' },
+    { name: 'AI Create', path: '/generate' },
+    { name: 'Prompt Examples', path: '/generate/prompts' },
+  ],
+});
+
 export default function PromptLibraryPage() {
   return (
     <>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(promptLibraryJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(promptLibraryBreadcrumbJsonLd) }}
       />
       <PromptLibraryContent />
     </>

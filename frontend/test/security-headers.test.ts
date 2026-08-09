@@ -34,7 +34,7 @@ test('CSP allows the production Clerk custom domain', async () => {
   assert.match(csp, /(?:^|; )frame-src[^;]*https:\/\/clerk\.picspeak\.art(?:\s|;)/);
 });
 
-test('canonical redirects force the production domain onto HTTPS with www', async () => {
+test('canonical redirects consolidate the demo alias and force HTTPS with www', async () => {
   const nextConfigModule = await import('../next.config.mjs');
   const nextConfig = nextConfigModule.default as {
     redirects: () => Promise<
@@ -50,6 +50,11 @@ test('canonical redirects force the production domain onto HTTPS with www', asyn
   const redirects = await nextConfig.redirects();
 
   assert.deepEqual(redirects, [
+    {
+      source: '/reviews/rev_35e0951d0df94a1e',
+      destination: '/reviews/rev_8424d4fbde054759',
+      permanent: true,
+    },
     {
       source: '/:path*',
       has: [{ type: 'host', value: 'picspeak.art' }],
@@ -82,9 +87,10 @@ test('public responses advertise language variance and third-party preconnects',
   assert.match(headers.get('Link') ?? '', /rel=preconnect/);
   assert.match(headers.get('Link') ?? '', /https:\/\/clerk\.picspeak\.art/);
   assert.match(headers.get('Link') ?? '', /https:\/\/pub-7ae066210514433e84a850bc95c5f1a2\.r2\.dev/);
+  assert.equal(headers.get('X-Frame-Options'), 'DENY');
 });
 
-test('only locale-pinned Blog pages receive shared public-cache headers', async () => {
+test('cookie-localized interactive pages stay out of shared public-cache headers', async () => {
   const nextConfigModule = await import('../next.config.mjs');
   const nextConfig = nextConfigModule.default as {
     headers: () => Promise<Array<{ source: string; headers: Array<{ key: string; value: string }> }>>;
@@ -103,6 +109,21 @@ test('only locale-pinned Blog pages receive shared public-cache headers', async 
   assert.ok(publiclyCachedSources.includes('/:locale(zh|en|ja)/blog/:slug*'));
   assert.ok(!publiclyCachedSources.includes('/blog'));
   assert.ok(!publiclyCachedSources.includes('/blog/:slug*'));
+  assert.ok(!publiclyCachedSources.includes('/generate'));
+  assert.ok(!publiclyCachedSources.includes('/retake'));
+});
+
+test('the home AI mirror points directly to the canonical English homepage', async () => {
+  const nextConfigModule = await import('../next.config.mjs');
+  const nextConfig = nextConfigModule.default as {
+    headers: () => Promise<Array<{ source: string; headers: Array<{ key: string; value: string }> }>>;
+  };
+
+  const routes = await nextConfig.headers();
+  const homeMirrorRoute = routes.find((route) => route.source === '/ai-content/home.md');
+  const canonical = homeMirrorRoute?.headers.find((header) => header.key === 'Link')?.value;
+
+  assert.equal(canonical, '<https://www.picspeak.art/en>; rel="canonical"');
 });
 
 test('proxy scrubs forged locale headers and makes locale redirects private', () => {

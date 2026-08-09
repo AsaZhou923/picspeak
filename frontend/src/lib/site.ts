@@ -36,13 +36,19 @@ export const siteConfig = {
   ],
   googleSiteVerification: 'uPzmX8kYSDzOWm7iBz-dty4It12mMcIVUOPPwWmLGnM',
   logoImage: '/logo.png',
+  logoImageWidth: 180,
+  logoImageHeight: 180,
   ogImage: '/og-product.png',
   ogImageWidth: 1200,
   ogImageHeight: 630,
   repositoryUrl: 'https://github.com/AsaZhou923/picspeak',
+  organizationId: 'https://www.picspeak.art/#organization',
+  websiteId: 'https://www.picspeak.art/#website',
+  editorialPolicyPath: '/editorial-policy',
   social: {
     x: 'https://x.com/Zzw_Prime',
     githubProfile: 'https://github.com/AsaZhou923',
+    productHunt: 'https://www.producthunt.com/products/picspeak',
   },
   author: {
     id: 'https://www.picspeak.art/author/asa-zhou#person',
@@ -52,5 +58,13 @@ export const siteConfig = {
     description:
       'Builds PicSpeak and writes Lens Notes about AI photo critique, composition, lighting, color, and repeatable review workflows.',
     email: 'xavierzhou23@gmail.com',
+    knowsAbout: [
+      'AI photo critique',
+      'photography composition',
+      'lighting analysis',
+      'color feedback',
+      'repeatable photography practice',
+      'GPT Image 2 prompt examples',
+    ],
   },
 } as const;

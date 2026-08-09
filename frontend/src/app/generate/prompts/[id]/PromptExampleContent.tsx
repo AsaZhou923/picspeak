@@ -25,6 +25,10 @@ const PROMPT_EXAMPLE_PAGE_COPY = {
     style: '风格',
     ratio: '比例',
     fullPrompt: '完整提示词',
+    sourceNote:
+      '来源与作者：此案例链接到 {author} 发布的原始公开来源。PicSpeak 会为学习场景整理和改写提示词结构，但不声明对来源帖拥有额外授权。',
+    provenanceNote:
+      '图片来源说明：预览图是 PicSpeak 托管的该提示词模式示例输出，可作为视觉参考；不要把它理解为 PicSpeak 对原始来源素材拥有所有权。',
   },
   en: {
     back: 'Back to prompt library',
@@ -37,6 +41,10 @@ const PROMPT_EXAMPLE_PAGE_COPY = {
     style: 'Style',
     ratio: 'Ratio',
     fullPrompt: 'Full prompt',
+    sourceNote:
+      'Source and author: this example links to the original public source by {author}. PicSpeak curates and adapts the prompt for learning, but does not claim extra license rights over the source post.',
+    provenanceNote:
+      'Image provenance: the preview image is a PicSpeak-hosted example output for this prompt pattern. Treat it as a visual reference, not as proof of ownership over the original source material.',
   },
   ja: {
     back: 'プロンプトライブラリへ戻る',
@@ -49,6 +57,10 @@ const PROMPT_EXAMPLE_PAGE_COPY = {
     style: 'スタイル',
     ratio: '比率',
     fullPrompt: '完全なプロンプト',
+    sourceNote:
+      '出典と作者: この例は {author} による公開元ページへリンクしています。PicSpeak は学習用にプロンプトを整理・調整しますが、元投稿に対する追加のライセンス権利は主張しません。',
+    provenanceNote:
+      '画像の来歴: プレビュー画像は、このプロンプトパターンの PicSpeak ホストの出力例です。視覚参考として扱い、元素材の所有権を示すものとは解釈しないでください。',
   },
 };
 
@@ -106,6 +118,9 @@ export default function PromptExampleContent({ example }: { example: GenerationP
           <p className="mt-6 text-xs uppercase tracking-[0.28em] text-gold/75">{categoryLabel}</p>
           <h1 className="mt-4 font-display text-5xl leading-tight text-ink sm:text-6xl">{title}</h1>
           <p className="mt-5 max-w-2xl text-sm leading-7 text-ink-muted">{copy.body}</p>
+          <p className="mt-4 max-w-2xl text-sm leading-7 text-ink-subtle">
+            {copy.sourceNote.replace('{author}', example.author)}
+          </p>
           <div className="mt-7 flex flex-wrap gap-3">
             <Link
               href={generateHref}
@@ -164,6 +179,7 @@ export default function PromptExampleContent({ example }: { example: GenerationP
 
       <section className="mx-auto mt-8 max-w-7xl rounded-lg border border-border-subtle bg-void/40 p-5 sm:p-6">
         <h2 className="font-display text-3xl text-ink">{copy.fullPrompt}</h2>
+        <p className="mt-3 text-sm leading-7 text-ink-subtle">{copy.provenanceNote}</p>
         <p className="mt-4 whitespace-pre-wrap break-words rounded-lg border border-border-subtle bg-surface/70 p-4 text-sm leading-7 text-ink-muted">
           {prompt}
         </p>

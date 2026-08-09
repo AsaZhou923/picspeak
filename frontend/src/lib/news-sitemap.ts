@@ -10,6 +10,8 @@ export type NewsSitemapEntry = {
   language: 'en';
 };
 
+const NEWS_SITEMAP_MAX_ENTRY_AGE_MS = 2 * 24 * 60 * 60 * 1000;
+
 function escapeXml(value: string): string {
   return value
     .replaceAll('&', '&amp;')
@@ -19,18 +21,29 @@ function escapeXml(value: string): string {
     .replaceAll("'", '&apos;');
 }
 
-export function buildNewsSitemapEntries(): NewsSitemapEntry[] {
+function parseUtcDate(value: string): Date {
+  return new Date(`${value}T00:00:00.000Z`);
+}
+
+export function buildNewsSitemapEntries(now = new Date()): NewsSitemapEntry[] {
   const latestUpdate = getLatestProductUpdate('en');
-  return latestUpdate
-    ? [
-      {
-        loc: `${siteConfig.url}/updates`,
-        title: latestUpdate.title,
-        publicationDate: latestUpdate.date,
-        language: 'en' as const,
-      },
-    ]
-    : [];
+  if (!latestUpdate) {
+    return [];
+  }
+
+  const entryAge = now.getTime() - parseUtcDate(latestUpdate.date).getTime();
+  if (entryAge < 0 || entryAge > NEWS_SITEMAP_MAX_ENTRY_AGE_MS) {
+    return [];
+  }
+
+  return [
+    {
+      loc: `${siteConfig.url}/updates`,
+      title: latestUpdate.title,
+      publicationDate: latestUpdate.date,
+      language: 'en' as const,
+    },
+  ];
 }
 
 export function buildNewsSitemapXml(entries = buildNewsSitemapEntries()): string {

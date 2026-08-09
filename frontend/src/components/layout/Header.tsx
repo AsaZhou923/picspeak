@@ -18,6 +18,7 @@ export default function Header() {
   const { t, locale } = useI18n();
   const blogUi = getBlogUi(locale);
   const retakeCopy = getRetakeCoachCopy(locale);
+  const homeHref = `/${locale}`;
   const [hasHydrated, setHasHydrated] = useState(false);
 
   useEffect(() => {
@@ -40,7 +41,7 @@ export default function Header() {
         {/* Left side: Logo and Mobile Home */}
         <div className="flex items-center gap-3">
           <Link
-            href="/"
+            href={homeHref}
             className="flex items-center gap-2 text-ink hover:text-gold transition-colors"
           >
             <Image
@@ -54,9 +55,9 @@ export default function Header() {
             <span className="font-display text-lg tracking-wide hidden lg:inline">PicSpeak</span>
           </Link>
           <Link 
-            href="/" 
+            href={homeHref}
             className={`md:hidden flex h-7 items-center rounded-full px-3 text-xs font-medium transition-colors ${
-              pathname === '/' 
+              pathname === '/' || pathname === homeHref
                 ? 'bg-gold/10 text-gold' 
                 : 'bg-raised/55 text-ink-muted hover:bg-raised hover:text-ink'
             }`}
@@ -67,7 +68,7 @@ export default function Header() {
 
         {/* Nav */}
         <nav className="hidden md:flex items-center gap-4 text-[13px] lg:gap-6 lg:text-sm">
-          <Link href="/" className={`transition-colors ${isActive('/')}`}>
+          <Link href={homeHref} className={`transition-colors ${pathname === '/' || pathname === homeHref ? 'text-gold' : 'text-ink-muted hover:text-ink'}`}>
             {t('nav_home')}
           </Link>
           <Link href="/workspace" className={`transition-colors ${isActive('/workspace')}`}>

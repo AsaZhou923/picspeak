@@ -9,6 +9,13 @@ import {
   INDEXNOW_ENDPOINT,
   submitIndexNowUrls,
 } from '../src/lib/indexnow.ts';
+import {
+  buildIndexNowPayload as buildScriptIndexNowPayload,
+  buildDefaultIndexNowPaths,
+  DEFAULT_INDEXNOW_PATHS,
+  INDEXNOW_URL_LIMIT,
+  normalizeIndexNowUrls,
+} from '../scripts/submit-indexnow.mjs';
 
 const TEST_DIR = path.dirname(fileURLToPath(import.meta.url));
 const FRONTEND_DIR = path.join(TEST_DIR, '..');
@@ -80,4 +87,38 @@ test('IndexNow automation is available as a deploy-safe script and workflow hook
   assert.match(workflowSource, /deployment_status\.state == 'success'/);
   assert.match(workflowSource, /npm run indexnow:submit/);
   assert.match(workflowSource, /INDEXNOW_KEY/);
+});
+
+test('IndexNow script default URLs include changed public leaf pages without aliases', () => {
+  const originalSiteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+  process.env.NEXT_PUBLIC_SITE_URL = 'https://picspeak.example.com';
+
+  try {
+    const defaultPaths = buildDefaultIndexNowPaths();
+    const defaultUrls = normalizeIndexNowUrls(DEFAULT_INDEXNOW_PATHS);
+    const payload = buildScriptIndexNowPayload(['/en', '/ja/blog'], VALID_KEY);
+
+    assert.ok(defaultPaths.includes('/zh/blog/ai-photo-critique-daily-practice'));
+    assert.ok(defaultPaths.includes('/en/blog/ai-photo-critique-daily-practice'));
+    assert.ok(defaultPaths.includes('/ja/blog/ai-photo-critique-daily-practice'));
+    assert.ok(defaultPaths.some((pathName) => pathName.startsWith('/generate/prompts/')));
+    assert.ok(defaultPaths.includes('/zh/updates'));
+    assert.ok(defaultPaths.includes('/en/updates'));
+    assert.ok(defaultPaths.includes('/ja/updates'));
+    assert.ok(defaultPaths.includes('/editorial-policy'));
+    assert.ok(!defaultPaths.includes('/'));
+    assert.ok(!defaultPaths.includes('/blog'));
+    assert.ok(!defaultPaths.some((pathName) => pathName.startsWith('/blog/')));
+    assert.equal(defaultUrls.length, new Set(defaultUrls).size);
+    assert.ok(defaultUrls.length <= INDEXNOW_URL_LIMIT);
+    assert.ok(defaultUrls.every((url) => new URL(url).origin === 'https://www.picspeak.art'));
+    assert.equal(payload?.host, 'www.picspeak.art');
+    assert.ok(payload?.urlList.every((url) => new URL(url).origin === 'https://www.picspeak.art'));
+  } finally {
+    if (originalSiteUrl === undefined) {
+      delete process.env.NEXT_PUBLIC_SITE_URL;
+    } else {
+      process.env.NEXT_PUBLIC_SITE_URL = originalSiteUrl;
+    }
+  }
 });

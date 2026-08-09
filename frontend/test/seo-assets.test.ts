@@ -107,7 +107,7 @@ test('robots and app routes expose the image sitemap', () => {
   assert.ok(robotsConfig.sitemap.includes(`${siteConfig.url}/sitemap-images.xml`));
   assert.ok(robotsConfig.sitemap.includes(`${siteConfig.url}/sitemap-news.xml`));
   assert.ok(defaultRule);
-  assert.equal(defaultRule.crawlDelay, 5);
+  assert.equal(defaultRule.crawlDelay, undefined);
   assert.ok(Array.isArray(defaultRule.disallow));
   assert.ok(defaultRule.disallow.includes('/api/'));
   assert.ok(defaultRule.disallow.includes('/account/'));
@@ -116,7 +116,8 @@ test('robots and app routes expose the image sitemap', () => {
 });
 
 test('news sitemap publishes recent updates with Google News metadata', () => {
-  const entries = buildNewsSitemapEntries();
+  const latestUpdateDate = getLatestProductUpdateDate();
+  const entries = buildNewsSitemapEntries(new Date(`${latestUpdateDate}T23:59:59.000Z`));
   const xml = buildNewsSitemapXml(entries);
 
   assert.equal(NEWS_SITEMAP_PATH, '/sitemap-news.xml');
@@ -129,12 +130,26 @@ test('news sitemap publishes recent updates with Google News metadata', () => {
   assert.match(xml, /<news:language>en<\/news:language>/);
 });
 
+test('news sitemap omits Google News entries older than two days', () => {
+  const latestUpdateDate = getLatestProductUpdateDate();
+  const staleBoundary = new Date(`${latestUpdateDate}T00:00:00.000Z`);
+  staleBoundary.setUTCDate(staleBoundary.getUTCDate() + 2);
+  const staleAfterBoundary = new Date(staleBoundary.getTime() + 1);
+
+  assert.equal(buildNewsSitemapEntries(staleBoundary).length, 1);
+  assert.deepEqual(buildNewsSitemapEntries(staleAfterBoundary), []);
+  assert.match(buildNewsSitemapXml([]), /<urlset[^>]*>\n\n<\/urlset>/);
+});
+
 test('regular sitemap keeps Blog aliases out and shares update freshness data', () => {
   const sitemapSource = readFileSync(path.join(FRONTEND_DIR, 'src', 'app', 'sitemap.ts'), 'utf8');
 
   assert.match(sitemapSource, /getLatestProductUpdateDate/);
   assert.doesNotMatch(sitemapSource, /new Date\('2026-04-11'\)/);
+  assert.doesNotMatch(sitemapSource, /const now = new Date\(\)/);
+  assert.doesNotMatch(sitemapSource, /url: siteConfig\.url,/);
   assert.doesNotMatch(sitemapSource, /url: `\$\{siteConfig\.url\}\/blog/);
+  assert.match(sitemapSource, /`\$\{siteConfig\.url\}\/editorial-policy`/);
   assert.match(sitemapSource, /'\/en\/blog'/);
   assert.match(sitemapSource, /`\/en\/blog\/\$\{post\.slug\}`/);
 });

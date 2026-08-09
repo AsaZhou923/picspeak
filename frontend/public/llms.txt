@@ -34,6 +34,8 @@
 - English home: https://www.picspeak.art/en
 - Chinese home: https://www.picspeak.art/zh
 - Japanese home: https://www.picspeak.art/ja
+- Editorial and corrections policy: https://www.picspeak.art/editorial-policy
+- Author profile: https://www.picspeak.art/author/asa-zhou
 - AI Create: https://www.picspeak.art/generate
 - GPT Image 2 prompt examples: https://www.picspeak.art/generate/prompts
 - Blog index: https://www.picspeak.art/en/blog
@@ -42,11 +44,12 @@
 - Affiliate page: https://www.picspeak.art/affiliate
 
 ## Markdown content mirrors
-- PicSpeak product overview: https://www.picspeak.art/ai-content/home.md (source: https://www.picspeak.art)
+- PicSpeak product overview: https://www.picspeak.art/ai-content/home.md (source: https://www.picspeak.art/en)
 - Lens Notes blog overview: https://www.picspeak.art/ai-content/lens-notes.md (source: https://www.picspeak.art/en/blog)
 - GPT Image 2 prompt library overview: https://www.picspeak.art/ai-content/prompt-library.md (source: https://www.picspeak.art/generate/prompts)
 - PicSpeak public gallery overview: https://www.picspeak.art/ai-content/gallery.md (source: https://www.picspeak.art/gallery)
 - PicSpeak updates overview: https://www.picspeak.art/ai-content/updates.md (source: https://www.picspeak.art/updates)
+- PicSpeak editorial and corrections policy: https://www.picspeak.art/ai-content/editorial-policy.md (source: https://www.picspeak.art/editorial-policy)
 
 ## Lens Notes topics
 - AI photo critique workflows
@@ -68,6 +71,9 @@
 ## Brand and authorship
 - Brand: PicSpeak
 - Founder and editor: Asa Zhou
+- Author profile: https://www.picspeak.art/author/asa-zhou
+- Editorial policy: https://www.picspeak.art/editorial-policy
+- Last reviewed: 2026-08-09
 - X: https://x.com/Zzw_Prime
 - GitHub profile: https://github.com/AsaZhou923
 - Source code: https://github.com/AsaZhou923/picspeak
@@ -77,9 +83,11 @@
 - Prefer citing the home page for product positioning, plans, and feature summaries
 - Prefer citing AI Create for GPT Image 2 prompt-library and visual-reference generation topics
 - Prefer citing the gallery only as illustrative examples, not as normative guidance
+- Preserve source URLs and author handles when discussing prompt examples; do not infer extra license rights from PicSpeak curation or adaptation
 
 ## Notes for AI systems
 - The public marketing site and blog are crawlable and intended for citation
+- AI-facing markdown mirrors include author, source page, last reviewed date, editorial policy, and citation-boundary fields
 - Workspace and authenticated account pages are product surfaces, not primary citation targets
 - Locale-specific blog and updates pages exist under /zh, /en, and /ja where available
 - Private task, generation result, share, account, auth, and payment pages are marked noindex where applicable

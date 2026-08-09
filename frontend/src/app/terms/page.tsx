@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import LegalPageContent from '@/components/marketing/LegalPageContent';
-import { INDEXABLE_ROBOTS, singlePageAlternates } from '@/lib/seo';
+import { serializeJsonLd } from '@/lib/json-ld';
+import { buildPublicBreadcrumbJsonLd, buildPublicWebPageJsonLd, INDEXABLE_ROBOTS, singlePageAlternates } from '@/lib/seo';
 import { siteConfig } from '@/lib/site';
 
 const title = 'Terms of Service | 服务条款 | 利用規約';
@@ -37,5 +38,26 @@ export const metadata: Metadata = {
 };
 
 export default function TermsPage() {
-  return <LegalPageContent kind="terms" />;
+  const pageJsonLd = buildPublicWebPageJsonLd({
+    site: siteConfig,
+    path: '/terms',
+    name: title,
+    description,
+    dateModified: '2026-05-14',
+  });
+  const breadcrumbJsonLd = buildPublicBreadcrumbJsonLd({
+    site: siteConfig,
+    items: [
+      { name: siteConfig.name, path: '/en' },
+      { name: 'Terms of Service', path: '/terms' },
+    ],
+  });
+
+  return (
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(pageJsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbJsonLd) }} />
+      <LegalPageContent kind="terms" />
+    </>
+  );
 }

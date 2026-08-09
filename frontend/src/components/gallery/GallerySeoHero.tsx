@@ -5,6 +5,7 @@ import { buildWorkspaceConversionHref } from '@/lib/content-conversion';
 import { getGallerySeoHeroCopy } from '@/lib/gallery-seo-copy';
 import { useI18n } from '@/lib/i18n';
 import { markProductAttributionSource, trackProductEvent } from '@/lib/product-analytics';
+import { DEMO_REVIEW_ID } from '@/lib/demo-review';
 
 export default function GallerySeoHero() {
   const { locale } = useI18n();
@@ -39,12 +40,18 @@ export default function GallerySeoHero() {
             >
               {copy.secondaryCta}
             </Link>
+            <Link
+              href={`/reviews/${DEMO_REVIEW_ID}`}
+              className="ui-action-secondary px-5 py-2.5 text-sm"
+            >
+              {copy.exampleCta}
+            </Link>
           </div>
         </div>
         <div className="grid gap-3">
           {copy.highlights.map((item) => (
             <article key={item.title} className="rounded-card border border-border-subtle bg-void/35 p-4">
-              <h3 className="font-display text-xl text-ink">{item.title}</h3>
+              <h2 className="font-display text-xl text-ink">{item.title}</h2>
               <p className="mt-2 text-sm leading-6 text-ink-muted">{item.body}</p>
             </article>
           ))}

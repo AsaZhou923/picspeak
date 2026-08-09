@@ -2,14 +2,16 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowRight, BookOpenText, Camera, Github, Mail, Sparkles, Twitter } from 'lucide-react';
 import { serializeJsonLd } from '@/lib/json-ld';
-import { INDEXABLE_ROBOTS } from '@/lib/seo';
+import { buildPublicBreadcrumbJsonLd, INDEXABLE_ROBOTS } from '@/lib/seo';
 import { siteConfig } from '@/lib/site';
 
 const AUTHOR_PATH = '/author/asa-zhou';
 const AUTHOR_URL = `${siteConfig.url}${AUTHOR_PATH}`;
+const POLICY_PATH = '/editorial-policy';
+const POLICY_URL = `${siteConfig.url}${POLICY_PATH}`;
 
 export const metadata: Metadata = {
-  title: 'Asa Zhou | PicSpeak Founder and Lens Notes Editor',
+  title: 'Asa Zhou — Founder and Lens Notes Editor',
   description:
     'Asa Zhou builds PicSpeak and writes Lens Notes about AI photo critique, composition, lighting, color, and repeatable review workflows.',
   robots: INDEXABLE_ROBOTS,
@@ -70,18 +72,14 @@ export default function AsaZhouAuthorPage() {
     email: siteConfig.author.email,
     url: AUTHOR_URL,
     sameAs: [siteConfig.social.x, siteConfig.social.githubProfile],
+    publishingPrinciples: POLICY_URL,
     worksFor: {
       '@type': 'Organization',
+      '@id': siteConfig.organizationId,
       name: siteConfig.name,
       url: siteConfig.url,
     },
-    knowsAbout: [
-      'AI photo critique',
-      'photography composition',
-      'lighting analysis',
-      'color feedback',
-      'GPT Image 2 prompt examples',
-    ],
+    knowsAbout: siteConfig.author.knowsAbout,
   };
 
   const profileJsonLd = {
@@ -93,11 +91,16 @@ export default function AsaZhouAuthorPage() {
       '@id': siteConfig.author.id,
     },
     isPartOf: {
-      '@type': 'WebSite',
-      name: siteConfig.name,
-      url: siteConfig.url,
+      '@id': siteConfig.websiteId,
     },
   };
+  const breadcrumbJsonLd = buildPublicBreadcrumbJsonLd({
+    site: siteConfig,
+    items: [
+      { name: siteConfig.name, path: '/en' },
+      { name: 'Asa Zhou', path: AUTHOR_PATH },
+    ],
+  });
 
   return (
     <>
@@ -108,6 +111,10 @@ export default function AsaZhouAuthorPage() {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(profileJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbJsonLd) }}
       />
 
       <div className="min-h-screen pt-10">
@@ -131,7 +138,47 @@ export default function AsaZhouAuthorPage() {
               >
                 Browse prompt examples
               </Link>
+              <Link
+                href={POLICY_PATH}
+                className="inline-flex items-center gap-2 rounded-full border border-border-subtle px-5 py-2.5 text-sm font-medium text-ink transition-colors hover:border-gold/40 hover:text-gold"
+              >
+                Editorial policy
+              </Link>
             </div>
+
+            <section className="mt-10 space-y-5 text-sm leading-8 text-ink-muted">
+              <p>
+                Asa Zhou is the founder of PicSpeak and the editor responsible for the public Lens Notes
+                and prompt-library surfaces connected to the product. His work focuses on making AI photo
+                critique useful for practical photographers rather than treating a score as the final answer.
+                In PicSpeak, that means shaping review flows around composition, lighting, color, impact,
+                and technique, then turning those observations into next-shoot decisions a user can test.
+              </p>
+              <p>
+                The author page, Lens Notes articles, and AI-facing markdown summaries describe how the
+                product is meant to be used: upload a photo, read the critique with attention to tradeoffs,
+                compare it with your own intent, and decide what to change before the next capture or edit.
+                Asa also reviews the public wording around plan limits, AI Create credits, prompt examples,
+                and gallery examples so that educational claims stay aligned with the live product rather
+                than drifting into unsupported marketing claims.
+              </p>
+              <p>
+                For AI Create and the prompt library, Asa curates examples as references for adaptation.
+                Source URLs and author handles are kept visible when available, and PicSpeak describes the
+                boundary between the original prompt/source material, the localized or adapted PicSpeak
+                presentation, and the generated example image. The goal is to help users understand prompt
+                structure and visual direction without implying that PicSpeak owns third-party source posts
+                or grants rights beyond the material it publishes itself.
+              </p>
+              <p>
+                Editorial responsibility includes keeping correction paths clear. When product behavior,
+                pricing, public URLs, or source attribution changes, Asa reviews the affected page and updates
+                the public copy where needed. Correction requests and provenance questions can be sent to the
+                listed contact address. The shared policy explains review cadence, AI-assistance disclosure,
+                source handling, sponsorship boundaries, and how PicSpeak treats material corrections across
+                public pages, public examples, and AI discovery files.
+              </p>
+            </section>
 
             <div className="mt-10 grid gap-4 md:grid-cols-3">
               {focusAreas.map((area) => {

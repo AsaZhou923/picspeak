@@ -12,11 +12,13 @@ export type AiMarkdownContentPage = {
   }>;
 };
 
+const LAST_REVIEWED_DATE = '2026-08-09';
+
 export const AI_MARKDOWN_CONTENT_PAGES: readonly AiMarkdownContentPage[] = [
   {
     slug: 'home',
     markdownPath: '/ai-content/home.md',
-    sourcePath: '/',
+    sourcePath: '/en',
     title: 'PicSpeak product overview',
     description:
       'A concise markdown overview of PicSpeak, its AI photo critique workflow, plan boundaries, and public citation guidance.',
@@ -124,6 +126,32 @@ export const AI_MARKDOWN_CONTENT_PAGES: readonly AiMarkdownContentPage[] = [
       },
     ],
   },
+  {
+    slug: 'editorial-policy',
+    markdownPath: '/ai-content/editorial-policy.md',
+    sourcePath: '/editorial-policy',
+    title: 'PicSpeak editorial and corrections policy',
+    description:
+      'Markdown summary of PicSpeak editorial review, corrections, AI-assistance disclosure, source provenance, sponsorship boundaries, and contact path.',
+    sections: [
+      {
+        heading: 'Trust and review standards',
+        bullets: [
+          'Editorial and product trust pages are reviewed by Asa Zhou before publication.',
+          'Corrections should update the affected public page and keep changed claims near the original context.',
+          'Public AI-discovery summaries disclose source boundaries and avoid claiming rights over third-party source posts.',
+        ],
+      },
+      {
+        heading: 'Contact and provenance',
+        bullets: [
+          `Send correction or provenance questions to ${siteConfig.author.email}.`,
+          'Prompt-library examples should cite the original source URL and author handle when known.',
+          'Sponsorship or material conflicts should be disclosed near the affected recommendation.',
+        ],
+      },
+    ],
+  },
 ] as const;
 
 export function getAiMarkdownContentPage(rawSlug: string): AiMarkdownContentPage | null {
@@ -145,7 +173,11 @@ ${section.bullets.map((bullet) => `- ${bullet}`).join('\n')}`,
 
 > ${page.description}
 
+Author: ${siteConfig.author.name}
 Source page: ${sourceUrl}
+Last reviewed: ${LAST_REVIEWED_DATE}
+Editorial policy: ${siteConfig.url}/editorial-policy
+Citation boundary: Cite this markdown only as a summary of the linked PicSpeak source page; for third-party prompt examples, retain the original source URL and do not infer additional license rights.
 
 ${sectionText}
 `;
