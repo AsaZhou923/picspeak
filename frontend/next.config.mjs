@@ -90,6 +90,19 @@ const publicPageCacheHeaders = [
   },
 ];
 
+const aiDiscoveryIndexHeaders = [
+  { key: 'X-Robots-Tag', value: 'noindex, follow' },
+];
+
+const aiContentCanonicalHeaders = [
+  ['/ai-content/home.md', 'https://www.picspeak.art'],
+  ['/ai-content/lens-notes.md', 'https://www.picspeak.art/en/blog'],
+  ['/ai-content/prompt-library.md', 'https://www.picspeak.art/generate/prompts'],
+  ['/ai-content/gallery.md', 'https://www.picspeak.art/gallery'],
+  ['/ai-content/updates.md', 'https://www.picspeak.art/updates'],
+  ['/ai-content/editorial-policy.md', 'https://www.picspeak.art/editorial-policy'],
+];
+
 const cacheablePublicPageSources = [
   '/',
   '/:locale(zh|en|ja)',
@@ -98,8 +111,11 @@ const cacheablePublicPageSources = [
   '/:locale(zh|en|ja)/blog/:slug*',
   '/updates',
   '/:locale(zh|en|ja)/updates',
+  '/generate',
   '/generate/prompts',
   '/generate/prompts/:id*',
+  '/retake',
+  '/reviews/rev_8424d4fbde054759',
   '/privacy',
   '/terms',
   '/affiliate',
@@ -108,6 +124,11 @@ const cacheablePublicPageSources = [
 ];
 
 const canonicalRedirects = [
+  {
+    source: '/reviews/rev_35e0951d0df94a1e',
+    destination: '/reviews/rev_8424d4fbde054759',
+    permanent: true,
+  },
   {
     source: '/:path*',
     has: [{ type: 'host', value: 'picspeak.art' }],
@@ -144,6 +165,14 @@ const nextConfig = {
       ...cacheablePublicPageSources.map((source) => ({
         source,
         headers: publicPageCacheHeaders,
+      })),
+      ...['/llms.txt', '/.well-known/llms.txt', '/ai-content/:slug*'].map((source) => ({
+        source,
+        headers: aiDiscoveryIndexHeaders,
+      })),
+      ...aiContentCanonicalHeaders.map(([source, canonical]) => ({
+        source,
+        headers: [{ key: 'Link', value: `<${canonical}>; rel="canonical"` }],
       })),
     ];
   },

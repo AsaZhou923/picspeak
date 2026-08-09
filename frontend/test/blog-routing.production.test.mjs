@@ -6,6 +6,7 @@ import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getLatestProductUpdateDate } from '../src/lib/updates-data.ts';
+import { DEMO_REVIEW_ID } from '../src/lib/demo-review.ts';
 
 const TEST_DIR = path.dirname(fileURLToPath(import.meta.url));
 const FRONTEND_DIR = path.join(TEST_DIR, '..');
@@ -93,6 +94,16 @@ function metadataUrl(html, attribute, value) {
 function jsonLdObjects(html) {
   return [...html.matchAll(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi)]
     .map((match) => JSON.parse(match[1]));
+}
+
+function documentTitle(html) {
+  const match = html.match(/<title>([^<]+)<\/title>/i);
+  assert.ok(match, 'document title should exist');
+  return match[1].replaceAll('&amp;', '&').replaceAll('&#x27;', "'").trim();
+}
+
+function headingCount(html, level) {
+  return [...html.matchAll(new RegExp(`<h${level}(?:\\s|>)`, 'gi'))].length;
 }
 
 before(async () => {
@@ -333,4 +344,76 @@ test('invalid locale-shaped paths are real 404s and discovery assets stay canoni
   const sitemapXml = await sitemapResponse.text();
   assert.doesNotMatch(sitemapXml, /<loc>https:\/\/www\.picspeak\.art<\/loc>/);
   assert.match(sitemapXml, /<loc>https:\/\/www\.picspeak\.art\/editorial-policy<\/loc>/);
+});
+
+test('search-result titles stay unique, concise, and free of duplicated brand suffixes', async () => {
+  const paths = [
+    '/en',
+    '/affiliate',
+    '/gallery',
+    '/editorial-policy',
+    '/author/asa-zhou',
+    '/en/blog/ai-photo-critique-daily-practice',
+    '/generate/prompts/photo-old-delhi-storefront',
+    `/reviews/${DEMO_REVIEW_ID}`,
+  ];
+  const titles = [];
+
+  for (const pathName of paths) {
+    const response = await fetch(`${baseUrl}${pathName}`);
+    assert.equal(response.status, 200, pathName);
+    const title = documentTitle(await response.text());
+    assert.ok(title.length <= 65, `${pathName} title is too long: ${title.length}`);
+    assert.doesNotMatch(title, /PicSpeak\s*[|—·]\s*PicSpeak/i, pathName);
+    titles.push(title);
+  }
+
+  assert.equal(new Set(titles).size, titles.length);
+});
+
+test('indexable interactive pages expose one primary heading, canonical metadata, and public cache', async () => {
+  const generateResponse = await fetch(`${baseUrl}/generate`);
+  assert.equal(generateResponse.status, 200);
+  assert.match(generateResponse.headers.get('cache-control') ?? '', /\bpublic\b/);
+  assert.equal(headingCount(await generateResponse.text(), 1), 1);
+
+  const retakeResponse = await fetch(`${baseUrl}/retake`);
+  assert.equal(retakeResponse.status, 200);
+  assert.match(retakeResponse.headers.get('cache-control') ?? '', /\bs-maxage=3600\b/);
+  const retakeHtml = await retakeResponse.text();
+  assert.equal(headingCount(retakeHtml, 1), 1);
+  assert.match(metadataUrl(retakeHtml, 'name', 'robots'), /index, follow/i);
+  assert.equal(new URL(metadataUrl(retakeHtml, 'rel', 'canonical'), baseUrl).pathname, '/retake');
+  const retakeTypes = jsonLdObjects(retakeHtml).map((schema) => schema['@type']);
+  for (const expectedType of ['WebPage', 'SoftwareApplication', 'BreadcrumbList']) {
+    assert.ok(retakeTypes.includes(expectedType), `/retake should contain ${expectedType}`);
+  }
+
+  const demoResponse = await fetch(`${baseUrl}/reviews/${DEMO_REVIEW_ID}`);
+  assert.equal(demoResponse.status, 200);
+  assert.match(demoResponse.headers.get('cache-control') ?? '', /\bs-maxage=3600\b/);
+  const demoHtml = await demoResponse.text();
+  assert.equal(headingCount(demoHtml, 1), 1);
+  assert.match(demoHtml, /Scores, Evidence, and Retake Guidance/);
+});
+
+test('legacy public demo URLs redirect permanently to the single canonical example', async () => {
+  const response = await fetch(`${baseUrl}/reviews/rev_35e0951d0df94a1e`, { redirect: 'manual' });
+
+  assert.equal(response.status, 308);
+  assert.equal(new URL(response.headers.get('location'), baseUrl).pathname, `/reviews/${DEMO_REVIEW_ID}`);
+});
+
+test('AI discovery text remains crawlable while canonical HTML owns search indexing', async () => {
+  const markdownResponse = await fetch(`${baseUrl}/ai-content/home.md`);
+  assert.equal(markdownResponse.status, 200);
+  assert.match(markdownResponse.headers.get('content-type') ?? '', /^text\/markdown/i);
+  assert.match(markdownResponse.headers.get('x-robots-tag') ?? '', /noindex, follow/i);
+  assert.match(markdownResponse.headers.get('link') ?? '', /<https:\/\/www\.picspeak\.art>; rel="canonical"/);
+
+  for (const pathName of ['/llms.txt', '/.well-known/llms.txt']) {
+    const response = await fetch(`${baseUrl}${pathName}`);
+    assert.equal(response.status, 200, pathName);
+    assert.match(response.headers.get('x-robots-tag') ?? '', /noindex, follow/i, pathName);
+  }
 });

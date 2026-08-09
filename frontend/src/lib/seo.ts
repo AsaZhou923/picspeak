@@ -410,7 +410,7 @@ type SinglePageSocialMetadataSite = {
 };
 
 export const AFFILIATE_METADATA = {
-  title: 'PicSpeak Affiliate Program | 推广联盟计划 | アフィリエイト — PicSpeak',
+  title: 'Affiliate Program · 推广计划 · アフィリエイト',
   description:
     'Promote PicSpeak AI photo critique and earn recurring commissions. 推广 PicSpeak AI 摄影点评工具，赚取持续佣金。PicSpeakアフィリエイト — AI写真批評ツールを紹介して継続報酬を獲得。',
   keywords: [
@@ -459,7 +459,7 @@ export function buildAffiliateMetadata(site: SinglePageSocialMetadataSite): Meta
 }
 
 export const DEFAULT_UPDATES_METADATA = {
-  title: 'PicSpeak Updates | 产品更新 | 更新履歴',
+  title: 'Product Updates | 产品更新 | 更新履歴',
   description:
     'PicSpeak product updates covering AI scoring, gallery improvements, blog launches, and workflow changes across the public product experience.',
   keywords: [

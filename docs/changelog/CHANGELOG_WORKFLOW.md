@@ -8,9 +8,10 @@ PicSpeak 现在只维护一份仓库内 changelog：
 
 - `docs/changelog/CHANGELOG.md`
 
-外部文档库的 Update Logs 目录只作为仓库内 changelog 目录的镜像副本：
+外部文档库的 Update Logs 目录只作为仓库内 changelog 目录的镜像副本。Windows 与 WSL 表示分别为：
 
-- `/Users/ze/Documents/docs/01 - Projects/PicSpeak/09 - Changelog/Update Logs`
+- `E:\Project Code\docs\01 - Projects\PicSpeak\09 - Changelog\Update Logs`
+- `/mnt/e/Project Code/docs/01 - Projects/PicSpeak/09 - Changelog/Update Logs`
 
 不要再新建 `docs/changelog/update-log-YYYY-MM-DD-topic.md` 或外部 `Update Logs\update-log-YYYY-MM-DD-topic.md`。历史拆分文件已经合并进统一 changelog，`/updates` 的 `docPath` 通过锚点定位到对应条目。
 
@@ -43,8 +44,8 @@ PicSpeak 现在只维护一份仓库内 changelog：
 
 ### 外部 Update Logs 归档
 
-- `/Users/ze/Documents/docs/01 - Projects/PicSpeak/09 - Changelog/Update Logs/CHANGELOG.md`
-- `/Users/ze/Documents/docs/01 - Projects/PicSpeak/09 - Changelog/Update Logs/CHANGELOG_WORKFLOW.md`
+- `E:\Project Code\docs\01 - Projects\PicSpeak\09 - Changelog\Update Logs\CHANGELOG.md`
+- `E:\Project Code\docs\01 - Projects\PicSpeak\09 - Changelog\Update Logs\CHANGELOG_WORKFLOW.md`
 
 该目录必须和仓库内 `docs/changelog` 保持同款结构：只保留统一 `CHANGELOG.md` 和 `CHANGELOG_WORKFLOW.md`，不要保留旧的 `update-log-*.md` 拆分文件。
 
@@ -215,10 +216,10 @@ YYYY-MM-DD-short-topic
 仓库内 `docs/changelog` 是事实来源，外部目录是镜像副本。每次更新 `CHANGELOG.md` 后，立刻执行：
 
 ```bash
-archive='/Users/ze/Documents/docs/01 - Projects/PicSpeak/09 - Changelog/Update Logs'
+archive='/mnt/e/Project Code/docs/01 - Projects/PicSpeak/09 - Changelog/Update Logs'
 find "$archive" -maxdepth 1 -type f -name 'update-log-*.md' -delete
 cp docs/changelog/CHANGELOG.md docs/changelog/CHANGELOG_WORKFLOW.md "$archive"/
-shasum -a 256 docs/changelog/CHANGELOG.md "$archive/CHANGELOG.md" docs/changelog/CHANGELOG_WORKFLOW.md "$archive/CHANGELOG_WORKFLOW.md"
+sha256sum docs/changelog/CHANGELOG.md "$archive/CHANGELOG.md" docs/changelog/CHANGELOG_WORKFLOW.md "$archive/CHANGELOG_WORKFLOW.md"
 ```
 
 要求：
@@ -274,7 +275,7 @@ shasum -a 256 docs/changelog/CHANGELOG.md "$archive/CHANGELOG.md" docs/changelog
 
 ```bash
 rg -n "docs/changelog/update-log|update-log-YYYY|CHANGELOG.md#" .
-find '/Users/ze/Documents/docs/01 - Projects/PicSpeak/09 - Changelog/Update Logs' -maxdepth 1 -type f -print
+find '/mnt/e/Project Code/docs/01 - Projects/PicSpeak/09 - Changelog/Update Logs' -maxdepth 1 -type f -print
 ```
 
 ### 9. 运行验证
@@ -290,8 +291,8 @@ node -e "for (const f of ['zh','en','ja']) JSON.parse(require('fs').readFileSync
 changelog 或 workflow 改动至少验证外部归档副本一致：
 
 ```bash
-archive='/Users/ze/Documents/docs/01 - Projects/PicSpeak/09 - Changelog/Update Logs'
-shasum -a 256 docs/changelog/CHANGELOG.md "$archive/CHANGELOG.md" docs/changelog/CHANGELOG_WORKFLOW.md "$archive/CHANGELOG_WORKFLOW.md"
+archive='/mnt/e/Project Code/docs/01 - Projects/PicSpeak/09 - Changelog/Update Logs'
+sha256sum docs/changelog/CHANGELOG.md "$archive/CHANGELOG.md" docs/changelog/CHANGELOG_WORKFLOW.md "$archive/CHANGELOG_WORKFLOW.md"
 ```
 
 前端 TypeScript 或导入结构受影响时执行：
@@ -328,7 +329,7 @@ python -m unittest discover -s tests -p "test_*.py"
 git diff -- docs/changelog frontend/src/content/updates README.md README*.md CLAUDE.md
 git status --short
 rg -n "docs/changelog/update-log|update-log-[0-9]{4}" .
-find '/Users/ze/Documents/docs/01 - Projects/PicSpeak/09 - Changelog/Update Logs' -maxdepth 1 -type f -print
+find '/mnt/e/Project Code/docs/01 - Projects/PicSpeak/09 - Changelog/Update Logs' -maxdepth 1 -type f -print
 ```
 
 确认：
@@ -396,7 +397,7 @@ git push origin <branch>
 写文档：
 
 - 更新 `docs/changelog/CHANGELOG.md`
-- 同步 `/Users/ze/Documents/docs/01 - Projects/PicSpeak/09 - Changelog/Update Logs`
+- 同步 `E:\Project Code\docs\01 - Projects\PicSpeak\09 - Changelog\Update Logs`
 - 更新 `frontend/src/content/updates/zh.json`
 - 更新 `frontend/src/content/updates/en.json`
 - 更新 `frontend/src/content/updates/ja.json`

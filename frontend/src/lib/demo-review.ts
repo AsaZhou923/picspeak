@@ -22,6 +22,8 @@ type DemoReviewStructuredDataSite = {
   name: string;
   url: string;
   logoImage: string;
+  organizationId?: string;
+  websiteId?: string;
 };
 
 type DemoReviewStructuredDataInput = {
@@ -69,6 +71,9 @@ export function buildDemoReviewJsonLd({
         url: DEMO_IMAGE_URL,
         caption: imageAlt,
       },
+      isPartOf: {
+        '@id': site.websiteId ?? `${site.url}/#website`,
+      },
     },
     reviewRating: {
       '@type': 'Rating',
@@ -77,18 +82,10 @@ export function buildDemoReviewJsonLd({
       worstRating: 0,
     },
     author: {
-      '@type': 'Organization',
-      name: site.name,
-      url: site.url,
+      '@id': site.organizationId ?? `${site.url}/#organization`,
     },
     publisher: {
-      '@type': 'Organization',
-      name: site.name,
-      url: site.url,
-      logo: {
-        '@type': 'ImageObject',
-        url: `${site.url}${site.logoImage}`,
-      },
+      '@id': site.organizationId ?? `${site.url}/#organization`,
     },
   };
 }

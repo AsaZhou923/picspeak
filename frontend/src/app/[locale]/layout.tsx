@@ -25,7 +25,7 @@ const LOCALE_META: Record<
   zh: {
     lang: 'zh-CN',
     ogLocale: 'zh_CN',
-    title: 'AI 摄影点评 · 照片评分 · 构图光线分析 — PicSpeak',
+    title: 'AI 摄影点评与照片分析',
     description:
       '上传照片，AI 即刻从构图、光线、色彩、表达与技术五维度打分并给出改进建议。免费试用，无需注册，秒级出结果。适合摄影爱好者、学生和创作者快速提升拍摄水平。',
     keywords: [
@@ -59,9 +59,9 @@ const LOCALE_META: Record<
     lang: 'en',
     ogLocale: 'en_US',
     // Lead with the highest-volume head term before the brand name
-    title: 'AI Photo Critique & Feedback · Free Online Photography Review — PicSpeak',
+    title: 'AI Photo Critique and Photography Feedback',
     description:
-      'Free AI photo critique across composition, lighting, color, impact and technique. Get professional-grade photography feedback in seconds — no sign-up required, start improving today.',
+      'Free AI photo critique across composition, lighting, color, impact, and technique. Get practical photography feedback in seconds with no sign-up required.',
     keywords: [
       'AI photo critique',
       'AI photography feedback',
@@ -92,7 +92,7 @@ const LOCALE_META: Record<
     lang: 'ja',
     ogLocale: 'ja_JP',
     // Lead with core Japanese search terms
-    title: 'AI写真批評・採点 · 無料写真フィードバック — PicSpeak',
+    title: 'AI写真講評・採点と写真フィードバック',
     description:
       '写真をアップするだけで、AIが構図・光・色彩・インパクト・技術の5項目を即座に採点・批評。登録不要・無料で今すぐ試せる、写真上達のためのAIフィードバックツール。',
     keywords: [

@@ -30,10 +30,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 
   const ui = getBlogUi(locale as Locale);
+  const seoTitle = post.seoTitle ?? post.title;
+  const seoDescription = post.seoDescription ?? post.description;
 
   return {
-    title: `${post.title} | ${ui.name}`,
-    description: post.description,
+    title: `${seoTitle} | ${ui.name}`,
+    description: seoDescription,
     keywords: [...post.keywords],
     robots: INDEXABLE_ROBOTS,
     alternates: {
@@ -49,7 +51,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       type: 'article',
       url: `${siteConfig.url}/${locale}/blog/${post.slug}`,
       title: post.title,
-      description: post.description,
+      description: seoDescription,
       siteName: siteConfig.name,
       publishedTime: post.publishedAt,
       modifiedTime: post.updatedAt,
@@ -59,7 +61,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     twitter: {
       card: 'summary_large_image',
       title: post.title,
-      description: post.description,
+      description: seoDescription,
       images: [`/${locale}/blog/${post.slug}/opengraph-image`],
     },
   };

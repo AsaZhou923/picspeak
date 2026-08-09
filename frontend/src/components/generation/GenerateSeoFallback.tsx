@@ -8,7 +8,7 @@ export function GenerateSeoFallback() {
   return (
     <section className="sr-only" data-seo-generate-fallback>
       <p>PicSpeak AI Create</p>
-      <h1>AI Image Generator and GPT Image 2 Prompt Library</h1>
+      <h2>AI Image Generator and GPT Image 2 Prompt Library</h2>
       <p>
         Create visual references for photography practice, social visuals, portraits, product scenes, interiors,
         moodboards, and prompt-library examples.

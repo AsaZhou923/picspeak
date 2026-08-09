@@ -6,7 +6,7 @@ import { siteConfig } from '@/lib/site';
 
 const POLICY_PATH = '/editorial-policy';
 const POLICY_URL = `${siteConfig.url}${POLICY_PATH}`;
-const title = 'Editorial and Corrections Policy | PicSpeak';
+const title = 'Editorial and Corrections Policy';
 const description =
   'How PicSpeak reviews educational and product content, handles corrections, discloses AI assistance, documents sources, and manages sponsorship or conflicts.';
 

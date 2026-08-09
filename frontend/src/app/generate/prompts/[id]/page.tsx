@@ -37,7 +37,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const description = normalizePromptExampleExcerpt(prompt, 150);
 
   return {
-    title: `${title} | GPT Image 2 Prompt Example`,
+    title,
     description,
     keywords: [
       title,

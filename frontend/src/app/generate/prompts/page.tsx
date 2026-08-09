@@ -10,7 +10,7 @@ import { siteConfig } from '@/lib/site';
 import PromptLibraryContent from './PromptLibraryContent';
 
 export const metadata: Metadata = {
-  title: 'GPT Image 2 Prompt Examples and AI Visual Reference Library',
+  title: 'GPT Image 2 Prompt Examples and Visual References',
   description:
     'Browse PicSpeak AI Create prompt examples for GPT Image 2: photography references, posters, product scenes, UI concepts, moodboards, and experimental visual prompts.',
   keywords: [

@@ -10,9 +10,11 @@
 
 ### 概览
 
-这次更新根据完整 SEO/GEO 审计，修复了会影响搜索抓取、AI 引用、页面实体识别和内容可信度的跨层问题，并用真实 production server 锁定路由、Schema、缓存与 sitemap 行为。
+这次更新根据彼此独立的传统 SEO 与 GEO 审计，修复了会影响搜索抓取、SERP 呈现、AI 引用、页面实体识别和内容可信度的跨层问题，并用真实 production server 与 50 页爬取锁定 metadata、H1、路由、Schema、缓存和 sitemap 行为。
 
 - 未知一级路径、非法 Blog/Prompt slug 和静态页非法子路径现在会在流式渲染前返回真实 `404`，不再生成 `200` 软 404。
+- 页面 title 不再重复追加品牌，英文 Blog 使用简洁 SEO title/description，`/generate` 与公开 Demo 保持单一服务端 H1。
+- Retake Coach 现在是具有 canonical、sitemap、public cache 与页面 Schema 的可索引产品页；旧 Demo Review ID 永久跳转到唯一 canonical 示例；AI Markdown mirrors 则以 `noindex, follow` 和 canonical HTTP Link 避免传统搜索重复收录。
 - 首页 JSON-LD 改为服务端输出；FAQ 只属于首页，Blog/Updates 不再继承错误 Schema，并新增稳定的 Organization/WebSite/Person 实体关系。
 - 普通 sitemap 移除非 canonical 根 URL 与虚假当前时间，News sitemap 只保留两天内更新，IndexNow 覆盖三语 Blog、Prompt、Updates 与 trust/legal 叶子 URL。
 - 新增 Editorial & Corrections Policy，扩充作者方法论、Blog byline/来源/JSON-LD citation、Prompt 来源边界，以及 AI markdown/llms.txt trust metadata。
@@ -26,6 +28,14 @@
 - News sitemap 对最新更新执行精确两日窗口过滤，超龄时保留合法空 `urlset`；普通 Updates URL 不受影响。
 - IndexNow 默认提交集合由 hub 扩展到真实叶子页面，执行同源去重并限制为协议允许的 10,000 URL。
 
+### 传统 SEO 页面与搜索呈现
+
+- 根 layout 只统一追加一次 `PicSpeak` 品牌；首页、Affiliate、Gallery、Review、Prompt 与 Lens Notes metadata 删除重复品牌和过长搜索标题。
+- 7 篇英文 Lens Notes 可为搜索结果使用独立简洁 title；过长 description 与 Retake description 已收短，而可见文章标题和正文保持自然表达。
+- `/generate` 的隐藏 SEO heading 改为 H2，公开 Demo 由服务器输出说明性 H1；Review 客户端结果标题按公开/私有边界选择 H2 或 H1。
+- Header、Marketing Header、Footer 使用当前 locale 首页 canonical；Footer 全站增加本地化 Updates 链接，Gallery 增加指向完整公开点评示例的可爬取链接。
+- 91 个 sitemap URL 中抽取 50 页进行最终爬取：全部为 200、indexable、public cache、单一 H1，title/description/canonical/OG/Twitter/lang 完整，0 个重复 title/description，0 个缺失 alt。
+
 ### Schema、内容信任与 AI 引用
 
 - 新的服务端 `HomeStructuredData` 输出 Organization、SoftwareApplication、WebSite、Person、SoftwareSourceCode、FAQPage 和 BreadcrumbList；locale layout 不再向全部子页注入首页图谱。
@@ -33,6 +43,7 @@
 - 作者页增加 300+ 词的方法论与编辑职责，Person 关联 `knowsAbout`、`worksFor`、`publishingPrinciples` 和公开身份链接。
 - 每篇 Lens Notes 至少关联两个来源目标，页面显示作者、编辑政策和来源区，BlogPosting 同步输出 `citation`。
 - Prompt 详情明确原始作者/来源、PicSpeak 适配边界与展示图 provenance；AI markdown 和 llms.txt 增加作者、来源、review date、policy 和引用边界。
+- Blog index、Gallery、Demo Review 与 Prompt 统一关联稳定 Organization/WebSite/Collection ID；AI Create 删除页面未展示的付费 Offer，只保留可见且可证明的免费 Offer。
 
 ### 首页更新记录同步
 
@@ -48,8 +59,9 @@
 - `frontend/src/proxy.ts`
 - `frontend/next.config.mjs`
 - `frontend/src/app/{page,[locale],updates,privacy,terms,affiliate,editorial-policy,author,gallery,generate,reviews,sitemap,robots}/`
-- `frontend/src/components/{home,layout,marketing}/`
-- `frontend/src/lib/{app-route-roots,home-structured-data,seo,site,news-sitemap,blog-references,ai-markdown,llms}.ts`
+- `frontend/src/components/{gallery,generation,home,layout,marketing}/`
+- `frontend/src/lib/{app-route-roots,home-structured-data,seo,site,news-sitemap,blog-data,blog-references,ai-markdown,llms,demo-review,gallery-schema,gallery-seo-copy}.ts`
+- `frontend/src/content/blog/en.json`
 - `frontend/src/content/generation/prompt-examples.ts`
 - `frontend/src/content/updates/{zh,en,ja}.json`
 - `frontend/src/lib/i18n-{zh,en,ja}.ts`
@@ -71,9 +83,10 @@
 
 - `cd frontend && npm run typecheck` 通过。
 - `cd frontend && npm run lint` 通过。
-- `cd frontend && npm test` 通过，135 / 135 tests passed。
+- `cd frontend && npm test` 通过，142 / 142 tests passed。
 - `cd frontend && npm run build` 通过，116 个页面完成 production build 页面数据与静态生成。
-- `cd frontend && npm run test:production-blog` 通过，7 / 7 production HTTP scenarios passed。
+- `cd frontend && npm run test:production-blog` 通过，11 / 11 production HTTP scenarios passed。
+- 最终 production crawl 从 91 个 sitemap URL 抽取 50 页，传统 SEO 契约 50 / 50 通过，并成功解析 151 个 JSON-LD 节点。
 - `./.venv/Scripts/python.exe -m pytest backend/tests` 通过，208 / 208 tests passed。
 - `git diff --check` 通过。
 - 仓库 changelog 与外部 Update Logs 镜像执行 SHA-256 一致性校验。

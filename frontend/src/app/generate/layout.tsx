@@ -23,13 +23,7 @@ const aiCreateJsonLd = {
     '@id': siteConfig.author.id,
   },
   publisher: {
-    '@type': 'Organization',
-    name: siteConfig.name,
-    url: siteConfig.url,
-    logo: {
-      '@type': 'ImageObject',
-      url: `${siteConfig.url}${siteConfig.logoImage}`,
-    },
+    '@id': siteConfig.organizationId,
   },
   featureList: [
     'GPT Image 2 visual reference generation',
@@ -44,12 +38,6 @@ const aiCreateJsonLd = {
       '@type': 'Offer',
       name: 'Free AI image credits',
       price: '0',
-      priceCurrency: 'USD',
-    },
-    {
-      '@type': 'Offer',
-      name: 'Pro monthly image credits',
-      price: '3.99',
       priceCurrency: 'USD',
     },
   ],

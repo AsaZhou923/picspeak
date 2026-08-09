@@ -116,7 +116,7 @@ export default function Footer() {
         </div>
 
         <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
-          <Link href="/" className="hover:text-ink transition-colors">
+          <Link href={`/${locale}`} className="hover:text-ink transition-colors">
             {t('footer_home')}
           </Link>
           <Link href="/workspace" className="hover:text-ink transition-colors">
@@ -124,6 +124,9 @@ export default function Footer() {
           </Link>
           <Link href={`/${locale}/blog`} className="hover:text-ink transition-colors">
             {blogUi.footerLabel}
+          </Link>
+          <Link href={`/${locale}/updates`} className="hover:text-ink transition-colors">
+            {t('updates_label')}
           </Link>
           <Link href="/affiliate" className="hover:text-ink transition-colors">
             {t('footer_affiliate')}

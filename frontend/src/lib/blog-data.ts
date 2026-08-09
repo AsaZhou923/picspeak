@@ -12,7 +12,9 @@ export interface BlogPostSection {
 export interface BlogPost {
   slug: string;
   title: string;
+  seoTitle?: string;
   description: string;
+  seoDescription?: string;
   excerpt: string;
   category: string;
   readingTime: string;

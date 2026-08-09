@@ -4,20 +4,24 @@ type GallerySchemaSite = {
   name: string;
   url: string;
   ogImage: string;
+  organizationId?: string;
+  websiteId?: string;
 };
 
 export function buildGalleryCollectionJsonLd({ site }: { site: GallerySchemaSite }) {
   return {
     '@context': 'https://schema.org',
     '@type': 'CollectionPage',
+    '@id': `${site.url}/gallery#collection`,
     name: 'PicSpeak AI Photo Critique Gallery',
     url: `${site.url}/gallery`,
     description:
       'A public gallery of approved PicSpeak AI photo critique examples with scorecards, improvement summaries, and links into photography practice workflows.',
     isPartOf: {
-      '@type': 'WebSite',
-      name: site.name,
-      url: site.url,
+      '@id': site.websiteId ?? `${site.url}/#website`,
+    },
+    publisher: {
+      '@id': site.organizationId ?? `${site.url}/#organization`,
     },
     about: [
       { '@type': 'Thing', name: 'AI photo critique examples' },

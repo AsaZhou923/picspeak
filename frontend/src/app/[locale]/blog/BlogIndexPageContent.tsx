@@ -8,6 +8,7 @@ import {
 } from '@/lib/blog-data';
 import type { Locale } from '@/lib/i18n';
 import { serializeJsonLd } from '@/lib/json-ld';
+import { buildPublicBreadcrumbJsonLd } from '@/lib/seo';
 import { siteConfig } from '@/lib/site';
 import { VALID_LOCALES } from '../locales';
 import { BlogViewCount, BlogViewCountProvider } from './BlogViewCount';
@@ -27,6 +28,7 @@ export default function BlogIndexPageContent({ locale }: { locale?: string }) {
   const collectionJsonLd = {
     '@context': 'https://schema.org',
     '@type': 'CollectionPage',
+    '@id': `${siteConfig.url}/${pinnedLocale}/blog#collection`,
     name: ui.title,
     description: ui.description,
     url: `${siteConfig.url}/${pinnedLocale}/blog`,
@@ -34,9 +36,10 @@ export default function BlogIndexPageContent({ locale }: { locale?: string }) {
       '@id': siteConfig.author.id,
     },
     publisher: {
-      '@type': 'Organization',
-      name: siteConfig.name,
-      url: siteConfig.url,
+      '@id': siteConfig.organizationId,
+    },
+    isPartOf: {
+      '@id': siteConfig.websiteId,
     },
     hasPart: posts.map((post) => ({
       '@type': 'BlogPosting',
@@ -61,7 +64,20 @@ export default function BlogIndexPageContent({ locale }: { locale?: string }) {
     description: siteConfig.author.description,
     email: siteConfig.author.email,
     sameAs: [siteConfig.social.x, siteConfig.social.githubProfile],
+    url: `${siteConfig.url}/author/asa-zhou`,
+    knowsAbout: siteConfig.author.knowsAbout,
+    publishingPrinciples: `${siteConfig.url}${siteConfig.editorialPolicyPath}`,
+    worksFor: {
+      '@id': siteConfig.organizationId,
+    },
   };
+  const breadcrumbJsonLd = buildPublicBreadcrumbJsonLd({
+    site: siteConfig,
+    items: [
+      { name: siteConfig.name, path: `/${pinnedLocale}` },
+      { name: ui.name, path: `/${pinnedLocale}/blog` },
+    ],
+  });
 
   return (
     <>
@@ -72,6 +88,11 @@ export default function BlogIndexPageContent({ locale }: { locale?: string }) {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(collectionJsonLd) }}
+      />
+      <script
+        id="picspeak-blog-index-breadcrumb-structured-data"
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbJsonLd) }}
       />
 
       <BlogViewCountProvider locale={pinnedLocale} slugs={postSlugs}>

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { buildDemoReviewJsonLd, DEMO_REVIEW_ID, isDemoReviewId } from '@/lib/demo-review';
 import { enTranslations } from '@/lib/i18n-en';
 import { serializeJsonLd } from '@/lib/json-ld';
@@ -13,7 +14,7 @@ export async function generateMetadata(
 
   return {
     title: isDemoReview
-      ? 'AI Photo Critique Example | AI摄影点评示例 | AI写真批評例 — PicSpeak'
+      ? 'AI Photo Critique Example'
       : 'Private AI Photo Critique Result with Detailed Feedback',
     description: isDemoReview
       ? 'Public PicSpeak example: composition, lighting, color, impact & technique scores with suggestions. 公开评图示例：构图、光线、色彩、表达与技术评分与改进建议。AI写真批評の公開例 — 構図・光・色彩の採点と改善提案。'
@@ -86,6 +87,29 @@ export default async function ReviewDetailLayout({
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: serializeJsonLd(demoBreadcrumbJsonLd) }}
         />
+      )}
+      {demoReviewJsonLd && (
+        <section className="border-b border-border-subtle px-6 py-10">
+          <div className="mx-auto max-w-workspace">
+            <p className="ui-eyebrow">Public AI photo critique example</p>
+            <h1 className="mt-3 max-w-4xl font-display text-4xl leading-tight text-ink sm:text-5xl">
+              AI Photo Critique Example: Scores, Evidence, and Retake Guidance
+            </h1>
+            <p className="mt-4 max-w-3xl text-sm leading-7 text-ink-muted sm:text-base">
+              See how PicSpeak evaluates composition, lighting, color, impact, and technique, then turns the
+              weakest dimension into a concrete next-shoot action. This public example is a product walkthrough,
+              not a private user result.
+            </p>
+            <div className="mt-6 flex flex-wrap gap-3 text-sm">
+              <Link href="/gallery" className="ui-action-secondary px-5 py-2.5">
+                Browse critique examples
+              </Link>
+              <Link href="/retake" className="ui-action-secondary px-5 py-2.5">
+                Open Retake Coach
+              </Link>
+            </div>
+          </div>
+        </section>
       )}
       {children}
     </>

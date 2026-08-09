@@ -32,7 +32,7 @@ const BLOG_REFERENCES: Record<string, readonly BlogReference[]> = {
   'color-grading-photography-guide': [
     {
       name: 'Adobe: Understand Color Modes',
-      url: 'https://helpx.adobe.com/creative-cloud/apps/colors/understand-color-modes.html',
+      url: 'https://helpx.adobe.com/photoshop/using/color-modes.html',
     },
     NIKON_LIGHTING,
   ],

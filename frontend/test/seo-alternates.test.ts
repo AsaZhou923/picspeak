@@ -74,7 +74,7 @@ test('blog post JSON-LD breadcrumbs link the locale home, blog index, and articl
 test('default updates metadata has canonical URL, hreflang alternates, and social previews', () => {
   const metadata = buildDefaultUpdatesMetadata(SITE);
 
-  assert.equal(metadata.title, 'PicSpeak Updates | 产品更新 | 更新履歴');
+  assert.equal(metadata.title, 'Product Updates | 产品更新 | 更新履歴');
   assert.equal(metadata.alternates?.canonical, '/updates');
   assert.deepEqual(metadata.alternates?.languages, UPDATES_LANGUAGE_ALTERNATES);
   assert.equal(metadata.openGraph?.url, 'https://www.picspeak.art/updates');

@@ -7,6 +7,7 @@ import { getLatestProductUpdateDate } from '@/lib/updates-data';
 
 const LOCALES = ['zh', 'en', 'ja'] as const;
 type Locale = (typeof LOCALES)[number];
+const SEO_CONTENT_LAST_MODIFIED = new Date('2026-08-09');
 
 const LANGUAGE_CODES: Record<Locale, string> = {
   zh: 'zh-CN',
@@ -49,18 +50,21 @@ export default function sitemap(): MetadataRoute.Sitemap {
     // Locale-prefixed home pages — same content, pinned language for SEO
     {
       url: `${siteConfig.url}/zh`,
+      lastModified: SEO_CONTENT_LAST_MODIFIED,
       changeFrequency: 'weekly',
       priority: 1,
       alternates: localizedAlternates((locale) => `/${locale}`, '/en'),
     },
     {
       url: `${siteConfig.url}/en`,
+      lastModified: SEO_CONTENT_LAST_MODIFIED,
       changeFrequency: 'weekly',
       priority: 1,
       alternates: localizedAlternates((locale) => `/${locale}`, '/en'),
     },
     {
       url: `${siteConfig.url}/ja`,
+      lastModified: SEO_CONTENT_LAST_MODIFIED,
       changeFrequency: 'weekly',
       priority: 1,
       alternates: localizedAlternates((locale) => `/${locale}`, '/en'),
@@ -68,55 +72,63 @@ export default function sitemap(): MetadataRoute.Sitemap {
     // Public single-URL pages. They are multilingual/mixed-language pages, not locale alternates.
     {
       url: `${siteConfig.url}/affiliate`,
+      lastModified: SEO_CONTENT_LAST_MODIFIED,
       changeFrequency: 'weekly',
       priority: 0.8,
       alternates: singleUrlAlternates('/affiliate'),
     },
     {
       url: `${siteConfig.url}/privacy`,
+      lastModified: new Date('2026-05-14'),
       changeFrequency: 'yearly',
       priority: 0.45,
       alternates: singleUrlAlternates('/privacy'),
     },
     {
       url: `${siteConfig.url}/terms`,
+      lastModified: new Date('2026-05-14'),
       changeFrequency: 'yearly',
       priority: 0.45,
       alternates: singleUrlAlternates('/terms'),
     },
     {
       url: `${siteConfig.url}/gallery`,
+      lastModified: SEO_CONTENT_LAST_MODIFIED,
       changeFrequency: 'daily',
       priority: 0.8,
       alternates: singleUrlAlternates('/gallery'),
     },
     {
       url: `${siteConfig.url}/author/asa-zhou`,
+      lastModified: SEO_CONTENT_LAST_MODIFIED,
       changeFrequency: 'monthly',
       priority: 0.62,
       alternates: singleUrlAlternates('/author/asa-zhou'),
     },
     {
       url: `${siteConfig.url}/editorial-policy`,
-      lastModified: new Date('2026-08-09'),
+      lastModified: SEO_CONTENT_LAST_MODIFIED,
       changeFrequency: 'monthly',
       priority: 0.55,
       alternates: singleUrlAlternates('/editorial-policy'),
     },
     {
       url: `${siteConfig.url}/generate`,
+      lastModified: SEO_CONTENT_LAST_MODIFIED,
       changeFrequency: 'weekly',
       priority: 0.85,
       alternates: singleUrlAlternates('/generate'),
     },
     {
       url: `${siteConfig.url}/generate/prompts`,
+      lastModified: SEO_CONTENT_LAST_MODIFIED,
       changeFrequency: 'weekly',
       priority: 0.76,
       alternates: singleUrlAlternates('/generate/prompts'),
     },
     ...GENERATION_PROMPT_EXAMPLES.map((example) => ({
       url: `${siteConfig.url}/generate/prompts/${example.id}`,
+      lastModified: SEO_CONTENT_LAST_MODIFIED,
       changeFrequency: 'monthly' as const,
       priority: 0.58,
       alternates: singleUrlAlternates(`/generate/prompts/${example.id}`),
@@ -155,6 +167,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: 'monthly',
       priority: 0.6,
       alternates: localizedAlternates((locale) => `/${locale}/updates`, '/updates'),
+    },
+    {
+      url: `${siteConfig.url}/retake`,
+      lastModified: SEO_CONTENT_LAST_MODIFIED,
+      changeFrequency: 'monthly',
+      priority: 0.78,
+      alternates: singleUrlAlternates('/retake'),
     },
     {
       // Canonical public example of an AI photo critique result

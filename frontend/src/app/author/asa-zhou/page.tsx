@@ -11,7 +11,7 @@ const POLICY_PATH = '/editorial-policy';
 const POLICY_URL = `${siteConfig.url}${POLICY_PATH}`;
 
 export const metadata: Metadata = {
-  title: 'Asa Zhou | PicSpeak Founder and Lens Notes Editor',
+  title: 'Asa Zhou — Founder and Lens Notes Editor',
   description:
     'Asa Zhou builds PicSpeak and writes Lens Notes about AI photo critique, composition, lighting, color, and repeatable review workflows.',
   robots: INDEXABLE_ROBOTS,

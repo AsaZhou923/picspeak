@@ -44,7 +44,9 @@
     {
       "slug": "ai-photo-critique-daily-practice",
       "title": "Why AI photo critique should become a shoot-review-retake-compare habit",
+      "seoTitle": "AI Photo Critique as a Daily Practice Loop",
       "description": "AI photo critique is most useful when the original, a clear shooting target, the retake, and a same-rubric comparison form one repeatable practice loop. Learn how short review cycles expose recurring weaknesses and produce visible evidence that the next photo actually improved.",
+      "seoDescription": "Build a repeatable shoot-review-retake-compare loop with AI photo critique, one clear target, and evidence that the next frame improved.",
       "excerpt": "The bigger gains come from completing a consistent shoot-review-retake-compare loop. Keep one target and an observable success condition so you can tell whether the advice really changed the next frame.",
       "category": "AI Critique",
       "readingTime": "6 min read",
@@ -121,7 +123,9 @@
     {
       "slug": "five-photo-composition-checks",
       "title": "Composition still feels \"off\"? Check these 5 common problems first",
+      "seoTitle": "5 Photo Composition Checks Before You Retake",
       "description": "Subject clarity, edge distractions, depth, balance, and visual flow are the five most useful composition checks. A walkthrough-style checklist for field and post-processing use.",
+      "seoDescription": "Check subject clarity, edge distractions, depth, balance, and visual flow before your next retake with this practical photo composition checklist.",
       "excerpt": "Most \"almost there\" photos do not fail because the photographer doesn't understand composition. They fail because nobody makes the final check. This article gives you an executable five-step process.",
       "category": "Composition",
       "readingTime": "6 min read",
@@ -196,7 +200,9 @@
     {
       "slug": "turn-photo-feedback-into-shooting-checklist",
       "title": "Turn photo feedback into a checklist for your next shoot",
+      "seoTitle": "Turn Photo Feedback into a Next-Shoot Checklist",
       "description": "Turn abstract photo feedback into a short next-shoot checklist, add an observable success condition to every action, and verify the result with a same-rubric retake comparison. Includes practical translation patterns, genre templates, and evidence-based progress checks.",
+      "seoDescription": "Turn photo critique into a short next-shoot checklist with visible success conditions, then verify progress through a comparable retake.",
       "excerpt": "Understanding feedback and fixing the problem are different skills. Translate \"cluttered\" into a field action, then use visible evidence from the original and retake to verify the change.",
       "category": "Workflow",
       "readingTime": "6 min read",
@@ -273,7 +279,9 @@
     {
       "slug": "lighting-mistakes-ai-catches",
       "title": "5 lighting mistakes AI catches most often — and how to avoid them on location",
+      "seoTitle": "5 Lighting Mistakes AI Finds in Photos",
       "description": "Backlight blowout, mixed color temperatures, crushed shadows, harsh top-light, and directionless flat lighting are the five lighting issues AI reviews flag most frequently.",
+      "seoDescription": "Find and fix five common lighting problems: blown backlight, mixed color, crushed shadows, harsh top-light, and flat directionless light.",
       "excerpt": "Lighting is the most underrated dimension in photography. Many people pour energy into composition while treating light as luck. This article lists the 5 most-flagged lighting issues and on-location fixes.",
       "category": "Lighting",
       "readingTime": "6 min read",
@@ -343,6 +351,7 @@
     {
       "slug": "color-grading-photography-guide",
       "title": "Why your photo colors feel \"off\"? 4 core principles of color in photography",
+      "seoTitle": "4 Color Principles for Better Photo Grading",
       "description": "Color temperature consistency, color relationships, saturation restraint, and tone-mood matching are the four keys to elevating photo color from \"okay\" to \"compelling.\"",
       "excerpt": "Color is not just a post-processing concern. From white-balance choices at capture to the colors of clothing and background in the scene, a photo's color quality is largely decided before the shutter clicks.",
       "category": "Color",
@@ -406,6 +415,7 @@
     {
       "slug": "street-photography-ai-review-workflow",
       "title": "Street photography × AI critique: a complete shoot-review-improve workflow",
+      "seoTitle": "Street Photography AI Critique Workflow",
       "description": "Street photography progress depends on fast iteration, yet most shooters lack a systematic review process. This article provides a full workflow combining AI critique.",
       "excerpt": "Street photography looks intuition-driven, but lasting improvement comes from systems. Use AI critique for a quick post-walk debrief and turn chance encounters into deliberate practice.",
       "category": "Field",
@@ -474,7 +484,9 @@
     {
       "slug": "gpt-image-2-prompt-examples-workflow",
       "title": "How to turn GPT Image 2 prompt examples into usable photo references",
+      "seoTitle": "GPT Image 2 Prompt Examples for Photo References",
       "description": "Prompt libraries are most useful when they become a repeatable image-making workflow. This guide explains how to choose GPT Image 2 prompt examples, adapt them to your own subject, and turn the result into a concrete reference for your next shoot or AI Create session.",
+      "seoDescription": "Choose, adapt, and test GPT Image 2 prompt examples as practical visual references for your next photo shoot or AI Create session.",
       "excerpt": "A good prompt example is not something to copy blindly. Treat it like a visual recipe: keep the structure, replace the subject, tighten the constraints, then compare the generated reference against your real creative goal.",
       "category": "AI Create",
       "readingTime": "6 min read",
