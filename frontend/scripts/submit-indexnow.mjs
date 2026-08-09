@@ -1,22 +1,77 @@
-import { pathToFileURL } from 'node:url';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 export const INDEXNOW_ENDPOINT = 'https://api.indexnow.org/indexnow';
 export const DEFAULT_SITE_URL = 'https://www.picspeak.art';
-export const DEFAULT_INDEXNOW_PATHS = [
-  '/',
+export const INDEXNOW_URL_LIMIT = 10000;
+export const BASE_INDEXNOW_PATHS = [
+  '/zh',
+  '/en',
+  '/ja',
   '/zh/blog',
   '/en/blog',
   '/ja/blog',
   '/updates',
+  '/zh/updates',
+  '/en/updates',
+  '/ja/updates',
   '/gallery',
   '/generate',
   '/generate/prompts',
   '/author/asa-zhou',
+  '/editorial-policy',
+  '/privacy',
+  '/terms',
+  '/affiliate',
   '/sitemap.xml',
   '/sitemap-images.xml',
 ];
 
 const INDEXNOW_KEY_PATTERN = /^[A-Za-z0-9-]{8,128}$/;
+const LOCALES = ['zh', 'en', 'ja'];
+const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
+const FRONTEND_DIR = path.resolve(SCRIPT_DIR, '..');
+
+function readJson(relativePath, fallback) {
+  try {
+    return JSON.parse(readFileSync(path.join(FRONTEND_DIR, relativePath), 'utf8'));
+  } catch {
+    return fallback;
+  }
+}
+
+function readText(relativePath) {
+  try {
+    return readFileSync(path.join(FRONTEND_DIR, relativePath), 'utf8');
+  } catch {
+    return '';
+  }
+}
+
+function getBlogPostPaths() {
+  return LOCALES.flatMap((locale) => {
+    const bundle = readJson(path.join('src', 'content', 'blog', `${locale}.json`), { posts: [] });
+    return (bundle.posts ?? []).flatMap((post) =>
+      typeof post.slug === 'string' ? [`/${locale}/blog/${post.slug}`] : [],
+    );
+  });
+}
+
+function getPromptDetailPaths() {
+  const source = readText(path.join('src', 'content', 'generation', 'prompt-examples.ts'));
+  return [...source.matchAll(/^\s*id:\s*["']([^"']+)["'],/gm)].map((match) => `/generate/prompts/${match[1]}`);
+}
+
+export function buildDefaultIndexNowPaths() {
+  return [
+    ...BASE_INDEXNOW_PATHS,
+    ...getBlogPostPaths(),
+    ...getPromptDetailPaths(),
+  ];
+}
+
+export const DEFAULT_INDEXNOW_PATHS = buildDefaultIndexNowPaths();
 
 export function getIndexNowKey(rawKey = process.env.INDEXNOW_KEY) {
   const key = rawKey?.trim() ?? '';
@@ -45,7 +100,7 @@ export function normalizeIndexNowUrls(rawUrls, siteUrl = process.env.NEXT_PUBLIC
     }
   }
 
-  return [...ownUrls];
+  return [...ownUrls].slice(0, INDEXNOW_URL_LIMIT);
 }
 
 export function buildIndexNowPayload(rawUrls, rawKey = process.env.INDEXNOW_KEY) {

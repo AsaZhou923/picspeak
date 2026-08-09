@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-08-09-seo-geo-authority-discovery",
+    "date": "2026-08-09",
+    "title": "SEO/GEO 权威度与发现能力加固",
+    "summary": "PicSpeak 完成了全面 SEO/GEO 审计，并关闭技术、Schema 与内容信任层最重要的缺口。非法公共 URL 现在返回真实 404，首页和页面 Schema 各自拥有明确边界，新鲜度信号使用可证明日期，镜头手记、Prompt、作者、编辑政策与 AI 发现文件也公开了更完整的来源关系。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-08-09-seo-geo-authority-discovery",
+    "sections": [
+      {
+        "title": "搜索发现与新鲜度",
+        "items": [
+          "未知公共路由和非法 Blog 或 Prompt slug 会在流式渲染前返回真实 404，不再形成软 404",
+          "普通 sitemap 不再提交根别名或虚假当前日期，News sitemap 只保留最近两天的更新",
+          "IndexNow 现在覆盖三语 Blog、Prompt 详情、Updates、编辑政策与法律叶子 URL，并执行同源去重和协议上限保护"
+        ]
+      },
+      {
+        "title": "实体与编辑信任",
+        "items": [
+          "服务端首页 JSON-LD 建立稳定的 Organization、WebSite、Person、产品、FAQ、源码与面包屑关系，首页 FAQ 不再污染子页面",
+          "新增编辑与纠错政策、扩充作者页，并为 Blog 增加可见作者、来源区和 BlogPosting citation 数据",
+          "Prompt provenance、AI markdown、llms.txt、页面 Schema 与面包屑现在提供更清晰的来源、复核、发布者和引用边界"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-07-31-blog-locale-routing-cache-hardening",
     "date": "2026-07-31",
     "title": "博客多语言路由与缓存加固",

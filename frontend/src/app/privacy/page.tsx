@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import LegalPageContent from '@/components/marketing/LegalPageContent';
-import { INDEXABLE_ROBOTS, singlePageAlternates } from '@/lib/seo';
+import { serializeJsonLd } from '@/lib/json-ld';
+import { buildPublicBreadcrumbJsonLd, buildPublicWebPageJsonLd, INDEXABLE_ROBOTS, singlePageAlternates } from '@/lib/seo';
 import { siteConfig } from '@/lib/site';
 
 const title = 'Privacy Notice | 隐私说明 | プライバシー通知';
@@ -37,5 +38,26 @@ export const metadata: Metadata = {
 };
 
 export default function PrivacyPage() {
-  return <LegalPageContent kind="privacy" />;
+  const pageJsonLd = buildPublicWebPageJsonLd({
+    site: siteConfig,
+    path: '/privacy',
+    name: title,
+    description,
+    dateModified: '2026-05-14',
+  });
+  const breadcrumbJsonLd = buildPublicBreadcrumbJsonLd({
+    site: siteConfig,
+    items: [
+      { name: siteConfig.name, path: '/en' },
+      { name: 'Privacy Notice', path: '/privacy' },
+    ],
+  });
+
+  return (
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(pageJsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbJsonLd) }} />
+      <LegalPageContent kind="privacy" />
+    </>
+  );
 }

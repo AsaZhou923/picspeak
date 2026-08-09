@@ -8,6 +8,7 @@ import {
   getFeaturedBlogPost,
   getStarterBlogPosts,
 } from '../src/lib/blog-data.ts';
+import { getBlogReferences } from '../src/lib/blog-references.ts';
 import { buildBlogPostingJsonLd, estimateBlogPostWordCount } from '../src/lib/seo.ts';
 import { siteConfig } from '../src/lib/site.ts';
 
@@ -253,6 +254,7 @@ test('blog post structured data exposes the headline and intro as speakable cont
     locale: 'en',
     ui: bundle.ui,
     post,
+    citations: getBlogReferences(post.slug),
   });
   const blogPostSource = readFileSync(
     path.join(TEST_DIR, '..', 'src', 'app', '[locale]', 'blog', '[slug]', 'BlogPostClient.tsx'),
@@ -269,4 +271,16 @@ test('blog post structured data exposes the headline and intro as speakable cont
   });
   assert.match(blogPostSource, /data-speakable="blog-intro"/);
   assert.match(blogPostSource, /buildBlogPostingJsonLd/);
+  assert.equal(schema.citation.length, 2);
+  assert.ok(schema.citation.every((citation) => citation.url.startsWith('https://')));
+  assert.match(blogPostSource, /rel="author"/);
+  assert.match(blogPostSource, /Sources and evidence/);
+});
+
+test('every Lens Notes slug has at least two explicit citation targets', () => {
+  for (const post of readBundle('en').posts) {
+    const references = getBlogReferences(post.slug);
+    assert.ok(references.length >= 2, `${post.slug} should have at least two references`);
+    assert.ok(references.every((reference) => /^https:\/\//.test(reference.url)));
+  }
 });

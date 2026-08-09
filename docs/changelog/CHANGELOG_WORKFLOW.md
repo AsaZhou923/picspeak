@@ -88,7 +88,7 @@ PicSpeak 现在只维护一份仓库内 changelog：
 如果以后入口再次重构，先用下面命令找到真实数据源和渲染点：
 
 ```powershell
-rg -n "getProductUpdates|updates_hint_latest|updates_label|/updates" frontend/src
+rg -n "getProductUpdates|updates_hint_home|updates_hint_latest|updates_label|/updates" frontend/src
 ```
 
 ### 项目级说明文件
@@ -253,10 +253,10 @@ shasum -a 256 docs/changelog/CHANGELOG.md "$archive/CHANGELOG.md" docs/changelog
 
 做法：
 
-1. 搜索 `updates_hint_latest`。
-2. 搜索 `updates_label`，确认首页入口仍然使用 i18n 文案。
-3. 打开 `frontend/src/components/home/HomeContactSection.tsx`，确认底部 `/updates` 链接实际读取的是 `t('updates_hint_latest')`。
-4. 保证最终生效的 zh / en / ja hint 都指向本次更新主题。
+1. 搜索 `updates_hint_home`、`updates_hint_latest` 与 `updates_label`。
+2. 打开 `frontend/src/components/home/HomeContactSection.tsx`，确认底部 `/updates` 链接实际读取的 key；当前真实入口使用 `t('updates_hint_home')`。
+3. 更新最终生效的 zh / en / ja `updates_hint_home`，保证都指向本次更新主题。
+4. 如果兼容字段 `updates_hint_latest` 仍存在，也同步更新，避免旧组件或后续重构重新显示过期主题。
 
 ### 8. 复查文档与入口是否一致
 

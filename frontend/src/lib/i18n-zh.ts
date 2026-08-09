@@ -17,8 +17,8 @@ export const zhTranslations = {
   app_error_retry: '重试',
   plan_guest_label: '游客',
   updates_label: '更新记录',
-  updates_hint_home: '查看博客多语言路由与缓存加固更新',
-  updates_hint_latest: '查看博客多语言路由与缓存加固更新',
+  updates_hint_home: '查看 SEO/GEO 权威度与发现能力加固更新',
+  updates_hint_latest: '查看 SEO/GEO 权威度与发现能力加固更新',
 
   generation_badge: 'AI 创作',
   generation_title: 'AI 创作',
@@ -245,6 +245,7 @@ export const zhTranslations = {
   footer_usage: '额度',
   footer_privacy: '隐私',
   footer_terms: '条款',
+  footer_editorial_policy: '编辑与更正政策',
   affiliate_badge: '推广计划',
   affiliate_title_1: '推广 PicSpeak。',
   affiliate_title_2: '赚取持续收益。',

@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { buildDemoReviewJsonLd, DEMO_REVIEW_ID, isDemoReviewId } from '@/lib/demo-review';
 import { enTranslations } from '@/lib/i18n-en';
 import { serializeJsonLd } from '@/lib/json-ld';
-import { INDEXABLE_ROBOTS, NO_INDEX_ROBOTS, singlePageAlternates } from '@/lib/seo';
+import { buildPublicBreadcrumbJsonLd, INDEXABLE_ROBOTS, NO_INDEX_ROBOTS, singlePageAlternates } from '@/lib/seo';
 import { siteConfig } from '@/lib/site';
 
 export async function generateMetadata(
@@ -60,6 +60,16 @@ export default async function ReviewDetailLayout({
         suggestions: enTranslations.demo_review_suggestions,
       })
     : null;
+  const demoBreadcrumbJsonLd = demoReviewJsonLd
+    ? buildPublicBreadcrumbJsonLd({
+        site: siteConfig,
+        items: [
+          { name: siteConfig.name, path: '/en' },
+          { name: 'Gallery', path: '/gallery' },
+          { name: 'AI Photo Critique Example', path: `/reviews/${reviewId}` },
+        ],
+      })
+    : null;
 
   return (
     <>
@@ -68,6 +78,13 @@ export default async function ReviewDetailLayout({
           id="picspeak-demo-review-structured-data"
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: serializeJsonLd(demoReviewJsonLd) }}
+        />
+      )}
+      {demoBreadcrumbJsonLd && (
+        <script
+          id="picspeak-demo-review-breadcrumb-structured-data"
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(demoBreadcrumbJsonLd) }}
         />
       )}
       {children}

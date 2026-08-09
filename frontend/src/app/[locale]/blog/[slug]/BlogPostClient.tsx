@@ -6,6 +6,7 @@ import { ArrowLeft, ArrowRight, Clock3, Eye, Sparkles } from 'lucide-react';
 import { notFound } from 'next/navigation';
 import { getBlogViewCounts, incrementBlogPostView } from '@/lib/api';
 import { getBlogPost, getBlogPosts, getBlogUi } from '@/lib/blog-data';
+import { getBlogReferences } from '@/lib/blog-references';
 import { formatBlogViewCount, shouldTrackBlogView } from '@/lib/blog-view-stats';
 import { getBlogWorkspaceCta, type ContentConversionEntrypoint } from '@/lib/content-conversion';
 import { I18nProvider, useI18n, type Locale } from '@/lib/i18n';
@@ -15,10 +16,33 @@ import { buildBlogBreadcrumbJsonLd, buildBlogPostingJsonLd } from '@/lib/seo';
 import { siteConfig } from '@/lib/site';
 import { VALID_LOCALES } from '../../locales';
 
+const TRUST_COPY: Record<Locale, { by: string; policy: string; sources: string; sourceIntro: string }> = {
+  zh: {
+    by: '作者',
+    policy: '编辑与更正政策',
+    sources: '来源与证据',
+    sourceIntro: '以下资料用于核对本文的方法、术语或产品边界；PicSpeak 对最终编辑内容负责。',
+  },
+  en: {
+    by: 'By',
+    policy: 'Editorial and corrections policy',
+    sources: 'Sources and evidence',
+    sourceIntro: 'These references support the methods, terminology, or product boundaries in this article. PicSpeak remains responsible for the final editorial text.',
+  },
+  ja: {
+    by: '執筆',
+    policy: '編集・訂正ポリシー',
+    sources: '出典と根拠',
+    sourceIntro: '以下の資料は、記事内の方法、用語、または製品の境界を確認するためのものです。最終的な編集内容には PicSpeak が責任を持ちます。',
+  },
+};
+
 function BlogPostContent({ slug }: { slug: string }) {
   const { locale } = useI18n();
   const ui = getBlogUi(locale);
   const post = getBlogPost(locale, slug);
+  const trustCopy = TRUST_COPY[locale];
+  const references = getBlogReferences(slug);
   const [viewCounts, setViewCounts] = useState<Record<string, number>>({});
 
   if (!post) {
@@ -88,6 +112,11 @@ function BlogPostContent({ slug }: { slug: string }) {
     description: siteConfig.author.description,
     email: siteConfig.author.email,
     sameAs: [siteConfig.social.x, siteConfig.social.githubProfile],
+    knowsAbout: siteConfig.author.knowsAbout,
+    publishingPrinciples: `${siteConfig.url}${siteConfig.editorialPolicyPath}`,
+    worksFor: {
+      '@id': siteConfig.organizationId,
+    },
   };
 
   const articleJsonLd = buildBlogPostingJsonLd({
@@ -95,6 +124,7 @@ function BlogPostContent({ slug }: { slug: string }) {
     locale,
     ui,
     post,
+    citations: references,
   });
   const breadcrumbJsonLd = buildBlogBreadcrumbJsonLd({
     siteName: siteConfig.name,
@@ -126,6 +156,16 @@ function BlogPostContent({ slug }: { slug: string }) {
             <p className="text-xs uppercase tracking-[0.28em] text-gold/72">{post.category}</p>
             <h1 className="mt-4 font-display text-4xl text-ink sm:text-5xl">{post.title}</h1>
             <p data-speakable="blog-intro" className="mt-5 text-sm leading-8 text-ink-muted sm:text-base">{post.intro}</p>
+            <p className="mt-5 text-sm text-ink-subtle">
+              {trustCopy.by}{' '}
+              <Link href="/author/asa-zhou" rel="author" className="text-gold transition-colors hover:text-gold-light">
+                {siteConfig.author.name}
+              </Link>
+              <span aria-hidden="true"> · </span>
+              <Link href={siteConfig.editorialPolicyPath} className="transition-colors hover:text-gold">
+                {trustCopy.policy}
+              </Link>
+            </p>
             <div className="mt-6 flex flex-wrap items-center gap-4 text-sm text-ink-subtle">
               <span>
                 {post.updatedAt !== post.publishedAt
@@ -188,6 +228,27 @@ function BlogPostContent({ slug }: { slug: string }) {
               </section>
             ))}
           </div>
+
+          {references.length > 0 ? (
+            <section className="mt-10 rounded-[28px] border border-border-subtle bg-raised/35 p-6 sm:p-7">
+              <p className="text-xs uppercase tracking-[0.22em] text-gold/70">{trustCopy.sources}</p>
+              <p className="mt-3 text-sm leading-7 text-ink-muted">{trustCopy.sourceIntro}</p>
+              <ol className="mt-5 space-y-3">
+                {references.map((reference) => (
+                  <li key={reference.url} className="text-sm leading-7 text-ink-muted">
+                    <a
+                      href={reference.url}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="text-gold transition-colors hover:text-gold-light"
+                    >
+                      {reference.name}
+                    </a>
+                  </li>
+                ))}
+              </ol>
+            </section>
+          ) : null}
 
           <section className="mt-10 rounded-[30px] border border-border-subtle bg-[linear-gradient(135deg,rgba(200,162,104,0.12),transparent_42%),rgb(var(--color-surface)/0.78)] p-6 sm:p-7">
             <p className="text-xs uppercase tracking-[0.22em] text-gold/70">{workspaceCta.label}</p>

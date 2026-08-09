@@ -81,7 +81,7 @@ test('update entries point to existing unified changelog anchors in newest-first
   }
 });
 
-test('latest Blog hardening release describes redirects without stale SSG claims', () => {
+test('Blog hardening release describes redirects without stale SSG claims', () => {
   const redirectWording = {
     en: /redirect/i,
     zh: /跳转/,
@@ -91,19 +91,19 @@ test('latest Blog hardening release describes redirects without stale SSG claims
 
   for (const locale of LOCALES) {
     const entries = readJson<UpdateEntry[]>(`src/content/updates/${locale}.json`);
-    const latestEntry = entries[0];
-    const recentCopy = entries
-      .slice(0, 2)
-      .flatMap((entry) => [
-        entry.title,
-        entry.summary,
-        ...(entry.sections ?? []).flatMap((section) => [section.title, ...section.items]),
-      ])
+    const hardeningEntry = entries.find(
+      (entry) => entry.id === '2026-07-31-blog-locale-routing-cache-hardening',
+    );
+    assert.ok(hardeningEntry);
+    const hardeningCopy = [
+      hardeningEntry.title,
+      hardeningEntry.summary,
+      ...(hardeningEntry.sections ?? []).flatMap((section) => [section.title, ...section.items]),
+    ]
       .join('\n');
 
-    assert.equal(latestEntry.id, '2026-07-31-blog-locale-routing-cache-hardening');
-    assert.match(recentCopy, redirectWording[locale]);
-    assert.doesNotMatch(recentCopy, staleSsgClaim);
+    assert.match(hardeningCopy, redirectWording[locale]);
+    assert.doesNotMatch(hardeningCopy, staleSsgClaim);
   }
 });
 

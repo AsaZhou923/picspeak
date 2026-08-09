@@ -1,8 +1,11 @@
 import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
 import UpdatesPageContent from '@/components/marketing/UpdatesPageContent';
 import { I18nProvider, type Locale } from '@/lib/i18n';
-import { UPDATES_LANGUAGE_ALTERNATES } from '@/lib/seo';
+import { serializeJsonLd } from '@/lib/json-ld';
+import { buildPublicBreadcrumbJsonLd, buildUpdatesCollectionJsonLd, UPDATES_LANGUAGE_ALTERNATES } from '@/lib/seo';
 import { siteConfig } from '@/lib/site';
+import { getProductUpdates } from '@/lib/updates-data';
 import { VALID_LOCALES } from '../locales';
 
 type Props = {
@@ -59,12 +62,35 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function LocaleUpdatesPage({ params }: Props) {
   const { locale } = await params;
-  const typedLocale: Locale = VALID_LOCALES.includes(locale as Locale)
-    ? (locale as Locale)
-    : 'en';
+  if (!VALID_LOCALES.includes(locale as Locale)) {
+    notFound();
+  }
+
+  const typedLocale = locale as Locale;
+  const meta = UPDATES_META[typedLocale];
+  const languageByLocale: Record<Locale, string> = { zh: 'zh-CN', en: 'en', ja: 'ja' };
+  const homeNameByLocale: Record<Locale, string> = { zh: '首页', en: 'Home', ja: 'ホーム' };
+  const updatesNameByLocale: Record<Locale, string> = { zh: '更新记录', en: 'Updates', ja: '更新履歴' };
+  const collectionJsonLd = buildUpdatesCollectionJsonLd({
+    site: siteConfig,
+    path: `/${typedLocale}/updates`,
+    name: meta.title,
+    description: meta.description,
+    language: languageByLocale[typedLocale],
+    updates: getProductUpdates(typedLocale),
+  });
+  const breadcrumbJsonLd = buildPublicBreadcrumbJsonLd({
+    site: siteConfig,
+    items: [
+      { name: homeNameByLocale[typedLocale], path: `/${typedLocale}` },
+      { name: updatesNameByLocale[typedLocale], path: `/${typedLocale}/updates` },
+    ],
+  });
 
   return (
     <I18nProvider initialLocale={typedLocale}>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(collectionJsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbJsonLd) }} />
       <UpdatesPageContent homeHref={`/${typedLocale}`} />
     </I18nProvider>
   );

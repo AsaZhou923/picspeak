@@ -6,6 +6,9 @@ import { fileURLToPath } from 'node:url';
 import {
   buildAffiliateMetadata,
   buildBlogBreadcrumbJsonLd,
+  buildPublicBreadcrumbJsonLd,
+  buildPublicWebPageJsonLd,
+  buildUpdatesCollectionJsonLd,
   buildWebSiteJsonLd,
   buildDefaultUpdatesMetadata,
   HOME_LANGUAGE_ALTERNATES,
@@ -118,6 +121,8 @@ test('website JSON-LD exposes search and updates subscription actions', () => {
   });
 
   assert.equal(schema['@type'], 'WebSite');
+  assert.equal(schema['@id'], 'https://www.picspeak.art/#website');
+  assert.equal(schema.publisher['@id'], 'https://www.picspeak.art/#organization');
   assert.deepEqual(
     schema.potentialAction.map((action) => action['@type']),
     ['SearchAction', 'SubscribeAction'],
@@ -133,4 +138,50 @@ test('website JSON-LD exposes search and updates subscription actions', () => {
   assert.equal(searchAction.target.urlTemplate, 'https://www.picspeak.art/gallery?q={search_term_string}');
   assert.equal(subscribeAction.object.name, 'PicSpeak Updates');
   assert.equal(subscribeAction.target.urlTemplate, 'https://www.picspeak.art/updates');
+});
+
+test('public page helpers connect page identity, organization, and breadcrumbs', () => {
+  const page = buildPublicWebPageJsonLd({
+    site: SITE,
+    path: '/privacy',
+    name: 'Privacy Notice',
+    description: 'How PicSpeak handles public and account data.',
+  });
+  const breadcrumb = buildPublicBreadcrumbJsonLd({
+    site: SITE,
+    items: [
+      { name: 'PicSpeak', path: '/en' },
+      { name: 'Privacy Notice', path: '/privacy' },
+    ],
+  });
+
+  assert.equal(page['@id'], 'https://www.picspeak.art/privacy#webpage');
+  assert.equal(page.isPartOf['@id'], 'https://www.picspeak.art/#website');
+  assert.equal(page.publisher['@id'], 'https://www.picspeak.art/#organization');
+  assert.deepEqual(
+    breadcrumb.itemListElement.map((item) => item.item),
+    ['https://www.picspeak.art/en', 'https://www.picspeak.art/privacy'],
+  );
+});
+
+test('updates collection schema exposes dated, ordered release entries', () => {
+  const schema = buildUpdatesCollectionJsonLd({
+    site: SITE,
+    path: '/updates',
+    name: 'PicSpeak Updates',
+    description: 'Product updates.',
+    language: 'en',
+    updates: [
+      { id: 'release-a', date: '2026-08-09', title: 'Release A', summary: 'Fresh release.' },
+      { id: 'release-b', date: '2026-08-01', title: 'Release B', summary: 'Earlier release.' },
+    ],
+  });
+
+  assert.equal(schema['@type'], 'CollectionPage');
+  assert.equal(schema.dateModified, '2026-08-09');
+  assert.equal(schema.mainEntity.numberOfItems, 2);
+  assert.deepEqual(
+    schema.mainEntity.itemListElement.map((item) => item.position),
+    [1, 2],
+  );
 });

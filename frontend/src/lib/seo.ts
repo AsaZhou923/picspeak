@@ -65,6 +65,8 @@ type WebSiteJsonLdInput = {
   site: {
     name: string;
     url: string;
+    organizationId?: string;
+    websiteId?: string;
   };
   locale: Locale;
   language: string;
@@ -82,10 +84,14 @@ export function buildWebSiteJsonLd({
   return {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
+    '@id': site.websiteId ?? `${site.url}/#website`,
     name: site.name,
-    url: `${site.url}/${locale}`,
+    url: site.url,
     inLanguage: language,
     description,
+    publisher: {
+      '@id': site.organizationId ?? `${site.url}/#organization`,
+    },
     potentialAction: [
       {
         '@type': 'SearchAction',
@@ -126,6 +132,137 @@ export function buildWebSiteJsonLd({
   };
 }
 
+type PublicStructuredDataSite = {
+  name: string;
+  url: string;
+  organizationId?: string;
+  websiteId?: string;
+};
+
+export type PublicBreadcrumbItem = {
+  name: string;
+  path: string;
+};
+
+function toAbsoluteUrl(siteUrl: string, pathOrUrl: string): string {
+  return pathOrUrl.startsWith('https://') || pathOrUrl.startsWith('http://')
+    ? pathOrUrl
+    : `${siteUrl}${pathOrUrl.startsWith('/') ? pathOrUrl : `/${pathOrUrl}`}`;
+}
+
+export function buildPublicBreadcrumbJsonLd({
+  site,
+  items,
+}: {
+  site: PublicStructuredDataSite;
+  items: readonly PublicBreadcrumbItem[];
+}) {
+  const finalUrl = items.length > 0 ? toAbsoluteUrl(site.url, items[items.length - 1].path) : site.url;
+
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    '@id': `${finalUrl}#breadcrumb`,
+    itemListElement: items.map((item, index) => ({
+      '@type': 'ListItem',
+      position: index + 1,
+      name: item.name,
+      item: toAbsoluteUrl(site.url, item.path),
+    })),
+  };
+}
+
+export function buildPublicWebPageJsonLd({
+  site,
+  path,
+  name,
+  description,
+  language,
+  pageType = 'WebPage',
+  dateModified,
+}: {
+  site: PublicStructuredDataSite;
+  path: string;
+  name: string;
+  description: string;
+  language?: string;
+  pageType?: 'WebPage' | 'CollectionPage' | 'ProfilePage';
+  dateModified?: string;
+}) {
+  const pageUrl = toAbsoluteUrl(site.url, path);
+
+  return {
+    '@context': 'https://schema.org',
+    '@type': pageType,
+    '@id': `${pageUrl}#webpage`,
+    name,
+    description,
+    url: pageUrl,
+    ...(language ? { inLanguage: language } : {}),
+    ...(dateModified ? { dateModified } : {}),
+    isPartOf: {
+      '@id': site.websiteId ?? `${site.url}/#website`,
+    },
+    publisher: {
+      '@id': site.organizationId ?? `${site.url}/#organization`,
+    },
+  };
+}
+
+type UpdatesCollectionEntry = {
+  id: string;
+  date: string;
+  title: string;
+  summary: string;
+};
+
+export function buildUpdatesCollectionJsonLd({
+  site,
+  path,
+  name,
+  description,
+  language,
+  updates,
+}: {
+  site: PublicStructuredDataSite;
+  path: string;
+  name: string;
+  description: string;
+  language: string;
+  updates: readonly UpdatesCollectionEntry[];
+}) {
+  const page = buildPublicWebPageJsonLd({
+    site,
+    path,
+    name,
+    description,
+    language,
+    pageType: 'CollectionPage',
+    dateModified: updates[0]?.date,
+  });
+
+  return {
+    ...page,
+    mainEntity: {
+      '@type': 'ItemList',
+      numberOfItems: updates.length,
+      itemListElement: updates.map((update, index) => ({
+        '@type': 'ListItem',
+        position: index + 1,
+        item: {
+          '@type': 'CreativeWork',
+          '@id': `${toAbsoluteUrl(site.url, path)}#${update.id}`,
+          name: update.title,
+          description: update.summary,
+          datePublished: update.date,
+          dateModified: update.date,
+          url: `${toAbsoluteUrl(site.url, path)}#${update.id}`,
+        },
+      })),
+    },
+  };
+}
+
 type BlogBreadcrumbJsonLdInput = {
   siteName: string;
   siteUrl: string;
@@ -140,6 +277,7 @@ type BlogPostingJsonLdInput = {
     name: string;
     url: string;
     logoImage: string;
+    organizationId?: string;
     author: {
       id: string;
     };
@@ -147,6 +285,10 @@ type BlogPostingJsonLdInput = {
   locale: Locale;
   ui: Pick<BlogUiCopy, 'name'>;
   post: BlogPost;
+  citations?: readonly {
+    name: string;
+    url: string;
+  }[];
 };
 
 function countReadableUnits(text: string): number {
@@ -172,7 +314,7 @@ export function estimateBlogPostWordCount(post: BlogPost): number {
   return contentBlocks.reduce((total, block) => total + countReadableUnits(block), 0);
 }
 
-export function buildBlogPostingJsonLd({ site, locale, ui, post }: BlogPostingJsonLdInput) {
+export function buildBlogPostingJsonLd({ site, locale, ui, post, citations = [] }: BlogPostingJsonLdInput) {
   return {
     '@context': 'https://schema.org',
     '@type': 'BlogPosting',
@@ -200,13 +342,7 @@ export function buildBlogPostingJsonLd({ site, locale, ui, post }: BlogPostingJs
       '@id': site.author.id,
     },
     publisher: {
-      '@type': 'Organization',
-      name: site.name,
-      url: site.url,
-      logo: {
-        '@type': 'ImageObject',
-        url: `${site.url}${site.logoImage}`,
-      },
+      '@id': site.organizationId ?? `${site.url}/#organization`,
     },
     mainEntityOfPage: `${site.url}/${locale}/blog/${post.slug}`,
     articleSection: post.category,
@@ -214,6 +350,11 @@ export function buildBlogPostingJsonLd({ site, locale, ui, post }: BlogPostingJs
     about: post.keywords.map((keyword) => ({
       '@type': 'Thing',
       name: keyword,
+    })),
+    citation: citations.map((citation) => ({
+      '@type': 'CreativeWork',
+      name: citation.name,
+      url: citation.url,
     })),
   };
 }

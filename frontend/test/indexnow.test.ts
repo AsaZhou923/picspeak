@@ -9,6 +9,12 @@ import {
   INDEXNOW_ENDPOINT,
   submitIndexNowUrls,
 } from '../src/lib/indexnow.ts';
+import {
+  buildDefaultIndexNowPaths,
+  DEFAULT_INDEXNOW_PATHS,
+  INDEXNOW_URL_LIMIT,
+  normalizeIndexNowUrls,
+} from '../scripts/submit-indexnow.mjs';
 
 const TEST_DIR = path.dirname(fileURLToPath(import.meta.url));
 const FRONTEND_DIR = path.join(TEST_DIR, '..');
@@ -80,4 +86,24 @@ test('IndexNow automation is available as a deploy-safe script and workflow hook
   assert.match(workflowSource, /deployment_status\.state == 'success'/);
   assert.match(workflowSource, /npm run indexnow:submit/);
   assert.match(workflowSource, /INDEXNOW_KEY/);
+});
+
+test('IndexNow script default URLs include changed public leaf pages without aliases', () => {
+  const defaultPaths = buildDefaultIndexNowPaths();
+  const defaultUrls = normalizeIndexNowUrls(DEFAULT_INDEXNOW_PATHS);
+
+  assert.ok(defaultPaths.includes('/zh/blog/ai-photo-critique-daily-practice'));
+  assert.ok(defaultPaths.includes('/en/blog/ai-photo-critique-daily-practice'));
+  assert.ok(defaultPaths.includes('/ja/blog/ai-photo-critique-daily-practice'));
+  assert.ok(defaultPaths.some((pathName) => pathName.startsWith('/generate/prompts/')));
+  assert.ok(defaultPaths.includes('/zh/updates'));
+  assert.ok(defaultPaths.includes('/en/updates'));
+  assert.ok(defaultPaths.includes('/ja/updates'));
+  assert.ok(defaultPaths.includes('/editorial-policy'));
+  assert.ok(!defaultPaths.includes('/'));
+  assert.ok(!defaultPaths.includes('/blog'));
+  assert.ok(!defaultPaths.some((pathName) => pathName.startsWith('/blog/')));
+  assert.equal(defaultUrls.length, new Set(defaultUrls).size);
+  assert.ok(defaultUrls.length <= INDEXNOW_URL_LIMIT);
+  assert.ok(defaultUrls.every((url) => new URL(url).origin === 'https://www.picspeak.art'));
 });

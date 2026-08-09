@@ -1,7 +1,9 @@
+import { notFound } from 'next/navigation';
 import { I18nProvider, type Locale } from '@/lib/i18n';
 import { getInitialTranslations } from '@/lib/i18n-initial';
 import { HomePageContent } from '@/components/home/HomePageClient';
 import { HomeSeoFallback } from '@/components/home/HomeSeoFallback';
+import HomeStructuredData from '@/components/home/HomeStructuredData';
 import { VALID_LOCALES } from './locales';
 
 
@@ -23,15 +25,17 @@ export default async function LocalePage({
 }) {
   const { locale } = await params;
 
-  // VALID_LOCALES guard is already enforced by the layout, but type-narrow here.
-  const pinnedLocale: Locale = VALID_LOCALES.includes(locale as Locale)
-    ? (locale as Locale)
-    : 'en';
+  if (!VALID_LOCALES.includes(locale as Locale)) {
+    notFound();
+  }
+
+  const pinnedLocale = locale as Locale;
 
   return (
     <I18nProvider initialLocale={pinnedLocale} initialMessages={getInitialTranslations(pinnedLocale)}>
+      <HomeStructuredData locale={pinnedLocale} />
       <HomeSeoFallback locale={pinnedLocale} />
-      <HomePageContent structuredDataScope="locale" />
+      <HomePageContent />
     </I18nProvider>
   );
 }

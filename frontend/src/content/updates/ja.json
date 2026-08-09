@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-08-09-seo-geo-authority-discovery",
+    "date": "2026-08-09",
+    "title": "SEO/GEO の信頼性と発見性を強化",
+    "summary": "PicSpeak は SEO/GEO の全面監査を行い、技術、Schema、コンテンツ信頼性の重要な不足を改善しました。無効な公開 URL は実際の 404 を返し、Home と各ページの Schema の責任範囲を分離し、鮮度シグナルには根拠のある日付を使用します。レンズノート、Prompt、著者、編集ポリシー、AI 向けファイルの出典関係も明確になりました。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-08-09-seo-geo-authority-discovery",
+    "sections": [
+      {
+        "title": "検索発見と鮮度",
+        "items": [
+          "未知の公開ルートや無効な Blog・Prompt slug は、ストリーミング前に実際の 404 を返し、ソフト 404 を防ぎます",
+          "通常 sitemap からルート別名と架空の現在日付を除き、News sitemap は直近 2 日以内の更新だけを掲載します",
+          "IndexNow は 3 言語 Blog、Prompt 詳細、Updates、編集ポリシー、法的ページの URL を同一オリジンで重複排除して送信します"
+        ]
+      },
+      {
+        "title": "エンティティと編集上の信頼",
+        "items": [
+          "サーバー出力の Home JSON-LD が Organization、WebSite、Person、製品、FAQ、ソースコード、パンくずを安定した ID で関連付け、Home FAQ を子ページへ混在させません",
+          "編集・訂正ポリシーと詳細な著者ページを追加し、Blog に著者表示、出典、BlogPosting citation を追加しました",
+          "Prompt provenance、AI markdown、llms.txt、ページ Schema、パンくずで、出典、確認日、発行者、引用範囲を明確にしました"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-07-31-blog-locale-routing-cache-hardening",
     "date": "2026-07-31",
     "title": "ブログの多言語ルーティングとキャッシュ強化",

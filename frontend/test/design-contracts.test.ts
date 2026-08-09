@@ -1,24 +1,25 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, relative, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const root = new URL('../', import.meta.url);
+const root = fileURLToPath(new URL('../', import.meta.url));
 
 function read(relativePath: string): string {
-  return readFileSync(new URL(relativePath, root), 'utf8');
+  return readFileSync(join(root, relativePath), 'utf8');
 }
 
 function listTsx(directory: string): string[] {
-  const absolute = new URL(directory, root);
+  const absolute = join(root, directory);
   const files: string[] = [];
 
   for (const entry of readdirSync(absolute, { withFileTypes: true })) {
-    const entryPath = join(absolute.pathname, entry.name);
+    const entryPath = join(absolute, entry.name);
     if (entry.isDirectory()) {
       files.push(...listTsx(`${directory}${entry.name}/`));
     } else if (entry.name.endsWith('.tsx')) {
-      files.push(relative(root.pathname, entryPath));
+      files.push(relative(root, entryPath).split(sep).join('/'));
     }
   }
 

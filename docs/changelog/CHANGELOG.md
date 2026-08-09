@@ -2,6 +2,84 @@
 
 本文件汇总了原 `docs/changelog/update-log-*.md` 的全部更新记录。新增 release 请追加到顶部，并为每条记录保留稳定锚点，供 `/updates` 的 `docPath` 和 README 链接定位。
 
+<a id="2026-08-09-seo-geo-authority-discovery"></a>
+
+## 2026-08-09 - SEO GEO authority and discovery hardening
+
+日期：2026-08-09
+
+### 概览
+
+这次更新根据完整 SEO/GEO 审计，修复了会影响搜索抓取、AI 引用、页面实体识别和内容可信度的跨层问题，并用真实 production server 锁定路由、Schema、缓存与 sitemap 行为。
+
+- 未知一级路径、非法 Blog/Prompt slug 和静态页非法子路径现在会在流式渲染前返回真实 `404`，不再生成 `200` 软 404。
+- 首页 JSON-LD 改为服务端输出；FAQ 只属于首页，Blog/Updates 不再继承错误 Schema，并新增稳定的 Organization/WebSite/Person 实体关系。
+- 普通 sitemap 移除非 canonical 根 URL 与虚假当前时间，News sitemap 只保留两天内更新，IndexNow 覆盖三语 Blog、Prompt、Updates 与 trust/legal 叶子 URL。
+- 新增 Editorial & Corrections Policy，扩充作者方法论、Blog byline/来源/JSON-LD citation、Prompt 来源边界，以及 AI markdown/llms.txt trust metadata。
+- Footer 外部徽章去重，robots 移除统一 crawl-delay，安全响应增加 `X-Frame-Options: DENY`。
+
+### 抓取、路由与新鲜度
+
+- `app-route-roots.ts` 维护公开 route、Blog slug 与 Prompt ID 的轻量 manifest；proxy 对未知公共路径返回带 `noindex` 的 404，内容集合测试防止 manifest 漂移。
+- `[locale]`、Blog 与 Prompt 静态参数收紧，生产回归覆盖 `/sitemap_index.xml`、随机路径、非法文章、非法 Prompt 和非法静态子路径。
+- 普通 sitemap 只提交 canonical URL，已知内容使用真实更新时间；Editorial Policy 成为可发现页面。
+- News sitemap 对最新更新执行精确两日窗口过滤，超龄时保留合法空 `urlset`；普通 Updates URL 不受影响。
+- IndexNow 默认提交集合由 hub 扩展到真实叶子页面，执行同源去重并限制为协议允许的 10,000 URL。
+
+### Schema、内容信任与 AI 引用
+
+- 新的服务端 `HomeStructuredData` 输出 Organization、SoftwareApplication、WebSite、Person、SoftwareSourceCode、FAQPage 和 BreadcrumbList；locale layout 不再向全部子页注入首页图谱。
+- Updates 输出 `CollectionPage + ItemList`；Privacy、Terms、Affiliate 与 Editorial Policy 输出事实可验证的 WebPage；Gallery、Prompt、Author 和公开 Review 补齐页面级面包屑。
+- 作者页增加 300+ 词的方法论与编辑职责，Person 关联 `knowsAbout`、`worksFor`、`publishingPrinciples` 和公开身份链接。
+- 每篇 Lens Notes 至少关联两个来源目标，页面显示作者、编辑政策和来源区，BlogPosting 同步输出 `citation`。
+- Prompt 详情明确原始作者/来源、PicSpeak 适配边界与展示图 provenance；AI markdown 和 llms.txt 增加作者、来源、review date、policy 和引用边界。
+
+### 首页更新记录同步
+
+- `/updates` 中、英、日三语数据新增本条记录，`docPath` 指向 `docs/changelog/CHANGELOG.md#2026-08-09-seo-geo-authority-discovery`。
+- 首页联系区三语“更新记录”提示同步到本次 SEO/GEO 权威度与发现能力加固。
+- `README.md`、`README.zh-CN.md` 的最新 changelog 链接同步到本条锚点。
+- 外部 Update Logs 目录同步仓库内统一 changelog 与 workflow 镜像，并执行 SHA-256 一致性校验。
+
+### 影响文件
+
+#### 前端
+
+- `frontend/src/proxy.ts`
+- `frontend/next.config.mjs`
+- `frontend/src/app/{page,[locale],updates,privacy,terms,affiliate,editorial-policy,author,gallery,generate,reviews,sitemap,robots}/`
+- `frontend/src/components/{home,layout,marketing}/`
+- `frontend/src/lib/{app-route-roots,home-structured-data,seo,site,news-sitemap,blog-references,ai-markdown,llms}.ts`
+- `frontend/src/content/generation/prompt-examples.ts`
+- `frontend/src/content/updates/{zh,en,ja}.json`
+- `frontend/src/lib/i18n-{zh,en,ja}.ts`
+- `frontend/scripts/submit-indexnow.mjs`
+- `frontend/public/llms.txt`
+- `frontend/test/`
+
+#### 文档
+
+- `docs/changelog/CHANGELOG.md`
+- `docs/changelog/CHANGELOG_WORKFLOW.md`
+- `CLAUDE.md`
+- `README.md`
+- `README.zh-CN.md`
+- 外部 `PicSpeak/07 - Analytics/2026-08-09 GEO-SEO 全面审计与优化报告.md`
+- 外部 `PicSpeak/09 - Changelog/Update Logs/{CHANGELOG.md,CHANGELOG_WORKFLOW.md}`
+
+### 验证
+
+- `cd frontend && npm run typecheck` 通过。
+- `cd frontend && npm run lint` 通过。
+- `cd frontend && npm test` 通过，135 / 135 tests passed。
+- `cd frontend && npm run build` 通过，116 个页面完成 production build 页面数据与静态生成。
+- `cd frontend && npm run test:production-blog` 通过，7 / 7 production HTTP scenarios passed。
+- `./.venv/Scripts/python.exe -m pytest backend/tests` 通过，208 / 208 tests passed。
+- `git diff --check` 通过。
+- 仓库 changelog 与外部 Update Logs 镜像执行 SHA-256 一致性校验。
+
+---
+
 <a id="2026-07-31-blog-locale-routing-cache-hardening"></a>
 
 ## 2026-07-31 - blog locale routing and cache hardening

@@ -164,6 +164,7 @@ export const enTranslations = {
     footer_usage: 'Quota',
     footer_privacy: 'Privacy',
     footer_terms: 'Terms',
+    footer_editorial_policy: 'Editorial Policy',
 
     // Affiliate page
     affiliate_badge: 'Affiliate Program',
@@ -216,8 +217,8 @@ export const enTranslations = {
     pro_offer_label: '',
     pro_offer_highlight: 'Pro',
     updates_label: 'Updates',
-    updates_hint_home: 'See the Blog locale routing and cache hardening update',
-    updates_hint_latest: 'See the Blog locale routing and cache hardening update',
+    updates_hint_home: 'See the SEO/GEO authority and discovery hardening update',
+    updates_hint_latest: 'See the SEO/GEO authority and discovery hardening update',
     contact_label: 'Contact',
     contact_headline: 'Get in Touch',
 

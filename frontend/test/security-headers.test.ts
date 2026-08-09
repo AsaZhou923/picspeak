@@ -82,6 +82,7 @@ test('public responses advertise language variance and third-party preconnects',
   assert.match(headers.get('Link') ?? '', /rel=preconnect/);
   assert.match(headers.get('Link') ?? '', /https:\/\/clerk\.picspeak\.art/);
   assert.match(headers.get('Link') ?? '', /https:\/\/pub-7ae066210514433e84a850bc95c5f1a2\.r2\.dev/);
+  assert.equal(headers.get('X-Frame-Options'), 'DENY');
 });
 
 test('only locale-pinned Blog pages receive shared public-cache headers', async () => {

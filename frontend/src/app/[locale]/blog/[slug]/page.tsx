@@ -11,6 +11,8 @@ type Props = {
   params: Promise<{ locale: string; slug: string }>;
 };
 
+export const dynamicParams = false;
+
 export function generateStaticParams() {
   const slugs = getBlogSlugs();
   return VALID_LOCALES.flatMap((locale) =>
@@ -23,7 +25,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!VALID_LOCALES.includes(locale as Locale)) return {};
 
   const post = getBlogPost(locale as Locale, slug);
-  if (!post) return {};
+  if (!post) {
+    notFound();
+  }
 
   const ui = getBlogUi(locale as Locale);
 

@@ -19,8 +19,8 @@ export default function Footer() {
   const badgeEyebrowClass = 'text-[10px] uppercase tracking-[0.24em] text-ink-muted/75';
   const badgeTitleClass = 'text-sm font-medium text-ink';
 
-  const badgeGroup = (
-    <div className="flex items-center gap-6 pr-6">
+  const badgeLinks = (
+    <>
       <a
         href={PRODUCT_HUNT_BADGE_HREF}
         target="_blank"
@@ -91,27 +91,16 @@ export default function Footer() {
           <span className={badgeTitleClass}>Product List Dir</span>
         </span>
       </a>
-    </div>
-  );
-
-  const badgesContent = (
-    <>
-      {badgeGroup}
-      {badgeGroup}
-      {badgeGroup}
-      {badgeGroup}
-      {badgeGroup}
     </>
   );
 
   return (
     <footer className="border-t border-border-subtle py-8 mt-auto overflow-hidden">
-      {/* Badges Marquee Section */}
-      <div className="w-full flex overflow-hidden mb-8 border-b border-border-subtle/30 pb-6 opacity-80">
-        <div className="flex w-max animate-marquee hover:[animation-play-state:paused]">
-          <div className="flex items-center">{badgesContent}</div>
-          <div className="flex items-center">{badgesContent}</div>
-        </div>
+      <div
+        aria-label="External listings"
+        className="mb-8 w-full overflow-x-auto border-b border-border-subtle/30 pb-6 opacity-80"
+      >
+        <div className="mx-auto flex max-w-6xl items-center gap-6 px-6">{badgeLinks}</div>
       </div>
 
       <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-ink-subtle">
@@ -147,6 +136,9 @@ export default function Footer() {
           </Link>
           <Link href="/terms" className="hover:text-ink transition-colors">
             {t('footer_terms')}
+          </Link>
+          <Link href="/editorial-policy" className="hover:text-ink transition-colors">
+            {t('footer_editorial_policy')}
           </Link>
         </div>
 

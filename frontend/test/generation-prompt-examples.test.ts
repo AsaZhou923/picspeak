@@ -83,7 +83,7 @@ test('prompt example structured data describes learning use cases', () => {
   const firstExample = GENERATION_PROMPT_EXAMPLES[0];
   const schema = buildPromptExampleCreativeWorkJsonLd(firstExample, {
     siteUrl: 'https://www.picspeak.art',
-    siteName: 'PicSpeak',
+    organizationId: 'https://www.picspeak.art/#organization',
   });
 
   assert.equal(schema['@type'], 'CreativeWork');
@@ -92,7 +92,8 @@ test('prompt example structured data describes learning use cases', () => {
   assert.ok(Array.isArray(schema.teaches));
   assert.ok(schema.teaches.includes('Photography prompt adaptation'));
   assert.ok(schema.teaches.includes(GENERATION_PROMPT_EXAMPLE_CATEGORY_LABELS[firstExample.category]));
-  assert.equal(schema.isPartOf.url, 'https://www.picspeak.art/generate/prompts');
+  assert.equal(schema.isPartOf['@id'], 'https://www.picspeak.art/generate/prompts#collection');
+  assert.equal(schema.publisher['@id'], 'https://www.picspeak.art/#organization');
 });
 
 test('localized prompt helpers avoid mojibake data in visible copy', () => {

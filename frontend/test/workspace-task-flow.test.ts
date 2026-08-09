@@ -2,12 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   getWorkspaceTaskFlowCopy,
   resolveWorkspaceTaskStep,
 } from '../src/features/workspace/workspaceTaskFlow.ts';
 
-const TEST_DIR = path.dirname(new URL(import.meta.url).pathname);
+const TEST_DIR = path.dirname(fileURLToPath(import.meta.url));
 const workspacePageSource = readFileSync(
   path.join(TEST_DIR, '..', 'src', 'app', 'workspace', 'page.tsx'),
   'utf8'

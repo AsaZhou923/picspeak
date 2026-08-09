@@ -67,7 +67,7 @@ export default function UpdatesPageContent({ homeHref }: UpdatesPageContentProps
           <p className="mt-4 text-sm leading-7 text-ink-muted">{copy.intro}</p>
         </div>
 
-        <section className="ui-feature-panel overflow-hidden">
+        <section id={latest.id} className="ui-feature-panel overflow-hidden">
           <div className="border-b border-border-subtle px-6 py-5">
             <div className="flex flex-wrap items-center justify-between gap-4 text-sm text-ink">
               <div className="flex items-center gap-3">
@@ -145,6 +145,7 @@ export default function UpdatesPageContent({ homeHref }: UpdatesPageContentProps
             {updates.map((entry, index) => (
               <article
                 key={entry.id}
+                id={index === 0 ? undefined : entry.id}
                 className="ui-panel p-5 transition-colors hover:border-gold/25 hover:shadow-level-2"
               >
                 <div className="flex items-center justify-between gap-3">
