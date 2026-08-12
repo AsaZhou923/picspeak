@@ -136,7 +136,7 @@ The Devpost testing field must contain the private account credentials and fallb
 cd frontend
 npm run typecheck
 npm run lint
-node --test test/*.test.ts
+npm run test
 npm run build
 ```
 
