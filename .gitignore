@@ -29,6 +29,9 @@ pnpm-debug.log*
 start-dev.bat
 start-dev-proxy.bat
 
+# Local database backups
+.local-backups/
+
 .vercel
 .env*.local
 .omx/
