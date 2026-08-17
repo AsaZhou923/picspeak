@@ -82,7 +82,10 @@ export function buildDemoReviewJsonLd({
       worstRating: 0,
     },
     author: {
+      '@type': 'Organization',
       '@id': site.organizationId ?? `${site.url}/#organization`,
+      name: site.name,
+      url: site.url,
     },
     publisher: {
       '@id': site.organizationId ?? `${site.url}/#organization`,

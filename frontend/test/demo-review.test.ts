@@ -43,6 +43,12 @@ test('demo critique exposes Review JSON-LD with a CreativeWork target and rating
   assert.equal(schema.reviewRating['@type'], 'Rating');
   assert.equal(schema.reviewRating.ratingValue, DEMO_REVIEW_RATING_VALUE);
   assert.equal(schema.reviewRating.bestRating, 10);
+  assert.deepEqual(schema.author, {
+    '@type': 'Organization',
+    '@id': 'https://www.picspeak.art/#organization',
+    name: 'PicSpeak',
+    url: 'https://www.picspeak.art',
+  });
   assert.match(schema.reviewBody, /Golden ginkgo/);
 });
 
