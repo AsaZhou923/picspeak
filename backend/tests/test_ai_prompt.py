@@ -14,7 +14,6 @@ from app.services.ai import (
     AIReviewError,
     PROMPT_VERSION,
     SCORE_VERSION,
-    _is_multimodal_model,
     _normalize_review_result_fields,
     _prompt_for_mode_v3,
     _writing_prompt,
@@ -37,20 +36,25 @@ class AIPromptTests(unittest.TestCase):
             prompt,
         )
 
-    def test_multimodal_model_detection_accepts_dashscope_qwen35_models(self) -> None:
-        self.assertTrue(_is_multimodal_model('qwen3.5-flash'))
-        self.assertTrue(_is_multimodal_model('qwen3.5-plus'))
-        self.assertTrue(_is_multimodal_model('qwen3.5-flash-2026-02-23'))
-        self.assertTrue(_is_multimodal_model('qwen-vl-plus'))
+    def test_model_name_uses_configured_qwen37_flash(self) -> None:
+        with patch(
+            'app.services.ai.settings.ai_model_name', 'fallback-model'
+        ), patch(
+            'app.services.ai.settings.flash_model_name', 'qwen3.7-flash'
+        ), patch('app.services.ai.settings.pro_model_name', ''):
+            self.assertEqual(model_name_for_mode('flash'), 'qwen3.7-flash')
 
-    def test_model_name_for_mode_accepts_qwen35_flash_without_vl_suffix(self) -> None:
-        with patch('app.services.ai.settings.ai_model_name', 'qwen3.5-flash'), patch(
+    def test_model_name_accepts_provider_defined_name(self) -> None:
+        with patch(
+            'app.services.ai.settings.ai_model_name',
+            'future-provider-vision-model',
+        ), patch(
             'app.services.ai.settings.flash_model_name', ''
         ), patch('app.services.ai.settings.pro_model_name', ''):
-            self.assertEqual(model_name_for_mode('flash'), 'qwen3.5-flash')
+            self.assertEqual(model_name_for_mode('flash'), 'future-provider-vision-model')
 
-    def test_model_name_for_mode_rejects_non_multimodal_model(self) -> None:
-        with patch('app.services.ai.settings.ai_model_name', 'qwen-plus'), patch(
+    def test_model_name_for_mode_rejects_missing_configuration(self) -> None:
+        with patch('app.services.ai.settings.ai_model_name', ''), patch(
             'app.services.ai.settings.flash_model_name', ''
         ), patch('app.services.ai.settings.pro_model_name', ''):
             with self.assertRaises(AIReviewError):

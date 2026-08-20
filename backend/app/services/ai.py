@@ -73,33 +73,6 @@ _OPENAI_WRITING_SCHEMA = {
 }
 
 
-def _is_multimodal_model(model_name: str) -> bool:
-    normalized = (model_name or '').strip().lower()
-    if not normalized:
-        return False
-
-    explicit_multimodal_models = (
-        'qwen3.5-plus',
-        'qwen3.5-flash',
-    )
-    if any(normalized == name or normalized.startswith(f'{name}-') for name in explicit_multimodal_models):
-        return True
-
-    multimodal_markers = (
-        '-vl',
-        'vl-',
-        '/vl',
-    )
-    return any(marker in normalized for marker in multimodal_markers)
-
-
-def _is_incompatible_multimodal_model(model_name: str) -> bool:
-    normalized = (model_name or '').strip().lower()
-    # SiliconFlow's Qwen thinking vision variants can reject the OpenAI-style
-    # multimodal messages payload we send for photo review.
-    return 'qwen3-vl' in normalized and 'thinking' in normalized
-
-
 def model_name_for_mode(mode: str) -> str:
     normalized = (mode or '').strip().lower()
     candidates: list[str] = []
@@ -116,19 +89,12 @@ def model_name_for_mode(mode: str) -> str:
     if settings.pro_model_name.strip():
         candidates.append(settings.pro_model_name.strip())
 
-    seen: set[str] = set()
-    for candidate in candidates:
-        if candidate in seen:
-            continue
-        seen.add(candidate)
-        if not _is_multimodal_model(candidate):
-            continue
-        if _is_incompatible_multimodal_model(candidate):
-            continue
-        return candidate
+    if candidates:
+        return candidates[0]
 
     raise AIReviewError(
-        'No multimodal AI model is configured. Set AI_MODEL_NAME, FLASH_MODEL_NAME, or PRO_MODEL_NAME to a vision-capable model.'
+        'No AI model is configured. Set AI_MODEL_NAME, FLASH_MODEL_NAME, '
+        'or PRO_MODEL_NAME.'
     )
 
 
