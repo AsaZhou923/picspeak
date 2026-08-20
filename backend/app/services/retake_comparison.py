@@ -153,7 +153,7 @@ def _extract_output_text(body: dict) -> str:
         details = body.get('incomplete_details')
         reason = details.get('reason') if isinstance(details, dict) else None
         suffix = f': {reason}' if isinstance(reason, str) and reason.strip() else ''
-        raise AIReviewError(f'GPT-5.6 Terra response was incomplete{suffix}')
+        raise AIReviewError(f'GPT-5.6 response was incomplete{suffix}')
     for output in body.get('output') or []:
         if not isinstance(output, dict) or output.get('type') != 'message':
             continue
@@ -162,10 +162,10 @@ def _extract_output_text(body: dict) -> str:
                 continue
             refusal = content.get('refusal')
             if isinstance(refusal, str) and refusal.strip():
-                raise AIReviewError(f'GPT-5.6 Terra refused the retake comparison: {refusal[:300]}')
+                raise AIReviewError(f'GPT-5.6 refused the retake comparison: {refusal[:300]}')
             if content.get('type') == 'output_text' and isinstance(content.get('text'), str):
                 return content['text']
-    raise AIReviewError('GPT-5.6 Terra response did not contain structured output text')
+    raise AIReviewError('GPT-5.6 response did not contain structured output text')
 
 
 def _trend(delta: int) -> str:
@@ -274,7 +274,7 @@ def run_retake_comparison(
     image_type: str,
 ) -> AIReviewResponse:
     if not settings.openai_api_key:
-        raise AIReviewError('OPENAI_API_KEY is not configured for GPT-5.6 Terra retake comparison')
+        raise AIReviewError('OPENAI_API_KEY is not configured for GPT-5.6 retake comparison')
 
     payload = {
         'model': settings.retake_analysis_model,
@@ -317,20 +317,20 @@ def run_retake_comparison(
         body = json.loads(response.data.decode('utf-8'))
     except PooledHTTPStatusError as exc:
         error_body = exc.response.data.decode('utf-8', errors='ignore')
-        raise AIReviewError(f'GPT-5.6 Terra API HTTP {exc.response.status}: {error_body[:300]}') from exc
+        raise AIReviewError(f'GPT-5.6 API HTTP {exc.response.status}: {error_body[:300]}') from exc
     except PooledHTTPRequestError as exc:
-        raise AIReviewError(f'GPT-5.6 Terra API request failed: {exc}') from exc
+        raise AIReviewError(f'GPT-5.6 API request failed: {exc}') from exc
     except json.JSONDecodeError as exc:
-        raise AIReviewError('GPT-5.6 Terra API returned invalid JSON') from exc
+        raise AIReviewError('GPT-5.6 API returned invalid JSON') from exc
 
     latency_ms = int((time.perf_counter() - started) * 1000)
     try:
         parsed = json.loads(_extract_output_text(body))
         comparison = _ModelComparison.model_validate(parsed)
     except json.JSONDecodeError as exc:
-        raise AIReviewError('GPT-5.6 Terra structured output was not valid JSON') from exc
+        raise AIReviewError('GPT-5.6 structured output was not valid JSON') from exc
     except ValidationError as exc:
-        raise AIReviewError(f'GPT-5.6 Terra structured output failed validation: {exc}') from exc
+        raise AIReviewError(f'GPT-5.6 structured output failed validation: {exc}') from exc
 
     model_name = str(body.get('model') or settings.retake_analysis_model)
     result = _build_result(

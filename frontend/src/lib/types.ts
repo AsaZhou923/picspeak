@@ -122,7 +122,7 @@ export interface PhotoCreateResponse {
 // ─── Review ──────────────────────────────────────────────────────────────────
 
 export type ReviewMode = 'flash' | 'pro';
-export type ReviewModel = 'qwen' | 'gpt-5.5' | 'gpt-5.6-terra';
+export type ReviewModel = 'qwen' | 'gpt-5.5' | 'gpt-5.6-luna';
 export type ReviewAnalysisType = 'single' | 'retake_compare';
 export type ImageType = 'default' | 'landscape' | 'portrait' | 'street' | 'still_life' | 'architecture';
 export type ReviewStatus = 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'EXPIRED';

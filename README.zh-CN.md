@@ -26,14 +26,14 @@
   -> 保存进步，并生成下一轮视觉目标
 ```
 
-- **单张照片点评：** 可选择兼容默认的 Qwen 路径，或通过 OpenAI Responses API 使用 GPT-5.5。
-- **复拍教练：** GPT-5.6 Terra 在同一次请求中接收原片和复拍；所有分差均由服务端确定性计算。
+- **单张照片点评：** 可选择兼容默认的 Qwen 路径，或通过 OpenAI Responses API 使用 `xhigh` 推理强度的 GPT-5.6 Luna。
+- **复拍教练：** GPT-5.6 Luna 以 `xhigh` 推理强度在同一次请求中接收原片和复拍；所有分差均由服务端确定性计算。
 - **AI 创作：** 使用 GPT Image 2 生成视觉参考，包括点评关联的构图、光线、色彩与复拍方向。
 - **学习入口：** 在点评、公开长廊、镜头手记、提示词案例、点评历史和同源复拍链之间继续练习。
 
 ## 产品界面
 
-| 公开点评 | GPT-5.6 Terra 复拍教练 |
+| 公开点评 | GPT-5.6 复拍教练 |
 |---|---|
 | ![包含评分、证据和下一次拍摄建议的公开点评](docs/assets/screenshots/review.jpg) | ![原片、目标、复拍、比较四步复拍教练](docs/assets/screenshots/retake.jpg) |
 
@@ -92,6 +92,8 @@ Next.js 15 / React 18
 
 PicSpeak 在提交窗口前已经存在。Build Week 的贡献是在原有单张照片产品上建立可审计的复拍闭环，而不是只替换模型名称。活动前基线为 [`b74ddfb`](https://github.com/AsaZhou923/picspeak/commit/b74ddfb88ae32e37965ba8b29f40c9ebcbbf77fc)，配对比较核心实现落在 [`2a626aa`](https://github.com/AsaZhou923/picspeak/commit/2a626aabab30d5cdb45ca0450fdd1ce7a5387b4c)。
 
+最初的 Build Week 实现使用 GPT-5.6 Terra；当前运行时默认值已经改为 `gpt-5.6-luna` 与 `reasoning.effort: xhigh`，配对评分和服务端计算分差的契约保持不变。
+
 | Build Week 前 | Build Week 期间新增 |
 |---|---|
 | 单张照片点评 | 同一次 GPT-5.6 Terra 请求配对评估原片与复拍 |
@@ -115,7 +117,7 @@ PicSpeak 在提交窗口前已经存在。Build Week 的贡献是在原有单张
 - PostgreSQL 14+
 - S3 兼容对象存储
 - OpenAI 协议兼容的点评 API Key
-- 对应点评路径所需的 GPT-5.5 与 GPT-5.6 Terra OpenAI API 访问权限
+- GPT-5.6 Luna OpenAI API 访问权限
 
 ### 1. 克隆并配置后端
 
@@ -134,14 +136,14 @@ pip install -r backend/requirements.txt
 ```dotenv
 OPENAI_API_KEY=
 OPENAI_API_BASE_URL=https://api.openai.com/v1
-OPENAI_REVIEW_MODEL=gpt-5.5
-OPENAI_REVIEW_REASONING_EFFORT=medium
+OPENAI_REVIEW_MODEL=gpt-5.6-luna
+OPENAI_REVIEW_REASONING_EFFORT=xhigh
 OPENAI_REVIEW_TIMEOUT_SECONDS=180
 
 # 可选：完整 endpoint；留空时会在 base URL 后追加 /responses。
 RETAKE_ANALYSIS_API_URL=
-RETAKE_ANALYSIS_MODEL=gpt-5.6-terra
-RETAKE_ANALYSIS_REASONING_EFFORT=medium
+RETAKE_ANALYSIS_MODEL=gpt-5.6-luna
+RETAKE_ANALYSIS_REASONING_EFFORT=xhigh
 RETAKE_ANALYSIS_TIMEOUT_SECONDS=180
 ```
 
@@ -184,7 +186,7 @@ npm run build
 
 ## 文档
 
-- [更新日志](docs/changelog/CHANGELOG.md)
+- [最新更新日志](docs/changelog/CHANGELOG.md#2026-08-20-gpt56-luna-xhigh)
 - [前端设计系统](DESIGN.md)
 - [SEO / GEO 审计报告](docs/seo/seo-audit-2026-05-01.md)
 - [系统架构说明](docs/architecture/系统架构.md)

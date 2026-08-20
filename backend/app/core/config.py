@@ -122,12 +122,12 @@ class Settings(BaseSettings):
 
     openai_api_key: str = ''
     openai_api_base_url: str = 'https://api.openai.com/v1'
-    openai_review_model: str = 'gpt-5.5'
-    openai_review_reasoning_effort: str = 'medium'
+    openai_review_model: str = 'gpt-5.6-luna'
+    openai_review_reasoning_effort: str = 'xhigh'
     openai_review_timeout_seconds: int = 180
     retake_analysis_api_url: str = ''
-    retake_analysis_model: str = 'gpt-5.6-terra'
-    retake_analysis_reasoning_effort: str = 'medium'
+    retake_analysis_model: str = 'gpt-5.6-luna'
+    retake_analysis_reasoning_effort: str = 'xhigh'
     retake_analysis_timeout_seconds: int = 180
     image_generation_api_key: str = ''
     image_generation_api_url: str = Field(

@@ -1,5 +1,32 @@
 [
   {
+    "id": "2026-08-20-gpt56-luna-xhigh",
+    "date": "2026-08-20",
+    "title": "OpenAI photo reviews move to GPT-5.6 Luna with xhigh reasoning",
+    "summary": "PicSpeak now routes both single-photo OpenAI reviews and original-versus-retake comparisons to GPT-5.6 Luna with xhigh reasoning. The product UI uses the stable GPT-5.6 family label, while request payloads, persisted model provenance, environment defaults, and regression tests identify the actual Luna route.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-08-20-gpt56-luna-xhigh",
+    "sections": [
+      {
+        "title": "Runtime routing",
+        "items": [
+          "Single-photo OpenAI reviews and retake comparisons now send model gpt-5.6-luna with reasoning.effort set to xhigh",
+          "Legacy clients that still submit GPT-5.5 for single-photo review or Terra for retake comparison are normalized to Luna",
+          "Usage metadata records the model returned by the OpenAI response instead of copying the client route label"
+        ]
+      },
+      {
+        "title": "Product labeling",
+        "items": [
+          "The navigation badge now reads 5.6 instead of Terra",
+          "The normal OpenAI review card now displays GPT-5.6 and submits the Luna route",
+          "English, Chinese, and Japanese Retake Coach surfaces use the GPT-5.6 family label consistently",
+          "Historical Build Week and release records keep their original Terra wording",
+          "The workspace card now displays Qwen 3.7; this frontend-only label change does not alter the existing DashScope backend route"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-08-09-seo-geo-authority-discovery",
     "date": "2026-08-09",
     "title": "SEO/GEO authority and discovery hardening",

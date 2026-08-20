@@ -555,7 +555,7 @@ def _process_task(db: Session, task: ReviewTask) -> None:
         metadata_json={
             'mode': task.mode.value if isinstance(task.mode, ReviewMode) else str(task.mode),
             'analysis_type': analysis_type,
-            'review_model': review_model,
+            'review_model': ai_response.model_name,
         },
     )
     db.add(ledger)

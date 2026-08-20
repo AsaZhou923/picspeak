@@ -63,7 +63,7 @@ class PhotoCreateResponse(BaseModel):
 class ReviewCreateRequest(BaseModel):
     photo_id: str
     mode: str = Field(pattern='^(flash|pro)$')
-    review_model: str = Field(default='qwen', pattern=r'^(qwen|gpt-5\.5|gpt-5\.6-terra)$')
+    review_model: str = Field(default='qwen', pattern=r'^(qwen|gpt-5\.5|gpt-5\.6-(?:terra|luna))$')
     image_type: str = Field(default='default', pattern='^(default|landscape|portrait|street|still_life|architecture)$')
     source_review_id: str | None = None
     analysis_type: str = Field(default='single', pattern='^(single|retake_compare)$')
@@ -74,9 +74,11 @@ class ReviewCreateRequest(BaseModel):
     @model_validator(mode='after')
     def align_review_model_with_analysis_type(self):
         if self.analysis_type == 'retake_compare':
-            self.review_model = 'gpt-5.6-terra'
+            self.review_model = 'gpt-5.6-luna'
+        elif self.review_model == 'gpt-5.5':
+            self.review_model = 'gpt-5.6-luna'
         elif self.review_model == 'gpt-5.6-terra':
-            raise ValueError('gpt-5.6-terra is reserved for retake comparison')
+            raise ValueError('gpt-5.6-terra is reserved for legacy retake compatibility')
         return self
 
 

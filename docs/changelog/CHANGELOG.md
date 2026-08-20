@@ -2,6 +2,82 @@
 
 本文件汇总了原 `docs/changelog/update-log-*.md` 的全部更新记录。新增 release 请追加到顶部，并为每条记录保留稳定锚点，供 `/updates` 的 `docPath` 和 README 链接定位。
 
+<a id="2026-08-20-gpt56-luna-xhigh"></a>
+
+## 2026-08-20 - GPT-5.6 Luna xhigh review routing
+
+日期：2026-08-20
+
+### 概览
+
+这次更新把普通单图 OpenAI 点评和原片与复拍比较统一迁移到 GPT-5.6 Luna，并把两条路径的推理强度都提升到 `xhigh`。产品界面统一显示稳定的 GPT-5.6 家族名称，实际请求、持久化 provenance、环境默认值和测试则明确锁定 Luna 路径。
+
+- 导航栏中的 `Terra` 小标识改为 `5.6`，中、英、日三语 Retake Coach 文案不再把产品品牌绑定到具体 tier。
+- 后端普通单图与复拍比较都默认发送 `model=gpt-5.6-luna` 与 `reasoning.effort=xhigh`，继续使用 Responses API、图片输入和严格 Structured Outputs。
+- 旧客户端在部署过渡期仍提交普通单图 `gpt-5.5` 或复拍 `gpt-5.6-terra` 时，后端都会归一化到 Luna；历史排队任务仍能进入 OpenAI 路径。
+- 使用记录改为保存 OpenAI 响应返回的真实模型名称，不再复制客户端路由标签。
+- Build Week、历史 Blog 与旧 release 条目继续保留当时真实使用 Terra 的记录，不回写历史。
+
+### OpenAI 模型契约
+
+- OpenAI 官方模型目录确认 `gpt-5.6-luna` 支持图像输入、Responses API 和 Structured Outputs。
+- GPT-5.6 官方迁移文档确认 `reasoning.effort` 支持 `xhigh`；本次未启用独立的 Pro mode。
+- 本地兼容网关的 `/models` 接口返回 HTTP 200，并明确列出 `gpt-5.5`、`gpt-5.6-sol`、`gpt-5.6-terra` 与 `gpt-5.6-luna`；未执行收费的真实图片推理。
+
+### 产品标识与文档同步
+
+- Header 小标识显示 `5.6`，普通单图模型卡片、Retake 入口、工作台、对比结果和首页回访入口统一显示 `GPT-5.6`。
+- 工作台 Qwen 模型卡片与请求摘要显示由 `Qwen 3.5` 改为 `Qwen 3.7`；本次只改前端标签，后端仍使用 DashScope 的 `qwen3.5-flash / qwen3.5-plus`，不把显示变更误记为实际模型迁移。
+- `README.md`、`README.zh-CN.md` 和 `CLAUDE.md` 记录当前 Luna + `xhigh` 默认值，同时明确 Build Week 初版曾使用 Terra。
+- `/updates` 三语记录和首页更新提示同步到本次迁移；历史三语更新记录与 Blog 正文保持不变。
+
+### 影响文件
+
+#### 后端
+
+- `backend/app/core/config.py`
+- `backend/app/schemas.py`
+- `backend/app/api/routers/review_create.py`
+- `backend/app/services/ai.py`
+- `backend/app/services/retake_comparison.py`
+- `backend/app/services/review_task_processor.py`
+- `backend/.env.example`
+- `backend/tests/{test_settings_defaults,test_openai_photo_review,test_retake_comparison,test_retake_review_contract}.py`
+
+#### 前端
+
+- `frontend/src/components/layout/Header.tsx`
+- `frontend/src/app/workspace/page.tsx`
+- `frontend/src/features/workspace/components/ReviewModelPicker.tsx`
+- `frontend/src/features/reviews/components/RetakeComparisonPanel.tsx`
+- `frontend/src/features/workspace/workspaceTaskFlow.ts`
+- `frontend/src/lib/{types,retake-coach-copy,content-conversion}.ts`
+- `frontend/src/content/updates/{zh,en,ja}.json`
+- `frontend/src/lib/i18n-{zh,en,ja}.ts`
+- `frontend/test/retake-coach.test.ts`
+
+#### 文档
+
+- `README.md`
+- `README.zh-CN.md`
+- `CLAUDE.md`
+- `docs/changelog/CHANGELOG.md`
+- 外部 `PicSpeak/09 - Changelog/Update Logs/CHANGELOG.md`
+
+### 验证
+
+- OpenAI 官方文档核对 `gpt-5.6-luna`、图像输入、Responses API、Structured Outputs 与 `xhigh` 支持。
+- `cd backend && ../.venv/Scripts/python.exe -m pytest tests/test_settings_defaults.py tests/test_retake_review_contract.py tests/test_openai_photo_review.py tests/test_retake_comparison.py -q` 通过，33 / 33 tests passed。
+- `cd frontend && node --test test/retake-coach.test.ts` 通过，7 / 7 tests passed。
+- `cd backend && ../.venv/Scripts/python.exe -m pytest tests -q` 通过，212 tests 与 11 subtests passed。
+- `cd frontend && npm test` 通过，143 / 143 tests passed；`npm run typecheck` 与 `npm run lint` 通过。
+- `cd frontend && npm run build` 通过，116 个页面完成 production build；`npm run test:production-blog` 通过，11 / 11 production HTTP scenarios passed。
+- Playwright 在本地 `/retake` 实际 DOM 中确认导航显示 `Retake Coach 5.6`，页面显示 `GPT-5.6 Retake Coach` 与 `Powered by GPT-5.6`，并更新 README Retake 截图。
+- Qwen 3.7 前端标签回归测试先在旧实现上失败，修改后目标测试 7 / 7、完整前端测试 143 / 143、typecheck、lint 与 116 页 production build 均通过；本地后端未运行，因此浏览器上传未进入模型选择阶段。
+- 本地兼容网关模型目录请求返回 HTTP 200 并列出 `gpt-5.6-luna`；未执行收费的真实图片推理。
+
+---
+
 <a id="2026-08-09-seo-geo-authority-discovery"></a>
 
 ## 2026-08-09 - SEO GEO authority and discovery hardening

@@ -4,29 +4,29 @@ import type { ReviewModel } from '@/lib/types';
 function modelCopy(locale: 'zh' | 'en' | 'ja') {
   if (locale === 'en') {
     return {
-      qwenTitle: 'Qwen 3.5',
+      qwenTitle: 'Qwen 3.7',
       qwenBadge: 'Fast',
       qwenBody: 'The established PicSpeak review path for quick everyday feedback.',
-      gptTitle: 'GPT-5.5',
+      gptTitle: 'GPT-5.6',
       gptBadge: 'Deep vision',
       gptBody: 'Uses OpenAI image reasoning and strict structured output. Usually takes longer.',
     };
   }
   if (locale === 'ja') {
     return {
-      qwenTitle: 'Qwen 3.5',
+      qwenTitle: 'Qwen 3.7',
       qwenBadge: '高速',
       qwenBody: '日常の写真講評に適した、従来の高速な PicSpeak 評価です。',
-      gptTitle: 'GPT-5.5',
+      gptTitle: 'GPT-5.6',
       gptBadge: '深い視覚分析',
       gptBody: 'OpenAI の画像推論と厳密な構造化出力を使用します。通常は時間がかかります。',
     };
   }
   return {
-    qwenTitle: 'Qwen 3.5',
+    qwenTitle: 'Qwen 3.7',
     qwenBadge: '快速',
     qwenBody: 'PicSpeak 现有的稳定评图路径，适合快速日常反馈。',
-    gptTitle: 'GPT-5.5',
+    gptTitle: 'GPT-5.6',
     gptBadge: '深度视觉',
     gptBody: '使用 OpenAI 图片推理和严格结构化输出，通常需要更长时间。',
   };
@@ -52,7 +52,7 @@ export function ReviewModelPicker({
       tone: 'gold',
     },
     {
-      value: 'gpt-5.5' as const,
+      value: 'gpt-5.6-luna' as const,
       title: copy.gptTitle,
       badge: copy.gptBadge,
       body: copy.gptBody,
@@ -90,7 +90,7 @@ export function ReviewModelPicker({
               <span className={`inline-flex items-center gap-1 rounded-control border px-2 py-1 text-[10px] ${
                 option.tone === 'sage' ? 'border-sage/30 text-sage' : 'border-gold/30 text-gold'
               }`}>
-                {selected ? <Check size={10} aria-hidden="true" /> : option.value === 'gpt-5.5' ? <Sparkles size={10} aria-hidden="true" /> : null}
+                {selected ? <Check size={10} aria-hidden="true" /> : option.value === 'gpt-5.6-luna' ? <Sparkles size={10} aria-hidden="true" /> : null}
                 {option.badge}
               </span>
             </div>

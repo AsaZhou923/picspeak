@@ -1,5 +1,32 @@
 [
   {
+    "id": "2026-08-20-gpt56-luna-xhigh",
+    "date": "2026-08-20",
+    "title": "OpenAI 写真講評を GPT-5.6 Luna と xhigh 推論へ更新",
+    "summary": "PicSpeak の通常の単一写真 OpenAI 講評と元写真・撮り直し比較は、xhigh 推論の GPT-5.6 Luna に統一されます。製品 UI は安定した GPT-5.6 ファミリー表示を使い、リクエスト、モデル provenance、環境デフォルト、回帰テストでは実際の Luna 経路を明示します。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-08-20-gpt56-luna-xhigh",
+    "sections": [
+      {
+        "title": "ランタイムルーティング",
+        "items": [
+          "通常の単一写真 OpenAI 講評と撮り直し比較は model=gpt-5.6-luna と reasoning.effort=xhigh を送信します",
+          "旧クライアントが単一写真で GPT-5.5、撮り直しで Terra を送っても、バックエンドで Luna に正規化します",
+          "利用メタデータはクライアントのラベルではなく OpenAI 応答の実モデルを保存します"
+        ]
+      },
+      {
+        "title": "製品表示",
+        "items": [
+          "ナビゲーションの小さなバッジを Terra から 5.6 に変更しました",
+          "通常の OpenAI 講評カードは GPT-5.6 を表示し、Luna ルートを送信します",
+          "英語、中国語、日本語の撮り直しコーチ画面を GPT-5.6 ファミリー表示に統一しました",
+          "Build Week と過去のリリース記録にある Terra の履歴表現は維持します",
+          "ワークスペースカードは Qwen 3.7 と表示します。このフロントエンドのみの変更では既存の DashScope バックエンド経路を変更しません"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-08-09-seo-geo-authority-discovery",
     "date": "2026-08-09",
     "title": "SEO/GEO の信頼性と発見性を強化",

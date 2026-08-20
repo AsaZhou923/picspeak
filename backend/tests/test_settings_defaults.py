@@ -36,6 +36,16 @@ class SettingsDefaultsTestCase(unittest.TestCase):
         settings = Settings(_env_file=None)
         self.assertEqual(settings.lemonsqueezy_zh_pro_variant_id, '')
 
+    def test_retake_analysis_defaults_to_luna_xhigh(self):
+        settings = Settings(_env_file=None)
+        self.assertEqual(settings.retake_analysis_model, 'gpt-5.6-luna')
+        self.assertEqual(settings.retake_analysis_reasoning_effort, 'xhigh')
+
+    def test_single_photo_openai_review_defaults_to_luna_xhigh(self):
+        settings = Settings(_env_file=None)
+        self.assertEqual(settings.openai_review_model, 'gpt-5.6-luna')
+        self.assertEqual(settings.openai_review_reasoning_effort, 'xhigh')
+
 
 if __name__ == '__main__':
     unittest.main()

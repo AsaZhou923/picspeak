@@ -40,7 +40,7 @@ function retakeTargetCopy(locale: 'zh' | 'en' | 'ja') {
       sourcePrompt: 'Prompt example',
       sourceContent: 'Content source',
       dimension: 'Focus',
-      coachTitle: 'GPT-5.6 Terra Retake Coach',
+      coachTitle: 'GPT-5.6 Retake Coach',
       originalLabel: '元の写真',
       retakeLabel: '再撮影',
       uploadHint: '新しい写真をアップロードすると、この目標と流入元の文脈を保ったまま講評できます。',
@@ -54,7 +54,7 @@ function retakeTargetCopy(locale: 'zh' | 'en' | 'ja') {
       sourcePrompt: 'Prompt example',
       sourceContent: 'Content source',
       dimension: 'Focus',
-      coachTitle: 'GPT-5.6 Terra Retake Coach',
+      coachTitle: 'GPT-5.6 Retake Coach',
       originalLabel: 'Original',
       retakeLabel: 'Retake',
       uploadHint: 'Upload a new photo and PicSpeak will keep this goal and source context attached to the critique.',
@@ -67,7 +67,7 @@ function retakeTargetCopy(locale: 'zh' | 'en' | 'ja') {
     sourcePrompt: '来源案例',
     sourceContent: '内容来源',
     dimension: '重点维度',
-    coachTitle: 'GPT-5.6 Terra 重拍教练',
+    coachTitle: 'GPT-5.6 重拍教练',
     originalLabel: '原片',
     retakeLabel: '重拍图',
     uploadHint: '上传新照片后，PicSpeak 会保留这次练习目标和来源上下文，方便继续复盘。',
@@ -134,7 +134,7 @@ function WorkspacePageContent() {
   const coachCopy = getRetakeCoachCopy(locale);
   const isRetakeCoachFlow = retakeIntent === 'retake_coach' && Boolean(sourceReviewId);
   const canUploadRetake = !isRetakeCoachFlow || Boolean(replayPhotoUrl);
-  const selectedReviewModel: ReviewModel = isRetakeCoachFlow ? 'gpt-5.6-terra' : reviewModel;
+  const selectedReviewModel: ReviewModel = isRetakeCoachFlow ? 'gpt-5.6-luna' : reviewModel;
   const contentSourceLabel = promptExampleId ?? contentSlug ?? galleryReviewId;
 
   useEffect(() => {

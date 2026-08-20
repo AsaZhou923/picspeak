@@ -69,8 +69,8 @@ export function resolveWorkspaceTaskStep(stage: Stage, hasReadyPhoto: boolean, h
   return 'image';
 }
 
-export function reviewModelLabel(model: 'qwen' | 'gpt-5.5' | 'gpt-5.6-terra'): string {
+export function reviewModelLabel(model: 'qwen' | 'gpt-5.5' | 'gpt-5.6-luna'): string {
   if (model === 'gpt-5.5') return 'GPT-5.5';
-  if (model === 'gpt-5.6-terra') return 'GPT-5.6 Terra';
-  return 'Qwen 3.5';
+  if (model === 'gpt-5.6-luna') return 'GPT-5.6';
+  return 'Qwen 3.7';
 }

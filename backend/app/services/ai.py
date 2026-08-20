@@ -444,7 +444,7 @@ def _run_openai_review(
     enforce_suggestion_structure: bool,
 ) -> AIReviewResponse:
     if not settings.openai_api_key:
-        raise AIReviewError('OPENAI_API_KEY is not configured for GPT-5.5 photo review')
+        raise AIReviewError('OPENAI_API_KEY is not configured for GPT-5.6 photo review')
     if not settings.openai_review_model:
         raise AIReviewError('OPENAI_REVIEW_MODEL is not configured')
 
@@ -509,7 +509,7 @@ def run_ai_review(
     enforce_suggestion_structure: bool = True,
     review_model: str = 'qwen',
 ) -> AIReviewResponse:
-    if review_model == 'gpt-5.5':
+    if review_model in {'gpt-5.5', 'gpt-5.6-luna'}:
         return _run_openai_review(
             mode=mode,
             image_url=image_url,

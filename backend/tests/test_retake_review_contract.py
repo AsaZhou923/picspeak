@@ -35,19 +35,42 @@ class RetakeReviewContractTests(unittest.TestCase):
         self.assertEqual(payload.analysis_type, 'single')
         self.assertEqual(payload.review_model, 'qwen')
 
-    def test_retake_analysis_is_always_pinned_to_terra(self) -> None:
+    def test_retake_analysis_is_always_pinned_to_luna(self) -> None:
         payload = _request(source_review_id='rev_source')
 
-        self.assertEqual(payload.review_model, 'gpt-5.6-terra')
+        self.assertEqual(payload.review_model, 'gpt-5.6-luna')
 
-    def test_terra_cannot_be_selected_for_normal_review(self) -> None:
-        with self.assertRaises(ValueError):
-            ReviewCreateRequest(
-                photo_id='pho_1',
-                mode='flash',
-                analysis_type='single',
-                review_model='gpt-5.6-terra',
-            )
+    def test_luna_can_be_selected_for_normal_review(self) -> None:
+        payload = ReviewCreateRequest(
+            photo_id='pho_1',
+            mode='flash',
+            analysis_type='single',
+            review_model='gpt-5.6-luna',
+        )
+
+        self.assertEqual(payload.review_model, 'gpt-5.6-luna')
+
+    def test_legacy_gpt55_single_request_is_normalized_to_luna(self) -> None:
+        payload = ReviewCreateRequest(
+            photo_id='pho_1',
+            mode='flash',
+            analysis_type='single',
+            review_model='gpt-5.5',
+        )
+
+        self.assertEqual(payload.review_model, 'gpt-5.6-luna')
+
+    def test_legacy_terra_retake_request_is_normalized_to_luna(self) -> None:
+        payload = ReviewCreateRequest(
+            photo_id='pho_retake',
+            mode='pro',
+            source_review_id='rev_source',
+            analysis_type='retake_compare',
+            review_model='gpt-5.6-terra',
+            locale='en',
+        )
+
+        self.assertEqual(payload.review_model, 'gpt-5.6-luna')
 
     def test_retake_requires_source_review(self) -> None:
         with self.assertRaises(HTTPException) as raised:
@@ -119,8 +142,8 @@ class RetakeReviewContractTests(unittest.TestCase):
             raw,
             final_score=7.2,
             prompt_version='retake-coach-v1',
-            model_name='gpt-5.6-terra',
-            model_version='gpt-5.6-terra',
+            model_name='gpt-5.6-luna',
+            model_version='gpt-5.6-luna',
             exif_info=None,
         )
         public = _review_result_payload(stored, 7.2)

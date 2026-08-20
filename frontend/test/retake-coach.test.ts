@@ -35,17 +35,24 @@ test('retake entry keeps only completed sources and carries the selected review 
   );
 });
 
-test('normal workspace exposes GPT-5.5 while retake flow stays locked to GPT-5.6 Terra', async () => {
+test('normal workspace and retake flow both route to GPT-5.6 Luna', async () => {
   const source = await readFile('src/app/workspace/page.tsx', 'utf8');
   const picker = await readFile('src/features/workspace/components/ReviewModelPicker.tsx', 'utf8');
   const settings = await readFile('src/features/workspace/components/WorkspaceSettingsPanel.tsx', 'utf8');
+  const header = await readFile('src/components/layout/Header.tsx', 'utf8');
+  const coachCopy = await readFile('src/lib/retake-coach-copy.ts', 'utf8');
 
   assert.match(source, /review_model: selectedReviewModel/);
-  assert.match(source, /isRetakeCoachFlow \? 'gpt-5\.6-terra' : reviewModel/);
+  assert.match(source, /isRetakeCoachFlow \? 'gpt-5\.6-luna' : reviewModel/);
   assert.match(source, /<WorkspaceSettingsPanel/);
   assert.match(settings, /<ReviewModelPicker/);
-  assert.match(picker, /Qwen 3\.5/);
-  assert.match(picker, /GPT-5\.5/);
+  assert.match(picker, /Qwen 3\.7/);
+  assert.doesNotMatch(picker, /Qwen 3\.5/);
+  assert.match(picker, /GPT-5\.6/);
+  assert.doesNotMatch(picker, /GPT-5\.5/);
+  assert.match(header, />5\.6<\/span>/);
+  assert.doesNotMatch(header, />Terra<\/span>/);
+  assert.doesNotMatch(coachCopy, /Terra/);
 });
 
 test('retake comparison keeps original before retake and handles inaccessible source photos', async () => {

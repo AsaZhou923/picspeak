@@ -13,7 +13,7 @@ const DIMENSIONS: RetakeDimensionKey[] = ['composition', 'lighting', 'color', 'i
 function getCopy(locale: 'zh' | 'en' | 'ja') {
   if (locale === 'ja') {
     return {
-      label: 'GPT-5.6 Terra Retake Coach', title: '元の写真と再撮影を比較', original: '元の写真', retake: '再撮影',
+      label: 'GPT-5.6 Retake Coach', title: '元の写真と再撮影を比較', original: '元の写真', retake: '再撮影',
       target: '撮影目標', compare: '変化を比較', targetLoading: '元の講評から撮影目標を読み込み中', targetUnavailable: '元の講評の目標を表示できません。',
       before: 'Before', after: 'After', evidence: '見える根拠', remaining: '次の課題', actions: '次回の撮影アクション',
       strongest: '最大の改善',
@@ -25,7 +25,7 @@ function getCopy(locale: 'zh' | 'en' | 'ja') {
   }
   if (locale === 'en') {
     return {
-      label: 'GPT-5.6 Terra Retake Coach', title: 'Original vs. retake', original: 'Original', retake: 'Retake',
+      label: 'GPT-5.6 Retake Coach', title: 'Original vs. retake', original: 'Original', retake: 'Retake',
       target: 'Target', compare: 'Compare the change', targetLoading: 'Loading the shooting target from the original critique', targetUnavailable: 'The original shooting target is unavailable.',
       before: 'Before', after: 'After', evidence: 'Visible evidence', remaining: 'Remaining gap', actions: 'Next-shoot actions',
       strongest: 'Strongest improvement',
@@ -36,7 +36,7 @@ function getCopy(locale: 'zh' | 'en' | 'ja') {
     };
   }
   return {
-    label: 'GPT-5.6 Terra 重拍教练', title: '原片与重拍对比', original: '原片', retake: '重拍图',
+    label: 'GPT-5.6 重拍教练', title: '原片与重拍对比', original: '原片', retake: '重拍图',
     target: '拍摄目标', compare: '对比变化', targetLoading: '正在从原点评读取拍摄目标', targetUnavailable: '暂时无法显示原点评中的拍摄目标。',
     before: '重拍前', after: '重拍后', evidence: '画面依据', remaining: '仍需改善', actions: '下一次拍摄行动',
     strongest: '最大改善',

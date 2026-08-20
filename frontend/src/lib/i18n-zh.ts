@@ -17,8 +17,8 @@ export const zhTranslations = {
   app_error_retry: '重试',
   plan_guest_label: '游客',
   updates_label: '更新记录',
-  updates_hint_home: '查看 SEO/GEO 权威度与发现能力加固更新',
-  updates_hint_latest: '查看 SEO/GEO 权威度与发现能力加固更新',
+  updates_hint_home: '查看 GPT-5.6 Luna 点评路由更新',
+  updates_hint_latest: '查看 GPT-5.6 Luna 点评路由更新',
 
   generation_badge: 'AI 创作',
   generation_title: 'AI 创作',

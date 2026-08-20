@@ -1,5 +1,32 @@
 [
   {
+    "id": "2026-08-20-gpt56-luna-xhigh",
+    "date": "2026-08-20",
+    "title": "OpenAI 摄影点评切换到 GPT-5.6 Luna 与 xhigh 推理",
+    "summary": "PicSpeak 的普通单图 OpenAI 点评和原片与复拍比较现已统一路由到 GPT-5.6 Luna，并使用 xhigh 推理强度。产品界面显示稳定的 GPT-5.6 家族标识，请求体、模型 provenance、环境默认值和回归测试则明确记录真实的 Luna 路径。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-08-20-gpt56-luna-xhigh",
+    "sections": [
+      {
+        "title": "运行时路由",
+        "items": [
+          "普通单图 OpenAI 点评和复拍比较都改为 model=gpt-5.6-luna，并设置 reasoning.effort=xhigh",
+          "仍提交普通单图 GPT-5.5 或复拍 Terra 路由值的旧客户端都会被后端归一化到 Luna",
+          "使用记录改为保存 OpenAI 响应返回的真实模型，而不是复制客户端路由标签"
+        ]
+      },
+      {
+        "title": "产品标识",
+        "items": [
+          "导航栏小标识由 Terra 改为 5.6",
+          "普通 OpenAI 点评卡片显示 GPT-5.6，并提交 Luna 路由",
+          "中、英、日三语复拍教练界面统一使用 GPT-5.6 家族名称",
+          "Build Week 和旧发布记录中的 Terra 历史描述保持不变",
+          "工作台卡片显示改为 Qwen 3.7；这次纯前端标签调整不改变现有 DashScope 后端路由"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-08-09-seo-geo-authority-discovery",
     "date": "2026-08-09",
     "title": "SEO/GEO 权威度与发现能力加固",

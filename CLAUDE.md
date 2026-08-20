@@ -14,7 +14,7 @@ Core product areas:
 - AI image generation with templates, tasks, generated image detail pages, history, credits, and credit-pack billing
 - Review-to-generation loop for composition, lighting, color, and retake reference images
 - Review-to-workspace retake targets, history practice themes, and in-task Blog reading during critique/generation waits
-- Original-to-retake comparison with GPT-5.6 Terra, deterministic score deltas, evidence-backed next-shoot actions, and same-chain progress tracking
+- Original-to-retake comparison with GPT-5.6 Luna at `xhigh` reasoning, deterministic score deltas, evidence-backed next-shoot actions, and same-chain progress tracking
 - Operational health snapshots for task status, AI costs, credits, payments, and public-content audits
 
 ## Architecture
@@ -23,7 +23,7 @@ Core product areas:
 - **Backend**: FastAPI, SQLAlchemy 2.x, Alembic, Uvicorn
 - **Database**: PostgreSQL
 - **Object storage**: Cloudflare R2 / S3-compatible storage
-- **AI critique**: Qwen-compatible single-photo critique by default, optional GPT-5.5 single-photo review through OpenAI Responses, and GPT-5.6 Terra paired original/retake comparison
+- **AI critique**: Qwen-compatible single-photo critique by default, optional GPT-5.6 Luna single-photo review through OpenAI Responses, and GPT-5.6 Luna paired original/retake comparison; both OpenAI paths use `xhigh` reasoning
 - **AI generation**: OpenAI-compatible image generation endpoint, task queue, credit pricing, and object-storage persistence
 - **Task processing**: In-process async worker by default, optional standalone worker and Cloud Tasks configuration
 - **Authentication**: Clerk plus legacy Google OAuth/guest JWT support
@@ -99,7 +99,7 @@ npm run test
 - `db/models.py` - SQLAlchemy models for users, photos, reviews, tasks, gallery, billing, usage, analytics, and generated images
 - `db/bootstrap.py` - Runtime schema bootstrap helpers
 - `services/ai.py` and `services/ai_prompts.py` - Vision critique client and prompt construction
-- `services/retake_comparison.py` - GPT-5.6 Terra paired-image schema, Responses API client, deterministic deltas, and comparison normalization
+- `services/retake_comparison.py` - GPT-5.6 Luna paired-image schema, Responses API client, deterministic deltas, and comparison normalization
 - `services/review_task_processor.py` - Photo review task execution
 - `services/image_generation*.py` - Generation client, prompt building, pricing, and task execution
 - `services/object_storage.py` - Presigned upload/download and generated image persistence
@@ -148,12 +148,12 @@ npm run test
 
 1. User opens `/retake`, selects a completed source critique, and continues to the workspace with its source review and target context.
 2. The workspace uploads a new photo and creates a review with `analysis_type=retake_compare` and the source review id.
-3. Backend resolves both stored images and sends them together to the OpenAI Responses API with `model=gpt-5.6-terra` and a strict paired-comparison schema.
-4. GPT-5.6 Terra scores both images under one rubric; the server calculates every dimension and overall delta before persisting `Review.result_json.comparison`.
+3. Backend resolves both stored images and sends them together to the OpenAI Responses API with `model=gpt-5.6-luna`, `reasoning.effort=xhigh`, and a strict paired-comparison schema.
+4. GPT-5.6 Luna scores both images under one rubric; the server calculates every dimension and overall delta before persisting `Review.result_json.comparison`.
 5. Comparable results appear in `RetakeComparisonPanel` and the same-chain `RetakeProgressPanel`; non-comparable results keep their caveat but do not count as progress.
 6. The paired diagnosis can feed the existing GPT Image 2 `review_linked` / `retake_reference` flow, but generated images never affect comparison scores.
 
-Normal single-photo review is a separate path: Qwen 3.5 remains the compatibility default, while an explicit GPT-5.5 selection uses the OpenAI Responses API. Do not reuse one model's completed review for another model choice.
+Normal single-photo review is a separate path: Qwen 3.5 remains the compatibility default, while an explicit GPT-5.6 selection uses GPT-5.6 Luna with `xhigh` reasoning through the OpenAI Responses API. Do not reuse one model's completed review for another model choice.
 
 ### Auth and quota
 
@@ -198,8 +198,8 @@ Frontend values live in `frontend/.env.local`; `NEXT_PUBLIC_API_URL` and site/pu
 - Keep backend task state changes transactional and idempotent.
 - Do not bypass quota, credit, or guest/auth helpers when adding new creation endpoints.
 - When touching image generation, update pricing, task processor, API schemas, frontend contracts, and tests together.
-- Keep normal GPT review pinned to GPT-5.5 and `retake_compare` pinned to GPT-5.6 Terra unless model-specific contract tests and redacted live routing evidence are updated together.
-- Retake deltas must always be calculated from the two scores produced inside the same paired request; never subtract a stored Qwen score from a GPT-5.6 Terra score.
+- Keep normal GPT review and `retake_compare` pinned to GPT-5.6 Luna with `xhigh` reasoning unless model-specific contract tests and redacted live routing evidence are updated together.
+- Retake deltas must always be calculated from the two scores produced inside the same paired request; never subtract a stored Qwen score from a GPT-5.6 Luna score.
 - When touching public pages, update localized copy and SEO tests together.
 - Use `serializeJsonLd()` for inline JSON-LD scripts, and reuse shared date, locale, and checkout helpers before reintroducing page-local copies.
 - Treat root `DESIGN.md` as the frontend product and UI decision baseline; preserve the professional photography coach plus efficient AI tool hierarchy when changing public or workflow pages.

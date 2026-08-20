@@ -76,7 +76,7 @@ export default function Header() {
           </Link>
           <Link href="/retake" className={`inline-flex items-center gap-1.5 transition-colors ${isActive('/retake')}`}>
             {retakeCopy.nav}
-            <span className="rounded-full border border-sage/25 bg-sage/10 px-1.5 py-0.5 text-[9px] font-medium text-sage">Terra</span>
+            <span className="rounded-full border border-sage/25 bg-sage/10 px-1.5 py-0.5 text-[9px] font-medium text-sage">5.6</span>
           </Link>
           <Link href="/generate" className={`transition-colors ${isActive('/generate')}`}>
             {t('nav_generate')}

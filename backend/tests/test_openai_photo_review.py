@@ -14,7 +14,7 @@ if str(BACKEND_ROOT) not in sys.path:
 from app.services.ai import AIReviewError, run_ai_review
 
 
-def _response(payload: dict, *, model: str = 'gpt-5.5', input_tokens: int = 100, output_tokens: int = 20):
+def _response(payload: dict, *, model: str = 'gpt-5.6-luna', input_tokens: int = 100, output_tokens: int = 20):
     body = {
         'id': 'resp_test',
         'status': 'completed',
@@ -53,8 +53,8 @@ class OpenAIPhotoReviewTests(unittest.TestCase):
 
         with patch('app.services.ai.settings.openai_api_key', 'test-key'), patch(
             'app.services.ai.settings.openai_api_base_url', 'https://api.openai.com/v1'
-        ), patch('app.services.ai.settings.openai_review_model', 'gpt-5.5'), patch(
-            'app.services.ai.settings.openai_review_reasoning_effort', 'medium'
+        ), patch('app.services.ai.settings.openai_review_model', 'gpt-5.6-luna'), patch(
+            'app.services.ai.settings.openai_review_reasoning_effort', 'xhigh'
         ), patch('app.services.ai.settings.openai_review_timeout_seconds', 180), patch(
             'app.services.ai.pooled_request', side_effect=[scoring, writing]
         ) as request_mock:
@@ -63,10 +63,10 @@ class OpenAIPhotoReviewTests(unittest.TestCase):
                 image_url='data:image/jpeg;base64,abc',
                 locale='en',
                 image_type='portrait',
-                review_model='gpt-5.5',
+                review_model='gpt-5.6-luna',
             )
 
-        self.assertEqual(response.model_name, 'gpt-5.5')
+        self.assertEqual(response.model_name, 'gpt-5.6-luna')
         self.assertEqual(response.result.scores['composition'], 7)
         self.assertEqual(response.result.final_score, 6.0)
         self.assertEqual(response.input_tokens, 300)
@@ -77,9 +77,9 @@ class OpenAIPhotoReviewTests(unittest.TestCase):
         first_payload = json.loads(request_mock.call_args_list[0].kwargs['body'])
         second_payload = json.loads(request_mock.call_args_list[1].kwargs['body'])
         self.assertEqual(first_url, 'https://api.openai.com/v1/responses')
-        self.assertEqual(first_payload['model'], 'gpt-5.5')
+        self.assertEqual(first_payload['model'], 'gpt-5.6-luna')
         self.assertFalse(first_payload['store'])
-        self.assertEqual(first_payload['reasoning'], {'effort': 'medium'})
+        self.assertEqual(first_payload['reasoning'], {'effort': 'xhigh'})
         self.assertEqual(first_payload['input'][0]['content'][1]['type'], 'input_image')
         self.assertEqual(first_payload['input'][0]['content'][1]['detail'], 'high')
         self.assertEqual(first_payload['text']['format']['type'], 'json_schema')
@@ -92,7 +92,7 @@ class OpenAIPhotoReviewTests(unittest.TestCase):
                 run_ai_review(
                     mode='flash',
                     image_url='https://example.com/photo.jpg',
-                    review_model='gpt-5.5',
+                    review_model='gpt-5.6-luna',
                 )
 
     def test_unknown_review_model_is_rejected(self) -> None:
