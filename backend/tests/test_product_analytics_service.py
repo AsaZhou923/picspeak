@@ -107,6 +107,7 @@ class ProductAnalyticsServiceTests(unittest.TestCase):
                 session_id='sess-1',
                 plan='guest',
                 source='home_direct',
+                metadata={'task_id': 'rt_home'},
             ),
             AnalyticsEventSample(
                 event_name='review_result_viewed',
@@ -115,6 +116,7 @@ class ProductAnalyticsServiceTests(unittest.TestCase):
                 session_id='sess-1',
                 plan='guest',
                 source='home_direct',
+                metadata={'task_id': 'rt_home'},
             ),
             AnalyticsEventSample(
                 event_name='sign_in_completed',
@@ -166,7 +168,7 @@ class ProductAnalyticsServiceTests(unittest.TestCase):
                 session_id='sess-3',
                 plan='guest',
                 source='blog',
-                metadata={'has_source_review_id': True, 'retake_intent': 'new_photo_retake'},
+                metadata={'task_id': 'rt_blog', 'has_source_review_id': True, 'retake_intent': 'new_photo_retake'},
             ),
             AnalyticsEventSample(
                 event_name='review_result_viewed',
@@ -175,6 +177,7 @@ class ProductAnalyticsServiceTests(unittest.TestCase):
                 session_id='sess-3',
                 plan='guest',
                 source='blog',
+                metadata={'task_id': 'rt_blog'},
             ),
             AnalyticsEventSample(
                 event_name='prompt_library_viewed',
@@ -208,6 +211,7 @@ class ProductAnalyticsServiceTests(unittest.TestCase):
                 source='prompt_library',
                 locale='en',
                 metadata={
+                    'task_id': 'igt_prompt',
                     'prompt_example_id': 'neon-portrait',
                     'prompt_example_category': 'photography',
                     'template_key': 'photo_inspiration',
@@ -222,7 +226,7 @@ class ProductAnalyticsServiceTests(unittest.TestCase):
                 plan='free',
                 source='prompt_library',
                 locale='en',
-                metadata={'quality': 'low', 'size': '1024x1024', 'credits_charged': 1, 'cost_usd': 0.01},
+                metadata={'task_id': 'igt_prompt', 'quality': 'low', 'size': '1024x1024', 'credits_charged': 1, 'cost_usd': 0.01},
             ),
             AnalyticsEventSample(
                 event_name='generation_used_for_retake',
@@ -436,6 +440,7 @@ class ProductAnalyticsServiceTests(unittest.TestCase):
                 session_id='blog-session',
                 plan='guest',
                 source='blog',
+                metadata={'task_id': 'rt_content_blog'},
             ),
             AnalyticsEventSample(
                 event_name='review_result_viewed',
@@ -444,6 +449,7 @@ class ProductAnalyticsServiceTests(unittest.TestCase):
                 session_id='blog-session',
                 plan='guest',
                 source='blog',
+                metadata={'task_id': 'rt_content_blog'},
             ),
             AnalyticsEventSample(
                 event_name='gallery_viewed',
@@ -549,7 +555,7 @@ class ProductAnalyticsServiceTests(unittest.TestCase):
         self.assertIn('### Prompt example 应用漏斗', markdown)
         self.assertIn('### Credit exhausted 承接', markdown)
         self.assertIn('### AI Create 单位经济模型', markdown)
-        self.assertIn('| 日期 | DAU | WAU | 首评完成率 | 7 日二次使用率 |', markdown)
+        self.assertIn('| 日期 | DAU | WAU | 请求 cohort 首次结果查看率 | 7 日二次使用率 |', markdown)
         self.assertIn('| 2026-04-10 | 1 | 1 | 0.0% | 0.0% |', markdown)
 
     def test_render_content_conversion_weekly_markdown_outputs_stage_d_table(self) -> None:
@@ -580,9 +586,286 @@ class ProductAnalyticsServiceTests(unittest.TestCase):
         markdown = render_content_conversion_weekly_markdown(snapshot)
 
         self.assertIn('# PicSpeak 内容来源转化周报', markdown)
-        self.assertIn('| 来源 | 浏览访客 | 工作台点击 | 工作台进入 | 上传成功 | 发起点评 | 查看结果 | 点击率 | 上传转化率 | 首评完成率 |', markdown)
+        self.assertIn('| 来源 | 浏览访客 | 工作台点击 | 工作台进入 | 上传成功 | 发起点评 | cohort 查看结果 | 点击率 | 上传转化率 | cohort 结果查看率 |', markdown)
         self.assertIn('| blog | 1 | 1 | 0 | 0 | 0 | 0 | 100.0% | 0.0% | 0.0% |', markdown)
         self.assertIn('| prompt_library | 0 | 0 | 0 | 0 | 0 | 0 | 0.0% | 0.0% | 0.0% |', markdown)
+
+    def test_review_completion_uses_causal_d_plus_one_request_cohort(self) -> None:
+        events = [
+            AnalyticsEventSample(
+                event_name='review_requested',
+                occurred_at=datetime(2026, 5, 1, 0, 1, tzinfo=timezone.utc),
+                device_id='same-browser',
+                plan='guest',
+                source='blog',
+                metadata={'task_id': 'rt_a'},
+            ),
+            AnalyticsEventSample(
+                event_name='review_result_viewed',
+                occurred_at=datetime(2026, 5, 1, 0, 2, tzinfo=timezone.utc),
+                device_id='same-browser',
+                plan='guest',
+                source='blog',
+                metadata={'task_id': 'rt_unrelated'},
+            ),
+            AnalyticsEventSample(
+                event_name='review_result_viewed',
+                occurred_at=datetime(2026, 5, 2, 23, 45, tzinfo=timezone.utc),
+                device_id='another-browser',
+                plan='guest',
+                source='blog',
+                metadata={'task_id': 'rt_a'},
+            ),
+            AnalyticsEventSample(
+                event_name='review_result_viewed',
+                occurred_at=datetime(2026, 5, 2, 23, 46, tzinfo=timezone.utc),
+                device_id='another-browser',
+                plan='guest',
+                source='blog',
+                metadata={'task_id': 'rt_a'},
+            ),
+        ]
+
+        snapshot = build_stage_a_snapshot(
+            events=events,
+            reviews=[],
+            start_date=date(2026, 5, 1),
+            end_date=date(2026, 5, 1),
+        )
+
+        first_review = snapshot['daily_rows'][0]['first_review_completion']
+        self.assertEqual(first_review['base_users'], 1)
+        self.assertEqual(first_review['users'], 1)
+        self.assertEqual(first_review['rate'], 1.0)
+        self.assertEqual(snapshot['source_breakdown']['blog']['review_results'], 1)
+        self.assertEqual(snapshot['content_conversion_weekly']['blog']['first_review_completion_rate'], 1.0)
+
+    def test_review_completion_excludes_missing_causal_keys_without_identity_fallback(self) -> None:
+        events = [
+            AnalyticsEventSample(
+                event_name='review_requested',
+                occurred_at=datetime(2026, 5, 1, 9, 0, tzinfo=timezone.utc),
+                device_id='dev-legacy',
+                source='blog',
+            ),
+            AnalyticsEventSample(
+                event_name='review_result_viewed',
+                occurred_at=datetime(2026, 5, 1, 9, 5, tzinfo=timezone.utc),
+                device_id='dev-legacy',
+                source='blog',
+            ),
+        ]
+
+        snapshot = build_stage_a_snapshot(
+            events=events,
+            reviews=[],
+            start_date=date(2026, 5, 1),
+            end_date=date(2026, 5, 1),
+        )
+
+        first_review = snapshot['daily_rows'][0]['first_review_completion']
+        self.assertEqual(first_review['base_users'], 0)
+        self.assertEqual(first_review['users'], 0)
+        self.assertEqual(first_review['rate'], 0.0)
+        self.assertEqual(snapshot['data_health']['review_causal_key_missing']['review_requested'], 1)
+        self.assertIn('review_causal_key_missing', snapshot['data_health']['warnings'])
+
+    def test_generation_lifecycle_and_unit_economics_dedupe_by_task(self) -> None:
+        events = [
+            AnalyticsEventSample(
+                event_name='generation_succeeded',
+                occurred_at=datetime(2026, 5, 3, 9, 0, tzinfo=timezone.utc),
+                source='unknown',
+                metadata={'task_id': 'igt_prior', 'credits_charged': 40, 'cost_usd': 1.0},
+            ),
+            AnalyticsEventSample(
+                event_name='generation_requested',
+                occurred_at=datetime(2026, 5, 3, 10, 0, tzinfo=timezone.utc),
+                device_id='request-browser',
+                source='prompt_library',
+                metadata={'task_id': 'igt_one', 'prompt_example_id': 'portrait', 'quality': 'low', 'size': '1024x1024'},
+            ),
+            AnalyticsEventSample(
+                event_name='generation_failed',
+                occurred_at=datetime(2026, 5, 3, 10, 1, tzinfo=timezone.utc),
+                source='unknown',
+                metadata={'task_id': 'igt_one', 'error_code': 'LEGACY_CONTRADICTION'},
+            ),
+            AnalyticsEventSample(
+                event_name='generation_succeeded',
+                occurred_at=datetime(2026, 5, 3, 10, 2, tzinfo=timezone.utc),
+                device_id='server',
+                source='unknown',
+                metadata={'task_id': 'igt_one', 'quality': 'low', 'size': '1024x1024', 'credits_charged': 1, 'cost_usd': 0.02},
+            ),
+            AnalyticsEventSample(
+                event_name='generation_succeeded',
+                occurred_at=datetime(2026, 5, 3, 10, 3, tzinfo=timezone.utc),
+                device_id='browser-tab',
+                source='prompt_library',
+                metadata={'task_id': 'igt_one', 'quality': 'low', 'size': '1024x1024', 'credits_charged': 1, 'cost_usd': 0.02},
+            ),
+        ]
+
+        snapshot = build_stage_a_snapshot(
+            events=events,
+            reviews=[],
+            start_date=date(2026, 5, 3),
+            end_date=date(2026, 5, 3),
+        )
+
+        funnel = snapshot['generation_funnel']
+        self.assertEqual(funnel['overall']['generation_requested'], 1)
+        self.assertEqual(funnel['overall']['generation_succeeded'], 1)
+        self.assertEqual(funnel['overall']['generation_failed'], 0)
+        self.assertEqual(funnel['request_success_rate'], 1.0)
+        self.assertEqual(funnel['by_source']['prompt_library']['successes'], 1)
+        self.assertEqual(funnel['prompt_examples']['requests_with_example'], 1)
+        unit_economics = snapshot['generation_unit_economics']
+        self.assertEqual(unit_economics['metered_successes'], 1)
+        self.assertEqual(unit_economics['credits_charged'], 1)
+        self.assertEqual(unit_economics['cost_usd'], 0.02)
+
+    def test_generation_request_cohort_counts_next_day_terminal_event(self) -> None:
+        events = [
+            AnalyticsEventSample(
+                event_name='generation_requested',
+                occurred_at=datetime(2026, 5, 3, 23, 59, tzinfo=timezone.utc),
+                device_id='request-browser',
+                source='prompt_library',
+                metadata={'task_id': 'igt_late', 'prompt_example_id': 'late-template'},
+            ),
+            AnalyticsEventSample(
+                event_name='generation_succeeded',
+                occurred_at=datetime(2026, 5, 4, 0, 2, tzinfo=timezone.utc),
+                device_id='server',
+                source='unknown',
+                metadata={'task_id': 'igt_late', 'quality': 'low', 'size': '1024x1024', 'credits_charged': 1, 'cost_usd': 0.02},
+            ),
+        ]
+
+        snapshot = build_stage_a_snapshot(
+            events=events,
+            reviews=[],
+            start_date=date(2026, 5, 3),
+            end_date=date(2026, 5, 3),
+        )
+
+        funnel = snapshot['generation_funnel']
+        self.assertEqual(funnel['overall']['generation_requested'], 1)
+        self.assertEqual(funnel['overall']['generation_succeeded'], 1)
+        self.assertEqual(funnel['request_success_rate'], 1.0)
+        self.assertEqual(funnel['by_source']['prompt_library']['successes'], 1)
+        self.assertEqual(snapshot['generation_unit_economics']['metered_successes'], 1)
+
+    def test_generation_lifecycle_uses_d_plus_one_terminal_events_for_request_cohort(self) -> None:
+        events = [
+            AnalyticsEventSample(
+                event_name='generation_requested',
+                occurred_at=datetime(2026, 5, 3, 23, 58, tzinfo=timezone.utc),
+                device_id='prompt-browser',
+                source='prompt_library',
+                locale='en',
+                metadata={'task_id': 'igt_boundary_success', 'prompt_example_id': 'portrait'},
+            ),
+            AnalyticsEventSample(
+                event_name='generation_requested',
+                occurred_at=datetime(2026, 5, 3, 23, 59, tzinfo=timezone.utc),
+                device_id='review-browser',
+                source='gallery',
+                locale='ja',
+                metadata={'task_id': 'igt_boundary_failure', 'generation_mode': 'review_linked'},
+            ),
+            AnalyticsEventSample(
+                event_name='generation_succeeded',
+                occurred_at=datetime(2026, 5, 4, 0, 1, tzinfo=timezone.utc),
+                source='unknown',
+                metadata={'task_id': 'igt_boundary_success', 'quality': 'low', 'size': '1024x1024', 'credits_charged': 1, 'cost_usd': 0.02},
+            ),
+            AnalyticsEventSample(
+                event_name='generation_failed',
+                occurred_at=datetime(2026, 5, 4, 0, 2, tzinfo=timezone.utc),
+                source='unknown',
+                metadata={'task_id': 'igt_boundary_failure', 'error_code': 'OPENAI_IMAGE_GENERATION_FAILED'},
+            ),
+            AnalyticsEventSample(
+                event_name='generation_requested',
+                occurred_at=datetime(2026, 5, 4, 0, 3, tzinfo=timezone.utc),
+                source='prompt_library',
+                metadata={'task_id': 'igt_outside_request'},
+            ),
+            AnalyticsEventSample(
+                event_name='generation_succeeded',
+                occurred_at=datetime(2026, 5, 4, 0, 4, tzinfo=timezone.utc),
+                source='unknown',
+                metadata={'task_id': 'igt_outside_request', 'credits_charged': 50, 'cost_usd': 1.25},
+            ),
+            AnalyticsEventSample(
+                event_name='generation_succeeded',
+                occurred_at=datetime(2026, 5, 5, 0, 0, tzinfo=timezone.utc),
+                source='unknown',
+                metadata={'task_id': 'igt_boundary_failure', 'credits_charged': 50, 'cost_usd': 1.25},
+            ),
+        ]
+
+        snapshot = build_stage_a_snapshot(
+            events=events,
+            reviews=[],
+            start_date=date(2026, 5, 3),
+            end_date=date(2026, 5, 3),
+        )
+
+        funnel = snapshot['generation_funnel']
+        self.assertEqual(funnel['overall']['generation_requested'], 2)
+        self.assertEqual(funnel['overall']['generation_succeeded'], 1)
+        self.assertEqual(funnel['overall']['generation_failed'], 1)
+        self.assertEqual(funnel['by_source']['prompt_library']['successes'], 1)
+        self.assertEqual(funnel['by_entrypoint']['review_linked']['failures'], 1)
+        self.assertEqual(snapshot['locale_breakdown']['en']['generation_successes'], 1)
+        self.assertEqual(snapshot['locale_breakdown']['ja']['generation_successes'], 0)
+        unit_economics = snapshot['generation_unit_economics']
+        self.assertEqual(unit_economics['metered_successes'], 1)
+        self.assertEqual(unit_economics['credits_charged'], 1)
+        self.assertEqual(unit_economics['cost_usd'], 0.02)
+
+    def test_data_health_excludes_system_performance_from_product_unknown_source_rate(self) -> None:
+        events = [
+            *[
+                AnalyticsEventSample(
+                    event_name='web_vital_reported',
+                    occurred_at=datetime(2026, 5, 4, 10, minute, tzinfo=timezone.utc),
+                    source='system_performance',
+                    metadata={'metric_name': 'LCP', 'value': 1200 + minute},
+                )
+                for minute in range(5)
+            ],
+            AnalyticsEventSample(
+                event_name='web_vital_reported',
+                occurred_at=datetime(2026, 5, 4, 11, 0, tzinfo=timezone.utc),
+                source='unknown',
+                metadata={'metric_name': 'LCP', 'value': 1400},
+            ),
+            AnalyticsEventSample(
+                event_name='workspace_viewed',
+                occurred_at=datetime(2026, 5, 4, 11, 0, tzinfo=timezone.utc),
+                device_id='dev-product',
+                source='unknown',
+            ),
+        ]
+
+        snapshot = build_stage_a_snapshot(
+            events=events,
+            reviews=[],
+            start_date=date(2026, 5, 4),
+            end_date=date(2026, 5, 4),
+        )
+
+        data_health = snapshot['data_health']
+        self.assertEqual(data_health['performance_events'], 6)
+        self.assertEqual(data_health['ops_events'], 6)
+        self.assertEqual(data_health['product_events'], 1)
+        self.assertEqual(data_health['unknown_source_events'], 1)
+        self.assertEqual(data_health['unknown_source_rate'], 1.0)
 
 
 if __name__ == '__main__':

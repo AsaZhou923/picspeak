@@ -40,6 +40,11 @@ const HomeFaq = dynamic(() => import('@/components/home/HomeFaq'), {
   ),
 });
 
+const HomeUpdateDialog = dynamic(() => import('@/components/home/HomeUpdateDialog'), {
+  ssr: false,
+  loading: () => null,
+});
+
 export function HomePageContent() {
   const { t, locale } = useI18n();
   const homeIntentEntrances = getHomeIntentEntrances(locale);
@@ -73,6 +78,7 @@ export function HomePageContent() {
   return (
     <>
       <HomeAuthWidgets />
+      <HomeUpdateDialog />
 
       <section className="relative overflow-hidden px-5 py-12 sm:px-6 sm:py-16 lg:py-20">
         <div

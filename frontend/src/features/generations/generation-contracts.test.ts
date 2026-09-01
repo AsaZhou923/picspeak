@@ -28,6 +28,7 @@ const _request: GenerationCreateRequest = {
   size: '1024x1536',
   output_format: 'webp',
   async: true,
+  analytics_source: 'prompt_library',
 };
 
 const _response: GenerationCreateResponse = {
@@ -99,6 +100,7 @@ const _usage: UsageResponse = {
   generation_credits: {
     monthly_total: 3,
     monthly_used: 1,
+    monthly_held: 0,
     monthly_remaining: 2,
   },
   features: {
@@ -168,6 +170,7 @@ test('generation catalog and pricing helpers stay aligned', () => {
 
 test('usage and activation-code contracts expose quota and Pro grant fields', () => {
   assert.equal(_usage.generation_credits.monthly_remaining, 2);
+  assert.equal(_usage.generation_credits.monthly_held, 0);
   assert.equal(_activationCodeResponse.status, 'redeemed');
   assert.equal(_activationCodeResponse.plan, 'pro');
   assert.match(_activationCodeResponse.activated_until, /^2026-05-25/);
@@ -189,17 +192,20 @@ test('generation routes use the shared landmark and header-offset contracts', ()
   }
 });
 
-test('generation analytics, idempotency and destinations remain wired', () => {
+test('generation analytics, idempotency and destinations remain server-owned', () => {
   for (const eventName of [
     'generation_page_viewed',
     'generation_prompt_opened',
     'generation_template_selected',
     'generation_prompt_example_applied',
-    'generation_requested',
     'generation_credit_exhausted',
   ]) {
     assert.match(generatePageSource, new RegExp(`'${eventName}'`));
   }
+  assert.match(generatePageSource, /analytics_source: analyticsSource/);
+  assert.doesNotMatch(generatePageSource, /trackProductEvent\('generation_requested'/);
+  assert.doesNotMatch(generationTaskSource, /trackProductEvent\('generation_succeeded'/);
+  assert.doesNotMatch(generationTaskSource, /trackProductEvent\('generation_failed'/);
   assert.match(generatePageSource, /idempotency_key:/);
   assert.match(generatePageSource, /router\.push\(`\/generation-tasks\/\$\{result\.task_id\}`\)/);
   assert.match(generationTaskSource, /router\.replace\(destination\)/);

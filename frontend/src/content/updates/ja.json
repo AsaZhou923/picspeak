@@ -1,5 +1,37 @@
 [
   {
+    "id": "2026-09-01-review-generation-reliability",
+    "date": "2026-09-01",
+    "title": "評価の一貫性、生成クレジット、タスク信頼性を強化",
+    "summary": "PicSpeak は数値評価を一つの公式 GPT モデルに統一し、文章講評では引き続き Qwen / GPT を選択できます。公開結果のプライバシー、生成クレジット予約、worker 並行処理、ストレージ補償、分析 attribution も同時に強化しました。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-09-01-review-generation-reliability",
+    "sections": [
+      {
+        "title": "講評とプライバシー",
+        "items": [
+          "通常講評はすべて同じ公式 GPT scorer を使い、Qwen / GPT の選択は文章フィードバックだけに反映されます",
+          "再講評では厳密に検証したスコアを再利用し、provider response ID は内部監査情報として保持します",
+          "公開共有と非所有者表示から EXIF、内部 task ID、タグ、メモを除外しました"
+        ]
+      },
+      {
+        "title": "画像生成とデータ信頼性",
+        "items": [
+          "画像クレジットに処理中の予約状態を追加し、成功時に消費、終端失敗時に自動解放します",
+          "atomic claim、worker lease、object cleanup、request / terminal analytics outbox を強化しました",
+          "日付をまたぐ生成完了も元の request cohort に残り、成功率を正しく集計します"
+        ]
+      },
+      {
+        "title": "ホームの更新案内",
+        "items": [
+          "ホームで最新 release を一度だけ表示する更新ダイアログを追加しました",
+          "ダイアログはいつでも閉じられ、三言語の完全な履歴は Updates ページで確認できます"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-08-20-gpt56-luna-xhigh",
     "date": "2026-08-20",
     "title": "OpenAI 写真講評を GPT-5.6 Luna と xhigh 推論へ更新",

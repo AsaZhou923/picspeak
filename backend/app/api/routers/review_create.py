@@ -38,6 +38,11 @@ from app.services.guard import (
 from app.services.task_dispatcher import TaskDispatchError, enqueue_review_task
 from app.services.task_events import record_task_event
 from app.services.retake_comparison import run_retake_comparison
+from app.services.review_score_cache import (
+    canonical_score_cache_lease,
+    review_uses_current_full_review_contract,
+    writer_contract_for_review_request,
+)
 from .review_support import (
     _attach_billing_info,
     _resolve_source_review,
@@ -79,6 +84,10 @@ def create_review(
             return response_json
 
     if actor.plan != UserPlan.guest and source_review is None:
+        requested_writer_model_name = writer_contract_for_review_request(
+            mode=payload.mode,
+            review_model=payload.review_model,
+        )
         existing_query = db.query(Review).filter(
             Review.photo_id == photo.id,
             Review.owner_user_id == actor.user.id,
@@ -92,10 +101,22 @@ def create_review(
             existing_query = existing_query.filter(
                 or_(Review.model_name.is_(None), ~Review.model_name.ilike('%gpt-%'))
             )
-        existing_review = (
+        existing_reviews = (
             existing_query
             .order_by(Review.created_at.desc(), Review.id.desc())
-            .first()
+            .limit(20)
+            .all()
+        )
+        existing_review = next(
+            (
+                review
+                for review in existing_reviews
+                if review_uses_current_full_review_contract(
+                    review,
+                    writer_model_name=requested_writer_model_name,
+                )
+            ),
+            None,
         )
         if existing_review is not None:
             response_sync = {
@@ -235,14 +256,20 @@ def create_review(
                 image_type=payload.image_type,
             )
         else:
-            ai_response = run_ai_review(
-                payload.mode,
-                image_url=image_url,
-                locale=payload.locale,
-                exif_data=photo.exif_data or None,
+            with canonical_score_cache_lease(
+                db,
+                photo=photo,
                 image_type=payload.image_type,
-                review_model=payload.review_model,
-            )
+            ) as canonical_score:
+                ai_response = run_ai_review(
+                    payload.mode,
+                    image_url=image_url,
+                    locale=payload.locale,
+                    exif_data=photo.exif_data or None,
+                    image_type=payload.image_type,
+                    review_model=payload.review_model,
+                    canonical_score=canonical_score,
+                )
     except AIReviewError as exc:
         logger.warning('AI review failed for photo %s: %s', photo.public_id, exc)
         raise api_error(status.HTTP_502_BAD_GATEWAY, 'AI_REVIEW_FAILED', 'AI review could not be completed') from exc
@@ -253,8 +280,17 @@ def create_review(
         prompt_version=ai_response.prompt_version,
         model_name=ai_response.model_name,
         model_version=ai_response.model_version,
+        scorer_model_name=ai_response.scorer_model_name,
+        scorer_model_version=ai_response.scorer_model_version,
+        writer_model_name=ai_response.writer_model_name,
+        writer_model_version=ai_response.writer_model_version,
+        score_prompt_version=ai_response.score_prompt_version,
+        scorer_preprocess_version=ai_response.scorer_preprocess_version,
+        score_cache_hit=ai_response.score_cache_hit,
         exif_info=photo.exif_data if photo.exif_data else None,
     )
+    if ai_response.cost_rate_version:
+        result_payload.setdefault('billing_info', {})['cost_rate_version'] = ai_response.cost_rate_version
     review = Review(
         public_id=new_public_id('rev'),
         task_id=None,
@@ -270,8 +306,11 @@ def create_review(
         input_tokens=ai_response.input_tokens,
         output_tokens=ai_response.output_tokens,
         cost_usd=ai_response.cost_usd,
+        cost_rate_version=ai_response.cost_rate_version,
         latency_ms=ai_response.latency_ms,
         model_name=ai_response.model_name,
+        scorer_model_name=ai_response.scorer_model_name,
+        writer_model_name=ai_response.writer_model_name,
     )
     db.add(review)
     db.flush()
@@ -288,6 +327,8 @@ def create_review(
                 'mode': payload.mode,
                 'analysis_type': payload.analysis_type,
                 'review_model': payload.review_model,
+                'scorer_model': ai_response.scorer_model_name,
+                'writer_model': ai_response.writer_model_name,
             },
         )
     )

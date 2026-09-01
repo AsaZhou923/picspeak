@@ -13,11 +13,14 @@ from app.schemas import ReviewResult
 from app.services.ai_prompts import (
     ALLOWED_IMAGE_TYPES,
     PROMPT_VERSION,
+    SCORE_PROMPT_VERSION,
     SCORE_VERSION,
+    SCORER_PREPROCESS_VERSION,
     _prompt_for_mode_v3,
     _score_prompt,
     _writing_prompt,
 )
+from app.services.review_pricing import ReviewModelUsage, estimate_review_usage_cost
 
 
 class AIReviewError(RuntimeError):
@@ -30,9 +33,17 @@ class AIReviewResponse:
     model_name: str
     model_version: str
     prompt_version: str
+    scorer_model_name: str | None = None
+    scorer_model_version: str | None = None
+    writer_model_name: str | None = None
+    writer_model_version: str | None = None
+    score_prompt_version: str | None = None
+    scorer_preprocess_version: str | None = None
+    score_cache_hit: bool = False
     input_tokens: int | None = None
     output_tokens: int | None = None
     cost_usd: float | None = None
+    cost_rate_version: str | None = None
     latency_ms: int | None = None
 
 
@@ -42,6 +53,21 @@ class AIJSONResponse:
     model_name: str
     usage: dict
     latency_ms: int
+
+
+@dataclass(frozen=True)
+class CanonicalScore:
+    scores: dict[str, int]
+    final_score: float
+    model_name: str
+    model_version: str
+    score_prompt_version: str
+    score_version: str
+    preprocess_version: str
+    cache_hit: bool = False
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    latency_ms: int = 0
 
 
 _OPENAI_SCORE_SCHEMA = {
@@ -125,7 +151,52 @@ def _normalize_locked_scores(raw_scores: dict) -> dict[str, int]:
     scores = dict(raw_scores)
     if 'impact' not in scores and 'story' in scores:
         scores['impact'] = scores['story']
-    return {key: int(scores[key]) for key in ('composition', 'lighting', 'color', 'impact', 'technical')}
+    locked_scores: dict[str, int] = {}
+    for key in ('composition', 'lighting', 'color', 'impact', 'technical'):
+        value = scores[key]
+        if type(value) is not int:
+            raise AIReviewError(f'Score for {key} must be an exact int')
+        locked_scores[key] = value
+    return locked_scores
+
+
+def build_cached_canonical_score(
+    raw_scores: dict,
+    *,
+    scorer_model_name: str,
+    scorer_model_version: str,
+    final_score: float | None = None,
+) -> CanonicalScore:
+    locked_scores = _normalize_locked_scores(raw_scores)
+    computed_final_score = _compute_final_score(locked_scores)
+    if final_score is not None and float(final_score) != computed_final_score:
+        raise AIReviewError('Cached score final_score does not match its dimensions')
+    canonical_score = CanonicalScore(
+        scores=locked_scores,
+        final_score=computed_final_score,
+        model_name=scorer_model_name,
+        model_version=scorer_model_version,
+        score_prompt_version=SCORE_PROMPT_VERSION,
+        score_version=SCORE_VERSION,
+        preprocess_version=SCORER_PREPROCESS_VERSION,
+        cache_hit=True,
+    )
+    _validate_canonical_score_contract(canonical_score)
+    return canonical_score
+
+
+def _validate_canonical_score_contract(canonical_score: CanonicalScore) -> None:
+    if canonical_score.model_name != settings.openai_score_model:
+        raise AIReviewError('Canonical score uses a different scorer model')
+    if canonical_score.score_prompt_version != SCORE_PROMPT_VERSION:
+        raise AIReviewError('Canonical score uses a different scoring prompt version')
+    if canonical_score.score_version != SCORE_VERSION:
+        raise AIReviewError('Canonical score uses a different score version')
+    if canonical_score.preprocess_version != SCORER_PREPROCESS_VERSION:
+        raise AIReviewError('Canonical score uses a different scorer preprocessing version')
+    expected_final_score = _compute_final_score(canonical_score.scores)
+    if canonical_score.final_score != expected_final_score:
+        raise AIReviewError('Canonical score final_score does not match its dimensions')
 
 
 def _extract_json_object(content: str) -> dict:
@@ -341,12 +412,15 @@ def _request_openai_multimodal_json(
     image_url: str,
     schema_name: str,
     schema: dict,
+    model_name: str | None = None,
+    reasoning_effort: str | None = None,
+    timeout_seconds: int | None = None,
 ) -> AIJSONResponse:
-    model_name = settings.openai_review_model
+    resolved_model_name = model_name or settings.openai_review_model
     payload = {
-        'model': model_name,
+        'model': resolved_model_name,
         'store': False,
-        'reasoning': {'effort': settings.openai_review_reasoning_effort},
+        'reasoning': {'effort': reasoning_effort or settings.openai_review_reasoning_effort},
         'input': [
             {
                 'role': 'user',
@@ -376,7 +450,7 @@ def _request_openai_multimodal_json(
                 'Authorization': f'Bearer {settings.openai_api_key}',
                 'Content-Type': 'application/json',
             },
-            timeout_seconds=settings.openai_review_timeout_seconds,
+            timeout_seconds=timeout_seconds or settings.openai_review_timeout_seconds,
         )
         body = json.loads(response.data.decode('utf-8'))
     except PooledHTTPStatusError as exc:
@@ -394,10 +468,68 @@ def _request_openai_multimodal_json(
 
     return AIJSONResponse(
         parsed=parsed,
-        model_name=str(body.get('model') or model_name),
+        model_name=str(body.get('model') or resolved_model_name),
         usage=body.get('usage') if isinstance(body.get('usage'), dict) else {},
         latency_ms=int((time.perf_counter() - started) * 1000),
     )
+
+
+def _run_canonical_scoring(
+    *,
+    image_url: str,
+    exif_data: dict | None,
+    image_type: str,
+) -> CanonicalScore:
+    if not settings.openai_api_key:
+        raise AIReviewError('OPENAI_API_KEY is not configured for the canonical GPT scorer')
+    if not settings.openai_score_model:
+        raise AIReviewError('OPENAI_SCORE_MODEL is not configured')
+
+    scoring_response = _request_openai_multimodal_json(
+        prompt=_score_prompt(exif_data, image_type=image_type),
+        image_url=image_url,
+        schema_name='picspeak_photo_scores',
+        schema=_OPENAI_SCORE_SCHEMA,
+        model_name=settings.openai_score_model,
+        reasoning_effort=settings.openai_score_reasoning_effort,
+        timeout_seconds=settings.openai_score_timeout_seconds,
+    )
+    try:
+        raw_scores = scoring_response.parsed.get('scores')
+        if not isinstance(raw_scores, dict):
+            raise AIReviewError('Canonical scorer response missing scores object')
+        locked_scores = _normalize_locked_scores(raw_scores)
+    except AIReviewError:
+        raise
+    except (KeyError, TypeError, ValueError) as exc:
+        raise AIReviewError(f'Invalid canonical scorer response structure: {exc}') from exc
+
+    canonical_score = CanonicalScore(
+        scores=locked_scores,
+        final_score=_compute_final_score(locked_scores),
+        model_name=settings.openai_score_model,
+        model_version=scoring_response.model_name,
+        score_prompt_version=SCORE_PROMPT_VERSION,
+        score_version=SCORE_VERSION,
+        preprocess_version=SCORER_PREPROCESS_VERSION,
+        input_tokens=scoring_response.usage.get('input_tokens'),
+        output_tokens=scoring_response.usage.get('output_tokens'),
+        latency_ms=scoring_response.latency_ms,
+    )
+    _validate_canonical_score_contract(canonical_score)
+    return canonical_score
+
+
+def _score_usage(canonical_score: CanonicalScore) -> list[ReviewModelUsage]:
+    if canonical_score.cache_hit:
+        return []
+    return [
+        ReviewModelUsage(
+            model_name=canonical_score.model_name,
+            input_tokens=canonical_score.input_tokens,
+            output_tokens=canonical_score.output_tokens,
+        )
+    ]
 
 
 def _run_openai_review(
@@ -408,34 +540,29 @@ def _run_openai_review(
     exif_data: dict | None,
     image_type: str,
     enforce_suggestion_structure: bool,
+    canonical_score: CanonicalScore | None,
 ) -> AIReviewResponse:
     if not settings.openai_api_key:
         raise AIReviewError('OPENAI_API_KEY is not configured for GPT-5.6 photo review')
     if not settings.openai_review_model:
         raise AIReviewError('OPENAI_REVIEW_MODEL is not configured')
 
-    scoring_response = _request_openai_multimodal_json(
-        prompt=_score_prompt(exif_data, image_type=image_type),
+    resolved_score = canonical_score or _run_canonical_scoring(
         image_url=image_url,
-        schema_name='picspeak_photo_scores',
-        schema=_OPENAI_SCORE_SCHEMA,
+        exif_data=exif_data,
+        image_type=image_type,
     )
-    try:
-        raw_scores = scoring_response.parsed.get('scores')
-        if not isinstance(raw_scores, dict):
-            raise AIReviewError('OpenAI review response missing scores object')
-        locked_scores = _normalize_locked_scores(raw_scores)
-    except AIReviewError:
-        raise
-    except (KeyError, TypeError, ValueError) as exc:
-        raise AIReviewError(f'Invalid OpenAI review score structure: {exc}') from exc
-
-    final_score = _compute_final_score(locked_scores)
+    _validate_canonical_score_contract(resolved_score)
+    locked_scores = resolved_score.scores
+    final_score = resolved_score.final_score
     writing_response = _request_openai_multimodal_json(
         prompt=_writing_prompt(mode, locale, locked_scores, exif_data, image_type=image_type),
         image_url=image_url,
         schema_name='picspeak_photo_review',
         schema=_OPENAI_WRITING_SCHEMA,
+        model_name=settings.openai_review_model,
+        reasoning_effort=settings.openai_review_reasoning_effort,
+        timeout_seconds=settings.openai_review_timeout_seconds,
     )
     try:
         parsed = _normalize_review_result_fields(
@@ -444,6 +571,13 @@ def _run_openai_review(
             enforce_suggestion_structure=enforce_suggestion_structure,
         )
         parsed['score_version'] = SCORE_VERSION
+        parsed['score_prompt_version'] = SCORE_PROMPT_VERSION
+        parsed['scorer_model_name'] = resolved_score.model_name
+        parsed['scorer_model_version'] = resolved_score.model_version
+        parsed['writer_model_name'] = settings.openai_review_model
+        parsed['writer_model_version'] = model_version_for_name(writing_response.model_name)
+        parsed['scorer_preprocess_version'] = resolved_score.preprocess_version
+        parsed['score_cache_hit'] = resolved_score.cache_hit
         parsed['scores'] = locked_scores
         parsed['final_score'] = final_score
         result = ReviewResult.model_validate(parsed)
@@ -452,17 +586,37 @@ def _run_openai_review(
     except ValueError as exc:
         raise AIReviewError(f'Invalid OpenAI review structure: {exc}') from exc
 
+    input_tokens = (resolved_score.input_tokens or 0) + (writing_response.usage.get('input_tokens') or 0)
+    output_tokens = (resolved_score.output_tokens or 0) + (writing_response.usage.get('output_tokens') or 0)
+    cost = estimate_review_usage_cost(
+        _score_usage(resolved_score)
+        + [
+            ReviewModelUsage(
+                model_name=settings.openai_review_model,
+                input_tokens=writing_response.usage.get('input_tokens'),
+                output_tokens=writing_response.usage.get('output_tokens'),
+            ),
+        ],
+        overrides=settings.review_pricing_overrides,
+    )
+
     return AIReviewResponse(
         result=result,
         model_name=writing_response.model_name,
         model_version=model_version_for_name(writing_response.model_name),
         prompt_version=PROMPT_VERSION,
-        input_tokens=(scoring_response.usage.get('input_tokens') or 0)
-        + (writing_response.usage.get('input_tokens') or 0),
-        output_tokens=(scoring_response.usage.get('output_tokens') or 0)
-        + (writing_response.usage.get('output_tokens') or 0),
-        cost_usd=None,
-        latency_ms=scoring_response.latency_ms + writing_response.latency_ms,
+        scorer_model_name=resolved_score.model_name,
+        scorer_model_version=resolved_score.model_version,
+        writer_model_name=settings.openai_review_model,
+        writer_model_version=model_version_for_name(writing_response.model_name),
+        score_prompt_version=resolved_score.score_prompt_version,
+        scorer_preprocess_version=resolved_score.preprocess_version,
+        score_cache_hit=resolved_score.cache_hit,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        cost_usd=float(cost.cost_usd) if cost.cost_usd is not None else None,
+        cost_rate_version=cost.rate_version,
+        latency_ms=resolved_score.latency_ms + writing_response.latency_ms,
     )
 
 
@@ -474,6 +628,7 @@ def run_ai_review(
     image_type: str = 'default',
     enforce_suggestion_structure: bool = True,
     review_model: str = 'qwen',
+    canonical_score: CanonicalScore | None = None,
 ) -> AIReviewResponse:
     if review_model in {'gpt-5.5', 'gpt-5.6-luna'}:
         return _run_openai_review(
@@ -483,33 +638,22 @@ def run_ai_review(
             exif_data=exif_data,
             image_type=image_type,
             enforce_suggestion_structure=enforce_suggestion_structure,
+            canonical_score=canonical_score,
         )
     if review_model != 'qwen':
         raise AIReviewError(f'Unsupported review model option: {review_model}')
     if not settings.ai_api_key:
         raise AIReviewError('AI_API_KEY is not configured')
 
-    scoring_model_name = model_name_for_mode('flash')
     writing_model_name = model_name_for_mode(mode)
-    scoring_response = _request_multimodal_json(
-        model_name=scoring_model_name,
-        prompt=_score_prompt(exif_data, image_type=image_type),
+    resolved_score = canonical_score or _run_canonical_scoring(
         image_url=image_url,
-        temperature=0,
+        exif_data=exif_data,
+        image_type=image_type,
     )
-
-    try:
-        raw_scoring_payload = scoring_response.parsed
-        scores = raw_scoring_payload.get('scores') if isinstance(raw_scoring_payload.get('scores'), dict) else raw_scoring_payload
-        if not isinstance(scores, dict):
-            raise AIReviewError('Model response missing scores object')
-        locked_scores = _normalize_locked_scores(scores)
-    except AIReviewError:
-        raise
-    except (KeyError, TypeError, ValueError) as exc:
-        raise AIReviewError(f'Invalid AI provider response structure: scoring.scores: {exc}') from exc
-
-    final_score = _compute_final_score(locked_scores)
+    _validate_canonical_score_contract(resolved_score)
+    locked_scores = resolved_score.scores
+    final_score = resolved_score.final_score
     writing_response = _request_multimodal_json(
         model_name=writing_model_name,
         prompt=_writing_prompt(mode, locale, locked_scores, exif_data, image_type=image_type),
@@ -524,6 +668,13 @@ def run_ai_review(
             enforce_suggestion_structure=enforce_suggestion_structure,
         )
         parsed['score_version'] = SCORE_VERSION
+        parsed['score_prompt_version'] = SCORE_PROMPT_VERSION
+        parsed['scorer_model_name'] = resolved_score.model_name
+        parsed['scorer_model_version'] = resolved_score.model_version
+        parsed['writer_model_name'] = writing_model_name
+        parsed['writer_model_version'] = model_version_for_name(writing_response.model_name)
+        parsed['scorer_preprocess_version'] = resolved_score.preprocess_version
+        parsed['score_cache_hit'] = resolved_score.cache_hit
         parsed['scores'] = locked_scores
         parsed['final_score'] = final_score
         result = ReviewResult.model_validate(parsed)
@@ -532,15 +683,36 @@ def run_ai_review(
     except ValueError as exc:
         raise AIReviewError(f'Invalid AI provider response structure: {exc}') from exc
 
-    scoring_usage = scoring_response.usage
     writing_usage = writing_response.usage
+    input_tokens = (resolved_score.input_tokens or 0) + (writing_usage.get('prompt_tokens') or 0)
+    output_tokens = (resolved_score.output_tokens or 0) + (writing_usage.get('completion_tokens') or 0)
+    cost = estimate_review_usage_cost(
+        _score_usage(resolved_score)
+        + [
+            ReviewModelUsage(
+                model_name=writing_model_name,
+                input_tokens=writing_usage.get('prompt_tokens'),
+                output_tokens=writing_usage.get('completion_tokens'),
+            ),
+        ],
+        overrides=settings.review_pricing_overrides,
+    )
+
     return AIReviewResponse(
         result=result,
         model_name=writing_response.model_name,
         model_version=model_version_for_name(writing_response.model_name),
         prompt_version=PROMPT_VERSION,
-        input_tokens=(scoring_usage.get('prompt_tokens') or 0) + (writing_usage.get('prompt_tokens') or 0),
-        output_tokens=(scoring_usage.get('completion_tokens') or 0) + (writing_usage.get('completion_tokens') or 0),
-        cost_usd=None,
-        latency_ms=scoring_response.latency_ms + writing_response.latency_ms,
+        scorer_model_name=resolved_score.model_name,
+        scorer_model_version=resolved_score.model_version,
+        writer_model_name=writing_model_name,
+        writer_model_version=model_version_for_name(writing_response.model_name),
+        score_prompt_version=resolved_score.score_prompt_version,
+        scorer_preprocess_version=resolved_score.preprocess_version,
+        score_cache_hit=resolved_score.cache_hit,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        cost_usd=float(cost.cost_usd) if cost.cost_usd is not None else None,
+        cost_rate_version=cost.rate_version,
+        latency_ms=resolved_score.latency_ms + writing_response.latency_ms,
     )

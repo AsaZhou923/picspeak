@@ -1,5 +1,37 @@
 [
   {
+    "id": "2026-09-01-review-generation-reliability",
+    "date": "2026-09-01",
+    "title": "More consistent reviews, credit reservations, and safer generation jobs",
+    "summary": "PicSpeak now uses one official GPT model for numeric scoring while keeping Qwen or GPT selectable for written critique. This release also strengthens public-result privacy, generation credit reservations, worker concurrency, storage compensation, and analytics attribution.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-09-01-review-generation-reliability",
+    "sections": [
+      {
+        "title": "Reviews and privacy",
+        "items": [
+          "Every standard review uses the same official GPT scorer; the Qwen / GPT choice only changes the written feedback",
+          "Repeat reviews can reuse strictly validated scores while provider response IDs remain available for internal audit",
+          "Public shares and non-owner views no longer expose EXIF, internal task IDs, tags, or notes"
+        ]
+      },
+      {
+        "title": "Generation and data reliability",
+        "items": [
+          "Image credits now show an in-progress reservation that is consumed on success and released on terminal failure",
+          "Atomic claims, worker leases, object cleanup, and durable request / terminal analytics outboxes are now enforced",
+          "Cross-midnight completions stay attached to the original request cohort instead of lowering the reported success rate"
+        ]
+      },
+      {
+        "title": "Homepage release notice",
+        "items": [
+          "The homepage now presents the newest release in a one-time update dialog for each browser",
+          "The dialog is dismissible and the complete multilingual history remains available on the Updates page"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-08-20-gpt56-luna-xhigh",
     "date": "2026-08-20",
     "title": "OpenAI photo reviews move to GPT-5.6 Luna with xhigh reasoning",

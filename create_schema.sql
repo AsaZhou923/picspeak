@@ -180,8 +180,11 @@ create table reviews
     input_tokens   integer,
     output_tokens  integer,
     cost_usd       numeric(12, 6),
+    cost_rate_version text,
     latency_ms     integer,
     model_name     text,
+    scorer_model_name text,
+    writer_model_name text,
     created_at     timestamp with time zone default now()       not null,
     updated_at     timestamp with time zone default now()       not null,
     final_score    numeric(4, 2)                                not null,
@@ -456,6 +459,14 @@ create index idx_image_generation_tasks_owner_created
 create index idx_image_generation_tasks_review_created
     on image_generation_tasks (source_review_id asc, created_at desc);
 
+create index idx_image_generation_tasks_pending_request_event
+    on image_generation_tasks (id)
+    where request_payload ? 'pending_request_event';
+
+create index idx_image_generation_tasks_pending_terminal_event
+    on image_generation_tasks (id)
+    where request_payload ? 'pending_terminal_event';
+
 create trigger trg_image_generation_tasks_updated_at
     before update
     on image_generation_tasks
@@ -524,6 +535,62 @@ create trigger trg_generated_images_updated_at
     on generated_images
     for each row
 execute procedure set_updated_at();
+
+
+create table generation_credit_reservations
+(
+    id                       bigserial
+        primary key,
+    generation_task_id       bigint                                                   not null
+        references image_generation_tasks,
+    user_id                  bigint                                                   not null
+        references users,
+    credits                  integer                                                  not null
+        constraint chk_generation_credit_reservations_credits_positive
+            check (credits > 0),
+    bill_period_start        date                                                     not null,
+    bill_period_end          date                                                     not null,
+    status                   text                     default 'held'::text            not null
+        constraint chk_generation_credit_reservations_status
+            check (status = any (array ['held'::text, 'consumed'::text, 'released'::text])),
+    consumed_usage_ledger_id bigint
+        references usage_ledger,
+    release_reason           text,
+    held_at                  timestamp with time zone default now()                   not null,
+    consumed_at              timestamp with time zone,
+    released_at              timestamp with time zone,
+    created_at               timestamp with time zone default now()                   not null,
+    updated_at               timestamp with time zone default now()                   not null,
+    constraint uq_generation_credit_reservations_task
+        unique (generation_task_id),
+    constraint uq_generation_credit_reservations_consumed_ledger
+        unique (consumed_usage_ledger_id),
+    constraint chk_generation_credit_reservations_period
+        check (bill_period_end > bill_period_start)
+);
+
+alter table generation_credit_reservations
+    owner to pic;
+
+create index idx_generation_credit_reservations_user_period_status
+    on generation_credit_reservations (user_id, bill_period_start, status);
+
+create index idx_generation_credit_reservations_status_created
+    on generation_credit_reservations (status, created_at);
+
+create or replace function set_generation_credit_reservation_updated_at()
+returns trigger as $$
+begin
+    new.updated_at = now();
+    return new;
+end;
+$$ language plpgsql;
+
+create trigger trg_generation_credit_reservations_updated_at
+    before update
+    on generation_credit_reservations
+    for each row
+execute function set_generation_credit_reservation_updated_at();
 
 
 create table billing_subscriptions

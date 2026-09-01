@@ -158,29 +158,31 @@ class ReviewHardeningTests(unittest.TestCase):
             )
 
     def test_run_ai_review_accepts_story_score_alias_before_locking_scores(self) -> None:
-        with patch('app.services.ai.settings.ai_api_key', 'test-key'), patch(
+        with patch('app.services.ai.settings.ai_api_key', 'test-qwen-key'), patch(
+            'app.services.ai.settings.openai_api_key', 'test-openai-key'
+        ), patch('app.services.ai.settings.openai_score_model', 'gpt-5.6-luna'), patch(
             'app.services.ai.model_name_for_mode',
             side_effect=lambda mode: 'qwen3.5-plus' if mode == 'pro' else 'qwen3.5-flash',
         ), patch(
+            'app.services.ai._request_openai_multimodal_json',
+            return_value=AIJSONResponse(
+                parsed={'scores': {'composition': 6, 'lighting': 5, 'color': 5, 'story': 4, 'technical': 7}},
+                model_name='gpt-5.6-luna',
+                usage={},
+                latency_ms=1,
+            ),
+        ), patch(
             'app.services.ai._request_multimodal_json',
-            side_effect=[
-                AIJSONResponse(
-                    parsed={'scores': {'composition': 6, 'lighting': 5, 'color': 5, 'story': 4, 'technical': 7}},
-                    model_name='qwen3.5-flash',
-                    usage={},
-                    latency_ms=1,
-                ),
-                AIJSONResponse(
-                    parsed={
-                        'advantage': '1. clear subject',
-                        'critique': '1. flat light',
-                        'suggestions': '1. Observation: flat foreground; Reason: weak separation; Action: lower the camera.',
-                    },
-                    model_name='qwen3.5-plus',
-                    usage={},
-                    latency_ms=1,
-                ),
-            ],
+            return_value=AIJSONResponse(
+                parsed={
+                    'advantage': '1. clear subject',
+                    'critique': '1. flat light',
+                    'suggestions': '1. Observation: flat foreground; Reason: weak separation; Action: lower the camera.',
+                },
+                model_name='qwen3.5-plus',
+                usage={},
+                latency_ms=1,
+            ),
         ):
             response = run_ai_review(
                 mode='pro',
@@ -194,7 +196,7 @@ class ReviewHardeningTests(unittest.TestCase):
         self.assertEqual(response.result.score_version, SCORE_VERSION)
 
     def test_review_billing_info_uses_usage_snapshot_dicts(self) -> None:
-        payload: dict[str, object] = {}
+        payload: dict[str, object] = {'billing_info': {'cost_rate_version': 'test-rate-v1'}}
         user = SimpleNamespace(plan=UserPlan.free)
 
         with patch(
@@ -210,6 +212,7 @@ class ReviewHardeningTests(unittest.TestCase):
         self.assertEqual(
             payload['billing_info'],
             {
+                'cost_rate_version': 'test-rate-v1',
                 'quota_charged': True,
                 'remaining_quota': {
                     'daily_remaining': 4,

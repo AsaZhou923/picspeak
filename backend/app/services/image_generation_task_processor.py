@@ -4,17 +4,40 @@ from datetime import datetime, timedelta, timezone
 import hashlib
 from io import BytesIO
 import logging
+from numbers import Number
 from typing import Any
 from urllib.parse import quote
+from uuid import uuid4
 
 from PIL import Image, ImageOps, UnidentifiedImageError
-from sqlalchemy import case, func
+from sqlalchemy import case, func, text
 from sqlalchemy.orm import Session
 
 from app.api.deps import new_public_id
 from app.core.config import settings
-from app.db.models import GeneratedImage, ImageGenerationTask, Photo, PhotoStatus, TaskStatus, UsageLedger, User, UserPlan
+from app.db.models import (
+    GeneratedImage,
+    ImageGenerationTask,
+    Photo,
+    PhotoStatus,
+    ProductAnalyticsEvent,
+    TaskStatus,
+    User,
+    UserPlan,
+)
 from app.db.session import SessionLocal
+from app.services.generation_credit_reservations import (
+    GenerationCreditReservationError,
+    consume_generation_credit_reservation,
+    count_monthly_generation_credit_consumed as _count_monthly_generation_credit_consumed,
+    count_monthly_generation_credit_grants as _count_monthly_generation_credit_grants,
+    count_monthly_generation_credit_holds as _count_monthly_generation_credit_holds,
+    count_monthly_generation_credits as _count_monthly_generation_credits,
+    ensure_generation_credits_available as _ensure_generation_credits_available,
+    monthly_generation_credit_limit_for_plan,
+    release_generation_credit_reservation,
+    require_held_generation_credit_reservation,
+)
 from app.services.image_generation import ImageGenerationError, ImageGenerationResult, OpenAIImageGenerationClient
 from app.services.image_generation_pricing import (
     estimate_image_generation_cost_usd,
@@ -33,89 +56,28 @@ _PUBLIC_GENERATION_ERROR_MESSAGES = {
     'IMAGE_GENERATION_PROCESSING_FAILED': 'Image generation could not be completed',
     'IMAGE_GENERATION_CREDITS_EXHAUSTED': 'Image generation credits are exhausted',
     'IMAGE_GENERATION_STORAGE_FAILED': 'Generated image could not be saved',
+    'IMAGE_GENERATION_PERSISTENCE_FAILED': 'Generated image could not be saved',
 }
 
 
 def count_monthly_generation_credits(db: Session, user: User, *, now: datetime | None = None) -> int:
-    period_start, next_period_start = _monthly_generation_credit_period(now=now)
-    return _sum_monthly_generation_credit_amount(db, user, period_start=period_start, next_period_start=next_period_start)
+    return _count_monthly_generation_credits(db, user, now=now)
 
 
 def count_monthly_generation_credit_consumed(db: Session, user: User, *, now: datetime | None = None) -> int:
-    period_start, next_period_start = _monthly_generation_credit_period(now=now)
-    consumed = (
-        db.query(func.coalesce(func.sum(UsageLedger.amount), 0))
-        .filter(
-            UsageLedger.user_id == user.id,
-            UsageLedger.usage_type == 'image_generation_credit',
-            UsageLedger.bill_date >= period_start,
-            UsageLedger.bill_date < next_period_start,
-            UsageLedger.amount > 0,
-        )
-        .scalar()
-    )
-    return int(consumed or 0)
+    return _count_monthly_generation_credit_consumed(db, user, now=now)
 
 
 def count_monthly_generation_credit_grants(db: Session, user: User, *, now: datetime | None = None) -> int:
-    period_start, next_period_start = _monthly_generation_credit_period(now=now)
-    granted = (
-        db.query(func.coalesce(func.sum(UsageLedger.amount), 0))
-        .filter(
-            UsageLedger.user_id == user.id,
-            UsageLedger.usage_type == 'image_generation_credit',
-            UsageLedger.bill_date >= period_start,
-            UsageLedger.bill_date < next_period_start,
-            UsageLedger.amount < 0,
-        )
-        .scalar()
-    )
-    return abs(int(granted or 0))
+    return _count_monthly_generation_credit_grants(db, user, now=now)
 
 
-def _monthly_generation_credit_period(*, now: datetime | None = None):
-    current = now or datetime.now(timezone.utc)
-    period_start = current.date().replace(day=1)
-    if period_start.month == 12:
-        next_period_start = period_start.replace(year=period_start.year + 1, month=1)
-    else:
-        next_period_start = period_start.replace(month=period_start.month + 1)
-    return period_start, next_period_start
-
-
-def _sum_monthly_generation_credit_amount(
-    db: Session,
-    user: User,
-    *,
-    period_start,
-    next_period_start,
-) -> int:
-    used = (
-        db.query(func.coalesce(func.sum(UsageLedger.amount), 0))
-        .filter(
-            UsageLedger.user_id == user.id,
-            UsageLedger.usage_type == 'image_generation_credit',
-            UsageLedger.bill_date >= period_start,
-            UsageLedger.bill_date < next_period_start,
-        )
-        .scalar()
-    )
-    return int(used or 0)
-
-
-def monthly_generation_credit_limit_for_plan(plan: UserPlan) -> int:
-    if plan == UserPlan.pro:
-        return settings.image_generation_pro_monthly_credits
-    if plan == UserPlan.free:
-        return settings.image_generation_free_monthly_credits
-    return 0
+def count_monthly_generation_credit_holds(db: Session, user: User, *, now: datetime | None = None) -> int:
+    return _count_monthly_generation_credit_holds(db, user, now=now)
 
 
 def ensure_generation_credits_available(db: Session, user: User, *, credits_needed: int) -> None:
-    limit = monthly_generation_credit_limit_for_plan(user.plan)
-    used = count_monthly_generation_credits(db, user)
-    if used + credits_needed > limit:
-        raise ValueError('IMAGE_GENERATION_CREDITS_EXHAUSTED')
+    _ensure_generation_credits_available(db, user, credits_needed=credits_needed)
 
 
 def _serialize_generation_task_status(task: ImageGenerationTask, image: GeneratedImage | None = None) -> dict[str, Any]:
@@ -158,6 +120,11 @@ def _prompt_hash(prompt: str) -> str:
 
 _ALLOWED_OUTPUT_FORMATS = frozenset({'webp', 'png', 'jpeg'})
 _REFERENCE_IMAGE_MAX_EDGE = 2048
+_GENERATION_CLAIM_ADVISORY_LOCK_KEY = 918_203_041
+_TERMINAL_GENERATION_EVENTS = frozenset({'generation_succeeded', 'generation_failed'})
+_SERVER_OWNED_GENERATION_EVENTS = frozenset({'generation_requested', *_TERMINAL_GENERATION_EVENTS})
+_PENDING_REQUEST_EVENT_KEY = 'pending_request_event'
+_PENDING_TERMINAL_EVENT_KEY = 'pending_terminal_event'
 
 
 def generation_object_key(*, owner_public_id: str, generated_public_id: str, output_format: str, now: datetime | None = None) -> str:
@@ -179,6 +146,8 @@ def _generation_retry_delay_seconds(attempt_count: int) -> int:
 
 
 def expire_image_generation_tasks(db: Session) -> None:
+    _reconcile_pending_generation_request_events(db)
+    _reconcile_pending_generation_terminal_events(db)
     _reconcile_completed_generation_tasks(db)
     now = datetime.now(timezone.utc)
     stale_cutoff = now - timedelta(seconds=_generation_task_stale_timeout_seconds())
@@ -201,6 +170,7 @@ def expire_image_generation_tasks(db: Session) -> None:
     if not stalled_tasks:
         return
 
+    terminal_events: list[tuple[ImageGenerationTask, User, str, dict[str, Any]]] = []
     for task in stalled_tasks:
         if task.attempt_count < task.max_attempts:
             retry_at = now + timedelta(seconds=_generation_retry_delay_seconds(task.attempt_count))
@@ -219,8 +189,17 @@ def expire_image_generation_tasks(db: Session) -> None:
             task.error_message = 'Image generation heartbeat stalled and max retries were exhausted'
             task.finished_at = now
             task.last_heartbeat_at = now
+            release_generation_credit_reservation(db, task=task, reason='TASK_STALLED')
+            owner = db.query(User).filter(User.id == task.owner_user_id).first()
+            if owner is not None:
+                metadata = _generation_failure_event_metadata(task, 'TASK_STALLED')
+                stage_generation_terminal_event(task, event_name='generation_failed', metadata=metadata)
+                terminal_events.append(
+                    (task, owner, 'generation_failed', metadata)
+                )
         db.add(task)
     db.commit()
+    _record_terminal_generation_events_after_state_commit(db, terminal_events)
 
 
 def _reconcile_completed_generation_tasks(db: Session) -> None:
@@ -237,7 +216,23 @@ def _reconcile_completed_generation_tasks(db: Session) -> None:
     if not completed_pairs:
         return
 
-    for task, _image in completed_pairs:
+    terminal_events: list[tuple[ImageGenerationTask, User, str, dict[str, Any]]] = []
+    for task, image in completed_pairs:
+        try:
+            consume_generation_credit_reservation(
+                db,
+                task=task,
+                usage_metadata={
+                    'generation_id': image.public_id,
+                    'quality': image.quality,
+                    'size': image.size,
+                    'generation_mode': image.generation_mode,
+                    'reconciled': True,
+                },
+            )
+        except GenerationCreditReservationError:
+            logger.warning('Completed generation task %s has no consumable credit reservation', task.public_id)
+            continue
         task.status = TaskStatus.SUCCEEDED
         task.progress = 100
         task.finished_at = task.finished_at or now
@@ -245,10 +240,67 @@ def _reconcile_completed_generation_tasks(db: Session) -> None:
         task.error_code = None
         task.error_message = None
         db.add(task)
+        owner = db.query(User).filter(User.id == task.owner_user_id).first()
+        if owner is not None:
+            metadata = {
+                'generation_id': image.public_id,
+                'task_id': task.public_id,
+                'generation_mode': image.generation_mode,
+                'intent': image.intent,
+                'quality': image.quality,
+                'size': image.size,
+                'credits_charged': image.credits_charged,
+                'template_key': image.template_key,
+                'reconciled': True,
+            }
+            stage_generation_terminal_event(task, event_name='generation_succeeded', metadata=metadata)
+            terminal_events.append(
+                (
+                    task,
+                    owner,
+                    'generation_succeeded',
+                    metadata,
+                )
+            )
     db.commit()
+    _record_terminal_generation_events_after_state_commit(db, terminal_events)
 
 
-def _claim_generation_task(db: Session, task_id: int, worker_name: str) -> bool:
+def _new_generation_claim_token(worker_name: str) -> str:
+    return f'{worker_name}:{uuid4().hex}'
+
+
+def _database_dialect_name(db: Session) -> str | None:
+    bind = getattr(db, 'bind', None) or getattr(db, 'get_bind', lambda: None)()
+    dialect = getattr(bind, 'dialect', None)
+    name = getattr(dialect, 'name', None)
+    return str(name) if name else None
+
+
+def _acquire_generation_claim_gate(db: Session) -> None:
+    if _database_dialect_name(db) == 'postgresql':
+        db.execute(text('SELECT pg_advisory_xact_lock(:lock_key)'), {'lock_key': _GENERATION_CLAIM_ADVISORY_LOCK_KEY})
+
+
+def _running_generation_task_count(db: Session) -> int:
+    running_count = (
+        db.query(func.count(ImageGenerationTask.id))
+        .filter(ImageGenerationTask.status == TaskStatus.RUNNING)
+        .scalar()
+        or 0
+    )
+    if isinstance(running_count, Number):
+        return int(running_count)
+    return 0
+
+
+def _claim_generation_task(db: Session, task_id: int, claim_token: str) -> bool:
+    _acquire_generation_claim_gate(db)
+    max_running = max(1, int(settings.image_generation_worker_concurrency or 1))
+    if _running_generation_task_count(db) >= max_running:
+        db.rollback()
+        return False
+
     now = datetime.now(timezone.utc)
     updated = (
         db.query(ImageGenerationTask)
@@ -260,7 +312,7 @@ def _claim_generation_task(db: Session, task_id: int, worker_name: str) -> bool:
                 ImageGenerationTask.attempt_count: ImageGenerationTask.attempt_count + 1,
                 ImageGenerationTask.started_at: now,
                 ImageGenerationTask.next_attempt_at: None,
-                ImageGenerationTask.claimed_by: worker_name,
+                ImageGenerationTask.claimed_by: claim_token,
                 ImageGenerationTask.last_heartbeat_at: now,
                 ImageGenerationTask.error_code: None,
                 ImageGenerationTask.error_message: None,
@@ -278,15 +330,6 @@ def _claim_generation_task(db: Session, task_id: int, worker_name: str) -> bool:
 def claim_next_pending_image_generation_task(db: Session, *, worker_name: str) -> ImageGenerationTask | None:
     expire_image_generation_tasks(db)
     now = datetime.now(timezone.utc)
-    max_running = max(1, int(settings.image_generation_worker_concurrency or 1))
-    running_count = (
-        db.query(func.count(ImageGenerationTask.id))
-        .filter(ImageGenerationTask.status == TaskStatus.RUNNING)
-        .scalar()
-        or 0
-    )
-    if int(running_count) >= max_running:
-        return None
 
     candidate = (
         db.query(ImageGenerationTask)
@@ -304,14 +347,23 @@ def claim_next_pending_image_generation_task(db: Session, *, worker_name: str) -
     )
     if candidate is None:
         return None
-    if not _claim_generation_task(db, candidate.id, worker_name):
+    if not _claim_generation_task(db, candidate.id, _new_generation_claim_token(worker_name)):
         return None
     return db.query(ImageGenerationTask).filter(ImageGenerationTask.id == candidate.id).first()
 
 
-def process_image_generation_task(task_public_id: str, *, worker_name: str) -> dict[str, str]:
+def process_image_generation_task(
+    task_public_id: str,
+    *,
+    worker_name: str,
+    claim_token: str | None = None,
+) -> dict[str, str]:
     db = SessionLocal()
     try:
+        # Cloud Task retries can arrive after a prior invocation died while
+        # holding a lease. Requeue genuinely stale work before evaluating the
+        # current invocation's token; fresh overlapping invocations remain no-ops.
+        expire_image_generation_tasks(db)
         task = db.query(ImageGenerationTask).filter(ImageGenerationTask.public_id == task_public_id).first()
         if task is None:
             return {'result': 'missing'}
@@ -320,10 +372,29 @@ def process_image_generation_task(task_public_id: str, *, worker_name: str) -> d
         if task.status == TaskStatus.PENDING and task.next_attempt_at and task.next_attempt_at > datetime.now(timezone.utc):
             return {'result': 'delayed', 'status': task.status.value}
         if task.status == TaskStatus.PENDING:
-            if not _claim_generation_task(db, task.id, worker_name):
-                return {'result': 'noop', 'status': task.status.value}
-        elif task.status != TaskStatus.RUNNING:
+            claim_token = claim_token or _new_generation_claim_token(worker_name)
+            if not _claim_generation_task(db, task.id, claim_token):
+                fresh_task = db.query(ImageGenerationTask).filter(ImageGenerationTask.id == task.id).first()
+                if fresh_task is not None and fresh_task.status == TaskStatus.PENDING:
+                    # The global worker slot was full. Cloud Tasks must receive a
+                    # retryable response instead of acknowledging work that is
+                    # still pending and would otherwise be stranded.
+                    return {'result': 'delayed', 'status': fresh_task.status.value, 'reason': 'capacity'}
+                return {
+                    'result': 'noop',
+                    'status': fresh_task.status.value if fresh_task is not None else task.status.value,
+                }
+            task = db.query(ImageGenerationTask).filter(ImageGenerationTask.id == task.id).first()
+            if task is None:
+                return {'result': 'missing'}
+        elif task.status == TaskStatus.RUNNING:
+            if not claim_token or task.claimed_by != claim_token:
+                return {'result': 'noop', 'status': task.status.value, 'reason': 'lease_mismatch'}
+        else:
             return {'result': 'noop', 'status': task.status.value}
+
+        if task.claimed_by != claim_token:
+            return {'result': 'noop', 'status': task.status.value, 'reason': 'lease_mismatch'}
 
         try:
             _process_generation_task(db, task)
@@ -351,17 +422,22 @@ def _process_generation_task(db: Session, task: ImageGenerationTask) -> None:
         _handle_generation_failure(db, task, error_code='USER_NOT_FOUND', error_message='Task owner not found', retryable=False)
         return
 
-    payload = dict(task.request_payload or {})
+    payload = dict(getattr(task, 'request_payload', None) or {})
     quality = normalize_generation_quality(payload.get('quality') or settings.image_generation_default_quality)
     size = normalize_generation_size(payload.get('size'))
     output_format = str(payload.get('output_format') or 'webp').strip().lower() or 'webp'
     reference_count = int(payload.get('reference_image_count') or 0)
     credits = estimate_image_generation_credits(quality=quality, size=size, reference_image_count=reference_count)
-
     try:
-        ensure_generation_credits_available(db, owner, credits_needed=credits)
-    except ValueError as exc:
-        _handle_generation_failure(db, task, error_code=str(exc), error_message='Image generation credits are exhausted', retryable=False)
+        require_held_generation_credit_reservation(db, task=task, expected_credits=credits)
+    except GenerationCreditReservationError as exc:
+        _handle_generation_failure(
+            db,
+            task,
+            error_code='IMAGE_GENERATION_RESERVATION_INVALID',
+            error_message=str(exc),
+            retryable=False,
+        )
         return
 
     task.progress = 60
@@ -425,29 +501,35 @@ def _process_generation_task(db: Session, task: ImageGenerationTask) -> None:
         )
         return
 
-    generated = _persist_successful_generation(
-        db,
-        task=task,
-        owner=owner,
-        result=result,
-        bucket=settings.object_bucket,
-        object_key=object_key,
-        credits_charged=credits,
-        generated_public_id=generated_public_id,
-    )
-    task.status = TaskStatus.SUCCEEDED
-    task.progress = 100
-    task.finished_at = datetime.now(timezone.utc)
-    task.last_heartbeat_at = datetime.now(timezone.utc)
-    task.error_code = None
-    task.error_message = None
-    db.add(task)
-    _record_generation_task_event(
-        db,
-        task=task,
-        owner=owner,
-        event_name='generation_succeeded',
-        metadata={
+    try:
+        generated = _persist_successful_generation(
+            db,
+            task=task,
+            owner=owner,
+            result=result,
+            bucket=settings.object_bucket,
+            object_key=object_key,
+            credits_charged=credits,
+            generated_public_id=generated_public_id,
+        )
+        task.status = TaskStatus.SUCCEEDED
+        task.progress = 100
+        task.finished_at = datetime.now(timezone.utc)
+        task.last_heartbeat_at = datetime.now(timezone.utc)
+        task.error_code = None
+        task.error_message = None
+        db.add(task)
+        consume_generation_credit_reservation(
+            db,
+            task=task,
+            usage_metadata={
+                'generation_id': generated.public_id,
+                'quality': quality,
+                'size': size,
+                'generation_mode': task.generation_mode,
+            },
+        )
+        success_metadata = {
             'generation_id': generated.public_id,
             'task_id': task.public_id,
             'generation_mode': task.generation_mode,
@@ -460,9 +542,107 @@ def _process_generation_task(db: Session, task: ImageGenerationTask) -> None:
             'prompt_example_id': payload.get('prompt_example_id'),
             'prompt_example_category': payload.get('prompt_example_category'),
             'source_review_id': payload.get('source_review_public_id'),
-        },
-    )
-    db.commit()
+        }
+        stage_generation_terminal_event(
+            task,
+            event_name='generation_succeeded',
+            metadata=success_metadata,
+        )
+        db.add(task)
+        db.commit()
+        _record_terminal_generation_events_after_state_commit(
+            db,
+            [(task, owner, 'generation_succeeded', success_metadata)],
+        )
+    except GenerationCreditReservationError as exc:
+        db.rollback()
+        cleanup = _delete_uploaded_generation_object(
+            storage,
+            bucket=settings.object_bucket,
+            object_key=object_key,
+            task_public_id=task.public_id,
+        )
+        _handle_generation_failure(
+            db,
+            task,
+            error_code='IMAGE_GENERATION_RESERVATION_INVALID',
+            error_message=str(exc),
+            retryable=False,
+            event_metadata=cleanup,
+        )
+        return
+    except Exception as exc:
+        db.rollback()
+        if _generated_image_was_committed(db, task=task, bucket=settings.object_bucket, object_key=object_key):
+            logger.warning(
+                'Generation task %s commit raised after generated image became visible; preserving uploaded object %s',
+                task.public_id,
+                object_key,
+            )
+            return
+        cleanup = _delete_uploaded_generation_object(storage, bucket=settings.object_bucket, object_key=object_key, task_public_id=task.public_id)
+        _handle_generation_failure(
+            db,
+            task,
+            error_code='IMAGE_GENERATION_PERSISTENCE_FAILED',
+            error_message=str(exc),
+            retryable=False,
+            event_metadata=cleanup,
+        )
+        return
+
+
+def _delete_uploaded_generation_object(
+    storage: Any,
+    *,
+    bucket: str,
+    object_key: str,
+    task_public_id: str,
+) -> dict[str, Any]:
+    try:
+        storage.delete_object(Bucket=bucket, Key=object_key)
+    except Exception as exc:
+        logger.exception('Failed to delete generated object %s after task %s persistence failure', object_key, task_public_id)
+        return {
+            'uploaded_object_bucket': bucket,
+            'uploaded_object_key': object_key,
+            'uploaded_object_cleanup': 'failed',
+            'uploaded_object_cleanup_error': str(exc)[:500],
+        }
+    return {
+        'uploaded_object_bucket': bucket,
+        'uploaded_object_key': object_key,
+        'uploaded_object_cleanup': 'deleted',
+    }
+
+
+def _generated_image_was_committed(
+    db: Session,
+    *,
+    task: ImageGenerationTask,
+    bucket: str,
+    object_key: str,
+) -> bool:
+    try:
+        return (
+            db.query(GeneratedImage.id)
+            .filter(
+                GeneratedImage.task_id == task.id,
+                GeneratedImage.object_bucket == bucket,
+                GeneratedImage.object_key == object_key,
+                GeneratedImage.deleted_at.is_(None),
+            )
+            .first()
+            is not None
+        )
+    except Exception:
+        logger.exception(
+            'Could not verify whether generated object %s for task %s was committed; preserving object',
+            object_key,
+            task.public_id,
+        )
+        db.rollback()
+        return True
 
 
 def _load_reference_image(db: Session, task: ImageGenerationTask) -> dict[str, Any] | None:
@@ -555,7 +735,7 @@ def _persist_successful_generation(
     credits_charged: int,
     generated_public_id: str,
 ) -> GeneratedImage:
-    payload = dict(task.request_payload or {})
+    payload = dict(getattr(task, 'request_payload', None) or {})
     generated = GeneratedImage(
         public_id=generated_public_id,
         task_id=task.id,
@@ -594,24 +774,6 @@ def _persist_successful_generation(
     )
     db.add(generated)
     db.flush()
-    db.add(
-        UsageLedger(
-            user_id=task.owner_user_id,
-            review_id=None,
-            task_id=None,
-            usage_type='image_generation_credit',
-            amount=credits_charged,
-            unit='credits',
-            bill_date=datetime.now(timezone.utc).date(),
-            metadata_json={
-                'generation_id': generated.public_id,
-                'generation_task_id': task.public_id,
-                'quality': generated.quality,
-                'size': generated.size,
-                'generation_mode': generated.generation_mode,
-            },
-        )
-    )
     return generated
 
 
@@ -622,19 +784,299 @@ def _record_generation_task_event(
     owner: User,
     event_name: str,
     metadata: dict[str, Any],
-) -> None:
+    page_path: str = '/generation-worker',
+    source: str | None = None,
+    created_at: datetime | None = None,
+) -> bool:
     try:
+        payload = dict(task.request_payload or {})
         record_product_event(
             db,
             event_name=event_name,
             user_public_id=owner.public_id,
             plan=owner.plan.value if hasattr(owner.plan, 'value') else str(owner.plan),
-            source='unknown',
-            page_path='/generation-worker',
+            source=source if source is not None else payload.get('analytics_source'),
+            page_path=page_path,
             metadata=metadata,
+            created_at=created_at,
+        )
+        return True
+    except Exception:
+        db.rollback()
+        logger.debug('Failed to record generation task analytics event %s for %s', event_name, task.public_id, exc_info=True)
+        return False
+
+
+def _generation_task_event_already_recorded(
+    db: Session,
+    *,
+    task: ImageGenerationTask,
+    owner: User,
+    event_name: str,
+    page_path: str = '/generation-worker',
+) -> bool:
+    if event_name not in _SERVER_OWNED_GENERATION_EVENTS:
+        return False
+    try:
+        return (
+            db.query(ProductAnalyticsEvent.id)
+            .filter(
+                ProductAnalyticsEvent.event_name == event_name,
+                ProductAnalyticsEvent.user_public_id == owner.public_id,
+                ProductAnalyticsEvent.page_path == page_path,
+                ProductAnalyticsEvent.metadata_json.contains({'task_id': task.public_id}),
+            )
+            .first()
+            is not None
         )
     except Exception:
-        logger.debug('Failed to record generation task analytics event %s for %s', event_name, task.public_id, exc_info=True)
+        db.rollback()
+        logger.debug('Failed to check generation terminal event uniqueness for %s', task.public_id, exc_info=True)
+        return False
+
+
+def stage_generation_request_event(
+    task: ImageGenerationTask,
+    *,
+    page_path: str,
+    source: str | None,
+    metadata: dict[str, Any],
+) -> None:
+    task.request_payload = {
+        **dict(task.request_payload or {}),
+        _PENDING_REQUEST_EVENT_KEY: {
+            'event_name': 'generation_requested',
+            'page_path': page_path,
+            'source': source,
+            'metadata': {**metadata, 'task_id': task.public_id},
+            'staged_at': datetime.now(timezone.utc).isoformat(),
+        },
+    }
+
+
+def _pending_generation_request_event(
+    task: ImageGenerationTask,
+) -> tuple[str, str | None, dict[str, Any], datetime | None] | None:
+    staged = dict(task.request_payload or {}).get(_PENDING_REQUEST_EVENT_KEY)
+    if not isinstance(staged, dict) or staged.get('event_name') != 'generation_requested':
+        return None
+    page_path = str(staged.get('page_path') or '/generate')
+    source = staged.get('source')
+    metadata = staged.get('metadata')
+    if not isinstance(metadata, dict):
+        return None
+    return (
+        page_path,
+        str(source) if source is not None else None,
+        dict(metadata),
+        _parse_staged_event_datetime(staged.get('staged_at')),
+    )
+
+
+def stage_generation_terminal_event(
+    task: ImageGenerationTask,
+    *,
+    event_name: str,
+    metadata: dict[str, Any],
+) -> None:
+    if event_name not in _TERMINAL_GENERATION_EVENTS:
+        raise ValueError(f'Unsupported generation terminal event: {event_name}')
+    task.request_payload = {
+        **dict(task.request_payload or {}),
+        _PENDING_TERMINAL_EVENT_KEY: {
+            'event_name': event_name,
+            'metadata': {**metadata, 'task_id': task.public_id},
+            'staged_at': datetime.now(timezone.utc).isoformat(),
+        },
+    }
+
+
+def _parse_staged_event_datetime(value: Any) -> datetime | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=timezone.utc)
+
+
+def _pending_generation_terminal_event(
+    task: ImageGenerationTask,
+) -> tuple[str, dict[str, Any], datetime | None] | None:
+    staged = dict(task.request_payload or {}).get(_PENDING_TERMINAL_EVENT_KEY)
+    if not isinstance(staged, dict):
+        return None
+    event_name = str(staged.get('event_name') or '')
+    metadata = staged.get('metadata')
+    if event_name not in _TERMINAL_GENERATION_EVENTS or not isinstance(metadata, dict):
+        return None
+    return event_name, dict(metadata), _parse_staged_event_datetime(staged.get('staged_at'))
+
+
+def record_generation_task_event_once(
+    db: Session,
+    *,
+    task: ImageGenerationTask,
+    owner: User,
+    event_name: str,
+    metadata: dict[str, Any],
+    page_path: str = '/generation-worker',
+    source: str | None = None,
+    created_at: datetime | None = None,
+) -> bool:
+    event_metadata = {
+        **metadata,
+        'task_id': task.public_id,
+        'server_owned': True,
+        'terminal_event': event_name in _TERMINAL_GENERATION_EVENTS,
+    }
+    if _generation_task_event_already_recorded(
+        db,
+        task=task,
+        owner=owner,
+        event_name=event_name,
+        page_path=page_path,
+    ):
+        return True
+    return _record_generation_task_event(
+        db,
+        task=task,
+        owner=owner,
+        event_name=event_name,
+        metadata=event_metadata,
+        page_path=page_path,
+        source=source,
+        created_at=created_at,
+    )
+
+
+def _lock_generation_task_for_event_delivery(
+    db: Session,
+    task: ImageGenerationTask,
+) -> ImageGenerationTask | None:
+    if _database_dialect_name(db) != 'postgresql' or getattr(task, 'id', None) is None:
+        return task
+    return (
+        db.query(ImageGenerationTask)
+        .filter(ImageGenerationTask.id == task.id)
+        .populate_existing()
+        .with_for_update()
+        .one_or_none()
+    )
+
+
+def deliver_generation_terminal_event(db: Session, *, task: ImageGenerationTask, owner: User) -> bool:
+    locked_task = _lock_generation_task_for_event_delivery(db, task)
+    if locked_task is None:
+        return False
+    pending = _pending_generation_terminal_event(locked_task)
+    if pending is None:
+        return True
+    event_name, metadata, created_at = pending
+    if not record_generation_task_event_once(
+        db,
+        task=locked_task,
+        owner=owner,
+        event_name=event_name,
+        metadata=metadata,
+        created_at=created_at,
+    ):
+        return False
+
+    payload = dict(locked_task.request_payload or {})
+    payload.pop(_PENDING_TERMINAL_EVENT_KEY, None)
+    locked_task.request_payload = payload
+    db.add(locked_task)
+    try:
+        # Commit the analytics row and outbox acknowledgement atomically. If it
+        # fails, both roll back and the staged marker remains for reconciliation.
+        db.commit()
+        return True
+    except Exception:
+        db.rollback()
+        logger.debug('Failed to acknowledge generation terminal event for %s', locked_task.public_id, exc_info=True)
+        return False
+
+
+def deliver_generation_request_event(db: Session, *, task: ImageGenerationTask, owner: User) -> bool:
+    locked_task = _lock_generation_task_for_event_delivery(db, task)
+    if locked_task is None:
+        return False
+    pending = _pending_generation_request_event(locked_task)
+    if pending is None:
+        return True
+    page_path, source, metadata, created_at = pending
+    if not record_generation_task_event_once(
+        db,
+        task=locked_task,
+        owner=owner,
+        event_name='generation_requested',
+        metadata=metadata,
+        page_path=page_path,
+        source=source,
+        created_at=created_at,
+    ):
+        return False
+
+    payload = dict(locked_task.request_payload or {})
+    payload.pop(_PENDING_REQUEST_EVENT_KEY, None)
+    locked_task.request_payload = payload
+    db.add(locked_task)
+    try:
+        db.commit()
+        return True
+    except Exception:
+        db.rollback()
+        logger.debug('Failed to acknowledge generation request event for %s', locked_task.public_id, exc_info=True)
+        return False
+
+
+def _reconcile_pending_generation_request_events(db: Session) -> None:
+    tasks = (
+        db.query(ImageGenerationTask)
+        .filter(ImageGenerationTask.request_payload.op('?')(_PENDING_REQUEST_EVENT_KEY))
+        .all()
+    )
+    for task in tasks:
+        if _pending_generation_request_event(task) is None:
+            continue
+        owner = db.query(User).filter(User.id == task.owner_user_id).first()
+        if owner is None:
+            continue
+        deliver_generation_request_event(db, task=task, owner=owner)
+
+
+def _reconcile_pending_generation_terminal_events(db: Session) -> None:
+    tasks = (
+        db.query(ImageGenerationTask)
+        .filter(
+            ImageGenerationTask.status.in_(
+                [TaskStatus.SUCCEEDED, TaskStatus.FAILED, TaskStatus.EXPIRED, TaskStatus.DEAD_LETTER]
+            ),
+            ImageGenerationTask.request_payload.op('?')(_PENDING_TERMINAL_EVENT_KEY),
+        )
+        .all()
+    )
+    for task in tasks:
+        if _pending_generation_terminal_event(task) is None:
+            continue
+        owner = db.query(User).filter(User.id == task.owner_user_id).first()
+        if owner is None:
+            continue
+        deliver_generation_terminal_event(db, task=task, owner=owner)
+
+
+def _record_terminal_generation_events_after_state_commit(
+    db: Session,
+    events: list[tuple[ImageGenerationTask, User, str, dict[str, Any]]],
+) -> None:
+    for task, owner, event_name, metadata in events:
+        if _pending_generation_terminal_event(task) is None:
+            raise RuntimeError(
+                f'Generation task {task.public_id} reached terminal delivery without a durable outbox marker'
+            )
+        deliver_generation_terminal_event(db, task=task, owner=owner)
 
 
 def _output_format_for_content_type(content_type: str, *, fallback: str) -> str:
@@ -653,13 +1095,41 @@ def _generation_failure_stage(error_code: str) -> str:
         return 'quota'
     if error_code == 'IMAGE_GENERATION_STORAGE_FAILED':
         return 'storage'
+    if error_code == 'IMAGE_GENERATION_PERSISTENCE_FAILED':
+        return 'persistence'
     if error_code == 'OPENAI_IMAGE_GENERATION_FAILED':
         return 'ai_service'
+    if error_code == 'TASK_DISPATCH_FAILED':
+        return 'dispatch'
+    if error_code == 'TASK_STALLED':
+        return 'worker_timeout'
     if error_code in {'GENERATION_PROMPT_REJECTED', 'PROMPT_SAFETY'}:
         return 'prompt_safety'
     if error_code in {'USER_NOT_FOUND', 'SOURCE_REVIEW_NOT_FOUND', 'SOURCE_PHOTO_NOT_FOUND'}:
         return 'auth_or_source'
     return 'worker'
+
+
+def _generation_failure_event_metadata(
+    task: ImageGenerationTask,
+    error_code: str,
+    extra_metadata: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    payload = dict(task.request_payload or {})
+    return {
+        'task_id': task.public_id,
+        'generation_mode': task.generation_mode,
+        'intent': task.intent,
+        'quality': payload.get('quality'),
+        'size': payload.get('size'),
+        'template_key': payload.get('template_key'),
+        'prompt_example_id': payload.get('prompt_example_id'),
+        'prompt_example_category': payload.get('prompt_example_category'),
+        'source_review_id': payload.get('source_review_public_id'),
+        'error_code': error_code,
+        'failure_stage': _generation_failure_stage(error_code),
+        **(extra_metadata or {}),
+    }
 
 
 def _handle_generation_failure(
@@ -669,6 +1139,7 @@ def _handle_generation_failure(
     error_code: str,
     error_message: str,
     retryable: bool,
+    event_metadata: dict[str, Any] | None = None,
 ) -> None:
     retry_delay: int | None = None
     if retryable and task.attempt_count < task.max_attempts:
@@ -683,31 +1154,32 @@ def _handle_generation_failure(
     task.error_code = error_code
     task.error_message = error_message[:500]
     task.last_heartbeat_at = datetime.now(timezone.utc)
+    if event_metadata:
+        task.request_payload = {
+            **dict(task.request_payload or {}),
+            'terminal_failure_metadata': dict(event_metadata),
+        }
     db.add(task)
+    terminal_event: tuple[ImageGenerationTask, User, str, dict[str, Any]] | None = None
     if task.status == TaskStatus.FAILED:
+        release_generation_credit_reservation(db, task=task, reason=error_code)
         owner = db.query(User).filter(User.id == task.owner_user_id).first()
         if owner is not None:
-            payload = dict(task.request_payload or {})
-            _record_generation_task_event(
-                db,
-                task=task,
-                owner=owner,
+            terminal_metadata = _generation_failure_event_metadata(task, error_code, event_metadata)
+            stage_generation_terminal_event(
+                task,
                 event_name='generation_failed',
-                metadata={
-                    'task_id': task.public_id,
-                    'generation_mode': task.generation_mode,
-                    'intent': task.intent,
-                    'quality': payload.get('quality'),
-                    'size': payload.get('size'),
-                    'template_key': payload.get('template_key'),
-                    'prompt_example_id': payload.get('prompt_example_id'),
-                    'prompt_example_category': payload.get('prompt_example_category'),
-                    'source_review_id': payload.get('source_review_public_id'),
-                    'error_code': error_code,
-                    'failure_stage': _generation_failure_stage(error_code),
-                },
+                metadata=terminal_metadata,
+            )
+            terminal_event = (
+                task,
+                owner,
+                'generation_failed',
+                terminal_metadata,
             )
     db.commit()
+    if terminal_event is not None:
+        _record_terminal_generation_events_after_state_commit(db, [terminal_event])
     if retry_delay is not None and getattr(settings, 'cloud_tasks_enabled', False) is True:
         try:
             from app.services.task_dispatcher import TaskDispatchError, enqueue_image_generation_task
@@ -725,7 +1197,28 @@ def _handle_generation_failure(
                 failed_task.error_code = 'TASK_DISPATCH_FAILED'
                 failed_task.error_message = str(exc)[:500]
                 db.add(failed_task)
+                release_generation_credit_reservation(db, task=failed_task, reason='TASK_DISPATCH_FAILED')
+                owner = db.query(User).filter(User.id == failed_task.owner_user_id).first()
+                terminal_metadata = _generation_failure_event_metadata(failed_task, 'TASK_DISPATCH_FAILED')
+                if owner is not None:
+                    stage_generation_terminal_event(
+                        failed_task,
+                        event_name='generation_failed',
+                        metadata=terminal_metadata,
+                    )
                 db.commit()
+                if owner is not None:
+                    _record_terminal_generation_events_after_state_commit(
+                        db,
+                        [
+                            (
+                                failed_task,
+                                owner,
+                                'generation_failed',
+                                terminal_metadata,
+                            )
+                        ],
+                    )
 
 
 def make_generation_task(

@@ -108,4 +108,6 @@ def execute_image_generation_task(payload: InternalTaskExecuteRequest, request: 
     result = process_image_generation_task(payload.task_id, worker_name='cloud-tasks')
     if result.get('result') == 'delayed':
         raise api_error(status.HTTP_503_SERVICE_UNAVAILABLE, 'TASK_RETRY_NOT_READY', 'Task is scheduled for a later retry')
+    if result.get('reason') == 'lease_mismatch':
+        raise api_error(status.HTTP_503_SERVICE_UNAVAILABLE, 'TASK_ALREADY_RUNNING', 'Task is already running')
     return result

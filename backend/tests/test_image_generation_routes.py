@@ -16,7 +16,13 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 from app.api.deps import get_current_actor  # noqa: E402
-from app.api.routers.generations import _generation_item_payload, download_generation, get_generation_task_status  # noqa: E402
+from app.api.routers.generations import (  # noqa: E402
+    _generation_item_payload,
+    _mark_generation_dispatch_failed,
+    _record_generation_event,
+    download_generation,
+    get_generation_task_status,
+)
 from app.db.models import TaskStatus, User, UserPlan, UserStatus  # noqa: E402
 from app.db.session import get_db  # noqa: E402
 from app.main import app  # noqa: E402
@@ -55,6 +61,28 @@ class ImageGenerationRoutesTests(unittest.TestCase):
         app.dependency_overrides[get_current_actor] = override_actor
         return db, user
 
+    def test_generation_analytics_failure_rolls_back_its_own_transaction(self) -> None:
+        db = MagicMock()
+        actor = SimpleNamespace(
+            user=SimpleNamespace(public_id='usr_generation'),
+            plan=UserPlan.free,
+        )
+
+        with patch(
+            'app.api.routers.generations.record_product_event',
+            side_effect=RuntimeError('analytics unavailable'),
+        ):
+            _record_generation_event(
+                db,
+                actor,
+                event_name='generation_requested',
+                page_path='/generate',
+                metadata={'task_id': 'igt_test'},
+            )
+
+        db.rollback.assert_called_once_with()
+        db.commit.assert_not_called()
+
     def test_guest_can_view_templates_but_cannot_create_generation(self) -> None:
         self._install_actor(UserPlan.guest)
 
@@ -82,7 +110,7 @@ class ImageGenerationRoutesTests(unittest.TestCase):
     def test_free_users_are_limited_to_low_quality(self) -> None:
         self._install_actor(UserPlan.free)
 
-        with self._client() as client:
+        with patch('app.api.routers.generations.reserve_generation_credits_for_task'), self._client() as client:
             response = client.post(
                 '/api/v1/generations',
                 json={
@@ -134,6 +162,7 @@ class ImageGenerationRoutesTests(unittest.TestCase):
 
         with (
             patch('app.api.routers.generations.settings.cloud_tasks_enabled', True),
+            patch('app.api.routers.generations.reserve_generation_credits_for_task'),
             patch('app.api.routers.generations.enqueue_image_generation_task') as enqueue_task,
             self._client() as client,
         ):
@@ -154,6 +183,38 @@ class ImageGenerationRoutesTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         enqueue_task.assert_called_once()
         self.assertTrue(enqueue_task.call_args.args[0].startswith('igt_'))
+
+    def test_mark_generation_dispatch_failed_records_terminal_failure_event(self) -> None:
+        db = MagicMock()
+        task = SimpleNamespace(
+            id=10,
+            public_id='igt_dispatch_failed',
+            owner_user_id=7,
+            request_payload={'quality': 'low', 'size': '1024x1024'},
+            generation_mode='general',
+            intent='social_visual',
+        )
+        owner = SimpleNamespace(id=7, public_id='usr_generation', plan=UserPlan.pro)
+        task_query = MagicMock()
+        task_query.filter.return_value.first.return_value = task
+        owner_query = MagicMock()
+        owner_query.filter.return_value.first.return_value = owner
+        db.query.side_effect = [task_query, owner_query]
+
+        with (
+            patch('app.api.routers.generations.release_generation_credit_reservation') as release_reservation,
+            patch('app.api.routers.generations.stage_generation_terminal_event') as stage_event,
+            patch('app.api.routers.generations.deliver_generation_terminal_event') as deliver_event,
+        ):
+            _mark_generation_dispatch_failed(db, 'igt_dispatch_failed', 'queue unavailable')
+
+        self.assertEqual(task.status, TaskStatus.FAILED)
+        self.assertEqual(task.error_code, 'TASK_DISPATCH_FAILED')
+        release_reservation.assert_called_once_with(db, task=task, reason='TASK_DISPATCH_FAILED')
+        stage_event.assert_called_once()
+        self.assertEqual(stage_event.call_args.kwargs['event_name'], 'generation_failed')
+        deliver_event.assert_called_once_with(db, task=task, owner=owner)
+        self.assertEqual(db.commit.call_count, 1)
 
     def test_internal_generation_task_execute_requires_dispatch_secret(self) -> None:
         with patch('app.api.routers.tasks.settings.cloud_tasks_enabled', True), patch(
@@ -181,6 +242,25 @@ class ImageGenerationRoutesTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['result'], 'processed')
         process_task.assert_called_once_with('igt_123', worker_name='cloud-tasks')
+
+    def test_internal_generation_task_execute_retries_lease_mismatch(self) -> None:
+        with (
+            patch('app.api.routers.tasks.settings.cloud_tasks_enabled', True),
+            patch('app.api.routers.tasks.settings.cloud_tasks_secret', 'secret'),
+            patch(
+                'app.api.routers.tasks.process_image_generation_task',
+                return_value={'result': 'noop', 'status': 'RUNNING', 'reason': 'lease_mismatch'},
+            ),
+            self._client() as client,
+        ):
+            response = client.post(
+                '/api/v1/internal/tasks/generations/execute',
+                json={'task_id': 'igt_123'},
+                headers={'X-Task-Dispatch-Secret': 'secret'},
+            )
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json()['error']['code'], 'TASK_ALREADY_RUNNING')
 
     def test_generation_payload_exposes_source_photo_and_review_public_ids(self) -> None:
         db = MagicMock()

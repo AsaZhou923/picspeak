@@ -270,6 +270,7 @@ export default function UsagePage() {
   const generationCredits = usage?.generation_credits ?? {
     monthly_total: 0,
     monthly_used: 0,
+    monthly_held: 0,
     monthly_remaining: 0,
   };
 

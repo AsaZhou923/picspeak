@@ -26,6 +26,8 @@ export default function UsageGenerationCreditsPanel({
   onCreditPackCheckout,
   renderUsageBar,
 }: UsageGenerationCreditsPanelProps) {
+  const monthlyHeld = generationCredits.monthly_held ?? 0;
+
   return (
     <div className="overflow-hidden rounded-lg border border-gold/25 bg-[linear-gradient(135deg,rgba(200,162,104,0.16),transparent_44%),rgb(var(--color-raised)/0.78)] p-6">
       <div className="flex flex-wrap items-start justify-between gap-5">
@@ -54,13 +56,23 @@ export default function UsageGenerationCreditsPanel({
       {generationCredits.monthly_total !== null &&
         generationCredits.monthly_total > 0 &&
         generationCredits.monthly_used !== null && (
-          <div className="mt-5">
-            {renderUsageBar({
-              label: t('usage_generation_credits_monthly_used'),
-              used: generationCredits.monthly_used,
-              total: generationCredits.monthly_total,
-            })}
-          </div>
+          <>
+            <div className="mt-5">
+              {renderUsageBar({
+                label: t('usage_generation_credits_monthly_used'),
+                used: generationCredits.monthly_used,
+                total: generationCredits.monthly_total,
+              })}
+            </div>
+            {monthlyHeld > 0 && (
+              <p className="mt-3 text-xs text-ink-muted">
+                {t('usage_generation_credits_monthly_held').replace(
+                  '{held}',
+                  String(monthlyHeld),
+                )}
+              </p>
+            )}
+          </>
         )}
 
       <p className="mt-4 rounded-md border border-border-subtle bg-void/25 px-3 py-2 text-xs leading-5 text-ink-muted">

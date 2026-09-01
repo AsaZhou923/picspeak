@@ -1,4 +1,10 @@
 import unittest
+import sys
+from pathlib import Path
+
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+if str(BACKEND_ROOT) not in sys.path:
+    sys.path.insert(0, str(BACKEND_ROOT))
 
 from app.core.config import Settings
 
@@ -45,6 +51,13 @@ class SettingsDefaultsTestCase(unittest.TestCase):
         settings = Settings(_env_file=None)
         self.assertEqual(settings.openai_review_model, 'gpt-5.6-luna')
         self.assertEqual(settings.openai_review_reasoning_effort, 'xhigh')
+
+    def test_openai_score_reasoning_effort_is_normalized_and_validated(self):
+        settings = Settings(_env_file=None, openai_score_reasoning_effort=' HIGH ')
+        self.assertEqual(settings.openai_score_reasoning_effort, 'high')
+
+        with self.assertRaises(ValueError):
+            Settings(_env_file=None, openai_score_reasoning_effort='turbo')
 
 
 if __name__ == '__main__':

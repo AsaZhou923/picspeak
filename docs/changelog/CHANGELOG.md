@@ -2,6 +2,37 @@
 
 本文件汇总了原 `docs/changelog/update-log-*.md` 的全部更新记录。新增 release 请追加到顶部，并为每条记录保留稳定锚点，供 `/updates` 的 `docPath` 和 README 链接定位。
 
+<a id="2026-09-01-review-generation-reliability"></a>
+
+## 2026-09-01 - Review consistency and generation reliability
+
+日期：2026-09-01
+
+### 概览
+
+这次更新统一了普通点评的数值评分来源，同时补强公开结果隐私、生图额度预留、worker 并发、对象存储补偿和 analytics 因果口径。首页新增一次性更新弹窗，直接复用三语 Updates 数据展示最新 release。
+
+- 普通点评统一使用一个官方 GPT scorer；Qwen / GPT 选择只决定文字反馈，不再改变五维分数。
+- provider 返回的具体模型 ID 继续写入 review provenance 供审计，但不再要求额外配置 model-version 环境变量，也不作为正常调用门槛。
+- 公开分享与非 owner review 不再返回 EXIF、内部 task ID、标签、备注或管理状态。
+- 生图额度增加 `held -> consumed|released` 预留生命周期，并在账户额度页显示处理中预留。
+- generation claim、worker lease、对象上传补偿、request/terminal analytics outbox 和跨日 cohort 均增加并发与 PostgreSQL 回归覆盖。
+
+### 首页更新弹窗
+
+- 首页读取 `updates-data` 中的最新三语 release，展示标题、摘要和重点条目。
+- 每个 release ID 在同一浏览器只自动出现一次；关闭、按 Escape 或打开完整更新页都会记录已读。
+- 弹窗遵循 PicSpeak 现有暖金色编辑风格，支持键盘焦点、背景滚动锁定和 reduced-motion。
+
+### 数据库与验证
+
+- Alembic head 更新为 `20260901_0006`，为 generation request/terminal outbox marker 增加 partial indexes。
+- 临时 PostgreSQL 完整后端测试通过：274 tests 与 17 subtests。
+- 前端 143 tests、lint、typecheck 和 116/116 production build 通过。
+- 独立代码复审无 actionable finding；独立架构复审为 `CLEAR`。
+
+---
+
 <a id="2026-08-20-gpt56-luna-xhigh"></a>
 
 ## 2026-08-20 - GPT-5.6 Luna xhigh review routing

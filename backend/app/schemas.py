@@ -135,8 +135,15 @@ class ReviewResult(BaseModel):
     schema_version: str = REVIEW_SCHEMA_VERSION
     prompt_version: str = ''
     score_version: str = 'legacy'
+    score_prompt_version: str = ''
     model_name: str = ''
     model_version: str = ''
+    scorer_model_name: str = ''
+    scorer_model_version: str = ''
+    writer_model_name: str = ''
+    writer_model_version: str = ''
+    scorer_preprocess_version: str = ''
+    score_cache_hit: bool = False
     scores: dict[str, int] = Field(default_factory=default_review_scores)
     final_score: float = 0.0
     advantage: str = ''
@@ -212,6 +219,7 @@ class GenerationCreateRequest(BaseModel):
     output_format: str = Field(default='webp', pattern='^(webp|png|jpeg)$')
     async_mode: bool = Field(default=True, alias='async')
     idempotency_key: str | None = None
+    analytics_source: str | None = Field(default=None, max_length=64)
 
 
 class GenerationCreateResponse(BaseModel):
@@ -273,6 +281,7 @@ class GeneratedImageHistoryResponse(BaseModel):
 
 class ReviewGetResponse(BaseModel):
     review_id: str
+    task_id: str | None = None
     photo_id: str
     photo_url: str | None = None
     mode: str
@@ -317,6 +326,11 @@ class ReviewHistoryItem(BaseModel):
     scores: dict[str, int] = Field(default_factory=default_review_scores)
     model_name: str = ''
     model_version: str = ''
+    scorer_model_name: str = ''
+    scorer_model_version: str = ''
+    writer_model_name: str = ''
+    writer_model_version: str = ''
+    score_version: str = 'legacy'
     favorite: bool = False
     gallery_visible: bool = False
     gallery_audit_status: str = 'none'
@@ -431,6 +445,11 @@ class ReviewExportData(BaseModel):
     image_type: str = 'default'
     model_name: str = ''
     model_version: str = ''
+    scorer_model_name: str = ''
+    scorer_model_version: str = ''
+    writer_model_name: str = ''
+    writer_model_version: str = ''
+    score_version: str = 'legacy'
     final_score: float
     scores: dict[str, int] = Field(default_factory=default_review_scores)
     advantage: str = ''
@@ -479,6 +498,7 @@ class UsageSubscription(BaseModel):
 class UsageGenerationCredits(BaseModel):
     monthly_total: int | None = None
     monthly_used: int | None = None
+    monthly_held: int | None = None
     monthly_remaining: int | None = None
 
 
