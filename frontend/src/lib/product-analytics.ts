@@ -30,9 +30,6 @@ export type ProductAnalyticsEventName =
   | 'generation_prompt_opened'
   | 'generation_prompt_example_applied'
   | 'generation_intent_selected'
-  | 'generation_requested'
-  | 'generation_succeeded'
-  | 'generation_failed'
   | 'generation_viewed'
   | 'generation_download_clicked'
   | 'generation_reuse_clicked'
@@ -59,6 +56,8 @@ export function normalizeProductAnalyticsSource(value: string | null | undefined
       return 'share';
     case 'checkout':
       return 'checkout';
+    case 'system_performance':
+      return 'system_performance';
     case 'unknown':
       return 'unknown';
     default:
@@ -135,9 +134,6 @@ export function derivePageEvent(pathname: string): ProductAnalyticsEventName | n
   }
   if (pathname === '/payment-success') {
     return 'payment_success_viewed';
-  }
-  if (/^\/reviews\/[^/]+$/.test(pathname)) {
-    return 'review_result_viewed';
   }
   if (/^\/generations\/[^/]+$/.test(pathname)) {
     return 'generation_viewed';

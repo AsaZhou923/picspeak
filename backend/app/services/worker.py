@@ -84,6 +84,7 @@ class ReviewWorker:
                         process_image_generation_task,
                         _task_public_id,
                         worker_name=_worker_name,
+                        claim_token=task.claimed_by,
                     )
                     self._gen_futures.append(future)
                     continue

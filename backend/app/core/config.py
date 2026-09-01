@@ -122,9 +122,13 @@ class Settings(BaseSettings):
 
     openai_api_key: str = ''
     openai_api_base_url: str = 'https://api.openai.com/v1'
+    openai_score_model: str = 'gpt-5.6-luna'
+    openai_score_reasoning_effort: str = 'xhigh'
+    openai_score_timeout_seconds: int = 180
     openai_review_model: str = 'gpt-5.6-luna'
     openai_review_reasoning_effort: str = 'xhigh'
     openai_review_timeout_seconds: int = 180
+    review_pricing_overrides: dict[str, Any] = Field(default_factory=dict)
     retake_analysis_api_url: str = ''
     retake_analysis_model: str = 'gpt-5.6-luna'
     retake_analysis_reasoning_effort: str = 'xhigh'
@@ -182,6 +186,13 @@ class Settings(BaseSettings):
             return [item.strip().rstrip('/') for item in raw.split(',') if item.strip()]
         raise ValueError('BACKEND_CORS_ORIGINS must be a list or string')
 
+    @field_validator('review_pricing_overrides', mode='before')
+    @classmethod
+    def parse_review_pricing_overrides_setting(cls, value: Any) -> dict[str, Any]:
+        from app.services.review_pricing import parse_review_pricing_overrides
+
+        return parse_review_pricing_overrides(value)
+
     @field_validator('frontend_origin', mode='before')
     @classmethod
     def normalize_frontend_origin(cls, value: Any) -> str:
@@ -210,6 +221,7 @@ class Settings(BaseSettings):
         'lemonsqueezy_image_credit_pack_variant_id',
         'lemonsqueezy_webhook_signing_secret',
         'openai_api_key',
+        'openai_score_reasoning_effort',
         'openai_review_reasoning_effort',
         'retake_analysis_reasoning_effort',
         'image_generation_api_key',
@@ -225,7 +237,7 @@ class Settings(BaseSettings):
             return ''
         return value.strip()
 
-    @field_validator('openai_review_reasoning_effort', 'retake_analysis_reasoning_effort')
+    @field_validator('openai_score_reasoning_effort', 'openai_review_reasoning_effort', 'retake_analysis_reasoning_effort')
     @classmethod
     def validate_openai_reasoning_effort(cls, value: str) -> str:
         normalized = value.strip().lower()

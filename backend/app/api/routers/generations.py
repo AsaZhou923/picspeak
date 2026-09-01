@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import CurrentActor, get_current_actor, get_db
 from app.core.config import settings
 from app.core.errors import api_error
-from app.db.models import GeneratedImage, ImageGenerationTask, Photo, PhotoStatus, Review, TaskStatus, UserPlan
+from app.db.models import GeneratedImage, ImageGenerationTask, Photo, PhotoStatus, Review, TaskStatus, User, UserPlan
 from app.schemas import (
     GeneratedImageDetailResponse,
     GeneratedImageHistoryResponse,
@@ -38,9 +38,14 @@ from app.services.image_generation_prompt import (
 )
 from app.services.image_generation_task_processor import (
     _serialize_generation_task_status,
-    ensure_generation_credits_available,
+    _generation_failure_event_metadata,
+    deliver_generation_request_event,
+    deliver_generation_terminal_event,
     make_generation_task,
+    stage_generation_request_event,
+    stage_generation_terminal_event,
 )
+from app.services.generation_credit_reservations import reserve_generation_credits_for_task, release_generation_credit_reservation
 from app.services.object_storage import get_object_storage_client
 from app.services.product_analytics import record_product_event
 from app.services.task_dispatcher import TaskDispatchError, enqueue_image_generation_task
@@ -156,6 +161,7 @@ def create_generation(
         'credits_reserved': credits_reserved,
         'source_review_public_id': payload.source_review_id,
         'source_photo_public_id': payload.source_photo_id,
+        'analytics_source': payload.analytics_source,
     }
     task = make_generation_task(
         owner_user_id=actor.user.id,
@@ -168,7 +174,7 @@ def create_generation(
         idempotency_key=idempotency_key,
     )
     db.add(task)
-    db.flush()
+    _reserve_generation_credits_or_raise(db, user=actor.user, task=task, credits=credits_reserved)
 
     response = {
         'task_id': task.public_id,
@@ -186,25 +192,34 @@ def create_generation(
             http_status=200,
             response_json=response,
         )
-    _record_generation_event(
-        db,
-        actor,
-        event_name='generation_requested',
-        page_path=f'/reviews/{payload.source_review_id}' if payload.generation_mode == 'review_linked' and payload.source_review_id else '/generate',
-        metadata={
-            'generation_mode': payload.generation_mode,
-            'intent': payload.intent,
-            'template_key': payload.template_key,
-            'prompt_example_id': payload.prompt_example_id,
-            'prompt_example_category': payload.prompt_example_category,
-            'quality': quality,
-            'size': size,
-            'task_id': task.public_id,
-            'credits_reserved': credits_reserved,
-            'source_review_id': payload.source_review_id,
-        },
+    request_event_page_path = (
+        f'/reviews/{payload.source_review_id}'
+        if payload.generation_mode == 'review_linked' and payload.source_review_id
+        else '/generate'
     )
+    request_event_metadata = {
+        'generation_mode': payload.generation_mode,
+        'intent': payload.intent,
+        'template_key': payload.template_key,
+        'prompt_example_id': payload.prompt_example_id,
+        'prompt_example_category': payload.prompt_example_category,
+        'quality': quality,
+        'size': size,
+        'task_id': task.public_id,
+        'credits_reserved': credits_reserved,
+        'source_review_id': payload.source_review_id,
+    }
+    stage_generation_request_event(
+        task,
+        page_path=request_event_page_path,
+        source=payload.analytics_source,
+        metadata=request_event_metadata,
+    )
+    db.add(task)
+    # Persist the accepted task and its authoritative request-event outbox marker
+    # atomically, then deliver analytics without coupling it to the product flow.
     db.commit()
+    deliver_generation_request_event(db, task=task, owner=actor.user)
     if settings.cloud_tasks_enabled:
         try:
             enqueue_image_generation_task(task.public_id)
@@ -246,7 +261,6 @@ def get_generation(
         page_path=f'/generations/{generation_id}',
         metadata={'generation_id': generation_id, 'generation_mode': image.generation_mode},
     )
-    db.commit()
     return _generation_detail_payload(db, image)
 
 
@@ -354,6 +368,7 @@ def download_generation(
 @router.post('/generations/{generation_id}/reuse', response_model=GenerationCreateResponse)
 def reuse_generation(
     generation_id: str,
+    request: Request,
     db: Session = Depends(get_db),
     actor: CurrentActor = Depends(get_current_actor),
 ):
@@ -375,16 +390,13 @@ def reuse_generation(
         'output_format': image.output_format,
         'model_snapshot': settings.image_generation_model_snapshot,
         'reference_image_count': 1 if image.source_photo_id is not None else 0,
+        'analytics_source': request.query_params.get('analytics_source'),
     }
     credits_reserved = estimate_image_generation_credits(
         quality=image.quality,
         size=image.size,
         reference_image_count=int(request_payload['reference_image_count']),
     )
-    try:
-        ensure_generation_credits_available(db, actor.user, credits_needed=credits_reserved)
-    except ValueError:
-        raise api_error(status.HTTP_402_PAYMENT_REQUIRED, 'GENERATION_CREDITS_EXHAUSTED', 'Image generation credits are exhausted')
     request_payload['credits_reserved'] = credits_reserved
     task = make_generation_task(
         owner_user_id=actor.user.id,
@@ -396,7 +408,30 @@ def reuse_generation(
         source_review_id=image.source_review_id,
     )
     db.add(task)
+    _reserve_generation_credits_or_raise(db, user=actor.user, task=task, credits=credits_reserved)
+    request_event_metadata = {
+        'generation_mode': image.generation_mode,
+        'intent': image.intent,
+        'template_key': image.template_key,
+        'prompt_example_id': payload.get('prompt_example_id'),
+        'prompt_example_category': payload.get('prompt_example_category'),
+        'quality': image.quality,
+        'size': image.size,
+        'task_id': task.public_id,
+        'credits_reserved': credits_reserved,
+        'source_review_id': _related_public_id(db, Review, image.source_review_id, None),
+        'entrypoint': 'generation_detail_reuse',
+    }
+    stage_generation_request_event(
+        task,
+        page_path=f'/generations/{generation_id}',
+        source=request_payload.get('analytics_source'),
+        metadata=request_event_metadata,
+    )
+    db.add(task)
+    # Commit the reusable task, credit hold, and request-event marker together.
     db.commit()
+    deliver_generation_request_event(db, task=task, owner=actor.user)
     if settings.cloud_tasks_enabled:
         try:
             enqueue_image_generation_task(task.public_id)
@@ -429,7 +464,35 @@ def _mark_generation_dispatch_failed(db: Session, task_public_id: str, error_mes
     failed_task.error_code = 'TASK_DISPATCH_FAILED'
     failed_task.error_message = error_message[:500]
     db.add(failed_task)
+    release_generation_credit_reservation(db, task=failed_task, reason='TASK_DISPATCH_FAILED')
+    owner = db.query(User).filter(User.id == failed_task.owner_user_id).first()
+    if owner is not None:
+        stage_generation_terminal_event(
+            failed_task,
+            event_name='generation_failed',
+            metadata=_generation_failure_event_metadata(failed_task, 'TASK_DISPATCH_FAILED'),
+        )
     db.commit()
+    if owner is not None:
+        deliver_generation_terminal_event(db, task=failed_task, owner=owner)
+
+
+def _reserve_generation_credits_or_raise(
+    db: Session,
+    *,
+    user: User,
+    task: ImageGenerationTask,
+    credits: int,
+) -> None:
+    try:
+        reserve_generation_credits_for_task(db, user=user, task=task, credits=credits)
+    except ValueError as exc:
+        db.rollback()
+        raise api_error(
+            status.HTTP_402_PAYMENT_REQUIRED,
+            'GENERATION_CREDITS_EXHAUSTED',
+            'Image generation credits are exhausted',
+        ) from exc
 
 
 def _record_generation_event(
@@ -438,6 +501,7 @@ def _record_generation_event(
     *,
     event_name: str,
     page_path: str,
+    source: str | None = None,
     metadata: dict,
 ) -> None:
     try:
@@ -446,12 +510,14 @@ def _record_generation_event(
             event_name=event_name,
             user_public_id=actor.user.public_id,
             plan=actor.plan.value if hasattr(actor.plan, 'value') else str(actor.plan),
-            source='unknown',
+            source=source,
             page_path=page_path,
             metadata=metadata,
         )
+        db.commit()
     except Exception:
         # Analytics must not block generation flows.
+        db.rollback()
         logger.debug('Failed to record generation analytics event %s', event_name, exc_info=True)
 
 

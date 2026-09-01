@@ -11,7 +11,7 @@ import { useAuth } from '@/lib/auth-context';
 import { ApiException, GeneratedImageItem, GenerationQuality, GenerationSize } from '@/lib/types';
 import { useI18n } from '@/lib/i18n';
 import { formatUserFacingError } from '@/lib/error-utils';
-import { trackProductEvent } from '@/lib/product-analytics';
+import { readProductAttributionSource, trackProductEvent } from '@/lib/product-analytics';
 import { useCreditPackCheckout } from '@/lib/hooks/useCreditPackCheckout';
 import { startProCheckout } from '@/lib/pro-checkout';
 import {
@@ -238,6 +238,7 @@ export default function GeneratePage() {
     setError('');
     try {
       const activeToken = await ensureToken();
+      const analyticsSource = readProductAttributionSource();
       const result = await createGeneration(
         {
           generation_mode: 'general',
@@ -254,25 +255,10 @@ export default function GeneratePage() {
           output_format: 'webp',
           async: true,
           idempotency_key: `${selectedTemplate.key}-${quality}-${size}-${Date.now()}`,
+          analytics_source: analyticsSource,
         },
         activeToken
       );
-      void trackProductEvent('generation_requested', {
-        token: activeToken,
-        pagePath: '/generate',
-        locale,
-        metadata: {
-          ...sourceMetadata,
-          task_id: result.task_id,
-          template_key: selectedTemplate.key,
-          prompt_example_id: appliedPromptExample?.id,
-          prompt_example_category: appliedPromptExample?.category,
-          prompt_example_modified: appliedPromptExample ? prompt.trim() !== appliedPromptExample.promptText.trim() : false,
-          quality,
-          size,
-          credits_reserved: result.credits_reserved,
-        },
-      });
       router.push(`/generation-tasks/${result.task_id}`);
     } catch (err) {
       if (err instanceof ApiException && err.code === 'IMAGE_GENERATION_CREDITS_EXHAUSTED') {

@@ -10,10 +10,12 @@ from app.core.config import settings
 from app.core.http_client import PooledHTTPRequestError, PooledHTTPStatusError, pooled_request
 from app.schemas import ReviewResult
 from app.services.ai import AIReviewError, AIReviewResponse
+from app.services.review_pricing import ReviewModelUsage, estimate_review_usage_cost
 
 
 RETAKE_PROMPT_VERSION = 'retake-coach-v1'
 RETAKE_SCORE_VERSION = 'retake-paired-v1'
+RETAKE_PREPROCESS_VERSION = 'openai-paired-input-image-high-v1'
 DIMENSION_KEYS = ('composition', 'lighting', 'color', 'impact', 'technical')
 
 
@@ -194,6 +196,7 @@ def _build_result(
     *,
     response_id: str,
     model_name: str,
+    model_version: str,
     original_review_id: str,
     original_photo_id: str,
     retake_photo_id: str,
@@ -251,8 +254,14 @@ def _build_result(
         schema_version='2.0',
         prompt_version=RETAKE_PROMPT_VERSION,
         score_version=RETAKE_SCORE_VERSION,
+        score_prompt_version=RETAKE_PROMPT_VERSION,
         model_name=model_name,
-        model_version=model_name,
+        model_version=model_version,
+        scorer_model_name=model_name,
+        scorer_model_version=model_version,
+        writer_model_name=model_name,
+        writer_model_version=model_version,
+        scorer_preprocess_version=RETAKE_PREPROCESS_VERSION,
         scores=after_scores,
         final_score=overall_after,
         advantage=comparison.summary,
@@ -332,24 +341,43 @@ def run_retake_comparison(
     except ValidationError as exc:
         raise AIReviewError(f'GPT-5.6 structured output failed validation: {exc}') from exc
 
-    model_name = str(body.get('model') or settings.retake_analysis_model)
+    configured_model_name = settings.retake_analysis_model
+    provider_model_version = str(body.get('model') or configured_model_name)
     result = _build_result(
         comparison,
         response_id=str(body.get('id') or ''),
-        model_name=model_name,
+        model_name=configured_model_name,
+        model_version=provider_model_version,
         original_review_id=original_review_id,
         original_photo_id=original_photo_id,
         retake_photo_id=retake_photo_id,
         image_type=image_type,
     )
     usage = body.get('usage') if isinstance(body.get('usage'), dict) else {}
+    cost = estimate_review_usage_cost(
+        [
+            ReviewModelUsage(
+                model_name=configured_model_name,
+                input_tokens=usage.get('input_tokens'),
+                output_tokens=usage.get('output_tokens'),
+            )
+        ],
+        overrides=settings.review_pricing_overrides,
+    )
     return AIReviewResponse(
         result=result,
-        model_name=model_name,
-        model_version=model_name,
+        model_name=configured_model_name,
+        model_version=provider_model_version,
         prompt_version=RETAKE_PROMPT_VERSION,
+        scorer_model_name=configured_model_name,
+        scorer_model_version=provider_model_version,
+        writer_model_name=configured_model_name,
+        writer_model_version=provider_model_version,
+        score_prompt_version=RETAKE_PROMPT_VERSION,
+        scorer_preprocess_version=RETAKE_PREPROCESS_VERSION,
         input_tokens=usage.get('input_tokens'),
         output_tokens=usage.get('output_tokens'),
-        cost_usd=None,
+        cost_usd=float(cost.cost_usd) if cost.cost_usd is not None else None,
+        cost_rate_version=cost.rate_version,
         latency_ms=latency_ms,
     )

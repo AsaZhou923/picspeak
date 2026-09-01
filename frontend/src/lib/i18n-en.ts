@@ -217,8 +217,8 @@ export const enTranslations = {
     pro_offer_label: '',
     pro_offer_highlight: 'Pro',
     updates_label: 'Updates',
-    updates_hint_home: 'See the GPT-5.6 Luna review routing update',
-    updates_hint_latest: 'See the GPT-5.6 Luna review routing update',
+    updates_hint_home: 'See the review and generation reliability update',
+    updates_hint_latest: 'See the review and generation reliability update',
     contact_label: 'Contact',
     contact_headline: 'Get in Touch',
 
@@ -427,6 +427,7 @@ export const enTranslations = {
     usage_generation_credits_body: 'Monthly credits for GPT Image 2 generation.',
     usage_generation_credits_monthly_remaining: '/ {total} credits left this month',
     usage_generation_credits_monthly_used: 'Used this month',
+    usage_generation_credits_monthly_held: 'Reserved for in-progress generations: {held}',
     usage_generation_credits_guest_hint: 'Sign in to Free to get 3 credits/month.',
     usage_generation_credits_pricing_hint: 'Low 1 credit; Medium 8/10 credits; High 30/40 credits.',
     usage_credit_pack_title: 'Credit pack',

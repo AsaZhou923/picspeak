@@ -9,7 +9,7 @@ import { useAuth } from '@/lib/auth-context';
 import { formatUserFacingError } from '@/lib/error-utils';
 import { useCreditPackCheckout } from '@/lib/hooks/useCreditPackCheckout';
 import { useI18n, type TranslationKey } from '@/lib/i18n';
-import { trackProductEvent } from '@/lib/product-analytics';
+import { readProductAttributionSource, trackProductEvent } from '@/lib/product-analytics';
 import { ApiException, type GenerationQuality, type GenerationSize, type ImageType } from '@/lib/types';
 import {
   type GenerationCreditsTable,
@@ -122,6 +122,7 @@ export function ReviewReferenceGenerationPanel({
     setError('');
     try {
       const token = await ensureToken();
+      const analyticsSource = readProductAttributionSource();
       const result = await createGeneration(
         {
           generation_mode: 'review_linked',
@@ -138,6 +139,7 @@ export function ReviewReferenceGenerationPanel({
           output_format: 'webp',
           async: true,
           idempotency_key: `${reviewId}-${intent}-${Date.now()}`,
+          analytics_source: analyticsSource,
         },
         token
       );

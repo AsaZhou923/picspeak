@@ -9,7 +9,7 @@ from app.api.deps import CurrentActor, get_current_actor, get_db
 from app.api.routers.gallery import GALLERY_AUDIT_NONE
 from app.api.routers.photos import _build_photo_proxy_url, _find_photo_owned
 from app.core.errors import api_error
-from app.db.models import Photo, Review, User, UserPlan
+from app.db.models import Photo, Review, ReviewTask, User, UserPlan
 from app.schemas import PhotoReviewsResponse, ReviewGetResponse, ReviewHistoryResponse, ReviewListItem
 from app.services.guard import review_history_cutoff
 from .review_support import (
@@ -55,9 +55,13 @@ def get_review(
         raise api_error(status.HTTP_404_NOT_FOUND, 'REVIEW_NOT_FOUND', 'Review not found')
 
     photo_url = _build_photo_proxy_url(request, photo.public_id, photo_owner.public_id)
+    review_task_public_id = None
+    if is_owner and review.task_id:
+        review_task_public_id = db.query(ReviewTask.public_id).filter(ReviewTask.id == review.task_id).scalar()
     db.commit()
     return ReviewGetResponse(
         review_id=review.public_id,
+        task_id=review_task_public_id,
         photo_id=photo.public_id if photo else 'unknown',
         photo_url=photo_url,
         mode=review.mode.value,
@@ -77,11 +81,11 @@ def get_review(
             review.final_score,
             model_name=review.model_name,
             model_version=_review_model_version(review),
-            exif_info=photo.exif_data if photo and photo.exif_data else None,
+            exif_info=photo.exif_data if is_owner and photo and photo.exif_data else {},
             share_info_override=_review_share_info(request, review, include_token=is_owner),
         ),
         created_at=review.created_at,
-        exif_data=photo.exif_data if photo and photo.exif_data else None,
+        exif_data=photo.exif_data if is_owner and photo and photo.exif_data else None,
     )
 
 
@@ -111,6 +115,7 @@ def get_public_review(
     db.commit()
     return ReviewGetResponse(
         review_id=review.public_id,
+        task_id=None,
         photo_id=photo.public_id if photo else 'unknown',
         photo_url=photo_url,
         mode=review.mode.value,
@@ -130,7 +135,7 @@ def get_public_review(
             review.final_score,
             model_name=review.model_name,
             model_version=_review_model_version(review),
-            exif_info=None,
+            exif_info={},
             share_info_override=_review_share_info(request, review, include_token=False),
         ),
         created_at=review.created_at,

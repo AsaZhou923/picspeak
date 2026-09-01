@@ -14,7 +14,7 @@ if str(BACKEND_ROOT) not in sys.path:
 
 from app.api.routers.tasks import _serialize_task_status
 from app.db.models import ReviewTask, TaskStatus
-from app.services.review_task_processor import _claim_task
+from app.services.review_task_processor import _claim_task, _review_task_stale_timeout_seconds
 
 
 class ReviewTaskProcessorTests(unittest.TestCase):
@@ -59,6 +59,17 @@ class ReviewTaskProcessorTests(unittest.TestCase):
         self.assertIsInstance(attempt_expr, BinaryExpression)
         self.assertEqual(getattr(attempt_expr.left, 'name', None), ReviewTask.attempt_count.key)
         self.assertEqual(getattr(attempt_expr.right, 'value', None), 1)
+
+    def test_review_task_stale_timeout_covers_scorer_and_writer_calls(self) -> None:
+        with patch('app.services.review_task_processor.settings') as mocked_settings:
+            mocked_settings.review_task_stale_timeout_seconds = 180
+            mocked_settings.openai_score_timeout_seconds = 180
+            mocked_settings.openai_review_timeout_seconds = 180
+            mocked_settings.pro_ai_timeout_seconds = 180
+            mocked_settings.ai_timeout_seconds = 60
+            mocked_settings.retake_analysis_timeout_seconds = 180
+
+            self.assertEqual(_review_task_stale_timeout_seconds(), 420)
 
 
 if __name__ == '__main__':

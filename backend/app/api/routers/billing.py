@@ -41,7 +41,7 @@ from app.services.guard import (
 from app.services.image_generation_task_processor import (
     count_monthly_generation_credit_consumed,
     count_monthly_generation_credit_grants,
-    count_monthly_generation_credits,
+    count_monthly_generation_credit_holds,
     monthly_generation_credit_limit_for_plan,
 )
 from app.services.lemonsqueezy import (
@@ -170,6 +170,7 @@ def _generation_credit_usage_snapshot(db: Session, user: User, plan: UserPlan) -
         return {
             'monthly_total': 0,
             'monthly_used': 0,
+            'monthly_held': 0,
             'monthly_remaining': 0,
         }
 
@@ -177,10 +178,12 @@ def _generation_credit_usage_snapshot(db: Session, user: User, plan: UserPlan) -
     monthly_granted = count_monthly_generation_credit_grants(db, user)
     monthly_total = base_monthly_total + monthly_granted
     monthly_used = count_monthly_generation_credit_consumed(db, user)
+    monthly_held = count_monthly_generation_credit_holds(db, user)
     return {
         'monthly_total': monthly_total,
         'monthly_used': max(monthly_used, 0),
-        'monthly_remaining': max(monthly_total - monthly_used, 0),
+        'monthly_held': max(monthly_held, 0),
+        'monthly_remaining': max(monthly_total - monthly_used - monthly_held, 0),
     }
 
 

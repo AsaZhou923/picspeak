@@ -208,8 +208,11 @@ class Review(Base):
     input_tokens: Mapped[int | None] = mapped_column(Integer)
     output_tokens: Mapped[int | None] = mapped_column(Integer)
     cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(12, 6))
+    cost_rate_version: Mapped[str | None] = mapped_column(Text)
     latency_ms: Mapped[int | None] = mapped_column(Integer)
     model_name: Mapped[str | None] = mapped_column(Text)
+    scorer_model_name: Mapped[str | None] = mapped_column(Text)
+    writer_model_name: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 
@@ -272,6 +275,16 @@ class ImageGenerationTask(Base):
         Index('idx_image_generation_tasks_status_next_attempt', 'status', 'next_attempt_at'),
         Index('idx_image_generation_tasks_owner_created', 'owner_user_id', 'created_at'),
         Index('idx_image_generation_tasks_review_created', 'source_review_id', 'created_at'),
+        Index(
+            'idx_image_generation_tasks_pending_request_event',
+            'id',
+            postgresql_where=text("request_payload ? 'pending_request_event'"),
+        ),
+        Index(
+            'idx_image_generation_tasks_pending_terminal_event',
+            'id',
+            postgresql_where=text("request_payload ? 'pending_terminal_event'"),
+        ),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
@@ -359,6 +372,34 @@ class UsageLedger(Base):
     bill_date: Mapped[date] = mapped_column(Date, nullable=False)
     metadata_json: Mapped[dict] = mapped_column('metadata', JSONB, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class GenerationCreditReservation(Base):
+    __tablename__ = 'generation_credit_reservations'
+    __table_args__ = (
+        UniqueConstraint('generation_task_id', name='uq_generation_credit_reservations_task'),
+        UniqueConstraint('consumed_usage_ledger_id', name='uq_generation_credit_reservations_consumed_ledger'),
+        CheckConstraint("status IN ('held', 'consumed', 'released')", name='chk_generation_credit_reservations_status'),
+        CheckConstraint('credits > 0', name='chk_generation_credit_reservations_credits_positive'),
+        CheckConstraint('bill_period_end > bill_period_start', name='chk_generation_credit_reservations_period'),
+        Index('idx_generation_credit_reservations_user_period_status', 'user_id', 'bill_period_start', 'status'),
+        Index('idx_generation_credit_reservations_status_created', 'status', 'created_at'),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    generation_task_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('image_generation_tasks.id'), nullable=False)
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('users.id'), nullable=False)
+    credits: Mapped[int] = mapped_column(Integer, nullable=False)
+    bill_period_start: Mapped[date] = mapped_column(Date, nullable=False)
+    bill_period_end: Mapped[date] = mapped_column(Date, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False, default='held', server_default='held')
+    consumed_usage_ledger_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey('usage_ledger.id'))
+    release_reason: Mapped[str | None] = mapped_column(Text)
+    held_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    released_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 
 
 class BillingSubscription(Base):

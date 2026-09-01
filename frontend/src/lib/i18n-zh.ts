@@ -17,8 +17,8 @@ export const zhTranslations = {
   app_error_retry: '重试',
   plan_guest_label: '游客',
   updates_label: '更新记录',
-  updates_hint_home: '查看 GPT-5.6 Luna 点评路由更新',
-  updates_hint_latest: '查看 GPT-5.6 Luna 点评路由更新',
+  updates_hint_home: '查看评分一致性与生图可靠性更新',
+  updates_hint_latest: '查看评分一致性与生图可靠性更新',
 
   generation_badge: 'AI 创作',
   generation_title: 'AI 创作',
@@ -387,6 +387,7 @@ export const zhTranslations = {
   usage_generation_credits_body: '用于 GPT Image 2 生图的月度 credit 额度。',
   usage_generation_credits_monthly_remaining: '/ {total} credits 本月剩余',
   usage_generation_credits_monthly_used: '本月已用',
+  usage_generation_credits_monthly_held: '处理中生图已预留：{held}',
   usage_generation_credits_guest_hint: '登录 Free 账户后可获得每月 3 credits。',
   usage_generation_credits_pricing_hint: 'Low 1 credit；Medium 8/10 credits；High 30/40 credits。',
   usage_credit_pack_title: '生图额度包',

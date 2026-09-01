@@ -28,6 +28,7 @@ from app.services.guard import guest_usage_snapshot, review_history_cutoff, user
 REVIEW_TAG_LIMIT = 8
 REVIEW_TAG_MAX_LENGTH = 32
 REVIEW_NOTE_MAX_LENGTH = 1000
+_EXIF_UNSET = object()
 
 
 def _default_visual_analysis_payload() -> dict[str, Any]:
@@ -183,7 +184,14 @@ def _review_result_payload(
     prompt_version: str | None = None,
     model_name: str | None = None,
     model_version: str | None = None,
-    exif_info: dict[str, Any] | None = None,
+    scorer_model_name: str | None = None,
+    scorer_model_version: str | None = None,
+    writer_model_name: str | None = None,
+    writer_model_version: str | None = None,
+    score_prompt_version: str | None = None,
+    scorer_preprocess_version: str | None = None,
+    score_cache_hit: bool | None = None,
+    exif_info: dict[str, Any] | None | object = _EXIF_UNSET,
     share_info_override: dict[str, Any] | None = None,
 ) -> dict:
     raw_payload = dict(result_json or {})
@@ -203,8 +211,21 @@ def _review_result_payload(
         'schema_version': str(raw_payload.get('schema_version') or REVIEW_SCHEMA_VERSION),
         'prompt_version': str(raw_payload.get('prompt_version') or prompt_version or ''),
         'score_version': str(raw_payload.get('score_version') or 'legacy'),
+        'score_prompt_version': str(raw_payload.get('score_prompt_version') or score_prompt_version or ''),
         'model_name': str(raw_payload.get('model_name') or model_name or ''),
         'model_version': str(raw_payload.get('model_version') or model_version or ''),
+        'scorer_model_name': str(raw_payload.get('scorer_model_name') or scorer_model_name or ''),
+        'scorer_model_version': str(raw_payload.get('scorer_model_version') or scorer_model_version or ''),
+        'writer_model_name': str(raw_payload.get('writer_model_name') or writer_model_name or model_name or ''),
+        'writer_model_version': str(raw_payload.get('writer_model_version') or writer_model_version or model_version or ''),
+        'scorer_preprocess_version': str(
+            raw_payload.get('scorer_preprocess_version') or scorer_preprocess_version or ''
+        ),
+        'score_cache_hit': bool(
+            raw_payload.get('score_cache_hit')
+            if raw_payload.get('score_cache_hit') is not None
+            else score_cache_hit
+        ),
         'scores': scores,
         'final_score': float(resolved_final_score),
         'advantage': str(raw_payload.get('advantage') or ''),
@@ -215,7 +236,7 @@ def _review_result_payload(
         'tonal_analysis': tonal_analysis,
         'issue_marks': issue_marks,
         'billing_info': billing_info,
-        'exif_info': exif_info if isinstance(exif_info, dict) else stored_exif_info,
+        'exif_info': stored_exif_info if exif_info is _EXIF_UNSET else (exif_info if isinstance(exif_info, dict) else {}),
         'share_info': share_info_override if isinstance(share_info_override, dict) else share_info,
         'comparison': comparison,
     }
@@ -322,6 +343,11 @@ def _review_history_item(request: Request, review: Review, photo: Photo, owner_p
         scores=_coerce_review_scores(result_payload.get('scores')),
         model_name=str(review.model_name or ''),
         model_version=_review_model_version(review),
+        scorer_model_name=str(review.scorer_model_name or result_payload.get('scorer_model_name') or ''),
+        scorer_model_version=str(result_payload.get('scorer_model_version') or ''),
+        writer_model_name=str(review.writer_model_name or result_payload.get('writer_model_name') or review.model_name or ''),
+        writer_model_version=str(result_payload.get('writer_model_version') or _review_model_version(review)),
+        score_version=str(result_payload.get('score_version') or 'legacy'),
         favorite=bool(review.favorite),
         gallery_visible=bool(review.gallery_visible),
         gallery_audit_status=_review_gallery_audit_status(review),
@@ -356,6 +382,11 @@ def _build_review_export_payload(
             'image_type': _review_image_type(review),
             'model_name': str(review.model_name or ''),
             'model_version': _review_model_version(review),
+            'scorer_model_name': str(review.scorer_model_name or result_payload.get('scorer_model_name') or ''),
+            'scorer_model_version': str(result_payload.get('scorer_model_version') or ''),
+            'writer_model_name': str(review.writer_model_name or result_payload.get('writer_model_name') or review.model_name or ''),
+            'writer_model_version': str(result_payload.get('writer_model_version') or _review_model_version(review)),
+            'score_version': str(result_payload.get('score_version') or 'legacy'),
             'final_score': float(review.final_score),
             'scores': _coerce_review_scores(result_payload.get('scores')),
             'advantage': str(result_payload.get('advantage') or ''),
@@ -393,11 +424,14 @@ def _attach_billing_info(
     else:
         usage = user_usage_snapshot(db, user)
 
-    result_payload['billing_info'] = {
+    existing_billing_info = result_payload.get('billing_info')
+    billing_info = dict(existing_billing_info) if isinstance(existing_billing_info, dict) else {}
+    billing_info.update({
         'quota_charged': charged,
         'remaining_quota': {
             'daily_remaining': usage.get('daily_remaining') if usage else None,
             'monthly_remaining': usage.get('monthly_remaining') if usage else None,
             'pro_monthly_remaining': usage.get('pro_monthly_remaining') if usage else None,
         },
-    }
+    })
+    result_payload['billing_info'] = billing_info

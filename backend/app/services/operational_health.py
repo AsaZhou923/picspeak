@@ -31,6 +31,7 @@ class OperationalCostSample:
     kind: str
     created_at: datetime
     cost_usd: Decimal | float | int | None = None
+    cost_rate_version: str | None = None
     credits_charged: Decimal | float | int | None = None
     quality: str | None = None
     size: str | None = None
@@ -43,6 +44,15 @@ class UsageLedgerSample:
     unit: str
     bill_date: date
     metadata: dict[str, Any] | None = None
+
+
+@dataclass(slots=True)
+class GenerationCreditReservationSample:
+    status: str
+    credits: Decimal | float | int
+    bill_period_start: date
+    bill_period_end: date
+    created_at: datetime
 
 
 @dataclass(slots=True)
@@ -90,6 +100,10 @@ def _kind_value(value: str) -> str:
     return normalized if normalized in TASK_KINDS else 'unknown'
 
 
+def _reservation_status(value: str) -> str:
+    return str(value or '').strip().lower()
+
+
 def _in_datetime_window(value: datetime, start_date: date, end_date: date) -> bool:
     current = _as_utc_datetime(value).date()
     return start_date <= current <= end_date
@@ -135,6 +149,7 @@ def build_operational_health_snapshot(
     ledger_entries: list[UsageLedgerSample],
     payment_events: list[PaymentEventSample],
     gallery_audit_samples: list[GalleryAuditSample],
+    credit_reservations: list[GenerationCreditReservationSample] | None = None,
     start_date: date,
     end_date: date,
     now: datetime | None = None,
@@ -153,6 +168,16 @@ def build_operational_health_snapshot(
     ]
     period_costs = [cost for cost in costs if _in_datetime_window(cost.created_at, start_date, end_date)]
     period_ledger = [entry for entry in ledger_entries if start_date <= entry.bill_date <= end_date]
+    period_reservations = [
+        reservation
+        for reservation in (credit_reservations or [])
+        if _in_datetime_window(reservation.created_at, start_date, end_date)
+        or (
+            _reservation_status(reservation.status) == 'held'
+            and reservation.bill_period_start <= end_date
+            and reservation.bill_period_end > start_date
+        )
+    ]
     period_payments = [event for event in payment_events if _in_datetime_window(event.created_at, start_date, end_date)]
 
     task_rows: dict[str, dict[str, Any]] = {}
@@ -203,6 +228,12 @@ def build_operational_health_snapshot(
 
     review_cost_usd = sum(_money(cost.cost_usd) for cost in period_costs if _kind_value(cost.kind) == 'review')
     generation_cost_usd = sum(_money(cost.cost_usd) for cost in period_costs if _kind_value(cost.kind) == 'generation')
+    review_cost_missing = sum(
+        1
+        for cost in period_costs
+        if _kind_value(cost.kind) == 'review'
+        and (cost.cost_usd is None or not str(cost.cost_rate_version or '').strip())
+    )
     generated_credits = sum(_money(cost.credits_charged) for cost in period_costs if _kind_value(cost.kind) == 'generation')
     ledger_credits_consumed = sum(
         _money(entry.amount)
@@ -219,6 +250,24 @@ def build_operational_health_snapshot(
         for entry in period_ledger
         if entry.usage_type == 'review_request'
     )
+    reservation_rows = {
+        status: {
+            'count': sum(
+                1
+                for reservation in period_reservations
+                if _reservation_status(reservation.status) == status
+            ),
+            'credits': round(
+                sum(
+                    _money(reservation.credits)
+                    for reservation in period_reservations
+                    if _reservation_status(reservation.status) == status
+                ),
+                2,
+            ),
+        }
+        for status in ('held', 'consumed', 'released')
+    }
 
     checkout_started = sum(
         1
@@ -260,6 +309,8 @@ def build_operational_health_snapshot(
         warnings.append('public_gallery_thumbnail_missing')
     if summary_missing:
         warnings.append('public_gallery_summary_missing')
+    if review_cost_missing:
+        warnings.append('review_cost_missing')
 
     status = 'healthy'
     if warnings:
@@ -284,12 +335,17 @@ def build_operational_health_snapshot(
         },
         'costs': {
             'review_cost_usd': round(review_cost_usd, 4),
+            'review_cost_missing': review_cost_missing,
             'generation_cost_usd': round(generation_cost_usd, 4),
             'total_ai_cost_usd': round(review_cost_usd + generation_cost_usd, 4),
             'generated_image_credits_charged': round(generated_credits, 2),
             'ledger_credits_consumed': round(ledger_credits_consumed, 2),
             'ledger_credits_granted': round(ledger_credits_granted, 2),
             'review_quota_used': round(review_quota_used, 2),
+        },
+        'generation_credit_reservations': {
+            'total': len(period_reservations),
+            'by_status': reservation_rows,
         },
         'payments': {
             'checkout_started': checkout_started,
@@ -385,12 +441,26 @@ def render_operational_health_markdown(snapshot: dict[str, Any]) -> str:
             '| 指标 | 数值 |',
             '| --- | ---: |',
             f"| review AI cost USD | {costs.get('review_cost_usd', 0)} |",
+            f"| review cost missing | {costs.get('review_cost_missing', 0)} |",
             f"| generation AI cost USD | {costs.get('generation_cost_usd', 0)} |",
             f"| total AI cost USD | {costs.get('total_ai_cost_usd', 0)} |",
             f"| generated image credits charged | {costs.get('generated_image_credits_charged', 0)} |",
             f"| ledger credits consumed | {costs.get('ledger_credits_consumed', 0)} |",
             f"| ledger credits granted | {costs.get('ledger_credits_granted', 0)} |",
             f"| review quota used | {costs.get('review_quota_used', 0)} |",
+        ]
+    )
+    reservations = snapshot.get('generation_credit_reservations', {})
+    reservation_statuses = reservations.get('by_status', {})
+    lines.extend(
+        [
+            '',
+            '| generation reservation | count | credits |',
+            '| --- | ---: | ---: |',
+            *[
+                f"| {status} | {reservation_statuses.get(status, {}).get('count', 0)} | {reservation_statuses.get(status, {}).get('credits', 0)} |"
+                for status in ('held', 'consumed', 'released')
+            ],
         ]
     )
 
@@ -431,12 +501,22 @@ def render_operational_health_markdown(snapshot: dict[str, Any]) -> str:
 
 
 def _review_summary_from_result(result_json: dict[str, Any] | None) -> str:
-    result = dict(result_json or {})
-    for key in ('summary', 'overall_summary', 'short_summary', 'final_summary'):
-        value = str(result.get(key) or '').strip()
-        if value:
-            return value
-    return ''
+    from app.services.gallery_summary import extract_review_gallery_summary
+
+    return extract_review_gallery_summary(result_json)
+
+
+def _review_cost_rate_version(review: Any) -> str | None:
+    value = getattr(review, 'cost_rate_version', None)
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    result = dict(getattr(review, 'result_json', None) or {})
+    billing_info = result.get('billing_info')
+    if isinstance(billing_info, dict):
+        raw_version = billing_info.get('cost_rate_version')
+        if isinstance(raw_version, str) and raw_version.strip():
+            return raw_version.strip()
+    return None
 
 
 def load_operational_health_snapshot_from_db(
@@ -451,6 +531,7 @@ def load_operational_health_snapshot_from_db(
 
     from app.db.models import (
         BillingWebhookEvent,
+        GenerationCreditReservation,
         GeneratedImage,
         ImageGenerationTask,
         Photo,
@@ -502,6 +583,23 @@ def load_operational_health_snapshot_from_db(
     ledger_rows = (
         db.query(UsageLedger)
         .filter(UsageLedger.bill_date >= start_date, UsageLedger.bill_date <= end_date)
+        .all()
+    )
+    reservation_rows = (
+        db.query(GenerationCreditReservation)
+        .filter(
+            or_(
+                (
+                    (GenerationCreditReservation.created_at >= window_start)
+                    & (GenerationCreditReservation.created_at < window_end)
+                ),
+                (
+                    (GenerationCreditReservation.status == 'held')
+                    & (GenerationCreditReservation.bill_period_start <= end_date)
+                    & (GenerationCreditReservation.bill_period_end > start_date)
+                ),
+            )
+        )
         .all()
     )
     analytics_payment_rows = (
@@ -562,7 +660,12 @@ def load_operational_health_snapshot_from_db(
     )
 
     costs = [
-        OperationalCostSample(kind='review', created_at=row.created_at, cost_usd=row.cost_usd)
+        OperationalCostSample(
+            kind='review',
+            created_at=row.created_at,
+            cost_usd=row.cost_usd,
+            cost_rate_version=_review_cost_rate_version(row),
+        )
         for row in review_rows
     ]
     costs.extend(
@@ -625,6 +728,16 @@ def load_operational_health_snapshot_from_db(
         ],
         payment_events=payments,
         gallery_audit_samples=gallery_samples,
+        credit_reservations=[
+            GenerationCreditReservationSample(
+                status=row.status,
+                credits=row.credits,
+                bill_period_start=row.bill_period_start,
+                bill_period_end=row.bill_period_end,
+                created_at=row.created_at,
+            )
+            for row in reservation_rows
+        ],
         start_date=start_date,
         end_date=end_date,
         now=now,

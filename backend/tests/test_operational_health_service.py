@@ -10,6 +10,7 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 from app.services.operational_health import (  # noqa: E402
+    GenerationCreditReservationSample,
     GalleryAuditSample,
     OperationalCostSample,
     OperationalTaskSample,
@@ -18,6 +19,7 @@ from app.services.operational_health import (  # noqa: E402
     build_operational_health_snapshot,
     render_operational_health_markdown,
 )
+from app.services.gallery_summary import extract_review_gallery_summary  # noqa: E402
 
 
 class OperationalHealthServiceTests(unittest.TestCase):
@@ -68,7 +70,7 @@ class OperationalHealthServiceTests(unittest.TestCase):
         snapshot = build_operational_health_snapshot(
             tasks=tasks,
             costs=[
-                OperationalCostSample(kind='review', created_at=now, cost_usd=0.02),
+                OperationalCostSample(kind='review', created_at=now, cost_usd=0.02, cost_rate_version='rate-v1'),
                 OperationalCostSample(kind='generation', created_at=now, cost_usd=0.041, credits_charged=8),
             ],
             ledger_entries=[
@@ -107,6 +109,29 @@ class OperationalHealthServiceTests(unittest.TestCase):
                     summary='',
                 ),
             ],
+            credit_reservations=[
+                GenerationCreditReservationSample(
+                    status='held',
+                    credits=8,
+                    bill_period_start=date(2026, 5, 1),
+                    bill_period_end=date(2026, 6, 1),
+                    created_at=now,
+                ),
+                GenerationCreditReservationSample(
+                    status='consumed',
+                    credits=3,
+                    bill_period_start=date(2026, 5, 1),
+                    bill_period_end=date(2026, 6, 1),
+                    created_at=now,
+                ),
+                GenerationCreditReservationSample(
+                    status='released',
+                    credits=1,
+                    bill_period_start=date(2026, 5, 1),
+                    bill_period_end=date(2026, 6, 1),
+                    created_at=now,
+                ),
+            ],
             start_date=date(2026, 5, 9),
             end_date=date(2026, 5, 9),
             now=now,
@@ -124,10 +149,14 @@ class OperationalHealthServiceTests(unittest.TestCase):
         self.assertEqual(snapshot['failures']['clusters']['ai'], 1)
         self.assertEqual(snapshot['failures']['clusters']['storage'], 1)
         self.assertEqual(snapshot['costs']['total_ai_cost_usd'], 0.061)
+        self.assertEqual(snapshot['costs']['review_cost_missing'], 0)
         self.assertEqual(snapshot['costs']['ledger_credits_consumed'], 8)
         self.assertEqual(snapshot['costs']['ledger_credits_granted'], 300)
         self.assertEqual(snapshot['payments']['checkout_to_paid_rate'], 1.0)
         self.assertEqual(snapshot['gallery_audit']['thumbnail_missing'], 1)
+        self.assertEqual(snapshot['generation_credit_reservations']['by_status']['held']['credits'], 8)
+        self.assertEqual(snapshot['generation_credit_reservations']['by_status']['consumed']['count'], 1)
+        self.assertEqual(snapshot['generation_credit_reservations']['by_status']['released']['count'], 1)
 
     def test_render_operational_health_markdown_outputs_daily_tables(self) -> None:
         now = datetime(2026, 5, 9, 12, 0, tzinfo=timezone.utc)
@@ -148,9 +177,42 @@ class OperationalHealthServiceTests(unittest.TestCase):
         self.assertIn('## 任务健康', markdown)
         self.assertIn('## 失败聚类', markdown)
         self.assertIn('## 成本与 Credits', markdown)
+        self.assertIn('| held | 0 | 0 |', markdown)
         self.assertIn('## 支付健康', markdown)
         self.assertIn('## 公开内容抽查', markdown)
         self.assertIn('| review | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.0% | 0.0 |', markdown)
+
+    def test_missing_review_cost_warns_without_counting_as_zero_claim(self) -> None:
+        now = datetime(2026, 5, 9, 12, 0, tzinfo=timezone.utc)
+        snapshot = build_operational_health_snapshot(
+            tasks=[],
+            costs=[
+                OperationalCostSample(kind='review', created_at=now, cost_usd=None),
+                OperationalCostSample(kind='review', created_at=now, cost_usd=0.01, cost_rate_version=None),
+            ],
+            ledger_entries=[],
+            payment_events=[],
+            gallery_audit_samples=[],
+            start_date=date(2026, 5, 9),
+            end_date=date(2026, 5, 9),
+            now=now,
+        )
+
+        self.assertIn('review_cost_missing', snapshot['warnings'])
+        self.assertEqual(snapshot['costs']['review_cost_missing'], 2)
+        self.assertEqual(snapshot['costs']['review_cost_usd'], 0.01)
+
+    def test_gallery_summary_extractor_accepts_review_text_payloads(self) -> None:
+        summary = extract_review_gallery_summary(
+            {
+                'summary': 'Legacy summary should not override the Gallery review schema.',
+                'suggestions': '1. Observation: Move closer; Reason: subject is small; Action: fill the frame.',
+                'critique': '1. Flat light.',
+                'advantage': '1. Clear color contrast.',
+            }
+        )
+
+        self.assertEqual(summary, 'Observation: Move closer; Reason: subject is small; Action: fill the frame.')
 
 
 if __name__ == '__main__':

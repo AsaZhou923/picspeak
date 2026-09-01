@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import json
 
-PROMPT_VERSION = 'photo-review-v5-split-score-lock'
-SCORE_VERSION = 'score-v2-strict'
+PROMPT_VERSION = 'photo-review-v6-canonical-gpt-score'
+SCORE_PROMPT_VERSION = 'photo-score-v3-canonical-gpt'
+SCORE_VERSION = 'score-v3-canonical-gpt'
+SCORER_PREPROCESS_VERSION = 'openai-input-image-high-v1'
 
 
 ALLOWED_IMAGE_TYPES = {'default', 'landscape', 'portrait', 'street', 'still_life', 'architecture'}
@@ -409,6 +411,5 @@ def _writing_prompt(mode: str, locale: str, scores: dict[str, int], exif_data: d
         f'{suggestion_note}'
         'Suggestions must be practical and, when appropriate, include concrete parameters or ranges. '
         'Each suggestion must follow Observation + Reason + Action. '
-        f'Use explicit labels inside every suggestion point, exactly like: {suggestion_example}. '
-        'Use explicit labels inside every suggestion point, exactly like: "观察：...；原因：...；可执行动作：...".'
+        f'Use explicit labels inside every suggestion point, exactly like: {suggestion_example}.'
     )

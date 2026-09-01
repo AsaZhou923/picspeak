@@ -201,8 +201,10 @@ KNOWN_SOURCES = {
     'prompt_library',
     'share',
     'checkout',
+    'system_performance',
     'unknown',
 }
+OPS_SOURCES = {'system_performance'}
 
 VISITOR_EVENT_BY_SOURCE = {
     'home_direct': 'home_viewed',
@@ -236,6 +238,9 @@ DATA_HEALTH_CORE_EVENTS = (
     'review_requested',
     'review_result_viewed',
 )
+REVIEW_CAUSAL_EVENTS = {'review_requested', 'review_result_viewed'}
+GENERATION_LIFECYCLE_EVENTS = {'generation_requested', 'generation_succeeded', 'generation_failed'}
+GENERATION_TERMINAL_EVENTS = {'generation_succeeded', 'generation_failed'}
 
 
 @dataclass(slots=True)
@@ -360,7 +365,10 @@ def _daily_reviews_with_second_use(reviews: list[ReviewSample]) -> dict[str, dic
     return rows
 
 
-def _build_content_conversion_weekly(period_events: list[AnalyticsEventSample]) -> dict[str, dict[str, Any]]:
+def _build_content_conversion_weekly(
+    period_events: list[AnalyticsEventSample],
+    all_events: list[AnalyticsEventSample],
+) -> dict[str, dict[str, Any]]:
     report: dict[str, dict[str, Any]] = {}
 
     for source in CONTENT_CONVERSION_SOURCES:
@@ -392,13 +400,15 @@ def _build_content_conversion_weekly(period_events: list[AnalyticsEventSample]) 
             period_events,
             event_names={'review_requested'},
             source=source,
-            key_builder=_guest_conversion_key,
+            key_builder=_review_causal_key,
         )
-        review_results = _count_distinct(
-            period_events,
-            event_names={'review_result_viewed'},
-            source=source,
-            key_builder=_guest_conversion_key,
+        review_results = _review_completion_metric(
+            [
+                event
+                for event in period_events
+                if event.event_name == 'review_requested' and event.source == source
+            ],
+            all_events,
         )
 
         row = {
@@ -407,11 +417,11 @@ def _build_content_conversion_weekly(period_events: list[AnalyticsEventSample]) 
             'workspace_entries': workspace_entries,
             'uploads': uploads,
             'review_requests': review_requests,
-            'review_results': review_results,
+            'review_results': review_results['users'],
             'workspace_click_rate': _safe_rate(workspace_clicks, visitors),
             'workspace_entry_rate': _safe_rate(workspace_entries, visitors),
             'upload_conversion_rate': _safe_rate(uploads, visitors),
-            'first_review_completion_rate': _safe_rate(review_results, review_requests),
+            'first_review_completion_rate': _safe_rate(review_results['users'], review_requests),
         }
 
         if source == 'blog':
@@ -485,6 +495,181 @@ def _event_metadata_number(event: AnalyticsEventSample, key: str) -> float:
         return 0.0
 
 
+def _event_metadata_key(event: AnalyticsEventSample, key: str) -> str:
+    if not event.metadata:
+        return ''
+    return str(event.metadata.get(key) or '').strip()
+
+
+def _review_causal_key(event: AnalyticsEventSample) -> str | None:
+    task_id = _event_metadata_key(event, 'task_id')
+    if task_id:
+        return f'task:{task_id}'
+    review_id = _event_metadata_key(event, 'review_id')
+    if review_id:
+        return f'review:{review_id}'
+    return None
+
+
+def _review_completion_metric(
+    request_events: Iterable[AnalyticsEventSample],
+    all_events: Iterable[AnalyticsEventSample],
+) -> dict[str, int]:
+    request_keys: set[str] = set()
+    windows_by_key: dict[str, tuple[datetime, datetime]] = {}
+    for event in request_events:
+        if event.event_name != 'review_requested':
+            continue
+        key = _review_causal_key(event)
+        if not key:
+            continue
+        request_keys.add(key)
+        start = _as_utc_datetime(event.occurred_at)
+        end = datetime.combine(
+            start.date() + timedelta(days=2),
+            datetime.min.time(),
+            tzinfo=timezone.utc,
+        )
+        current_window = windows_by_key.get(key)
+        if current_window is None or start < current_window[0]:
+            windows_by_key[key] = (start, end)
+
+    completed_keys: set[str] = set()
+    for event in all_events:
+        if event.event_name != 'review_result_viewed':
+            continue
+        key = _review_causal_key(event)
+        if not key or key not in windows_by_key:
+            continue
+        start, end = windows_by_key[key]
+        occurred_at = _as_utc_datetime(event.occurred_at)
+        if start <= occurred_at < end:
+            completed_keys.add(key)
+
+    return {'base_users': len(request_keys), 'users': len(completed_keys)}
+
+
+def _count_review_causal_gaps(events: Iterable[AnalyticsEventSample]) -> dict[str, int]:
+    gaps = {'review_requested': 0, 'review_result_viewed': 0}
+    for event in events:
+        if event.event_name in REVIEW_CAUSAL_EVENTS and _review_causal_key(event) is None:
+            gaps[event.event_name] += 1
+    return gaps
+
+
+def _generation_task_key(event: AnalyticsEventSample) -> str | None:
+    task_id = _event_metadata_key(event, 'task_id')
+    if task_id:
+        return f'task:{task_id}'
+    return None
+
+
+def _generation_request_index(events: Iterable[AnalyticsEventSample]) -> dict[str, AnalyticsEventSample]:
+    index: dict[str, AnalyticsEventSample] = {}
+    for event in events:
+        if event.event_name != 'generation_requested':
+            continue
+        key = _generation_task_key(event)
+        if key and key not in index:
+            index[key] = event
+    return index
+
+
+def _generation_terminal_index(
+    events: Iterable[AnalyticsEventSample],
+    request_index: dict[str, AnalyticsEventSample],
+) -> dict[str, AnalyticsEventSample]:
+    index: dict[str, AnalyticsEventSample] = {}
+    for event in sorted(events, key=lambda item: _as_utc_datetime(item.occurred_at)):
+        if event.event_name not in GENERATION_TERMINAL_EVENTS:
+            continue
+        key = _generation_task_key(event)
+        if not key or key not in request_index:
+            continue
+        request_at = _as_utc_datetime(request_index[key].occurred_at)
+        occurred_at = _as_utc_datetime(event.occurred_at)
+        terminal_window_end = datetime.combine(
+            request_at.date() + timedelta(days=2),
+            datetime.min.time(),
+            tzinfo=timezone.utc,
+        )
+        if occurred_at < request_at or occurred_at >= terminal_window_end:
+            continue
+        # The latest terminal fact is authoritative if legacy data contains a contradiction.
+        index[key] = event
+    return index
+
+
+def _matches_generation_attribution(
+    event: AnalyticsEventSample,
+    *,
+    source: str | None,
+    entrypoint: str | None,
+) -> bool:
+    if source is not None and event.source != source:
+        return False
+    if entrypoint is not None and _generation_entrypoint(event) != entrypoint:
+        return False
+    return True
+
+
+def _generation_lifecycle_events(
+    events: Iterable[AnalyticsEventSample],
+    *,
+    event_names: set[str],
+    source: str | None = None,
+    entrypoint: str | None = None,
+    request_index: dict[str, AnalyticsEventSample] | None = None,
+) -> list[AnalyticsEventSample]:
+    events = list(events)
+    request_index = request_index or _generation_request_index(events)
+    if event_names.issubset(GENERATION_TERMINAL_EVENTS):
+        selected: list[AnalyticsEventSample] = []
+        for key, event in _generation_terminal_index(events, request_index).items():
+            if event.event_name not in event_names:
+                continue
+            attribution_event = request_index[key]
+            if not _matches_generation_attribution(attribution_event, source=source, entrypoint=entrypoint):
+                continue
+            selected.append(event)
+        return selected
+    selected: list[AnalyticsEventSample] = []
+    seen: set[str] = set()
+    for event in events:
+        if event.event_name not in event_names:
+            continue
+        key = _generation_task_key(event)
+        if not key or key in seen:
+            continue
+        if event.event_name in GENERATION_LIFECYCLE_EVENTS and key not in request_index:
+            continue
+        attribution_event = request_index.get(key, event)
+        if not _matches_generation_attribution(attribution_event, source=source, entrypoint=entrypoint):
+            continue
+        seen.add(key)
+        selected.append(event)
+    return selected
+
+
+def _count_generation_lifecycle(
+    events: Iterable[AnalyticsEventSample],
+    *,
+    event_names: set[str],
+    source: str | None = None,
+    entrypoint: str | None = None,
+    request_index: dict[str, AnalyticsEventSample] | None = None,
+) -> int:
+    return len(
+        _generation_lifecycle_events(
+            events,
+            event_names=event_names,
+            source=source,
+            entrypoint=entrypoint,
+            request_index=request_index,
+        )
+    )
+
+
 def _distinct_keys(
     events: Iterable[AnalyticsEventSample],
     *,
@@ -518,12 +703,23 @@ def _generation_entrypoint(event: AnalyticsEventSample) -> str:
     return 'direct_or_unknown'
 
 
-def _build_generation_funnel(period_events: list[AnalyticsEventSample]) -> dict[str, Any]:
+def _build_generation_funnel(
+    period_events: list[AnalyticsEventSample],
+    all_events: list[AnalyticsEventSample] | None = None,
+) -> dict[str, Any]:
+    request_index = _generation_request_index(period_events)
+    lifecycle_events = all_events if all_events is not None else period_events
     overall = {
-        event_name: _count_distinct(
-            period_events,
-            event_names={event_name},
-            key_builder=_guest_conversion_key,
+        event_name: (
+            _count_generation_lifecycle(lifecycle_events, event_names={event_name}, request_index=request_index)
+            if event_name in GENERATION_TERMINAL_EVENTS
+            else _count_generation_lifecycle(period_events, event_names={event_name}, request_index=request_index)
+            if event_name in GENERATION_LIFECYCLE_EVENTS
+            else _count_distinct(
+                period_events,
+                event_names={event_name},
+                key_builder=_guest_conversion_key,
+            )
         )
         for event_name in GENERATION_FUNNEL_EVENTS
     }
@@ -548,17 +744,17 @@ def _build_generation_funnel(period_events: list[AnalyticsEventSample]) -> dict[
                 source=source,
                 key_builder=_guest_conversion_key,
             ),
-            'requests': _count_distinct(
+            'requests': _count_generation_lifecycle(
                 period_events,
                 event_names={'generation_requested'},
                 source=source,
-                key_builder=_guest_conversion_key,
+                request_index=request_index,
             ),
-            'successes': _count_distinct(
-                period_events,
+            'successes': _count_generation_lifecycle(
+                lifecycle_events,
                 event_names={'generation_succeeded'},
                 source=source,
-                key_builder=_guest_conversion_key,
+                request_index=request_index,
             ),
             'credit_exhausted': _count_distinct(
                 period_events,
@@ -588,20 +784,23 @@ def _build_generation_funnel(period_events: list[AnalyticsEventSample]) -> dict[
                 event_names={'generation_prompt_example_applied'},
                 key_builder=_guest_conversion_key,
             ),
-            'requests': _count_distinct(
-                entry_events,
+            'requests': _count_generation_lifecycle(
+                period_events,
                 event_names={'generation_requested'},
-                key_builder=_guest_conversion_key,
+                entrypoint=entrypoint,
+                request_index=request_index,
             ),
-            'successes': _count_distinct(
-                entry_events,
+            'successes': _count_generation_lifecycle(
+                lifecycle_events,
                 event_names={'generation_succeeded'},
-                key_builder=_guest_conversion_key,
+                entrypoint=entrypoint,
+                request_index=request_index,
             ),
-            'failures': _count_distinct(
-                entry_events,
+            'failures': _count_generation_lifecycle(
+                lifecycle_events,
                 event_names={'generation_failed'},
-                key_builder=_guest_conversion_key,
+                entrypoint=entrypoint,
+                request_index=request_index,
             ),
             'views': _count_distinct(
                 entry_events,
@@ -660,12 +859,10 @@ def _build_generation_funnel(period_events: list[AnalyticsEventSample]) -> dict[
         'prompt_examples': {
             'applied_users': overall.get('generation_prompt_example_applied', 0),
             'requests_with_example': _count_distinct(
-                [
-                    event
-                    for event in period_events
-                    if event.event_name == 'generation_requested' and _event_metadata_text(event, 'prompt_example_id')
-                ],
-                key_builder=_guest_conversion_key,
+                _generation_lifecycle_events(period_events, event_names={'generation_requested'}, request_index=request_index),
+                key_builder=lambda event: _generation_task_key(event)
+                if _event_metadata_text(request_index.get(_generation_task_key(event) or '', event), 'prompt_example_id')
+                else None,
             ),
             'by_category': prompt_examples_by_category,
             'by_template': prompt_examples_by_template,
@@ -680,10 +877,33 @@ def _build_generation_funnel(period_events: list[AnalyticsEventSample]) -> dict[
     }
 
 
-def _build_locale_breakdown(period_events: list[AnalyticsEventSample]) -> dict[str, dict[str, int]]:
+def _build_locale_breakdown(
+    period_events: list[AnalyticsEventSample],
+    all_events: list[AnalyticsEventSample] | None = None,
+) -> dict[str, dict[str, int]]:
     breakdown = {}
+    request_index = _generation_request_index(period_events)
+    lifecycle_events = all_events if all_events is not None else period_events
     for locale in ('zh', 'en', 'ja', 'unknown'):
         locale_events = [event for event in period_events if _event_locale(event) == locale]
+        generation_request_events = [
+            event
+            for event in _generation_lifecycle_events(
+                lifecycle_events,
+                event_names={'generation_requested'},
+                request_index=request_index,
+            )
+            if _event_locale(event) == locale
+        ]
+        generation_success_events = [
+            event
+            for event in _generation_lifecycle_events(
+                lifecycle_events,
+                event_names={'generation_succeeded'},
+                request_index=request_index,
+            )
+            if _event_locale(request_index.get(_generation_task_key(event) or '', event)) == locale
+        ]
         breakdown[locale] = {
             'active_users': _count_distinct(
                 locale_events,
@@ -697,23 +917,14 @@ def _build_locale_breakdown(period_events: list[AnalyticsEventSample]) -> dict[s
             'review_requests': _count_distinct(
                 locale_events,
                 event_names={'review_requested'},
-                key_builder=_guest_conversion_key,
+                key_builder=_review_causal_key,
             ),
-            'review_results': _count_distinct(
-                locale_events,
-                event_names={'review_result_viewed'},
-                key_builder=_guest_conversion_key,
-            ),
-            'generation_requests': _count_distinct(
-                locale_events,
-                event_names={'generation_requested'},
-                key_builder=_guest_conversion_key,
-            ),
-            'generation_successes': _count_distinct(
-                locale_events,
-                event_names={'generation_succeeded'},
-                key_builder=_guest_conversion_key,
-            ),
+            'review_results': _review_completion_metric(
+                [event for event in locale_events if event.event_name == 'review_requested'],
+                lifecycle_events,
+            )['users'],
+            'generation_requests': len(generation_request_events),
+            'generation_successes': len(generation_success_events),
             'checkout_started': _count_distinct(
                 locale_events,
                 event_names={'checkout_started', 'credit_pack_checkout_started'},
@@ -723,12 +934,16 @@ def _build_locale_breakdown(period_events: list[AnalyticsEventSample]) -> dict[s
     return breakdown
 
 
-def _build_generation_unit_economics(period_events: list[AnalyticsEventSample]) -> dict[str, Any]:
+def _build_generation_unit_economics(
+    period_events: list[AnalyticsEventSample],
+    all_events: list[AnalyticsEventSample] | None = None,
+) -> dict[str, Any]:
+    request_index = _generation_request_index(period_events)
+    lifecycle_events = all_events if all_events is not None else period_events
     success_events = [
         event
-        for event in period_events
-        if event.event_name == 'generation_succeeded'
-        and (_event_metadata_number(event, 'credits_charged') > 0 or _event_metadata_number(event, 'cost_usd') > 0)
+        for event in _generation_lifecycle_events(lifecycle_events, event_names={'generation_succeeded'}, request_index=request_index)
+        if _event_metadata_number(event, 'credits_charged') > 0 or _event_metadata_number(event, 'cost_usd') > 0
     ]
     paid_credit_pack_events = [
         event
@@ -782,29 +997,53 @@ def _build_generation_unit_economics(period_events: list[AnalyticsEventSample]) 
     }
 
 
+def _is_ops_analytics_event(event: AnalyticsEventSample) -> bool:
+    return (
+        event.source in OPS_SOURCES
+        or STAGE_A_EVENT_CATALOG.get(event.event_name, {}).get('stage') == 'OPS'
+    )
+
+
 def _build_data_health(period_events: list[AnalyticsEventSample]) -> dict[str, Any]:
     total_events = len(period_events)
-    unknown_source_events = _event_count(period_events, source='unknown')
+    ops_events = [event for event in period_events if _is_ops_analytics_event(event)]
+    product_events = [event for event in period_events if not _is_ops_analytics_event(event)]
+    unknown_source_events = _event_count(product_events, source='unknown')
     missing_core_events = [
         event_name
         for event_name in DATA_HEALTH_CORE_EVENTS
-        if _event_count(period_events, event_names={event_name}) == 0
+        if _event_count(product_events, event_names={event_name}) == 0
     ]
     generation_events = _event_count(period_events, event_names=set(GENERATION_FUNNEL_EVENTS))
+    review_causal_gaps = _count_review_causal_gaps(product_events)
+    generation_missing_task_events = sum(
+        1
+        for event in product_events
+        if event.event_name in GENERATION_LIFECYCLE_EVENTS and _generation_task_key(event) is None
+    )
     warnings = []
     if total_events == 0:
         warnings.append('no_events_in_window')
-    if total_events > 0 and unknown_source_events / total_events > 0.3:
+    if product_events and unknown_source_events / len(product_events) > 0.3:
         warnings.append('unknown_source_over_30_percent')
     if missing_core_events:
         warnings.append('missing_core_review_events')
+    if any(review_causal_gaps.values()):
+        warnings.append('review_causal_key_missing')
+    if generation_missing_task_events:
+        warnings.append('generation_task_key_missing')
     if _event_count(period_events, event_names={'generation_page_viewed', 'prompt_library_viewed'}) > 0 and generation_events <= 1:
         warnings.append('generation_funnel_events_missing_after_entry')
 
     return {
         'total_events': total_events,
+        'product_events': len(product_events),
+        'ops_events': len(ops_events),
+        'performance_events': _event_count(ops_events, event_names={'web_vital_reported'}),
         'unknown_source_events': unknown_source_events,
-        'unknown_source_rate': _safe_rate(unknown_source_events, total_events),
+        'unknown_source_rate': _safe_rate(unknown_source_events, len(product_events)),
+        'review_causal_key_missing': review_causal_gaps,
+        'generation_task_key_missing': generation_missing_task_events,
         'missing_core_events': missing_core_events,
         'generation_events': generation_events,
         'warnings': warnings,
@@ -930,14 +1169,7 @@ def build_stage_a_snapshot(
             if trailing_window_start <= event.occurred_at.date() <= current
         ]
 
-        review_requested_base = _count_distinct(
-            day_events,
-            event_names={'review_requested'},
-        )
-        review_requested_users = _count_distinct(
-            day_events,
-            event_names={'review_result_viewed'},
-        )
+        first_review_metric = _review_completion_metric(day_events, normalized_events)
 
         guest_active_base = _count_distinct(
             day_events,
@@ -980,9 +1212,9 @@ def build_stage_a_snapshot(
                 'dau': _count_distinct(day_events),
                 'wau': _count_distinct(trailing_events),
                 'first_review_completion': {
-                    'base_users': review_requested_base,
-                    'users': review_requested_users,
-                    'rate': _safe_rate(review_requested_users, review_requested_base),
+                    'base_users': first_review_metric['base_users'],
+                    'users': first_review_metric['users'],
+                    'rate': _safe_rate(first_review_metric['users'], first_review_metric['base_users']),
                 },
                 'second_review_within_7d': {
                     'base_users': second_review_metric['base_users'],
@@ -1045,13 +1277,15 @@ def build_stage_a_snapshot(
             period_events,
             event_names={'review_requested'},
             source=source,
-            key_builder=_guest_conversion_key,
+            key_builder=_review_causal_key,
         )
-        review_results = _count_distinct(
-            period_events,
-            event_names={'review_result_viewed'},
-            source=source,
-            key_builder=_guest_conversion_key,
+        review_results = _review_completion_metric(
+            [
+                event
+                for event in period_events
+                if event.event_name == 'review_requested' and event.source == source
+            ],
+            normalized_events,
         )
         source_breakdown[source] = {
             'visitors': visitors,
@@ -1059,11 +1293,11 @@ def build_stage_a_snapshot(
             'workspace_entries': workspace_entries,
             'uploads': uploads,
             'review_requests': review_requests,
-            'review_results': review_results,
+            'review_results': review_results['users'],
             'workspace_click_rate': _safe_rate(workspace_clicks, visitors),
             'workspace_entry_rate': _safe_rate(workspace_entries, visitors),
             'upload_conversion_rate': _safe_rate(uploads, visitors),
-            'review_completion_rate': _safe_rate(review_results, review_requests),
+            'review_completion_rate': _safe_rate(review_results['users'], review_requests),
         }
 
     plan_breakdown: dict[str, dict[str, int]] = {}
@@ -1074,12 +1308,16 @@ def build_stage_a_snapshot(
                 period_events,
                 event_names={'review_requested'},
                 plan=plan,
+                key_builder=_review_causal_key,
             ),
-            'review_results': _count_distinct(
-                period_events,
-                event_names={'review_result_viewed'},
-                plan=plan,
-            ),
+            'review_results': _review_completion_metric(
+                [
+                    event
+                    for event in period_events
+                    if event.event_name == 'review_requested' and event.plan == plan
+                ],
+                normalized_events,
+            )['users'],
             'checkout_started': _count_distinct(
                 period_events,
                 event_names={'checkout_started'},
@@ -1100,11 +1338,11 @@ def build_stage_a_snapshot(
         'event_catalog': STAGE_A_EVENT_CATALOG,
         'daily_rows': daily_rows,
         'source_breakdown': source_breakdown,
-        'content_conversion_weekly': _build_content_conversion_weekly(period_events),
+        'content_conversion_weekly': _build_content_conversion_weekly(period_events, normalized_events),
         'plan_breakdown': plan_breakdown,
-        'locale_breakdown': _build_locale_breakdown(period_events),
-        'generation_funnel': _build_generation_funnel(period_events),
-        'generation_unit_economics': _build_generation_unit_economics(period_events),
+        'locale_breakdown': _build_locale_breakdown(period_events, normalized_events),
+        'generation_funnel': _build_generation_funnel(period_events, normalized_events),
+        'generation_unit_economics': _build_generation_unit_economics(period_events, normalized_events),
         'retake_contribution': _build_retake_contribution(period_events),
         'data_health': _build_data_health(period_events),
     }
@@ -1132,14 +1370,16 @@ def render_stage_a_snapshot_markdown(snapshot: dict[str, Any]) -> str:
     lines.extend(
         [
             f"| 总事件数 | {data_health.get('total_events', 0)} |",
-            f"| unknown source 事件数 | {data_health.get('unknown_source_events', 0)} ({_format_percent(data_health.get('unknown_source_rate', 0.0))}) |",
+            f"| 产品事件数 | {data_health.get('product_events', 0)} |",
+            f"| 性能遥测事件数 | {data_health.get('performance_events', 0)} |",
+            f"| 产品事件 unknown source | {data_health.get('unknown_source_events', 0)} ({_format_percent(data_health.get('unknown_source_rate', 0.0))}) |",
             f"| 缺失核心事件 | {missing_core_events} |",
             f"| 生图漏斗事件数 | {data_health.get('generation_events', 0)} |",
             f"| 告警 | {warnings} |",
             '',
             '## 日度漏斗总览',
             '',
-            '| 日期 | DAU | WAU | 首评完成率 | 7 日二次使用率 | guest -> sign-in | free -> checkout | checkout -> paid |',
+            '| 日期 | DAU | WAU | 请求 cohort 首次结果查看率 | 7 日二次使用率 | guest -> sign-in | free -> checkout | checkout -> paid |',
             '| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |',
         ]
     )
@@ -1410,7 +1650,7 @@ def render_content_conversion_weekly_markdown(snapshot: dict[str, Any]) -> str:
         '',
         '## 内容来源漏斗',
         '',
-        '| 来源 | 浏览访客 | 工作台点击 | 工作台进入 | 上传成功 | 发起点评 | 查看结果 | 点击率 | 上传转化率 | 首评完成率 |',
+        '| 来源 | 浏览访客 | 工作台点击 | 工作台进入 | 上传成功 | 发起点评 | cohort 查看结果 | 点击率 | 上传转化率 | cohort 结果查看率 |',
         '| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |',
     ]
 
@@ -1437,7 +1677,7 @@ def render_content_conversion_weekly_markdown(snapshot: dict[str, Any]) -> str:
             '## 读数口径',
             '',
             '- Blog 点击率：`content_workspace_clicked(source=blog) / blog_post_viewed`。',
-            '- Blog 首评完成率：`review_result_viewed(source=blog) / review_requested(source=blog)`。',
+            '- Blog 请求 cohort 结果查看率：以 `task_id/review_id` 配对 Blog 来源请求与 D0/D+1 首次结果查看；重复或无因果键事件不进入转化率。',
             '- Gallery 上传转化率：`upload_succeeded(source=gallery) / gallery_viewed`。',
             '- Prompt Library 点击率：`content_workspace_clicked(source=prompt_library) / prompt_library_viewed`。',
             '- 工作台进入和上传成功都继承前端会话级来源，点击事件用来确认具体入口位。',
@@ -1498,7 +1738,7 @@ def load_stage_a_snapshot_from_db(
     from app.db.models import ProductAnalyticsEvent, Review, User
 
     event_window_start = datetime.combine(start_date, datetime.min.time(), tzinfo=timezone.utc)
-    event_window_end = datetime.combine(end_date + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc)
+    event_window_end = datetime.combine(end_date + timedelta(days=2), datetime.min.time(), tzinfo=timezone.utc)
     review_window_end = datetime.combine(end_date + timedelta(days=8), datetime.min.time(), tzinfo=timezone.utc)
 
     event_rows = (

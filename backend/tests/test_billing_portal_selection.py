@@ -159,12 +159,17 @@ class BillingPortalSelectionTests(unittest.TestCase):
             routes,
             'count_monthly_generation_credit_grants',
             return_value=0,
-        ), patch.object(routes, 'count_monthly_generation_credit_consumed', return_value=42):
+        ), patch.object(routes, 'count_monthly_generation_credit_consumed', return_value=42), patch.object(
+            routes,
+            'count_monthly_generation_credit_holds',
+            return_value=11,
+        ):
             snapshot = _generation_credit_usage_snapshot(Mock(), user, UserPlan.pro)
 
         self.assertEqual(snapshot['monthly_total'], 199)
         self.assertEqual(snapshot['monthly_used'], 42)
-        self.assertEqual(snapshot['monthly_remaining'], 157)
+        self.assertEqual(snapshot['monthly_held'], 11)
+        self.assertEqual(snapshot['monthly_remaining'], 146)
 
     def test_generation_credit_usage_snapshot_displays_bonus_credits_without_negative_used(self) -> None:
         user = User(
@@ -182,12 +187,17 @@ class BillingPortalSelectionTests(unittest.TestCase):
             routes,
             'count_monthly_generation_credit_grants',
             return_value=30,
-        ), patch.object(routes, 'count_monthly_generation_credit_consumed', return_value=0):
+        ), patch.object(routes, 'count_monthly_generation_credit_consumed', return_value=0), patch.object(
+            routes,
+            'count_monthly_generation_credit_holds',
+            return_value=8,
+        ):
             snapshot = _generation_credit_usage_snapshot(Mock(), user, UserPlan.free)
 
         self.assertEqual(snapshot['monthly_total'], 33)
         self.assertEqual(snapshot['monthly_used'], 0)
-        self.assertEqual(snapshot['monthly_remaining'], 33)
+        self.assertEqual(snapshot['monthly_held'], 8)
+        self.assertEqual(snapshot['monthly_remaining'], 25)
 
 
 if __name__ == '__main__':

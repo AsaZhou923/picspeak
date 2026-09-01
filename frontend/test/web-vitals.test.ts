@@ -27,7 +27,7 @@ test('web vitals helper converts Core Web Vitals into analytics metadata', async
   assert.equal(isCoreWebVitalMetric('FCP'), false);
   assert.deepEqual(payload, {
     event_name: 'web_vital_reported',
-    source: 'unknown',
+    source: 'system_performance',
     page_path: '/en/blog/five-photo-composition-checks',
     metadata: {
       metric_id: 'v5-1740000000000-123',
@@ -48,7 +48,7 @@ test('web vitals helper converts Core Web Vitals into analytics metadata', async
   assert.deepEqual(trackedPayload, {
     eventName: 'web_vital_reported',
     options: {
-      source: 'unknown',
+      source: 'system_performance',
       pagePath: '/en/blog/five-photo-composition-checks',
       metadata: payload.metadata,
     },

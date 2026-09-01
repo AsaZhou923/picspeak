@@ -10,7 +10,7 @@ import { useAuth } from '@/lib/auth-context';
 import { GeneratedImageDetailResponse } from '@/lib/types';
 import { useI18n } from '@/lib/i18n';
 import { formatUserFacingError } from '@/lib/error-utils';
-import { trackProductEvent } from '@/lib/product-analytics';
+import { readProductAttributionSource, trackProductEvent } from '@/lib/product-analytics';
 import { formatGenerationOutputSpec } from '@/features/generations/generation-config';
 
 export default function GenerationDetailPage() {
@@ -75,7 +75,7 @@ export default function GenerationDetailPage() {
           entrypoint: 'generation_detail_reuse',
         },
       });
-      const result = await reuseGeneration(generationId, token);
+      const result = await reuseGeneration(generationId, token, readProductAttributionSource());
       router.push(`/generation-tasks/${result.task_id}`);
     } catch (err) {
       setError(formatUserFacingError(t, err, t('generation_detail_reuse_error')));

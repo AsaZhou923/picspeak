@@ -1,5 +1,37 @@
 [
   {
+    "id": "2026-09-01-review-generation-reliability",
+    "date": "2026-09-01",
+    "title": "评分一致性、生图额度与任务可靠性升级",
+    "summary": "PicSpeak 现在用统一的官方 GPT 模型负责数值评分，并继续允许用户选择 Qwen 或 GPT 撰写点评。此次更新同时补强了公开结果隐私、生图额度预留、任务并发、对象存储补偿和数据分析口径。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-09-01-review-generation-reliability",
+    "sections": [
+      {
+        "title": "点评与隐私",
+        "items": [
+          "所有普通点评使用同一个官方 GPT 评分器，Qwen / GPT 选择只影响文字反馈",
+          "重复点评会复用经过严格校验的分数，模型响应 ID 继续作为内部审计信息保存",
+          "公开分享与非拥有者访问不再暴露 EXIF、内部任务 ID、标签或备注"
+        ]
+      },
+      {
+        "title": "生图与数据可靠性",
+        "items": [
+          "生图额度新增处理中预留状态，成功后扣除，终态失败时自动释放",
+          "并发 claim、worker lease、对象上传补偿和请求/终态事件 outbox 均已加固",
+          "跨日完成的生图会按原始请求时间进入正确 cohort，避免成功率被窗口边界低估"
+        ]
+      },
+      {
+        "title": "首页更新提示",
+        "items": [
+          "首页会用一次性弹窗展示最新版本摘要，每个 release 在同一浏览器只自动出现一次",
+          "完整历史仍保留在三语 Updates 页面，弹窗可随时关闭，不影响主流程"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-08-20-gpt56-luna-xhigh",
     "date": "2026-08-20",
     "title": "OpenAI 摄影点评切换到 GPT-5.6 Luna 与 xhigh 推理",

@@ -515,9 +515,11 @@ export async function getMyGenerations(
 
 export async function reuseGeneration(
   generationId: string,
-  token: string
+  token: string,
+  analyticsSource?: string
 ): Promise<GenerationCreateResponse> {
-  return request<GenerationCreateResponse>(`/generations/${generationId}/reuse`, {
+  const suffix = analyticsSource ? `?analytics_source=${encodeURIComponent(analyticsSource)}` : '';
+  return request<GenerationCreateResponse>(`/generations/${generationId}/reuse${suffix}`, {
     method: 'POST',
     token,
     unauthorizedRecovery: 'guest',

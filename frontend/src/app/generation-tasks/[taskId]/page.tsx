@@ -36,7 +36,7 @@ export default function GenerationTaskPage() {
   const [task, setTask] = useState<GenerationTaskStatusResponse | null>(null);
   const [error, setError] = useState('');
   const finalRef = useRef(false);
-  const trackedFinalRef = useRef(false);
+  const creditExhaustedTrackedRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
   const activeTaskIdRef = useRef(taskId);
@@ -46,7 +46,7 @@ export default function GenerationTaskPage() {
     if (activeTaskIdRef.current !== taskId) {
       activeTaskIdRef.current = taskId;
       finalRef.current = false;
-      trackedFinalRef.current = false;
+      creditExhaustedTrackedRef.current = false;
       setTask(null);
       setError('');
     }
@@ -64,21 +64,6 @@ export default function GenerationTaskPage() {
         setError('');
         if (nextTask.status === 'SUCCEEDED' && nextTask.generation_id) {
           finalRef.current = true;
-          if (!trackedFinalRef.current) {
-            trackedFinalRef.current = true;
-            void trackProductEvent('generation_succeeded', {
-              token,
-              pagePath: `/generation-tasks/${taskId}`,
-              locale,
-              metadata: {
-                task_id: taskId,
-                generation_id: nextTask.generation_id,
-                generation_mode: nextTask.generation_mode,
-                intent: nextTask.intent,
-                source_review_id: nextTask.source_review_id,
-              },
-            });
-          }
           const destination = `/generations/${nextTask.generation_id}`;
           router.replace(destination);
           window.setTimeout(() => {
@@ -90,34 +75,20 @@ export default function GenerationTaskPage() {
         }
         if (nextTask.status === 'FAILED' || nextTask.status === 'EXPIRED' || nextTask.status === 'DEAD_LETTER') {
           finalRef.current = true;
-          if (!trackedFinalRef.current) {
-            trackedFinalRef.current = true;
-            void trackProductEvent('generation_failed', {
+          if (nextTask.error?.code === 'IMAGE_GENERATION_CREDITS_EXHAUSTED' && !creditExhaustedTrackedRef.current) {
+            creditExhaustedTrackedRef.current = true;
+            void trackProductEvent('generation_credit_exhausted', {
               token,
               pagePath: `/generation-tasks/${taskId}`,
               locale,
               metadata: {
                 task_id: taskId,
-                error_code: nextTask.error?.code,
                 generation_mode: nextTask.generation_mode,
                 intent: nextTask.intent,
                 source_review_id: nextTask.source_review_id,
+                entrypoint: 'generation_task_failed',
               },
             });
-            if (nextTask.error?.code === 'IMAGE_GENERATION_CREDITS_EXHAUSTED') {
-              void trackProductEvent('generation_credit_exhausted', {
-                token,
-                pagePath: `/generation-tasks/${taskId}`,
-                locale,
-                metadata: {
-                  task_id: taskId,
-                  generation_mode: nextTask.generation_mode,
-                  intent: nextTask.intent,
-                  source_review_id: nextTask.source_review_id,
-                  entrypoint: 'generation_task_failed',
-                },
-              });
-            }
           }
           return;
         }

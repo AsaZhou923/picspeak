@@ -29,6 +29,7 @@ export interface UsageResponse {
   generation_credits: {
     monthly_total: number | null;
     monthly_used: number | null;
+    monthly_held: number | null;
     monthly_remaining: number | null;
   };
   features: {
@@ -181,8 +182,15 @@ export interface ReviewResult {
   schema_version: string;
   prompt_version: string;
   score_version: string;
+  score_prompt_version: string;
   model_name: string;
   model_version: string;
+  scorer_model_name: string;
+  scorer_model_version: string;
+  writer_model_name: string;
+  writer_model_version: string;
+  scorer_preprocess_version: string;
+  score_cache_hit: boolean;
   scores: ReviewScores;
   final_score: number;
   advantage: string;
@@ -284,6 +292,7 @@ export interface GenerationCreateRequest {
   output_format: GenerationOutputFormat;
   async: boolean;
   idempotency_key?: string;
+  analytics_source?: ProductAnalyticsSource;
 }
 
 export interface GenerationCreateResponse {
@@ -345,6 +354,7 @@ export interface GeneratedImageHistoryResponse {
 
 export interface ReviewGetResponse {
   review_id: string;
+  task_id?: string | null;
   photo_id: string;
   photo_url: string | null;
   mode: ReviewMode;
@@ -389,6 +399,11 @@ export interface ReviewHistoryItem {
   scores: ReviewScores;
   model_name: string;
   model_version: string;
+  scorer_model_name: string;
+  scorer_model_version: string;
+  writer_model_name: string;
+  writer_model_version: string;
+  score_version: string;
   favorite?: boolean;
   gallery_visible?: boolean;
   gallery_audit_status?: 'none' | 'approved' | 'rejected';
@@ -465,6 +480,11 @@ export interface ReviewExportData {
   image_type: ImageType;
   model_name: string;
   model_version: string;
+  scorer_model_name: string;
+  scorer_model_version: string;
+  writer_model_name: string;
+  writer_model_version: string;
+  score_version: string;
   final_score: number;
   scores: ReviewScores;
   advantage: string;
@@ -538,6 +558,7 @@ export type ProductAnalyticsSource =
   | 'prompt_library'
   | 'share'
   | 'checkout'
+  | 'system_performance'
   | 'unknown';
 
 export interface ProductAnalyticsTrackRequest {

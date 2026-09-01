@@ -13,6 +13,8 @@ frontend/coverage/
 frontend/*.tsbuildinfo
 frontend/.env.local
 frontend/.env*.local
+.playwright-cli/
+output/playwright/
 
 # Backend
 backend/.env

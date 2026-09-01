@@ -6,10 +6,14 @@ from fastapi import APIRouter, Depends, Header, Request, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import CurrentActor, get_db, get_optional_actor
+from app.core.errors import api_error
 from app.schemas import ProductAnalyticsTrackRequest, ProductAnalyticsTrackResponse
-from app.services.product_analytics import record_product_event
+from app.services.product_analytics import normalize_stage_a_event_name, record_product_event
 
 router = APIRouter(prefix='/analytics', tags=['analytics'])
+SERVER_OWNED_ANALYTICS_EVENTS = frozenset(
+    {'generation_requested', 'generation_succeeded', 'generation_failed'}
+)
 
 
 def _normalized_optional_header(value: str | None, *, max_length: int = 128) -> str | None:
@@ -29,9 +33,23 @@ def track_product_analytics_event(
     actor: CurrentActor | None = Depends(get_optional_actor),
     device_id: str | None = Header(default=None, alias='X-Device-Id'),
 ):
+    try:
+        event_name = normalize_stage_a_event_name(payload.event_name)
+    except ValueError as exc:
+        raise api_error(
+            status.HTTP_400_BAD_REQUEST,
+            'ANALYTICS_EVENT_UNSUPPORTED',
+            'Unsupported analytics event',
+        ) from exc
+    if event_name in SERVER_OWNED_ANALYTICS_EVENTS:
+        raise api_error(
+            status.HTTP_400_BAD_REQUEST,
+            'ANALYTICS_EVENT_SERVER_OWNED',
+            'This analytics event is recorded by the server',
+        )
     record_product_event(
         db,
-        event_name=payload.event_name,
+        event_name=event_name,
         user_public_id=None if actor is None else actor.user.public_id,
         plan='guest' if actor is None else actor.plan.value,
         device_id=_normalized_optional_header(device_id),
@@ -42,4 +60,4 @@ def track_product_analytics_event(
         metadata=payload.metadata,
     )
     db.commit()
-    return ProductAnalyticsTrackResponse(status='accepted', event_name=payload.event_name)
+    return ProductAnalyticsTrackResponse(status='accepted', event_name=event_name)

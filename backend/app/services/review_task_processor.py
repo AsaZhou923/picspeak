@@ -15,6 +15,7 @@ from app.db.session import SessionLocal
 from app.services.ai import AIReviewError, run_ai_review
 from app.services.guard import enforce_user_quota, guest_usage_snapshot, increment_quota, user_usage_snapshot
 from app.services.retake_comparison import run_retake_comparison
+from app.services.review_score_cache import canonical_score_cache_lease
 from app.services.task_events import record_task_event
 
 
@@ -66,6 +67,12 @@ def public_task_error_message(
     return mapped[0] if retryable else mapped[1]
 
 
+def _review_task_stale_timeout_seconds() -> int:
+    scorer_timeout = int(getattr(settings, 'openai_score_timeout_seconds', 180) or 180)
+    writer_timeout = int(getattr(settings, 'openai_review_timeout_seconds', 180) or 180)
+    return max(int(settings.review_task_stale_timeout_seconds), scorer_timeout + writer_timeout + 60, 30)
+
+
 def _normalize_review_result_payload(
     result_json: dict | None,
     *,
@@ -74,6 +81,13 @@ def _normalize_review_result_payload(
     model_name: str,
     model_version: str,
     exif_info: dict | None,
+    scorer_model_name: str | None = None,
+    scorer_model_version: str | None = None,
+    writer_model_name: str | None = None,
+    writer_model_version: str | None = None,
+    score_prompt_version: str | None = None,
+    scorer_preprocess_version: str | None = None,
+    score_cache_hit: bool = False,
 ) -> dict:
     raw_payload = dict(result_json or {})
     scores = {
@@ -114,8 +128,17 @@ def _normalize_review_result_payload(
         'schema_version': str(raw_payload.get('schema_version') or '1.0'),
         'prompt_version': str(raw_payload.get('prompt_version') or prompt_version),
         'score_version': str(raw_payload.get('score_version') or 'legacy'),
+        'score_prompt_version': str(raw_payload.get('score_prompt_version') or score_prompt_version or ''),
         'model_name': str(raw_payload.get('model_name') or model_name),
         'model_version': str(raw_payload.get('model_version') or model_version),
+        'scorer_model_name': str(raw_payload.get('scorer_model_name') or scorer_model_name or ''),
+        'scorer_model_version': str(raw_payload.get('scorer_model_version') or scorer_model_version or ''),
+        'writer_model_name': str(raw_payload.get('writer_model_name') or writer_model_name or model_name),
+        'writer_model_version': str(raw_payload.get('writer_model_version') or writer_model_version or model_version),
+        'scorer_preprocess_version': str(
+            raw_payload.get('scorer_preprocess_version') or scorer_preprocess_version or ''
+        ),
+        'score_cache_hit': bool(raw_payload.get('score_cache_hit', score_cache_hit)),
         'scores': scores,
         'final_score': float(resolved_final_score),
         'advantage': str(raw_payload.get('advantage') or ''),
@@ -154,7 +177,7 @@ def expire_review_tasks(db: Session) -> None:
     if expired_tasks:
         db.commit()
 
-    stale_timeout = max(int(settings.review_task_stale_timeout_seconds), 30)
+    stale_timeout = _review_task_stale_timeout_seconds()
     stale_cutoff = now - timedelta(seconds=stale_timeout)
     stalled_tasks = (
         db.query(ReviewTask)
@@ -500,15 +523,21 @@ def _process_task(db: Session, task: ReviewTask) -> None:
                 image_type=payload_image_type,
             )
         else:
-            ai_response = run_ai_review(
-                task.mode.value if isinstance(task.mode, ReviewMode) else str(task.mode),
-                image_url=image_url,
-                locale=payload_locale,
-                exif_data=photo.exif_data or None,
+            with canonical_score_cache_lease(
+                db,
+                photo=photo,
                 image_type=payload_image_type,
-                enforce_suggestion_structure=task.attempt_count < task.max_attempts,
-                review_model=review_model,
-            )
+            ) as canonical_score:
+                ai_response = run_ai_review(
+                    task.mode.value if isinstance(task.mode, ReviewMode) else str(task.mode),
+                    image_url=image_url,
+                    locale=payload_locale,
+                    exif_data=photo.exif_data or None,
+                    image_type=payload_image_type,
+                    enforce_suggestion_structure=task.attempt_count < task.max_attempts,
+                    review_model=review_model,
+                    canonical_score=canonical_score,
+                )
     except AIReviewError as exc:
         logger.warning('AI review failed for task %s: %s', task.public_id, exc)
         _handle_failure(db, task, error_code='AI_CALL_FAILED', error_message=str(exc), retryable=True)
@@ -521,7 +550,16 @@ def _process_task(db: Session, task: ReviewTask) -> None:
         model_name=ai_response.model_name,
         model_version=ai_response.model_version,
         exif_info=photo.exif_data or None,
+        scorer_model_name=ai_response.scorer_model_name,
+        scorer_model_version=ai_response.scorer_model_version,
+        writer_model_name=ai_response.writer_model_name,
+        writer_model_version=ai_response.writer_model_version,
+        score_prompt_version=ai_response.score_prompt_version,
+        scorer_preprocess_version=ai_response.scorer_preprocess_version,
+        score_cache_hit=ai_response.score_cache_hit,
     )
+    if ai_response.cost_rate_version:
+        result_payload.setdefault('billing_info', {})['cost_rate_version'] = ai_response.cost_rate_version
 
     review = Review(
         public_id=new_public_id('rev'),
@@ -538,8 +576,11 @@ def _process_task(db: Session, task: ReviewTask) -> None:
         input_tokens=ai_response.input_tokens,
         output_tokens=ai_response.output_tokens,
         cost_usd=ai_response.cost_usd,
+        cost_rate_version=ai_response.cost_rate_version,
         latency_ms=ai_response.latency_ms,
         model_name=ai_response.model_name,
+        scorer_model_name=ai_response.scorer_model_name,
+        writer_model_name=ai_response.writer_model_name,
     )
     db.add(review)
     db.flush()
@@ -555,7 +596,9 @@ def _process_task(db: Session, task: ReviewTask) -> None:
         metadata_json={
             'mode': task.mode.value if isinstance(task.mode, ReviewMode) else str(task.mode),
             'analysis_type': analysis_type,
-            'review_model': ai_response.model_name,
+            'review_model': review_model,
+            'scorer_model': ai_response.scorer_model_name,
+            'writer_model': ai_response.writer_model_name,
         },
     )
     db.add(ledger)
@@ -564,6 +607,7 @@ def _process_task(db: Session, task: ReviewTask) -> None:
     usage = guest_usage_snapshot(db, guest_scope_key) if guest_scope_key else user_usage_snapshot(db, owner)
     result_payload['billing_info'] = {
         'quota_charged': True,
+        'cost_rate_version': ai_response.cost_rate_version,
         'remaining_quota': {
             'daily_remaining': usage.get('daily_remaining'),
             'monthly_remaining': usage.get('monthly_remaining'),

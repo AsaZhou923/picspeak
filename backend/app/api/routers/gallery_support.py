@@ -20,6 +20,7 @@ from app.api.routers.photos import (
 from app.core.errors import api_error
 from app.db.models import Photo, Review, ReviewLike, User
 from app.schemas import PublicGalleryItem
+from app.services.gallery_summary import extract_review_gallery_summary
 from app.services.object_storage import get_object_storage_client
 
 GALLERY_AUDIT_NONE = 'none'
@@ -236,17 +237,10 @@ def _review_image_type_gallery(review: Review) -> str:
 
 
 def _review_gallery_summary(review: Review) -> str:
-  import re
-  payload = dict(review.result_json or {})
-  for field_name in ('suggestions', 'critique', 'advantage'):
-    raw_value = payload.get(field_name)
-    if not isinstance(raw_value, str):
-      continue
-    for line in raw_value.splitlines():
-      normalized = re.sub(r'^\d+\.\s*', '', line).strip()
-      if normalized:
-        return normalized[:180]
-  return 'Saved to the public gallery.'
+  return extract_review_gallery_summary(
+    review.result_json,
+    fallback='Saved to the public gallery.',
+  )
 
 
 def _public_gallery_item(

@@ -82,6 +82,7 @@ class RetakeComparisonTests(unittest.TestCase):
             mocked_settings.retake_analysis_reasoning_effort = 'xhigh'
             mocked_settings.retake_analysis_api_url = 'https://api.openai.com/v1/responses'
             mocked_settings.retake_analysis_timeout_seconds = 180
+            mocked_settings.review_pricing_overrides = {}
             with patch('app.services.retake_comparison.pooled_request', return_value=response) as request:
                 ai_response = self._run()
 
@@ -110,6 +111,28 @@ class RetakeComparisonTests(unittest.TestCase):
         self.assertEqual(comparison.overall_delta, 1.2)
         self.assertEqual(ai_response.input_tokens, 321)
         self.assertEqual(ai_response.output_tokens, 210)
+        self.assertEqual(ai_response.cost_usd, 0.000316)
+        self.assertIn('openai:gpt-5.6-luna:standard', ai_response.cost_rate_version or '')
+
+    def test_pricing_uses_configured_model_while_storing_provider_snapshot(self) -> None:
+        body = _response_body()
+        body['model'] = 'gpt-5.6-luna-2026-08-20'
+        response = PooledHTTPResponse(status=200, data=json.dumps(body).encode('utf-8'), headers={}, reason='OK')
+        with patch('app.services.retake_comparison.settings') as mocked_settings:
+            mocked_settings.openai_api_key = 'test-openai-key'
+            mocked_settings.retake_analysis_model = 'gpt-5.6-luna'
+            mocked_settings.retake_analysis_reasoning_effort = 'xhigh'
+            mocked_settings.retake_analysis_api_url = 'https://api.openai.com/v1/responses'
+            mocked_settings.retake_analysis_timeout_seconds = 180
+            mocked_settings.review_pricing_overrides = {}
+            with patch('app.services.retake_comparison.pooled_request', return_value=response):
+                ai_response = self._run()
+
+        self.assertEqual(ai_response.model_name, 'gpt-5.6-luna')
+        self.assertEqual(ai_response.model_version, 'gpt-5.6-luna-2026-08-20')
+        self.assertEqual(ai_response.result.model_name, 'gpt-5.6-luna')
+        self.assertEqual(ai_response.result.model_version, 'gpt-5.6-luna-2026-08-20')
+        self.assertEqual(ai_response.cost_usd, 0.000316)
 
     def test_requires_openai_api_key(self) -> None:
         with patch('app.services.retake_comparison.settings') as mocked_settings:

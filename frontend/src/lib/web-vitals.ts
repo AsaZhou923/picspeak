@@ -14,7 +14,7 @@ type WebVitalAnalyticsContext = {
 type WebVitalTrackFunction = (
   eventName: 'web_vital_reported',
   options: {
-    source: 'unknown';
+    source: 'system_performance';
     pagePath?: string;
     metadata: Record<string, unknown>;
   },
@@ -29,7 +29,7 @@ export function isCoreWebVitalMetric(name: string): boolean {
 export function buildWebVitalAnalyticsPayload(metric: WebVitalMetricInput, context: WebVitalAnalyticsContext = {}) {
   return {
     event_name: 'web_vital_reported' as const,
-    source: 'unknown' as const,
+    source: 'system_performance' as const,
     page_path: context.pagePath ?? undefined,
     metadata: {
       metric_id: metric.id,
