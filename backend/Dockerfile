@@ -27,6 +27,9 @@ RUN pip install --no-cache-dir --no-index --find-links=/wheels -r requirements.t
     && rm -rf /wheels
 
 COPY app ./app
+COPY alembic ./alembic
+COPY alembic.ini ./alembic.ini
+COPY scripts/ensure_runtime_schema.py ./scripts/ensure_runtime_schema.py
 
 EXPOSE 8080
 

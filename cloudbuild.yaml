@@ -1,0 +1,99 @@
+substitutions:
+  _AR_HOSTNAME: asia-northeast1-docker.pkg.dev
+  _AR_PROJECT_ID: project-f26ea384-25df-4d69-a78
+  _AR_REPOSITORY: cloud-run-source-deploy
+  _DEPLOY_REGION: asia-northeast1
+  _SERVICE_NAME: picspeak-api
+  _MIGRATION_JOB: picspeak-db-migrate
+  _DATABASE_SECRET: picspeak-supabase-database-url
+  _RUNTIME_SERVICE_ACCOUNT: 781338217290-compute@developer.gserviceaccount.com
+
+steps:
+  - id: Pull
+    name: gcr.io/cloud-builders/docker
+    entrypoint: bash
+    args:
+      - -ceu
+      - |
+        if ! docker pull "$_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/$REPO_NAME/$_SERVICE_NAME:latest"; then
+          echo "WARNING: optional cache image unavailable; building without a warm cache." >&2
+        fi
+
+  - id: Build
+    name: gcr.io/cloud-builders/docker
+    waitFor:
+      - Pull
+    args:
+      - build
+      - --cache-from
+      - $_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/$REPO_NAME/$_SERVICE_NAME:latest
+      - -t
+      - $_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
+      - -t
+      - $_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/$REPO_NAME/$_SERVICE_NAME:latest
+      - -f
+      - backend/Dockerfile
+      - backend
+
+  - id: Push
+    name: gcr.io/cloud-builders/docker
+    waitFor:
+      - Build
+    args:
+      - push
+      - --all-tags
+      - $_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/$REPO_NAME/$_SERVICE_NAME
+
+  - id: Migrate
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: gcloud
+    waitFor:
+      - Push
+    args:
+      - run
+      - jobs
+      - deploy
+      - $_MIGRATION_JOB
+      - --image=$_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
+      - --region=$_DEPLOY_REGION
+      - --service-account=$_RUNTIME_SERVICE_ACCOUNT
+      - --command=python
+      - --args=scripts/ensure_runtime_schema.py
+      - --set-secrets=DATABASE_URL=$_DATABASE_SECRET:latest
+      - --tasks=1
+      - --parallelism=1
+      - --max-retries=0
+      - --task-timeout=10m
+      - --execute-now
+      - --wait
+      - --quiet
+
+  - id: Deploy
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: gcloud
+    waitFor:
+      - Migrate
+    args:
+      - run
+      - services
+      - update
+      - $_SERVICE_NAME
+      - --image=$_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
+      - --update-labels=managed-by=gcp-cloud-build-deploy-cloud-run,gcb-trigger-region=$LOCATION,commit-sha=$COMMIT_SHA,gcb-build-id=$BUILD_ID
+      - --region=$_DEPLOY_REGION
+      - --quiet
+
+images:
+  - $_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
+  - $_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/$REPO_NAME/$_SERVICE_NAME:latest
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  requestedVerifyOption: VERIFIED
+  substitutionOption: ALLOW_LOOSE
+
+tags:
+  - gcp-cloud-build-deploy-cloud-run
+  - picspeak-api
+
+timeout: 1200s

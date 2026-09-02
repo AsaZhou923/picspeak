@@ -39,7 +39,8 @@ start-dev-proxy.bat
 .omx/
 .omc/
 .claude/
-deploy/
+deploy/*
+!deploy/deploy-backend.bat
 
 # GEO audit reports (generated locally)
 GEO-*.md
