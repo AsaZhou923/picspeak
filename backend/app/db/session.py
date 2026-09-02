@@ -1,13 +1,10 @@
 from sqlalchemy import create_engine
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import IllegalStateChangeError
-from sqlalchemy.orm import DeclarativeBase, sessionmaker
+from sqlalchemy.orm import sessionmaker
 
 from app.core.config import settings
-
-
-class Base(DeclarativeBase):
-    pass
+from app.db.base import Base
 
 
 _engine_kwargs = {'pool_pre_ping': True}
