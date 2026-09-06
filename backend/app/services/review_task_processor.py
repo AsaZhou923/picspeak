@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import nullcontext
 from datetime import datetime, timedelta, timezone
 import logging
 from urllib.parse import quote
@@ -12,10 +13,16 @@ from app.core.config import settings
 from app.core.errors import ApiHTTPException
 from app.db.models import Photo, PhotoStatus, Review, ReviewMode, ReviewStatus, ReviewTask, TaskStatus, UsageLedger, User, UserPlan
 from app.db.session import SessionLocal
-from app.services.ai import AIReviewError, run_ai_review
+from app.services.ai import AIReviewError, CanonicalScore, run_ai_review
 from app.services.guard import enforce_user_quota, guest_usage_snapshot, increment_quota, user_usage_snapshot
 from app.services.retake_comparison import run_retake_comparison
-from app.services.review_score_cache import canonical_score_cache_lease
+from app.services.review_pricing import ReviewModelUsage, estimate_review_usage_cost
+from app.services.review_score_cache import (
+    canonical_score_cache_lease,
+    checkpoint_task_canonical_score,
+    clear_task_canonical_score_checkpoint,
+    load_task_canonical_score_checkpoint,
+)
 from app.services.task_events import record_task_event
 
 
@@ -26,11 +33,48 @@ _PUBLIC_TASK_ERROR_MESSAGES: dict[str, tuple[str, str]] = {
         'AI review is temporarily unavailable; retry scheduled',
         'AI review could not be completed',
     ),
+    'AI_SCORING_FAILED': (
+        'AI scoring is temporarily unavailable; retry scheduled',
+        'AI scoring could not be completed',
+    ),
+    'AI_WRITING_FAILED': (
+        'AI review writing is temporarily unavailable; retry scheduled',
+        'AI review writing could not be completed',
+    ),
     'TASK_PROCESSING_FAILED': (
         'Review task failed unexpectedly; retry scheduled',
         'Review task could not be completed',
     ),
 }
+
+
+def review_task_failure_stage(error_code: str | None) -> str:
+    if error_code == 'AI_SCORING_FAILED':
+        return 'ai_scoring'
+    if error_code == 'AI_WRITING_FAILED':
+        return 'ai_writing'
+    return 'pre_charge'
+
+
+def _canonical_score_event_payload(score: CanonicalScore) -> dict:
+    estimate = estimate_review_usage_cost(
+        [
+            ReviewModelUsage(
+                model_name=score.model_name,
+                input_tokens=score.input_tokens,
+                output_tokens=score.output_tokens,
+            )
+        ],
+        overrides=settings.review_pricing_overrides,
+    )
+    return {
+        'scorer_model': score.model_name,
+        'input_tokens': score.input_tokens,
+        'output_tokens': score.output_tokens,
+        'latency_ms': score.latency_ms,
+        'estimated_cost_usd': float(estimate.cost_usd) if estimate.cost_usd is not None else None,
+        'cost_rate_version': estimate.rate_version,
+    }
 
 
 def _default_visual_analysis_payload() -> dict:
@@ -318,6 +362,8 @@ def _claim_task(db: Session, task_id: int, worker_name: str) -> bool:
                 ReviewTask.started_at: now,
                 ReviewTask.claimed_by: worker_name,
                 ReviewTask.last_heartbeat_at: now,
+                ReviewTask.error_code: None,
+                ReviewTask.error_message: None,
             },
             synchronize_session=False,
         )
@@ -439,6 +485,8 @@ def _process_task(db: Session, task: ReviewTask) -> None:
     task.next_attempt_at = None
     task.last_heartbeat_at = datetime.now(timezone.utc)
     task.progress = 10
+    task.error_code = None
+    task.error_message = None
     db.add(task)
     record_task_event(db, task, event_type='TASK_STARTED', message=f'Attempt {task.attempt_count} started')
     db.commit()
@@ -523,11 +571,37 @@ def _process_task(db: Session, task: ReviewTask) -> None:
                 image_type=payload_image_type,
             )
         else:
-            with canonical_score_cache_lease(
-                db,
-                photo=photo,
-                image_type=payload_image_type,
-            ) as canonical_score:
+            checkpointed_score = load_task_canonical_score_checkpoint(task)
+            score_context = (
+                nullcontext(checkpointed_score)
+                if checkpointed_score is not None
+                else canonical_score_cache_lease(
+                    db,
+                    photo=photo,
+                    image_type=payload_image_type,
+                )
+            )
+            with score_context as canonical_score:
+                if checkpointed_score is not None:
+                    record_task_event(
+                        db,
+                        task,
+                        event_type='AI_SCORING_REUSED',
+                        message='Reusing completed canonical score from an earlier attempt',
+                        payload={'scorer_model': checkpointed_score.model_name},
+                    )
+
+                def save_score_checkpoint(score: CanonicalScore) -> None:
+                    checkpoint_task_canonical_score(task, score)
+                    db.add(task)
+                    record_task_event(
+                        db,
+                        task,
+                        event_type='AI_SCORING_COMPLETED',
+                        message='Canonical score completed and checkpointed',
+                        payload=_canonical_score_event_payload(score),
+                    )
+
                 ai_response = run_ai_review(
                     task.mode.value if isinstance(task.mode, ReviewMode) else str(task.mode),
                     image_url=image_url,
@@ -537,11 +611,18 @@ def _process_task(db: Session, task: ReviewTask) -> None:
                     enforce_suggestion_structure=task.attempt_count < task.max_attempts,
                     review_model=review_model,
                     canonical_score=canonical_score,
+                    on_canonical_score=save_score_checkpoint,
                 )
     except AIReviewError as exc:
-        logger.warning('AI review failed for task %s: %s', task.public_id, exc)
-        _handle_failure(db, task, error_code='AI_CALL_FAILED', error_message=str(exc), retryable=True)
+        error_code = {
+            'scoring': 'AI_SCORING_FAILED',
+            'writing': 'AI_WRITING_FAILED',
+        }.get(exc.stage, 'AI_CALL_FAILED')
+        logger.warning('AI review failed for task %s at %s stage: %s', task.public_id, exc.stage or 'unknown', exc)
+        _handle_failure(db, task, error_code=error_code, error_message=str(exc), retryable=True)
         return
+
+    clear_task_canonical_score_checkpoint(task)
 
     result_payload = _normalize_review_result_payload(
         ai_response.result.model_dump(),

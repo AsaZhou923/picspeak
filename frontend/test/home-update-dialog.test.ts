@@ -19,11 +19,8 @@ const homeSource = readFileSync(
 test('latest update bundle is aligned across locales for the homepage dialog', () => {
   const updates = ['zh', 'en', 'ja'].map((locale) => getLatestProductUpdate(locale as 'zh' | 'en' | 'ja'));
   assert.equal(updates.every(Boolean), true);
-  assert.deepEqual(updates.map((entry) => entry!.id), [
-    '2026-09-01-review-generation-reliability',
-    '2026-09-01-review-generation-reliability',
-    '2026-09-01-review-generation-reliability',
-  ]);
+  assert.match(updates[0]!.id, /^\d{4}-\d{2}-\d{2}-.+/);
+  assert.deepEqual(updates.map((entry) => entry!.id), Array(3).fill(updates[0]!.id));
 });
 
 test('homepage update dialog is version-scoped, dismissible and accessible', () => {

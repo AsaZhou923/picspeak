@@ -16,9 +16,12 @@ from app.services.ai_prompts import (
     SCORE_VERSION,
     SCORER_PREPROCESS_VERSION,
 )
-from app.services.ai import AIReviewError, build_cached_canonical_score
+from app.services.ai import AIReviewError, CanonicalScore, build_cached_canonical_score
 from app.services.review_score_cache import (
     canonical_score_cache_lease,
+    checkpoint_task_canonical_score,
+    clear_task_canonical_score_checkpoint,
+    load_task_canonical_score_checkpoint,
     review_uses_current_full_review_contract,
     review_uses_current_score_contract,
     writer_contract_for_review_request,
@@ -152,6 +155,55 @@ class ReviewScoreCacheTests(unittest.TestCase):
                     writer_model_name=writer_name,
                 )
             )
+
+    def test_task_checkpoint_round_trip_preserves_paid_score_usage(self) -> None:
+        task = SimpleNamespace(request_payload={'locale': 'zh'})
+        score = CanonicalScore(
+            scores={'composition': 7, 'lighting': 6, 'color': 6, 'impact': 5, 'technical': 6},
+            final_score=6.0,
+            model_name='gpt-5.6-luna',
+            model_version='gpt-5.6-luna-2026-08-01',
+            score_prompt_version=SCORE_PROMPT_VERSION,
+            score_version=SCORE_VERSION,
+            preprocess_version=SCORER_PREPROCESS_VERSION,
+            input_tokens=3590,
+            output_tokens=414,
+            latency_ms=10_000,
+        )
+
+        with patch('app.services.ai.settings.openai_score_model', 'gpt-5.6-luna'):
+            checkpoint_task_canonical_score(task, score)
+            restored = load_task_canonical_score_checkpoint(task)
+
+        self.assertIsNotNone(restored)
+        self.assertEqual(restored.scores, score.scores)
+        self.assertEqual(restored.input_tokens, 3590)
+        self.assertEqual(restored.output_tokens, 414)
+        self.assertEqual(restored.latency_ms, 10_000)
+        self.assertFalse(restored.cache_hit)
+        self.assertEqual(task.request_payload['locale'], 'zh')
+
+        clear_task_canonical_score_checkpoint(task)
+        self.assertEqual(task.request_payload, {'locale': 'zh'})
+
+    def test_task_checkpoint_rejects_stale_score_contract(self) -> None:
+        task = SimpleNamespace(
+            request_payload={
+                '_canonical_score_checkpoint': {
+                    'checkpoint_version': 1,
+                    'scores': {'composition': 7, 'lighting': 6, 'color': 6, 'impact': 5, 'technical': 6},
+                    'final_score': 6.0,
+                    'model_name': 'gpt-5.6-luna',
+                    'model_version': 'gpt-5.6-luna-2026-08-01',
+                    'score_prompt_version': 'stale-prompt',
+                    'score_version': SCORE_VERSION,
+                    'preprocess_version': SCORER_PREPROCESS_VERSION,
+                }
+            }
+        )
+
+        with patch('app.services.ai.settings.openai_score_model', 'gpt-5.6-luna'):
+            self.assertIsNone(load_task_canonical_score_checkpoint(task))
 
 
 if __name__ == '__main__':

@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
@@ -19,6 +19,7 @@ from app.services.ai import (
     build_cached_canonical_score,
     _normalize_review_result_fields,
     _prompt_for_mode_v3,
+    _score_prompt,
     _writing_prompt,
     _validate_suggestions_structure,
     model_name_for_mode,
@@ -28,9 +29,9 @@ from app.services.ai import (
 
 class AIPromptTests(unittest.TestCase):
     def test_prompt_versions_identify_canonical_gpt_scoring(self) -> None:
-        self.assertEqual(PROMPT_VERSION, 'photo-review-v6-canonical-gpt-score')
-        self.assertEqual(SCORE_PROMPT_VERSION, 'photo-score-v3-canonical-gpt')
-        self.assertEqual(SCORE_VERSION, 'score-v3-canonical-gpt')
+        self.assertEqual(PROMPT_VERSION, 'photo-review-v8-image-led')
+        self.assertEqual(SCORE_PROMPT_VERSION, 'photo-score-v4-intent-aware')
+        self.assertEqual(SCORE_VERSION, 'score-v4-intent-aware')
 
     def test_chinese_prompt_contains_stricter_scoring_rules(self) -> None:
         prompt = _prompt_for_mode_v3(mode='pro', locale='zh', image_type='street')
@@ -40,6 +41,108 @@ class AIPromptTests(unittest.TestCase):
             '"scores":{"composition":0-10,"lighting":0-10,"color":0-10,"impact":0-10,"technical":0-10}',
             prompt,
         )
+
+    def test_score_prompt_is_style_relative_without_cross_dimension_caps(self) -> None:
+        prompt = _score_prompt(
+            exif_data={'Flash': 'Flash did not fire'},
+            image_type='landscape',
+        )
+
+        self.assertIn('Score each dimension independently from visible evidence', prompt)
+        self.assertIn('Return exactly five integer scores from 0 to 10', prompt)
+        self.assertIn('the service computes the final score as their arithmetic mean', prompt)
+        self.assertIn('Impact explicitly rewards specificity, originality, emotional force, narrative', prompt)
+        self.assertIn('A high score in one dimension does not require high scores in the other dimensions', prompt)
+        self.assertIn('Style is not a bonus by itself', prompt)
+        self.assertIn('For monochrome images, score color by tonal relationships', prompt)
+        self.assertIn('Assess technical clarity relative to expressive purpose', prompt)
+        self.assertIn('Negative space, silhouettes, deep shadows, blur, grain, or muted color', prompt)
+        self.assertIn(
+            'Provided metadata for fact checking only: Flash: Flash did not fire.',
+            _writing_prompt(
+                'flash',
+                'en',
+                {'composition': 6, 'lighting': 6, 'color': 6, 'impact': 6, 'technical': 6},
+                {'Flash': 'Flash did not fire'},
+                'portrait',
+            ),
+        )
+        self.assertNotIn('portfolio-level execution with no obvious weak dimension', prompt)
+        self.assertNotIn('9-10 should be extremely rare', prompt)
+
+    def test_writing_prompts_avoid_flash_lighting_confusion_across_locales(self) -> None:
+        scores = {'composition': 6, 'lighting': 6, 'color': 6, 'impact': 6, 'technical': 6}
+        prompts = [
+            _writing_prompt(mode, locale, scores, exif_data=None, image_type=genre)
+            for mode in ('flash', 'pro', 'unknown')
+            for locale in ('zh', 'en', 'ja', 'unknown')
+            for genre in ('portrait', 'landscape', 'street', 'not_real')
+        ]
+
+        for prompt in prompts:
+            self.assertNotIn('Current mode is flash', prompt)
+            self.assertNotIn('flash suggestion', prompt)
+            self.assertNotIn('Flash version', prompt)
+            self.assertIn('Genre hint, not a required formula:', prompt)
+            self.assertNotIn('Portrait logic:', prompt)
+            self.assertNotIn('Landscape logic:', prompt)
+            self.assertNotIn('Street logic:', prompt)
+        self.assertTrue(any('Quick review:' in prompt for prompt in prompts))
+        self.assertTrue(any('Detailed review:' in prompt for prompt in prompts))
+
+    def test_writing_prompt_is_image_led_and_preserves_scene_truth(self) -> None:
+        prompt = _writing_prompt(
+            mode='pro',
+            locale='en',
+            scores={'composition': 8, 'lighting': 7, 'color': 8, 'impact': 9, 'technical': 6},
+            exif_data=None,
+            image_type='landscape',
+        )
+
+        self.assertIn('choose 2-4 shared visible observations', prompt)
+        self.assertIn('READ THE IMAGE FIRST', prompt)
+        self.assertIn('SELECT, THEN WRITE', prompt)
+        self.assertIn('OUTPUT CONTRACT', prompt)
+        self.assertIn('Begin advantage with the defining visual relationship', prompt)
+        self.assertIn('Silhouettes can communicate through gesture', prompt)
+        self.assertIn('quiet tones through restraint', prompt)
+        self.assertIn('environmental clutter through documentary context', prompt)
+        self.assertIn('Do not recommend removing people or objects as an improvement to documentary work', prompt)
+        self.assertIn('preserve scene truth and prefer timing, framing, or local tone', prompt)
+        self.assertIn('a foggy scene can succeed through gentle separation', prompt)
+        self.assertIn('a close-cropped portrait can succeed through intimacy', prompt)
+
+    def test_writing_prompt_output_contract_is_exact_and_localized(self) -> None:
+        scores = {'composition': 6, 'lighting': 5, 'color': 5, 'impact': 4, 'technical': 7}
+
+        quick_zh = _writing_prompt(mode='flash', locale='zh', scores=scores, exif_data=None, image_type='architecture')
+        detailed_ja = _writing_prompt(mode='pro', locale='ja', scores=scores, exif_data=None, image_type='portrait')
+
+        self.assertIn('Quick review: advantage 1-2 points, critique 1 strongest point, suggestions 1 point.', quick_zh)
+        self.assertIn('Detailed review: advantage 2-3 grounded points; critique and suggestions 1-2 focused points', detailed_ja)
+        self.assertIn('Output exactly three non-empty strings: advantage, critique, and suggestions.', quick_zh)
+        self.assertIn('Every string must start with "1. "', quick_zh)
+        self.assertIn('Only suggestions use explicit Observation/Reason/Action labels', detailed_ja)
+        self.assertIn('“观察：...；原因：...；可执行动作：...”', quick_zh)
+        self.assertIn('「観察：...；理由：...；行動：...」', detailed_ja)
+        self.assertIn('Existing scores are reference only, not visual evidence', quick_zh)
+        self.assertIn('No shooting metadata is available; keep camera and lighting setup unknown.', detailed_ja)
+
+    def test_writing_prompt_blocks_recipe_and_equipment_advice(self) -> None:
+        prompt = _writing_prompt(
+            mode='flash',
+            locale='en',
+            scores={'composition': 6, 'lighting': 5, 'color': 5, 'impact': 4, 'technical': 7},
+            exif_data={'FNumber': 8, 'Flash': 'Flash did not fire'},
+            image_type='street',
+        )
+
+        self.assertIn('EXIF is metadata for fact checking only, not proof of cause.', prompt)
+        self.assertIn('Do not infer flash use, lighting rigs, weather, editing history, or camera settings', prompt)
+        self.assertIn('Equipment purchases, filters, flash power, Kelvin values, and slider recipes are outside this review', prompt)
+        self.assertIn('Use direction and a visual stopping point instead of unsupported numbers', prompt)
+        self.assertIn('check that the direction actually addresses the problem', prompt)
+        self.assertIn('Provided metadata for fact checking only: Aperture: f/8, Flash: Flash did not fire.', prompt)
 
     def test_model_name_uses_configured_qwen37_flash(self) -> None:
         with patch(
@@ -127,7 +230,7 @@ class AIPromptTests(unittest.TestCase):
 
         self.assertIn('\u5efa\u8bae\uff1a', normalized['suggestions'])
 
-    def test_writing_prompt_flash_requires_single_target_next_shot_actions(self) -> None:
+    def test_writing_prompt_quick_review_requires_single_issue_minimal_route(self) -> None:
         prompt = _writing_prompt(
             mode='flash',
             locale='en',
@@ -136,8 +239,11 @@ class AIPromptTests(unittest.TestCase):
             image_type='architecture',
         )
 
-        self.assertIn('Each flash suggestion should focus on one concrete adjustment for the next shot.', prompt)
-        self.assertIn('Lead with the action first so it can double as a short next-shoot checklist item.', prompt)
+        self.assertIn('Suggestions must address the same issue as critique.', prompt)
+        self.assertIn('Use one route for one target', prompt)
+        self.assertIn('a minimal adjustment to framing, timing, selection, or local tone', prompt)
+        self.assertIn('explicitly preserve the defining strength identified in advantage', prompt)
+        self.assertIn('A different aesthetic may be marked as optional exploration', prompt)
 
     def test_writing_prompt_uses_english_action_labels_for_english_locale(self) -> None:
         prompt = _writing_prompt(
@@ -259,6 +365,61 @@ class AIPromptTests(unittest.TestCase):
         self.assertEqual(response.result.final_score, 6.0)
         self.assertEqual(response.input_tokens, 80)
         self.assertNotIn('openai:gpt-5.6-luna', response.cost_rate_version or '')
+
+    def test_score_callback_runs_before_qwen_writer_failure(self) -> None:
+        scorer_response = AIJSONResponse(
+            parsed={'scores': {'composition': 6, 'lighting': 5, 'color': 5, 'impact': 4, 'technical': 7}},
+            model_name='gpt-5.6-luna',
+            usage={'input_tokens': 100, 'output_tokens': 20},
+            latency_ms=120,
+        )
+        score_callback = MagicMock()
+
+        with patch('app.services.ai.settings.ai_api_key', 'test-qwen-key'), patch(
+            'app.services.ai.settings.openai_api_key', 'test-openai-key'
+        ), patch('app.services.ai.settings.openai_score_model', 'gpt-5.6-luna'), patch(
+            'app.services.ai.model_name_for_mode', return_value='qwen3.5-flash'
+        ), patch(
+            'app.services.ai._request_openai_multimodal_json', return_value=scorer_response
+        ), patch(
+            'app.services.ai._request_multimodal_json', side_effect=AIReviewError('writer timed out')
+        ):
+            with self.assertRaises(AIReviewError) as raised:
+                run_ai_review(
+                    mode='flash',
+                    image_url='https://example.com/photo.jpg',
+                    on_canonical_score=score_callback,
+                )
+
+        score_callback.assert_called_once()
+        self.assertEqual(raised.exception.stage, 'writing')
+
+    def test_invalid_qwen_writer_payload_is_attributed_to_writing_stage(self) -> None:
+        cached_score = build_cached_canonical_score(
+            {'composition': 7, 'lighting': 6, 'color': 6, 'impact': 5, 'technical': 6},
+            scorer_model_name='gpt-5.6-luna',
+            scorer_model_version='gpt-5.6-luna',
+        )
+
+        with patch('app.services.ai.settings.ai_api_key', 'test-qwen-key'), patch(
+            'app.services.ai.settings.openai_score_model', 'gpt-5.6-luna'
+        ), patch('app.services.ai.model_name_for_mode', return_value='qwen3.5-flash'), patch(
+            'app.services.ai._request_multimodal_json',
+            return_value=AIJSONResponse(
+                parsed={'suggestions': '1. Missing the required structured labels.'},
+                model_name='qwen3.5-flash',
+                usage={},
+                latency_ms=10,
+            ),
+        ):
+            with self.assertRaises(AIReviewError) as raised:
+                run_ai_review(
+                    mode='flash',
+                    image_url='https://example.com/photo.jpg',
+                    canonical_score=cached_score,
+                )
+
+        self.assertEqual(raised.exception.stage, 'writing')
 
 
 if __name__ == '__main__':

@@ -1,5 +1,12 @@
 [
   {
+    "id": "2026-09-06-image-led-critiques",
+    "date": "2026-09-06",
+    "title": "写真ごとの表現を大切にする評価を近日公開",
+    "summary": "写真のスタイルと表現に沿った、具体的で一貫した講評を準備しています。検証後にギャラリー作品を無料で再評価します。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-09-06-image-led-critiques"
+  },
+  {
     "id": "2026-09-01-review-generation-reliability",
     "date": "2026-09-01",
     "title": "評価の一貫性、生成クレジット、タスク信頼性を強化",

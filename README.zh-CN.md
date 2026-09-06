@@ -186,7 +186,7 @@ npm run build
 
 ## 文档
 
-- [最新更新日志](docs/changelog/CHANGELOG.md#2026-09-01-review-generation-reliability)
+- [最新更新日志](docs/changelog/CHANGELOG.md#2026-09-06-image-led-critiques)
 - [前端设计系统](DESIGN.md)
 - [SEO / GEO 审计报告](docs/seo/seo-audit-2026-05-01.md)
 - [系统架构说明](docs/architecture/系统架构.md)

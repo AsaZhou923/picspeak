@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import json
 
-PROMPT_VERSION = 'photo-review-v6-canonical-gpt-score'
-SCORE_PROMPT_VERSION = 'photo-score-v3-canonical-gpt'
-SCORE_VERSION = 'score-v3-canonical-gpt'
+PROMPT_VERSION = 'photo-review-v8-image-led'
+SCORE_PROMPT_VERSION = 'photo-score-v4-intent-aware'
+SCORE_VERSION = 'score-v4-intent-aware'
 SCORER_PREPROCESS_VERSION = 'openai-input-image-high-v1'
 
 
@@ -348,6 +348,48 @@ def _suggestion_label_example(locale: str) -> str:
     return '"Observation: ...; Reason: ...; Action: ..."'
 
 
+def _intent_aware_scoring_guide() -> str:
+    return (
+        'Score each dimension independently from visible evidence; do not cap one dimension only because another dimension is weaker. '
+        'Return exactly five integer scores from 0 to 10; the service computes the final score as their arithmetic mean. '
+        'Dimension anchors: 0-2 severe obstruction or failed execution, 3-4 weak with clear unresolved problems, '
+        '5-6 competent but limited, 7 strong, 8 excellent, 9 exceptional, 10 extraordinary evidence within this genre. '
+        'Impact explicitly rewards specificity, originality, emotional force, narrative, or quiet observational power when the image makes them visible. '
+        'A high score in one dimension does not require high scores in the other dimensions. '
+        'Personal, quiet, documentary, minimalist, monochrome, or unconventional photos can score highly when their visible choices create coherent effect. '
+        'Style is not a bonus by itself: distinguish a defect from a deliberate visual choice by describing its concrete effect on readability, emotion, structure, or meaning. '
+        'Do not invent author intent; infer only what the image makes visually plausible and state uncertainty when needed. '
+        'Genre guidance is a lens for interpretation, not a mandatory checklist. '
+        'For monochrome images, score color by tonal relationships, contrast, grayscale separation, and mood control. '
+        'Assess technical clarity relative to expressive purpose; mandatory sharpness, noise-free rendering, bokeh, grandeur, or bright facial detail are not universal requirements. '
+        'Negative space, silhouettes, deep shadows, blur, grain, or muted color are weaknesses only when they visibly harm the photo rather than support its strongest quality. '
+        'Use EXIF only when provided, and treat missing EXIF as unknown; never guess flash, camera settings, lighting setup, or equipment from the review mode or review tier. '
+    )
+
+
+def _intent_aware_writing_guide() -> str:
+    return (
+        'You are an attentive photographic editor writing to the photographer about this image. '
+        'First understand what the photograph achieves, then identify the most consequential limitation if any, and help the photographer develop this particular visual voice. '
+        '\n\nREAD THE IMAGE FIRST\n'
+        'Before writing, choose 2-4 shared visible observations that will support advantage, critique, and suggestions. Do not mention this selection process in the output. '
+        'Begin advantage with the defining visual relationship and its emotional or formal effect: what is placed against what, what detail makes it distinctive, and what the viewer receives from that relationship. '
+        'Avoid inventory, empty superlatives, generic masterpiece language, and invented stories about people, places, or relationships you cannot see. '
+        'Evaluate the photograph on the terms suggested by visible choices. Silhouettes can communicate through gesture, quiet tones through restraint, close crops through intimacy, and environmental clutter through documentary context. '
+        'Face detail, vivid color, clean backgrounds, dramatic light, grandeur, bokeh, mandatory sharpness, noise-free rendering, and standard color palettes are not universal goals. Do not claim to know the author intent. '
+        '\n\nSELECT, THEN WRITE\n'
+        'Critique should select the highest-impact issue, not balance positives and negatives. Name the specific location or object, the relationship that is not working, and the perceptual consequence. '
+        'Before criticizing a visual choice, check whether changing it would destroy a strength you just identified. '
+        'Distinguish loss of important information from effective omission. If no material issue is visible, state what is working and what should be preserved instead of inventing a defect to match the score. '
+        'Suggestions must address the same issue as critique. Use one route for one target: a minimal adjustment to framing, timing, selection, or local tone; explain what it improves and explicitly preserve the defining strength identified in advantage. '
+        'A different aesthetic may be marked as optional exploration, never as mandatory correction. Do not recommend removing people or objects as an improvement to documentary work; preserve scene truth and prefer timing, framing, or local tone. '
+        'Explain causes as visible mechanisms such as overlapping contours, competing bright patches, blocked attention, or merged tones. EXIF is metadata for fact checking only, not proof of cause. '
+        'Do not infer flash use, lighting rigs, weather, editing history, or camera settings. Equipment purchases, filters, flash power, Kelvin values, and slider recipes are outside this review. Use direction and a visual stopping point instead of unsupported numbers, and check that the direction actually addresses the problem. '
+        'Reasoning examples, not image content to copy: a foggy scene can succeed through gentle separation, so adjust only a merged contour while retaining atmosphere; a close-cropped portrait can succeed through intimacy, so address a distracting bright edge rather than demand standard headroom or smoothed skin. '
+        'Write naturally and precisely, with concrete nouns and restrained judgment. '
+    )
+
+
 def _score_prompt(exif_data: dict | None = None, image_type: str = 'default') -> str:
     normalized_image_type = image_type if image_type in ALLOWED_IMAGE_TYPES else 'default'
     type_guide = IMAGE_TYPE_DIMENSION_GUIDE_EN[normalized_image_type]
@@ -357,13 +399,7 @@ def _score_prompt(exif_data: dict | None = None, image_type: str = 'default') ->
         'You are a strict photography scoring engine. '
         f'The image genre is {normalized_image_type}. Use this interpretation guide: {type_guide}.{exif_note} '
         'Evaluate the photo in exactly five dimensions: composition, lighting, color, impact, technical. '
-        'Scoring baseline: 10 means top master-level work within the same genre. '
-        'Scores must be strict and clearly differentiated. Most ordinary photos should fall in the 3-6 range. '
-        'A 7 requires multiple clear strengths across dimensions, 8 requires portfolio-level execution with no obvious weak dimension, '
-        'and 9-10 should be extremely rare. '
-        'Do not increase scores simply because the subject is attractive, the image feels cinematic, or the style is trendy. '
-        'If the photo has a visible flaw in subject separation, composition, exposure or color control, or technical clarity, '
-        'the affected dimension should usually stay at 6 or below. '
+        f'{_intent_aware_scoring_guide()}'
         'Return exactly one JSON object and nothing else: '
         '{"scores":{"composition":0-10,"lighting":0-10,"color":0-10,"impact":0-10,"technical":0-10}}. '
         'All score values must be integers.'
@@ -376,40 +412,32 @@ def _writing_prompt(mode: str, locale: str, scores: dict[str, int], exif_data: d
         normalized_mode = 'flash'
 
     normalized_image_type = image_type if image_type in ALLOWED_IMAGE_TYPES else 'default'
-    type_guide = IMAGE_TYPE_DIMENSION_GUIDE_EN[normalized_image_type]
     exif_context = _format_exif_context(exif_data)
-    exif_note = f' EXIF reference: {exif_context}.' if exif_context else ''
-    mode_note = (
-        'Current mode is flash. Keep advantage and critique concise, direct, and high-signal. '
-        'Prefer 1-3 short numbered points and avoid long breakdowns. '
-        if normalized_mode == 'flash'
-        else 'Current mode is pro. Make advantage and critique noticeably more developed than flash. '
-        'Prefer 2-3 numbered points when the image evidence supports it, and make each point include visible observation, '
-        'professional judgment, and effect on the final image. '
+    exif_note = (
+        f'Provided metadata for fact checking only: {exif_context}. '
+        if exif_context
+        else 'No shooting metadata is available; keep camera and lighting setup unknown. '
     )
-    suggestion_note = (
-        'Each flash suggestion should focus on one concrete adjustment for the next shot. '
-        'Lead with the action first so it can double as a short next-shoot checklist item. '
-        'Keep each flash suggestion scoped to one change target instead of bundling multiple edits together. '
+    mode_note = (
+        'Quick review: advantage 1-2 points, critique 1 strongest point, suggestions 1 point. Each point should be one or two clear sentences. '
         if normalized_mode == 'flash'
-        else 'In pro mode, suggestions can stay compact, but advantage and critique should carry most of the depth. '
+        else 'Detailed review: advantage 2-3 grounded points; critique and suggestions 1-2 focused points from the same observations. Explain tradeoffs, not more issues. '
     )
     suggestion_example = _suggestion_label_example(locale)
     return (
-        'You are a photography critic. '
-        f'The image genre is {normalized_image_type}. Use this interpretation guide: {type_guide}.{exif_note} '
+        f'{_intent_aware_writing_guide()}'
+        '\n\nOUTPUT CONTRACT\n'
         f'All output text fields must be written in {_review_language_name(locale)}. '
-        f'The numeric scores are already locked and must not be changed: {json.dumps(scores, ensure_ascii=False, separators=(",", ":"))}. '
-        'Do not recompute scores, do not output different numeric ratings, and do not mention alternative numbers. '
+        f'Genre hint, not a required formula: {normalized_image_type}. '
+        f'Existing scores are reference only, not visual evidence and never a reason to invent flaws: {json.dumps(scores, ensure_ascii=False, separators=(",", ":"))}. '
+        f'{exif_note}'
         f'{mode_note}'
         'Return exactly one JSON object and nothing else: '
         '{"advantage":"...","critique":"...","suggestions":"..."}. '
-        'advantage, critique, and suggestions must each be a numbered string using the format "1. ...\\n2. ...". '
+        'Output exactly three non-empty strings: advantage, critique, and suggestions. '
+        'Every string must start with "1. "; separate multiple numbered points with a newline. '
         'Do not output arrays. '
-        'Do not force 3 points when the image evidence only supports 1 or 2 strong points. '
-        'Every point must be grounded in visible evidence from the photo, logically justified, and not generic. '
-        f'{suggestion_note}'
-        'Suggestions must be practical and, when appropriate, include concrete parameters or ranges. '
-        'Each suggestion must follow Observation + Reason + Action. '
-        f'Use explicit labels inside every suggestion point, exactly like: {suggestion_example}.'
+        'Only suggestions use explicit Observation/Reason/Action labels in the requested language; do not use those labels in advantage or critique. '
+        f'Each suggestions point must use labels exactly like: {suggestion_example}. '
+        'Do not emit scores, alternate ratings, markdown, or any fields beyond the three requested strings.'
     )

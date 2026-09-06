@@ -4,6 +4,7 @@ import json
 import re
 import time
 from dataclasses import dataclass
+from typing import Callable
 
 from pydantic import ValidationError
 
@@ -24,7 +25,9 @@ from app.services.review_pricing import ReviewModelUsage, estimate_review_usage_
 
 
 class AIReviewError(RuntimeError):
-    pass
+    def __init__(self, message: str, *, stage: str | None = None) -> None:
+        super().__init__(message)
+        self.stage = stage
 
 
 @dataclass
@@ -266,7 +269,7 @@ def _split_numbered_text_field(value: str) -> list[str]:
 def _has_structured_label(text: str, labels: tuple[str, ...]) -> bool:
     return any(
         re.search(
-            rf'(?:^|\d+\.\s*|[\uFF1B;\uFF0C,\n]\s*){re.escape(label)}[\uFF1A:]',
+            rf'(?:^|\d+\.\s*|[\uFF1B;\uFF0C,\u3002.\n]\s*){re.escape(label)}[\uFF1A:]',
             text,
             flags=re.IGNORECASE,
         )
@@ -310,6 +313,8 @@ def _normalize_review_result_fields(parsed: dict, *, image_type: str, enforce_su
     normalized = dict(parsed)
     for field_name in ('advantage', 'critique', 'suggestions'):
         normalized[field_name] = _normalize_numbered_text_field(normalized.get(field_name, ''))
+        if not isinstance(normalized[field_name], str) or not normalized[field_name].strip():
+            raise ValueError(f'{field_name} must be a non-empty string')
     if enforce_suggestion_structure:
         _validate_suggestions_structure(normalized.get('suggestions', ''))
     normalized['image_type'] = image_type if image_type in ALLOWED_IMAGE_TYPES else 'default'
@@ -485,24 +490,29 @@ def _run_canonical_scoring(
     if not settings.openai_score_model:
         raise AIReviewError('OPENAI_SCORE_MODEL is not configured')
 
-    scoring_response = _request_openai_multimodal_json(
-        prompt=_score_prompt(exif_data, image_type=image_type),
-        image_url=image_url,
-        schema_name='picspeak_photo_scores',
-        schema=_OPENAI_SCORE_SCHEMA,
-        model_name=settings.openai_score_model,
-        reasoning_effort=settings.openai_score_reasoning_effort,
-        timeout_seconds=settings.openai_score_timeout_seconds,
-    )
+    try:
+        scoring_response = _request_openai_multimodal_json(
+            prompt=_score_prompt(exif_data, image_type=image_type),
+            image_url=image_url,
+            schema_name='picspeak_photo_scores',
+            schema=_OPENAI_SCORE_SCHEMA,
+            model_name=settings.openai_score_model,
+            reasoning_effort=settings.openai_score_reasoning_effort,
+            timeout_seconds=settings.openai_score_timeout_seconds,
+        )
+    except AIReviewError as exc:
+        raise AIReviewError(str(exc), stage='scoring') from exc
     try:
         raw_scores = scoring_response.parsed.get('scores')
         if not isinstance(raw_scores, dict):
-            raise AIReviewError('Canonical scorer response missing scores object')
+            raise AIReviewError('Canonical scorer response missing scores object', stage='scoring')
         locked_scores = _normalize_locked_scores(raw_scores)
-    except AIReviewError:
-        raise
+    except AIReviewError as exc:
+        if exc.stage:
+            raise
+        raise AIReviewError(str(exc), stage='scoring') from exc
     except (KeyError, TypeError, ValueError) as exc:
-        raise AIReviewError(f'Invalid canonical scorer response structure: {exc}') from exc
+        raise AIReviewError(f'Invalid canonical scorer response structure: {exc}', stage='scoring') from exc
 
     canonical_score = CanonicalScore(
         scores=locked_scores,
@@ -541,29 +551,37 @@ def _run_openai_review(
     image_type: str,
     enforce_suggestion_structure: bool,
     canonical_score: CanonicalScore | None,
+    on_canonical_score: Callable[[CanonicalScore], None] | None,
 ) -> AIReviewResponse:
     if not settings.openai_api_key:
         raise AIReviewError('OPENAI_API_KEY is not configured for GPT-5.6 photo review')
     if not settings.openai_review_model:
         raise AIReviewError('OPENAI_REVIEW_MODEL is not configured')
 
-    resolved_score = canonical_score or _run_canonical_scoring(
-        image_url=image_url,
-        exif_data=exif_data,
-        image_type=image_type,
-    )
+    resolved_score = canonical_score
+    if resolved_score is None:
+        resolved_score = _run_canonical_scoring(
+            image_url=image_url,
+            exif_data=exif_data,
+            image_type=image_type,
+        )
+        if on_canonical_score is not None:
+            on_canonical_score(resolved_score)
     _validate_canonical_score_contract(resolved_score)
     locked_scores = resolved_score.scores
     final_score = resolved_score.final_score
-    writing_response = _request_openai_multimodal_json(
-        prompt=_writing_prompt(mode, locale, locked_scores, exif_data, image_type=image_type),
-        image_url=image_url,
-        schema_name='picspeak_photo_review',
-        schema=_OPENAI_WRITING_SCHEMA,
-        model_name=settings.openai_review_model,
-        reasoning_effort=settings.openai_review_reasoning_effort,
-        timeout_seconds=settings.openai_review_timeout_seconds,
-    )
+    try:
+        writing_response = _request_openai_multimodal_json(
+            prompt=_writing_prompt(mode, locale, locked_scores, exif_data, image_type=image_type),
+            image_url=image_url,
+            schema_name='picspeak_photo_review',
+            schema=_OPENAI_WRITING_SCHEMA,
+            model_name=settings.openai_review_model,
+            reasoning_effort=settings.openai_review_reasoning_effort,
+            timeout_seconds=settings.openai_review_timeout_seconds,
+        )
+    except AIReviewError as exc:
+        raise AIReviewError(str(exc), stage='writing') from exc
     try:
         parsed = _normalize_review_result_fields(
             writing_response.parsed,
@@ -582,9 +600,12 @@ def _run_openai_review(
         parsed['final_score'] = final_score
         result = ReviewResult.model_validate(parsed)
     except ValidationError as exc:
-        raise AIReviewError(f'Invalid OpenAI review structure: {_format_validation_error(exc)}') from exc
+        raise AIReviewError(
+            f'Invalid OpenAI review structure: {_format_validation_error(exc)}',
+            stage='writing',
+        ) from exc
     except ValueError as exc:
-        raise AIReviewError(f'Invalid OpenAI review structure: {exc}') from exc
+        raise AIReviewError(f'Invalid OpenAI review structure: {exc}', stage='writing') from exc
 
     input_tokens = (resolved_score.input_tokens or 0) + (writing_response.usage.get('input_tokens') or 0)
     output_tokens = (resolved_score.output_tokens or 0) + (writing_response.usage.get('output_tokens') or 0)
@@ -629,6 +650,7 @@ def run_ai_review(
     enforce_suggestion_structure: bool = True,
     review_model: str = 'qwen',
     canonical_score: CanonicalScore | None = None,
+    on_canonical_score: Callable[[CanonicalScore], None] | None = None,
 ) -> AIReviewResponse:
     if review_model in {'gpt-5.5', 'gpt-5.6-luna'}:
         return _run_openai_review(
@@ -639,6 +661,7 @@ def run_ai_review(
             image_type=image_type,
             enforce_suggestion_structure=enforce_suggestion_structure,
             canonical_score=canonical_score,
+            on_canonical_score=on_canonical_score,
         )
     if review_model != 'qwen':
         raise AIReviewError(f'Unsupported review model option: {review_model}')
@@ -646,20 +669,27 @@ def run_ai_review(
         raise AIReviewError('AI_API_KEY is not configured')
 
     writing_model_name = model_name_for_mode(mode)
-    resolved_score = canonical_score or _run_canonical_scoring(
-        image_url=image_url,
-        exif_data=exif_data,
-        image_type=image_type,
-    )
+    resolved_score = canonical_score
+    if resolved_score is None:
+        resolved_score = _run_canonical_scoring(
+            image_url=image_url,
+            exif_data=exif_data,
+            image_type=image_type,
+        )
+        if on_canonical_score is not None:
+            on_canonical_score(resolved_score)
     _validate_canonical_score_contract(resolved_score)
     locked_scores = resolved_score.scores
     final_score = resolved_score.final_score
-    writing_response = _request_multimodal_json(
-        model_name=writing_model_name,
-        prompt=_writing_prompt(mode, locale, locked_scores, exif_data, image_type=image_type),
-        image_url=image_url,
-        temperature=0.2,
-    )
+    try:
+        writing_response = _request_multimodal_json(
+            model_name=writing_model_name,
+            prompt=_writing_prompt(mode, locale, locked_scores, exif_data, image_type=image_type),
+            image_url=image_url,
+            temperature=0.2,
+        )
+    except AIReviewError as exc:
+        raise AIReviewError(str(exc), stage='writing') from exc
 
     try:
         parsed = _normalize_review_result_fields(
@@ -679,9 +709,12 @@ def run_ai_review(
         parsed['final_score'] = final_score
         result = ReviewResult.model_validate(parsed)
     except ValidationError as exc:
-        raise AIReviewError(f'Invalid AI provider response structure: {_format_validation_error(exc)}') from exc
+        raise AIReviewError(
+            f'Invalid AI provider response structure: {_format_validation_error(exc)}',
+            stage='writing',
+        ) from exc
     except ValueError as exc:
-        raise AIReviewError(f'Invalid AI provider response structure: {exc}') from exc
+        raise AIReviewError(f'Invalid AI provider response structure: {exc}', stage='writing') from exc
 
     writing_usage = writing_response.usage
     input_tokens = (resolved_score.input_tokens or 0) + (writing_usage.get('prompt_tokens') or 0)

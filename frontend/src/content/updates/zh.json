@@ -1,5 +1,12 @@
 [
   {
+    "id": "2026-09-06-image-led-critiques",
+    "date": "2026-09-06",
+    "title": "更懂照片表达的评图即将推出",
+    "summary": "新评图将结合照片自身的风格和表达，给出更具体、彼此一致的反馈。长廊免费重评将在验证完成后进行。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-09-06-image-led-critiques"
+  },
+  {
     "id": "2026-09-01-review-generation-reliability",
     "date": "2026-09-01",
     "title": "评分一致性、生图额度与任务可靠性升级",

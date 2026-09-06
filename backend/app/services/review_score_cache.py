@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import hashlib
 from contextlib import contextmanager
+from dataclasses import replace
 from typing import Iterator
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.db.models import Photo, Review, ReviewStatus
+from app.db.models import Photo, Review, ReviewStatus, ReviewTask
 from app.services.ai import (
     AIReviewError,
     CanonicalScore,
@@ -23,6 +24,75 @@ from app.services.ai_prompts import (
 )
 
 _SCORE_CACHE_LOCK_NAMESPACE = 'picspeak-score-cache-v1'
+_TASK_SCORE_CHECKPOINT_KEY = '_canonical_score_checkpoint'
+_TASK_SCORE_CHECKPOINT_VERSION = 1
+
+
+def _optional_nonnegative_int(value: object) -> int | None:
+    if value is None:
+        return None
+    if type(value) is not int or value < 0:
+        raise ValueError('Score usage values must be non-negative integers')
+    return value
+
+
+def checkpoint_task_canonical_score(task: ReviewTask, score: CanonicalScore) -> None:
+    payload = dict(task.request_payload or {})
+    payload[_TASK_SCORE_CHECKPOINT_KEY] = {
+        'checkpoint_version': _TASK_SCORE_CHECKPOINT_VERSION,
+        'scores': dict(score.scores),
+        'final_score': score.final_score,
+        'model_name': score.model_name,
+        'model_version': score.model_version,
+        'score_prompt_version': score.score_prompt_version,
+        'score_version': score.score_version,
+        'preprocess_version': score.preprocess_version,
+        'input_tokens': score.input_tokens,
+        'output_tokens': score.output_tokens,
+        'latency_ms': score.latency_ms,
+    }
+    task.request_payload = payload
+
+
+def load_task_canonical_score_checkpoint(task: ReviewTask) -> CanonicalScore | None:
+    raw = (task.request_payload or {}).get(_TASK_SCORE_CHECKPOINT_KEY)
+    if not isinstance(raw, dict):
+        return None
+    if (
+        raw.get('checkpoint_version') != _TASK_SCORE_CHECKPOINT_VERSION
+        or raw.get('score_prompt_version') != SCORE_PROMPT_VERSION
+        or raw.get('score_version') != SCORE_VERSION
+        or raw.get('preprocess_version') != SCORER_PREPROCESS_VERSION
+        or not isinstance(raw.get('model_name'), str)
+        or not raw['model_name'].strip()
+        or not isinstance(raw.get('model_version'), str)
+        or not raw['model_version'].strip()
+    ):
+        return None
+    try:
+        restored = build_cached_canonical_score(
+            raw['scores'],
+            scorer_model_name=str(raw['model_name']),
+            scorer_model_version=str(raw['model_version']),
+            final_score=float(raw['final_score']),
+        )
+        return replace(
+            restored,
+            cache_hit=False,
+            input_tokens=_optional_nonnegative_int(raw.get('input_tokens')),
+            output_tokens=_optional_nonnegative_int(raw.get('output_tokens')),
+            latency_ms=_optional_nonnegative_int(raw.get('latency_ms')) or 0,
+        )
+    except (AIReviewError, KeyError, TypeError, ValueError):
+        return None
+
+
+def clear_task_canonical_score_checkpoint(task: ReviewTask) -> None:
+    payload = dict(task.request_payload or {})
+    if _TASK_SCORE_CHECKPOINT_KEY not in payload:
+        return
+    payload.pop(_TASK_SCORE_CHECKPOINT_KEY)
+    task.request_payload = payload
 
 
 def review_uses_current_score_contract(review: Review) -> bool:

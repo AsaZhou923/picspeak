@@ -11,7 +11,12 @@ from app.core.errors import api_error
 from app.db.models import Review, ReviewTask, ReviewTaskEvent, TaskStatus
 from app.schemas import InternalTaskExecuteRequest, TaskStatusResponse
 from app.services.image_generation_task_processor import process_image_generation_task
-from app.services.review_task_processor import expire_review_tasks, process_review_task, public_task_error_message
+from app.services.review_task_processor import (
+    expire_review_tasks,
+    process_review_task,
+    public_task_error_message,
+    review_task_failure_stage,
+)
 
 router = APIRouter(tags=['tasks'])
 
@@ -35,7 +40,7 @@ def _serialize_task_status(task: ReviewTask, review: Review | None = None) -> di
             'message': public_task_error_message(task.error_code, retryable=retryable, fallback=task.error_message),
             'retryable': retryable,
             'timeout': task.error_code in {'TASK_EXPIRED', 'TASK_STALLED'},
-            'failure_stage': 'pre_charge',
+            'failure_stage': review_task_failure_stage(task.error_code),
             'quota_charged': False,
         }
     return {

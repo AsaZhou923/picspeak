@@ -29,6 +29,9 @@ Core product areas:
 - **Authentication**: Clerk plus legacy Google OAuth/guest JWT support
 - **Billing**: Lemon Squeezy Pro checkout, activation codes, image credit packs, and webhooks
 
+
+Current single-photo contract: `score-v4-intent-aware` / `photo-score-v4-intent-aware` with `photo-review-v8-image-led` prose. Judge visible expressive effects, preserve defining strengths, and keep scorer checkpoints through writer retries. Historical gallery re-evaluation requires an explicit maintenance run; changing prompts alone does not update stored reviews.
+
 ## Common Commands
 
 ### Backend setup
