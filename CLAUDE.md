@@ -62,6 +62,7 @@ python scripts/verify_product_analytics_write.py
 python scripts/export_product_analytics_weekly_report.py
 python scripts/export_operational_health_snapshot.py
 python scripts/backfill_gallery_thumbnails.py
+python scripts/reassess_gallery_reviews.py  # dry-run; --execute requires an authorized maintenance run
 ```
 
 ### Backend tests

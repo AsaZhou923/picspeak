@@ -50,6 +50,44 @@ function buildRemotePatterns() {
   return patterns;
 }
 
+function appendUniqueSource(sources, source) {
+  if (!sources.includes(source)) {
+    sources.push(source);
+  }
+}
+
+function buildWebSocketConnectSources() {
+  const sources = ['ws://localhost:8000', 'ws://127.0.0.1:8000'];
+  const rawApiUrl = process.env.NEXT_PUBLIC_API_URL;
+
+  if (!rawApiUrl) {
+    return sources;
+  }
+
+  try {
+    const apiUrl = new URL(rawApiUrl);
+    if (apiUrl.protocol === 'https:') {
+      apiUrl.protocol = 'wss:';
+      appendUniqueSource(sources, apiUrl.origin);
+    } else if (apiUrl.protocol === 'http:') {
+      apiUrl.protocol = 'ws:';
+      appendUniqueSource(sources, apiUrl.origin);
+    }
+  } catch {
+    // Ignore invalid env values and keep the static safe defaults.
+  }
+
+  return sources;
+}
+
+const connectSources = [
+  "'self'",
+  'https:',
+  'http://localhost:8000',
+  'http://127.0.0.1:8000',
+  ...buildWebSocketConnectSources(),
+].join(' ');
+
 const securityHeaders = [
   {
     key: 'Content-Security-Policy',
@@ -63,7 +101,7 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline'",
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.clerk.accounts.dev https://*.clerk.com https://clerk.picspeak.art https://challenges.cloudflare.com",
       "worker-src 'self' blob:",
-      "connect-src 'self' https: http://localhost:8000 http://127.0.0.1:8000",
+      `connect-src ${connectSources}`,
       "frame-src 'self' https://*.clerk.accounts.dev https://*.clerk.com https://clerk.picspeak.art https://challenges.cloudflare.com",
       "form-action 'self'",
     ].join('; '),

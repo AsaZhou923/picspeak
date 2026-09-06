@@ -2,41 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-test('CSP allows Clerk modal workers without wildcard worker sources', async () => {
-  const nextConfigModule = await import('../next.config.mjs');
-  const nextConfig = nextConfigModule.default as {
-    headers: () => Promise<Array<{ headers: Array<{ key: string; value: string }> }>>;
-  };
-
-  const routes = await nextConfig.headers();
-  const csp =
-    routes
-      .flatMap((route) => route.headers)
-      .find((header) => header.key === 'Content-Security-Policy')?.value ?? '';
-
-  assert.match(csp, /(?:^|; )worker-src 'self' blob:(?:;|$)/);
-  assert.doesNotMatch(csp, /(?:^|; )worker-src[^;]*\*/);
-});
-
-test('CSP allows the production Clerk custom domain', async () => {
-  const nextConfigModule = await import('../next.config.mjs');
-  const nextConfig = nextConfigModule.default as {
-    headers: () => Promise<Array<{ headers: Array<{ key: string; value: string }> }>>;
-  };
-
-  const routes = await nextConfig.headers();
-  const csp =
-    routes
-      .flatMap((route) => route.headers)
-      .find((header) => header.key === 'Content-Security-Policy')?.value ?? '';
-
-  assert.match(csp, /(?:^|; )script-src[^;]*https:\/\/clerk\.picspeak\.art(?:\s|;)/);
-  assert.match(csp, /(?:^|; )frame-src[^;]*https:\/\/clerk\.picspeak\.art(?:\s|;)/);
-});
-
-test('canonical redirects consolidate the demo alias and force HTTPS with www', async () => {
-  const nextConfigModule = await import('../next.config.mjs');
-  const nextConfig = nextConfigModule.default as {
+async function loadNextConfig(suffix = 'default') {
+  const nextConfigModule = await import(`../next.config.mjs?test=${suffix}-${Date.now()}`);
+  return nextConfigModule.default as {
+    headers: () => Promise<Array<{ source?: string; headers: Array<{ key: string; value: string }> }>>;
     redirects: () => Promise<
       Array<{
         source: string;
@@ -46,6 +15,62 @@ test('canonical redirects consolidate the demo alias and force HTTPS with www', 
       }>
     >;
   };
+}
+
+async function loadCsp(suffix?: string): Promise<string> {
+  const nextConfig = await loadNextConfig(suffix);
+  const routes = await nextConfig.headers();
+  return (
+    routes
+      .flatMap((route) => route.headers)
+      .find((header) => header.key === 'Content-Security-Policy')?.value ?? ''
+  );
+}
+
+test('CSP allows Clerk modal workers without wildcard worker sources', async () => {
+  const csp = await loadCsp();
+
+  assert.match(csp, /(?:^|; )worker-src 'self' blob:(?:;|$)/);
+  assert.doesNotMatch(csp, /(?:^|; )worker-src[^;]*\*/);
+});
+
+test('CSP allows the production Clerk custom domain', async () => {
+  const csp = await loadCsp();
+
+  assert.match(csp, /(?:^|; )script-src[^;]*https:\/\/clerk\.picspeak\.art(?:\s|;)/);
+  assert.match(csp, /(?:^|; )frame-src[^;]*https:\/\/clerk\.picspeak\.art(?:\s|;)/);
+});
+
+test('CSP allows task WebSockets for the configured production API origin only', async () => {
+  const originalApiUrl = process.env.NEXT_PUBLIC_API_URL;
+  process.env.NEXT_PUBLIC_API_URL = 'https://api.picspeak.art';
+
+  try {
+    const csp = await loadCsp('production-api-websocket');
+    const connectSrc = csp.match(/(?:^|; )connect-src ([^;]+)/)?.[1] ?? '';
+
+    assert.match(connectSrc, /(?:^|\s)wss:\/\/api\.picspeak\.art(?:\s|$)/);
+    assert.doesNotMatch(connectSrc, /(?:^|\s)wss:(?:\s|$)/);
+    assert.doesNotMatch(connectSrc, /(?:^|\s)ws:(?:\s|$)/);
+  } finally {
+    if (originalApiUrl === undefined) {
+      delete process.env.NEXT_PUBLIC_API_URL;
+    } else {
+      process.env.NEXT_PUBLIC_API_URL = originalApiUrl;
+    }
+  }
+});
+
+test('CSP allows local task WebSockets during frontend development', async () => {
+  const csp = await loadCsp('local-websocket');
+  const connectSrc = csp.match(/(?:^|; )connect-src ([^;]+)/)?.[1] ?? '';
+
+  assert.match(connectSrc, /(?:^|\s)ws:\/\/localhost:8000(?:\s|$)/);
+  assert.match(connectSrc, /(?:^|\s)ws:\/\/127\.0\.0\.1:8000(?:\s|$)/);
+});
+
+test('canonical redirects consolidate the demo alias and force HTTPS with www', async () => {
+  const nextConfig = await loadNextConfig('redirects');
 
   const redirects = await nextConfig.redirects();
 
@@ -74,10 +99,7 @@ test('canonical redirects consolidate the demo alias and force HTTPS with www', 
 });
 
 test('public responses advertise language variance and third-party preconnects', async () => {
-  const nextConfigModule = await import('../next.config.mjs');
-  const nextConfig = nextConfigModule.default as {
-    headers: () => Promise<Array<{ source: string; headers: Array<{ key: string; value: string }> }>>;
-  };
+  const nextConfig = await loadNextConfig('public-headers');
 
   const routes = await nextConfig.headers();
   const globalRoute = routes.find((route) => route.source === '/:path*');
@@ -91,10 +113,7 @@ test('public responses advertise language variance and third-party preconnects',
 });
 
 test('cookie-localized interactive pages stay out of shared public-cache headers', async () => {
-  const nextConfigModule = await import('../next.config.mjs');
-  const nextConfig = nextConfigModule.default as {
-    headers: () => Promise<Array<{ source: string; headers: Array<{ key: string; value: string }> }>>;
-  };
+  const nextConfig = await loadNextConfig('cache-headers');
 
   const routes = await nextConfig.headers();
   const publiclyCachedSources = routes
@@ -114,10 +133,7 @@ test('cookie-localized interactive pages stay out of shared public-cache headers
 });
 
 test('the home AI mirror points directly to the canonical English homepage', async () => {
-  const nextConfigModule = await import('../next.config.mjs');
-  const nextConfig = nextConfigModule.default as {
-    headers: () => Promise<Array<{ source: string; headers: Array<{ key: string; value: string }> }>>;
-  };
+  const nextConfig = await loadNextConfig('home-ai-mirror');
 
   const routes = await nextConfig.headers();
   const homeMirrorRoute = routes.find((route) => route.source === '/ai-content/home.md');
