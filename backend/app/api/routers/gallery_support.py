@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import Request, status
-from sqlalchemy import Float, cast, func
+from sqlalchemy import Float, cast, func, literal
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_user_from_token
@@ -55,27 +55,40 @@ def _gallery_rank_score_value(
   return (float(final_score) * GALLERY_SCORE_WEIGHT) + (freshness_score * GALLERY_FRESHNESS_WEIGHT)
 
 
-def _gallery_rank_score_expr():
-  age_seconds = func.extract('epoch', func.now() - Review.gallery_added_at)
+def _gallery_rank_score_expr(*, reference_now: datetime | None = None):
+  active_now = func.now() if reference_now is None else literal(_as_utc_datetime(reference_now))
+  age_seconds = func.greatest(0.0, func.extract('epoch', active_now - Review.gallery_added_at))
   freshness_score = 10.0 * func.power(0.5, age_seconds / GALLERY_FRESHNESS_HALF_LIFE_SECONDS)
   return (Review.final_score * GALLERY_SCORE_WEIGHT) + (freshness_score * GALLERY_FRESHNESS_WEIGHT)
 
 
-def _encode_public_gallery_cursor(rank_score: float, gallery_added_at: datetime, review_id: int) -> str:
-  return f'{float(rank_score):.12f}|{_as_utc_datetime(gallery_added_at).isoformat()}|{review_id}'
+def _encode_public_gallery_cursor(
+  rank_score: float,
+  gallery_added_at: datetime,
+  review_id: int,
+  *,
+  rank_reference_at: datetime | None = None,
+) -> str:
+  cursor = f'{float(rank_score):.12f}|{_as_utc_datetime(gallery_added_at).isoformat()}|{review_id}'
+  if rank_reference_at is not None:
+    cursor = f'{cursor}|{_as_utc_datetime(rank_reference_at).isoformat()}'
+  return cursor
 
 
-def _decode_public_gallery_cursor(cursor: str) -> tuple[float | None, datetime, int | None]:
-  parts = cursor.split('|', 2)
-  if len(parts) != 3:
+def _decode_public_gallery_cursor(cursor: str) -> tuple[float | None, datetime, int | None, datetime | None]:
+  parts = cursor.split('|')
+  if len(parts) == 1:
     try:
-      return None, datetime.fromisoformat(cursor), None
+      return None, datetime.fromisoformat(cursor), None, None
     except ValueError as exc:
       raise api_error(status.HTTP_400_BAD_REQUEST, 'CURSOR_INVALID', 'Invalid cursor') from exc
+  if len(parts) not in {3, 4}:
+    raise api_error(status.HTTP_400_BAD_REQUEST, 'CURSOR_INVALID', 'Invalid cursor')
 
-  raw_score, raw_dt, raw_id = parts
+  raw_score, raw_dt, raw_id = parts[:3]
   try:
-    return float(raw_score), datetime.fromisoformat(raw_dt), int(raw_id)
+    rank_reference_at = datetime.fromisoformat(parts[3]) if len(parts) == 4 else None
+    return float(raw_score), datetime.fromisoformat(raw_dt), int(raw_id), rank_reference_at
   except ValueError as exc:
     raise api_error(status.HTTP_400_BAD_REQUEST, 'CURSOR_INVALID', 'Invalid cursor') from exc
 

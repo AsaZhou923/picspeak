@@ -217,8 +217,8 @@ export const enTranslations = {
     pro_offer_label: '',
     pro_offer_highlight: 'Pro',
     updates_label: 'Updates',
-    updates_hint_home: 'See the image-led critique update',
-    updates_hint_latest: 'See the image-led critique update',
+    updates_hint_home: 'See the completed free gallery re-evaluation',
+    updates_hint_latest: 'See the completed free gallery re-evaluation',
     contact_label: 'Contact',
     contact_headline: 'Get in Touch',
 
@@ -362,7 +362,7 @@ export const enTranslations = {
     gallery_score_upgrade_badge: 'Critique standard upgraded',
     gallery_score_upgrade_title: 'Gallery critiques now value each image on its own terms',
     gallery_score_upgrade_body: 'The new critique standard gives more weight to what each photograph actually communicates. Distinctive style, honest emotion, silhouettes, negative space, and monochrome work can all be recognized when the image holds together.',
-    gallery_score_upgrade_detail: 'Scores and written feedback no longer push every image toward one formula. Older gallery works keep their current results for now while we prepare a free gallery-wide re-evaluation.',
+    gallery_score_upgrade_detail: 'Gallery works have completed a free re-evaluation, with refreshed scores and feedback and no account critique quota charged. Work links, likes, and gallery dates are unchanged.',
     gallery_score_upgrade_ack: 'Understood',
     gallery_summary_fallback: 'Saved to your gallery for future comparison and review.',
 

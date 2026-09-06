@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Header, Query, Request, status
 from sqlalchemy import Float, and_, cast, func, or_, select
@@ -59,6 +59,17 @@ def list_public_gallery(
 
   viewer = _optional_gallery_viewer(authorization, db)
   gallery_filters = _public_gallery_filters()
+  cursor_val = None
+  cursor_dt = None
+  cursor_review_id = None
+  cursor_rank_reference_at = None
+
+  if cursor:
+    cursor_val, cursor_dt, cursor_review_id, cursor_rank_reference_at = _decode_public_gallery_cursor(cursor)
+
+  rank_reference_at = None
+  if sort == 'default':
+    rank_reference_at = cursor_rank_reference_at or datetime.now(timezone.utc)
 
   if sort == 'latest':
     primary_expr = cast(func.extract('epoch', Review.gallery_added_at), Float).label('gallery_primary_val')
@@ -72,7 +83,7 @@ def list_public_gallery(
       .label('gallery_primary_val')
     )
   else:
-    primary_expr = _gallery_rank_score_expr().label('gallery_primary_val')
+    primary_expr = _gallery_rank_score_expr(reference_now=rank_reference_at).label('gallery_primary_val')
 
   count_query = db.query(func.count(Review.id)).filter(*gallery_filters)
   count_query = _apply_review_history_filters_gallery(
@@ -102,15 +113,17 @@ def list_public_gallery(
     image_type=image_type,
   )
 
-  if cursor:
-    cursor_val, cursor_dt, cursor_review_id = _decode_public_gallery_cursor(cursor)
-    if cursor_val is None or cursor_review_id is None:
-      query = query.filter(Review.gallery_added_at < cursor_dt)
-    else:
+  if cursor and cursor_dt is not None:
+    if sort == 'latest' or cursor_val is None or cursor_review_id is None:
+      seek_filters = [Review.gallery_added_at < cursor_dt]
+      if cursor_review_id is not None:
+        seek_filters.append(and_(Review.gallery_added_at == cursor_dt, Review.id < cursor_review_id))
+      query = query.filter(or_(*seek_filters))
+    elif cursor_review_id is not None:
       same_val = func.abs(primary_expr - cursor_val) <= 1e-9
       query = query.filter(
         or_(
-          primary_expr < cursor_val - 1e-9,
+          and_(primary_expr < cursor_val - 1e-9, Review.id != cursor_review_id),
           and_(same_val, Review.gallery_added_at < cursor_dt),
           and_(same_val, Review.gallery_added_at == cursor_dt, Review.id < cursor_review_id),
         )
@@ -142,6 +155,7 @@ def list_public_gallery(
       rank_score=float(last_primary_val),
       gallery_added_at=last_review.gallery_added_at,
       review_id=last_review.id,
+      rank_reference_at=rank_reference_at,
     )
 
   return PublicGalleryResponse(items=items, total_count=total_count, next_cursor=next_cursor)

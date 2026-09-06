@@ -1,5 +1,12 @@
 [
   {
+    "id": "2026-09-06-gallery-free-reassessment",
+    "date": "2026-09-06",
+    "title": "Free gallery re-evaluation is complete",
+    "summary": "All 64 gallery works have been re-evaluated with the updated critique standard. Scores and feedback are refreshed without using account critique quota. Work links, likes, and gallery dates are unchanged.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-09-06-gallery-free-reassessment"
+  },
+  {
     "id": "2026-09-06-image-led-critiques",
     "date": "2026-09-06",
     "title": "Critiques that understand your photograph",

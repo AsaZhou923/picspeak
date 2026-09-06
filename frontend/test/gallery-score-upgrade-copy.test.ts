@@ -14,8 +14,8 @@ test('gallery upgrade copy explains the user-facing change in every locale', () 
   }
 });
 
-test('gallery upgrade copy states that free legacy re-evaluation is being prepared', () => {
-  assert.match(zhTranslations.gallery_score_upgrade_detail, /暂时保留原结果.*免费统一重评方案正在准备中/);
-  assert.match(enTranslations.gallery_score_upgrade_detail, /keep their current results for now.*prepare a free gallery-wide re-evaluation/);
-  assert.match(jaTranslations.gallery_score_upgrade_detail, /現在の結果を一時的に保持.*無料の一括再評価を準備/);
+test('gallery upgrade copy states that free gallery re-evaluation is complete without quota charges', () => {
+  assert.match(zhTranslations.gallery_score_upgrade_detail, /已完成免费重评.*不扣除账户评图额度/);
+  assert.match(enTranslations.gallery_score_upgrade_detail, /completed a free re-evaluation.*no account critique quota charged/);
+  assert.match(jaTranslations.gallery_score_upgrade_detail, /無料再評価が完了.*評価回数は消費していません/);
 });

@@ -1,5 +1,12 @@
 [
   {
+    "id": "2026-09-06-gallery-free-reassessment",
+    "date": "2026-09-06",
+    "title": "ギャラリー作品の無料再評価が完了しました",
+    "summary": "ギャラリーの全64作品を新しい評価基準で無料再評価しました。スコアと講評を更新し、アカウントの評価回数は消費していません。作品リンク、いいね、掲載日はそのままです。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-09-06-gallery-free-reassessment"
+  },
+  {
     "id": "2026-09-06-image-led-critiques",
     "date": "2026-09-06",
     "title": "写真ごとの表現を大切にする評価",

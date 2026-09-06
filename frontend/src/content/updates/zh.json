@@ -1,5 +1,12 @@
 [
   {
+    "id": "2026-09-06-gallery-free-reassessment",
+    "date": "2026-09-06",
+    "title": "长廊作品已完成免费重评",
+    "summary": "影像长廊的 64 件作品已按新评图标准完成免费重评，分数与评语均已更新，不扣除账户评图额度。作品链接、点赞和收录时间保持不变。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-09-06-gallery-free-reassessment"
+  },
+  {
     "id": "2026-09-06-image-led-critiques",
     "date": "2026-09-06",
     "title": "更懂照片表达的评图",
