@@ -17,8 +17,8 @@ export const zhTranslations = {
   app_error_retry: '重试',
   plan_guest_label: '游客',
   updates_label: '更新记录',
-  updates_hint_home: '即将推出：高分更有依据，进步对比更清楚',
-  updates_hint_latest: '即将推出：高分更有依据，进步对比更清楚',
+  updates_hint_home: '查看更谨慎的高分判断与进步对比',
+  updates_hint_latest: '查看更谨慎的高分判断与进步对比',
 
   generation_badge: 'AI 创作',
   generation_title: 'AI 创作',

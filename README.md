@@ -186,7 +186,7 @@ The frontend and backend can be deployed independently. The backend includes a c
 
 ## Documentation
 
-- [Latest changelog (upcoming)](docs/changelog/CHANGELOG.md#2026-09-08-evidence-based-scoring)
+- [Latest changelog](docs/changelog/CHANGELOG.md#2026-09-08-evidence-based-scoring)
 - [Frontend design system](DESIGN.md)
 - [SEO / GEO audit](docs/seo/seo-audit-2026-05-01.md)
 - [System architecture](docs/architecture/系统架构.md)

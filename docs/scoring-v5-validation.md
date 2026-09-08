@@ -1,6 +1,6 @@
 # v5 本地评分验证
 
-日期：2026-09-08。范围：本地评分代码、隔离测试数据库与少量模型诊断。未部署，未改变长廊、历史分数或用户额度。
+日期：2026-09-08。先完成本地评分代码、隔离测试数据库与少量模型诊断；随后按用户要求执行 changelog 工作流并 push，自动发布结果见下方记录。未改变长廊、历史分数或用户额度。
 
 ## 真实原图诊断
 
@@ -52,7 +52,23 @@
 - 回归：backend scorer/cache/task/export/evidence/calibration 测试与 synthetic fixture，frontend score-display/growth/retake 测试。
 - 操作说明：`CLAUDE.md`、`docs/scoring-v5-fix.md`、本验证记录。
 
-保留既有五维均值、writer 分离、JSON 结果和 checkpoint 存储；没有新增依赖或数据库迁移，也没有改动生产配置或历史结果。
+保留既有五维均值、writer 分离、JSON 结果和 checkpoint 存储；没有新增依赖或数据库迁移。后续自动发布更新了服务镜像，未改评分环境变量或历史结果。
+
+## 后续发布验证
+
+按用户明确要求执行 `CHANGELOG_WORKFLOW.md` 并 push，评分代码提交为 `4e2727f004866d41edb89aabd40fdd6ef39c7e84`。发布前公告明确标为准备中，确认自动发布后才改为已发布语态。
+
+- [GitHub CI 34219801982](https://github.com/AsaZhou923/picspeak/actions/runs/34219801982)：backend 与 frontend 均成功，包含 PostgreSQL migration cycle 与前端 production routing 检查。
+- [Vercel 自动发布](https://vercel.com/asazhou923s-projects/picspeak/23gXYYof6Q3Fau9M9gYm4CeyRpYN)：提交状态为 success，三语更新数据已进入站点。
+- Cloud Build `a30cc67f-45e2-4a7e-942e-36f3f73c631e`：Pull、Build、Push、Migrate、Deploy 均成功，依赖顺序正确。
+- Cloud Run migration execution `picspeak-db-migrate-7gqsm`：1 task 成功。本次没有新 migration。
+- Cloud Run `picspeak-api-00198-c7h` 接收 100% 流量，`commit-sha` 与上述评分代码提交一致。
+- 使用生产 Secret Manager 对应数据库执行只读事务：`transaction_read_only=on`，`alembic_version=20260901_0006`，查询后 rollback。未执行人工生产写入。
+- 线上 OpenAPI 返回 200，`ReviewResult` 与 `ReviewExportData` 均包含 `score_evidence`；公开长廊查询返回 200，目标旧记录仍为 v4 的 8.4，证明本轮没有重评该历史记录。
+- `/zh/updates` 返回 200 且含本次 release ID。`/healthz` 在自定义域名和服务域名均返回 Google 404，因此没有把该路径计作成功健康检查；应用只读 smoke 使用 OpenAPI 与 gallery。
+- 外部 Update Logs 两个文件与仓库副本 SHA256 一致。初次镜像由文档库自动备份提交 `2f18325` 推送，已核对远端提交内容完全一致。
+
+上面的发布证明代码已交付，不替代正式真人盲评校准；架构 WATCH 继续保留。
 
 ## 局限
 
