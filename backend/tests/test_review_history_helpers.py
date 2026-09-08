@@ -18,6 +18,8 @@ from app.api.routers.reviews import (
 )
 from app.api.routers.gallery import _review_gallery_summary
 from app.db.models import Review, ReviewMode, ReviewStatus
+from app.services.ai_prompts import SCORE_VERSION
+from scoring_fixtures import score_evidence_fixture
 
 
 class _RequestStub:
@@ -76,6 +78,21 @@ class ReviewHistoryHelperTests(unittest.TestCase):
         self.assertEqual(payload.review.image_type, 'street')
         self.assertEqual(payload.review.model_version, '2026-03')
         self.assertEqual(payload.review.tags, ['Night', 'Street'])
+
+    def test_v5_export_preserves_scoring_evidence_without_aliasing_stored_data(self) -> None:
+        review = _review()
+        review.result_json['score_version'] = SCORE_VERSION
+        evidence = score_evidence_fixture(review.result_json['scores'], audited=True)
+        review.result_json['score_evidence'] = evidence
+
+        payload = _build_review_export_payload(
+            review=review, photo_id='pho_123', photo_url=None,
+            photo_thumbnail_url=None, source_review_id=None,
+        )
+
+        self.assertEqual(payload.review.model_dump()['score_evidence'], evidence)
+        payload.review.score_evidence['dimensions']['composition']['strength'] = 'Changed export'
+        self.assertNotEqual(evidence['dimensions']['composition']['strength'], 'Changed export')
 
     def test_review_gallery_summary_prefers_first_suggestion_line(self) -> None:
         review = _review()

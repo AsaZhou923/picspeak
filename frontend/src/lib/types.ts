@@ -144,6 +144,18 @@ export interface ReviewScores {
 export type RetakeDimensionKey = keyof ReviewScores;
 export type RetakeTrend = 'improved' | 'flat' | 'declined';
 
+export interface ReviewScoreEvidenceDimension {
+  strength?: string | null;
+  limitation?: string | null;
+  high_score_justification?: string | null;
+}
+
+export interface ReviewScoreEvidence {
+  dimensions?: Partial<Record<RetakeDimensionKey, ReviewScoreEvidenceDimension>>;
+  overall_justification?: string | null;
+  high_score_audited?: boolean | null;
+}
+
 export interface RetakeDimensionResult {
   before_score: number;
   after_score: number;
@@ -181,7 +193,7 @@ export interface RetakeComparisonResult {
 export interface ReviewResult {
   schema_version: string;
   prompt_version: string;
-  score_version: string;
+  score_version?: string | null;
   score_prompt_version: string;
   model_name: string;
   model_version: string;
@@ -192,6 +204,7 @@ export interface ReviewResult {
   scorer_preprocess_version: string;
   score_cache_hit: boolean;
   scores: ReviewScores;
+  score_evidence?: ReviewScoreEvidence | null;
   final_score: number;
   advantage: string;
   critique: string;
@@ -403,7 +416,7 @@ export interface ReviewHistoryItem {
   scorer_model_version: string;
   writer_model_name: string;
   writer_model_version: string;
-  score_version: string;
+  score_version?: string | null;
   favorite?: boolean;
   gallery_visible?: boolean;
   gallery_audit_status?: 'none' | 'approved' | 'rejected';
@@ -484,9 +497,10 @@ export interface ReviewExportData {
   scorer_model_version: string;
   writer_model_name: string;
   writer_model_version: string;
-  score_version: string;
+  score_version?: string | null;
   final_score: number;
   scores: ReviewScores;
+  score_evidence?: ReviewScoreEvidence | null;
   advantage: string;
   critique: string;
   suggestions: string;

@@ -12,7 +12,7 @@ import {
   normalizeDateDisplay,
 } from '@/lib/date-filters';
 import { useI18n } from '@/lib/i18n';
-import type { HistoryGrowthSnapshot } from '@/lib/review-growth';
+import { getScoreVersionLabel, type HistoryGrowthSnapshot } from '@/lib/review-growth';
 import {
   getHistoryCopy,
   getHistoryIntlLocale,
@@ -192,6 +192,16 @@ export function ReviewGrowthPanel({
           <p className="mt-2 inline-flex rounded-full border border-sage/20 bg-sage/10 px-3 py-1 text-[11px] font-medium text-sage">
             {practiceThemeCopy.windowLabel}
           </p>
+          <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
+            <span className="rounded-full border border-border-subtle bg-raised/70 px-3 py-1 text-ink-muted">
+              {growthCopy.scoreVersionLabel}: {getScoreVersionLabel(growthSnapshot.scoreVersion, locale as 'zh' | 'en' | 'ja')}
+            </span>
+            {growthSnapshot.excludedVersionCount > 0 && (
+              <span className="rounded-full border border-gold/25 bg-gold/10 px-3 py-1 text-gold">
+                {growthCopy.mixedVersionNotice(growthSnapshot.excludedVersionCount)}
+              </span>
+            )}
+          </div>
         </div>
         <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium ${
           growthSnapshot.trend === 'up'

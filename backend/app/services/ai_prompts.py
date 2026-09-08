@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 
 PROMPT_VERSION = 'photo-review-v8-image-led'
-SCORE_PROMPT_VERSION = 'photo-score-v4-intent-aware'
-SCORE_VERSION = 'score-v4-intent-aware'
+SCORE_PROMPT_VERSION = 'photo-score-v5-evidence-calibrated'
+SCORE_VERSION = 'score-v5-evidence-calibrated'
 SCORER_PREPROCESS_VERSION = 'openai-input-image-high-v1'
 
 
@@ -353,7 +353,10 @@ def _intent_aware_scoring_guide() -> str:
         'Score each dimension independently from visible evidence; do not cap one dimension only because another dimension is weaker. '
         'Return exactly five integer scores from 0 to 10; the service computes the final score as their arithmetic mean. '
         'Dimension anchors: 0-2 severe obstruction or failed execution, 3-4 weak with clear unresolved problems, '
-        '5-6 competent but limited, 7 strong, 8 excellent, 9 exceptional, 10 extraordinary evidence within this genre. '
+        '5-6 means competent but limited, 7 means clearly strong, 8 means selected portfolio-worthy execution, '
+        '9 means exceptional visible control, and 10 requires extraordinary evidence within this genre. '
+        'A high score requires photographer-made visual evidence: frame edges, layers, occlusion, attention control, exposure control, tonal separation, color relationship, timing, or a distinctive subject-background relationship. '
+        'Attractive scenery, architecture, flowers, or cinematic mood is not enough for 8+ unless the photograph itself shows selected, controlled, and coherent execution. '
         'Impact explicitly rewards specificity, originality, emotional force, narrative, or quiet observational power when the image makes them visible. '
         'A high score in one dimension does not require high scores in the other dimensions. '
         'Personal, quiet, documentary, minimalist, monochrome, or unconventional photos can score highly when their visible choices create coherent effect. '
@@ -364,6 +367,9 @@ def _intent_aware_scoring_guide() -> str:
         'Assess technical clarity relative to expressive purpose; mandatory sharpness, noise-free rendering, bokeh, grandeur, or bright facial detail are not universal requirements. '
         'Negative space, silhouettes, deep shadows, blur, grain, or muted color are weaknesses only when they visibly harm the photo rather than support its strongest quality. '
         'Use EXIF only when provided, and treat missing EXIF as unknown; never guess flash, camera settings, lighting setup, or equipment from the review mode or review tier. '
+        'For every dimension, provide visible strength, main limitation, and high-score justification. '
+        'For any dimension scored 8 or above, high-score justification must explain the specific visible control that supports that score; for lower dimensions it may be an empty string. '
+        'If the final arithmetic mean is 8 or above, overall_justification must explain why the whole photograph clears a selected portfolio-worthy threshold. '
     )
 
 
@@ -401,8 +407,36 @@ def _score_prompt(exif_data: dict | None = None, image_type: str = 'default') ->
         'Evaluate the photo in exactly five dimensions: composition, lighting, color, impact, technical. '
         f'{_intent_aware_scoring_guide()}'
         'Return exactly one JSON object and nothing else: '
-        '{"scores":{"composition":0-10,"lighting":0-10,"color":0-10,"impact":0-10,"technical":0-10}}. '
+        '{"scores":{"composition":0-10,"lighting":0-10,"color":0-10,"impact":0-10,"technical":0-10},'
+        '"score_evidence":{"dimensions":{"composition":{"strength":"...","limitation":"...","high_score_justification":"..."},'
+        '"lighting":{"strength":"...","limitation":"...","high_score_justification":"..."},'
+        '"color":{"strength":"...","limitation":"...","high_score_justification":"..."},'
+        '"impact":{"strength":"...","limitation":"...","high_score_justification":"..."},'
+        '"technical":{"strength":"...","limitation":"...","high_score_justification":"..."}},"overall_justification":"..."}}. '
         'All score values must be integers.'
+    )
+
+
+def _score_audit_prompt(
+    *,
+    candidate_scores: dict[str, int],
+    candidate_score_evidence: dict,
+    exif_data: dict | None = None,
+    image_type: str = 'default',
+) -> str:
+    candidate_payload = {
+        'scores': candidate_scores,
+        'score_evidence': candidate_score_evidence,
+    }
+    return (
+        f'{_score_prompt(exif_data, image_type=image_type)}'
+        '\n\nHIGH SCORE AUDIT\n'
+        'The first scoring pass produced a high-score candidate. Re-review the same image independently, then decide whether the candidate is actually supported by visible photographic control. '
+        'You may keep, raise, or lower any dimension. Do not average with the candidate and do not simply choose the lower value. '
+        'Accept 8+ only when the visible evidence meets the selected portfolio-worthy threshold described above. '
+        'Reject high scores based mainly on attractive subject matter, location, flowers, architecture, cinematic mood, or generic atmosphere. '
+        'Use the candidate only as an audit target, not as authority: '
+        f'{json.dumps(candidate_payload, ensure_ascii=False, separators=(",", ":"))}.'
     )
 
 

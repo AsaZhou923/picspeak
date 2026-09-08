@@ -1,0 +1,79 @@
+{
+  "records": [
+    {
+      "sample_id": "low-1",
+      "content_group": "group-low-1",
+      "image_type": "architecture",
+      "split": "test",
+      "human_ratings": [
+        {"rater_id": "rater-1", "score": 6.0},
+        {"rater_id": "rater-2", "score": 6.4}
+      ],
+      "model_repeats": [
+        {"run_id": "run-1", "version": "score-v5-evidence-calibrated", "score": 6.4},
+        {"run_id": "run-2", "version": "score-v5-evidence-calibrated", "score": 6.5},
+        {"run_id": "run-3", "version": "score-v5-evidence-calibrated", "score": 6.6}
+      ]
+    },
+    {
+      "sample_id": "low-2",
+      "content_group": "group-low-2",
+      "image_type": "architecture",
+      "split": "test",
+      "human_ratings": [
+        {"rater_id": "rater-1", "score": 5.7},
+        {"rater_id": "rater-2", "score": 6.1}
+      ],
+      "model_repeats": [
+        {"run_id": "run-1", "version": "score-v5-evidence-calibrated", "score": 6.0},
+        {"run_id": "run-2", "version": "score-v5-evidence-calibrated", "score": 6.1},
+        {"run_id": "run-3", "version": "score-v5-evidence-calibrated", "score": 6.2}
+      ]
+    },
+    {
+      "sample_id": "low-3",
+      "content_group": "group-low-3",
+      "image_type": "architecture",
+      "split": "test",
+      "human_ratings": [
+        {"rater_id": "rater-1", "score": 6.2},
+        {"rater_id": "rater-2", "score": 6.5}
+      ],
+      "model_repeats": [
+        {"run_id": "run-1", "version": "score-v5-evidence-calibrated", "score": 6.6},
+        {"run_id": "run-2", "version": "score-v5-evidence-calibrated", "score": 6.7},
+        {"run_id": "run-3", "version": "score-v5-evidence-calibrated", "score": 6.7}
+      ]
+    },
+    {
+      "sample_id": "high-1",
+      "content_group": "group-high-1",
+      "image_type": "architecture",
+      "split": "test",
+      "human_ratings": [
+        {"rater_id": "rater-1", "score": 8.1},
+        {"rater_id": "rater-2", "score": 8.3}
+      ],
+      "model_repeats": [
+        {"run_id": "run-1", "version": "score-v5-evidence-calibrated", "score": 8.0},
+        {"run_id": "run-2", "version": "score-v5-evidence-calibrated", "score": 8.1},
+        {"run_id": "run-3", "version": "score-v5-evidence-calibrated", "score": 8.2}
+      ]
+    },
+    {
+      "sample_id": "high-2",
+      "content_group": "group-high-2",
+      "image_type": "architecture",
+      "split": "test",
+      "human_ratings": [
+        {"rater_id": "rater-1", "score": 8.4},
+        {"rater_id": "rater-2", "score": 8.6}
+      ],
+      "model_repeats": [
+        {"run_id": "run-1", "version": "score-v5-evidence-calibrated", "score": 8.4},
+        {"run_id": "run-2", "version": "score-v5-evidence-calibrated", "score": 8.5},
+        {"run_id": "run-3", "version": "score-v5-evidence-calibrated", "score": 8.6}
+      ]
+    }
+  ]
+}

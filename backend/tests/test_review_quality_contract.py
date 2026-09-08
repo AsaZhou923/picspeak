@@ -7,6 +7,7 @@ from unittest.mock import patch
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from app.services.ai import (
     AIJSONResponse,
@@ -24,6 +25,7 @@ from app.services.review_score_cache import (
     load_task_canonical_score_checkpoint,
     review_uses_current_score_contract,
 )
+from scoring_fixtures import score_evidence_fixture
 
 
 VALID_TEXT = {
@@ -70,7 +72,12 @@ def test_empty_writer_result_is_a_writing_failure_and_does_not_rescore(provider)
     ), patch('app.services.ai.settings.openai_api_key', 'test'), patch(
         'app.services.ai.settings.ai_api_key', 'test'
     ), patch('app.services.ai.model_name_for_mode', return_value='qwen-test'):
-        score = build_cached_canonical_score(SCORES, scorer_model_name='gpt-5.6-luna', scorer_model_version='test-snapshot')
+        score = build_cached_canonical_score(
+            SCORES,
+            scorer_model_name='gpt-5.6-luna',
+            scorer_model_version='test-snapshot',
+            score_evidence=score_evidence_fixture(SCORES, audited=True),
+        )
         response = AIJSONResponse(parsed={key: '' for key in VALID_TEXT}, usage={}, model_name='test', latency_ms=1)
         with patch('app.services.ai._run_canonical_scoring') as scorer, patch(
             'app.services.ai._request_openai_multimodal_json', return_value=response
@@ -85,13 +92,19 @@ def test_empty_writer_result_is_a_writing_failure_and_does_not_rescore(provider)
 
 def test_old_rubric_cannot_reuse_scores_or_retry_checkpoint():
     with patch('app.services.ai.settings.openai_score_model', 'gpt-5.6-luna'):
-        score = build_cached_canonical_score(SCORES, scorer_model_name='gpt-5.6-luna', scorer_model_version='test-snapshot')
+        score = build_cached_canonical_score(
+            SCORES,
+            scorer_model_name='gpt-5.6-luna',
+            scorer_model_version='test-snapshot',
+            score_evidence=score_evidence_fixture(SCORES, audited=True),
+        )
         task = ReviewTask(request_payload={})
         checkpoint_task_canonical_score(task, score)
         assert load_task_canonical_score_checkpoint(task) is not None
         review = Review(scorer_model_name='gpt-5.6-luna', result_json={
             'score_version': SCORE_VERSION, 'score_prompt_version': SCORE_PROMPT_VERSION,
             'scorer_model_version': 'test-snapshot', 'scorer_preprocess_version': SCORER_PREPROCESS_VERSION,
+            'scores': SCORES, 'final_score': 8.0, 'score_evidence': score_evidence_fixture(SCORES, audited=True),
         })
         assert review_uses_current_score_contract(review)
         for key, old in [('score_version', 'score-v3-canonical-gpt'), ('score_prompt_version', 'photo-score-v3-canonical-gpt')]:

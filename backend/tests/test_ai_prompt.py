@@ -8,10 +8,15 @@ from unittest.mock import MagicMock, patch
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
+TESTS_ROOT = Path(__file__).resolve().parent
+if str(TESTS_ROOT) not in sys.path:
+    sys.path.insert(0, str(TESTS_ROOT))
 
 from app.services.ai import (
     AIJSONResponse,
     AIReviewError,
+    CanonicalScore,
+    _OPENAI_SCORE_SCHEMA,
     PROMPT_VERSION,
     SCORE_PROMPT_VERSION,
     SCORE_VERSION,
@@ -19,19 +24,27 @@ from app.services.ai import (
     build_cached_canonical_score,
     _normalize_review_result_fields,
     _prompt_for_mode_v3,
+    _score_audit_prompt,
     _score_prompt,
+    _validate_canonical_score_contract,
     _writing_prompt,
     _validate_suggestions_structure,
     model_name_for_mode,
     run_ai_review,
+)
+from scoring_fixtures import (
+    HIGH_SCORES,
+    LOW_SCORES,
+    model_score_payload,
+    score_evidence_fixture,
 )
 
 
 class AIPromptTests(unittest.TestCase):
     def test_prompt_versions_identify_canonical_gpt_scoring(self) -> None:
         self.assertEqual(PROMPT_VERSION, 'photo-review-v8-image-led')
-        self.assertEqual(SCORE_PROMPT_VERSION, 'photo-score-v4-intent-aware')
-        self.assertEqual(SCORE_VERSION, 'score-v4-intent-aware')
+        self.assertEqual(SCORE_PROMPT_VERSION, 'photo-score-v5-evidence-calibrated')
+        self.assertEqual(SCORE_VERSION, 'score-v5-evidence-calibrated')
 
     def test_chinese_prompt_contains_stricter_scoring_rules(self) -> None:
         prompt = _prompt_for_mode_v3(mode='pro', locale='zh', image_type='street')
@@ -51,6 +64,10 @@ class AIPromptTests(unittest.TestCase):
         self.assertIn('Score each dimension independently from visible evidence', prompt)
         self.assertIn('Return exactly five integer scores from 0 to 10', prompt)
         self.assertIn('the service computes the final score as their arithmetic mean', prompt)
+        self.assertIn('5-6 means competent but limited', prompt)
+        self.assertIn('8 means selected portfolio-worthy execution', prompt)
+        self.assertIn('Attractive scenery, architecture, flowers, or cinematic mood is not enough', prompt)
+        self.assertIn('For every dimension, provide visible strength, main limitation, and high-score justification', prompt)
         self.assertIn('Impact explicitly rewards specificity, originality, emotional force, narrative', prompt)
         self.assertIn('A high score in one dimension does not require high scores in the other dimensions', prompt)
         self.assertIn('Style is not a bonus by itself', prompt)
@@ -69,6 +86,30 @@ class AIPromptTests(unittest.TestCase):
         )
         self.assertNotIn('portfolio-level execution with no obvious weak dimension', prompt)
         self.assertNotIn('9-10 should be extremely rare', prompt)
+
+    def test_score_schema_requires_evidence_without_server_audit_field(self) -> None:
+        evidence_schema = _OPENAI_SCORE_SCHEMA['properties']['score_evidence']
+
+        self.assertFalse(_OPENAI_SCORE_SCHEMA['additionalProperties'])
+        self.assertIn('score_evidence', _OPENAI_SCORE_SCHEMA['required'])
+        self.assertFalse(evidence_schema['additionalProperties'])
+        self.assertEqual(set(evidence_schema['required']), {'dimensions', 'overall_justification'})
+        self.assertNotIn('high_score_audited', evidence_schema['properties'])
+        dimensions_schema = evidence_schema['properties']['dimensions']
+        self.assertEqual(set(dimensions_schema['required']), {'composition', 'lighting', 'color', 'impact', 'technical'})
+        self.assertFalse(dimensions_schema['additionalProperties'])
+
+    def test_score_audit_prompt_rechecks_high_candidate_without_using_min_rule(self) -> None:
+        prompt = _score_audit_prompt(
+            candidate_scores=HIGH_SCORES,
+            candidate_score_evidence=score_evidence_fixture(HIGH_SCORES),
+            image_type='architecture',
+        )
+
+        self.assertIn('HIGH SCORE AUDIT', prompt)
+        self.assertIn('You may keep, raise, or lower any dimension', prompt)
+        self.assertIn('Do not average with the candidate and do not simply choose the lower value', prompt)
+        self.assertIn('"scores":{"composition":9,"lighting":8,"color":8,"impact":9,"technical":6}', prompt)
 
     def test_writing_prompts_avoid_flash_lighting_confusion_across_locales(self) -> None:
         scores = {'composition': 6, 'lighting': 6, 'color': 6, 'impact': 6, 'technical': 6}
@@ -278,7 +319,7 @@ class AIPromptTests(unittest.TestCase):
         ), patch(
             'app.services.ai._request_openai_multimodal_json',
             return_value=AIJSONResponse(
-                parsed={'scores': {'composition': 6, 'lighting': 5, 'color': 5, 'impact': 4, 'technical': 7}},
+                parsed=model_score_payload({'composition': 6, 'lighting': 5, 'color': 5, 'impact': 4, 'technical': 7}),
                 model_name='gpt-5.6-luna',
                 usage={'input_tokens': 100, 'output_tokens': 20},
                 latency_ms=120,
@@ -315,6 +356,8 @@ class AIPromptTests(unittest.TestCase):
         self.assertEqual(response.result.scores['composition'], 6)
         self.assertEqual(response.result.final_score, 5.4)
         self.assertEqual(response.result.score_version, SCORE_VERSION)
+        self.assertEqual(response.result.score_evidence['dimensions']['composition']['strength'], 'The frame gives the main subject a readable position.')
+        self.assertFalse(response.result.score_evidence['high_score_audited'])
         self.assertEqual(response.result.advantage, '1. \u4e3b\u4f53\u660e\u786e')
         self.assertEqual(response.input_tokens, 180)
         self.assertEqual(response.output_tokens, 60)
@@ -326,9 +369,10 @@ class AIPromptTests(unittest.TestCase):
 
     def test_cached_score_is_shared_by_qwen_writer_without_another_score_call(self) -> None:
         cached_score = build_cached_canonical_score(
-            {'composition': 7, 'lighting': 6, 'color': 6, 'impact': 5, 'technical': 6},
+            LOW_SCORES,
             scorer_model_name='gpt-5.6-luna',
             scorer_model_version='gpt-5.6-luna',
+            score_evidence=score_evidence_fixture(LOW_SCORES),
         )
         writer_response = AIJSONResponse(
             parsed={
@@ -368,7 +412,7 @@ class AIPromptTests(unittest.TestCase):
 
     def test_score_callback_runs_before_qwen_writer_failure(self) -> None:
         scorer_response = AIJSONResponse(
-            parsed={'scores': {'composition': 6, 'lighting': 5, 'color': 5, 'impact': 4, 'technical': 7}},
+            parsed=model_score_payload({'composition': 6, 'lighting': 5, 'color': 5, 'impact': 4, 'technical': 7}),
             model_name='gpt-5.6-luna',
             usage={'input_tokens': 100, 'output_tokens': 20},
             latency_ms=120,
@@ -396,9 +440,10 @@ class AIPromptTests(unittest.TestCase):
 
     def test_invalid_qwen_writer_payload_is_attributed_to_writing_stage(self) -> None:
         cached_score = build_cached_canonical_score(
-            {'composition': 7, 'lighting': 6, 'color': 6, 'impact': 5, 'technical': 6},
+            LOW_SCORES,
             scorer_model_name='gpt-5.6-luna',
             scorer_model_version='gpt-5.6-luna',
+            score_evidence=score_evidence_fixture(LOW_SCORES),
         )
 
         with patch('app.services.ai.settings.ai_api_key', 'test-qwen-key'), patch(
@@ -420,6 +465,137 @@ class AIPromptTests(unittest.TestCase):
                 )
 
         self.assertEqual(raised.exception.stage, 'writing')
+
+    def test_cached_score_requires_evidence(self) -> None:
+        with self.assertRaisesRegex(AIReviewError, 'score_evidence'):
+            build_cached_canonical_score(
+                {'composition': 7, 'lighting': 6, 'color': 6, 'impact': 5, 'technical': 6},
+                scorer_model_name='gpt-5.6-luna',
+                scorer_model_version='gpt-5.6-luna',
+            )
+
+    def test_high_cached_score_requires_audited_evidence(self) -> None:
+        with self.assertRaisesRegex(AIReviewError, 'high score audit'):
+            build_cached_canonical_score(
+                HIGH_SCORES,
+                scorer_model_name='gpt-5.6-luna',
+                scorer_model_version='gpt-5.6-luna',
+                score_evidence=score_evidence_fixture(HIGH_SCORES),
+            )
+
+    def test_cached_score_requires_audit_flag_to_be_bool(self) -> None:
+        evidence = score_evidence_fixture(HIGH_SCORES, audited=True)
+        evidence['high_score_audited'] = 'true'
+        with self.assertRaisesRegex(AIReviewError, 'high_score_audited must be bool'):
+            build_cached_canonical_score(
+                HIGH_SCORES,
+                scorer_model_name='gpt-5.6-luna',
+                scorer_model_version='gpt-5.6-luna',
+                score_evidence=evidence,
+            )
+
+    def test_direct_canonical_score_rejects_bool_dimension(self) -> None:
+        score = CanonicalScore(
+            scores={'composition': True, 'lighting': 6, 'color': 6, 'impact': 5, 'technical': 6},
+            score_evidence=score_evidence_fixture(LOW_SCORES),
+            final_score=4.8,
+            model_name='gpt-5.6-luna',
+            model_version='gpt-5.6-luna',
+            score_prompt_version=SCORE_PROMPT_VERSION,
+            score_version=SCORE_VERSION,
+            preprocess_version=SCORER_PREPROCESS_VERSION,
+        )
+
+        with patch('app.services.ai.settings.openai_score_model', 'gpt-5.6-luna'):
+            with self.assertRaisesRegex(AIReviewError, 'must be an exact int'):
+                _validate_canonical_score_contract(score)
+
+    def test_cached_score_rejects_empty_model_version_metadata(self) -> None:
+        with self.assertRaisesRegex(AIReviewError, 'model version'):
+            build_cached_canonical_score(
+                LOW_SCORES,
+                scorer_model_name='gpt-5.6-luna',
+                scorer_model_version='',
+                score_evidence=score_evidence_fixture(LOW_SCORES),
+            )
+
+    def test_high_canonical_score_is_audited_once_and_usage_is_aggregated(self) -> None:
+        first = AIJSONResponse(
+            parsed=model_score_payload(HIGH_SCORES),
+            model_name='gpt-5.6-luna',
+            usage={'input_tokens': 100, 'output_tokens': 20},
+            latency_ms=120,
+        )
+        audited = AIJSONResponse(
+            parsed=model_score_payload({'composition': 7, 'lighting': 7, 'color': 7, 'impact': 7, 'technical': 6}),
+            model_name='gpt-5.6-luna',
+            usage={'input_tokens': 110, 'output_tokens': 30},
+            latency_ms=130,
+        )
+        writer = AIJSONResponse(
+            parsed={
+                'advantage': '1. The frame has a clear architectural subject.',
+                'critique': '1. The edges still compete with the opening.',
+                'suggestions': (
+                    '1. Observation: Branches crowd the upper edge; '
+                    'Reason: They pull attention from the arch; '
+                    'Action: Crop tighter at the top while preserving the window shape.'
+                ),
+            },
+            model_name='gpt-5.6-luna',
+            usage={'input_tokens': 200, 'output_tokens': 70},
+            latency_ms=240,
+        )
+
+        with patch('app.services.ai.settings.openai_api_key', 'test-key'), patch(
+            'app.services.ai.settings.openai_score_model', 'gpt-5.6-luna'
+        ), patch('app.services.ai.settings.openai_review_model', 'gpt-5.6-luna'), patch(
+            'app.services.ai._request_openai_multimodal_json', side_effect=[first, audited, writer]
+        ) as request_mock:
+            response = run_ai_review(
+                mode='flash',
+                image_url='https://example.com/photo.jpg',
+                locale='en',
+                image_type='architecture',
+                review_model='gpt-5.6-luna',
+            )
+
+        self.assertEqual(request_mock.call_count, 3)
+        self.assertEqual(response.result.final_score, 6.8)
+        self.assertTrue(response.result.score_evidence['high_score_audited'])
+        self.assertEqual(response.input_tokens, 410)
+        self.assertEqual(response.output_tokens, 120)
+        self.assertEqual(response.latency_ms, 490)
+        self.assertEqual(
+            response.cost_rate_version,
+            'review-pricing-2026-08-28:openai:gpt-5.6-luna:standard+'
+            'review-pricing-2026-08-28:openai:gpt-5.6-luna:standard',
+        )
+
+    def test_high_score_audit_failure_is_scoring_failure(self) -> None:
+        first = AIJSONResponse(
+            parsed=model_score_payload(HIGH_SCORES),
+            model_name='gpt-5.6-luna',
+            usage={'input_tokens': 100, 'output_tokens': 20},
+            latency_ms=120,
+        )
+
+        with patch('app.services.ai.settings.openai_api_key', 'test-key'), patch(
+            'app.services.ai.settings.openai_score_model', 'gpt-5.6-luna'
+        ), patch('app.services.ai.settings.openai_review_model', 'gpt-5.6-luna'), patch(
+            'app.services.ai._request_openai_multimodal_json',
+            side_effect=[first, AIReviewError('audit timeout')],
+        ):
+            with self.assertRaises(AIReviewError) as raised:
+                run_ai_review(
+                    mode='flash',
+                    image_url='https://example.com/photo.jpg',
+                    locale='en',
+                    image_type='architecture',
+                    review_model='gpt-5.6-luna',
+                )
+
+        self.assertEqual(raised.exception.stage, 'scoring')
 
 
 if __name__ == '__main__':

@@ -4,6 +4,8 @@ export type GrowthTrend = 'up' | 'down' | 'flat';
 export type GrowthDimensionKey = keyof ReviewScores;
 export type HistoryPracticeIntensity = 'recover' | 'stabilize' | 'extend';
 
+export const CURRENT_SCORE_VERSION = 'score-v5-evidence-calibrated';
+
 export interface NextShootChecklistItem {
   title: string;
   detail: string;
@@ -28,6 +30,8 @@ export interface HistoryGrowthSnapshot {
   analyzedItems: ReviewHistoryItem[];
   recentItems: ReviewHistoryItem[];
   previousItems: ReviewHistoryItem[];
+  scoreVersion: string | null;
+  excludedVersionCount: number;
   recentAverage: number | null;
   previousAverage: number | null;
   averageDelta: number | null;
@@ -37,6 +41,39 @@ export interface HistoryGrowthSnapshot {
 }
 
 const DIMENSION_KEYS: GrowthDimensionKey[] = ['composition', 'lighting', 'color', 'impact', 'technical'];
+
+export function normalizeScoreVersion(version?: string | null): string | null {
+  const normalized = version?.trim().toLowerCase();
+  if (normalized === 'legacy' || normalized === 'unknown') return null;
+  return normalized ? normalized : null;
+}
+
+export function getScoreVersionLabel(version?: string | null, locale: 'zh' | 'en' | 'ja' = 'en'): string {
+  const normalized = normalizeScoreVersion(version);
+  if (!normalized) {
+    return locale === 'zh' ? '未知标尺' : locale === 'ja' ? '不明な基準' : 'Unknown rubric';
+  }
+  if (normalized === CURRENT_SCORE_VERSION) {
+    return locale === 'zh' ? 'v5 证据评分' : locale === 'ja' ? 'v5 根拠付き評価' : 'v5 evidence rubric';
+  }
+  if (normalized === 'score-v4-intent-aware') {
+    return locale === 'zh' ? 'v4 意图标尺' : locale === 'ja' ? 'v4 意図基準' : 'v4 intent-aware rubric';
+  }
+  if (normalized === 'score-v3-canonical-gpt') {
+    return locale === 'zh' ? 'v3 固定评分标尺' : locale === 'ja' ? 'v3 固定採点基準' : 'v3 canonical rubric';
+  }
+  if (normalized === 'score-v2-strict') {
+    return locale === 'zh' ? 'v2 严格标尺' : locale === 'ja' ? 'v2 厳格基準' : 'v2 strict rubric';
+  }
+  if (normalized === 'retake-paired-v1') {
+    return locale === 'zh' ? '复拍成对标尺 v1' : locale === 'ja' ? '撮り直しペア基準 v1' : 'Retake paired rubric v1';
+  }
+  const compact = normalized
+    .replace(/^photo-score-/, '')
+    .replace(/^score-/, '')
+    .replace(/-/g, ' ');
+  return locale === 'zh' ? `评分标尺 ${compact}` : locale === 'ja' ? `採点基準 ${compact}` : `Rubric ${compact}`;
+}
 
 function roundToOneDecimal(value: number): number {
   return Math.round(value * 10) / 10;
@@ -161,8 +198,13 @@ function practiceIntensityForTrend(trend: GrowthTrend): HistoryPracticeIntensity
 
 export function buildHistoryGrowthSnapshot(items: ReviewHistoryItem[], recentWindow = 3): HistoryGrowthSnapshot {
   const sortedItems = [...items].sort(compareByCreatedAtDesc);
-  const recentItems = sortedItems.slice(0, recentWindow);
-  const previousItems = sortedItems.slice(recentWindow, recentWindow * 2);
+  const scoreVersion = normalizeScoreVersion(sortedItems[0]?.score_version);
+  const analyzedItems = scoreVersion
+    ? sortedItems.filter((item) => normalizeScoreVersion(item.score_version) === scoreVersion)
+    : [];
+  const excludedVersionCount = sortedItems.length - analyzedItems.length;
+  const recentItems = analyzedItems.slice(0, recentWindow);
+  const previousItems = analyzedItems.slice(recentWindow, recentWindow * 2);
   const recentAverage = average(recentItems.map((item) => item.final_score));
   const previousAverage = average(previousItems.map((item) => item.final_score));
   const averageDelta =
@@ -182,8 +224,8 @@ export function buildHistoryGrowthSnapshot(items: ReviewHistoryItem[], recentWin
   const weakDimensions = DIMENSION_KEYS
     .map((key) => ({
       key,
-      lowCount: sortedItems.filter((item) => item.scores[key] < 7).length,
-      average: average(sortedItems.map((item) => item.scores[key])) ?? 0,
+      lowCount: analyzedItems.filter((item) => item.scores[key] < 7).length,
+      average: average(analyzedItems.map((item) => item.scores[key])) ?? 0,
     }))
     .filter((item) => item.lowCount > 0)
     .sort((left, right) => (
@@ -193,12 +235,14 @@ export function buildHistoryGrowthSnapshot(items: ReviewHistoryItem[], recentWin
     ))
     .slice(0, 3);
 
-  const practiceDimension = weakDimensions[0]?.key ?? lowestAverageDimension(sortedItems);
+  const practiceDimension = weakDimensions[0]?.key ?? lowestAverageDimension(analyzedItems);
 
   return {
-    analyzedItems: sortedItems,
+    analyzedItems,
     recentItems,
     previousItems,
+    scoreVersion,
+    excludedVersionCount,
     recentAverage,
     previousAverage,
     averageDelta,
@@ -207,7 +251,7 @@ export function buildHistoryGrowthSnapshot(items: ReviewHistoryItem[], recentWin
     practiceTheme: {
       dimension: practiceDimension,
       intensity: practiceIntensityForTrend(trend),
-      reviewCount: sortedItems.length,
+      reviewCount: analyzedItems.length,
     },
   };
 }

@@ -10,8 +10,12 @@ from unittest.mock import patch
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
+TESTS_ROOT = Path(__file__).resolve().parent
+if str(TESTS_ROOT) not in sys.path:
+    sys.path.insert(0, str(TESTS_ROOT))
 
 from app.services.ai import AIReviewError, build_cached_canonical_score, run_ai_review
+from scoring_fixtures import LOW_SCORES, model_score_payload, score_evidence_fixture
 
 
 def _response(payload: dict, *, model: str = 'gpt-5.6-luna', input_tokens: int = 100, output_tokens: int = 20):
@@ -33,7 +37,7 @@ def _response(payload: dict, *, model: str = 'gpt-5.6-luna', input_tokens: int =
 class OpenAIPhotoReviewTests(unittest.TestCase):
     def test_gpt_review_uses_responses_image_input_and_locks_scores(self) -> None:
         scoring = _response(
-            {'scores': {'composition': 7, 'lighting': 6, 'color': 6, 'impact': 5, 'technical': 6}},
+            model_score_payload(LOW_SCORES),
             model='gpt-5.6-luna-2026-08-01',
             input_tokens=120,
             output_tokens=30,
@@ -77,6 +81,7 @@ class OpenAIPhotoReviewTests(unittest.TestCase):
         self.assertEqual(response.writer_model_name, 'gpt-5.6-luna')
         self.assertEqual(response.writer_model_version, 'gpt-5.6-luna-2026-08-01')
         self.assertEqual(response.result.scores['composition'], 7)
+        self.assertEqual(response.result.score_evidence['dimensions']['composition']['strength'], 'The frame gives the main subject a readable position.')
         self.assertEqual(response.result.final_score, 6.0)
         self.assertEqual(response.input_tokens, 300)
         self.assertEqual(response.output_tokens, 100)
@@ -109,9 +114,10 @@ class OpenAIPhotoReviewTests(unittest.TestCase):
 
     def test_gpt_writer_reuses_cached_canonical_score(self) -> None:
         cached_score = build_cached_canonical_score(
-            {'composition': 7, 'lighting': 6, 'color': 6, 'impact': 5, 'technical': 6},
+            LOW_SCORES,
             scorer_model_name='gpt-5.6-luna',
             scorer_model_version='gpt-5.6-luna',
+            score_evidence=score_evidence_fixture(LOW_SCORES),
         )
         writing = _response(
             {

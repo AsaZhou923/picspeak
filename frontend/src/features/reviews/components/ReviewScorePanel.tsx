@@ -2,6 +2,7 @@
 import { TrendingDown, ZoomIn } from 'lucide-react';
 import type { ReviewGetResponse } from '@/lib/types';
 import { useI18n } from '@/lib/i18n';
+import { getScoreVersionLabel } from '@/lib/review-growth';
 import {
   DIM_TO_TAGS,
   formatExposureValue,
@@ -27,6 +28,12 @@ interface ReviewScorePanelProps {
 interface ReviewMetadataPanelProps {
   review: ReviewGetResponse;
   imgNaturalSize: { w: number; h: number } | null;
+}
+
+function getScoreVersionCopy(locale: 'zh' | 'en' | 'ja') {
+  if (locale === 'zh') return '评分标尺';
+  if (locale === 'ja') return '採点基準';
+  return 'Scoring rubric';
 }
 
 export function ReviewPhotoPanel({
@@ -100,6 +107,9 @@ export function ReviewScorePanel({
         <h2 id="review-score-panel-title" className="text-lg font-semibold text-ink">
           {t('review_score_dims_basis')}
         </h2>
+        <p className="mt-2 text-xs text-ink-subtle">
+          {getScoreVersionCopy(locale)}: {getScoreVersionLabel(review.result.score_version, locale)}
+        </p>
       </div>
       <div className="space-y-2">
         {scoreDims.map((dimension) => {
@@ -123,11 +133,11 @@ export function ReviewScorePanel({
                   className="h-1.5 flex-1 overflow-hidden rounded-full bg-void/50"
                 >
                   <span
-                    className={`block h-full rounded-full transition-all duration-700 ${getDimColorClass(score)}`}
+                    className={`block h-full rounded-full transition-all duration-700 ${getDimColorClass(score, review.result.score_version)}`}
                     style={{ width: `${score * 10}%` }}
                   />
                 </span>
-                <span className={`w-8 shrink-0 text-right font-mono text-xs ${getDimTextClass(score)}`}>
+                <span className={`w-8 shrink-0 text-right font-mono text-xs ${getDimTextClass(score, review.result.score_version)}`}>
                   {score.toFixed(1)}
                 </span>
                 {isWeakest && <TrendingDown size={12} className="shrink-0 text-rust" aria-label={t('review_score_lowest')} />}

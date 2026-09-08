@@ -16,6 +16,7 @@ if str(BACKEND_ROOT) not in sys.path:
 from app.api.routers.tasks import _serialize_task_status
 from app.db.models import Photo, ReviewMode, ReviewTask, TaskStatus, User, UserPlan
 from app.services.ai import AIReviewError, CanonicalScore
+from scoring_fixtures import LOW_SCORES, score_evidence_fixture
 from app.services.ai_prompts import SCORE_PROMPT_VERSION, SCORE_VERSION, SCORER_PREPROCESS_VERSION
 from app.services.review_task_processor import (
     _canonical_score_event_payload,
@@ -26,6 +27,40 @@ from app.services.review_task_processor import (
 
 
 class ReviewTaskProcessorTests(unittest.TestCase):
+    def test_cache_lock_contention_is_reported_as_retryable_scoring_failure(self) -> None:
+        db = MagicMock()
+        photo = SimpleNamespace(id=11, object_key='photo.jpg', exif_data={})
+        owner = SimpleNamespace(id=22, plan=UserPlan.guest)
+        task = SimpleNamespace(
+            id=33, public_id='tsk_busy_score', photo_id=photo.id, owner_user_id=owner.id,
+            mode=ReviewMode.flash, status=TaskStatus.RUNNING,
+            request_payload={'locale': 'zh', 'image_type': 'default'},
+            attempt_count=1, max_attempts=3, progress=10, next_attempt_at=None,
+            last_heartbeat_at=None, error_code=None, error_message=None,
+        )
+
+        def query(model):
+            mocked = MagicMock()
+            if model is Photo:
+                mocked.filter.return_value.first.return_value = photo
+            elif model is User:
+                mocked.filter.return_value.first.return_value = owner
+            mocked.filter.return_value.order_by.return_value.limit.return_value.all.return_value = []
+            return mocked
+
+        db.query.side_effect = query
+        db.bind = None
+        db.get_bind.return_value.dialect.name = 'postgresql'
+        db.execute.return_value.scalar.return_value = False
+        with patch('app.services.review_task_processor._handle_failure') as failure, patch(
+            'app.services.review_task_processor.run_ai_review'
+        ) as run_review:
+            _process_task(db, task)
+
+        run_review.assert_not_called()
+        self.assertEqual(failure.call_args.kwargs['error_code'], 'AI_SCORING_FAILED')
+        self.assertTrue(failure.call_args.kwargs['retryable'])
+
     def test_serialize_task_status_hides_internal_ai_failure_details(self) -> None:
         task = SimpleNamespace(
             public_id='tsk_123',
@@ -79,7 +114,7 @@ class ReviewTaskProcessorTests(unittest.TestCase):
             mocked_settings.ai_timeout_seconds = 60
             mocked_settings.retake_analysis_timeout_seconds = 180
 
-            self.assertEqual(_review_task_stale_timeout_seconds(), 420)
+            self.assertEqual(_review_task_stale_timeout_seconds(), 600)
 
     def test_serialize_task_status_identifies_writer_failure_stage(self) -> None:
         task = SimpleNamespace(
@@ -134,6 +169,7 @@ class ReviewTaskProcessorTests(unittest.TestCase):
         db.query.side_effect = query
         score = CanonicalScore(
             scores={'composition': 7, 'lighting': 6, 'color': 6, 'impact': 5, 'technical': 6},
+            score_evidence=score_evidence_fixture(LOW_SCORES),
             final_score=6.0,
             model_name='gpt-5.6-luna',
             model_version='gpt-5.6-luna-2026-08-01',
@@ -171,6 +207,7 @@ class ReviewTaskProcessorTests(unittest.TestCase):
     def test_score_checkpoint_event_includes_estimated_cost(self) -> None:
         score = CanonicalScore(
             scores={'composition': 7, 'lighting': 6, 'color': 6, 'impact': 5, 'technical': 6},
+            score_evidence=score_evidence_fixture(LOW_SCORES),
             final_score=6.0,
             model_name='gpt-5.6-luna',
             model_version='gpt-5.6-luna-2026-08-01',

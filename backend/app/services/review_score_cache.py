@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 from contextlib import contextmanager
+from copy import deepcopy
 from dataclasses import replace
 from typing import Iterator
 
@@ -13,6 +14,7 @@ from app.db.models import Photo, Review, ReviewStatus, ReviewTask
 from app.services.ai import (
     AIReviewError,
     CanonicalScore,
+    _validate_canonical_score_contract,
     build_cached_canonical_score,
     model_name_for_mode,
 )
@@ -25,7 +27,7 @@ from app.services.ai_prompts import (
 
 _SCORE_CACHE_LOCK_NAMESPACE = 'picspeak-score-cache-v1'
 _TASK_SCORE_CHECKPOINT_KEY = '_canonical_score_checkpoint'
-_TASK_SCORE_CHECKPOINT_VERSION = 1
+_TASK_SCORE_CHECKPOINT_VERSION = 2
 
 
 def _optional_nonnegative_int(value: object) -> int | None:
@@ -37,10 +39,12 @@ def _optional_nonnegative_int(value: object) -> int | None:
 
 
 def checkpoint_task_canonical_score(task: ReviewTask, score: CanonicalScore) -> None:
+    _validate_canonical_score_contract(score)
     payload = dict(task.request_payload or {})
     payload[_TASK_SCORE_CHECKPOINT_KEY] = {
         'checkpoint_version': _TASK_SCORE_CHECKPOINT_VERSION,
         'scores': dict(score.scores),
+        'score_evidence': deepcopy(score.score_evidence),
         'final_score': score.final_score,
         'model_name': score.model_name,
         'model_version': score.model_version,
@@ -75,6 +79,7 @@ def load_task_canonical_score_checkpoint(task: ReviewTask) -> CanonicalScore | N
             scorer_model_name=str(raw['model_name']),
             scorer_model_version=str(raw['model_version']),
             final_score=float(raw['final_score']),
+            score_evidence=raw.get('score_evidence'),
         )
         return replace(
             restored,
@@ -99,13 +104,25 @@ def review_uses_current_score_contract(review: Review) -> bool:
     payload = dict(review.result_json or {})
     scorer_model_name = str(review.scorer_model_name or payload.get('scorer_model_name') or '')
     scorer_model_version = str(payload.get('scorer_model_version') or '')
-    return (
+    if not (
         scorer_model_name == settings.openai_score_model
         and bool(scorer_model_version)
         and str(payload.get('score_prompt_version') or '') == SCORE_PROMPT_VERSION
         and str(payload.get('score_version') or '') == SCORE_VERSION
         and str(payload.get('scorer_preprocess_version') or '') == SCORER_PREPROCESS_VERSION
-    )
+    ):
+        return False
+    try:
+        score = build_cached_canonical_score(
+            payload['scores'],
+            scorer_model_name=scorer_model_name,
+            scorer_model_version=scorer_model_version,
+            final_score=review.final_score,
+            score_evidence=payload.get('score_evidence'),
+        )
+        return float(payload['final_score']) == score.final_score
+    except (AIReviewError, AttributeError, KeyError, TypeError, ValueError):
+        return False
 
 
 def writer_contract_for_review_request(*, mode: str, review_model: str) -> str:
@@ -166,6 +183,7 @@ def _lookup_cached_score(db: Session, *, photo_id: int, image_type: str) -> Cano
                 scorer_model_name=settings.openai_score_model,
                 scorer_model_version=scorer_model_version,
                 final_score=review.final_score,
+                score_evidence=payload.get('score_evidence'),
             )
         except (AIReviewError, KeyError, TypeError, ValueError):
             continue
@@ -227,7 +245,7 @@ def canonical_score_cache_lease(
         if cached is not None:
             yield cached
             return
-        raise AIReviewError('Canonical scoring is already running for this photo')
+        raise AIReviewError('Canonical scoring is already running for this photo', stage='scoring')
 
     # PostgreSQL transaction-level advisory locks remain held until the caller
     # commits the completed Review (or rolls back on failure). That closes the

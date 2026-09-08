@@ -4,7 +4,7 @@ import json
 import re
 import time
 from dataclasses import dataclass
-from typing import Callable
+from typing import Any, Callable
 
 from pydantic import ValidationError
 
@@ -18,10 +18,15 @@ from app.services.ai_prompts import (
     SCORE_VERSION,
     SCORER_PREPROCESS_VERSION,
     _prompt_for_mode_v3,
+    _score_audit_prompt,
     _score_prompt,
     _writing_prompt,
 )
 from app.services.review_pricing import ReviewModelUsage, estimate_review_usage_cost
+
+
+DIMENSION_KEYS = ('composition', 'lighting', 'color', 'impact', 'technical')
+MAX_SCORE_EVIDENCE_TEXT_LENGTH = 1000
 
 
 class AIReviewError(RuntimeError):
@@ -61,6 +66,7 @@ class AIJSONResponse:
 @dataclass(frozen=True)
 class CanonicalScore:
     scores: dict[str, int]
+    score_evidence: dict[str, Any]
     final_score: float
     model_name: str
     model_version: str
@@ -73,6 +79,17 @@ class CanonicalScore:
     latency_ms: int = 0
 
 
+_SCORE_DIMENSION_EVIDENCE_SCHEMA = {
+    'type': 'object',
+    'additionalProperties': False,
+    'properties': {
+        'strength': {'type': 'string'},
+        'limitation': {'type': 'string'},
+        'high_score_justification': {'type': 'string'},
+    },
+    'required': ['strength', 'limitation', 'high_score_justification'],
+}
+
 _OPENAI_SCORE_SCHEMA = {
     'type': 'object',
     'additionalProperties': False,
@@ -82,12 +99,29 @@ _OPENAI_SCORE_SCHEMA = {
             'additionalProperties': False,
             'properties': {
                 key: {'type': 'integer', 'minimum': 0, 'maximum': 10}
-                for key in ('composition', 'lighting', 'color', 'impact', 'technical')
+                for key in DIMENSION_KEYS
             },
-            'required': ['composition', 'lighting', 'color', 'impact', 'technical'],
-        }
+            'required': list(DIMENSION_KEYS),
+        },
+        'score_evidence': {
+            'type': 'object',
+            'additionalProperties': False,
+            'properties': {
+                'dimensions': {
+                    'type': 'object',
+                    'additionalProperties': False,
+                    'properties': {
+                        key: _SCORE_DIMENSION_EVIDENCE_SCHEMA
+                        for key in DIMENSION_KEYS
+                    },
+                    'required': list(DIMENSION_KEYS),
+                },
+                'overall_justification': {'type': 'string'},
+            },
+            'required': ['dimensions', 'overall_justification'],
+        },
     },
-    'required': ['scores'],
+    'required': ['scores', 'score_evidence'],
 }
 
 _OPENAI_WRITING_SCHEMA = {
@@ -138,12 +172,12 @@ def _compute_final_score(scores: dict[str, int]) -> float:
     if 'impact' not in scores and 'story' in scores:
         scores = dict(scores)
         scores['impact'] = scores['story']
-    for key in ('composition', 'lighting', 'color', 'impact', 'technical'):
+    for key in DIMENSION_KEYS:
         if key not in scores:
             raise AIReviewError(f'Missing score field: {key}')
         value = scores[key]
-        if not isinstance(value, int):
-            raise AIReviewError(f'Score for {key} must be int')
+        if type(value) is not int:
+            raise AIReviewError(f'Score for {key} must be an exact int')
         if value < 0 or value > 10:
             raise AIReviewError(f'Score for {key} out of range')
         values.append(value)
@@ -155,7 +189,7 @@ def _normalize_locked_scores(raw_scores: dict) -> dict[str, int]:
     if 'impact' not in scores and 'story' in scores:
         scores['impact'] = scores['story']
     locked_scores: dict[str, int] = {}
-    for key in ('composition', 'lighting', 'color', 'impact', 'technical'):
+    for key in DIMENSION_KEYS:
         value = scores[key]
         if type(value) is not int:
             raise AIReviewError(f'Score for {key} must be an exact int')
@@ -163,19 +197,107 @@ def _normalize_locked_scores(raw_scores: dict) -> dict[str, int]:
     return locked_scores
 
 
+def _non_empty_string(value: object) -> str:
+    if not isinstance(value, str):
+        raise AIReviewError('score_evidence fields must be strings')
+    text = value.strip()
+    if len(text) > MAX_SCORE_EVIDENCE_TEXT_LENGTH:
+        raise AIReviewError('score_evidence fields must be 1000 characters or fewer')
+    return text
+
+
+def _server_audit_flag(raw_evidence: dict | None) -> bool:
+    if raw_evidence is None or 'high_score_audited' not in raw_evidence:
+        return False
+    value = raw_evidence.get('high_score_audited')
+    if type(value) is not bool:
+        raise AIReviewError('score_evidence.high_score_audited must be bool')
+    return value
+
+
+def _normalize_score_evidence(
+    raw_evidence: object,
+    scores: dict[str, int],
+    *,
+    high_score_audited: bool,
+    allow_server_audit_field: bool = True,
+    require_final_high_score_audit: bool = True,
+) -> dict[str, Any]:
+    if not isinstance(raw_evidence, dict):
+        raise AIReviewError('score_evidence must be an object')
+    if 'high_score_audited' in raw_evidence and not allow_server_audit_field:
+        raise AIReviewError('score_evidence high_score_audited is server-managed')
+
+    dimensions = raw_evidence.get('dimensions')
+    if not isinstance(dimensions, dict):
+        raise AIReviewError('score_evidence.dimensions must be an object')
+    extra_dimensions = set(dimensions) - set(DIMENSION_KEYS)
+    if extra_dimensions:
+        raise AIReviewError('score_evidence.dimensions contains unknown dimensions')
+
+    normalized_dimensions: dict[str, dict[str, str]] = {}
+    for key in DIMENSION_KEYS:
+        raw_dimension = dimensions.get(key)
+        if not isinstance(raw_dimension, dict):
+            raise AIReviewError(f'score_evidence.dimensions.{key} must be an object')
+        extra_fields = set(raw_dimension) - {'strength', 'limitation', 'high_score_justification'}
+        if extra_fields:
+            raise AIReviewError(f'score_evidence.dimensions.{key} contains unknown fields')
+
+        strength = _non_empty_string(raw_dimension.get('strength'))
+        limitation = _non_empty_string(raw_dimension.get('limitation'))
+        high_score_justification = _non_empty_string(raw_dimension.get('high_score_justification'))
+        if not strength:
+            raise AIReviewError(f'score_evidence.dimensions.{key}.strength is required')
+        if not limitation:
+            raise AIReviewError(f'score_evidence.dimensions.{key}.limitation is required')
+        if scores[key] >= 8 and not high_score_justification:
+            raise AIReviewError(
+                f'score_evidence.dimensions.{key}.high_score_justification is required for scores >= 8'
+            )
+        normalized_dimensions[key] = {
+            'strength': strength,
+            'limitation': limitation,
+            'high_score_justification': high_score_justification,
+        }
+
+    overall_justification = _non_empty_string(raw_evidence.get('overall_justification'))
+    final_score = _compute_final_score(scores)
+    if final_score >= 8:
+        if not overall_justification:
+            raise AIReviewError('score_evidence.overall_justification is required for final scores >= 8')
+        if require_final_high_score_audit and not high_score_audited:
+            raise AIReviewError('score_evidence high score audit is required for final scores >= 8')
+
+    return {
+        'dimensions': normalized_dimensions,
+        'overall_justification': overall_justification,
+        'high_score_audited': high_score_audited,
+    }
+
+
 def build_cached_canonical_score(
     raw_scores: dict,
     *,
     scorer_model_name: str,
     scorer_model_version: str,
+    score_evidence: dict | None = None,
     final_score: float | None = None,
 ) -> CanonicalScore:
     locked_scores = _normalize_locked_scores(raw_scores)
     computed_final_score = _compute_final_score(locked_scores)
     if final_score is not None and float(final_score) != computed_final_score:
         raise AIReviewError('Cached score final_score does not match its dimensions')
+    normalized_evidence = _normalize_score_evidence(
+        score_evidence,
+        locked_scores,
+        high_score_audited=_server_audit_flag(score_evidence),
+        allow_server_audit_field=True,
+        require_final_high_score_audit=True,
+    )
     canonical_score = CanonicalScore(
         scores=locked_scores,
+        score_evidence=normalized_evidence,
         final_score=computed_final_score,
         model_name=scorer_model_name,
         model_version=scorer_model_version,
@@ -188,9 +310,15 @@ def build_cached_canonical_score(
     return canonical_score
 
 
-def _validate_canonical_score_contract(canonical_score: CanonicalScore) -> None:
+def _validate_canonical_score_contract(
+    canonical_score: CanonicalScore,
+    *,
+    require_high_score_audit: bool = True,
+) -> None:
     if canonical_score.model_name != settings.openai_score_model:
         raise AIReviewError('Canonical score uses a different scorer model')
+    if not str(canonical_score.model_version or '').strip():
+        raise AIReviewError('Canonical score model version is required')
     if canonical_score.score_prompt_version != SCORE_PROMPT_VERSION:
         raise AIReviewError('Canonical score uses a different scoring prompt version')
     if canonical_score.score_version != SCORE_VERSION:
@@ -200,6 +328,13 @@ def _validate_canonical_score_contract(canonical_score: CanonicalScore) -> None:
     expected_final_score = _compute_final_score(canonical_score.scores)
     if canonical_score.final_score != expected_final_score:
         raise AIReviewError('Canonical score final_score does not match its dimensions')
+    _normalize_score_evidence(
+        canonical_score.score_evidence,
+        canonical_score.scores,
+        high_score_audited=_server_audit_flag(canonical_score.score_evidence),
+        allow_server_audit_field=True,
+        require_final_high_score_audit=require_high_score_audit,
+    )
 
 
 def _extract_json_object(content: str) -> dict:
@@ -479,6 +614,89 @@ def _request_openai_multimodal_json(
     )
 
 
+def _build_canonical_score_from_response(
+    *,
+    scoring_response: AIJSONResponse,
+    high_score_audited: bool,
+) -> CanonicalScore:
+    try:
+        raw_scores = scoring_response.parsed.get('scores')
+        if not isinstance(raw_scores, dict):
+            raise AIReviewError('Canonical scorer response missing scores object', stage='scoring')
+        locked_scores = _normalize_locked_scores(raw_scores)
+        normalized_evidence = _normalize_score_evidence(
+            scoring_response.parsed.get('score_evidence'),
+            locked_scores,
+            high_score_audited=high_score_audited,
+            allow_server_audit_field=False,
+            require_final_high_score_audit=high_score_audited,
+        )
+    except AIReviewError as exc:
+        if exc.stage:
+            raise
+        raise AIReviewError(str(exc), stage='scoring') from exc
+    except (KeyError, TypeError, ValueError) as exc:
+        raise AIReviewError(f'Invalid canonical scorer response structure: {exc}', stage='scoring') from exc
+
+    canonical_score = CanonicalScore(
+        scores=locked_scores,
+        score_evidence=normalized_evidence,
+        final_score=_compute_final_score(locked_scores),
+        model_name=settings.openai_score_model,
+        model_version=scoring_response.model_name,
+        score_prompt_version=SCORE_PROMPT_VERSION,
+        score_version=SCORE_VERSION,
+        preprocess_version=SCORER_PREPROCESS_VERSION,
+        input_tokens=scoring_response.usage.get('input_tokens'),
+        output_tokens=scoring_response.usage.get('output_tokens'),
+        latency_ms=scoring_response.latency_ms,
+    )
+    _validate_canonical_score_contract(canonical_score, require_high_score_audit=high_score_audited)
+    return canonical_score
+
+
+def _request_canonical_score_once(*, prompt: str, image_url: str, high_score_audited: bool) -> CanonicalScore:
+    try:
+        scoring_response = _request_openai_multimodal_json(
+            prompt=prompt,
+            image_url=image_url,
+            schema_name='picspeak_photo_scores',
+            schema=_OPENAI_SCORE_SCHEMA,
+            model_name=settings.openai_score_model,
+            reasoning_effort=settings.openai_score_reasoning_effort,
+            timeout_seconds=settings.openai_score_timeout_seconds,
+        )
+        return _build_canonical_score_from_response(
+            scoring_response=scoring_response,
+            high_score_audited=high_score_audited,
+        )
+    except AIReviewError as exc:
+        raise AIReviewError(str(exc), stage='scoring') from exc
+
+
+def _merge_scoring_usage(final_score: CanonicalScore, previous_score: CanonicalScore) -> CanonicalScore:
+    input_tokens = None
+    if final_score.input_tokens is not None or previous_score.input_tokens is not None:
+        input_tokens = (final_score.input_tokens or 0) + (previous_score.input_tokens or 0)
+    output_tokens = None
+    if final_score.output_tokens is not None or previous_score.output_tokens is not None:
+        output_tokens = (final_score.output_tokens or 0) + (previous_score.output_tokens or 0)
+    return CanonicalScore(
+        scores=final_score.scores,
+        score_evidence=final_score.score_evidence,
+        final_score=final_score.final_score,
+        model_name=final_score.model_name,
+        model_version=final_score.model_version,
+        score_prompt_version=final_score.score_prompt_version,
+        score_version=final_score.score_version,
+        preprocess_version=final_score.preprocess_version,
+        cache_hit=final_score.cache_hit,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        latency_ms=previous_score.latency_ms + final_score.latency_ms,
+    )
+
+
 def _run_canonical_scoring(
     *,
     image_url: str,
@@ -490,44 +708,28 @@ def _run_canonical_scoring(
     if not settings.openai_score_model:
         raise AIReviewError('OPENAI_SCORE_MODEL is not configured')
 
-    try:
-        scoring_response = _request_openai_multimodal_json(
-            prompt=_score_prompt(exif_data, image_type=image_type),
-            image_url=image_url,
-            schema_name='picspeak_photo_scores',
-            schema=_OPENAI_SCORE_SCHEMA,
-            model_name=settings.openai_score_model,
-            reasoning_effort=settings.openai_score_reasoning_effort,
-            timeout_seconds=settings.openai_score_timeout_seconds,
-        )
-    except AIReviewError as exc:
-        raise AIReviewError(str(exc), stage='scoring') from exc
-    try:
-        raw_scores = scoring_response.parsed.get('scores')
-        if not isinstance(raw_scores, dict):
-            raise AIReviewError('Canonical scorer response missing scores object', stage='scoring')
-        locked_scores = _normalize_locked_scores(raw_scores)
-    except AIReviewError as exc:
-        if exc.stage:
-            raise
-        raise AIReviewError(str(exc), stage='scoring') from exc
-    except (KeyError, TypeError, ValueError) as exc:
-        raise AIReviewError(f'Invalid canonical scorer response structure: {exc}', stage='scoring') from exc
-
-    canonical_score = CanonicalScore(
-        scores=locked_scores,
-        final_score=_compute_final_score(locked_scores),
-        model_name=settings.openai_score_model,
-        model_version=scoring_response.model_name,
-        score_prompt_version=SCORE_PROMPT_VERSION,
-        score_version=SCORE_VERSION,
-        preprocess_version=SCORER_PREPROCESS_VERSION,
-        input_tokens=scoring_response.usage.get('input_tokens'),
-        output_tokens=scoring_response.usage.get('output_tokens'),
-        latency_ms=scoring_response.latency_ms,
+    prompt = _score_prompt(exif_data, image_type=image_type)
+    canonical_score = _request_canonical_score_once(
+        prompt=prompt,
+        image_url=image_url,
+        high_score_audited=False,
     )
-    _validate_canonical_score_contract(canonical_score)
-    return canonical_score
+    if canonical_score.final_score < 8:
+        return canonical_score
+
+    audited_score = _request_canonical_score_once(
+        prompt=_score_audit_prompt(
+            candidate_scores=canonical_score.scores,
+            candidate_score_evidence=canonical_score.score_evidence,
+            exif_data=exif_data,
+            image_type=image_type,
+        ),
+        image_url=image_url,
+        high_score_audited=True,
+    )
+    merged_score = _merge_scoring_usage(audited_score, canonical_score)
+    _validate_canonical_score_contract(merged_score)
+    return merged_score
 
 
 def _score_usage(canonical_score: CanonicalScore) -> list[ReviewModelUsage]:
@@ -597,6 +799,7 @@ def _run_openai_review(
         parsed['scorer_preprocess_version'] = resolved_score.preprocess_version
         parsed['score_cache_hit'] = resolved_score.cache_hit
         parsed['scores'] = locked_scores
+        parsed['score_evidence'] = resolved_score.score_evidence
         parsed['final_score'] = final_score
         result = ReviewResult.model_validate(parsed)
     except ValidationError as exc:
@@ -706,6 +909,7 @@ def run_ai_review(
         parsed['scorer_preprocess_version'] = resolved_score.preprocess_version
         parsed['score_cache_hit'] = resolved_score.cache_hit
         parsed['scores'] = locked_scores
+        parsed['score_evidence'] = resolved_score.score_evidence
         parsed['final_score'] = final_score
         result = ReviewResult.model_validate(parsed)
     except ValidationError as exc:

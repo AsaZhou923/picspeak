@@ -18,6 +18,7 @@ function makeHistoryItem(
   createdAt: string,
   finalScore: number,
   scores: ReviewScores,
+  scoreVersion = 'score-v3-canonical-gpt',
 ): ReviewHistoryItem {
   return {
     review_id: reviewId,
@@ -36,7 +37,7 @@ function makeHistoryItem(
     scorer_model_version: '2026-04',
     writer_model_name: 'test-writer',
     writer_model_version: '2026-04',
-    score_version: 'score-v3-canonical-gpt',
+    score_version: scoreVersion,
     favorite: false,
     gallery_visible: false,
     gallery_audit_status: 'none',
@@ -99,6 +100,8 @@ test('buildHistoryGrowthSnapshot summarizes recent average trend and frequent we
   assert.equal(snapshot.previousAverage, 6.1);
   assert.equal(snapshot.averageDelta, 1.6);
   assert.equal(snapshot.trend, 'up');
+  assert.equal(snapshot.scoreVersion, 'score-v3-canonical-gpt');
+  assert.equal(snapshot.excludedVersionCount, 0);
   assert.deepEqual(snapshot.practiceTheme, {
     dimension: 'lighting',
     intensity: 'extend',
@@ -108,6 +111,54 @@ test('buildHistoryGrowthSnapshot summarizes recent average trend and frequent we
     snapshot.weakDimensions.map((item) => item.key),
     ['lighting', 'technical', 'composition'],
   );
+});
+
+test('buildHistoryGrowthSnapshot compares only the latest score version', () => {
+  const snapshot = buildHistoryGrowthSnapshot([
+    makeHistoryItem('rev-v5-3', '2026-09-03T10:00:00Z', 6.9, makeScores({ composition: 7, lighting: 6, color: 7, impact: 7, technical: 6 }), 'score-v5-evidence-calibrated'),
+    makeHistoryItem('rev-v4-high', '2026-09-02T10:00:00Z', 9.4, makeScores({ composition: 9, lighting: 9, color: 10, impact: 10, technical: 9 }), 'score-v4-intent-aware'),
+    makeHistoryItem('rev-retake', '2026-09-01T10:00:00Z', 8.8, makeScores({ composition: 9, lighting: 9, color: 9, impact: 8, technical: 9 }), 'retake-paired-v1'),
+    makeHistoryItem('rev-v5-2', '2026-08-31T10:00:00Z', 6.7, makeScores({ composition: 7, lighting: 6, color: 7, impact: 7, technical: 6 }), 'score-v5-evidence-calibrated'),
+    makeHistoryItem('rev-unknown', '2026-08-30T10:00:00Z', 9.1, makeScores({ composition: 9, lighting: 9, color: 9, impact: 10, technical: 9 }), ''),
+    makeHistoryItem('rev-v5-1', '2026-08-29T10:00:00Z', 6.4, makeScores({ composition: 6, lighting: 6, color: 7, impact: 7, technical: 6 }), 'score-v5-evidence-calibrated'),
+  ]);
+
+  assert.deepEqual(snapshot.analyzedItems.map((item) => item.review_id), [
+    'rev-v5-3',
+    'rev-v5-2',
+    'rev-v5-1',
+  ]);
+  assert.equal(snapshot.scoreVersion, 'score-v5-evidence-calibrated');
+  assert.equal(snapshot.excludedVersionCount, 3);
+  assert.equal(snapshot.recentAverage, 6.7);
+  assert.equal(snapshot.previousAverage, null);
+  assert.equal(snapshot.trend, 'flat');
+});
+
+test('buildHistoryGrowthSnapshot does not treat a missing latest score version as current', () => {
+  const snapshot = buildHistoryGrowthSnapshot([
+    makeHistoryItem('rev-unknown-latest', '2026-09-03T10:00:00Z', 8.8, makeScores({ composition: 9 }), ''),
+    makeHistoryItem('rev-v5', '2026-09-02T10:00:00Z', 6.2, makeScores({ composition: 6 }), 'score-v5-evidence-calibrated'),
+  ]);
+
+  assert.equal(snapshot.scoreVersion, null);
+  assert.equal(snapshot.excludedVersionCount, 2);
+  assert.deepEqual(snapshot.analyzedItems, []);
+  assert.equal(snapshot.recentAverage, null);
+  assert.equal(snapshot.practiceTheme.reviewCount, 0);
+});
+
+test('buildHistoryGrowthSnapshot treats legacy and unknown score versions as incomparable', () => {
+  const snapshot = buildHistoryGrowthSnapshot([
+    makeHistoryItem('rev-legacy-latest', '2026-09-03T10:00:00Z', 8.8, makeScores({ composition: 9 }), 'legacy'),
+    makeHistoryItem('rev-legacy-older', '2026-09-02T10:00:00Z', 6.2, makeScores({ composition: 6 }), 'legacy'),
+    makeHistoryItem('rev-unknown', '2026-09-01T10:00:00Z', 7.4, makeScores({ composition: 7 }), 'unknown'),
+  ]);
+
+  assert.equal(snapshot.scoreVersion, null);
+  assert.equal(snapshot.excludedVersionCount, 3);
+  assert.deepEqual(snapshot.analyzedItems, []);
+  assert.equal(snapshot.averageDelta, null);
 });
 
 test('buildHistoryGrowthSnapshot uses the lowest average dimension when no dimension is under 7', () => {

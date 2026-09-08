@@ -219,8 +219,8 @@ export default function ReviewPage() {
   ];
   const weakestKey = getWeakestDimKey(r.scores);
   const weakestDim = SCORE_DIMS.find((d) => d.key === weakestKey) ?? SCORE_DIMS[0];
-  const scoreLabelColor = getScoreLabelColor(r.final_score);
-  const scoreLabel = t(getScoreLabelKey(r.final_score));
+  const scoreLabelColor = getScoreLabelColor(r.final_score, r.score_version);
+  const scoreLabel = t(getScoreLabelKey(r.final_score, r.score_version));
   const scoreSummary = generateScoreSummary(r.scores, SCORE_DIMS, locale);
   const { remaining: quotaRemaining, total: quotaTotal } = getEffectiveQuota(usage, isPro ? 'pro' : 'flash');
   const isLowQuota = quotaRemaining !== null && quotaTotal !== null && quotaTotal > 0

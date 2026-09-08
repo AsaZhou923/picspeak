@@ -1,6 +1,11 @@
-import type { TranslationKey } from './i18n-zh';
 import type { ReviewScores, UsageResponse } from './types';
 import typeDimDescriptions from '@/content/review/dim-descriptions.json';
+export {
+  getDimColorClass,
+  getDimTextClass,
+  getScoreLabelColor,
+  getScoreLabelKey,
+} from './score-display';
 
 export type CritiqueImageType = 'default' | 'landscape' | 'portrait' | 'street' | 'still_life' | 'architecture';
 export type DimKey = 'composition' | 'lighting' | 'color' | 'impact' | 'technical';
@@ -38,24 +43,6 @@ export function generateScoreSummary(
   if (locale === 'zh') return `${top.label}为本次亮点，${bottom.label}有提升空间`;
   if (locale === 'ja') return `${top.label}が際立っており、${bottom.label}を伸ばす余地があります`;
   return `${top.label} is the highlight; ${bottom.label} has room to grow`;
-}
-
-export function getDimColorClass(score: number): string {
-  if (score >= 7.5) return 'bg-sage';
-  if (score >= 5.5) return 'bg-gold';
-  return 'bg-rust';
-}
-
-export function getDimTextClass(score: number): string {
-  if (score >= 7.5) return 'text-sage';
-  if (score >= 5.5) return 'text-gold';
-  return 'text-rust';
-}
-
-export function getScoreLabelColor(score: number): string {
-  if (score >= 7.5) return 'text-sage';
-  if (score >= 5.5) return 'text-gold';
-  return 'text-rust';
 }
 
 export function getEffectiveQuota(
@@ -509,8 +496,3 @@ export function parsePointWithShortActionTitle(raw: string): { title: string; de
 
 export const FLASH_DETAIL_LIMIT = 120;
 export const CARD_HIGHLIGHT_DURATION_MS = 1800;
-
-export function getScoreLabelKey(score: number): TranslationKey {
-  const bucket = Math.max(1, Math.min(10, Math.round(score)));
-  return `score_label_${bucket}` as TranslationKey;
-}

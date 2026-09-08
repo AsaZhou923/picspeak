@@ -217,8 +217,8 @@ export const enTranslations = {
     pro_offer_label: '',
     pro_offer_highlight: 'Pro',
     updates_label: 'Updates',
-    updates_hint_home: 'See the completed free gallery re-evaluation',
-    updates_hint_latest: 'See the completed free gallery re-evaluation',
+    updates_hint_home: 'Coming soon: clearer evidence for high scores and progress',
+    updates_hint_latest: 'Coming soon: clearer evidence for high scores and progress',
     contact_label: 'Contact',
     contact_headline: 'Get in Touch',
 

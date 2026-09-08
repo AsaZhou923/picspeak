@@ -17,6 +17,7 @@ from app.services.ai_prompts import (
     SCORER_PREPROCESS_VERSION,
 )
 from app.services.ai import AIReviewError, CanonicalScore, build_cached_canonical_score
+from scoring_fixtures import LOW_SCORES, score_evidence_fixture
 from app.services.review_score_cache import (
     canonical_score_cache_lease,
     checkpoint_task_canonical_score,
@@ -32,7 +33,11 @@ class ReviewScoreCacheTests(unittest.TestCase):
     def test_requires_every_score_contract_component(self) -> None:
         review = SimpleNamespace(
             scorer_model_name='gpt-5.6-luna',
+            final_score=6.0,
             result_json={
+                'scores': dict(LOW_SCORES),
+                'final_score': 6.0,
+                'score_evidence': score_evidence_fixture(LOW_SCORES),
                 'prompt_version': PROMPT_VERSION,
                 'score_prompt_version': SCORE_PROMPT_VERSION,
                 'score_version': SCORE_VERSION,
@@ -94,12 +99,14 @@ class ReviewScoreCacheTests(unittest.TestCase):
                     {'composition': '7', 'lighting': 6, 'color': 6, 'impact': 5, 'technical': 6},
                     scorer_model_name='gpt-5.6-luna',
                     scorer_model_version='gpt-5.6-luna',
+                    score_evidence=score_evidence_fixture(),
                 )
             with self.assertRaisesRegex(AIReviewError, 'exact int'):
                 build_cached_canonical_score(
                     {'composition': 7.0, 'lighting': 6, 'color': 6, 'impact': 5, 'technical': 6},
                     scorer_model_name='gpt-5.6-luna',
                     scorer_model_version='gpt-5.6-luna',
+                    score_evidence=score_evidence_fixture(),
                 )
 
     def test_cached_score_requires_persisted_final_score_to_match_dimensions(self) -> None:
@@ -109,6 +116,7 @@ class ReviewScoreCacheTests(unittest.TestCase):
                     {'composition': 7, 'lighting': 6, 'color': 6, 'impact': 5, 'technical': 6},
                     scorer_model_name='gpt-5.6-luna',
                     scorer_model_version='gpt-5.6-luna',
+                    score_evidence=score_evidence_fixture(),
                     final_score=7.0,
                 )
 
@@ -120,19 +128,24 @@ class ReviewScoreCacheTests(unittest.TestCase):
         db.get_bind.return_value.dialect.name = 'postgresql'
         photo = SimpleNamespace(id=42)
 
-        with self.assertRaisesRegex(AIReviewError, 'already running'):
+        with self.assertRaisesRegex(AIReviewError, 'already running') as raised:
             with canonical_score_cache_lease(db, photo=photo, image_type='default'):
                 pass
 
+        self.assertEqual(raised.exception.stage, 'scoring')
         sql = str(db.execute.call_args.args[0])
         self.assertIn('pg_try_advisory_xact_lock', sql)
 
     def test_full_review_contract_accepts_provider_snapshots_without_version_configuration(self) -> None:
         review = SimpleNamespace(
+            final_score=6.0,
             scorer_model_name='gpt-5.6-luna',
             writer_model_name='gpt-5.6-luna',
             model_name='gpt-5.6-luna-2026-08-20',
             result_json={
+                'scores': dict(LOW_SCORES),
+                'final_score': 6.0,
+                'score_evidence': score_evidence_fixture(LOW_SCORES),
                 'prompt_version': PROMPT_VERSION,
                 'score_prompt_version': SCORE_PROMPT_VERSION,
                 'score_version': SCORE_VERSION,
@@ -160,6 +173,7 @@ class ReviewScoreCacheTests(unittest.TestCase):
         task = SimpleNamespace(request_payload={'locale': 'zh'})
         score = CanonicalScore(
             scores={'composition': 7, 'lighting': 6, 'color': 6, 'impact': 5, 'technical': 6},
+            score_evidence=score_evidence_fixture(LOW_SCORES),
             final_score=6.0,
             model_name='gpt-5.6-luna',
             model_version='gpt-5.6-luna-2026-08-01',
@@ -177,6 +191,7 @@ class ReviewScoreCacheTests(unittest.TestCase):
 
         self.assertIsNotNone(restored)
         self.assertEqual(restored.scores, score.scores)
+        self.assertEqual(restored.score_evidence['dimensions'], score.score_evidence['dimensions'])
         self.assertEqual(restored.input_tokens, 3590)
         self.assertEqual(restored.output_tokens, 414)
         self.assertEqual(restored.latency_ms, 10_000)

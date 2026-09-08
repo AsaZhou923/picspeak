@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from copy import deepcopy
+
 from contextlib import nullcontext
 from datetime import datetime, timedelta, timezone
 import logging
@@ -114,7 +116,8 @@ def public_task_error_message(
 def _review_task_stale_timeout_seconds() -> int:
     scorer_timeout = int(getattr(settings, 'openai_score_timeout_seconds', 180) or 180)
     writer_timeout = int(getattr(settings, 'openai_review_timeout_seconds', 180) or 180)
-    return max(int(settings.review_task_stale_timeout_seconds), scorer_timeout + writer_timeout + 60, 30)
+    # A high-scoring candidate gets one additional scoring pass before the writer.
+    return max(int(settings.review_task_stale_timeout_seconds), 2 * scorer_timeout + writer_timeout + 60, 30)
 
 
 def _normalize_review_result_payload(
@@ -184,6 +187,7 @@ def _normalize_review_result_payload(
         ),
         'score_cache_hit': bool(raw_payload.get('score_cache_hit', score_cache_hit)),
         'scores': scores,
+        'score_evidence': deepcopy(raw_payload.get('score_evidence')),
         'final_score': float(resolved_final_score),
         'advantage': str(raw_payload.get('advantage') or ''),
         'critique': str(raw_payload.get('critique') or ''),

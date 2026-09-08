@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from copy import deepcopy
+
 import re
 import secrets
 from datetime import datetime, timezone
@@ -227,6 +229,7 @@ def _review_result_payload(
             else score_cache_hit
         ),
         'scores': scores,
+        'score_evidence': deepcopy(raw_payload.get('score_evidence')),
         'final_score': float(resolved_final_score),
         'advantage': str(raw_payload.get('advantage') or ''),
         'critique': str(raw_payload.get('critique') or ''),
@@ -389,6 +392,7 @@ def _build_review_export_payload(
             'score_version': str(result_payload.get('score_version') or 'legacy'),
             'final_score': float(review.final_score),
             'scores': _coerce_review_scores(result_payload.get('scores')),
+            'score_evidence': deepcopy(result_payload.get('score_evidence')),
             'advantage': str(result_payload.get('advantage') or ''),
             'critique': str(result_payload.get('critique') or ''),
             'suggestions': str(result_payload.get('suggestions') or ''),

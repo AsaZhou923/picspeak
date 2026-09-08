@@ -30,7 +30,9 @@ Core product areas:
 - **Billing**: Lemon Squeezy Pro checkout, activation codes, image credit packs, and webhooks
 
 
-Current single-photo contract: `score-v4-intent-aware` / `photo-score-v4-intent-aware` with `photo-review-v8-image-led` prose. Judge visible expressive effects, preserve defining strengths, and keep scorer checkpoints through writer retries. Historical gallery re-evaluation requires an explicit maintenance run; changing prompts alone does not update stored reviews.
+Current single-photo code contract: `score-v5-evidence-calibrated` / `photo-score-v5-evidence-calibrated` with `photo-review-v8-image-led` prose. Store dimension evidence and perform one additional canonical-scoring audit for candidates >=8; final dimension scores still determine the arithmetic mean. Judge visible expressive effects, preserve defining strengths, and keep completed scoring evidence/checkpoints through writer retries. Historical gallery re-evaluation requires an explicit maintenance run; changing prompts alone does not update deployed services or stored reviews.
+
+Validate scoring changes with `backend/scripts/evaluate_score_calibration.py` and the protocol in `docs/scoring-calibration.md`. Synthetic fixtures and small live-model probes are diagnostic only; formal calibration requires independent human labels and a held-out test set. Keep ordinary and paired-retake scoring versions separate in growth statistics.
 
 ## Common Commands
 

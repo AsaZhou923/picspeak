@@ -145,6 +145,7 @@ class ReviewResult(BaseModel):
     scorer_preprocess_version: str = ''
     score_cache_hit: bool = False
     scores: dict[str, int] = Field(default_factory=default_review_scores)
+    score_evidence: dict[str, Any] | None = None
     final_score: float = 0.0
     advantage: str = ''
     critique: str = ''
@@ -452,6 +453,7 @@ class ReviewExportData(BaseModel):
     score_version: str = 'legacy'
     final_score: float
     scores: dict[str, int] = Field(default_factory=default_review_scores)
+    score_evidence: dict[str, Any] | None = None
     advantage: str = ''
     critique: str = ''
     suggestions: str = ''

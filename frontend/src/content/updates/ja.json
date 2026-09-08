@@ -1,5 +1,12 @@
 [
   {
+    "id": "2026-09-08-evidence-based-scoring",
+    "date": "2026-09-08",
+    "title": "高得点の根拠と進歩比較をより明確にします（準備中）",
+    "summary": "準備中：高得点の根拠をより慎重に確認し、進歩は同じ基準で比較します。保存済みの過去の評価とギャラリー作品のスコアはそのままです。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-09-08-evidence-based-scoring"
+  },
+  {
     "id": "2026-09-06-gallery-free-reassessment",
     "date": "2026-09-06",
     "title": "ギャラリー作品の無料再評価が完了しました",

@@ -23,6 +23,7 @@ from app.db.models import UserPlan
 from app.main import _should_capture_audit_body, _should_skip_audit
 from app.api.routers.review_support import _attach_billing_info
 from app.services.ai import AIJSONResponse, SCORE_VERSION, run_ai_review
+from scoring_fixtures import score_evidence_fixture
 from app.services.guard import _enforce_scope_rate_limit
 from app.services.worker import ReviewWorker
 from scripts.generate_activation_codes import build_insert_sql
@@ -166,7 +167,12 @@ class ReviewHardeningTests(unittest.TestCase):
         ), patch(
             'app.services.ai._request_openai_multimodal_json',
             return_value=AIJSONResponse(
-                parsed={'scores': {'composition': 6, 'lighting': 5, 'color': 5, 'story': 4, 'technical': 7}},
+                parsed={
+                    'scores': {'composition': 6, 'lighting': 5, 'color': 5, 'story': 4, 'technical': 7},
+                    'score_evidence': score_evidence_fixture(
+                        {'composition': 6, 'lighting': 5, 'color': 5, 'impact': 4, 'technical': 7}
+                    ),
+                },
                 model_name='gpt-5.6-luna',
                 usage={},
                 latency_ms=1,

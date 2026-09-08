@@ -33,6 +33,8 @@ export type ReviewHistoryGrowthCopy = {
   label: string;
   title: string;
   body: string;
+  scoreVersionLabel: string;
+  mixedVersionNotice: (count: number) => string;
   recentAverage: string;
   previousAverage: string;
   recentList: string;
@@ -83,6 +85,8 @@ const COPY: Record<ReviewHistoryLocale, LocaleCopy> = {
       label: '连续进步',
       title: '把最近 3 次点评连成一条线看',
       body: '先看平均分有没有往上走，再看哪些维度在反复拖后腿。',
+      scoreVersionLabel: '当前标尺',
+      mixedVersionNotice: (count: number) => `已排除 ${count} 条不同或未知标尺的记录`,
       recentAverage: '最近 3 次均分',
       previousAverage: '之前 3 次均分',
       recentList: '最近 3 次点评',
@@ -123,6 +127,8 @@ const COPY: Record<ReviewHistoryLocale, LocaleCopy> = {
       label: 'Growth Loop',
       title: 'Read the last three critiques as one loop',
       body: 'Check whether the average is moving up first, then which dimensions keep slipping below a good score.',
+      scoreVersionLabel: 'Current rubric',
+      mixedVersionNotice: (count: number) => `${count} records with a different or unknown rubric were excluded`,
       recentAverage: 'Recent 3 average',
       previousAverage: 'Previous 3 average',
       recentList: 'Most recent three critiques',
@@ -163,6 +169,8 @@ const COPY: Record<ReviewHistoryLocale, LocaleCopy> = {
       label: 'Growth Loop',
       title: '直近 3 回をひとつの流れで見る',
       body: '平均点が上向いているか、どの次元が繰り返し足を引っ張っているかを先に確認します。',
+      scoreVersionLabel: '現在の基準',
+      mixedVersionNotice: (count: number) => `異なる基準または不明な基準の記録を ${count} 件除外しました`,
       recentAverage: '直近 3 回の平均',
       previousAverage: 'その前 3 回の平均',
       recentList: '直近 3 回の講評',

@@ -1,5 +1,12 @@
 [
   {
+    "id": "2026-09-08-evidence-based-scoring",
+    "date": "2026-09-08",
+    "title": "高分更有依据，进步对比更清楚（准备中）",
+    "summary": "即将推出更谨慎的高分判断，并按同一套标准比较前后进步；已保存的历史评分和长廊作品分数保持原状。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-09-08-evidence-based-scoring"
+  },
+  {
     "id": "2026-09-06-gallery-free-reassessment",
     "date": "2026-09-06",
     "title": "长廊作品已完成免费重评",
