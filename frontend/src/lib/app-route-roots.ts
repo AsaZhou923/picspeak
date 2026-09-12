@@ -42,6 +42,8 @@ export const PUBLIC_BLOG_SLUGS = new Set([
   'color-grading-photography-guide',
   'street-photography-ai-review-workflow',
   'gpt-image-2-prompt-examples-workflow',
+  'compare-photo-retakes-real-improvement',
+  'subject-background-separation-portrait-street',
 ]);
 
 export const PUBLIC_PROMPT_EXAMPLE_IDS = new Set([

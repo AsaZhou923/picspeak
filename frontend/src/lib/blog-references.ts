@@ -47,6 +47,24 @@ const BLOG_REFERENCES: Record<string, readonly BlogReference[]> = {
       url: 'https://www.picspeak.art/generate/prompts',
     },
   ],
+  'compare-photo-retakes-real-improvement': [
+    {
+      name: 'Ericsson: Deliberate Practice and Acquisition of Expert Performance',
+      url: 'https://doi.org/10.1111/j.1553-2712.2008.00227.x',
+    },
+    NIKON_COMPOSITION,
+  ],
+  'subject-background-separation-portrait-street': [
+    {
+      name: 'Nikon: What is Aperture? The Key to Sharper, More Creative Photography',
+      url: 'https://www.nikonusa.com/learn-and-explore/c/tips-and-techniques/what-is-aperture',
+    },
+    {
+      name: 'Nikon: Bokeh for Beginners',
+      url: 'https://www.nikonusa.com/learn-and-explore/c/tips-and-techniques/bokeh-for-beginners',
+    },
+    NIKON_COMPOSITION,
+  ],
 };
 
 export function getBlogReferences(slug: string): readonly BlogReference[] {

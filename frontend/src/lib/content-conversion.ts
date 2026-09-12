@@ -172,6 +172,36 @@ const BLOG_TOPIC_BY_SLUG: Record<string, BlogTopic> = {
       body: 'ストリートの1枚をアップロードし、構図・瞬間・インパクトを同じ流れで確認します。',
     },
   },
+  'compare-photo-retakes-real-improvement': {
+    imageType: 'default',
+    zh: {
+      topic: '复拍对比',
+      body: '上传原片与复拍片，用同一目标和可见证据判断改进是否真正发生。',
+    },
+    en: {
+      topic: 'retake comparison',
+      body: 'Upload the original and retake, then test the same goal against visible evidence instead of trusting a score alone.',
+    },
+    ja: {
+      topic: '撮り直し比較',
+      body: '元の写真と撮り直しを上げ、同じ目標と見える根拠から本当の改善かを確かめます。',
+    },
+  },
+  'subject-background-separation-portrait-street': {
+    imageType: 'portrait',
+    zh: {
+      topic: '主体与背景分离',
+      body: '上传一张人像或街拍，检查轮廓、明暗、色彩、景深与背景距离是否让主体更清晰。',
+    },
+    en: {
+      topic: 'subject-background separation',
+      body: 'Upload a portrait or street frame and inspect edges, tone, color, depth of field, and background distance.',
+    },
+    ja: {
+      topic: '被写体と背景の分離',
+      body: 'ポートレートやストリート写真で、輪郭・明暗・色・被写界深度・背景距離を確認します。',
+    },
+  },
 };
 
 const FALLBACK_TOPIC: BlogTopic = {

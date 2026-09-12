@@ -35,6 +35,23 @@ test('blog CTA preserves specific shooting types when the article has one', () =
   assert.match(cta.body, /street/i);
 });
 
+test('new Blog guides keep their retake and portrait workspace context', () => {
+  const retakeCta = getBlogWorkspaceCta('zh', {
+    slug: 'compare-photo-retakes-real-improvement',
+    category: '复拍练习',
+  });
+  const separationCta = getBlogWorkspaceCta('en', {
+    slug: 'subject-background-separation-portrait-street',
+    category: 'Composition',
+  });
+
+  assert.match(retakeCta.title, /复拍对比/);
+  assert.equal(retakeCta.imageType, 'default');
+  assert.equal(separationCta.imageType, 'portrait');
+  assert.match(separationCta.body, /background distance/i);
+  assert.match(separationCta.href, /image_type=portrait/);
+});
+
 test('gallery CTA creates practice and score-standard workspace entries', () => {
   const item: PublicGalleryItem = {
     review_id: 'rev_gallery_1',

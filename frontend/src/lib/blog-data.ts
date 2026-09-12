@@ -83,6 +83,8 @@ const STARTER_BLOG_SLUGS = [
   'color-grading-photography-guide',
   'street-photography-ai-review-workflow',
   'gpt-image-2-prompt-examples-workflow',
+  'compare-photo-retakes-real-improvement',
+  'subject-background-separation-portrait-street',
 ] as const;
 
 const BLOG_POSTS_BY_LOCALE: Record<Locale, Map<string, BlogPost>> = {

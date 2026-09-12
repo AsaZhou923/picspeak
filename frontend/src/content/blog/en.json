@@ -556,6 +556,149 @@
           ]
         }
       ]
+    },
+    {
+      "slug": "compare-photo-retakes-real-improvement",
+      "title": "How to tell whether a photo retake actually improved",
+      "seoTitle": "How to Compare Photo Retakes for Real Improvement",
+      "description": "A higher score does not automatically prove that a photo retake improved. Learn how to define one visible goal, keep the comparison fair, inspect evidence and tradeoffs, and decide whether to keep the change, repeat the exercise, or start a new baseline.",
+      "seoDescription": "Compare an original photo and retake with one visible goal, a fair setup, and evidence that shows whether the intended improvement really happened.",
+      "excerpt": "Retakes become useful practice when the original and new frame answer the same question. Define a visible success condition, compare the evidence, and treat the score as supporting context rather than the verdict.",
+      "category": "Retake Practice",
+      "readingTime": "6 min read",
+      "publishedAt": "2026-09-12",
+      "updatedAt": "2026-09-12",
+      "keywords": [
+        "photo retake comparison",
+        "photography improvement",
+        "before and after photography",
+        "deliberate practice photography",
+        "photo critique evidence",
+        "Retake Coach"
+      ],
+      "intro": "A retake can look cleaner and still fail the lesson you meant to practice. It may benefit from better weather, a more cooperative subject, or a stronger location while the original problem remains. A useful comparison begins with one shared goal and ends with visible evidence: what changed, what stayed unresolved, and what new tradeoff appeared.",
+      "takeawayTitle": "A fair retake comparison needs a question, not just two scores",
+      "takeawayItems": [
+        "Write one target and one visible success condition before the retake.",
+        "Keep the goal stable and record major scene changes that weaken comparability.",
+        "Read visible differences first, then use same-rubric score changes as supporting evidence.",
+        "Preserve regressions and non-comparable results instead of forcing every retake into a win."
+      ],
+      "sections": [
+        {
+          "title": "1. Decide whether the pair answers the same question",
+          "paragraphs": [
+            "The frames do not need to be pixel-for-pixel copies, but they do need a shared learning goal. If the original problem was a bright sign crossing the subject's head, the retake should test edge control and background placement. A sunset portrait in a new location may be a better photograph, yet it cannot isolate whether that original decision improved.",
+            "Before comparing, note changes in subject, light, camera position, focal length, editing, and intended mood. Small changes are normal. When several major variables change at once, keep the new frame as a fresh baseline rather than inventing a precise before-and-after claim."
+          ]
+        },
+        {
+          "title": "2. Turn the critique into a testable prediction",
+          "paragraphs": [
+            "Translate the previous critique into an action and an observable result. Replace \"make the composition stronger\" with \"move left until no bright line touches the subject's outline.\" Replace \"improve the light\" with \"turn the face toward the window until both eyes retain detail and the cheek still has shape.\"",
+            "This creates a small hypothesis: if I take this action, this specific visual condition should change. Focused practice works because the task, feedback, evaluation, and repeated attempt stay connected. Without that connection, a retake is simply another photo from another day."
+          ],
+          "bullets": [
+            "Composition target: the subject outline remains clear at thumbnail size.",
+            "Lighting target: important highlights keep texture while shadows preserve shape.",
+            "Timing target: the gesture or interaction is readable without explanation.",
+            "Color target: the subject and background no longer compete at similar brightness and saturation."
+          ]
+        },
+        {
+          "title": "3. Read the evidence in a fixed order",
+          "paragraphs": [
+            "Start with the stated success condition. Did it appear in the retake? Next, name the exact visible difference: the sign moved outside the silhouette, the catchlight returned, or the gesture became clearer. Then check whether the relevant dimension changed under the same rubric. Finally, inspect tradeoffs across the rest of the frame.",
+            "A retake can solve one problem while creating another. A wider aperture may simplify the background but leave the second eye soft. A tighter crop may strengthen the subject but remove useful context. Real improvement means the intended gain is visible and the cost is acceptable for the photograph's purpose."
+          ]
+        },
+        {
+          "title": "4. Change fewer variables when you want a clearer lesson",
+          "paragraphs": [
+            "If possible, keep the scene and goal stable while changing one or two controllable decisions: camera position, subject-background distance, timing, aperture, or exposure. Record the important choice in a short note so you can connect the result to an action later.",
+            "This is not a laboratory rule. Street and family photography rarely repeat perfectly. The point is to reduce guesswork, not spontaneity. When conditions move beyond useful comparison, say so plainly and begin a new chain from the stronger frame."
+          ]
+        },
+        {
+          "title": "5. End with one of three honest decisions",
+          "paragraphs": [
+            "Choose \"keep\" when the target is visibly met and the tradeoffs fit your intent. Choose \"repeat\" when the pair is comparable but the target remains weak; adjust one action for the next attempt. Choose \"new baseline\" when the subject, scene, or creative goal changed too much for a fair verdict.",
+            "In PicSpeak Retake Coach, select the original review and upload the retake so both frames can be evaluated under one current rubric. Read the cited visual evidence and five-dimension changes together. The comparison should help you choose the next action, not manufacture a success story."
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "subject-background-separation-portrait-street",
+      "title": "Subject-background separation for portraits and street photography",
+      "seoTitle": "Subject Separation for Portraits and Street Photos",
+      "description": "Subject-background separation is more than background blur. Use camera position, physical distance, edge control, tone, color, light, aperture, and timing to make portraits and street subjects read clearly without removing the context that gives the image meaning.",
+      "seoDescription": "Make portrait and street subjects read clearly with better position, distance, edges, tone, color, light, depth of field, and timing.",
+      "excerpt": "Blur is only one way to separate a subject. Often the faster fix is to move your feet, find a cleaner edge, wait for tonal contrast, or increase the distance between the subject and background.",
+      "category": "Composition",
+      "readingTime": "6 min read",
+      "publishedAt": "2026-09-12",
+      "updatedAt": "2026-09-12",
+      "keywords": [
+        "subject background separation",
+        "portrait background",
+        "street photography composition",
+        "depth of field portrait",
+        "clean subject edges",
+        "photography visual hierarchy"
+      ],
+      "intro": "When a person disappears into a busy scene, the instinctive fix is often to buy a faster lens or open the aperture. That can help, but separation begins before camera settings. Position, distance, clean edges, tonal contrast, color, light, and timing can make the subject readable while preserving enough environment to tell the story.",
+      "takeawayTitle": "Build separation in layers",
+      "takeawayItems": [
+        "Move the camera and inspect the subject's outline before changing settings.",
+        "Increase subject-background distance when you want a softer background.",
+        "Use tone, color, and light to separate edges that focus blur cannot rescue.",
+        "Keep environmental detail when it explains the person, place, or moment."
+      ],
+      "sections": [
+        {
+          "title": "1. Separation is a hierarchy problem, not a blur contest",
+          "paragraphs": [
+            "A clear subject is the part of the frame the viewer understands first. Shallow depth of field can support that hierarchy, but a blurred bright sign can still dominate and a sharp background can still work when its shapes, tones, and colors organize around the person.",
+            "Judge separation at two scales. At thumbnail size, ask whether the subject reads immediately. At full size, inspect where background lines, highlights, signs, or faces touch the outline. This catches both large hierarchy problems and small edge collisions."
+          ]
+        },
+        {
+          "title": "2. Move first: the cheapest tool is camera position",
+          "paragraphs": [
+            "Take half a step left or right, crouch slightly, or raise the camera before reaching for a new lens. A small change can place the subject against open sky, a darker wall, or a quiet patch between signs. It can also remove a pole that appears to grow from the head.",
+            "In street photography, choose the clean zone first and wait for the person to enter it. In portraits, walk around the subject and inspect the whole silhouette, especially hair, shoulders, hands, and the space between limbs. Good separation often comes from selecting the background rather than blurring it away."
+          ]
+        },
+        {
+          "title": "3. Use distance and aperture with a clear purpose",
+          "paragraphs": [
+            "A wider aperture can create shallower depth of field, and increasing the physical distance between subject and background can make that background softer. Move closer only when the resulting perspective and personal space still suit the image. Keep focus on the important eye or facial plane rather than assuming maximum blur is always better.",
+            "Context matters. An environmental portrait may need shop signs, tools, or architecture to remain legible. Stop down until those clues are recognizable but not competitive. The right depth of field is the one that supports the story, not simply the lowest f-number your lens offers."
+          ]
+        },
+        {
+          "title": "4. Separate with tone, color, and light",
+          "paragraphs": [
+            "If the subject and background share the same brightness, look for a lighter or darker patch behind the face. Side light, window light, or a subtle rim can define the outline, while a small position change may keep a bright background from swallowing a shadowed face.",
+            "Color contrast can do similar work. A warm face against a cooler street, or a muted outfit against a restrained wall, can create hierarchy without aggressive blur. Watch saturation as well as hue: a tiny vivid object near the edge may compete more than a large neutral shape."
+          ]
+        },
+        {
+          "title": "5. Run a five-point field check",
+          "paragraphs": [
+            "Before pressing the shutter, check the subject outline, the brightest competing object, subject-background distance, important focus plane, and whether the environment adds meaning. For moving scenes, simplify this to one instruction: protect the outline and wait for the cleanest moment.",
+            "Afterward, upload a portrait or street frame to PicSpeak and inspect whether the critique identifies the same edge, hierarchy, light, and depth problems you noticed. Turn the strongest issue into one retake action, then compare the new frame against the same success condition."
+          ],
+          "bullets": [
+            "Outline: no accidental poles, text, or bright lines cut through the subject.",
+            "Tone and color: the subject does not merge with a similar background patch.",
+            "Distance and focus: depth of field supports the intended context.",
+            "Timing: other people and moving objects do not steal the decisive space.",
+            "Meaning: the remaining background tells the viewer something useful."
+          ]
+        }
+      ]
     }
   ]
 }

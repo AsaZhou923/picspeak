@@ -12,6 +12,10 @@ const TEST_DIR = path.dirname(fileURLToPath(import.meta.url));
 const FRONTEND_DIR = path.join(TEST_DIR, '..');
 const NEXT_BIN = path.join(FRONTEND_DIR, 'node_modules', 'next', 'dist', 'bin', 'next');
 const ARTICLE_SLUG = 'five-photo-composition-checks';
+const NEW_ARTICLE_SLUGS = [
+  'compare-photo-retakes-real-improvement',
+  'subject-background-separation-portrait-street',
+];
 const LOCALE_CASES = [
   { locale: 'zh', documentLang: 'zh-CN' },
   { locale: 'en', documentLang: 'en' },
@@ -244,6 +248,21 @@ test('locale-prefixed articles own document language, canonical, and social imag
   }
 });
 
+test('new articles render at every locale-pinned canonical URL', async () => {
+  for (const { locale } of LOCALE_CASES) {
+    for (const slug of NEW_ARTICLE_SLUGS) {
+      const expectedPath = `/${locale}/blog/${slug}`;
+      const response = await fetch(`${baseUrl}${expectedPath}`);
+      assert.equal(response.status, 200);
+      const html = await response.text();
+      const canonical = new URL(metadataUrl(html, 'rel', 'canonical'), baseUrl);
+
+      assert.equal(canonical.pathname, expectedPath);
+      assert.equal(headingCount(html, 1), 1);
+    }
+  }
+});
+
 test('regular sitemap excludes Blog aliases and shares the latest update date', async () => {
   const response = await fetch(`${baseUrl}/sitemap.xml`);
   assert.equal(response.status, 200);
@@ -260,6 +279,11 @@ test('regular sitemap excludes Blog aliases and shares the latest update date', 
         `<loc>${siteOrigin}${escapedPath}<\\/loc>[\\s\\S]*?<lastmod>${latestDate}`,
       ),
     );
+  }
+  for (const { locale } of LOCALE_CASES) {
+    for (const slug of NEW_ARTICLE_SLUGS) {
+      assert.match(xml, new RegExp(`<loc>${siteOrigin}/${locale}/blog/${slug}<\\/loc>`));
+    }
   }
 });
 
