@@ -1,5 +1,12 @@
 [
   {
+    "id": "2026-09-14-multilingual-experience-consistency",
+    "date": "2026-09-14",
+    "title": "A more consistent multilingual experience",
+    "summary": "Your language preference now carries through pages, errors, prompt examples, generation, and checkout without unexpected language switches.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-09-14-multilingual-experience-consistency"
+  },
+  {
     "id": "2026-09-08-evidence-based-scoring",
     "date": "2026-09-08",
     "title": "Clearer high-score judgments and progress comparisons",

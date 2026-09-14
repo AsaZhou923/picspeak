@@ -5,8 +5,8 @@ import {
   GENERATION_PROMPT_EXAMPLES,
   buildPromptExampleCreativeWorkJsonLd,
   getGenerationPromptExample,
-  getLocalizedPromptExampleText,
   getLocalizedPromptExampleTitle,
+  getPromptExamplePromptPresentation,
   normalizePromptExampleExcerpt,
 } from '@/content/generation/prompt-examples';
 import { serializeJsonLd } from '@/lib/json-ld';
@@ -33,7 +33,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 
   const title = getLocalizedPromptExampleTitle(example, 'en');
-  const prompt = getLocalizedPromptExampleText(example.prompt, 'en');
+  const prompt = getPromptExamplePromptPresentation(example, 'en').text;
   const description = normalizePromptExampleExcerpt(prompt, 150);
 
   return {

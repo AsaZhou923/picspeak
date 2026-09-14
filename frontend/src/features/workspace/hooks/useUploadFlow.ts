@@ -126,7 +126,7 @@ export function useUploadFlow({ fetchUsage }: { fetchUsage: () => void }) {
           } else if (err.status === 402 || err.code === 'QUOTA_EXCEEDED') {
             setErrMessage(formatUserFacingError(t, err, t('err_quota')));
           } else {
-            setErrMessage(formatUserFacingError(t, err, err.message));
+            setErrMessage(formatUserFacingError(t, err, t('err_upload')));
           }
         } else {
           setErrMessage(formatUserFacingError(t, err, t('err_upload')));

@@ -15,8 +15,37 @@ export function localeFromPathname(pathname: string): SupportedLocale | null {
 export function resolveRequestLocale(
   pathname: string,
   cookieLocale: string | null | undefined,
+  acceptLanguage?: string | null | undefined,
 ): SupportedLocale | null {
-  return localeFromPathname(pathname) ?? (isSupportedLocale(cookieLocale) ? cookieLocale : null);
+  return (
+    localeFromPathname(pathname) ??
+    (isSupportedLocale(cookieLocale) ? cookieLocale : null) ??
+    localeFromAcceptLanguage(acceptLanguage)
+  );
+}
+
+export function localeFromAcceptLanguage(acceptLanguage: string | null | undefined): SupportedLocale | null {
+  if (!acceptLanguage) return null;
+
+  const candidates = acceptLanguage
+    .split(',')
+    .map((entry) => {
+      const [tag = '', ...params] = entry.trim().split(';');
+      const qParam = params.find((param) => param.trim().toLowerCase().startsWith('q='));
+      const q = qParam ? Number.parseFloat(qParam.split('=')[1] ?? '') : 1;
+      return { tag: tag.trim().toLowerCase(), q: Number.isFinite(q) ? q : 0 };
+    })
+    .filter((entry) => entry.tag && entry.q > 0)
+    .sort((a, b) => b.q - a.q);
+
+  for (const { tag } of candidates) {
+    const normalized = localeFromLanguageTag(tag);
+    if (normalized) {
+      return normalized;
+    }
+  }
+
+  return null;
 }
 
 export function getLocalizedBlogRedirectPath(
@@ -36,6 +65,24 @@ export function normalizeLocale(locale: string | null | undefined): SupportedLoc
   if (normalized.startsWith('ja')) return 'ja';
   if (normalized.startsWith('en')) return 'en';
   return 'en';
+}
+
+export function localeFromLanguageTag(locale: string | null | undefined): SupportedLocale | null {
+  const normalized = (locale ?? '').trim().toLowerCase();
+  if (normalized.startsWith('zh')) return 'zh';
+  if (normalized.startsWith('ja')) return 'ja';
+  if (normalized.startsWith('en')) return 'en';
+  return null;
+}
+
+export function localeFromLanguagePreferences(languages: readonly (string | null | undefined)[]): SupportedLocale | null {
+  for (const language of languages) {
+    const normalized = localeFromLanguageTag(language);
+    if (normalized) {
+      return normalized;
+    }
+  }
+  return null;
 }
 
 /**

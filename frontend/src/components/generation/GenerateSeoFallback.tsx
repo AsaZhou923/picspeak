@@ -3,6 +3,12 @@ import {
   GENERATION_SIZE_OPTIONS,
   GENERATION_TEMPLATES,
 } from '@/features/generations/generation-config';
+import {
+  QUALITY_COPY_KEYS,
+  SIZE_DETAIL_KEYS,
+  templateCopyKey,
+} from '@/features/generations/generation-page-copy';
+import { enTranslations } from '@/lib/i18n-en';
 
 export function GenerateSeoFallback() {
   return (
@@ -17,8 +23,8 @@ export function GenerateSeoFallback() {
       <ul>
         {GENERATION_TEMPLATES.map((template) => (
           <li key={template.key}>
-            <strong>{template.labelEn}</strong>
-            <p>{template.description}</p>
+            <strong>{enTranslations[templateCopyKey(template.key).label]}</strong>
+            <p>{enTranslations[templateCopyKey(template.key).description]}</p>
           </li>
         ))}
       </ul>
@@ -26,7 +32,8 @@ export function GenerateSeoFallback() {
       <ul>
         {GENERATION_QUALITY_OPTIONS.map((quality) => (
           <li key={quality.value}>
-            {quality.label}: {quality.detail}
+            {enTranslations[QUALITY_COPY_KEYS[quality.value].label]}:{' '}
+            {enTranslations[QUALITY_COPY_KEYS[quality.value].detail]}
           </li>
         ))}
       </ul>
@@ -34,7 +41,7 @@ export function GenerateSeoFallback() {
       <ul>
         {GENERATION_SIZE_OPTIONS.map((size) => (
           <li key={size.value}>
-            {size.label}: {size.detail}
+            {size.label}: {enTranslations[SIZE_DETAIL_KEYS[size.value]]}
           </li>
         ))}
       </ul>

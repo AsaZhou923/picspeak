@@ -69,7 +69,7 @@ class ReviewCreateRequest(BaseModel):
     analysis_type: str = Field(default='single', pattern='^(single|retake_compare)$')
     async_mode: bool = Field(default=True, alias='async')
     idempotency_key: str | None = None
-    locale: str = Field(default='zh', pattern='^(zh|en|ja)$')
+    locale: str = Field(default='en', pattern='^(zh|en|ja)$')
 
     @model_validator(mode='after')
     def align_review_model_with_analysis_type(self):
@@ -221,6 +221,7 @@ class GenerationCreateRequest(BaseModel):
     async_mode: bool = Field(default=True, alias='async')
     idempotency_key: str | None = None
     analytics_source: str | None = Field(default=None, max_length=64)
+    locale: str = Field(default='en', pattern='^(zh|en|ja)$')
 
 
 class GenerationCreateResponse(BaseModel):

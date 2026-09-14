@@ -14,6 +14,8 @@ import { GENERATION_PROMPT_EXAMPLES } from '../src/content/generation/prompt-exa
 import {
   getLocalizedBlogRedirectPath,
   isSupportedLocale,
+  localeFromAcceptLanguage,
+  localeFromLanguagePreferences,
   localeFromPathname,
   normalizeLocale,
   resolveRequestLocale,
@@ -35,6 +37,20 @@ test('explicit supported locale codes are preserved', () => {
   assert.equal(normalizeLocale('ja-JP'), 'ja');
 });
 
+test('first-visit browser language negotiation ignores unsupported languages', () => {
+  assert.equal(localeFromLanguagePreferences(['fr-FR', 'ja-JP', 'en-US']), 'ja');
+  assert.equal(localeFromLanguagePreferences(['zh-Hant-TW', 'en-US']), 'zh');
+  assert.equal(localeFromLanguagePreferences(['en-GB', 'ja-JP']), 'en');
+  assert.equal(localeFromLanguagePreferences(['fr-FR', 'de-DE']), null);
+  assert.equal(localeFromLanguagePreferences([]), null);
+});
+
+test('Accept-Language negotiation respects q order and skips unsupported tags', () => {
+  assert.equal(localeFromAcceptLanguage('fr-FR;q=1, ja-JP;q=0.9, en-US;q=0.8'), 'ja');
+  assert.equal(localeFromAcceptLanguage('fr-FR;q=1, de-DE;q=0.9'), null);
+  assert.equal(localeFromAcceptLanguage('zh-CN;q=0.4, en-US;q=0.9'), 'en');
+});
+
 test('request locale resolution only trusts exact path and cookie values', () => {
   for (const locale of ['zh', 'en', 'ja']) {
     assert.equal(isSupportedLocale(locale), true);
@@ -47,6 +63,7 @@ test('request locale resolution only trusts exact path and cookie values', () =>
   assert.equal(localeFromPathname('/zh-CN/blog'), null);
   assert.equal(resolveRequestLocale('/en/blog', 'zh'), 'en');
   assert.equal(resolveRequestLocale('/blog', 'ja'), 'ja');
+  assert.equal(resolveRequestLocale('/blog', null, 'fr-FR;q=1,ja-JP;q=.9'), 'ja');
   assert.equal(resolveRequestLocale('/blog', 'zh-CN'), null);
   assert.equal(resolveRequestLocale('/blog', 'fr'), null);
 });

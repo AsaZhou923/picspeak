@@ -72,7 +72,7 @@ export function useCreditPackCheckout({
 
         if (!response.checkout_url) {
           closeExternalCheckoutWindow(checkoutWindow);
-          publishMessage(`${response.credits} credits / ${response.price} checkout is unavailable.`);
+          publishMessage(t('usage_checkout_unavailable'));
           return false;
         }
 

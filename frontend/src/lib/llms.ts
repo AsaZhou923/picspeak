@@ -46,9 +46,14 @@ export function getLlmsText(): string {
 - Author profile: ${siteConfig.url}/author/asa-zhou
 - AI Create: ${siteConfig.url}/generate
 - GPT Image 2 prompt examples: ${siteConfig.url}/generate/prompts
-- Blog index: ${siteConfig.url}/en/blog
+- English Blog index: ${siteConfig.url}/en/blog
+- Chinese Blog index: ${siteConfig.url}/zh/blog
+- Japanese Blog index: ${siteConfig.url}/ja/blog
 - Gallery: ${siteConfig.url}/gallery
-- Updates: ${siteConfig.url}/updates
+- Updates / x-default: ${siteConfig.url}/updates
+- English Updates: ${siteConfig.url}/en/updates
+- Chinese Updates: ${siteConfig.url}/zh/updates
+- Japanese Updates: ${siteConfig.url}/ja/updates
 - Affiliate page: ${siteConfig.url}/affiliate
 
 ## Markdown content mirrors

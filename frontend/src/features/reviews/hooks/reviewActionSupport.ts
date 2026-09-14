@@ -1,4 +1,5 @@
 import { Locale, Translator } from '@/lib/i18n';
+import { localeToIntlLocale } from '@/lib/locale';
 import { ReviewExportResponse, ReviewGetResponse, ReviewMetaResponse } from '@/lib/types';
 import { getImageTypeLabelForLocale } from '@/lib/review-page-copy';
 
@@ -53,8 +54,8 @@ export function buildReviewExportMarkdown(args: {
   const lines = [
     `# ${exportSummaryCopy.title}`,
     '',
-    `- ${exportSummaryCopy.exportedAt}: ${new Date(payload.review.exported_at).toLocaleString(locale)}`,
-    `- ${exportSummaryCopy.createdAt}: ${new Date(payload.review.created_at).toLocaleString(locale)}`,
+    `- ${exportSummaryCopy.exportedAt}: ${new Date(payload.review.exported_at).toLocaleString(localeToIntlLocale(locale))}`,
+    `- ${exportSummaryCopy.createdAt}: ${new Date(payload.review.created_at).toLocaleString(localeToIntlLocale(locale))}`,
     '',
     `## ${exportSummaryCopy.reviewInfo}`,
     `- ${exportSummaryCopy.reviewId}: ${payload.review.review_id}`,

@@ -12,15 +12,18 @@ export const CN_PRO_CHECKOUT_TIP =
   '中文用户使用 Lemon Squeezy 中文专属 checkout，$1.99 一次性开通 30 天 Pro，不会自动续费。已收到激活码的用户仍可在站内兑换。';
 
 const ACCOUNT_USAGE_PATH = '/account/usage';
+const CHECKOUT_LOADING_COPY: Record<Locale, string> = {
+  zh: '正在打开 Pro 支付页面…',
+  en: 'Opening Pro checkout…',
+  ja: 'Pro の決済画面を開いています…',
+};
 
 export async function startProCheckout(
   ensureToken: () => Promise<string>,
   locale?: Locale
 ): Promise<void> {
   rememberCheckoutReturnPath();
-  const checkoutWindow = openExternalCheckoutWindow(
-    locale === 'zh' ? '正在打开 Pro 支付页面...' : 'Opening Pro checkout...'
-  );
+  const checkoutWindow = openExternalCheckoutWindow(CHECKOUT_LOADING_COPY[locale ?? 'en']);
 
   void trackProductEvent('upgrade_pro_clicked', {
     locale,

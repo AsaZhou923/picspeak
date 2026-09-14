@@ -306,6 +306,7 @@ export interface GenerationCreateRequest {
   async: boolean;
   idempotency_key?: string;
   analytics_source?: ProductAnalyticsSource;
+  locale?: 'zh' | 'en' | 'ja';
 }
 
 export interface GenerationCreateResponse {

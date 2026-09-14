@@ -5,8 +5,9 @@ import Link from 'next/link';
 import { Camera } from 'lucide-react';
 import {
   getLocalizedPromptExampleCategoryLabel,
-  getLocalizedPromptExampleText,
   getLocalizedPromptExampleTitle,
+  getPromptExampleLanguageLabel,
+  getPromptExamplePromptPresentation,
   type GenerationPromptExample,
 } from '@/content/generation/prompt-examples';
 import { getPromptLibraryWorkspaceCta } from '@/lib/content-conversion';
@@ -24,6 +25,7 @@ const PROMPT_EXAMPLE_PAGE_COPY = {
     template: '模板',
     style: '风格',
     ratio: '比例',
+    language: '提示词语言',
     fullPrompt: '完整提示词',
     sourceNote:
       '来源与作者：此案例链接到 {author} 发布的原始公开来源。PicSpeak 会为学习场景整理和改写提示词结构，但不声明对来源帖拥有额外授权。',
@@ -40,6 +42,7 @@ const PROMPT_EXAMPLE_PAGE_COPY = {
     template: 'Template',
     style: 'Style',
     ratio: 'Ratio',
+    language: 'Prompt language',
     fullPrompt: 'Full prompt',
     sourceNote:
       'Source and author: this example links to the original public source by {author}. PicSpeak curates and adapts the prompt for learning, but does not claim extra license rights over the source post.',
@@ -56,6 +59,7 @@ const PROMPT_EXAMPLE_PAGE_COPY = {
     template: 'テンプレート',
     style: 'スタイル',
     ratio: '比率',
+    language: 'プロンプト言語',
     fullPrompt: '完全なプロンプト',
     sourceNote:
       '出典と作者: この例は {author} による公開元ページへリンクしています。PicSpeak は学習用にプロンプトを整理・調整しますが、元投稿に対する追加のライセンス権利は主張しません。',
@@ -68,7 +72,8 @@ export default function PromptExampleContent({ example }: { example: GenerationP
   const { locale } = useI18n();
   const copy = PROMPT_EXAMPLE_PAGE_COPY[locale];
   const title = getLocalizedPromptExampleTitle(example, locale);
-  const prompt = getLocalizedPromptExampleText(example.prompt, locale);
+  const promptPresentation = getPromptExamplePromptPresentation(example, locale);
+  const prompt = promptPresentation.text;
   const categoryLabel = getLocalizedPromptExampleCategoryLabel(example.category, locale);
   const workspaceCta = getPromptLibraryWorkspaceCta(locale, {
     id: example.id,
@@ -175,6 +180,13 @@ export default function PromptExampleContent({ example }: { example: GenerationP
           <p className="text-xs uppercase tracking-[0.22em] text-ink-subtle">{copy.ratio}</p>
           <p className="mt-3 font-display text-2xl text-ink">{example.suggestedSize}</p>
         </div>
+      </section>
+
+      <section className="mx-auto mt-4 max-w-7xl rounded-lg border border-border-subtle bg-raised/35 p-5">
+        <p className="text-xs uppercase tracking-[0.22em] text-ink-subtle">{copy.language}</p>
+        <p className="mt-2 text-sm text-ink-muted">
+          {getPromptExampleLanguageLabel(promptPresentation.textLocale, locale, promptPresentation.localized)}
+        </p>
       </section>
 
       <section className="mx-auto mt-8 max-w-7xl rounded-lg border border-border-subtle bg-void/40 p-5 sm:p-6">

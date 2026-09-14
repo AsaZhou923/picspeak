@@ -274,11 +274,11 @@ export default function GenerationDetailPage() {
 
             {(generation.source_photo_id || generation.source_review_id) && (
               <section className="ui-panel p-5">
-                <p className="font-mono text-xs uppercase tracking-[0.18em] text-ink-subtle">Source</p>
+                <p className="font-mono text-xs uppercase tracking-[0.18em] text-ink-subtle">{t('generation_detail_source')}</p>
                 <div className="mt-3 space-y-3 text-sm">
                   {generation.source_photo_id && (
                     <div className="rounded-control border border-border bg-raised/70 p-3">
-                      <p className="text-xs text-ink-subtle">{locale === 'zh' ? '参考原图' : 'Source photo'}</p>
+                      <p className="text-xs text-ink-subtle">{t('generation_detail_source_photo')}</p>
                       <p className="mt-1 font-mono text-xs text-ink">{generation.source_photo_id}</p>
                     </div>
                   )}
@@ -287,7 +287,7 @@ export default function GenerationDetailPage() {
                       href={`/reviews/${generation.source_review_id}`}
                       className="block rounded-control border border-gold/25 bg-gold/10 p-3 transition-colors hover:bg-gold/15"
                     >
-                      <p className="text-xs text-gold/85">{locale === 'zh' ? '来源点评' : 'Source review'}</p>
+                      <p className="text-xs text-gold/85">{t('generation_detail_source_review')}</p>
                       <p className="mt-1 font-mono text-xs text-ink">{generation.source_review_id}</p>
                     </Link>
                   )}

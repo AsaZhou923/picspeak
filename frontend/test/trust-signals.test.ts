@@ -21,6 +21,13 @@ test('editorial policy page is crawlable and covers required trust topics', () =
   assert.match(source, /singlePageAlternates\(POLICY_PATH\)/);
   assert.match(source, /'@type': 'WebPage'/);
   assert.match(source, /dateModified: '2026-08-09'/);
+  assert.match(source, /headers\(\)/);
+  assert.match(source, /x-picspeak-locale/);
+  assert.match(source, /POLICY_COPY: Record<Locale, PolicyCopy>/);
+  assert.match(source, /编辑与纠错政策/);
+  assert.match(source, /編集・訂正ポリシー/);
+  assert.match(source, /name: title/);
+  assert.match(source, /description,/);
 
   for (const topic of [
     'Editorial Review',
@@ -37,12 +44,18 @@ test('editorial policy page is crawlable and covers required trust topics', () =
 
 test('author profile keeps verified identity links and adds policy-backed publishing principles', () => {
   const source = readFrontendFile('src/app/author/asa-zhou/page.tsx');
-  const visibleAuthorCopy = source
-    .split('<section className="mt-10 space-y-5 text-sm leading-8 text-ink-muted">')[1]
-    ?.split('</section>')[0] ?? '';
-  const words = visibleAuthorCopy.match(/[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*/g) ?? [];
+  const englishAuthorCopy = source
+    .split('en: {')[1]
+    ?.split('zh: {')[0] ?? '';
+  const words = englishAuthorCopy.match(/[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*/g) ?? [];
 
-  assert.ok(words.length >= 300, `expected 300+ visible words, got ${words.length}`);
+  assert.ok(words.length >= 300, `expected 300+ English copy words, got ${words.length}`);
+  assert.match(source, /headers\(\)/);
+  assert.match(source, /x-picspeak-locale/);
+  assert.match(source, /const blogHref = `\/\$\{locale\}\/blog`/);
+  assert.match(source, /AUTHOR_COPY: Record<Locale, AuthorCopy>/);
+  assert.match(source, /AI 摄影点评系统/);
+  assert.match(source, /AI 写真批評システム/);
   assert.match(source, /sameAs: \[siteConfig\.social\.x, siteConfig\.social\.githubProfile\]/);
   assert.match(source, /publishingPrinciples: POLICY_URL/);
   assert.match(source, /'@id': siteConfig\.organizationId/);
@@ -73,6 +86,10 @@ test('AI markdown and llms.txt publish trust metadata consistently', () => {
   assert.match(llmsText, /Author profile: https:\/\/www\.picspeak\.art\/author\/asa-zhou/);
   assert.match(llmsText, /Last reviewed: 2026-08-09/);
   assert.match(llmsText, /do not infer extra license rights/);
+  for (const locale of ['en', 'zh', 'ja']) {
+    assert.match(llmsText, new RegExp(`https://www\\.picspeak\\.art/${locale}/blog`));
+    assert.match(llmsText, new RegExp(`https://www\\.picspeak\\.art/${locale}/updates`));
+  }
 
   const markdown = buildAiMarkdownContent(policyMirror);
   assert.match(markdown, new RegExp(`Author: ${siteConfig.author.name}`));

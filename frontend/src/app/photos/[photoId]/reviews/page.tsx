@@ -41,7 +41,7 @@ export default function PhotoReviewsPage() {
         setItems((prev) => (nextCursor ? [...prev, ...data.items] : data.items));
         setCursor(data.next_cursor);
       } catch (err) {
-        setError(formatUserFacingError(t, err, '获取历史点评失败，请重试'));
+        setError(formatUserFacingError(t, err, t('reviews_err_fetch')));
       } finally {
         setLoading(false);
         setLoadingMore(false);
@@ -57,25 +57,22 @@ export default function PhotoReviewsPage() {
   return (
     <div className="min-h-screen">
       <div className="max-w-2xl mx-auto px-6 py-12 animate-fade-in">
-        {/* Back */}
         <button
           onClick={() => router.back()}
           className="flex items-center gap-1.5 text-xs text-ink-subtle hover:text-ink-muted transition-colors mb-8"
         >
           <ArrowLeft size={12} />
-          返回
+          {t('back_btn')}
         </button>
 
-        {/* Header */}
         <div className="mb-10">
           <p className="text-xs text-gold/70 font-mono mb-2 tracking-widest uppercase">
-            — 照片历史点评
+            — {t('review_btn_photo_history')}
           </p>
-          <h1 className="font-display text-4xl sm:text-5xl mb-2">历史记录</h1>
+          <h1 className="font-display text-4xl sm:text-5xl mb-2">{t('account_reviews_headline')}</h1>
           <p className="text-xs text-ink-subtle font-mono">{photoId}</p>
         </div>
 
-        {/* Content */}
         {loading ? (
           <div className="space-y-3">
             {[0, 1, 2].map((i) => (
@@ -89,12 +86,12 @@ export default function PhotoReviewsPage() {
           </div>
         ) : items.length === 0 ? (
           <div className="text-center py-16 space-y-3">
-            <p className="text-ink-muted">这张照片还没有点评记录</p>
+            <p className="text-ink-muted">{t('reviews_empty')}</p>
             <Link
               href="/workspace"
               className="text-sm text-gold hover:text-gold-light transition-colors"
             >
-              前往工作台评图 →
+              {t('reviews_empty_cta')} →
             </Link>
           </div>
         ) : (
@@ -127,7 +124,6 @@ export default function PhotoReviewsPage() {
           </div>
         )}
 
-        {/* Load more */}
         {cursor && !loading && (
           <div className="mt-6 flex justify-center">
             <button
@@ -136,7 +132,7 @@ export default function PhotoReviewsPage() {
               className="flex items-center gap-2 px-5 py-2 border border-border text-ink-muted text-sm rounded hover:border-gold/40 transition-colors disabled:opacity-50"
             >
               {loadingMore ? <LoadingSpinner size={16} /> : null}
-              加载更多
+              {t('reviews_load_more')}
             </button>
           </div>
         )}

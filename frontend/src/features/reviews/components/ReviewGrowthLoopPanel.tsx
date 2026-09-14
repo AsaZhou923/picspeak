@@ -21,7 +21,7 @@ function getLoopCopy(locale: 'zh' | 'en' | 'ja') {
       body: 'まず進み方を選びます。同じ写真で修正を検証するか、新しい写真で改善をやり直すかです。',
       replayTitle: '同じ写真で修正の効き目を確認する',
       replayBody: '露出、色温度、トリミング、局所コントラストのような短い調整を確かめるのに向いています。',
-      uploadTitle: '新しい写真で清単を持って撮り直す',
+      uploadTitle: '新しい写真でチェックリストを持って撮り直す',
       uploadBody: '機位、タイミング、背景整理、主題分離のように撮り直しが必要な改善に向いています。',
       checklistLabel: 'Next-Shoot Checklist',
       checklistTitle: '次回はまずこの 3 つ',

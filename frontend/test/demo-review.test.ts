@@ -81,6 +81,13 @@ test('demo review route emits the structured data helper for public rich results
 
   assert.match(layoutSource, /buildDemoReviewJsonLd/);
   assert.match(layoutSource, /picspeak-demo-review-structured-data/);
+  assert.match(layoutSource, /headers\(\)/);
+  assert.match(layoutSource, /x-picspeak-locale/);
+  assert.match(layoutSource, /DEMO_HERO_COPY: Record<Locale/);
+  assert.match(layoutSource, /公开 AI 摄影点评示例/);
+  assert.match(layoutSource, /公開 AI 写真批評サンプル/);
+  assert.match(layoutSource, /title: 'AI Photo Critique Example'/);
+  assert.match(layoutSource, /locale: 'en'/);
 });
 
 test('demo critique detail copy is localized for Chinese', () => {

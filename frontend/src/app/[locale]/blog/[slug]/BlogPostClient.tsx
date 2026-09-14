@@ -10,6 +10,7 @@ import { getBlogReferences } from '@/lib/blog-references';
 import { formatBlogViewCount, shouldTrackBlogView } from '@/lib/blog-view-stats';
 import { getBlogWorkspaceCta, type ContentConversionEntrypoint } from '@/lib/content-conversion';
 import { I18nProvider, useI18n, type Locale } from '@/lib/i18n';
+import { getInitialTranslations } from '@/lib/i18n-initial';
 import { serializeJsonLd } from '@/lib/json-ld';
 import { markProductAttributionSource, trackProductEvent } from '@/lib/product-analytics';
 import { buildBlogBreadcrumbJsonLd, buildBlogPostingJsonLd } from '@/lib/seo';
@@ -335,7 +336,10 @@ export default function BlogPostClient({ locale, slug }: { locale?: string; slug
     : undefined;
 
   return (
-    <I18nProvider initialLocale={pinnedLocale}>
+    <I18nProvider
+      initialLocale={pinnedLocale}
+      initialMessages={pinnedLocale ? getInitialTranslations(pinnedLocale) : undefined}
+    >
       <BlogPostContent slug={slug} />
     </I18nProvider>
   );

@@ -171,7 +171,11 @@ Normal single-photo review is a separate path: Qwen 3.5 remains the compatibilit
 ### SEO, locale, and content
 
 - English, Chinese, and Japanese content is represented across `i18n-*.ts`, localized routes, blog/update JSON files, and SEO helpers.
+- `i18n-en.ts` defines the canonical key set; Chinese and Japanese dictionaries must explicitly define every key rather than spreading the English dictionary. Keep interpolation placeholders aligned and extend `i18n-contracts.test.ts` when adding shared product terms.
+- Request locale resolution is path, then exact locale cookie, then `Accept-Language`, with English as the unsupported-language fallback. Public single-URL pages that vary by cookie or language must pair shared caching with `Vary: Cookie, Accept-Language`.
+- User-facing API and task failures must resolve stable backend error codes through `error-utils.ts`; do not render backend `message` or task-event text directly.
 - `/generate/prompts` and `/generate/prompts/[id]` are crawlable GPT Image 2 prompt-example pages backed by `content/generation/prompt-examples.ts`; keep static params, metadata, JSON-LD, localized visible titles, and sitemap entries aligned.
+- Prompt examples distinguish source-language text from localized adaptations. Copy, apply, detail, structured-data, and sitemap surfaces must use the shared prompt-presentation helper and label the displayed language accurately.
 - `/retake` is an indexable public product page with canonical metadata, sitemap coverage, public caching, and WebPage/SoftwareApplication/BreadcrumbList schema. Arbitrary private review pages remain `noindex` and private; only the canonical demo review ID may be indexed and cached publicly, while legacy demo IDs permanently redirect to it.
 - `frontend/src/lib/app-route-roots.ts` is the early 404 manifest for public routes. Adding a top-level App route, Lens Notes slug, or Prompt example ID requires updating this manifest; `locale-default.test.ts` locks it to the source content collections.
 - Homepage Organization/Product/WebSite/Person/FAQ schema belongs to the server-rendered `HomeStructuredData`; `[locale]/layout.tsx` must stay schema-neutral so Blog and Updates do not inherit homepage FAQ or breadcrumbs.

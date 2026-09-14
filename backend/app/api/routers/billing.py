@@ -306,6 +306,7 @@ def create_image_credit_pack_checkout(
                 actor.user,
                 pack=IMAGE_CREDIT_PACK_KEY,
                 credits=IMAGE_CREDIT_PACK_CREDITS,
+                locale=payload.locale,
             )
         except LemonSqueezyConfigurationError as exc:
             raise api_error(status.HTTP_503_SERVICE_UNAVAILABLE, 'LEMONSQUEEZY_NOT_CONFIGURED', str(exc)) from exc

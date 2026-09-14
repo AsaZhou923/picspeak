@@ -191,9 +191,9 @@ const PROMPT_EXAMPLE_TITLE_OVERRIDES: Record<string, LocalizedGenerationPromptEx
     ja: 'サイバーパンクネオン UI デザインシステム',
   },
   'ui-ai-game-dev-overview-slide': {
-    zh: '日语 AI 游戏开发概览幻灯片提示词',
+    zh: '日语 AI 游戏开发概览幻灯片',
     en: 'Japanese AI Game Dev Overview Slide Prompt',
-    ja: 'AI ゲーム開発概要スライドプロンプト',
+    ja: 'AI ゲーム開発概要スライド',
   },
   'experimental-dark-myth-scene': {
     zh: '狮驼岭暗黑神话场景',
@@ -223,6 +223,25 @@ const PROMPT_EXAMPLE_TITLE_OVERRIDES: Record<string, LocalizedGenerationPromptEx
 };
 
 const MOJIBAKE_PATTERN = /[�銈銉鎽鐓鍐鏋瑭鈥閫]/;
+const PROMPT_SOURCE_LOCALE_OVERRIDES: Partial<Record<string, GenerationPromptExampleLocale>> = {
+  'poster-chengdu-food-map': 'zh',
+  'ui-ai-game-dev-overview-slide': 'ja',
+};
+const PROMPT_LANGUAGE_LABELS: Record<
+  'source' | 'localized',
+  Record<GenerationPromptExampleLocale, Record<SupportedLocale, string>>
+> = {
+  source: {
+    zh: { zh: '中文原文', en: 'Chinese source', ja: '中国語原文' },
+    en: { zh: '英文原文', en: 'English source', ja: '英語原文' },
+    ja: { zh: '日文原文', en: 'Japanese source', ja: '日本語原文' },
+  },
+  localized: {
+    zh: { zh: '中文适配版', en: 'Chinese adaptation', ja: '中国語版' },
+    en: { zh: '英文适配版', en: 'English adaptation', ja: '英語版' },
+    ja: { zh: '日文适配版', en: 'Japanese adaptation', ja: '日本語版' },
+  },
+};
 
 function isMojibakeLike(text: string) {
   return MOJIBAKE_PATTERN.test(text);
@@ -238,6 +257,62 @@ export function getLocalizedPromptExampleText(
     return localized;
   }
   return text.en || text.zh || text.ja;
+}
+
+function detectPromptLocale(text: string): GenerationPromptExampleLocale {
+  const latinCount = (text.match(/[A-Za-z]/g) ?? []).length;
+  const hanCount = (text.match(/[\u4e00-\u9fff]/g) ?? []).length;
+  const kanaCount = (text.match(/[\u3040-\u30ff]/g) ?? []).length;
+  if (kanaCount >= 16 && kanaCount + hanCount > latinCount * 0.4) return 'ja';
+  if (hanCount >= 16 && kanaCount === 0 && hanCount > latinCount * 0.4) return 'zh';
+  return 'en';
+}
+
+function isTextInLocale(text: string, locale: GenerationPromptExampleLocale): boolean {
+  if (isMojibakeLike(text) || !text.trim()) return false;
+  if (locale === 'en') {
+    const latinCount = (text.match(/[A-Za-z]/g) ?? []).length;
+    const hanCount = (text.match(/[\u4e00-\u9fff]/g) ?? []).length;
+    const kanaCount = (text.match(/[\u3040-\u30ff]/g) ?? []).length;
+    return latinCount >= 16 && hanCount + kanaCount <= latinCount * 0.25;
+  }
+  if (locale === 'ja') return /[\u3040-\u30ff]/.test(text);
+  return /[\u4e00-\u9fff]/.test(text) && !/[\u3040-\u30ff]/.test(text);
+}
+
+export function getPromptExampleSourceLocale(example: GenerationPromptExample): GenerationPromptExampleLocale {
+  const override = PROMPT_SOURCE_LOCALE_OVERRIDES[example.id];
+  if (override) return override;
+  return detectPromptLocale(example.prompt.en || example.prompt.zh || example.prompt.ja);
+}
+
+export function getPromptExamplePromptPresentation(
+  example: GenerationPromptExample,
+  locale: Locale | string,
+): { text: string; textLocale: GenerationPromptExampleLocale; localized: boolean } {
+  const requestedLocale = normalizeLocale(locale);
+  const sourceLocale = getPromptExampleSourceLocale(example);
+  const sourceText = example.prompt[sourceLocale] || example.prompt.en || example.prompt.zh || example.prompt.ja;
+  const requestedText = example.prompt[requestedLocale];
+
+  if (
+    requestedLocale !== sourceLocale &&
+    requestedText &&
+    requestedText !== sourceText &&
+    isTextInLocale(requestedText, requestedLocale)
+  ) {
+    return { text: requestedText, textLocale: requestedLocale, localized: true };
+  }
+
+  return { text: sourceText, textLocale: sourceLocale, localized: false };
+}
+
+export function getPromptExampleLanguageLabel(
+  textLocale: GenerationPromptExampleLocale,
+  uiLocale: Locale | string,
+  localized = false,
+): string {
+  return PROMPT_LANGUAGE_LABELS[localized ? 'localized' : 'source'][textLocale][normalizeLocale(uiLocale)];
 }
 
 export function getLocalizedPromptExampleCategoryLabel(
@@ -272,7 +347,7 @@ export function buildPromptExampleCreativeWorkJsonLd(
   site: { siteUrl: string; organizationId?: string },
 ) {
   const title = getLocalizedPromptExampleTitle(example, 'en');
-  const prompt = getLocalizedPromptExampleText(example.prompt, 'en');
+  const prompt = getPromptExamplePromptPresentation(example, 'en').text;
   const categoryLabel = GENERATION_PROMPT_EXAMPLE_CATEGORY_LABELS[example.category];
 
   return {
@@ -481,8 +556,8 @@ export const GENERATION_PROMPT_EXAMPLES = [
     imagePath: "/generation-prompt-examples/poster-chengdu-food-map.jpg",
     prompt: {
       zh: "一张手绘风格的城市美食地图，以成都为主题。画面以鸟瞰视角的手绘简化城市地图为底，标注主要道路和地标但不追求精确比例而是追求可爱的手绘感。地图上分布着 12 个美食地点的精致手绘小插画：春熙路的串串香（一把竹签插着各种食材冒着热气）、宽窄巷子的三大炮（三个糯米团子飞向铜盘）、建设路的蛋烘糕（金黄酥脆正在翻面）、玉林路的火锅（九宫格锅翻滚冒泡）等，每个插画约占地图的 5% 面积，旁边用手写体标注店名和一句推荐语\"凌晨两点还在排队的那家\"。地图边缘用手绘藤蔓和辣椒装饰形成边框。右下角有一个手绘指南针和图例说明。左上角标题\"成都·吃货暴走地图\"使用胖圆的手绘美术字配辣椒装饰。整体画风为水彩+彩铅混合的手绘质感，颜色以暖色系（辣椒红、姜黄、翠绿）为主，图片比例 1:1。",
-      en: "一张手绘风格的城市美食地图，以成都为主题。画面以鸟瞰视角的手绘简化城市地图为底，标注主要道路和地标但不追求精确比例而是追求可爱的手绘感。地图上分布着 12 个美食地点的精致手绘小插画：春熙路的串串香（一把竹签插着各种食材冒着热气）、宽窄巷子的三大炮（三个糯米团子飞向铜盘）、建设路的蛋烘糕（金黄酥脆正在翻面）、玉林路的火锅（九宫格锅翻滚冒泡）等，每个插画约占地图的 5% 面积，旁边用手写体标注店名和一句推荐语\"凌晨两点还在排队的那家\"。地图边缘用手绘藤蔓和辣椒装饰形成边框。右下角有一个手绘指南针和图例说明。左上角标题\"成都·吃货暴走地图\"使用胖圆的手绘美术字配辣椒装饰。整体画风为水彩+彩铅混合的手绘质感，颜色以暖色系（辣椒红、姜黄、翠绿）为主，图片比例 1:1。",
-      ja: "一张手绘风格的城市美食地图，以成都为主题。画面以鸟瞰视角的手绘简化城市地图为底，标注主要道路和地标但不追求精确比例而是追求可爱的手绘感。地图上分布着 12 个美食地点的精致手绘小插画：春熙路的串串香（一把竹签插着各种食材冒着热气）、宽窄巷子的三大炮（三个糯米团子飞向铜盘）、建设路的蛋烘糕（金黄酥脆正在翻面）、玉林路的火锅（九宫格锅翻滚冒泡）等，每个插画约占地图的 5% 面积，旁边用手写体标注店名和一句推荐语\"凌晨两点还在排队的那家\"。地图边缘用手绘藤蔓和辣椒装饰形成边框。右下角有一个手绘指南针和图例说明。左上角标题\"成都·吃货暴走地图\"使用胖圆的手绘美术字配辣椒装饰。整体画风为水彩+彩铅混合的手绘质感，颜色以暖色系（辣椒红、姜黄、翠绿）为主，图片比例 1:1。",
+      en: "A hand-drawn city food map themed around Chengdu. Use a simplified cute illustrated city map from a bird's-eye view as the base, marking main roads and landmarks without strict scale accuracy. Place 12 delicate food-location illustrations across the map: Chuanchuan skewers on Chunxi Road with steaming bamboo skewers, San Da Pao rice cakes in Kuanzhai Alley flying toward a brass plate, Jianshe Road dan hong gao being flipped until golden and crisp, Yulin Road hot pot bubbling in a nine-grid pot, and other Chengdu snacks. Each food illustration should take about 5% of the map, with handwritten shop names and a short recommendation note such as \"the place still queued at 2 a.m.\" Decorate the map border with hand-drawn vines and chili peppers. Add a small compass and legend in the lower right. Put the title \"Chengdu Food Walk Map\" in the upper left with chunky rounded hand-lettering and chili decorations. Mixed watercolor and colored-pencil texture, warm palette of chili red, ginger yellow, and emerald green, 1:1 aspect ratio.",
+      ja: "成都をテーマにした手描き風の都市グルメマップ。鳥瞰視点のかわいい簡略化された市街地図をベースに、主要道路やランドマークを描くが、正確な縮尺より手描きの楽しさを優先する。地図上に 12 か所のグルメスポットの小さなイラストを配置する：春熙路の串串香は湯気の立つ竹串、寛窄巷子の三大砲は銅皿へ飛ぶ三つのもち団子、建設路の蛋烘糕は黄金色に焼けて返される瞬間、玉林路の火鍋は九宮格の鍋が泡立つ様子など。各イラストは地図の約 5% の大きさで、横に手書き風の店名と「午前 2 時でも行列ができる店」のような短い推薦コメントを添える。地図の縁は手描きのつる植物と唐辛子で飾る。右下に手描きの方位磁針と凡例を置く。左上のタイトルは「成都グルメ散歩マップ」とし、丸みのある太めの手描き文字と唐辛子装飾を使う。水彩と色鉛筆を混ぜた質感、唐辛子の赤、生姜の黄色、翡翠の緑を中心にした暖色パレット、1:1 比率。",
     },
     suggestedTemplateKey: "social_visual",
     suggestedStyle: "illustration",
@@ -774,15 +849,15 @@ export const GENERATION_PROMPT_EXAMPLES = [
     title: {
       zh: "赛博朋克霓虹 UI 设计系统",
       en: "Cyberpunk Neon UI Design System",
-      ja: "Cyberpunk Neon UI Design System",
+      ja: "サイバーパンクネオン UI デザインシステム",
     },
     author: "AZLnfvp",
     sourceUrl: "https://x.com/AZLnfvp/status/2046468976092533180",
     imagePath: "/generation-prompt-examples/ui-cyberpunk-neon-system.jpg",
     prompt: {
       zh: "用未来都市风格生成UI设计系统,灵感来自赛博朋克城市夜景,包含霓虹灯、玻璃建筑反射、高对比光影,配色以紫色、蓝色、粉色霓虹为主,设计网页Dashboard、移动端界面、卡片、按钮、控件等,视觉炫酷、层次丰富、科技感极强",
-      en: "用未来都市风格生成UI设计系统,灵感来自赛博朋克城市夜景,包含霓虹灯、玻璃建筑反射、高对比光影,配色以紫色、蓝色、粉色霓虹为主,设计网页Dashboard、移动端界面、卡片、按钮、控件等,视觉炫酷、层次丰富、科技感极强",
-      ja: "用未来都市风格生成UI设计系统,灵感来自赛博朋克城市夜景,包含霓虹灯、玻璃建筑反射、高对比光影,配色以紫色、蓝色、粉色霓虹为主,设计网页Dashboard、移动端界面、卡片、按钮、控件等,视觉炫酷、层次丰富、科技感极强",
+      en: "Generate a UI design system in a futuristic city style, inspired by cyberpunk night streets. Include neon lights, reflections on glass buildings, and high-contrast lighting. Use a purple, blue, and pink neon palette. Design a web dashboard, mobile screens, cards, buttons, controls, and component states. The visual language should feel striking, layered, highly technological, and cinematic.",
+      ja: "未来都市風の UI デザインシステムを生成する。サイバーパンクの夜景から着想し、ネオンライト、ガラス建築の反射、高コントラストな光と影を含める。配色は紫、青、ピンクのネオンを中心にする。Web ダッシュボード、モバイル画面、カード、ボタン、各種コントロールと状態を設計する。視覚はクールで階層が豊か、強いテクノロジー感とシネマティックな印象を持たせる。",
     },
     suggestedTemplateKey: "custom_creation",
     suggestedStyle: "illustration",
@@ -794,14 +869,14 @@ export const GENERATION_PROMPT_EXAMPLES = [
     title: {
       zh: "日本 AI 游戏开发概览幻灯片",
       en: "Japanese AI Game Dev Overview Slide Prompt",
-      ja: "Japanese AI Game Dev Overview Slide Prompt",
+      ja: "AI ゲーム開発概要スライド",
     },
     author: "ailovedirector",
     sourceUrl: "https://x.com/ailovedirector/status/2046905387274891296",
     imagePath: "/generation-prompt-examples/ui-ai-game-dev-overview-slide.jpg",
     prompt: {
-      zh: "横長のパワポ画像ここで生成してみて　どのモデル使ってるか判定するから、今のAIゲーム開発の概要をまとめた1枚パワポで　日本語で\r\n\r\nゲーム開発の技術に関して、工数ベースでどこにパワーかかるかの分析資料といかに量産が大事かについての説明とかのパワポ画も作って",
-      en: "横長のパワポ画像ここで生成してみて　どのモデル使ってるか判定するから、今のAIゲーム開発の概要をまとめた1枚パワポで　日本語で\r\n\r\nゲーム開発の技術に関して、工数ベースでどこにパワーかかるかの分析資料といかに量産が大事かについての説明とかのパワポ画も作って",
+      zh: "生成一张横向 PowerPoint 风格的幻灯片图片，内容用日语呈现，总结当前 AI 游戏开发的概览。画面应包含：游戏开发技术中各环节按工时消耗的分析图、哪些环节最吃资源、为什么量产能力很重要，以及 AI 如何帮助角色、场景、代码、测试和运营素材快速迭代。整体是清晰的商业汇报风格，信息分区明确，图表和短句结合，适合一页讲清 AI 游戏开发现状。",
+      en: "Create a landscape PowerPoint-style slide image written in Japanese, summarizing the current state of AI game development. Include a work-hour based analysis of where game development effort is concentrated, which technical areas consume the most resources, why mass production capability matters, and how AI helps iterate characters, environments, code, testing, and live-ops assets. Make it a clean business presentation slide with clear sections, charts, and concise Japanese labels that explain the overview in one page.",
       ja: "横長のパワポ画像ここで生成してみて　どのモデル使ってるか判定するから、今のAIゲーム開発の概要をまとめた1枚パワポで　日本語で\r\n\r\nゲーム開発の技術に関して、工数ベースでどこにパワーかかるかの分析資料といかに量産が大事かについての説明とかのパワポ画も作って",
     },
     suggestedTemplateKey: "custom_creation",
@@ -1081,8 +1156,8 @@ export const GENERATION_PROMPT_EXAMPLES = [
     imagePath: "/generation-prompt-examples/ui-song-dynasty-social-feed.jpg",
     prompt: {
       zh: "\"宋朝人的朋友圈\"/\"SONG DYNASTY SOCIAL MEDIA FEED\"，古今穿越幽默融合界面设计风格，画面模拟手机社交媒体界面，但内容全部是宋朝场景头像是宋代文人画像，用户名\"苏东坡SuShi_Official\"，发布内容\"刚到黄州，被贬了但心情还行。今天自己做了东坡肉，味道绝了，附菜谱：\"，配图为工笔画风格的东坡肉特写，点赞列表\"黄庭坚、秦观、佛印等126人\"，评论区\"王安石：呵呵\"\"司马光：还是那个味道\"，界面元素如点赞图标用宋代花纹替代，状态栏显示\"大宋移动 5G\"和\"元丰三年\"，配色为手机深色模式搭配宋代雅致色调，历史与社交媒体的趣味碰撞杰作",
-      en: "\"宋朝人的朋友圈\"/\"SONG DYNASTY SOCIAL MEDIA FEED\"，古今穿越幽默融合界面设计风格，画面模拟手机社交媒体界面，但内容全部是宋朝场景头像是宋代文人画像，用户名\"苏东坡SuShi_Official\"，发布内容\"刚到黄州，被贬了但心情还行。今天自己做了东坡肉，味道绝了，附菜谱：\"，配图为工笔画风格的东坡肉特写，点赞列表\"黄庭坚、秦观、佛印等126人\"，评论区\"王安石：呵呵\"\"司马光：还是那个味道\"，界面元素如点赞图标用宋代花纹替代，状态栏显示\"大宋移动 5G\"和\"元丰三年\"，配色为手机深色模式搭配宋代雅致色调，历史与社交媒体的趣味碰撞杰作",
-      ja: "\"宋朝人的朋友圈\"/\"SONG DYNASTY SOCIAL MEDIA FEED\"，古今穿越幽默融合界面设计风格，画面模拟手机社交媒体界面，但内容全部是宋朝场景头像是宋代文人画像，用户名\"苏东坡SuShi_Official\"，发布内容\"刚到黄州，被贬了但心情还行。今天自己做了东坡肉，味道绝了，附菜谱：\"，配图为工笔画风格的东坡肉特写，点赞列表\"黄庭坚、秦观、佛印等126人\"，评论区\"王安石：呵呵\"\"司马光：还是那个味道\"，界面元素如点赞图标用宋代花纹替代，状态栏显示\"大宋移动 5G\"和\"元丰三年\"，配色为手机深色模式搭配宋代雅致色调，历史与社交媒体的趣味碰撞杰作",
+      en: "\"Song Dynasty Social Media Feed\", a humorous time-travel UI concept blending ancient and modern culture. The image imitates a mobile social media app, but every element belongs to a Song dynasty scene. Profile avatars are Song literati portraits. The username is \"Su Dongpo SuShi_Official\" and the post says: \"Just arrived in Huangzhou. Exiled, but still in a decent mood. Made Dongpo pork today and it tastes amazing. Recipe attached:\" The attached image is a meticulous gongbi-style close-up of Dongpo pork. Likes list: \"Huang Tingjian, Qin Guan, Foyin and 126 others.\" Comment area includes \"Wang Anshi: hehe\" and \"Sima Guang: still the same flavor.\" Interface icons such as the like button are replaced with Song decorative patterns. The status bar reads \"Great Song Mobile 5G\" and \"Yuanfeng Year 3.\" Use dark-mode mobile UI colors mixed with elegant Song dynasty tones, creating a playful collision of history and social media.",
+      ja: "「宋代のソーシャルフィード」。古代と現代をユーモラスに融合したタイムスリップ風 UI デザイン。画面はスマートフォンのソーシャルメディアアプリを模しているが、内容はすべて宋代の場面にする。プロフィール画像は宋代文人の肖像。ユーザー名は「蘇東坡 SuShi_Official」、投稿文は「黄州に着いたばかり。左遷されたけれど気分はまあまあ。今日は東坡肉を作った。味は最高。レシピを添付：」。添付画像は工筆画風の東坡肉クローズアップ。いいね一覧は「黄庭堅、秦観、仏印ほか 126 人」。コメント欄には「王安石：ふふ」「司馬光：相変わらずの味」。いいねアイコンなどの UI 要素は宋代文様に置き換える。ステータスバーには「大宋モバイル 5G」と「元豊三年」。スマホのダークモード配色に宋代らしい雅な色調を合わせ、歴史と SNS が楽しく衝突する作品にする。",
     },
     suggestedTemplateKey: "custom_creation",
     suggestedStyle: "illustration",

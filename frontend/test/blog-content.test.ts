@@ -241,6 +241,8 @@ test('generate page keeps template copy crawlable through a server SEO fallback'
   assert.match(pageSource, /<GeneratePageClient \/>/);
   assert.match(clientSource, /^'use client';/);
   assert.match(fallbackSource, /data-seo-generate-fallback/);
+  assert.match(fallbackSource, /enTranslations\[templateCopyKey\(template\.key\)\.description\]/);
+  assert.doesNotMatch(fallbackSource, /template\.description\}/);
   assert.match(fallbackSource, /GENERATION_TEMPLATES/);
 });
 

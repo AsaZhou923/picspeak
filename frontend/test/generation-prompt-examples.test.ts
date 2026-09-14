@@ -13,6 +13,9 @@ import {
   getLocalizedPromptExampleCategoryLabel,
   getLocalizedPromptExampleText,
   getLocalizedPromptExampleTitle,
+  getPromptExampleLanguageLabel,
+  getPromptExamplePromptPresentation,
+  getPromptExampleSourceLocale,
   normalizePromptExampleExcerpt,
 } from '../src/content/generation/prompt-examples.ts';
 
@@ -105,4 +108,42 @@ test('localized prompt helpers avoid mojibake data in visible copy', () => {
       assert.ok(!getLocalizedPromptExampleText(example.prompt, locale).includes('�'), `replacement char in prompt: ${example.id}:${locale}`);
     }
   }
+});
+
+test('prompt text presentation exposes source language instead of pretending every prompt is localized', () => {
+  const chengdu = getGenerationPromptExample('poster-chengdu-food-map');
+  const gameSlide = getGenerationPromptExample('ui-ai-game-dev-overview-slide');
+  const bodega = getGenerationPromptExample('photo-bodega-night-musician');
+
+  assert.ok(chengdu);
+  assert.ok(gameSlide);
+  assert.ok(bodega);
+  assert.equal(getPromptExampleSourceLocale(chengdu), 'zh');
+  assert.equal(getPromptExamplePromptPresentation(chengdu, 'en').textLocale, 'en');
+  assert.equal(getPromptExamplePromptPresentation(chengdu, 'en').localized, true);
+  assert.equal(getPromptExamplePromptPresentation(chengdu, 'ja').textLocale, 'ja');
+  assert.equal(getPromptExamplePromptPresentation(chengdu, 'ja').localized, true);
+  assert.equal(getPromptExampleSourceLocale(gameSlide), 'ja');
+  assert.equal(getPromptExamplePromptPresentation(gameSlide, 'en').textLocale, 'en');
+  assert.equal(getPromptExamplePromptPresentation(gameSlide, 'en').localized, true);
+  assert.equal(getPromptExampleSourceLocale(bodega), 'en');
+  assert.equal(getPromptExamplePromptPresentation(bodega, 'zh').textLocale, 'en');
+  assert.equal(getPromptExampleLanguageLabel('ja', 'zh'), '日文原文');
+  assert.equal(getPromptExampleLanguageLabel('en', 'zh', true), '英文适配版');
+  assert.equal(getPromptExampleLanguageLabel('ja', 'en', true), 'Japanese adaptation');
+});
+
+test('prompt source detection tolerates English prompts that request small Chinese or Japanese text in the image', () => {
+  const englishWithOutputText = {
+    ...GENERATION_PROMPT_EXAMPLES[0],
+    id: 'test-english-with-output-text',
+    prompt: {
+      zh: 'Design a poster with the visible headline "春日" and a small Japanese caption "こんにちは", clean editorial layout, realistic paper texture, no watermark',
+      en: 'Design a poster with the visible headline "春日" and a small Japanese caption "こんにちは", clean editorial layout, realistic paper texture, no watermark',
+      ja: 'Design a poster with the visible headline "春日" and a small Japanese caption "こんにちは", clean editorial layout, realistic paper texture, no watermark',
+    },
+  };
+
+  assert.equal(getPromptExampleSourceLocale(englishWithOutputText), 'en');
+  assert.equal(getPromptExamplePromptPresentation(englishWithOutputText, 'ja').textLocale, 'en');
 });

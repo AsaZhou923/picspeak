@@ -847,7 +847,7 @@ def _run_openai_review(
 def run_ai_review(
     mode: str,
     image_url: str,
-    locale: str = 'zh',
+    locale: str = 'en',
     exif_data: dict | None = None,
     image_type: str = 'default',
     enforce_suggestion_structure: bool = True,

@@ -162,6 +162,7 @@ def create_generation(
         'source_review_public_id': payload.source_review_id,
         'source_photo_public_id': payload.source_photo_id,
         'analytics_source': payload.analytics_source,
+        'locale': payload.locale,
     }
     task = make_generation_task(
         owner_user_id=actor.user.id,
@@ -391,6 +392,7 @@ def reuse_generation(
         'model_snapshot': settings.image_generation_model_snapshot,
         'reference_image_count': 1 if image.source_photo_id is not None else 0,
         'analytics_source': request.query_params.get('analytics_source'),
+        'locale': payload.get('locale') if payload.get('locale') in {'zh', 'en', 'ja'} else 'en',
     }
     credits_reserved = estimate_image_generation_credits(
         quality=image.quality,

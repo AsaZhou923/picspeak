@@ -98,21 +98,21 @@ test('canonical redirects consolidate the demo alias and force HTTPS with www', 
   ]);
 });
 
-test('public responses advertise language variance and third-party preconnects', async () => {
+test('public responses advertise third-party preconnects without fake global language variance', async () => {
   const nextConfig = await loadNextConfig('public-headers');
 
   const routes = await nextConfig.headers();
   const globalRoute = routes.find((route) => route.source === '/:path*');
   const headers = new Map(globalRoute?.headers.map((header) => [header.key, header.value]) ?? []);
 
-  assert.equal(headers.get('Vary'), 'Accept-Language');
+  assert.equal(headers.get('Vary'), undefined);
   assert.match(headers.get('Link') ?? '', /rel=preconnect/);
   assert.match(headers.get('Link') ?? '', /https:\/\/clerk\.picspeak\.art/);
   assert.match(headers.get('Link') ?? '', /https:\/\/pub-7ae066210514433e84a850bc95c5f1a2\.r2\.dev/);
   assert.equal(headers.get('X-Frame-Options'), 'DENY');
 });
 
-test('cookie-localized interactive pages stay out of shared public-cache headers', async () => {
+test('localized public pages partition shared cache by cookie and accepted language', async () => {
   const nextConfig = await loadNextConfig('cache-headers');
 
   const routes = await nextConfig.headers();
@@ -123,13 +123,43 @@ test('cookie-localized interactive pages stay out of shared public-cache headers
       ),
     )
     .map((route) => route.source);
+  const localizedPublicPageSources = [
+    '/',
+    '/gallery',
+    '/updates',
+    '/generate/prompts',
+    '/generate/prompts/:id*',
+    '/reviews/rev_8424d4fbde054759',
+    '/privacy',
+    '/terms',
+    '/affiliate',
+    '/editorial-policy',
+    '/author/:path*',
+  ];
 
   assert.ok(publiclyCachedSources.includes('/:locale(zh|en|ja)/blog'));
   assert.ok(publiclyCachedSources.includes('/:locale(zh|en|ja)/blog/:slug*'));
+  assert.ok(publiclyCachedSources.includes('/:locale(zh|en|ja)/updates'));
+  assert.ok(publiclyCachedSources.includes('/'));
+  assert.ok(publiclyCachedSources.includes('/gallery'));
+  assert.ok(publiclyCachedSources.includes('/updates'));
   assert.ok(!publiclyCachedSources.includes('/blog'));
   assert.ok(!publiclyCachedSources.includes('/blog/:slug*'));
   assert.ok(!publiclyCachedSources.includes('/generate'));
+  assert.ok(publiclyCachedSources.includes('/generate/prompts'));
+  assert.ok(publiclyCachedSources.includes('/generate/prompts/:id*'));
   assert.ok(!publiclyCachedSources.includes('/retake'));
+  assert.ok(publiclyCachedSources.includes('/privacy'));
+  assert.ok(publiclyCachedSources.includes('/terms'));
+  assert.ok(publiclyCachedSources.includes('/affiliate'));
+  assert.ok(publiclyCachedSources.includes('/editorial-policy'));
+  assert.ok(publiclyCachedSources.includes('/author/:path*'));
+
+  for (const source of localizedPublicPageSources) {
+    const route = routes.find((candidate) => candidate.source === source);
+    const headers = new Map(route?.headers.map((header) => [header.key, header.value]) ?? []);
+    assert.equal(headers.get('Vary'), 'Cookie, Accept-Language');
+  }
 });
 
 test('the home AI mirror points directly to the canonical English homepage', async () => {
@@ -149,5 +179,16 @@ test('proxy scrubs forged locale headers and makes locale redirects private', ()
   assert.match(source, /requestHeaders\.delete\('x-picspeak-locale'\)/);
   assert.match(source, /NextResponse\.redirect\(redirectUrl, 307\)/);
   assert.match(source, /private, no-store, max-age=0, must-revalidate/);
-  assert.match(source, /response\.headers\.set\('Vary', 'Cookie'\)/);
+  assert.match(source, /response\.headers\.set\('Vary', 'Cookie, Accept-Language'\)/);
+});
+
+test('proxy localizes guarded 404 responses from path or cookie locale', () => {
+  const proxySource = new URL('../src/proxy.ts', import.meta.url);
+  const source = readFileSync(proxySource, 'utf8');
+
+  assert.match(source, /const NOT_FOUND_COPY/);
+  assert.match(source, /ページが見つかりません/);
+  assert.match(source, /页面不存在/);
+  assert.match(source, /unknownRouteResponse\(locale \?\? 'en'\)/);
+  assert.match(source, /<a href="\/\$\{locale\}">/);
 });

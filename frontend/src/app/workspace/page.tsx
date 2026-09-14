@@ -253,7 +253,7 @@ function WorkspacePageContent() {
         } else if (err.code === 'QUOTA_EXCEEDED') {
           setErrMessage(formatUserFacingError(t, err, t('err_quota')));
         } else {
-          setErrMessage(formatUserFacingError(t, err, err.message));
+          setErrMessage(formatUserFacingError(t, err, t('task_failed_detail')));
         }
       } else {
         setErrMessage(formatUserFacingError(t, err, t('err_upload')));
@@ -406,7 +406,7 @@ function WorkspacePageContent() {
                       <div className="photo-frame group relative aspect-[4/3] bg-raised">
                         <Image
                           src={preview}
-                          alt="Preview"
+                          alt={t('uploader_preview_alt')}
                           fill
                           className="object-contain transition-transform duration-300 group-hover:scale-[1.01]"
                           unoptimized

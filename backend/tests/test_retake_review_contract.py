@@ -8,7 +8,7 @@ from fastapi import HTTPException
 
 from app.api.routers.review_support import _public_comparison_payload, _resolve_source_review, _review_result_payload
 from app.db.models import ReviewStatus
-from app.schemas import ReviewCreateRequest
+from app.schemas import GenerationCreateRequest, ReviewCreateRequest
 from app.services.review_task_processor import _normalize_review_result_payload
 
 
@@ -34,6 +34,12 @@ class RetakeReviewContractTests(unittest.TestCase):
 
         self.assertEqual(payload.analysis_type, 'single')
         self.assertEqual(payload.review_model, 'qwen')
+        self.assertEqual(payload.locale, 'en')
+
+    def test_generation_create_locale_defaults_to_english(self) -> None:
+        payload = GenerationCreateRequest(prompt='A simple studio product photo')
+
+        self.assertEqual(payload.locale, 'en')
 
     def test_retake_analysis_is_always_pinned_to_luna(self) -> None:
         payload = _request(source_review_id='rev_source')

@@ -204,7 +204,7 @@ export default function UsagePage() {
         return;
       }
       closeExternalCheckoutWindow(checkoutWindow);
-      setBillingMessage(response.message);
+      setBillingMessage(response.status === 'already_active' ? t('usage_checkout_already_active') : t('usage_checkout_started'));
       setBillingModalOpen(true);
     } catch (err) {
       closeExternalCheckoutWindow(checkoutWindow);
@@ -236,7 +236,7 @@ export default function UsagePage() {
         return;
       }
       closeExternalCheckoutWindow(portalWindow);
-      setBillingMessage(response.message);
+      setBillingMessage(response.status === 'ready' ? t('usage_manage_ready') : t('usage_manage_unavailable'));
       setBillingModalOpen(true);
     } catch (err) {
       closeExternalCheckoutWindow(portalWindow);

@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import UpdatesPageContent from '@/components/marketing/UpdatesPageContent';
 import { I18nProvider, type Locale } from '@/lib/i18n';
+import { getInitialTranslations } from '@/lib/i18n-initial';
 import { serializeJsonLd } from '@/lib/json-ld';
 import { buildPublicBreadcrumbJsonLd, buildUpdatesCollectionJsonLd, UPDATES_LANGUAGE_ALTERNATES } from '@/lib/seo';
 import { siteConfig } from '@/lib/site';
@@ -88,7 +89,7 @@ export default async function LocaleUpdatesPage({ params }: Props) {
   });
 
   return (
-    <I18nProvider initialLocale={typedLocale}>
+    <I18nProvider initialLocale={typedLocale} initialMessages={getInitialTranslations(typedLocale)}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(collectionJsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbJsonLd) }} />
       <UpdatesPageContent homeHref={`/${typedLocale}`} />

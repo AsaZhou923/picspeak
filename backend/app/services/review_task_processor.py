@@ -524,12 +524,12 @@ def _process_task(db: Session, task: ReviewTask) -> None:
             return
 
     image_url = f'{settings.object_base_url.rstrip("/")}/{quote(photo.object_key)}'
-    payload_locale = (task.request_payload or {}).get('locale', 'zh')
+    payload_locale = (task.request_payload or {}).get('locale', 'en')
     payload_image_type = (task.request_payload or {}).get('image_type', 'default')
     analysis_type = (task.request_payload or {}).get('analysis_type', 'single')
     review_model = (task.request_payload or {}).get('review_model', 'qwen')
     if payload_locale not in {'zh', 'en', 'ja'}:
-        payload_locale = 'zh'
+        payload_locale = 'en'
     _transition_progress(db, task, 70, 'AI_REVIEW_STARTED', 'Running AI review')
 
     try:

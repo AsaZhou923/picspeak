@@ -17,6 +17,7 @@ import { getMyReviews } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { formatUserFacingError } from '@/lib/error-utils';
 import { useI18n } from '@/lib/i18n';
+import { localeToIntlLocale } from '@/lib/locale';
 import { getRetakeCoachCopy } from '@/lib/retake-coach-copy';
 import { buildRetakeWorkspaceHref, getEligibleRetakeSources } from '@/lib/retake-coach';
 import type { RetakeDimensionKey, ReviewHistoryItem } from '@/lib/types';
@@ -33,7 +34,7 @@ function SourceCard({ item }: { item: ReviewHistoryItem }) {
   const { locale } = useI18n();
   const copy = getRetakeCoachCopy(locale);
   const date = new Date(item.created_at).toLocaleDateString(
-    locale === 'zh' ? 'zh-CN' : locale === 'ja' ? 'ja-JP' : 'en-US',
+    localeToIntlLocale(locale),
     { year: 'numeric', month: 'short', day: 'numeric' }
   );
   const targetDimension = getWeakestDimension(item);

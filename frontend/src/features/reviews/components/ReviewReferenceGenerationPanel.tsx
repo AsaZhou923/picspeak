@@ -140,6 +140,7 @@ export function ReviewReferenceGenerationPanel({
           async: true,
           idempotency_key: `${reviewId}-${intent}-${Date.now()}`,
           analytics_source: analyticsSource,
+          locale,
         },
         token
       );

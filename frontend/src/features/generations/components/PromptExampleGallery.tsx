@@ -7,8 +7,9 @@ import { Check, Copy, ExternalLink, Sparkles, Wand2 } from 'lucide-react';
 import {
   GENERATION_PROMPT_EXAMPLE_CATEGORIES,
   GENERATION_PROMPT_EXAMPLES,
-  getLocalizedPromptExampleText,
   getLocalizedPromptExampleTitle,
+  getPromptExampleLanguageLabel,
+  getPromptExamplePromptPresentation,
   type GenerationPromptExample,
   type GenerationPromptExampleCategory,
 } from '@/content/generation/prompt-examples';
@@ -17,7 +18,6 @@ import { useI18n, type TranslationKey } from '@/lib/i18n';
 type CategoryFilter = 'all' | GenerationPromptExampleCategory;
 
 const CATEGORY_FILTERS = ['all', ...GENERATION_PROMPT_EXAMPLE_CATEGORIES] as const satisfies readonly CategoryFilter[];
-
 const CATEGORY_LABEL_KEYS = {
   all: 'generation_examples_category_all',
   photography: 'generation_examples_category_photography',
@@ -70,7 +70,7 @@ export function PromptExampleGallery({ onApply }: PromptExampleGalleryProps) {
 
   async function copyPrompt(example: GenerationPromptExample) {
     try {
-      await navigator.clipboard.writeText(getLocalizedPromptExampleText(example.prompt, locale));
+      await navigator.clipboard.writeText(getPromptExamplePromptPresentation(example, locale).text);
       setCopiedId(example.id);
       window.setTimeout(() => setCopiedId((current) => (current === example.id ? null : current)), 1600);
     } catch {
@@ -162,7 +162,8 @@ export function PromptExampleGallery({ onApply }: PromptExampleGalleryProps) {
           {examples.map((example) => {
             const copied = copiedId === example.id;
             const title = getLocalizedPromptExampleTitle(example, locale);
-            const prompt = getLocalizedPromptExampleText(example.prompt, locale);
+            const promptPresentation = getPromptExamplePromptPresentation(example, locale);
+            const prompt = promptPresentation.text;
             return (
               <article
                 key={example.id}
@@ -199,6 +200,9 @@ export function PromptExampleGallery({ onApply }: PromptExampleGalleryProps) {
                     </div>
                     <p className="mt-1 truncate text-[11px] text-ink-subtle">
                       {formatByline(t('generation_examples_by'), example.author)}
+                    </p>
+                    <p className="mt-1 text-[11px] text-ink-subtle">
+                      {getPromptExampleLanguageLabel(promptPresentation.textLocale, locale, promptPresentation.localized)}
                     </p>
                   </div>
                   <p className="line-clamp-3 min-h-[3.75rem] text-xs leading-5 text-ink-muted">

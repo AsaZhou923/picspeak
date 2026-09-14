@@ -7,7 +7,7 @@ import { buildTaskWebSocketUrl, getTask, isAbortError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useI18n } from '@/lib/i18n';
 import { ApiException, TaskErrorPayload, TaskStatusResponse, TaskStreamMessage } from '@/lib/types';
-import { formatSupportMessage, formatUserFacingError } from '@/lib/error-utils';
+import { formatTaskError, formatUserFacingError } from '@/lib/error-utils';
 import { WaitingBlogWindow } from '@/components/blog/WaitingBlogWindow';
 import { logClientError } from '@/lib/client-log';
 
@@ -51,7 +51,6 @@ export default function TaskPage() {
 
   const [task, setTask] = useState<TaskStatusResponse | null>(null);
   const [error, setError] = useState('');
-  const [eventMessage, setEventMessage] = useState('');
   const pollCount = useRef(0);
   const pageStartedAtRef = useRef(Date.now());
   const transientErrorCountRef = useRef(0);
@@ -74,7 +73,7 @@ export default function TaskPage() {
     }
   };
 
-  const handleTaskUpdate = (nextTask: TaskStatusResponse, nextEventMessage?: string) => {
+  const handleTaskUpdate = (nextTask: TaskStatusResponse) => {
     // Ignore stale updates once a terminal state has been reached (e.g. a concurrent HTTP
     // poll returning an old RUNNING snapshot after the WebSocket already delivered SUCCEEDED).
     if (finalRef.current) return;
@@ -83,7 +82,6 @@ export default function TaskPage() {
     transientErrorCountRef.current = 0;
     setTask(nextTask);
     setError('');
-    if (nextEventMessage) setEventMessage(nextEventMessage);
 
     if (nextTask.status === 'SUCCEEDED') {
       if (nextTask.review_id) {
@@ -155,11 +153,11 @@ export default function TaskPage() {
             if (!withinGraceWindow || hasTaskSnapshot) {
               errorTerminalRef.current = true;
               if (wsRef.current) wsRef.current.close();
-              setError(formatUserFacingError(t, err, err.message));
+              setError(formatUserFacingError(t, err, t('task_fetch_error')));
               return;
             }
           }
-        setTransientError(formatUserFacingError(t, err, err.message));
+        setTransientError(formatUserFacingError(t, err, t('task_fetch_error')));
       } else {
         setTransientError(formatUserFacingError(t, err, t('task_fetch_error')));
       }
@@ -198,7 +196,7 @@ export default function TaskPage() {
           const message = JSON.parse(event.data) as TaskStreamMessage | { error?: { message?: string } };
           if ('task' in message) {
             setError('');
-            handleTaskUpdate(message.task, message.event?.message ?? undefined);
+            handleTaskUpdate(message.task);
             return;
           }
           if (message.error?.message) {
@@ -207,11 +205,11 @@ export default function TaskPage() {
               const hasTaskSnapshot = taskRef.current !== null;
               if (!withinGraceWindow || hasTaskSnapshot) {
                 errorTerminalRef.current = true;
-                setError(formatUserFacingError(t, new ApiException(404, 'TASK_NOT_FOUND', message.error.message), message.error.message));
+                setError(formatUserFacingError(t, new ApiException(404, 'TASK_NOT_FOUND', message.error.message), t('task_fetch_error')));
                 return;
               }
             }
-            setTransientError(formatUserFacingError(t, new ApiException(500, 'TASK_STREAM_ERROR', message.error.message), message.error.message));
+            setTransientError(formatUserFacingError(t, new ApiException(500, 'TASK_STREAM_ERROR', message.error.message), t('task_fetch_error')));
           }
         };
 
@@ -272,7 +270,7 @@ export default function TaskPage() {
     REVIEW_DIMENSIONS.length - 1
   );
   const taskError: TaskErrorPayload | null = task?.error ?? null;
-  const taskErrorMessage = taskError ? formatSupportMessage(t, taskError.message ?? t('err_unknown_title')) : '';
+  const taskErrorMessage = taskError ? formatTaskError(t, taskError, t('task_failed_detail')) : '';
   const showWaitingBlog = !isFinal && !error;
   const waitingLayoutClass = showWaitingBlog
     ? 'max-w-6xl lg:grid-cols-[minmax(0,560px)_360px]'
@@ -381,8 +379,6 @@ export default function TaskPage() {
             </p>
           </section>
         )}
-
-        {eventMessage && !isFinal && <p className="text-xs text-ink-muted font-mono">{eventMessage}</p>}
 
         {urlMode === 'pro' && activeStep?.id === 'ai' && !isFinal && !isSuccess && (
           <p className="text-xs text-ink-muted bg-raised border border-border rounded px-4 py-2">

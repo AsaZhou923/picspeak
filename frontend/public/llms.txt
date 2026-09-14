@@ -38,9 +38,14 @@
 - Author profile: https://www.picspeak.art/author/asa-zhou
 - AI Create: https://www.picspeak.art/generate
 - GPT Image 2 prompt examples: https://www.picspeak.art/generate/prompts
-- Blog index: https://www.picspeak.art/en/blog
+- English Blog index: https://www.picspeak.art/en/blog
+- Chinese Blog index: https://www.picspeak.art/zh/blog
+- Japanese Blog index: https://www.picspeak.art/ja/blog
 - Gallery: https://www.picspeak.art/gallery
-- Updates: https://www.picspeak.art/updates
+- Updates / x-default: https://www.picspeak.art/updates
+- English Updates: https://www.picspeak.art/en/updates
+- Chinese Updates: https://www.picspeak.art/zh/updates
+- Japanese Updates: https://www.picspeak.art/ja/updates
 - Affiliate page: https://www.picspeak.art/affiliate
 
 ## Markdown content mirrors

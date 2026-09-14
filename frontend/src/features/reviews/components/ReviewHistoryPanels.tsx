@@ -50,6 +50,7 @@ export function DateFilterField({
   error?: string;
   onChange: (value: string) => void;
 }) {
+  const { t } = useI18n();
   const nativeInputRef = useRef<HTMLInputElement>(null);
   const nativeValue = displayDateToIso(value) ?? '';
 
@@ -60,7 +61,7 @@ export function DateFilterField({
         <input
           type="text"
           inputMode="numeric"
-          placeholder="yyyy/mm/dd"
+          placeholder={t('filter_date_placeholder')}
           value={value}
           onChange={(event) => onChange(normalizeDateDisplay(event.target.value))}
           aria-invalid={Boolean(error)}
@@ -70,7 +71,7 @@ export function DateFilterField({
         />
         <button
           type="button"
-          aria-label={`${label} calendar`}
+          aria-label={t('filter_calendar_label').replace('{label}', label)}
           onClick={() => {
             const input = nativeInputRef.current;
             if (!input) return;

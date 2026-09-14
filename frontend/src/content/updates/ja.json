@@ -1,5 +1,12 @@
 [
   {
+    "id": "2026-09-14-multilingual-experience-consistency",
+    "date": "2026-09-14",
+    "title": "多言語体験をより一貫したものに",
+    "summary": "選択した言語がページ、エラー、プロンプト例、画像生成、決済まで引き継がれ、途中で別の言語が混ざりにくくなりました。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-09-14-multilingual-experience-consistency"
+  },
+  {
     "id": "2026-09-08-evidence-based-scoring",
     "date": "2026-09-08",
     "title": "高得点の根拠と進歩比較をより明確に",

@@ -44,12 +44,15 @@ test('Retake Coach is indexable without cookie-unsafe shared cache coverage', ()
   assert.doesNotMatch(cacheSources, /['"]\/retake['"]/);
 });
 
-test('legacy demo review URLs consolidate into one canonical indexable example', () => {
+test('legacy demo review URLs consolidate with locale-partitioned public cache coverage', () => {
   const nextConfig = source('next.config.mjs');
   const cacheSources = nextConfig.match(/const cacheablePublicPageSources = \[([\s\S]*?)\];/)?.[1] ?? '';
+  const localizedSources = nextConfig.match(/const localizedPublicPageSources = \[([\s\S]*?)\];/)?.[1] ?? '';
 
-  assert.match(cacheSources, /\/reviews\/rev_8424d4fbde054759/);
+  assert.doesNotMatch(cacheSources, /\/reviews\/rev_8424d4fbde054759/);
   assert.doesNotMatch(cacheSources, /\/reviews\/rev_35e0951d0df94a1e/);
+  assert.match(localizedSources, /\/reviews\/rev_8424d4fbde054759/);
+  assert.match(nextConfig, /const localizedPublicPageCacheHeaders = \[[\s\S]*Vary'[\s\S]*Cookie, Accept-Language/);
   assert.match(
     nextConfig,
     /source: '\/reviews\/rev_35e0951d0df94a1e',[\s\S]*destination: '\/reviews\/rev_8424d4fbde054759',[\s\S]*permanent: true/,

@@ -137,7 +137,7 @@ export default function AffiliatePageContent() {
               <p className="text-sm text-ink-muted mt-1">{t('affiliate_commission_rate_caption')}</p>
             </div>
             <div>
-              <p className="font-display text-4xl text-gold">30 days</p>
+              <p className="font-display text-4xl text-gold">{t('affiliate_commission_window_value')}</p>
               <p className="text-sm text-ink-muted mt-1">{t('affiliate_commission_window_caption')}</p>
             </div>
             <p className="text-sm text-ink-muted leading-relaxed">{t('affiliate_commission_body')}</p>

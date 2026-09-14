@@ -18,11 +18,11 @@ function getFavoritesCopy(locale: 'zh' | 'en' | 'ja') {
   if (locale === 'ja') {
     return {
       label: 'お気に入り',
-      title: 'お気に入りの評図',
+      title: 'お気に入りの講評',
       intro: 'あとで見返したい分析結果だけを集めた一覧です。ここから直接お気に入り解除もできます。',
       empty: 'まだお気に入りはありません',
-      emptyBody: '気になる評図結果でハートを押すと、ここに集まります。',
-      emptyCta: '評図しに行く',
+      emptyBody: '気になる講評結果でハートを押すと、ここに集まります。',
+      emptyCta: '講評を始める',
       openReview: '結果を見る',
       remove: '解除',
       loadingMore: 'さらに読み込み中...',

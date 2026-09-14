@@ -113,7 +113,6 @@ const securityHeaders = [
 ];
 
 const seoResponseHeaders = [
-  { key: 'Vary', value: 'Accept-Language' },
   {
     key: 'Link',
     value:
@@ -126,6 +125,11 @@ const publicPageCacheHeaders = [
     key: 'Cache-Control',
     value: 'public, s-maxage=3600, stale-while-revalidate=86400',
   },
+];
+
+const localizedPublicPageCacheHeaders = [
+  ...publicPageCacheHeaders,
+  { key: 'Vary', value: 'Cookie, Accept-Language' },
 ];
 
 const aiDiscoveryIndexHeaders = [
@@ -142,13 +146,16 @@ const aiContentCanonicalHeaders = [
 ];
 
 const cacheablePublicPageSources = [
-  '/',
   '/:locale(zh|en|ja)',
-  '/gallery',
   '/:locale(zh|en|ja)/blog',
   '/:locale(zh|en|ja)/blog/:slug*',
-  '/updates',
   '/:locale(zh|en|ja)/updates',
+];
+
+const localizedPublicPageSources = [
+  '/',
+  '/gallery',
+  '/updates',
   '/generate/prompts',
   '/generate/prompts/:id*',
   '/reviews/rev_8424d4fbde054759',
@@ -201,6 +208,10 @@ const nextConfig = {
       ...cacheablePublicPageSources.map((source) => ({
         source,
         headers: publicPageCacheHeaders,
+      })),
+      ...localizedPublicPageSources.map((source) => ({
+        source,
+        headers: localizedPublicPageCacheHeaders,
       })),
       ...['/llms.txt', '/.well-known/llms.txt', '/ai-content/:slug*'].map((source) => ({
         source,

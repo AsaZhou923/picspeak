@@ -80,7 +80,7 @@ def _format_exif_context(exif_data: dict | None) -> str:
 
 
 def _prompt_for_mode_legacy(mode: str, locale: str, exif_data: dict | None = None, image_type: str = 'default') -> str:
-    lang = locale if locale in {'zh', 'en', 'ja'} else 'zh'
+    lang = locale if locale in {'zh', 'en', 'ja'} else 'en'
     depth_by_lang = {
         'zh': ('详细且专业', '简洁且直接'),
         'en': ('detailed and professional', 'concise and direct'),
@@ -183,7 +183,7 @@ def _prompt_for_mode_legacy(mode: str, locale: str, exif_data: dict | None = Non
 
 
 def _prompt_for_mode_v3(mode: str, locale: str, exif_data: dict | None = None, image_type: str = 'default') -> str:
-    lang = locale if locale in {'zh', 'en', 'ja'} else 'zh'
+    lang = locale if locale in {'zh', 'en', 'ja'} else 'en'
     normalized_mode = (mode or '').strip().lower()
     if normalized_mode not in {'flash', 'pro'}:
         normalized_mode = 'flash'

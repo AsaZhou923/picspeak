@@ -29,7 +29,7 @@ export default function Footer() {
       >
         <Image
           src={PRODUCT_HUNT_BADGE_SRC}
-          alt="PicSpeak - Get AI photo critiques and visual references in seconds | Product Hunt"
+          alt={t('footer_product_hunt_alt')}
           width={250}
           height={54}
           unoptimized
@@ -45,7 +45,7 @@ export default function Footer() {
           IA
         </span>
         <span className="flex flex-col leading-tight">
-          <span className={badgeEyebrowClass}>Listed on</span>
+          <span className={badgeEyebrowClass}>{t('footer_listed_on')}</span>
           <span className={badgeTitleClass}>IndieAI Directory</span>
         </span>
       </a>
@@ -59,7 +59,7 @@ export default function Footer() {
           ST
         </span>
         <span className="flex flex-col leading-tight">
-          <span className={badgeEyebrowClass}>Featured on</span>
+          <span className={badgeEyebrowClass}>{t('footer_featured_on')}</span>
           <span className={badgeTitleClass}>SaaS Tools Dir</span>
         </span>
       </a>
@@ -73,7 +73,7 @@ export default function Footer() {
           SH
         </span>
         <span className="flex flex-col leading-tight">
-          <span className={badgeEyebrowClass}>Featured on</span>
+          <span className={badgeEyebrowClass}>{t('footer_featured_on')}</span>
           <span className={badgeTitleClass}>SaaS Hub Directory</span>
         </span>
       </a>
@@ -87,7 +87,7 @@ export default function Footer() {
           PL
         </span>
         <span className="flex flex-col leading-tight">
-          <span className={badgeEyebrowClass}>Featured on</span>
+          <span className={badgeEyebrowClass}>{t('footer_featured_on')}</span>
           <span className={badgeTitleClass}>Product List Dir</span>
         </span>
       </a>
@@ -97,7 +97,7 @@ export default function Footer() {
   return (
     <footer className="border-t border-border-subtle py-8 mt-auto overflow-hidden">
       <div
-        aria-label="External listings"
+        aria-label={t('footer_external_listings')}
         className="mb-8 w-full overflow-x-auto border-b border-border-subtle/30 pb-6 opacity-80"
       >
         <div className="mx-auto flex max-w-6xl items-center gap-6 px-6">{badgeLinks}</div>

@@ -142,7 +142,7 @@ export default function GenerateFormPanel({
               onChange={(event) => onNegativePromptChange(event.target.value)}
               rows={3}
               className="mt-3 w-full resize-y rounded-control border border-border bg-void/70 px-4 py-3 text-sm leading-6 text-ink outline-none focus:border-gold/50"
-              placeholder="no text, no watermark, no distorted face"
+              placeholder={t('generation_negative_placeholder')}
             />
           )}
         </div>

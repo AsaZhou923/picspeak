@@ -6,9 +6,9 @@ import { useParams, useRouter } from 'next/navigation';
 import { AlertCircle, ArrowLeft, CheckCircle2, Clock, Cpu, Palette, Save, Sparkles } from 'lucide-react';
 import { getGenerationTask, isAbortError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
-import { ApiException, GenerationTaskStatusResponse } from '@/lib/types';
+import { GenerationTaskStatusResponse } from '@/lib/types';
 import { useI18n } from '@/lib/i18n';
-import { formatUserFacingError } from '@/lib/error-utils';
+import { formatTaskError, formatUserFacingError } from '@/lib/error-utils';
 import { trackProductEvent } from '@/lib/product-analytics';
 import { WaitingBlogWindow } from '@/components/blog/WaitingBlogWindow';
 import { useCreditPackCheckout } from '@/lib/hooks/useCreditPackCheckout';
@@ -97,7 +97,7 @@ export default function GenerationTaskPage() {
         }
       } catch (err) {
         if (!cancelled && !isAbortError(err)) {
-          setError(formatUserFacingError(t, err, err instanceof ApiException ? err.message : t('generation_task_fetch_error')));
+          setError(formatUserFacingError(t, err, t('generation_task_fetch_error')));
           timerRef.current = setTimeout(poll, POLL_INTERVAL * 2);
         }
       }
@@ -227,7 +227,7 @@ export default function GenerationTaskPage() {
                   <div className="flex items-start gap-3">
                     <AlertCircle size={22} className="mt-0.5 shrink-0 text-rust" aria-hidden="true" />
                     <p className="text-sm leading-7 text-ink-muted">
-                      {task?.error?.message ?? t('generation_task_failed_body')}
+                      {formatTaskError(t, task?.error, t('generation_task_failed_body'))}
                     </p>
                   </div>
                   <div className="mt-5 grid gap-3 sm:grid-cols-2">

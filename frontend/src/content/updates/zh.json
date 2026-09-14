@@ -1,5 +1,12 @@
 [
   {
+    "id": "2026-09-14-multilingual-experience-consistency",
+    "date": "2026-09-14",
+    "title": "中英日体验更一致",
+    "summary": "语言偏好现在会贯穿页面、错误提示、提示词案例、生成与支付流程，减少使用中突然混入其他语言的情况。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-09-14-multilingual-experience-consistency"
+  },
+  {
     "id": "2026-09-08-evidence-based-scoring",
     "date": "2026-09-08",
     "title": "高分更有依据，进步对比更清楚",

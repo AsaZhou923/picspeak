@@ -70,7 +70,9 @@ test('root and locale home pages server-render schema while the locale layout st
 
   assert.match(structuredDataSource, /<script/);
   assert.match(structuredDataSource, /buildHomeOrganizationJsonLd/);
-  assert.match(rootPageSource, /<HomeStructuredData locale="en" \/>/);
+  assert.match(rootPageSource, /<HomeStructuredData locale=\{locale\} \/>/);
+  assert.match(rootPageSource, /headers\(\)/);
+  assert.match(rootPageSource, /isSupportedLocale\(requestLocale\)/);
   assert.match(localePageSource, /<HomeStructuredData locale=\{pinnedLocale\} \/>/);
   assert.match(localeLayoutSource, /export const dynamicParams = false/);
   assert.doesNotMatch(localeLayoutSource, /application\/ld\+json|buildHomeFaqJsonLd/);

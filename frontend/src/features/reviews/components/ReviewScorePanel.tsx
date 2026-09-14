@@ -2,6 +2,7 @@
 import { TrendingDown, ZoomIn } from 'lucide-react';
 import type { ReviewGetResponse } from '@/lib/types';
 import { useI18n } from '@/lib/i18n';
+import { localeToIntlLocale } from '@/lib/locale';
 import { getScoreVersionLabel } from '@/lib/review-growth';
 import {
   DIM_TO_TAGS,
@@ -193,7 +194,7 @@ export function ReviewMetadataPanel({ review, imgNaturalSize }: ReviewMetadataPa
     <section className="ui-panel p-5" aria-labelledby="review-metadata-title">
       <h2 id="review-metadata-title" className="text-lg font-semibold text-ink">{t('review_exif_params')}</h2>
       <div className="mt-3 space-y-1 font-mono text-xs text-ink-subtle">
-        <p>{new Date(review.created_at).toLocaleString(locale)} · #{review.review_id.slice(0, 8)}</p>
+        <p>{new Date(review.created_at).toLocaleString(localeToIntlLocale(locale))} · #{review.review_id.slice(0, 8)}</p>
         {imgNaturalSize && (
           <p>{t('review_img_resolution')}: {imgNaturalSize.w} × {imgNaturalSize.h}</p>
         )}

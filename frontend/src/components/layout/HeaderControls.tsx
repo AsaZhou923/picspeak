@@ -21,7 +21,7 @@ const AUTH_LABELS: Record<Locale, { signIn: string; signUp: string }> = {
 const LOCALE_PREFIXES: readonly string[] = ['zh', 'en', 'ja'];
 
 export function LanguageSwitcher() {
-  const { locale, setLocale } = useI18n();
+  const { locale, setLocale, t } = useI18n();
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -56,7 +56,7 @@ export function LanguageSwitcher() {
         ref={triggerRef}
         onClick={() => setOpen((value) => !value)}
         className="flex items-center gap-1 text-sm text-ink-muted hover:text-ink transition-colors px-2 py-1 rounded"
-        aria-label="Switch language"
+        aria-label={t('language_switcher_label')}
         aria-expanded={open}
         aria-haspopup="menu"
       >

@@ -167,7 +167,7 @@ export default function ImageUploader({
           className="hidden"
           onChange={onInputChange}
           disabled={disabled || compressing}
-          aria-label="Upload image file"
+          aria-label={t('uploader_file_label')}
         />
 
         <div className="flex flex-col items-center gap-3 px-8 py-10 text-center">
@@ -232,7 +232,8 @@ export default function ImageUploader({
           <span>{error}</span>
           <button
             type="button"
-            title="Close"
+            title={t('quota_modal_close')}
+            aria-label={t('quota_modal_close')}
             onClick={() => setError(null)}
             className="ml-auto text-rust/60 hover:text-rust"
           >

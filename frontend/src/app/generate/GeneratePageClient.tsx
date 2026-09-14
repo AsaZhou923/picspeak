@@ -33,7 +33,7 @@ import GenerationPricingGrid from '@/features/generations/components/GenerationP
 import { PromptExampleGallery } from '@/features/generations/components/PromptExampleGallery';
 import {
   getGenerationPromptExample,
-  getLocalizedPromptExampleText,
+  getPromptExamplePromptPresentation,
   type GenerationPromptExample,
 } from '@/content/generation/prompt-examples';
 import GeneratePageHeader from '@/features/generations/components/GeneratePageHeader';
@@ -96,7 +96,7 @@ export default function GeneratePage() {
       if (promptExample && !initialUrlPromptAppliedRef.current) {
         initialUrlPromptAppliedRef.current = true;
         const nextTemplate = getTemplateByKey(promptExample.suggestedTemplateKey);
-        const nextPrompt = getLocalizedPromptExampleText(promptExample.prompt, locale);
+        const nextPrompt = getPromptExamplePromptPresentation(promptExample, locale).text;
         skipNextTemplatePromptSyncRef.current = true;
         setTemplateKey(nextTemplate.key);
         setPrompt(nextPrompt);
@@ -196,7 +196,7 @@ export default function GeneratePage() {
       if (nextTemplate.key !== templateKey) {
         skipNextTemplatePromptSyncRef.current = true;
       }
-      const nextPrompt = getLocalizedPromptExampleText(example.prompt, locale);
+      const nextPrompt = getPromptExamplePromptPresentation(example, locale).text;
       setTemplateKey(nextTemplate.key);
       setPrompt(nextPrompt);
       setStyle(example.suggestedStyle);
@@ -256,6 +256,7 @@ export default function GeneratePage() {
           async: true,
           idempotency_key: `${selectedTemplate.key}-${quality}-${size}-${Date.now()}`,
           analytics_source: analyticsSource,
+          locale,
         },
         activeToken
       );

@@ -54,6 +54,7 @@ Upload a photo
 | Retake Coach | Paired original/retake evaluation, comparability and confidence handling, deterministic deltas, remaining gaps, success checks, and progress chains |
 | AI Create | Template and prompt controls, quality and aspect-ratio choices, GPT Image 2 credits, review-linked references, download, reuse, and generation history |
 | Public learning | 50 crawlable prompt examples, critique gallery, trilingual Lens Notes, update history, and server-rendered SEO/GEO content |
+| Multilingual UX | English, Simplified Chinese, and Japanese across navigation, errors, public guidance, prompt-language labels, generation, and checkout |
 | Platform | Clerk sign-in, guest/authenticated quotas, Lemon Squeezy billing, WebSocket task updates, PostgreSQL persistence, and S3-compatible storage |
 
 ## Public routes
@@ -186,7 +187,7 @@ The frontend and backend can be deployed independently. The backend includes a c
 
 ## Documentation
 
-- [Latest changelog](docs/changelog/CHANGELOG.md#2026-09-08-evidence-based-scoring)
+- [Latest changelog](docs/changelog/CHANGELOG.md#2026-09-14-multilingual-experience-consistency)
 - [Frontend design system](DESIGN.md)
 - [SEO / GEO audit](docs/seo/seo-audit-2026-05-01.md)
 - [System architecture](docs/architecture/系统架构.md)

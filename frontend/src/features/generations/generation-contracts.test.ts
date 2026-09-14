@@ -29,6 +29,7 @@ const _request: GenerationCreateRequest = {
   output_format: 'webp',
   async: true,
   analytics_source: 'prompt_library',
+  locale: 'en',
 };
 
 const _response: GenerationCreateResponse = {
@@ -144,6 +145,7 @@ const generationDetailSource = readFileSync(new URL('../../app/generations/[gene
 
 test('generation create contract includes async task handoff fields', () => {
   assert.equal(_request.async, true);
+  assert.equal(_request.locale, 'en');
   assert.equal(_response.status, 'PENDING');
   assert.equal(_response.task_id.startsWith('igt_'), true);
   assert.equal(_response.credits_reserved, 8);
@@ -211,4 +213,15 @@ test('generation analytics, idempotency and destinations remain server-owned', (
   assert.match(generationTaskSource, /router\.replace\(destination\)/);
   assert.match(generationTaskSource, /source_review_id: nextTask\.source_review_id/);
   assert.match(generationDetailSource, /router\.push\(`\/workspace\?\$\{params\.toString\(\)\}`\)/);
+});
+
+test('prompt library localized fields keep locale-specific copy for known regressions', () => {
+  const source = readFileSync(new URL('../../content/generation/prompt-examples.ts', import.meta.url), 'utf8');
+  assert.match(source, /A hand-drawn city food map themed around Chengdu/);
+  assert.match(source, /成都をテーマにした手描き風の都市グルメマップ/);
+  assert.match(source, /Create a landscape PowerPoint-style slide image written in Japanese/);
+  assert.match(source, /生成一张横向 PowerPoint 风格的幻灯片图片/);
+  assert.doesNotMatch(source, /en: "一张手绘风格的城市美食地图/);
+  assert.doesNotMatch(source, /ja: "一张手绘风格的城市美食地图/);
+  assert.doesNotMatch(source, /en: "横長のパワポ画像/);
 });

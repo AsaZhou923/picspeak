@@ -419,6 +419,8 @@ class ApiSurfaceRegressionTests(unittest.TestCase):
         self.assertEqual(query['checkout[custom][kind]'], ['image_credit_pack'])
         self.assertEqual(query['checkout[custom][pack]'], ['image_credits_300'])
         self.assertEqual(query['checkout[custom][credits]'], ['300'])
+        self.assertEqual(query['checkout[custom][locale]'], ['en'])
+        self.assertEqual(query['locale'], ['en'])
         db.commit.assert_called_once()
 
     def test_billing_checkout_uses_one_time_zh_hosted_checkout_for_chinese_locale(self) -> None:
@@ -467,6 +469,7 @@ class ApiSurfaceRegressionTests(unittest.TestCase):
         self.assertEqual(query['checkout[custom][billing_mode]'], ['one_time_pro'])
         self.assertEqual(query['checkout[custom][duration_days]'], ['30'])
         self.assertEqual(query['checkout[custom][locale]'], ['zh'])
+        self.assertEqual(query['locale'], ['zh-CN'])
         self.assertIn('checkout[custom][grant_token]', query)
         grant_payload = verify_payload(query['checkout[custom][grant_token]'][0])
         self.assertEqual(grant_payload['purpose'], 'lemonsqueezy_one_time_pro')
@@ -474,6 +477,41 @@ class ApiSurfaceRegressionTests(unittest.TestCase):
         self.assertEqual(grant_payload['billing_mode'], 'one_time_pro')
         self.assertEqual(grant_payload['duration_days'], 30)
         db.commit.assert_called_once()
+
+    def test_api_checkout_payload_sets_provider_locale_for_japanese(self) -> None:
+        user = User(
+            id=29,
+            public_id='usr_ja_checkout',
+            email='ja-checkout@example.com',
+            username='ja_checkout',
+            plan=UserPlan.free,
+            daily_quota_total=0,
+            daily_quota_used=0,
+            status=UserStatus.active,
+        )
+        api_response = {
+            'data': {
+                'id': 'chk_ja',
+                'attributes': {'url': 'https://checkout.example.com/ja'},
+            },
+        }
+
+        with patch('app.services.lemonsqueezy.settings.lemonsqueezy_pro_checkout_url', ''), patch(
+            'app.services.lemonsqueezy._api_request',
+            return_value=api_response,
+        ) as api_request, patch('app.services.lemonsqueezy.settings.lemonsqueezy_store_id', '123'), patch(
+            'app.services.lemonsqueezy.settings.lemonsqueezy_pro_variant_id',
+            '456',
+        ):
+            from app.services.lemonsqueezy import create_checkout_for_user
+
+            checkout = create_checkout_for_user(user, locale='ja')
+
+        self.assertEqual(checkout.checkout_id, 'chk_ja')
+        payload = api_request.call_args.kwargs['payload']
+        attributes = payload['data']['attributes']
+        self.assertEqual(attributes['checkout_options']['locale'], 'ja')
+        self.assertEqual(attributes['checkout_data']['custom']['locale'], 'ja')
 
     def test_image_credit_pack_rmb_is_no_longer_available(self) -> None:
         db = MagicMock()

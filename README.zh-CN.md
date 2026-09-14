@@ -54,6 +54,7 @@
 | 复拍教练 | 原片 / 复拍配对评估、可比性与置信度处理、确定性分差、剩余问题、成功条件与进步链 |
 | AI 创作 | 模板和提示词控制、质量与画幅选择、GPT Image 2 credits、点评关联参考图、下载、复用与生成历史 |
 | 公开学习 | 50 个可抓取提示词案例、点评长廊、三语镜头手记、更新记录与服务端渲染的 SEO / GEO 内容 |
+| 多语言体验 | 导航、错误提示、公开说明、提示词语言标记、生成与结账流程支持英文、简体中文和日文 |
 | 平台能力 | Clerk 登录、游客 / 用户额度、Lemon Squeezy 计费、WebSocket 任务更新、PostgreSQL 与 S3 兼容存储 |
 
 ## 公开入口
@@ -186,7 +187,7 @@ npm run build
 
 ## 文档
 
-- [最新更新日志](docs/changelog/CHANGELOG.md#2026-09-08-evidence-based-scoring)
+- [最新更新日志](docs/changelog/CHANGELOG.md#2026-09-14-multilingual-experience-consistency)
 - [前端设计系统](DESIGN.md)
 - [SEO / GEO 审计报告](docs/seo/seo-audit-2026-05-01.md)
 - [系统架构说明](docs/architecture/系统架构.md)

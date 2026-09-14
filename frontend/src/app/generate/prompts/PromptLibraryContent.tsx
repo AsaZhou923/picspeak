@@ -6,8 +6,9 @@ import {
   GENERATION_PROMPT_EXAMPLE_CATEGORIES,
   GENERATION_PROMPT_EXAMPLES,
   getLocalizedPromptExampleCategoryLabel,
-  getLocalizedPromptExampleText,
   getLocalizedPromptExampleTitle,
+  getPromptExampleLanguageLabel,
+  getPromptExamplePromptPresentation,
   normalizePromptExampleExcerpt,
 } from '@/content/generation/prompt-examples';
 import { useI18n } from '@/lib/i18n';
@@ -22,6 +23,7 @@ const PROMPT_LIBRARY_COPY = {
     secondaryCta: '浏览点评长廊',
     countSuffix: '个案例',
     sourcePrefix: '来源',
+    languagePrefix: '提示词语言',
   },
   en: {
     eyebrow: 'PicSpeak AI Create',
@@ -32,6 +34,7 @@ const PROMPT_LIBRARY_COPY = {
     secondaryCta: 'Browse critique gallery',
     countSuffix: 'examples',
     sourcePrefix: 'Source',
+    languagePrefix: 'Prompt language',
   },
   ja: {
     eyebrow: 'PicSpeak AI 作成',
@@ -42,6 +45,7 @@ const PROMPT_LIBRARY_COPY = {
     secondaryCta: '講評ギャラリーを見る',
     countSuffix: '件',
     sourcePrefix: '出典',
+    languagePrefix: 'プロンプト言語',
   },
 };
 
@@ -96,7 +100,8 @@ export default function PromptLibraryContent() {
       <section className="mx-auto mt-12 grid max-w-7xl gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {GENERATION_PROMPT_EXAMPLES.map((example) => {
           const title = getLocalizedPromptExampleTitle(example, locale);
-          const prompt = getLocalizedPromptExampleText(example.prompt, locale);
+          const promptPresentation = getPromptExamplePromptPresentation(example, locale);
+          const prompt = promptPresentation.text;
           return (
             <article
               key={example.id}
@@ -119,6 +124,10 @@ export default function PromptLibraryContent() {
                   <h2 className="mt-2 line-clamp-2 font-display text-2xl text-ink">{title}</h2>
                   <p className="mt-2 text-xs text-ink-subtle">
                     {copy.sourcePrefix}: {example.author}
+                  </p>
+                  <p className="mt-1 text-xs text-ink-subtle">
+                    {copy.languagePrefix}:{' '}
+                    {getPromptExampleLanguageLabel(promptPresentation.textLocale, locale, promptPresentation.localized)}
                   </p>
                   <p className="mt-4 line-clamp-3 text-sm leading-6 text-ink-muted">
                     {normalizePromptExampleExcerpt(prompt)}

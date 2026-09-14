@@ -1,10 +1,52 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import Link from 'next/link';
 import { buildDemoReviewJsonLd, DEMO_REVIEW_ID, isDemoReviewId } from '@/lib/demo-review';
+import type { Locale } from '@/lib/i18n';
 import { enTranslations } from '@/lib/i18n-en';
 import { serializeJsonLd } from '@/lib/json-ld';
+import { isSupportedLocale } from '@/lib/locale';
 import { buildPublicBreadcrumbJsonLd, INDEXABLE_ROBOTS, NO_INDEX_ROBOTS, singlePageAlternates } from '@/lib/seo';
 import { siteConfig } from '@/lib/site';
+
+const DEMO_HERO_COPY: Record<Locale, {
+  eyebrow: string;
+  title: string;
+  body: string;
+  galleryCta: string;
+  retakeCta: string;
+}> = {
+  en: {
+    eyebrow: 'Public AI photo critique example',
+    title: 'AI Photo Critique Example: Scores, Evidence, and Retake Guidance',
+    body:
+      'See how PicSpeak evaluates composition, lighting, color, impact, and technique, then turns the weakest dimension into a concrete next-shoot action. This public example is a product walkthrough, not a private user result.',
+    galleryCta: 'Browse critique examples',
+    retakeCta: 'Open Retake Coach',
+  },
+  zh: {
+    eyebrow: '公开 AI 摄影点评示例',
+    title: 'AI 摄影点评示例：评分、依据与复拍建议',
+    body:
+      '查看 PicSpeak 如何评估构图、光线、色彩、表达和技术质量，并把最弱维度转化为下一次拍摄可执行的行动。这个公开示例是产品演示，不是私人用户结果。',
+    galleryCta: '浏览点评示例',
+    retakeCta: '打开复拍教练',
+  },
+  ja: {
+    eyebrow: '公開 AI 写真批評サンプル',
+    title: 'AI 写真批評サンプル：スコア、根拠、撮り直しガイド',
+    body:
+      'PicSpeak が構図、光、色、印象、技術をどう評価し、最も弱い要素を次の撮影アクションへ変えるかを確認できます。この公開例は製品ウォークスルーであり、非公開ユーザー結果ではありません。',
+    galleryCta: '批評例を見る',
+    retakeCta: 'Retake Coach を開く',
+  },
+};
+
+async function getRequestLocale(): Promise<Locale> {
+  const requestHeaders = await headers();
+  const locale = requestHeaders.get('x-picspeak-locale');
+  return isSupportedLocale(locale) ? locale : 'en';
+}
 
 export async function generateMetadata(
   { params }: { params: Promise<{ reviewId: string }> }
@@ -47,6 +89,8 @@ export default async function ReviewDetailLayout({
   params: Promise<{ reviewId: string }>;
 }) {
   const { reviewId } = await params;
+  const locale = await getRequestLocale();
+  const demoHeroCopy = DEMO_HERO_COPY[locale];
   const demoReviewJsonLd = isDemoReviewId(reviewId)
     ? buildDemoReviewJsonLd({
         site: siteConfig,
@@ -91,21 +135,19 @@ export default async function ReviewDetailLayout({
       {demoReviewJsonLd && (
         <section className="border-b border-border-subtle px-6 py-10">
           <div className="mx-auto max-w-workspace">
-            <p className="ui-eyebrow">Public AI photo critique example</p>
+            <p className="ui-eyebrow">{demoHeroCopy.eyebrow}</p>
             <h1 className="mt-3 max-w-4xl font-display text-4xl leading-tight text-ink sm:text-5xl">
-              AI Photo Critique Example: Scores, Evidence, and Retake Guidance
+              {demoHeroCopy.title}
             </h1>
             <p className="mt-4 max-w-3xl text-sm leading-7 text-ink-muted sm:text-base">
-              See how PicSpeak evaluates composition, lighting, color, impact, and technique, then turns the
-              weakest dimension into a concrete next-shoot action. This public example is a product walkthrough,
-              not a private user result.
+              {demoHeroCopy.body}
             </p>
             <div className="mt-6 flex flex-wrap gap-3 text-sm">
               <Link href="/gallery" className="ui-action-secondary px-5 py-2.5">
-                Browse critique examples
+                {demoHeroCopy.galleryCta}
               </Link>
               <Link href="/retake" className="ui-action-secondary px-5 py-2.5">
-                Open Retake Coach
+                {demoHeroCopy.retakeCta}
               </Link>
             </div>
           </div>

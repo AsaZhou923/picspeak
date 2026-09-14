@@ -1,7 +1,7 @@
 import {
   GENERATION_PROMPT_EXAMPLES,
-  getLocalizedPromptExampleText,
   getLocalizedPromptExampleTitle,
+  getPromptExamplePromptPresentation,
   normalizePromptExampleExcerpt,
 } from '../content/generation/prompt-examples.ts';
 import { DEMO_IMAGE_URL, DEMO_REVIEW_ID } from './demo-review.ts';
@@ -36,7 +36,7 @@ function escapeXml(value: string): string {
 export function buildImageSitemapEntries(): ImageSitemapEntry[] {
   const promptEntries = GENERATION_PROMPT_EXAMPLES.map((example) => {
     const title = getLocalizedPromptExampleTitle(example, 'en');
-    const prompt = getLocalizedPromptExampleText(example.prompt, 'en');
+    const prompt = getPromptExamplePromptPresentation(example, 'en').text;
 
     return {
       loc: absoluteUrl(`/generate/prompts/${example.id}`),

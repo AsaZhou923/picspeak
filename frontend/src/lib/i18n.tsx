@@ -3,7 +3,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { enTranslations, type TranslationDictionary, type TranslationKey } from './i18n-en';
 import { zhTranslations } from './i18n-zh';
-import { isSupportedLocale, LOCALE_COOKIE_NAME } from './locale';
+import { isSupportedLocale, LOCALE_COOKIE_NAME, localeFromLanguagePreferences } from './locale';
 
 export type { TranslationKey } from './i18n-en';
 
@@ -49,15 +49,27 @@ function detectPathLocale(): Locale | null {
 }
 
 async function loadTranslations(locale: Locale): Promise<TranslationDictionary> {
-  switch (locale) {
-    case 'zh':
-      return zhTranslations;
-    case 'ja':
-      return (await import('./i18n-ja')).jaTranslations;
-    case 'en':
-    default:
-      return enTranslations;
+  try {
+    switch (locale) {
+      case 'zh':
+        return zhTranslations;
+      case 'ja':
+        return (await import('./i18n-ja')).jaTranslations;
+      case 'en':
+      default:
+        return enTranslations;
+    }
+  } catch {
+    return enTranslations;
   }
+}
+
+function detectBrowserLocale(defaultLocale: Locale): Locale {
+  if (typeof navigator === 'undefined') return defaultLocale;
+  const candidates = Array.isArray(navigator.languages) && navigator.languages.length > 0
+    ? navigator.languages
+    : [navigator.language];
+  return localeFromLanguagePreferences(candidates) ?? defaultLocale;
 }
 
 function persistLocalePreference(locale: Locale) {
@@ -119,7 +131,9 @@ export function I18nProvider({
       // ignore
     }
 
-    setLocaleState(defaultLocale);
+    const detected = detectBrowserLocale(defaultLocale);
+    setLocaleState(detected);
+    persistLocalePreference(detected);
   }, [defaultLocale, initialLocale, initialMessages]);
 
   useEffect(() => {
@@ -170,7 +184,7 @@ export function I18nProvider({
 
   const t = useCallback(
     (key: TranslationKey): string => {
-      return messages[key] ?? zhTranslations[key] ?? key;
+      return messages[key] ?? enTranslations[key] ?? key;
     },
     [messages]
   );

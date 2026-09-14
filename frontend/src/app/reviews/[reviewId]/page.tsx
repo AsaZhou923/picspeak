@@ -10,6 +10,7 @@ import { FinalScoreRing } from '@/components/ui/ScoreRing';
 import { SkeletonBlock } from '@/components/ui/LoadingSpinner';
 import { isDemoReviewId } from '@/lib/demo-review';
 import { useI18n } from '@/lib/i18n';
+import { localeToIntlLocale } from '@/lib/locale';
 import {
   CARD_HIGHLIGHT_DURATION_MS,
   DIM_TO_TAGS,
@@ -389,7 +390,7 @@ export default function ReviewPage() {
                       <span aria-hidden="true">✓</span>{t('status_succeeded')}
                     </span>
                     <span aria-hidden="true">·</span>
-                    <span>{new Date(review.created_at).toLocaleDateString(locale)}</span>
+                    <span>{new Date(review.created_at).toLocaleDateString(localeToIntlLocale(locale))}</span>
                   </div>
                 </div>
               </div>

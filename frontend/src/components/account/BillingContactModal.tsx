@@ -47,7 +47,7 @@ export default function BillingContactModal({ t, message, onClose }: BillingCont
         </button>
 
         <div className="mb-5">
-          <h2 id="billing-contact-title" className="ui-eyebrow mb-3 pr-12">Billing</h2>
+          <h2 id="billing-contact-title" className="ui-eyebrow mb-3 pr-12">{t('billing_contact_title')}</h2>
           <p id="billing-contact-message" className="text-sm text-ink leading-relaxed">
             {message || t('billing_payment_placeholder')}
           </p>

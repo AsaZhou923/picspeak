@@ -22,6 +22,7 @@ from app.api.routers.generations import (  # noqa: E402
     _record_generation_event,
     download_generation,
     get_generation_task_status,
+    reuse_generation,
 )
 from app.db.models import TaskStatus, User, UserPlan, UserStatus  # noqa: E402
 from app.db.session import get_db  # noqa: E402
@@ -155,6 +156,64 @@ class ImageGenerationRoutesTests(unittest.TestCase):
         self.assertEqual(body['credits_reserved'], 8)
         db.add.assert_called()
         db.commit.assert_called()
+
+    def test_reuse_generation_preserves_valid_locale_and_defaults_invalid_locale_to_english(self) -> None:
+        db = MagicMock()
+        user = User(
+            id=7,
+            public_id='usr_generation',
+            email='generation@example.com',
+            username='generation_user',
+            plan=UserPlan.pro,
+            daily_quota_total=0,
+            daily_quota_used=0,
+            status=UserStatus.active,
+        )
+        actor = SimpleNamespace(user=user, plan=UserPlan.pro)
+        base_image = SimpleNamespace(
+            generation_mode='general',
+            intent='social_visual',
+            prompt='cinematic rainy street portrait',
+            template_key='social_visual',
+            quality='low',
+            size='1024x1024',
+            output_format='webp',
+            source_photo_id=None,
+            source_review_id=None,
+        )
+
+        captured_locales: list[str] = []
+
+        def fake_make_generation_task(**kwargs):
+            captured_locales.append(kwargs['request_payload']['locale'])
+            return SimpleNamespace(public_id=f'igt_reuse_{len(captured_locales)}', status=TaskStatus.PENDING)
+
+        with (
+            patch('app.api.routers.generations._reserve_generation_credits_or_raise'),
+            patch('app.api.routers.generations.stage_generation_request_event'),
+            patch('app.api.routers.generations.deliver_generation_request_event'),
+            patch('app.api.routers.generations.settings.cloud_tasks_enabled', False),
+            patch('app.api.routers.generations.make_generation_task', side_effect=fake_make_generation_task),
+            patch('app.api.routers.generations._find_generation_owned') as find_generation,
+        ):
+            for locale in ('ja', 'fr'):
+                find_generation.return_value = SimpleNamespace(
+                    **{
+                        **base_image.__dict__,
+                        'metadata_json': {
+                            'user_prompt': 'cinematic rainy street portrait',
+                            'locale': locale,
+                        },
+                    }
+                )
+                reuse_generation(
+                    'gen_reuse',
+                    SimpleNamespace(query_params={'analytics_source': 'history'}),
+                    db=db,
+                    actor=actor,
+                )
+
+        self.assertEqual(captured_locales, ['ja', 'en'])
 
     def test_cloud_tasks_enabled_dispatches_generation_task(self) -> None:
         db, _user = self._install_actor(UserPlan.pro)
