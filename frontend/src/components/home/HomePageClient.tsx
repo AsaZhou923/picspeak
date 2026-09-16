@@ -14,7 +14,6 @@ import {
 import HomeContactSection from '@/components/home/HomeContactSection';
 import HomeCritiqueArtifact from '@/components/home/HomeCritiqueArtifact';
 import HomeGenerationPricingSection from '@/components/home/HomeGenerationPricingSection';
-import HomeImageCreditRedeem from '@/components/home/HomeImageCreditRedeem';
 import HomeImprovementLoop from '@/components/home/HomeImprovementLoop';
 import { getHomeIntentEntrances, type HomeIntent } from '@/lib/content-conversion';
 import { useI18n } from '@/lib/i18n';
@@ -207,10 +206,6 @@ export function HomePageContent() {
                 );
               })}
             </div>
-          </div>
-
-          <div className="mt-7 flex justify-center">
-            <HomeImageCreditRedeem />
           </div>
         </div>
       </section>
