@@ -26,13 +26,9 @@ export default function ProductAnalyticsProvider({ children }: { children: React
       return;
     }
 
-    const pageEvent = derivePageEvent(pathname);
-    if (!pageEvent) {
-      return;
-    }
-
     const explicitSource = normalizeProductAnalyticsSource(searchParams.get('source'));
-    const pathSource = deriveAttributionSourceForPath(pathname);
+    const pathSource = deriveAttributionSourceForPath(pathname)
+      ?? (pathname === '/workspace' && searchParams.has('practice_session_id') ? 'retake_coach' : null);
     const resolvedSource = explicitSource ?? pathSource ?? readProductAttributionSource();
 
     if (explicitSource) {
@@ -40,6 +36,9 @@ export default function ProductAnalyticsProvider({ children }: { children: React
     } else if (pathSource) {
       markProductAttributionSource(pathSource);
     }
+
+    const pageEvent = derivePageEvent(pathname);
+    if (!pageEvent) return;
 
     const trackKey = `${pageEvent}:${pathname}:${searchParams.toString()}`;
     if (lastTrackedKeyRef.current === trackKey) {

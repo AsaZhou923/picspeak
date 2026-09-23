@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import {
   Aperture,
   ArrowRight,
@@ -15,6 +16,7 @@ import HomeContactSection from '@/components/home/HomeContactSection';
 import HomeCritiqueArtifact from '@/components/home/HomeCritiqueArtifact';
 import HomeGenerationPricingSection from '@/components/home/HomeGenerationPricingSection';
 import HomeImprovementLoop from '@/components/home/HomeImprovementLoop';
+import { getPracticeConfig } from '@/lib/api';
 import { getHomeIntentEntrances, type HomeIntent } from '@/lib/content-conversion';
 import { useI18n } from '@/lib/i18n';
 import { markProductAttributionSource, trackProductEvent } from '@/lib/product-analytics';
@@ -44,8 +46,23 @@ const HomeUpdateDialog = dynamic(() => import('@/components/home/HomeUpdateDialo
   loading: () => null,
 });
 
+const CRITIQUE_ENTRY_COPY = {
+  zh: { start: '上传照片，开始评图', results: '五维评分 · 优点与问题 · 具体改进建议' },
+  en: { start: 'Upload a photo for critique', results: 'Five scores · Strengths and issues · Actionable suggestions' },
+  ja: { start: '写真をアップロードして講評', results: '5項目の評価 · 長所と課題 · 具体的な改善案' },
+} as const;
+
 export function HomePageContent() {
   const { t, locale } = useI18n();
+  const [practiceEnabled, setPracticeEnabled] = useState<boolean | null>(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    getPracticeConfig(undefined, controller.signal)
+      .then((config) => { if (!controller.signal.aborted) setPracticeEnabled(config.practice_enabled); })
+      .catch(() => { if (!controller.signal.aborted) setPracticeEnabled(false); });
+    return () => controller.abort();
+  }, []);
+  const entryCopy = CRITIQUE_ENTRY_COPY[locale];
   const homeIntentEntrances = getHomeIntentEntrances(locale);
   const retakeCopy = getRetakeCoachCopy(locale);
   const homeIntentIcons: Record<HomeIntent, typeof UploadCloud> = {
@@ -77,7 +94,7 @@ export function HomePageContent() {
   return (
     <>
       <HomeAuthWidgets />
-      <HomeUpdateDialog />
+      {practiceEnabled === false && <HomeUpdateDialog />}
 
       <section className="relative overflow-hidden px-5 py-12 sm:px-6 sm:py-16 lg:py-20">
         <div
@@ -93,7 +110,7 @@ export function HomePageContent() {
 
             <div
               aria-hidden="true"
-              className="mt-5 text-balance font-display text-[clamp(3.25rem,7vw,6.75rem)] leading-[0.9] tracking-[-0.035em] text-ink"
+              className="mt-5 text-balance font-display text-[clamp(2.5rem,4vw,3.5rem)] leading-[1.14] tracking-[-0.035em] text-ink"
             >
               {t('hero_headline_1')}
               <span className="mt-1 block text-gold">{t('hero_headline_2')}</span>
@@ -108,9 +125,10 @@ export function HomePageContent() {
               onClick={() => markProductAttributionSource('home_direct')}
               className="ui-action-primary mt-8 w-full px-7 py-3.5 text-sm sm:w-auto"
             >
-              {t('hero_cta_start')}
+              {entryCopy.start}
               <ArrowRight size={15} aria-hidden="true" />
             </Link>
+            <p className="mt-4 text-xs leading-6 text-ink-muted">{entryCopy.results}</p>
           </div>
 
           <HomeCritiqueArtifact t={t} />
@@ -130,6 +148,8 @@ export function HomePageContent() {
 
       <HomeImprovementLoop
         t={t}
+        locale={locale}
+        practiceEnabled={practiceEnabled === true}
         retakeTitle={retakeCopy.homeTitle}
         retakeBody={retakeCopy.homeBody}
       />

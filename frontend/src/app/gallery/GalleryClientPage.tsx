@@ -18,10 +18,16 @@ import {
 import { buildWorkspaceConversionHref } from '@/lib/content-conversion';
 import { type TranslationKey, useI18n } from '@/lib/i18n';
 import { markProductAttributionSource, trackProductEvent } from '@/lib/product-analytics';
-import { PublicGalleryItem } from '@/lib/types';
+import type { PublicGalleryItem as GalleryUxItem } from '@/lib/gallery-ux-types';
 import { isInvalidCompletedDate } from '@/lib/date-filters';
 import { localeToIntlLocale } from '@/lib/locale';
 import { useModalFocusTrap } from '@/lib/hooks/useModalFocusTrap';
+import {
+  galleryGridClassName,
+  readGalleryPreferences,
+  writeGalleryPreferences,
+  type GalleryPreferences,
+} from '@/lib/gallery-preferences';
 import {
   buildGallerySearchParams,
   EMPTY_GALLERY_FILTERS,
@@ -34,6 +40,8 @@ import {
 import GalleryFilters, { FilterDraft } from '@/components/gallery/GalleryFilters';
 import GalleryPagination from '@/components/gallery/GalleryPagination';
 import GalleryCard from '@/components/gallery/GalleryCard';
+import GalleryScoreboard from '@/components/gallery/GalleryScoreboard';
+import GalleryViewControls from '@/components/gallery/GalleryViewControls';
 
 const GALLERY_SEO_SECTIONS: Array<{ titleKey: TranslationKey; bodyKey: TranslationKey }> = [
   { titleKey: 'gallery_seo_section1_title', bodyKey: 'gallery_seo_section1_body' },
@@ -48,10 +56,10 @@ function GalleryPageContent() {
   const { token, userInfo, ensureToken, isLoading: authLoading } = useAuth();
   
   const pendingRestoreRef = useRef<GalleryRestoreState | null>(null);
-  const pagesRef = useRef<PublicGalleryItem[][]>([]);
+  const pagesRef = useRef<GalleryUxItem[][]>([]);
   const nextCursorRef = useRef<string | null>(null);
   
-  const [pages, setPages] = useState<PublicGalleryItem[][]>([]);
+  const [pages, setPages] = useState<GalleryUxItem[][]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [pageIndex, setPageIndex] = useState(0);
@@ -60,6 +68,7 @@ function GalleryPageContent() {
   const [error, setError] = useState('');
   const [actionError, setActionError] = useState('');
   const [likeBusyId, setLikeBusyId] = useState<string | null>(null);
+  const [preferences, setPreferences] = useState<GalleryPreferences>(() => readGalleryPreferences());
   const [guestLikePromptOpen, setGuestLikePromptOpen] = useState(false);
   const guestLikePromptCloseRef = useRef<HTMLButtonElement>(null);
   const closeGuestLikePrompt = useCallback(() => setGuestLikePromptOpen(false), []);
@@ -83,6 +92,14 @@ function GalleryPageContent() {
   const filterSignature = filterSearch.toString();
   const appliedFilters = useMemo(() => galleryFiltersFromSearchParams(filterSearch), [filterSearch]);
   const restoreKey = useMemo(() => buildGalleryRestoreKey(filterSignature), [filterSignature]);
+  const rankReferenceAtRef = useRef(new Date().toISOString());
+  const galleryContextQuery = useMemo(() => {
+    const params = new URLSearchParams(filterSignature);
+    if ((appliedFilters.sort || 'default') === 'default') {
+      params.set('rank_reference_at', rankReferenceAtRef.current);
+    }
+    return params.toString();
+  }, [appliedFilters.sort, filterSignature]);
   
   const backHref = useMemo(() => {
     const params = buildGallerySearchParams(appliedFilters, { restore: true });
@@ -98,6 +115,10 @@ function GalleryPageContent() {
   useEffect(() => {
     setDraftFilters(appliedFilters);
   }, [appliedFilters]);
+
+  useEffect(() => {
+    writeGalleryPreferences(preferences);
+  }, [preferences]);
 
   useEffect(() => {
     pagesRef.current = pages;
@@ -120,7 +141,7 @@ function GalleryPageContent() {
   const loadPage = useCallback(async (cursor?: string | null) => {
     const response = await getPublicGallery({ ...toGalleryQuery(appliedFilters), cursor: cursor ?? undefined }, viewerToken);
     return {
-      items: response.items,
+      items: response.items as GalleryUxItem[],
       totalCount: response.total_count,
       nextCursor: response.next_cursor,
     };
@@ -218,7 +239,7 @@ function GalleryPageContent() {
     router.push(query ? `/gallery?${query}` : '/gallery');
   }, [router]);
 
-  const patchGalleryItem = useCallback((reviewId: string, updater: (item: PublicGalleryItem) => PublicGalleryItem) => {
+  const patchGalleryItem = useCallback((reviewId: string, updater: (item: GalleryUxItem) => GalleryUxItem) => {
     setPages((current) =>
       current.map((page) =>
         page.map((item) => (item.review_id === reviewId ? updater(item) : item))
@@ -292,8 +313,12 @@ function GalleryPageContent() {
     pushFilterState(newFilters);
   };
 
+  const buildReviewHref = useCallback((reviewId: string) => (
+    `/reviews/${reviewId}?back=${encodeURIComponent(backHref)}&gallery_query=${encodeURIComponent(galleryContextQuery)}`
+  ), [backHref, galleryContextQuery]);
+
   const handleLikeToggle = useCallback(
-    async (item: PublicGalleryItem) => {
+    async (item: GalleryUxItem) => {
       if (likeBusyId || authLoading) return;
       setActionError('');
       if (!userInfo || userInfo.plan === 'guest') {
@@ -406,6 +431,20 @@ function GalleryPageContent() {
           createdToInvalid={createdToInvalid}
         />
 
+        <GalleryViewControls
+          locale={locale}
+          preferences={preferences}
+          onChange={setPreferences}
+        />
+
+        <GalleryScoreboard
+          locale={locale}
+          imageType={appliedFilters.imageType}
+          token={viewerToken}
+          onOpenReview={persistGalleryState}
+          buildReviewHref={buildReviewHref}
+        />
+
         {(error || actionError) && (
           <div className="mt-6 flex items-center gap-2 rounded-lg border border-rust/20 bg-rust/5 px-4 py-3 text-sm text-rust animate-fade-in">
             <AlertCircle size={14} />
@@ -414,7 +453,7 @@ function GalleryPageContent() {
         )}
 
         {loading ? (
-          <section className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <section className={`mt-8 grid gap-4 ${galleryGridClassName(preferences.columns)}`}>
             {Array.from({ length: 8 }).map((_, index) => (
               <div key={index} className="h-[420px] animate-pulse rounded-card border border-border-subtle bg-raised/45" />
             ))}
@@ -455,7 +494,9 @@ function GalleryPageContent() {
                   handleLikeToggle={handleLikeToggle}
                   persistGalleryState={persistGalleryState}
                   backHref={backHref}
+                  galleryQuery={galleryContextQuery}
                   dateLocale={dateLocale}
+                  density={preferences.density}
                 />
               ))}
             </section>

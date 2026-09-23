@@ -1,14 +1,16 @@
 'use client';
 
 import { memo, useEffect, useState } from 'react';
-import { PublicGalleryItem } from '@/lib/types';
+import type { PublicGalleryItem } from '@/lib/gallery-ux-types';
 
 function GalleryCardImage({
   item,
   alt,
+  compact = false,
 }: {
   item: PublicGalleryItem;
   alt: string;
+  compact?: boolean;
 }) {
   // Signed proxy URLs are more reliable here when rendered directly than through Next image optimization.
   const primarySrc = item.photo_thumbnail_url || item.photo_url || '';
@@ -30,7 +32,7 @@ function GalleryCardImage({
   };
 
   return (
-    <div className="relative aspect-[4/5] w-full overflow-hidden rounded-card border border-border-subtle bg-raised shadow-level-1">
+    <div className={`relative w-full overflow-hidden rounded-card border border-border-subtle bg-raised shadow-level-1 ${compact ? 'aspect-[5/4]' : 'aspect-[4/5]'}`}>
       {!broken && src ? (
         <>
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -42,7 +44,7 @@ function GalleryCardImage({
             decoding="async"
             className="absolute inset-0 h-full w-full scale-110 object-cover opacity-30 blur-[26px] saturate-[0.85] transition-transform duration-1000 group-hover:scale-[1.2] dark:opacity-45"
           />
-          <div className="absolute inset-x-4 bottom-6 top-4 flex items-center justify-center overflow-hidden rounded-card border border-border bg-surface/70 shadow-level-1 backdrop-blur-[3px]">
+          <div className={`absolute flex items-center justify-center overflow-hidden rounded-card border border-border bg-surface/70 shadow-level-1 backdrop-blur-[3px] ${compact ? 'inset-3' : 'inset-x-4 bottom-6 top-4'}`}>
             <div className="relative h-full w-full">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -50,7 +52,7 @@ function GalleryCardImage({
                 alt={alt}
                 loading="lazy"
                 decoding="async"
-                className="absolute inset-0 h-full w-full object-contain px-3 py-4 transition-transform duration-700 group-hover:scale-[1.05]"
+                className={`absolute inset-0 h-full w-full object-contain transition-transform duration-700 group-hover:scale-[1.05] ${compact ? 'px-2 py-2' : 'px-3 py-4'}`}
                 onError={handleError}
               />
             </div>

@@ -40,17 +40,20 @@ test('normal workspace and retake flow both route to GPT-5.6 Luna', async () => 
   const picker = await readFile('src/features/workspace/components/ReviewModelPicker.tsx', 'utf8');
   const settings = await readFile('src/features/workspace/components/WorkspaceSettingsPanel.tsx', 'utf8');
   const header = await readFile('src/components/layout/Header.tsx', 'utf8');
+  const headerControls = await readFile('src/components/layout/HeaderControls.tsx', 'utf8');
   const coachCopy = await readFile('src/lib/retake-coach-copy.ts', 'utf8');
 
   assert.match(source, /review_model: selectedReviewModel/);
-  assert.match(source, /isRetakeCoachFlow \? 'gpt-5\.6-luna' : reviewModel/);
+  assert.match(source, /isRetakeCoachFlow \|\| isPracticePairedFlow \? 'gpt-5\.6-luna' : reviewModel/);
+  assert.match(source, /showReviewModel=\{!isRetakeCoachFlow && !isPracticePairedFlow\}/);
   assert.match(source, /<WorkspaceSettingsPanel/);
   assert.match(settings, /<ReviewModelPicker/);
   assert.match(picker, /Qwen 3\.7/);
   assert.doesNotMatch(picker, /Qwen 3\.5/);
   assert.match(picker, /GPT-5\.6/);
   assert.doesNotMatch(picker, /GPT-5\.5/);
-  assert.match(header, />5\.6<\/span>/);
+  assert.match(header, /href="\/account\/practice"/);
+  assert.match(headerControls, /href: '\/retake'/);
   assert.doesNotMatch(header, />Terra<\/span>/);
   assert.doesNotMatch(coachCopy, /Terra/);
 });
@@ -64,12 +67,13 @@ test('retake comparison keeps original before retake and handles inaccessible so
   assert.match(source, /aria-label=/);
 });
 
-test('retake progress SVG remains responsive without forced horizontal scrolling', async () => {
+test('retake progress records remain responsive without forced horizontal scrolling', async () => {
   const source = await readFile('src/features/reviews/components/RetakeProgressPanel.tsx', 'utf8');
 
   assert.doesNotMatch(source, /overflow-x-auto/);
   assert.doesNotMatch(source, /min-w-\[/);
-  assert.match(source, /className="h-auto w-full"/);
+  assert.doesNotMatch(source, /<svg/);
+  assert.match(source, /grid gap-3 lg:grid-cols-2/);
 });
 
 test('review result sends the paired visual target into the existing reference generator', async () => {

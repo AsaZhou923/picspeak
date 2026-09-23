@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { buildHistoryGrowthSnapshot, buildNextShootChecklist } from '../src/lib/review-growth.ts';
 import type { ReviewHistoryItem, ReviewScores } from '../src/lib/types.ts';
 
@@ -194,4 +195,14 @@ test('buildHistoryGrowthSnapshot falls back to composition when history is empty
   assert.deepEqual(snapshot.weakDimensions, []);
   assert.equal(snapshot.practiceTheme.dimension, 'composition');
   assert.equal(snapshot.practiceTheme.reviewCount, 0);
+});
+
+test('history growth copy frames single-image history as sampled work performance', async () => {
+  const source = await readFile('src/lib/review-history-copy.ts', 'utf8');
+
+  assert.match(source, /按已加载点评查看作品记录/);
+  assert.match(source, /不等于已验证能力提升/);
+  assert.match(source, /Read the loaded critique records as a sample/);
+  assert.match(source, /not a verified skill-growth claim/);
+  assert.match(source, /検証済みの技能向上/);
 });

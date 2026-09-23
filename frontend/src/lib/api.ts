@@ -20,6 +20,21 @@ import {
   PhotoReviewsResponse,
   PresignRequest,
   PresignResponse,
+  PracticeConfigResponse,
+  PracticeFeedbackRequest,
+  PracticeFeedbackResponse,
+  PracticeGuidanceProfileResponse,
+  PracticeLegacyComparisonsQuery,
+  PracticeLegacyComparisonsResponse,
+  PracticeRecommendationsResponse,
+  PracticeSceneGroupRequest,
+  PracticeSceneGroupResponse,
+  PracticeSessionCreateRequest,
+  PracticeSessionsQuery,
+  PracticeSessionsResponse,
+  PracticeSessionPatchRequest,
+  PracticeSessionResponse,
+  PracticeSummaryResponse,
   ProductAnalyticsTrackRequest,
   ProductAnalyticsTrackResponse,
   PublicGalleryQuery,
@@ -458,6 +473,151 @@ export async function createReview(
   return response;
 }
 
+export async function getPracticeConfig(
+  token?: string,
+  signal?: AbortSignal
+): Promise<PracticeConfigResponse> {
+  return request<PracticeConfigResponse>('/practice/config', {
+    token,
+    signal,
+    cache: 'no-store',
+  });
+}
+
+export async function createPracticeSession(
+  payload: PracticeSessionCreateRequest,
+  token: string
+): Promise<PracticeSessionResponse> {
+  return request<PracticeSessionResponse>('/practice/sessions', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    token,
+    unauthorizedRecovery: 'guest',
+  });
+}
+
+export async function getPracticeSession(
+  sessionId: string,
+  token: string,
+  signal?: AbortSignal
+): Promise<PracticeSessionResponse> {
+  return request<PracticeSessionResponse>(`/practice/sessions/${encodeURIComponent(sessionId)}?_ts=${Date.now()}`, {
+    token,
+    cache: 'no-store',
+    signal,
+  });
+}
+
+export async function getPracticeSessions(
+  token: string,
+  query: PracticeSessionsQuery = {},
+  signal?: AbortSignal
+): Promise<PracticeSessionsResponse> {
+  const params = new URLSearchParams({ limit: String(query.limit ?? 20) });
+  if (query.cursor) params.set('cursor', query.cursor);
+  if (query.lifecycle && query.lifecycle !== 'all') params.set('lifecycle', query.lifecycle);
+  if (query.dimension && query.dimension !== 'all') params.set('dimension', query.dimension);
+  if (query.practice_kind && query.practice_kind !== 'all') params.set('practice_kind', query.practice_kind);
+  return request<PracticeSessionsResponse>(`/practice/sessions?${params.toString()}`, {
+    token,
+    signal,
+    cache: 'no-store',
+  });
+}
+
+export async function getPracticeSummary(
+  token: string,
+  signal?: AbortSignal
+): Promise<PracticeSummaryResponse> {
+  return request<PracticeSummaryResponse>('/practice/summary?scope=all_practice', {
+    token,
+    signal,
+    cache: 'no-store',
+  });
+}
+
+export async function getPracticeGuidanceProfile(
+  token: string,
+  locale: 'zh' | 'en' | 'ja' = 'en',
+  signal?: AbortSignal
+): Promise<PracticeGuidanceProfileResponse> {
+  const params = new URLSearchParams({ locale });
+  return request<PracticeGuidanceProfileResponse>(`/practice/profile?${params.toString()}`, {
+    token,
+    signal,
+    cache: 'no-store',
+  });
+}
+
+export async function getPracticeRecommendations(
+  token: string,
+  locale: 'zh' | 'en' | 'ja' = 'en',
+  signal?: AbortSignal
+): Promise<PracticeRecommendationsResponse> {
+  const params = new URLSearchParams({ locale });
+  return request<PracticeRecommendationsResponse>(`/practice/recommendations?${params.toString()}`, {
+    token,
+    signal,
+    cache: 'no-store',
+  });
+}
+
+export async function getPracticeLegacyComparisons(
+  token: string,
+  query: PracticeLegacyComparisonsQuery = {},
+  signal?: AbortSignal
+): Promise<PracticeLegacyComparisonsResponse> {
+  const params = new URLSearchParams({ limit: String(query.limit ?? 20) });
+  if (query.cursor) params.set('cursor', query.cursor);
+  return request<PracticeLegacyComparisonsResponse>(`/practice/legacy-comparisons?${params.toString()}`, {
+    token,
+    signal,
+    cache: 'no-store',
+  });
+}
+
+export async function updatePracticeSceneGroup(
+  sessionId: string,
+  payload: PracticeSceneGroupRequest,
+  token: string
+): Promise<PracticeSceneGroupResponse> {
+  return request<PracticeSceneGroupResponse>(`/practice/sessions/${encodeURIComponent(sessionId)}/scene-group`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+    token,
+    unauthorizedRecovery: 'guest',
+  });
+}
+
+export async function updatePracticeSession(
+  sessionId: string,
+  payload: PracticeSessionPatchRequest,
+  token: string
+): Promise<PracticeSessionResponse> {
+  return request<PracticeSessionResponse>(`/practice/sessions/${encodeURIComponent(sessionId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+    token,
+    unauthorizedRecovery: 'guest',
+  });
+}
+
+export async function submitPracticeFeedback(
+  attemptId: string,
+  payload: PracticeFeedbackRequest,
+  token: string
+): Promise<PracticeFeedbackResponse> {
+  return request<PracticeFeedbackResponse>(
+    `/practice/attempts/${encodeURIComponent(attemptId)}/feedback`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      token,
+      unauthorizedRecovery: 'guest',
+    }
+  );
+}
+
 export async function getTask(taskId: string, token: string, signal?: AbortSignal): Promise<TaskStatusResponse> {
   return request<TaskStatusResponse>(`/tasks/${taskId}?_ts=${Date.now()}`, {
     token,
@@ -572,7 +732,8 @@ export async function getPhotoReviews(
 
 export async function getMyReviews(
   token: string,
-  query: ReviewHistoryQuery = {}
+  query: ReviewHistoryQuery = {},
+  signal?: AbortSignal
 ): Promise<ReviewHistoryResponse> {
   const params = new URLSearchParams({ limit: String(query.limit ?? 20) });
   if (query.cursor) params.set('cursor', query.cursor);
@@ -582,7 +743,7 @@ export async function getMyReviews(
   if (typeof query.max_score === 'number') params.set('max_score', String(query.max_score));
   if (query.image_type) params.set('image_type', query.image_type);
   if (query.favorite_only) params.set('favorite_only', 'true');
-  return request<ReviewHistoryResponse>(`/me/reviews?${params.toString()}`, { token });
+  return request<ReviewHistoryResponse>(`/me/reviews?${params.toString()}`, { token, signal });
 }
 
 export async function getBlogViewCounts(slugs: string[]): Promise<Record<string, number>> {

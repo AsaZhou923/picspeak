@@ -187,7 +187,8 @@ npm run build
 
 ## 文档
 
-- [最新更新日志](docs/changelog/CHANGELOG.md#2026-09-14-multilingual-experience-consistency)
+- [develop 准备中的更新](docs/changelog/CHANGELOG.md#2026-09-23-critique-practice-and-sharing)
+- [最新已发布更新日志](docs/changelog/CHANGELOG.md#2026-09-14-multilingual-experience-consistency)
 - [前端设计系统](DESIGN.md)
 - [SEO / GEO 审计报告](docs/seo/seo-audit-2026-05-01.md)
 - [系统架构说明](docs/architecture/系统架构.md)

@@ -40,10 +40,14 @@ import { ReviewReferenceGenerationPanel } from '@/features/reviews/components/Re
 import { ReviewGalleryPanel } from '@/features/reviews/components/ReviewGalleryPanel';
 import { ImageZoomOverlay } from '@/features/reviews/components/ImageZoomOverlay';
 import { RetakeComparisonPanel } from '@/features/reviews/components/RetakeComparisonPanel';
+import { usePracticeExposure } from '@/features/reviews/hooks/usePracticeExposure';
 import { buildNextShootChecklist, type NextShootChecklistItem } from '@/lib/review-growth';
 import { getProUpgradeTriggerCopy, type ProUpgradeTrigger } from '@/lib/pro-conversion';
 import { trackProductEvent } from '@/lib/product-analytics';
 import { getReviewContinuationPlan } from '@/features/reviews/hooks/reviewContinuationSupport';
+import GalleryReviewNeighborNav from '@/components/gallery/GalleryReviewNeighborNav';
+import ReviewExportPanel from '@/features/reviews/components/ReviewExportPanel';
+import { ReviewOwnerTools } from '@/features/reviews/components/ReviewOwnerTools';
 
 function getReviewSourceContextCopy(locale: 'zh' | 'en' | 'ja') {
   if (locale === 'ja') {
@@ -112,10 +116,15 @@ export default function ReviewPage() {
   const { userInfo, token } = useAuth();
 
   const reviewId = params.reviewId as string;
-  const backHref = searchParams.get('back') ?? '/workspace';
+  const requestedBackHref = searchParams.get('back') ?? '/workspace';
+  const backHref = /^\/(gallery|account\/(reviews|favorites)|workspace|u\/[A-Za-z0-9_-]+)(?:\?|$)/.test(requestedBackHref)
+    ? requestedBackHref : '/workspace';
   const isGalleryBackHref = backHref.startsWith('/gallery');
+  const isProfileBackHref = backHref.startsWith('/u/');
   const backLabel = isGalleryBackHref
     ? t('nav_gallery')
+    : isProfileBackHref
+      ? (locale === 'zh' ? '公开作品主页' : locale === 'ja' ? '公開作品プロフィール' : 'Public portfolio')
     : backHref === '/account/reviews'
       ? t('review_back_history')
       : backHref === '/account/favorites'
@@ -134,6 +143,10 @@ export default function ReviewPage() {
   const [highlightedCardId, setHighlightedCardId] = useState<string | null>(null);
 
   const { review, setReview, loading, error, initialPhotoUrl } = useReviewDetail(reviewId);
+  const recheckExposureRef = usePracticeExposure(
+    'practice_result_viewed', review?.practice?.attempt_id, locale,
+    Boolean(review?.viewer_is_owner && review.practice?.kind === 'same_image_recheck'),
+  );
   const {
     photoUrl, photoError, imgNaturalSize, setImgNaturalSize, handlePhotoError,
     zoomOpen, setZoomOpen, zoomMounted, setZoomMounted,
@@ -252,6 +265,11 @@ export default function ReviewPage() {
     retakeAvailable: showOwnerActions,
     generateAvailable: showOwnerActions,
   });
+  const isGoalPracticeReview = Boolean(
+    r.comparison &&
+    activeReview.practice?.session_id &&
+    (activeReview.goal_assessment || r.goal_assessment || r.comparison.goal_assessment)
+  );
 
   function handleUploadNewRound() {
     const primaryAction = nextShootChecklist[0];
@@ -278,6 +296,7 @@ export default function ReviewPage() {
       mode: activeReview.mode,
       image_type: activeReview.image_type ?? activeReview.result.image_type ?? 'default',
       retake_intent: 'new_photo_retake',
+      practice_kind: 'capture_retake',
     });
     if (primaryAction) {
       nextParams.set('next_shoot_action', primaryAction.detail || primaryAction.title);
@@ -308,6 +327,7 @@ export default function ReviewPage() {
       mode: activeReview.mode,
       image_type: activeReview.image_type ?? activeReview.result.image_type ?? 'default',
       retake_intent: 'new_photo_retake',
+      practice_kind: 'capture_retake',
       next_shoot_action: item.detail || item.title,
       next_shoot_dimension: item.dimension,
     });
@@ -344,7 +364,7 @@ export default function ReviewPage() {
         />
       )}
 
-      <div className="mx-auto max-w-workspace px-5 py-10 sm:px-6 sm:py-12">
+      <div ref={recheckExposureRef} className="mx-auto max-w-workspace px-5 py-10 sm:px-6 sm:py-12">
         <button
           type="button"
           onClick={handleBackNavigation}
@@ -358,6 +378,12 @@ export default function ReviewPage() {
           <div role="status" className="mb-6 flex items-center gap-2 rounded-control border border-rust/25 bg-rust/5 px-4 py-3 text-sm text-rust">
             <AlertCircle size={16} className="shrink-0" aria-hidden="true" />
             <span>{usageError}</span>
+          </div>
+        )}
+
+        {isGoalPracticeReview && r.comparison && (
+          <div className="mb-6">
+            <RetakeComparisonPanel review={activeReview} locale={locale} />
           </div>
         )}
 
@@ -376,46 +402,52 @@ export default function ReviewPage() {
               <ReviewResultHeading className="mt-2 text-3xl font-semibold leading-tight text-ink sm:text-4xl">
                 {t('review_page_headline')}
               </ReviewResultHeading>
-              <div className="mt-4 ui-panel flex items-center gap-4 p-4 sm:p-5">
-                <FinalScoreRing score={r.final_score} />
-                <div className="min-w-0">
-                  <p className={`text-xl font-semibold leading-none ${scoreLabelColor}`}>{scoreLabel}</p>
-                  <p className="mt-2 text-sm leading-6 text-ink-muted">{scoreSummary}</p>
-                  <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-ink-subtle">
-                    <span className={review.mode === 'pro' ? 'font-medium text-gold' : 'text-ink-muted'}>
-                      {review.mode === 'pro' ? 'Pro' : 'Flash'}
-                    </span>
-                    <span aria-hidden="true">·</span>
-                    <span className="inline-flex items-center gap-1.5 font-medium text-sage">
-                      <span aria-hidden="true">✓</span>{t('status_succeeded')}
-                    </span>
-                    <span aria-hidden="true">·</span>
-                    <span>{new Date(review.created_at).toLocaleDateString(localeToIntlLocale(locale))}</span>
+              {!isGoalPracticeReview && (
+                <div className="mt-4 ui-panel flex items-center gap-4 p-4 sm:p-5">
+                  <FinalScoreRing score={r.final_score} />
+                  <div className="min-w-0">
+                    <p className={`text-xl font-semibold leading-none ${scoreLabelColor}`}>{scoreLabel}</p>
+                    <p className="mt-2 text-sm leading-6 text-ink-muted">{scoreSummary}</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-ink-subtle">
+                      <span className={review.mode === 'pro' ? 'font-medium text-gold' : 'text-ink-muted'}>
+                        {review.mode === 'pro' ? 'Pro' : 'Flash'}
+                      </span>
+                      <span aria-hidden="true">·</span>
+                      <span className="inline-flex items-center gap-1.5 font-medium text-sage">
+                        <span aria-hidden="true">✓</span>{t('status_succeeded')}
+                      </span>
+                      <span aria-hidden="true">·</span>
+                      <span>{new Date(review.created_at).toLocaleDateString(localeToIntlLocale(locale))}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
             </header>
 
-            <section className="ui-panel border-l-4 border-l-rust p-5" aria-labelledby="review-strongest-finding-title">
-              <div className="flex items-center gap-2 text-rust">
-                <TrendingDown size={16} aria-hidden="true" />
-                <p className="text-xs font-semibold uppercase tracking-[0.16em]">{hierarchyCopy.strongestLabel}</p>
-              </div>
-              <h2 id="review-strongest-finding-title" className="mt-2 text-xl font-semibold text-ink">
-                {hierarchyCopy.strongestTitle}
-              </h2>
-              <p className="mt-2 text-sm leading-7 text-ink-muted">{strongestFinding}</p>
-              <p className="mt-3 text-xs text-ink-subtle">
-                {t('review_score_lowest')}: <span className="font-medium text-rust">{weakestDim.label}</span>
-              </p>
-            </section>
+            {!isGoalPracticeReview && (
+              <>
+                <section className="ui-panel border-l-4 border-l-rust p-5" aria-labelledby="review-strongest-finding-title">
+                  <div className="flex items-center gap-2 text-rust">
+                    <TrendingDown size={16} aria-hidden="true" />
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em]">{hierarchyCopy.strongestLabel}</p>
+                  </div>
+                  <h2 id="review-strongest-finding-title" className="mt-2 text-xl font-semibold text-ink">
+                    {hierarchyCopy.strongestTitle}
+                  </h2>
+                  <p className="mt-2 text-sm leading-7 text-ink-muted">{strongestFinding}</p>
+                  <p className="mt-3 text-xs text-ink-subtle">
+                    {t('review_score_lowest')}: <span className="font-medium text-rust">{weakestDim.label}</span>
+                  </p>
+                </section>
 
-            <ReviewNextActionPanel
-              locale={locale}
-              plan={continuationPlan}
-              onRetake={handleUploadNewRound}
-              onGenerate={handleGenerateSetup}
-            />
+                <ReviewNextActionPanel
+                  locale={locale}
+                  plan={continuationPlan}
+                  onRetake={handleUploadNewRound}
+                  onGenerate={handleGenerateSetup}
+                />
+              </>
+            )}
           </div>
         </div>
 
@@ -448,7 +480,7 @@ export default function ReviewPage() {
           </h2>
 
           <div className="mt-6 space-y-6">
-            {r.comparison && <RetakeComparisonPanel review={activeReview} locale={locale} />}
+            {r.comparison && !isGoalPracticeReview && <RetakeComparisonPanel review={activeReview} locale={locale} />}
 
             <div className="grid items-start gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
               <ReviewScorePanel
@@ -496,6 +528,7 @@ export default function ReviewPage() {
 
             {showOwnerActions && (
               <ReviewGrowthLoopPanel
+                sourceReviewId={review.review_id}
                 locale={locale}
                 checklist={nextShootChecklist}
                 actionBusy={actionBusy}
@@ -538,6 +571,28 @@ export default function ReviewPage() {
               )}
             </div>
           </div>
+
+          {showOwnerActions && (
+            <div className="mt-6 space-y-6">
+              <ReviewOwnerTools
+                key={`owner-${review.review_id}`}
+                review={review}
+                externalVersion={`${actionBusy ?? ''}:${actionFeedback}:${review.gallery_visible}`}
+                onUpdated={(patch) => setReview((previous) => previous?.review_id === review.review_id ? { ...previous, ...patch } : previous)}
+              />
+              <ReviewExportPanel key={`export-${review.review_id}`} review={review} />
+            </div>
+          )}
+
+          {isGalleryBackHref && (
+            <GalleryReviewNeighborNav
+              reviewId={review.review_id}
+              locale={locale}
+              token={token ?? undefined}
+              search={searchParams.get('gallery_query') ?? ''}
+              className="mt-6"
+            />
+          )}
 
           {showOwnerActions && (
             <div className="mt-6">

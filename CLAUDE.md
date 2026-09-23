@@ -6,15 +6,17 @@ This file gives Claude Code project-specific guidance for working in this reposi
 
 PicSpeak is an AI photo critique and visual-reference generation web app. Users can upload photos for structured AI photography feedback, browse review history and gallery content, and generate AI reference images from prompts, templates, or review improvement suggestions.
 
+Photo critique remains the primary product entry point. Practice, organization, gallery, public profile, sharing, and printable-card work should reinforce the user's path after a critique result rather than replacing the upload-and-critique flow.
+
 Core product areas:
 
-- Photo upload, AI critique, scoring, and retake suggestions
+- Photo upload, AI critique, scoring, and retake suggestions as the first-time user path
 - Guest and authenticated usage with quotas and upgrade paths
 - Public gallery, blog, changelog/updates, SEO metadata, and llms.txt support
 - AI image generation with templates, tasks, generated image detail pages, history, credits, and credit-pack billing
 - Review-to-generation loop for composition, lighting, color, and retake reference images
 - Review-to-workspace retake targets, history practice themes, and in-task Blog reading during critique/generation waits
-- Original-to-retake comparison with GPT-5.6 Luna at `xhigh` reasoning, deterministic score deltas, evidence-backed next-shoot actions, and same-chain progress tracking
+- Original-to-retake comparison with GPT-5.6 Luna at `xhigh` reasoning, deterministic per-request score deltas, evidence-backed next-shoot actions, and separate practice-round records
 - Operational health snapshots for task status, AI costs, credits, payments, and public-content audits
 
 ## Architecture
@@ -156,10 +158,16 @@ npm run test
 2. The workspace uploads a new photo and creates a review with `analysis_type=retake_compare` and the source review id.
 3. Backend resolves both stored images and sends them together to the OpenAI Responses API with `model=gpt-5.6-luna`, `reasoning.effort=xhigh`, and a strict paired-comparison schema.
 4. GPT-5.6 Luna scores both images under one rubric; the server calculates every dimension and overall delta before persisting `Review.result_json.comparison`.
-5. Comparable results appear in `RetakeComparisonPanel` and the same-chain `RetakeProgressPanel`; non-comparable results keep their caveat but do not count as progress.
+5. Results appear in `RetakeComparisonPanel` and the per-round `RetakeProgressPanel`; each pair retains its own before/after scores, version, and comparability. Never sum paired deltas or join independently rescored images into an ability curve.
 6. The paired diagnosis can feed the existing GPT Image 2 `review_linked` / `retake_reference` flow, but generated images never affect comparison scores.
 
-Normal single-photo review is a separate path: Qwen 3.5 remains the compatibility default, while an explicit GPT-5.6 selection uses GPT-5.6 Luna with `xhigh` reasoning through the OpenAI Responses API. Do not reuse one model's completed review for another model choice.
+The optional goal-practice flow is controlled by backend `PRACTICE_ENABLED` (default `false`). Its versioned contract is in `E:\Project Code\docs\01 - Projects\PicSpeak\02 - Architecture\Practice v1 合同.md`; machine-readable metric fixtures live at `backend/tests/fixtures/practice_metric_examples.json`. Accepted goals live in immutable `PracticeSession` snapshots; `PracticeAttempt` links one user attempt to one existing `ReviewTask`. Workers load trusted goals from those records and store four-state evidence in `Review.result_json.goal_assessment`. A score increase never substitutes for goal completion. Disabling the flag stops new sessions and attempts while keeping saved results readable. This describes the local code contract, not a deployed feature or a validated claim of skill improvement.
+
+Practice analytics uses server-owned accepted/submitted/completed/feedback events and owner-validated, deduplicated visible-card events. `review_call_costs` records actual provider-call estimates, including scorer audits, failed usage, and retries; unavailable usage is null. `export_practice_analytics_report.py` is offline by default and requires an explicit database URL for DB mode; an optional eligibility manifest is required before unknown users can enter official A7/L14/W4 denominators. The account history Practice view uses cursor pagination and a separate server-wide authorized summary. Goal and Beta evaluators are offline tools under `backend/scripts/`; missing real evidence must remain `INSUFFICIENT_INVALID`, never a Beta or skill-improvement claim.
+
+Keep execution records, evaluation protocols, and generated analytics reports in the sibling docs vault under `E:\Project Code\docs\01 - Projects\PicSpeak` (Testing, Architecture, and Analytics subfolders). Keep machine-readable test fixtures and evaluator input templates in the code repository.
+
+Normal single-photo review is a separate path: the Qwen-compatible route remains the default and the workspace currently labels it as Qwen 3.7, while an explicit GPT-5.6 selection uses GPT-5.6 Luna with `xhigh` reasoning through the OpenAI Responses API. Do not reuse one model's completed review for another model choice.
 
 ### Auth and quota
 

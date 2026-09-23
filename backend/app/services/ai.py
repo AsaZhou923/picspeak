@@ -3,8 +3,10 @@ from __future__ import annotations
 import json
 import re
 import time
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any, Callable, Iterator, Literal
 
 from pydantic import ValidationError
 
@@ -52,6 +54,10 @@ class AIReviewResponse:
     output_tokens: int | None = None
     cost_usd: float | None = None
     cost_rate_version: str | None = None
+    writer_input_tokens: int | None = None
+    writer_output_tokens: int | None = None
+    writer_cost_usd: float | None = None
+    writer_cost_rate_version: str | None = None
     latency_ms: int | None = None
 
 
@@ -61,6 +67,29 @@ class AIJSONResponse:
     model_name: str
     usage: dict
     latency_ms: int
+
+
+ProviderCallStage = Literal['scorer', 'writer', 'pair']
+ProviderCallOutcome = Literal['succeeded', 'failed', 'unknown']
+
+
+@dataclass(frozen=True)
+class AIProviderCallUsage:
+    stage: ProviderCallStage
+    outcome: ProviderCallOutcome
+    model_name: str | None = None
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    cost_usd: float | None = None
+    cost_rate_version: str | None = None
+    sequence: str | int | None = None
+
+
+_ProviderCallObserver = Callable[[AIProviderCallUsage], None]
+_provider_call_observer: ContextVar[_ProviderCallObserver | None] = ContextVar(
+    'provider_call_observer',
+    default=None,
+)
 
 
 @dataclass(frozen=True)
@@ -77,6 +106,63 @@ class CanonicalScore:
     input_tokens: int | None = None
     output_tokens: int | None = None
     latency_ms: int = 0
+
+
+@contextmanager
+def observe_ai_provider_calls(observer: _ProviderCallObserver) -> Iterator[None]:
+    token = _provider_call_observer.set(observer)
+    try:
+        yield
+    finally:
+        _provider_call_observer.reset(token)
+
+
+def _usage_int(usage: dict, *keys: str) -> int | None:
+    for key in keys:
+        value = usage.get(key)
+        if type(value) is int and value >= 0:
+            return value
+    return None
+
+
+def notify_ai_provider_call(
+    *,
+    stage: ProviderCallStage,
+    outcome: ProviderCallOutcome,
+    model_name: str | None,
+    usage: dict | None = None,
+    sequence: str | int | None = None,
+    input_keys: tuple[str, ...] = ('input_tokens',),
+    output_keys: tuple[str, ...] = ('output_tokens',),
+) -> None:
+    observer = _provider_call_observer.get()
+    if observer is None:
+        return
+    usage_dict = usage if isinstance(usage, dict) else {}
+    input_tokens = _usage_int(usage_dict, *input_keys)
+    output_tokens = _usage_int(usage_dict, *output_keys)
+    estimate = estimate_review_usage_cost(
+        [
+            ReviewModelUsage(
+                model_name=model_name,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+            )
+        ],
+        overrides=settings.review_pricing_overrides,
+    )
+    observer(
+        AIProviderCallUsage(
+            stage=stage,
+            outcome=outcome,
+            model_name=model_name,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            cost_usd=float(estimate.cost_usd) if estimate.cost_usd is not None else None,
+            cost_rate_version=estimate.rate_version,
+            sequence=sequence,
+        )
+    )
 
 
 _SCORE_DIMENSION_EVIDENCE_SCHEMA = {
@@ -465,7 +551,15 @@ def _format_validation_error(exc: ValidationError) -> str:
     return f'{location}: {message}'
 
 
-def _request_multimodal_json(*, model_name: str, prompt: str, image_url: str, temperature: float) -> AIJSONResponse:
+def _request_multimodal_json(
+    *,
+    model_name: str,
+    prompt: str,
+    image_url: str,
+    temperature: float,
+    call_stage: ProviderCallStage | None = None,
+    call_sequence: str | int | None = None,
+) -> AIJSONResponse:
     endpoint = settings.ai_api_base_url.rstrip('/') + '/chat/completions'
     payload = {
         'model': model_name,
@@ -496,14 +590,32 @@ def _request_multimodal_json(*, model_name: str, prompt: str, image_url: str, te
         )
         body = json.loads(response.data.decode('utf-8'))
     except PooledHTTPStatusError as exc:
+        if call_stage is not None:
+            notify_ai_provider_call(stage=call_stage, outcome='failed', model_name=model_name, sequence=call_sequence)
         err_body = exc.response.data.decode('utf-8', errors='ignore')
         raise AIReviewError(f'AI provider HTTP {exc.response.status}: {err_body[:300]}') from exc
     except PooledHTTPRequestError as exc:
+        if call_stage is not None:
+            notify_ai_provider_call(stage=call_stage, outcome='failed', model_name=model_name, sequence=call_sequence)
         raise AIReviewError(f'AI provider request failed: {exc}') from exc
     except json.JSONDecodeError as exc:
+        if call_stage is not None:
+            notify_ai_provider_call(stage=call_stage, outcome='failed', model_name=model_name, sequence=call_sequence)
         raise AIReviewError('AI provider returned invalid JSON') from exc
 
     latency_ms = int((time.perf_counter() - start) * 1000)
+    response_model_name = str(body.get('model') or model_name)
+    usage = body.get('usage') or {}
+    if call_stage is not None:
+        notify_ai_provider_call(
+            stage=call_stage,
+            outcome='unknown',
+            model_name=response_model_name,
+            usage=usage,
+            sequence=call_sequence,
+            input_keys=('prompt_tokens',),
+            output_keys=('completion_tokens',),
+        )
     try:
         choice = body['choices'][0]
         message = choice['message']
@@ -514,8 +626,8 @@ def _request_multimodal_json(*, model_name: str, prompt: str, image_url: str, te
 
     return AIJSONResponse(
         parsed=parsed,
-        model_name=str(body.get('model') or model_name),
-        usage=body.get('usage') or {},
+        model_name=response_model_name,
+        usage=usage,
         latency_ms=latency_ms,
     )
 
@@ -555,6 +667,8 @@ def _request_openai_multimodal_json(
     model_name: str | None = None,
     reasoning_effort: str | None = None,
     timeout_seconds: int | None = None,
+    call_stage: ProviderCallStage | None = None,
+    call_sequence: str | int | None = None,
 ) -> AIJSONResponse:
     resolved_model_name = model_name or settings.openai_review_model
     payload = {
@@ -594,13 +708,44 @@ def _request_openai_multimodal_json(
         )
         body = json.loads(response.data.decode('utf-8'))
     except PooledHTTPStatusError as exc:
+        if call_stage is not None:
+            notify_ai_provider_call(
+                stage=call_stage,
+                outcome='failed',
+                model_name=resolved_model_name,
+                sequence=call_sequence,
+            )
         error_body = exc.response.data.decode('utf-8', errors='ignore')
         raise AIReviewError(f'OpenAI review API HTTP {exc.response.status}: {error_body[:300]}') from exc
     except PooledHTTPRequestError as exc:
+        if call_stage is not None:
+            notify_ai_provider_call(
+                stage=call_stage,
+                outcome='failed',
+                model_name=resolved_model_name,
+                sequence=call_sequence,
+            )
         raise AIReviewError(f'OpenAI review API request failed: {exc}') from exc
     except json.JSONDecodeError as exc:
+        if call_stage is not None:
+            notify_ai_provider_call(
+                stage=call_stage,
+                outcome='failed',
+                model_name=resolved_model_name,
+                sequence=call_sequence,
+            )
         raise AIReviewError('OpenAI review API returned invalid JSON') from exc
 
+    response_model_name = str(body.get('model') or resolved_model_name)
+    usage = body.get('usage') if isinstance(body.get('usage'), dict) else {}
+    if call_stage is not None:
+        notify_ai_provider_call(
+            stage=call_stage,
+            outcome='unknown',
+            model_name=resolved_model_name,
+            usage=usage,
+            sequence=call_sequence,
+        )
     try:
         parsed = json.loads(_extract_openai_output_text(body))
     except json.JSONDecodeError as exc:
@@ -608,8 +753,8 @@ def _request_openai_multimodal_json(
 
     return AIJSONResponse(
         parsed=parsed,
-        model_name=str(body.get('model') or resolved_model_name),
-        usage=body.get('usage') if isinstance(body.get('usage'), dict) else {},
+        model_name=response_model_name,
+        usage=usage,
         latency_ms=int((time.perf_counter() - started) * 1000),
     )
 
@@ -655,7 +800,13 @@ def _build_canonical_score_from_response(
     return canonical_score
 
 
-def _request_canonical_score_once(*, prompt: str, image_url: str, high_score_audited: bool) -> CanonicalScore:
+def _request_canonical_score_once(
+    *,
+    prompt: str,
+    image_url: str,
+    high_score_audited: bool,
+    sequence: str,
+) -> CanonicalScore:
     try:
         scoring_response = _request_openai_multimodal_json(
             prompt=prompt,
@@ -665,6 +816,8 @@ def _request_canonical_score_once(*, prompt: str, image_url: str, high_score_aud
             model_name=settings.openai_score_model,
             reasoning_effort=settings.openai_score_reasoning_effort,
             timeout_seconds=settings.openai_score_timeout_seconds,
+            call_stage='scorer',
+            call_sequence=sequence,
         )
         return _build_canonical_score_from_response(
             scoring_response=scoring_response,
@@ -713,6 +866,7 @@ def _run_canonical_scoring(
         prompt=prompt,
         image_url=image_url,
         high_score_audited=False,
+        sequence='initial',
     )
     if canonical_score.final_score < 8:
         return canonical_score
@@ -726,6 +880,7 @@ def _run_canonical_scoring(
         ),
         image_url=image_url,
         high_score_audited=True,
+        sequence='audit',
     )
     merged_score = _merge_scoring_usage(audited_score, canonical_score)
     _validate_canonical_score_contract(merged_score)
@@ -781,6 +936,7 @@ def _run_openai_review(
             model_name=settings.openai_review_model,
             reasoning_effort=settings.openai_review_reasoning_effort,
             timeout_seconds=settings.openai_review_timeout_seconds,
+            call_stage='writer',
         )
     except AIReviewError as exc:
         raise AIReviewError(str(exc), stage='writing') from exc
@@ -812,15 +968,14 @@ def _run_openai_review(
 
     input_tokens = (resolved_score.input_tokens or 0) + (writing_response.usage.get('input_tokens') or 0)
     output_tokens = (resolved_score.output_tokens or 0) + (writing_response.usage.get('output_tokens') or 0)
+    writer_usage = ReviewModelUsage(
+        model_name=settings.openai_review_model,
+        input_tokens=writing_response.usage.get('input_tokens'),
+        output_tokens=writing_response.usage.get('output_tokens'),
+    )
+    writer_cost = estimate_review_usage_cost([writer_usage], overrides=settings.review_pricing_overrides)
     cost = estimate_review_usage_cost(
-        _score_usage(resolved_score)
-        + [
-            ReviewModelUsage(
-                model_name=settings.openai_review_model,
-                input_tokens=writing_response.usage.get('input_tokens'),
-                output_tokens=writing_response.usage.get('output_tokens'),
-            ),
-        ],
+        _score_usage(resolved_score) + [writer_usage],
         overrides=settings.review_pricing_overrides,
     )
 
@@ -840,6 +995,10 @@ def _run_openai_review(
         output_tokens=output_tokens,
         cost_usd=float(cost.cost_usd) if cost.cost_usd is not None else None,
         cost_rate_version=cost.rate_version,
+        writer_input_tokens=writing_response.usage.get('input_tokens'),
+        writer_output_tokens=writing_response.usage.get('output_tokens'),
+        writer_cost_usd=float(writer_cost.cost_usd) if writer_cost.cost_usd is not None else None,
+        writer_cost_rate_version=writer_cost.rate_version,
         latency_ms=resolved_score.latency_ms + writing_response.latency_ms,
     )
 
@@ -890,6 +1049,7 @@ def run_ai_review(
             prompt=_writing_prompt(mode, locale, locked_scores, exif_data, image_type=image_type),
             image_url=image_url,
             temperature=0.2,
+            call_stage='writer',
         )
     except AIReviewError as exc:
         raise AIReviewError(str(exc), stage='writing') from exc
@@ -923,15 +1083,14 @@ def run_ai_review(
     writing_usage = writing_response.usage
     input_tokens = (resolved_score.input_tokens or 0) + (writing_usage.get('prompt_tokens') or 0)
     output_tokens = (resolved_score.output_tokens or 0) + (writing_usage.get('completion_tokens') or 0)
+    writer_usage = ReviewModelUsage(
+        model_name=writing_model_name,
+        input_tokens=writing_usage.get('prompt_tokens'),
+        output_tokens=writing_usage.get('completion_tokens'),
+    )
+    writer_cost = estimate_review_usage_cost([writer_usage], overrides=settings.review_pricing_overrides)
     cost = estimate_review_usage_cost(
-        _score_usage(resolved_score)
-        + [
-            ReviewModelUsage(
-                model_name=writing_model_name,
-                input_tokens=writing_usage.get('prompt_tokens'),
-                output_tokens=writing_usage.get('completion_tokens'),
-            ),
-        ],
+        _score_usage(resolved_score) + [writer_usage],
         overrides=settings.review_pricing_overrides,
     )
 
@@ -951,5 +1110,9 @@ def run_ai_review(
         output_tokens=output_tokens,
         cost_usd=float(cost.cost_usd) if cost.cost_usd is not None else None,
         cost_rate_version=cost.rate_version,
+        writer_input_tokens=writing_usage.get('prompt_tokens'),
+        writer_output_tokens=writing_usage.get('completion_tokens'),
+        writer_cost_usd=float(writer_cost.cost_usd) if writer_cost.cost_usd is not None else None,
+        writer_cost_rate_version=writer_cost.rate_version,
         latency_ms=resolved_score.latency_ms + writing_response.latency_ms,
     )

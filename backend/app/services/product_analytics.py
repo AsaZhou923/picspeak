@@ -7,6 +7,12 @@ from typing import Any, Iterable
 
 
 STAGE_A_EVENT_CATALOG: dict[str, dict[str, Any]] = {
+    'practice_goal_shown': {'label': '目标卡可见', 'stage': 'PRACTICE', 'description': 'An owned goal card became visible.'},
+    'practice_goal_accepted': {'label': '接受练习目标', 'stage': 'PRACTICE', 'description': 'The server saved an immutable practice session.'},
+    'practice_attempt_submitted': {'label': '提交练习尝试', 'stage': 'PRACTICE', 'description': 'The server persisted a linked task and attempt.'},
+    'practice_analysis_completed': {'label': '练习分析完成', 'stage': 'PRACTICE', 'description': 'The server persisted the review and assessment.'},
+    'practice_result_viewed': {'label': '查看练习结果', 'stage': 'PRACTICE', 'description': 'An owner viewed the saved practice result; deduplicated by attempt.'},
+    'practice_feedback_submitted': {'label': '练习结果反馈', 'stage': 'PRACTICE', 'description': 'The server saved feedback separately from the model assessment.'},
     'home_viewed': {
         'label': '进入首页',
         'stage': 'A',
@@ -195,6 +201,7 @@ STAGE_A_EVENT_CATALOG: dict[str, dict[str, Any]] = {
 }
 
 KNOWN_SOURCES = {
+    'retake_coach',
     'home_direct',
     'blog',
     'gallery',
@@ -207,6 +214,7 @@ KNOWN_SOURCES = {
 OPS_SOURCES = {'system_performance'}
 
 VISITOR_EVENT_BY_SOURCE = {
+    'retake_coach': 'workspace_viewed',
     'home_direct': 'home_viewed',
     'blog': 'blog_post_viewed',
     'gallery': 'gallery_viewed',
@@ -214,7 +222,7 @@ VISITOR_EVENT_BY_SOURCE = {
     'share': 'share_viewed',
 }
 
-CONTENT_CONVERSION_SOURCES = ('blog', 'gallery', 'prompt_library')
+CONTENT_CONVERSION_SOURCES = ('blog', 'gallery', 'prompt_library', 'retake_coach')
 GENERATION_FUNNEL_EVENTS = (
     'generation_page_viewed',
     'prompt_library_viewed',
@@ -376,6 +384,7 @@ def _build_content_conversion_weekly(
         visitors = _count_distinct(
             period_events,
             event_names={visitor_event_name},
+            source=source if source == 'retake_coach' else None,
             key_builder=_guest_conversion_key,
         )
         workspace_clicks = _count_distinct(
@@ -1253,6 +1262,7 @@ def build_stage_a_snapshot(
         visitors = _count_distinct(
             period_events,
             event_names={visitor_event_name},
+            source=source if source == 'retake_coach' else None,
             key_builder=_guest_conversion_key,
         )
         workspace_entries = _count_distinct(
@@ -1635,11 +1645,15 @@ def render_stage_a_snapshot_markdown(snapshot: dict[str, Any]) -> str:
 
 
 def render_product_analytics_weekly_markdown(snapshot: dict[str, Any]) -> str:
-    return render_stage_a_snapshot_markdown(snapshot).replace(
+    markdown = render_stage_a_snapshot_markdown(snapshot).replace(
         '# PicSpeak 阶段 A 基线快照',
         '# PicSpeak 产品经营周报',
         1,
     )
+    if 'practice' in snapshot:
+        from app.services.practice_metrics import render_practice_analytics_markdown
+        markdown += '\n' + render_practice_analytics_markdown(snapshot['practice'])
+    return markdown
 
 
 def render_content_conversion_weekly_markdown(snapshot: dict[str, Any]) -> str:
@@ -1786,5 +1800,14 @@ def load_stage_a_snapshot_from_db(
         start_date=start_date,
         end_date=end_date,
     )
-    snapshot['generated_at'] = _as_utc_datetime(datetime.now(timezone.utc)).isoformat()
+    from app.services.practice_metrics import load_practice_snapshot_from_db
+    generated_at = _as_utc_datetime(datetime.now(timezone.utc))
+    practice = load_practice_snapshot_from_db(
+        db,
+        start_date=datetime.combine(start_date, datetime.min.time(), tzinfo=timezone.utc),
+        end_date=datetime.combine(end_date + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc),
+        as_of=generated_at,
+    )
+    snapshot['practice'] = practice.to_dict()
+    snapshot['generated_at'] = generated_at.isoformat()
     return snapshot

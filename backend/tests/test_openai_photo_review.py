@@ -14,7 +14,8 @@ TESTS_ROOT = Path(__file__).resolve().parent
 if str(TESTS_ROOT) not in sys.path:
     sys.path.insert(0, str(TESTS_ROOT))
 
-from app.services.ai import AIReviewError, build_cached_canonical_score, run_ai_review
+from app.core.http_client import PooledHTTPRequestError
+from app.services.ai import AIReviewError, build_cached_canonical_score, observe_ai_provider_calls, run_ai_review
 from scoring_fixtures import LOW_SCORES, model_score_payload, score_evidence_fixture
 
 
@@ -151,6 +152,73 @@ class OpenAIPhotoReviewTests(unittest.TestCase):
         self.assertTrue(response.score_cache_hit)
         self.assertEqual(response.result.final_score, 6.0)
         self.assertEqual(response.input_tokens, 180)
+
+    def test_malformed_billed_writer_response_is_observed_before_validation_failure(self) -> None:
+        cached_score = build_cached_canonical_score(
+            LOW_SCORES,
+            scorer_model_name='gpt-5.6-luna',
+            scorer_model_version='gpt-5.6-luna',
+            score_evidence=score_evidence_fixture(LOW_SCORES),
+        )
+        malformed = _response(
+            {'advantage': '', 'critique': '', 'suggestions': ''},
+            model='gpt-5.6-luna-2026-08-01',
+            input_tokens=77,
+            output_tokens=9,
+        )
+        observed = []
+
+        with patch('app.services.ai.settings.openai_api_key', 'test-key'), patch(
+            'app.services.ai.settings.openai_review_model', 'gpt-5.6-luna'
+        ), patch('app.services.ai.pooled_request', return_value=malformed), observe_ai_provider_calls(observed.append):
+            with self.assertRaises(AIReviewError) as raised:
+                run_ai_review(
+                    mode='flash',
+                    image_url='https://example.com/photo.jpg',
+                    locale='en',
+                    canonical_score=cached_score,
+                    review_model='gpt-5.6-luna',
+                )
+
+        self.assertEqual(raised.exception.stage, 'writing')
+        self.assertEqual(len(observed), 1)
+        self.assertEqual(observed[0].stage, 'writer')
+        self.assertEqual(observed[0].outcome, 'unknown')
+        self.assertEqual(observed[0].input_tokens, 77)
+        self.assertEqual(observed[0].output_tokens, 9)
+        self.assertIn('openai:gpt-5.6-luna', observed[0].cost_rate_version or '')
+
+    def test_network_writer_failure_is_observed_without_usage_or_cost(self) -> None:
+        cached_score = build_cached_canonical_score(
+            LOW_SCORES,
+            scorer_model_name='gpt-5.6-luna',
+            scorer_model_version='gpt-5.6-luna',
+            score_evidence=score_evidence_fixture(LOW_SCORES),
+        )
+        observed = []
+
+        with patch('app.services.ai.settings.openai_api_key', 'test-key'), patch(
+            'app.services.ai.settings.openai_review_model', 'gpt-5.6-luna'
+        ), patch(
+            'app.services.ai.pooled_request',
+            side_effect=PooledHTTPRequestError('connection reset'),
+        ), observe_ai_provider_calls(observed.append):
+            with self.assertRaises(AIReviewError) as raised:
+                run_ai_review(
+                    mode='flash',
+                    image_url='https://example.com/photo.jpg',
+                    locale='en',
+                    canonical_score=cached_score,
+                    review_model='gpt-5.6-luna',
+                )
+
+        self.assertEqual(raised.exception.stage, 'writing')
+        self.assertEqual(len(observed), 1)
+        self.assertEqual(observed[0].stage, 'writer')
+        self.assertEqual(observed[0].outcome, 'failed')
+        self.assertIsNone(observed[0].input_tokens)
+        self.assertIsNone(observed[0].output_tokens)
+        self.assertIsNone(observed[0].cost_usd)
 
     def test_unknown_review_model_is_rejected(self) -> None:
         with self.assertRaisesRegex(AIReviewError, 'Unsupported review model'):

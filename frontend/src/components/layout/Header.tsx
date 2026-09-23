@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { Camera, BarChart2, LayoutGrid, Repeat2, Wand2 } from 'lucide-react';
+import { Camera, LayoutGrid, Repeat2, Target, Wand2 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { getBlogUi } from '@/lib/blog-data';
 import { useI18n } from '@/lib/i18n';
@@ -72,11 +72,10 @@ export default function Header() {
             {t('nav_home')}
           </Link>
           <Link href="/workspace" className={`transition-colors ${isActive('/workspace')}`}>
-            {t('nav_workspace')}
+            {t('nav_critique')}
           </Link>
-          <Link href="/retake" className={`inline-flex items-center gap-1.5 transition-colors ${isActive('/retake')}`}>
-            {retakeCopy.nav}
-            <span className="rounded-full border border-sage/25 bg-sage/10 px-1.5 py-0.5 text-[9px] font-medium text-sage">5.6</span>
+          <Link href="/account/practice" className={`transition-colors ${isActive('/account/practice')}`}>
+            {t('nav_practice')}
           </Link>
           <Link href="/generate" className={`transition-colors ${isActive('/generate')}`}>
             {t('nav_generate')}
@@ -109,7 +108,7 @@ export default function Header() {
               }`}
             >
               <Camera size={14} />
-              <span className="tracking-wide">{t('nav_workspace')}</span>
+              <span className="tracking-wide">{t('nav_critique')}</span>
             </Link>
             <Link
               href="/gallery"
@@ -145,15 +144,15 @@ export default function Header() {
               <span className="tracking-wide">{t('nav_generate_short')}</span>
             </Link>
             <Link
-              href="/account/usage"
+              href="/account/practice"
               className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-control text-[10px] font-medium transition-all duration-200 ${
-                pathname === '/account/usage'
+                pathname === '/account/practice'
                   ? 'bg-void shadow-sm text-gold'
                   : 'text-ink-subtle hover:text-ink-muted active:scale-95'
               }`}
             >
-              <BarChart2 size={14} />
-              <span className="tracking-wide">{t('nav_usage')}</span>
+              <Target size={14} />
+              <span className="tracking-wide">{t('nav_practice')}</span>
             </Link>
           </nav>
         </div>

@@ -181,6 +181,7 @@ export function useReviewActions({
       mode: review.mode,
       image_type: review.image_type ?? review.result.image_type ?? 'default',
       retake_intent: 'same_photo_fix',
+      practice_kind: 'same_image_recheck',
     });
     router.push(`/workspace?${nextParams.toString()}`);
   }, [review, actionBusy, token, locale, actionCopy, router]);

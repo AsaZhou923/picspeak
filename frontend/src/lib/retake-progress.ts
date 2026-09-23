@@ -1,78 +1,138 @@
 import type { ReviewHistoryItem } from './types';
 import { normalizeScoreVersion } from './review-growth.ts';
 
-export interface RetakeChainSnapshot {
+export type RetakePracticeComparability =
+  | 'comparable'
+  | 'low_confidence'
+  | 'incomparable'
+  | 'unknown_version'
+  | 'missing_pair_scores';
+
+export type RetakePracticeDeltaTrend = 'improved' | 'declined' | 'flat' | 'unknown';
+
+export interface RetakePracticeRecord {
+  review: ReviewHistoryItem;
+  reviewId: string;
+  sourceReviewId: string | null;
+  createdAt: string;
+  scoreVersion: string | null;
+  before: number | null;
+  after: number | null;
+  delta: number | null;
+  confidence: 'low' | 'medium' | 'high' | null;
+  comparability: RetakePracticeComparability;
+  trend: RetakePracticeDeltaTrend;
+  goalMissing: boolean;
+}
+
+export interface RetakePracticeSnapshot {
+  records: RetakePracticeRecord[];
+  comparableCount: number;
+  nonComparableCount: number;
+  unknownVersionCount: number;
+}
+
+export type RetakeChainSnapshot = RetakePracticeSnapshot & {
   chain: ReviewHistoryItem[];
   scoreVersion: string | null;
   excludedVersionCount: number;
+};
+
+function roundToOneDecimal(value: number): number {
+  return Math.round(value * 10) / 10;
 }
 
-function hasPairedScores(item: ReviewHistoryItem): boolean {
+function finiteNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? roundToOneDecimal(value)
+    : null;
+}
+
+function compareByCreatedAtDesc(left: ReviewHistoryItem, right: ReviewHistoryItem): number {
+  return new Date(right.created_at).getTime() - new Date(left.created_at).getTime();
+}
+
+function hasSavedPracticeGoal(item: ReviewHistoryItem): boolean {
+  const maybeGoal = item as ReviewHistoryItem & {
+    practice_session_id?: string | null;
+    practice_goal?: unknown;
+    goal_assessment?: unknown;
+  };
+  return Boolean(maybeGoal.practice_session_id || maybeGoal.practice_goal || maybeGoal.goal_assessment);
+}
+
+function comparabilityFor(item: ReviewHistoryItem, scoreVersion: string | null): RetakePracticeComparability {
   const comparison = item.comparison;
-  return (
-    typeof comparison?.overall_before === 'number'
-    && Number.isFinite(comparison.overall_before)
-    && typeof comparison.overall_after === 'number'
-    && Number.isFinite(comparison.overall_after)
-  );
+  const before = finiteNumber(comparison?.overall_before);
+  const after = finiteNumber(comparison?.overall_after);
+  if (!scoreVersion) return 'unknown_version';
+  if (before === null || after === null) return 'missing_pair_scores';
+  if (comparison?.comparison_confidence === 'low') return 'low_confidence';
+  if (!comparison?.is_comparable) return 'incomparable';
+  return 'comparable';
 }
 
-function isComparableRetake(item: ReviewHistoryItem): boolean {
-  return Boolean(
-    item.comparison?.is_comparable
-    && item.comparison.comparison_confidence !== 'low'
-    && hasPairedScores(item)
-  );
+function deltaTrend(delta: number | null): RetakePracticeDeltaTrend {
+  if (delta === null) return 'unknown';
+  if (delta > 0) return 'improved';
+  if (delta < 0) return 'declined';
+  return 'flat';
 }
 
-function pathEndingAt(item: ReviewHistoryItem, byId: Map<string, ReviewHistoryItem>): ReviewHistoryItem[] {
-  const path = [item];
+function buildRecord(item: ReviewHistoryItem): RetakePracticeRecord | null {
+  const comparison = item.comparison;
+  if (!comparison) return null;
+
+  const before = finiteNumber(comparison.overall_before);
+  const after = finiteNumber(comparison.overall_after);
+  const delta = before !== null && after !== null
+    ? finiteNumber(comparison.overall_delta) ?? roundToOneDecimal(after - before)
+    : null;
   const scoreVersion = normalizeScoreVersion(item.score_version);
-  let current: ReviewHistoryItem | undefined = item;
-  const visited = new Set<string>();
-  while (current?.source_review_id && !visited.has(current.review_id)) {
-    visited.add(current.review_id);
-    const parent = byId.get(current.source_review_id);
-    if (
-      !parent
-      || normalizeScoreVersion(parent.score_version) !== scoreVersion
-      || !isComparableRetake(parent)
-    ) {
-      break;
-    }
-    path.unshift(parent);
-    current = parent;
-  }
-  return path;
+
+  return {
+    review: item,
+    reviewId: item.review_id,
+    sourceReviewId: item.source_review_id ?? comparison.original_review_id ?? null,
+    createdAt: item.created_at,
+    scoreVersion,
+    before,
+    after,
+    delta,
+    confidence: comparison.comparison_confidence ?? null,
+    comparability: comparabilityFor(item, scoreVersion),
+    trend: deltaTrend(delta),
+    goalMissing: !hasSavedPracticeGoal(item),
+  };
+}
+
+export function buildRetakePracticeSnapshot(items: ReviewHistoryItem[]): RetakePracticeSnapshot {
+  const records = items
+    .filter((item) => Boolean(item.comparison))
+    .sort(compareByCreatedAtDesc)
+    .map(buildRecord)
+    .filter((record): record is RetakePracticeRecord => Boolean(record));
+
+  return {
+    records,
+    comparableCount: records.filter((record) => record.comparability === 'comparable').length,
+    nonComparableCount: records.filter((record) => record.comparability !== 'comparable').length,
+    unknownVersionCount: records.filter((record) => record.comparability === 'unknown_version').length,
+  };
 }
 
 export function buildLatestRetakeChainSnapshot(items: ReviewHistoryItem[]): RetakeChainSnapshot {
-  const comparable = items
-    .filter(isComparableRetake)
-    .sort((left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime());
-  const scoreVersion = normalizeScoreVersion(comparable[0]?.score_version);
-  if (!scoreVersion) {
-    return {
-      chain: [],
-      scoreVersion: null,
-      excludedVersionCount: comparable.length,
-    };
-  }
-
-  const versioned = comparable.filter((item) => normalizeScoreVersion(item.score_version) === scoreVersion);
-  const byId = new Map(versioned.map((item) => [item.review_id, item]));
-  const paths = versioned.map((item) => pathEndingAt(item, byId));
-
-  const chain = paths
-    .sort((left, right) => {
-      if (right.length !== left.length) return right.length - left.length;
-      return new Date(right[right.length - 1].created_at).getTime() - new Date(left[left.length - 1].created_at).getTime();
-    })[0] ?? [];
+  const snapshot = buildRetakePracticeSnapshot(items);
+  const chain = snapshot.records
+    .filter((record) => record.comparability === 'comparable')
+    .map((record) => record.review);
+  const scoreVersion = snapshot.records[0]?.scoreVersion ?? null;
 
   return {
+    ...snapshot,
     chain,
     scoreVersion,
-    excludedVersionCount: comparable.length - versioned.length,
+    excludedVersionCount: snapshot.nonComparableCount,
   };
 }
 

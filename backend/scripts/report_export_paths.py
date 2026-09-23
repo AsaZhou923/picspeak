@@ -5,7 +5,8 @@ from pathlib import Path
 
 
 def dated_analytics_report_path(repo_root: Path, end_date: date, filename_stem: str) -> Path:
-    return repo_root / 'docs' / 'analytics' / f'{end_date.isoformat()}-{filename_stem}.md'
+    project_docs = repo_root.parent / 'docs' / '01 - Projects' / 'PicSpeak' / '07 - Analytics'
+    return project_docs / f'{end_date.isoformat()}-{filename_stem}.md'
 
 
 def resolve_report_output_path(

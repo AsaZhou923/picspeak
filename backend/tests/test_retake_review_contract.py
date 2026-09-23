@@ -27,7 +27,7 @@ class RetakeReviewContractTests(unittest.TestCase):
     def setUp(self) -> None:
         self.db = MagicMock()
         self.actor = SimpleNamespace(user=SimpleNamespace(id=7))
-        self.retake_photo = SimpleNamespace(id=22)
+        self.retake_photo = SimpleNamespace(id=22, checksum_sha256=None)
 
     def test_analysis_type_defaults_to_single_for_existing_clients(self) -> None:
         payload = ReviewCreateRequest(photo_id='pho_1', mode='flash')

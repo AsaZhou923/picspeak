@@ -14,16 +14,20 @@ from app.schemas import PhotoReviewsResponse, ReviewGetResponse, ReviewHistoryRe
 from app.services.guard import review_history_cutoff
 from .review_support import (
     _apply_review_history_filters,
+    _apply_review_history_organization_filters,
     _apply_review_history_visibility,
     _normalize_review_tags,
+    _public_goal_assessment_payload,
     _review_gallery_audit_status,
     _review_history_item,
     _review_image_type,
     _review_model_version,
     _review_result_payload,
     _review_share_info,
+    _review_source_public_ids_from_maps,
     _review_source_public_id,
 )
+from app.services.practice import owner_practice_context_for_review
 
 router = APIRouter(tags=['reviews'])
 
@@ -58,6 +62,8 @@ def get_review(
     review_task_public_id = None
     if is_owner and review.task_id:
         review_task_public_id = db.query(ReviewTask.public_id).filter(ReviewTask.id == review.task_id).scalar()
+    practice_context = owner_practice_context_for_review(db, review) if is_owner else None
+    result_payload = dict(review.result_json or {})
     db.commit()
     return ReviewGetResponse(
         review_id=review.public_id,
@@ -67,7 +73,13 @@ def get_review(
         mode=review.mode.value,
         status=review.status.value,
         image_type=_review_image_type(review),
-        source_review_id=_review_source_public_id(db, review) if is_owner else None,
+        source_review_id=(
+            _review_source_public_id(db, review, owner_user_id=actor.user.id, cutoff=cutoff)
+            if is_owner else None
+        ),
+        practice=practice_context,
+        practice_session_id=practice_context.get('session_id') if practice_context else None,
+        goal_assessment=_public_goal_assessment_payload(result_payload.get('goal_assessment')) if is_owner else None,
         viewer_is_owner=is_owner,
         favorite=bool(review.favorite) if is_owner else False,
         gallery_visible=bool(review.gallery_visible) if is_owner else False,
@@ -83,6 +95,7 @@ def get_review(
             model_version=_review_model_version(review),
             exif_info=photo.exif_data if is_owner and photo and photo.exif_data else {},
             share_info_override=_review_share_info(request, review, include_token=is_owner),
+            include_goal_assessment=is_owner,
         ),
         created_at=review.created_at,
         exif_data=photo.exif_data if is_owner and photo and photo.exif_data else None,
@@ -101,7 +114,6 @@ def get_public_review(
         .join(User, User.id == Photo.owner_user_id)
         .filter(
             Review.share_token == share_token,
-            Review.is_public == True,  # noqa: E712
             Review.deleted_at.is_(None),
         )
         .first()
@@ -137,6 +149,7 @@ def get_public_review(
             model_version=_review_model_version(review),
             exif_info={},
             share_info_override=_review_share_info(request, review, include_token=False),
+            include_goal_assessment=False,
         ),
         created_at=review.created_at,
         exif_data=None,
@@ -154,6 +167,8 @@ def list_my_reviews(
     max_score: float | None = Query(default=None, ge=0, le=10),
     image_type: str | None = Query(default=None, pattern='^(default|landscape|portrait|street|still_life|architecture)$'),
     favorite_only: bool = Query(default=False),
+    q: str | None = Query(default=None, max_length=100),
+    tag: list[str] = Query(default_factory=list),
     db: Session = Depends(get_db),
     actor: CurrentActor = Depends(get_current_actor),
 ):
@@ -181,6 +196,7 @@ def list_my_reviews(
         image_type=image_type,
         favorite_only=favorite_only,
     )
+    query = _apply_review_history_organization_filters(query, q=q, tags=tag)
 
     if cursor:
         try:
@@ -193,13 +209,26 @@ def list_my_reviews(
     has_next = len(rows) > limit
     rows = rows[:limit]
     source_review_ids = {review.source_review_id for review, _photo in rows if review.source_review_id}
-    source_review_map = {
-        review_id: public_id
-        for review_id, public_id in db.query(Review.id, Review.public_id).filter(Review.id.in_(source_review_ids)).all()
+    source_reviews_by_id = {
+        review.id: review
+        for review in db.query(Review).filter(Review.id.in_(source_review_ids)).all()
     } if source_review_ids else {}
+    source_photo_ids = {review.photo_id for review in source_reviews_by_id.values()}
+    source_photos_by_id = {
+        photo.id: photo
+        for photo in db.query(Photo).filter(Photo.id.in_(source_photo_ids)).all()
+    } if source_photo_ids else {}
+    cutoff = review_history_cutoff(actor.plan)
+    source_review_map = _review_source_public_ids_from_maps(
+        [review for review, _photo in rows],
+        source_reviews_by_id=source_reviews_by_id,
+        source_photos_by_id=source_photos_by_id,
+        owner_user_id=actor.user.id,
+        cutoff=cutoff,
+    )
 
     items = [
-        _review_history_item(request, review, photo, actor.user.public_id, source_review_map.get(review.source_review_id))
+        _review_history_item(request, review, photo, actor.user.public_id, source_review_map.get(review.id))
         for review, photo in rows
     ]
     next_cursor = rows[-1][0].created_at.isoformat() if has_next and rows else None

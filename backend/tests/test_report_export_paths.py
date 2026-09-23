@@ -19,7 +19,7 @@ class ReportExportPathTests(unittest.TestCase):
 
         self.assertEqual(
             output_path,
-            Path('repo') / 'docs' / 'analytics' / '2026-05-23-stage-a-baseline-snapshot.md',
+            Path('docs') / '01 - Projects' / 'PicSpeak' / '07 - Analytics' / '2026-05-23-stage-a-baseline-snapshot.md',
         )
 
     def test_resolve_report_output_path_preserves_explicit_output(self) -> None:

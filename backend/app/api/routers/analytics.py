@@ -9,10 +9,11 @@ from app.api.deps import CurrentActor, get_db, get_optional_actor
 from app.core.errors import api_error
 from app.schemas import ProductAnalyticsTrackRequest, ProductAnalyticsTrackResponse
 from app.services.product_analytics import normalize_stage_a_event_name, record_product_event
+from app.services.practice_events import PRACTICE_CLIENT_EVENTS, PRACTICE_SERVER_EVENTS, record_client_practice_event
 
 router = APIRouter(prefix='/analytics', tags=['analytics'])
 SERVER_OWNED_ANALYTICS_EVENTS = frozenset(
-    {'generation_requested', 'generation_succeeded', 'generation_failed'}
+    {'generation_requested', 'generation_succeeded', 'generation_failed', 'paid_success'} | PRACTICE_SERVER_EVENTS
 )
 
 
@@ -47,6 +48,10 @@ def track_product_analytics_event(
             'ANALYTICS_EVENT_SERVER_OWNED',
             'This analytics event is recorded by the server',
         )
+    if event_name in PRACTICE_CLIENT_EVENTS:
+        record_client_practice_event(db, actor=actor, event_name=event_name, metadata=payload.metadata or {}, locale=payload.locale)
+        db.commit()
+        return ProductAnalyticsTrackResponse(status='accepted', event_name=event_name)
     record_product_event(
         db,
         event_name=event_name,

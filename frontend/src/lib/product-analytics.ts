@@ -4,6 +4,8 @@ import { trackProductAnalyticsEvent } from '@/lib/api';
 import type { ProductAnalyticsSource } from '@/lib/types';
 
 export type ProductAnalyticsEventName =
+  | 'practice_goal_shown'
+  | 'practice_result_viewed'
   | 'home_viewed'
   | 'blog_post_viewed'
   | 'gallery_viewed'
@@ -22,7 +24,6 @@ export type ProductAnalyticsEventName =
   | 'next_shoot_action_clicked'
   | 'upgrade_pro_clicked'
   | 'checkout_started'
-  | 'paid_success'
   | 'payment_success_viewed'
   | 'sign_in_completed'
   | 'generation_page_viewed'
@@ -56,6 +57,8 @@ export function normalizeProductAnalyticsSource(value: string | null | undefined
       return 'share';
     case 'checkout':
       return 'checkout';
+    case 'retake_coach':
+      return 'retake_coach';
     case 'system_performance':
       return 'system_performance';
     case 'unknown':
@@ -148,6 +151,9 @@ export function derivePageEvent(pathname: string): ProductAnalyticsEventName | n
 }
 
 export function deriveAttributionSourceForPath(pathname: string): ProductAnalyticsSource | null {
+  if (pathname === '/retake') {
+    return 'retake_coach';
+  }
   if (pathname === '/') {
     return 'home_direct';
   }

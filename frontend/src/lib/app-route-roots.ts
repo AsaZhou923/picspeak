@@ -30,6 +30,7 @@ export const APP_ROUTE_ROOTS = new Set([
   'tasks',
   'terms',
   'trpc',
+  'u',
   'updates',
   'workspace',
 ]);
@@ -147,6 +148,7 @@ export function hasKnownAppPath(pathname: string): boolean {
     return segments.length === 2 || (segments.length === 3 && PUBLIC_PROMPT_EXAMPLE_IDS.has(segments[2]));
   }
   if (routeRoot === 'author') return segments.length === 2 && segments[1] === 'asa-zhou';
+  if (routeRoot === 'u') return segments.length === 2;
   if (routeRoot === '.well-known') return segments.length === 2 && segments[1] === 'llms.txt';
   if (STRICT_SINGLE_PAGE_ROOTS.has(routeRoot)) return segments.length === 1;
 

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { BookOpen, Camera, LayoutGrid, Repeat2, Wand2 } from 'lucide-react';
+import { Camera, LayoutGrid, Repeat2, Target, Wand2 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { getBlogUi } from '@/lib/blog-data';
 import { useI18n } from '@/lib/i18n';
@@ -13,13 +13,12 @@ import { getHeaderVisibilityState } from './header-auth-visibility';
 import { getRetakeCoachCopy } from '@/lib/retake-coach-copy';
 
 const MARKETING_LINKS: Array<
-  | { href: string; key: 'nav_home' | 'nav_workspace' | 'nav_generate' | 'nav_gallery' | 'nav_usage' }
-  | { href: string; kind: 'retake' }
+  | { href: string; key: 'nav_home' | 'nav_critique' | 'nav_practice' | 'nav_generate' | 'nav_gallery' | 'nav_usage' }
   | { kind: 'blog' }
 > = [
   { href: '/', key: 'nav_home' },
-  { href: '/workspace', key: 'nav_workspace' },
-  { href: '/retake', kind: 'retake' },
+  { href: '/workspace', key: 'nav_critique' },
+  { href: '/account/practice', key: 'nav_practice' },
   { href: '/generate', key: 'nav_generate' },
   { href: '/gallery', key: 'nav_gallery' },
   { kind: 'blog' },
@@ -28,14 +27,15 @@ const MARKETING_LINKS: Array<
 
 const MOBILE_MARKETING_LINKS: Array<{
   href: string;
-  key?: 'nav_workspace' | 'nav_generate_short' | 'nav_gallery';
+  key?: 'nav_critique' | 'nav_generate_short' | 'nav_gallery' | 'nav_practice';
   kind?: 'retake';
   icon: typeof Camera;
 }> = [
-  { href: '/workspace', key: 'nav_workspace', icon: Camera },
+  { href: '/workspace', key: 'nav_critique', icon: Camera },
   { href: '/retake', kind: 'retake', icon: Repeat2 },
   { href: '/generate', key: 'nav_generate_short', icon: Wand2 },
   { href: '/gallery', key: 'nav_gallery', icon: LayoutGrid },
+  { href: '/account/practice', key: 'nav_practice', icon: Target },
 ];
 
 export default function MarketingHeader() {
@@ -99,17 +99,18 @@ export default function MarketingHeader() {
 
         <nav className="hidden md:flex items-center gap-4 text-[13px] lg:gap-6 lg:text-sm">
           {MARKETING_LINKS.map((link) => {
-            const href =
-              'kind' in link && link.kind === 'blog'
-                ? `/${locale}/blog`
-                : link.href === '/'
-                  ? homeHref
-                  : link.href;
-            const activeHref =
-              'kind' in link && link.kind === 'blog' ? '/blog' : link.href;
+            if (!('href' in link)) {
+              return (
+                <Link key="blog" href={`/${locale}/blog`} className={`transition-colors ${activeClass('/blog')}`}>
+                  {blogUi.navLabel}
+                </Link>
+              );
+            }
+
+            const href = link.href === '/' ? homeHref : link.href;
             return (
-              <Link key={href} href={href} className={`transition-colors ${activeClass(activeHref)}`}>
-                {'key' in link ? t(link.key) : link.kind === 'retake' ? retakeCopy.nav : blogUi.navLabel}
+              <Link key={href} href={href} className={`transition-colors ${activeClass(link.href)}`}>
+                {t(link.key)}
               </Link>
             );
           })}
@@ -133,17 +134,6 @@ export default function MarketingHeader() {
               <span className="tracking-wide">{kind === 'retake' ? retakeCopy.navShort : t(key!)}</span>
             </Link>
           ))}
-          <Link
-            href={`/${locale}/blog`}
-            className={`flex-1 flex flex-col items-center justify-center gap-1 rounded-control py-2 text-[10px] font-medium transition-all duration-200 ${
-              isActive('/blog')
-                ? 'bg-void shadow-sm text-gold'
-                : 'text-ink-subtle hover:text-ink-muted active:scale-95'
-            }`}
-          >
-            <BookOpen size={14} />
-            <span className="tracking-wide">{blogUi.navLabel}</span>
-          </Link>
         </nav>
       </div>
     </header>

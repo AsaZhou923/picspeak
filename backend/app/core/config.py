@@ -50,6 +50,7 @@ class Settings(BaseSettings):
     free_review_limit_per_day: int = 5
     free_review_limit_per_month: int = 60
     free_pro_review_limit_per_month: int = 10
+    practice_enabled: bool = False
 
     oauth_jwt_secret: str = 'change-me-jwt-secret'
     oauth_jwt_issuer: str = ''

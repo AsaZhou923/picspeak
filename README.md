@@ -187,7 +187,8 @@ The frontend and backend can be deployed independently. The backend includes a c
 
 ## Documentation
 
-- [Latest changelog](docs/changelog/CHANGELOG.md#2026-09-14-multilingual-experience-consistency)
+- [Develop update in preparation](docs/changelog/CHANGELOG.md#2026-09-23-critique-practice-and-sharing)
+- [Latest published changelog](docs/changelog/CHANGELOG.md#2026-09-14-multilingual-experience-consistency)
 - [Frontend design system](DESIGN.md)
 - [SEO / GEO audit](docs/seo/seo-audit-2026-05-01.md)
 - [System architecture](docs/architecture/系统架构.md)

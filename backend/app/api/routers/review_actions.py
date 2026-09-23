@@ -10,7 +10,8 @@ from app.api.routers.gallery import GALLERY_AUDIT_APPROVED, GALLERY_AUDIT_NONE, 
 from app.api.routers.photos import PHOTO_THUMBNAIL_SIZE, _build_photo_proxy_url, _build_storage_photo_url
 from app.core.errors import api_error
 from app.db.models import Photo, UserPlan
-from app.schemas import ReviewExportResponse, ReviewMetaResponse, ReviewMetaUpdateRequest, ReviewShareResponse
+from app.schemas import ReviewExportResponse, ReviewMetaResponse, ReviewMetaUpdateRequest, ReviewShareResponse, ReviewVisibilityResponse
+from app.services.guard import review_history_cutoff
 from app.services.content_audit import ContentAuditError, run_content_audit
 from .review_support import (
     _build_review_export_payload,
@@ -19,7 +20,9 @@ from .review_support import (
     _normalize_review_note,
     _normalize_review_tags,
     _review_meta_payload,
+    _review_visibility_payload,
     _review_source_public_id,
+    _sync_review_public_flag,
 )
 
 router = APIRouter(tags=['reviews'])
@@ -35,7 +38,7 @@ def enable_review_share(
     review = _find_review_owned(db, review_id, actor.user.id)
     if not review.share_token:
         review.share_token = _generate_review_share_token(db)
-    review.is_public = True
+    _sync_review_public_flag(review)
     db.add(review)
     db.commit()
     db.refresh(review)
@@ -45,6 +48,57 @@ def enable_review_share(
         share_url=str(request.url_for('get_public_review', share_token=review.share_token)),
         enabled=True,
     )
+
+
+@router.delete('/reviews/{review_id}/share', response_model=ReviewVisibilityResponse)
+def revoke_review_share(
+    review_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    actor: CurrentActor = Depends(get_current_actor),
+):
+    review = _find_review_owned(db, review_id, actor.user.id)
+    review.share_token = None
+    _sync_review_public_flag(review)
+    db.add(review)
+    db.commit()
+    db.refresh(review)
+    return _review_visibility_payload(request, review)
+
+
+@router.get('/reviews/{review_id}/visibility', response_model=ReviewVisibilityResponse)
+def get_review_visibility(
+    review_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    actor: CurrentActor = Depends(get_current_actor),
+):
+    review = _find_review_owned(db, review_id, actor.user.id)
+    _sync_review_public_flag(review)
+    db.add(review)
+    db.commit()
+    db.refresh(review)
+    return _review_visibility_payload(request, review)
+
+
+@router.delete('/reviews/{review_id}/visibility', response_model=ReviewVisibilityResponse)
+def disable_review_public_visibility(
+    review_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    actor: CurrentActor = Depends(get_current_actor),
+):
+    review = _find_review_owned(db, review_id, actor.user.id)
+    review.share_token = None
+    review.gallery_visible = False
+    review.gallery_audit_status = GALLERY_AUDIT_NONE
+    review.gallery_added_at = None
+    review.gallery_rejected_reason = None
+    _sync_review_public_flag(review)
+    db.add(review)
+    db.commit()
+    db.refresh(review)
+    return _review_visibility_payload(request, review)
 
 
 @router.patch('/reviews/{review_id}/meta', response_model=ReviewMetaResponse)
@@ -77,18 +131,16 @@ def update_review_meta(
                 _ensure_gallery_thumbnail(photo)
                 review.gallery_audit_status = GALLERY_AUDIT_APPROVED
                 review.gallery_rejected_reason = None
-                review.is_public = True
                 db.add(photo)
             else:
                 review.gallery_audit_status = GALLERY_AUDIT_REJECTED
                 review.gallery_rejected_reason = audit_result.reason or 'Image content did not pass gallery audit'
-                review.is_public = bool(review.share_token)
         else:
             review.gallery_visible = False
             review.gallery_audit_status = GALLERY_AUDIT_NONE
             review.gallery_added_at = None
             review.gallery_rejected_reason = None
-            review.is_public = bool(review.share_token)
+        _sync_review_public_flag(review)
     if payload.tags is not None:
         review.tags_json = _normalize_review_tags(payload.tags)
     if payload.note is not None:
@@ -119,7 +171,12 @@ def export_review(
         photo_id=photo_public_id,
         photo_url=photo_url,
         photo_thumbnail_url=photo_thumbnail_url,
-        source_review_id=_review_source_public_id(db, review),
+        source_review_id=_review_source_public_id(
+            db,
+            review,
+            owner_user_id=actor.user.id,
+            cutoff=review_history_cutoff(actor.plan),
+        ),
     )
     db.commit()
     return payload
@@ -135,6 +192,7 @@ def delete_review(
     if review.deleted_at is None:
         review.deleted_at = datetime.now(timezone.utc)
         review.is_public = False
+        review.share_token = None
         review.gallery_visible = False
         review.gallery_audit_status = GALLERY_AUDIT_NONE
         review.gallery_added_at = None

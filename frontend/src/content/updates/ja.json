@@ -1,5 +1,12 @@
 [
   {
+    "id": "2026-09-23-critique-practice-and-sharing",
+    "date": "2026-09-23",
+    "title": "準備中：講評後の整理、撮り直し、共有",
+    "summary": "アップロードして講評を受ける流れを第一入口にしたまま、保存目標、撮り直し比較、非公開タグとメモ、練習ログ、ギャラリー閲覧、共有取り消し、公開プロフィール、画像カード、印刷サマリーを準備しています。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-09-23-critique-practice-and-sharing"
+  },
+  {
     "id": "2026-09-14-multilingual-experience-consistency",
     "date": "2026-09-14",
     "title": "多言語体験をより一貫したものに",

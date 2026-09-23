@@ -1,9 +1,13 @@
-import { ArrowRight, Camera, ListTodo, RotateCcw } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { ArrowRight, Camera, ListTodo, RotateCcw, Shuffle, X } from 'lucide-react';
+import { getPracticeConfig } from '@/lib/api';
 import { type Translator } from '@/lib/i18n';
 import { type NextShootChecklistItem } from '@/lib/review-growth';
 import { getReplayIntentCopy } from '@/lib/replay-intent-copy';
+import { usePracticeExposure } from '@/features/reviews/hooks/usePracticeExposure';
 
 interface ReviewGrowthLoopPanelProps {
+  sourceReviewId: string;
   locale: 'zh' | 'en' | 'ja';
   checklist: NextShootChecklistItem[];
   actionBusy: string | null;
@@ -32,6 +36,11 @@ function getLoopCopy(locale: 'zh' | 'en' | 'ja') {
       primaryBadge: 'Priority',
       uploadBadge: 'New Photo',
       actionCta: 'ワークスペースへ持ち込む',
+      goalLabel: 'Practice Goal',
+      acceptGoal: 'この目標で練習',
+      editGoal: '目標を編集',
+      alternativeGoal: '別の目標',
+      skipGoal: '今は練習しない',
     };
   }
   if (locale === 'en') {
@@ -52,6 +61,11 @@ function getLoopCopy(locale: 'zh' | 'en' | 'ja') {
       primaryBadge: 'Priority',
       uploadBadge: 'New Photo',
       actionCta: 'Carry this to workspace',
+      goalLabel: 'Practice Goal',
+      acceptGoal: 'Practice this goal',
+      editGoal: 'Edit goal',
+      alternativeGoal: 'Try another goal',
+      skipGoal: 'Skip for now',
     };
   }
   return {
@@ -71,10 +85,16 @@ function getLoopCopy(locale: 'zh' | 'en' | 'ja') {
     primaryBadge: '第一优先级',
     uploadBadge: '新照片',
     actionCta: '带到工作台',
+    goalLabel: '练习目标',
+    acceptGoal: '练习这个目标',
+    editGoal: '改写目标',
+    alternativeGoal: '换一个目标',
+    skipGoal: '暂不练习',
   };
 }
 
 export function ReviewGrowthLoopPanel({
+  sourceReviewId,
   locale,
   checklist,
   actionBusy,
@@ -85,6 +105,40 @@ export function ReviewGrowthLoopPanel({
 }: ReviewGrowthLoopPanelProps) {
   const copy = getLoopCopy(locale);
   const replayCopy = getReplayIntentCopy(locale);
+  const [practiceEnabled, setPracticeEnabled] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [editedGoal, setEditedGoal] = useState('');
+  const [editing, setEditing] = useState(false);
+  const [skipped, setSkipped] = useState(false);
+  const goalExposureRef = usePracticeExposure('practice_goal_shown', sourceReviewId, locale, practiceEnabled && !skipped);
+  const selectedGoal = checklist[selectedIndex] ?? checklist[0];
+  const effectiveGoal = useMemo(() => {
+    if (!selectedGoal) return null;
+    const trimmed = editedGoal.trim();
+    return trimmed
+      ? { ...selectedGoal, title: trimmed, detail: trimmed, observation: selectedGoal.observation, reason: selectedGoal.reason }
+      : selectedGoal;
+  }, [editedGoal, selectedGoal]);
+
+  function chooseAlternative() {
+    if (checklist.length < 2) return;
+    setSelectedIndex((current) => (current + 1) % checklist.length);
+    setEditedGoal('');
+    setEditing(false);
+    setSkipped(false);
+  }
+
+  useEffect(() => {
+    const controller = new AbortController();
+    getPracticeConfig(undefined, controller.signal)
+      .then((config) => {
+        if (!controller.signal.aborted) setPracticeEnabled(config.practice_enabled);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setPracticeEnabled(false);
+      });
+    return () => controller.abort();
+  }, []);
 
   return (
     <section className="rounded-[28px] border border-border-subtle bg-[radial-gradient(circle_at_top_left,rgba(200,171,90,0.14),transparent_32%),linear-gradient(180deg,rgba(18,20,24,0.9),rgba(16,17,20,0.82))] p-5 sm:p-6">
@@ -147,6 +201,60 @@ export function ReviewGrowthLoopPanel({
           </div>
           <h3 className="font-display text-[1.7rem] leading-[1.08] text-ink">{copy.checklistTitle}</h3>
           <p className="mt-2 text-sm leading-6 text-ink-muted">{copy.checklistBody}</p>
+
+          {practiceEnabled && !skipped && effectiveGoal && (
+            <div ref={goalExposureRef} className="mt-4 rounded-[22px] border border-gold/25 bg-gold/5 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gold/80">{copy.goalLabel}</p>
+              {editing ? (
+                <textarea
+                  value={editedGoal || effectiveGoal.detail || effectiveGoal.title}
+                  maxLength={500}
+                  onChange={(event) => setEditedGoal(event.target.value.slice(0, 500))}
+                  className="mt-3 min-h-24 w-full rounded-control border border-border bg-surface px-3 py-2 text-sm leading-6 text-ink outline-none transition-colors focus:border-gold/55"
+                />
+              ) : (
+                <p className="mt-2 text-sm leading-7 text-ink">{effectiveGoal.detail || effectiveGoal.title}</p>
+              )}
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => onChecklistAction(effectiveGoal, selectedIndex)}
+                  className="inline-flex min-h-11 items-center gap-2 rounded-control bg-action px-4 py-2 text-sm font-semibold text-void transition-colors hover:bg-action-hover"
+                >
+                  {copy.acceptGoal}
+                  <ArrowRight size={13} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!editing && !editedGoal) setEditedGoal(effectiveGoal.detail || effectiveGoal.title);
+                    setEditing((value) => !value);
+                  }}
+                  className="inline-flex min-h-11 items-center rounded-control border border-border-subtle px-3 py-2 text-sm text-ink-muted transition-colors hover:border-gold/30 hover:text-ink"
+                >
+                  {copy.editGoal}
+                </button>
+                {checklist.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={chooseAlternative}
+                    className="inline-flex min-h-11 items-center gap-1.5 rounded-control border border-border-subtle px-3 py-2 text-sm text-ink-muted transition-colors hover:border-gold/30 hover:text-ink"
+                  >
+                    <Shuffle size={13} />
+                    {copy.alternativeGoal}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setSkipped(true)}
+                  className="inline-flex min-h-11 items-center gap-1.5 rounded-control border border-border-subtle px-3 py-2 text-sm text-ink-subtle transition-colors hover:border-rust/30 hover:text-rust"
+                >
+                  <X size={13} />
+                  {copy.skipGoal}
+                </button>
+              </div>
+            </div>
+          )}
 
           {checklist.length ? (
             <ol className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">

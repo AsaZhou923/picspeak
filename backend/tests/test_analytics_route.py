@@ -24,7 +24,7 @@ class AnalyticsRouteTests(unittest.TestCase):
         )
         request = SimpleNamespace(url=SimpleNamespace(path='/api/v1/analytics/events'))
 
-        for event_name in ('generation_requested', 'generation_succeeded', 'generation_failed'):
+        for event_name in ('generation_requested', 'generation_succeeded', 'generation_failed', 'paid_success'):
             for raw_event_name in (event_name, f'  {event_name}  '):
                 with self.subTest(event_name=raw_event_name), patch(
                     'app.api.routers.analytics.record_product_event'

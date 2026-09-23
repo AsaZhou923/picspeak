@@ -1,0 +1,383 @@
+{
+  "schema_version": "practice-metric-fixtures-v1",
+  "as_of": "2026-10-30T00:00:00Z",
+  "metric_scope": "capture_retake is the only north-star valid loop source; edit_revision and same_image_recheck remain training records but do not enter A7/L14/W4 numerators.",
+  "fixtures": [
+    {
+      "id": "fx01_basic_a7_success",
+      "user_id": "usr_01",
+      "first_qualified_review_at": "2026-10-01T10:00:00Z",
+      "sessions": [
+        {
+          "session_id": "prs_01",
+          "practice_kind": "capture_retake",
+          "created_at": "2026-10-02T10:00:00Z",
+          "attempts": [
+            {
+              "attempt_id": "pra_01_1",
+              "sequence": 1,
+              "task_attempt_count": 1,
+              "analysis_completed_at": "2026-10-03T10:00:00Z",
+              "result_viewed_at": "2026-10-03T10:05:00Z",
+              "goal_status": "achieved",
+              "cost_usd": "0.064000",
+              "expected_valid_loop": true,
+              "access_snapshot_verified": true
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "a7_denominator": 1,
+        "a7_numerator": 1,
+        "first_valid_loop_at": "2026-10-03T10:05:00Z"
+      }
+    },
+    {
+      "id": "fx02_immature_a7_window",
+      "user_id": "usr_02",
+      "first_qualified_review_at": "2026-10-26T10:00:00Z",
+      "sessions": [
+        {
+          "session_id": "prs_02",
+          "practice_kind": "capture_retake",
+          "created_at": "2026-10-27T10:00:00Z",
+          "attempts": [
+            {
+              "attempt_id": "pra_02_1",
+              "sequence": 1,
+              "task_attempt_count": 1,
+              "analysis_completed_at": "2026-10-28T10:00:00Z",
+              "result_viewed_at": "2026-10-28T10:03:00Z",
+              "goal_status": "partial",
+              "cost_usd": "0.064000",
+              "expected_valid_loop": true,
+              "access_snapshot_verified": true
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "a7_denominator": 0,
+        "a7_numerator": 0,
+        "reason": "first qualified review has not reached the 7-day mature window"
+      }
+    },
+    {
+      "id": "fx03_mature_no_attempt",
+      "user_id": "usr_03",
+      "first_qualified_review_at": "2026-10-01T11:00:00Z",
+      "sessions": [
+        {
+          "session_id": "prs_03",
+          "practice_kind": "capture_retake",
+          "created_at": "2026-10-02T11:00:00Z",
+          "attempts": []
+        }
+      ],
+      "expected": {
+        "a7_denominator": 1,
+        "a7_numerator": 0,
+        "first_valid_loop_at": null
+      }
+    },
+    {
+      "id": "fx04_task_retry_not_duplicate_attempt",
+      "user_id": "usr_04",
+      "first_qualified_review_at": "2026-10-01T12:00:00Z",
+      "sessions": [
+        {
+          "session_id": "prs_04",
+          "practice_kind": "capture_retake",
+          "created_at": "2026-10-02T12:00:00Z",
+          "attempts": [
+            {
+              "attempt_id": "pra_04_1",
+              "sequence": 1,
+              "task_attempt_count": 3,
+              "technical_failures_before_success": 2,
+              "analysis_completed_at": "2026-10-04T12:00:00Z",
+              "result_viewed_at": "2026-10-04T12:08:00Z",
+              "goal_status": "not_achieved",
+              "cost_usd": "0.100000",
+              "expected_valid_loop": true,
+              "access_snapshot_verified": true
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "a7_denominator": 1,
+        "a7_numerator": 1,
+        "attempt_count_for_metrics": 1,
+        "reason": "ReviewTask technical retries do not create additional PracticeAttempt rows"
+      }
+    },
+    {
+      "id": "fx05_indeterminate_then_valid_same_session",
+      "user_id": "usr_05",
+      "first_qualified_review_at": "2026-10-01T13:00:00Z",
+      "sessions": [
+        {
+          "session_id": "prs_05",
+          "practice_kind": "capture_retake",
+          "created_at": "2026-10-02T13:00:00Z",
+          "attempts": [
+            {
+              "attempt_id": "pra_05_1",
+              "sequence": 1,
+              "task_attempt_count": 1,
+              "analysis_completed_at": "2026-10-03T13:00:00Z",
+              "result_viewed_at": "2026-10-03T13:02:00Z",
+              "goal_status": "indeterminate",
+              "cost_usd": "0.064000",
+              "expected_valid_loop": false,
+              "access_snapshot_verified": true
+            },
+            {
+              "attempt_id": "pra_05_2",
+              "sequence": 2,
+              "task_attempt_count": 1,
+              "analysis_completed_at": "2026-10-04T13:00:00Z",
+              "result_viewed_at": "2026-10-04T13:02:00Z",
+              "goal_status": "achieved",
+              "cost_usd": "0.064000",
+              "expected_valid_loop": true,
+              "access_snapshot_verified": true
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "a7_denominator": 1,
+        "a7_numerator": 1,
+        "goal_assessment_denominator": 2,
+        "indeterminate_numerator": 1,
+        "valid_loop_count": 1
+      }
+    },
+    {
+      "id": "fx06_l14_second_loop",
+      "user_id": "usr_06",
+      "first_qualified_review_at": "2026-09-20T10:00:00Z",
+      "sessions": [
+        {
+          "session_id": "prs_06_a",
+          "practice_kind": "capture_retake",
+          "created_at": "2026-09-21T10:00:00Z",
+          "attempts": [
+            {
+              "attempt_id": "pra_06_1",
+              "sequence": 1,
+              "task_attempt_count": 1,
+              "analysis_completed_at": "2026-09-23T10:00:00Z",
+              "result_viewed_at": "2026-09-23T10:10:00Z",
+              "goal_status": "partial",
+              "cost_usd": "0.064000",
+              "expected_valid_loop": true,
+              "access_snapshot_verified": true
+            }
+          ]
+        },
+        {
+          "session_id": "prs_06_b",
+          "practice_kind": "capture_retake",
+          "created_at": "2026-10-02T10:00:00Z",
+          "attempts": [
+            {
+              "attempt_id": "pra_06_2",
+              "sequence": 1,
+              "task_attempt_count": 1,
+              "analysis_completed_at": "2026-10-03T10:00:00Z",
+              "result_viewed_at": "2026-10-03T10:05:00Z",
+              "goal_status": "achieved",
+              "cost_usd": "0.064000",
+              "expected_valid_loop": true,
+              "access_snapshot_verified": true
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "a7_denominator": 1,
+        "a7_numerator": 1,
+        "l14_denominator": 1,
+        "l14_numerator": 1,
+        "w4_denominator": 1,
+        "w4_numerator": 0
+      }
+    },
+    {
+      "id": "fx07_w4_return_without_l14",
+      "user_id": "usr_07",
+      "first_qualified_review_at": "2026-09-18T09:00:00Z",
+      "sessions": [
+        {
+          "session_id": "prs_07_a",
+          "practice_kind": "capture_retake",
+          "created_at": "2026-09-19T09:00:00Z",
+          "attempts": [
+            {
+              "attempt_id": "pra_07_1",
+              "sequence": 1,
+              "task_attempt_count": 1,
+              "analysis_completed_at": "2026-09-20T09:00:00Z",
+              "result_viewed_at": "2026-09-20T09:03:00Z",
+              "goal_status": "achieved",
+              "cost_usd": "0.064000",
+              "expected_valid_loop": true,
+              "access_snapshot_verified": true
+            }
+          ]
+        },
+        {
+          "session_id": "prs_07_b",
+          "practice_kind": "capture_retake",
+          "created_at": "2026-10-14T09:00:00Z",
+          "attempts": [
+            {
+              "attempt_id": "pra_07_2",
+              "sequence": 1,
+              "task_attempt_count": 1,
+              "analysis_completed_at": "2026-10-15T09:00:00Z",
+              "result_viewed_at": "2026-10-15T09:05:00Z",
+              "goal_status": "partial",
+              "cost_usd": "0.064000",
+              "expected_valid_loop": true,
+              "access_snapshot_verified": true
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "a7_denominator": 1,
+        "a7_numerator": 1,
+        "l14_denominator": 1,
+        "l14_numerator": 0,
+        "w4_denominator": 1,
+        "w4_numerator": 1
+      }
+    },
+    {
+      "id": "fx08_same_image_recheck_excluded",
+      "user_id": "usr_08",
+      "first_qualified_review_at": "2026-10-01T14:00:00Z",
+      "sessions": [
+        {
+          "session_id": "prs_08",
+          "practice_kind": "same_image_recheck",
+          "created_at": "2026-10-02T14:00:00Z",
+          "attempts": [
+            {
+              "attempt_id": "pra_08_1",
+              "sequence": 1,
+              "analysis_type": "single",
+              "task_attempt_count": 1,
+              "analysis_completed_at": "2026-10-03T14:00:00Z",
+              "result_viewed_at": "2026-10-03T14:04:00Z",
+              "goal_status": null,
+              "cost_usd": "0.040000",
+              "expected_valid_loop": false,
+              "access_snapshot_verified": true
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "a7_denominator": 1,
+        "a7_numerator": 0,
+        "reason": "same_image_recheck uses single analysis and has no goal_assessment"
+      }
+    },
+    {
+      "id": "fx09_edit_revision_excluded_from_capture_metrics",
+      "user_id": "usr_09",
+      "first_qualified_review_at": "2026-10-01T15:00:00Z",
+      "sessions": [
+        {
+          "session_id": "prs_09",
+          "practice_kind": "edit_revision",
+          "created_at": "2026-10-02T15:00:00Z",
+          "attempts": [
+            {
+              "attempt_id": "pra_09_1",
+              "sequence": 1,
+              "analysis_type": "retake_compare",
+              "task_attempt_count": 1,
+              "analysis_completed_at": "2026-10-03T15:00:00Z",
+              "result_viewed_at": "2026-10-03T15:04:00Z",
+              "goal_status": "achieved",
+              "cost_usd": "0.070000",
+              "expected_valid_loop": false,
+              "access_snapshot_verified": true
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "a7_denominator": 1,
+        "a7_numerator": 0,
+        "goal_assessment_denominator": 1,
+        "reason": "edit_revision is assessed but not a real capture_retake loop"
+      }
+    },
+    {
+      "id": "fx10_guest_merge_unknown_cost",
+      "user_id": "usr_10",
+      "guest_user_id_before_merge": "guest_10",
+      "merged_at": "2026-10-02T16:00:00Z",
+      "first_qualified_review_at": "2026-10-01T16:00:00Z",
+      "sessions": [
+        {
+          "session_id": "prs_10",
+          "practice_kind": "capture_retake",
+          "created_at": "2026-10-01T16:30:00Z",
+          "owner_after_merge": "usr_10",
+          "attempts": [
+            {
+              "attempt_id": "pra_10_1",
+              "sequence": 1,
+              "task_attempt_count": 1,
+              "analysis_completed_at": "2026-10-05T16:00:00Z",
+              "result_viewed_at": "2026-10-05T16:04:00Z",
+              "goal_status": "partial",
+              "cost_usd": null,
+              "expected_valid_loop": true,
+              "access_snapshot_verified": true
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "a7_denominator": 1,
+        "a7_numerator": 1,
+        "unknown_cost_request_count": 1,
+        "reason": "guest records count once after ownership migration; old guest credentials must not duplicate the loop"
+      }
+    }
+  ],
+  "expected_aggregate": {
+    "a7": {
+      "mature_denominator": 9,
+      "numerator": 6
+    },
+    "l14": {
+      "mature_denominator": 6,
+      "numerator": 1
+    },
+    "w4": {
+      "mature_denominator": 2,
+      "numerator": 1
+    },
+    "goal_assessments": {
+      "denominator": 11,
+      "indeterminate_numerator": 1
+    },
+    "costs": {
+      "known_practice_cost_usd": "0.722000",
+      "unknown_cost_request_count": 1,
+      "valid_capture_loop_count": 9,
+      "known_cost_unit_cost_lower_bound_usd": "0.080222"
+    }
+  }
+}

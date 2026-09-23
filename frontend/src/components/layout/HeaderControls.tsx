@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { Show, SignInButton, SignUpButton, UserButton } from '@clerk/nextjs';
-import { BadgeDollarSign, ChevronDown, ChevronRight, Clock, Heart, Moon, Sun, Wand2 } from 'lucide-react';
+import { BadgeDollarSign, ChevronDown, ChevronRight, Clock, Heart, Moon, Repeat2, Sun, UserRound, Wand2 } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import { KeyboardEvent, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
@@ -11,6 +11,7 @@ import useOnClickOutside from '@/lib/hooks/useOnClickOutside';
 import { LOCALE_LABELS, Locale, useI18n } from '@/lib/i18n';
 import { useTheme } from '@/lib/theme-context';
 import type { HeaderVisibilityState } from './header-auth-visibility';
+import { getRetakeCoachCopy } from '@/lib/retake-coach-copy';
 
 const AUTH_LABELS: Record<Locale, { signIn: string; signUp: string }> = {
   zh: { signIn: '登录', signUp: '注册' },
@@ -87,6 +88,7 @@ function QuickLinksMenu() {
   const pathname = usePathname();
   const { t, locale } = useI18n();
   const { userInfo } = useAuth();
+  const retakeCopy = getRetakeCoachCopy(locale);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -106,8 +108,14 @@ function QuickLinksMenu() {
 
   const links = [
     { href: '/account/favorites', label: t('review_nav_favorites'), icon: Heart },
+    { href: '/retake', label: retakeCopy.nav, icon: Repeat2 },
     ...(userInfo && userInfo.plan !== 'guest' ? [{ href: '/account/reviews', label: t('nav_history'), icon: Clock }] : []),
     ...(userInfo && userInfo.plan !== 'guest' ? [{ href: '/account/generations', label: t('generation_history_nav'), icon: Wand2 }] : []),
+    ...(userInfo && userInfo.plan !== 'guest' ? [{
+      href: '/account/profile',
+      label: locale === 'zh' ? '公开作品主页' : locale === 'ja' ? '公開作品プロフィール' : 'Public portfolio',
+      icon: UserRound,
+    }] : []),
     { href: '/affiliate', label: t('nav_affiliate'), icon: BadgeDollarSign },
   ] as Array<{
     href: string;

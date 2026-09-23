@@ -9,15 +9,21 @@ from urllib.parse import quote
 
 from sqlalchemy import case
 from sqlalchemy.orm import Session
+from pydantic import ValidationError
 
 from app.api.deps import new_public_id
 from app.core.config import settings
 from app.core.errors import ApiHTTPException
 from app.db.models import Photo, PhotoStatus, Review, ReviewMode, ReviewStatus, ReviewTask, TaskStatus, UsageLedger, User, UserPlan
 from app.db.session import SessionLocal
-from app.services.ai import AIReviewError, CanonicalScore, run_ai_review
+from app.services.ai import AIProviderCallUsage, AIReviewError, CanonicalScore, observe_ai_provider_calls, run_ai_review
 from app.services.guard import enforce_user_quota, guest_usage_snapshot, increment_quota, user_usage_snapshot
+from app.services.practice import attach_practice_review, resolve_task_practice
+from app.services.practice_events import record_practice_analysis_completed
 from app.services.retake_comparison import run_retake_comparison
+from app.services.review_call_costs import (
+    record_observed_provider_call_costs,
+)
 from app.services.review_pricing import ReviewModelUsage, estimate_review_usage_cost
 from app.services.review_score_cache import (
     canonical_score_cache_lease,
@@ -200,6 +206,7 @@ def _normalize_review_result_payload(
         'exif_info': exif_info if isinstance(exif_info, dict) else (stored_exif_info if isinstance(stored_exif_info, dict) else {}),
         'share_info': share_info if isinstance(share_info, dict) else {},
         'comparison': raw_payload.get('comparison') if isinstance(raw_payload.get('comparison'), dict) else None,
+        'goal_assessment': deepcopy(raw_payload.get('goal_assessment')) if isinstance(raw_payload.get('goal_assessment'), dict) else None,
     }
 
 
@@ -507,6 +514,21 @@ def _process_task(db: Session, task: ReviewTask) -> None:
         _handle_failure(db, task, error_code='USER_NOT_FOUND', error_message='Task owner not found', retryable=False)
         return
 
+    # Resolve the accepted goal through the persisted attempt and session. Request
+    # metadata (including a copied goal or URL parameters) is never an authority.
+    try:
+        practice_context = resolve_task_practice(db, task)
+        goal_context = practice_context.goal_context if practice_context is not None else None
+    except (ApiHTTPException, ValidationError) as exc:
+        detail = exc.detail if isinstance(exc, ApiHTTPException) and isinstance(exc.detail, dict) else {}
+        _handle_failure(
+            db, task,
+            error_code=str(detail.get('code') or 'PRACTICE_GOAL_INVALID'),
+            error_message=str(detail.get('message') or 'The saved practice goal is invalid'),
+            retryable=False,
+        )
+        return
+
     if owner.plan != UserPlan.guest:
         try:
             enforce_user_quota(db, owner, mode=task.mode if isinstance(task.mode, ReviewMode) else ReviewMode(task.mode))
@@ -525,6 +547,8 @@ def _process_task(db: Session, task: ReviewTask) -> None:
 
     image_url = f'{settings.object_base_url.rstrip("/")}/{quote(photo.object_key)}'
     payload_locale = (task.request_payload or {}).get('locale', 'en')
+    if practice_context is not None:
+        payload_locale = practice_context.session.locale
     payload_image_type = (task.request_payload or {}).get('image_type', 'default')
     analysis_type = (task.request_payload or {}).get('analysis_type', 'single')
     review_model = (task.request_payload or {}).get('review_model', 'qwen')
@@ -532,96 +556,105 @@ def _process_task(db: Session, task: ReviewTask) -> None:
         payload_locale = 'en'
     _transition_progress(db, task, 70, 'AI_REVIEW_STARTED', 'Running AI review')
 
+    provider_calls: list[AIProviderCallUsage] = []
     try:
-        if analysis_type == 'retake_compare':
-            source_review_id = (task.request_payload or {}).get('source_review_internal_id')
-            source_row = (
-                db.query(Review, Photo)
-                .join(Photo, Photo.id == Review.photo_id)
-                .filter(
-                    Review.id == source_review_id,
-                    Review.owner_user_id == task.owner_user_id,
-                    Review.deleted_at.is_(None),
-                )
-                .first()
-            )
-            if source_row is None:
-                _handle_failure(
-                    db,
-                    task,
-                    error_code='RETAKE_SOURCE_NOT_FOUND',
-                    error_message='Source review or original photo not found for retake comparison',
-                    retryable=False,
-                )
-                return
-            source_review, source_photo = source_row
-            if source_review.status != ReviewStatus.SUCCEEDED or source_photo.status != PhotoStatus.READY:
-                _handle_failure(
-                    db,
-                    task,
-                    error_code='RETAKE_SOURCE_NOT_READY',
-                    error_message='Source review or original photo is not ready for retake comparison',
-                    retryable=False,
-                )
-                return
-            original_image_url = f'{settings.object_base_url.rstrip("/")}/{quote(source_photo.object_key)}'
-            ai_response = run_retake_comparison(
-                original_image_url=original_image_url,
-                retake_image_url=image_url,
-                original_review_id=source_review.public_id,
-                original_photo_id=source_photo.public_id,
-                retake_photo_id=photo.public_id,
-                locale=payload_locale,
-                image_type=payload_image_type,
-            )
-        else:
-            checkpointed_score = load_task_canonical_score_checkpoint(task)
-            score_context = (
-                nullcontext(checkpointed_score)
-                if checkpointed_score is not None
-                else canonical_score_cache_lease(
-                    db,
-                    photo=photo,
-                    image_type=payload_image_type,
-                )
-            )
-            with score_context as canonical_score:
-                if checkpointed_score is not None:
-                    record_task_event(
+        with observe_ai_provider_calls(provider_calls.append):
+            if analysis_type == 'retake_compare':
+                if practice_context is not None:
+                    source_row = (practice_context.source_review, practice_context.source_photo)
+                else:
+                    source_review_id = (task.request_payload or {}).get('source_review_internal_id')
+                    source_row = (
+                        db.query(Review, Photo)
+                        .join(Photo, Photo.id == Review.photo_id)
+                        .filter(
+                            Review.id == source_review_id,
+                            Review.owner_user_id == task.owner_user_id,
+                            Photo.owner_user_id == task.owner_user_id,
+                            Review.deleted_at.is_(None),
+                        )
+                        .first()
+                    )
+                if source_row is None:
+                    _handle_failure(
                         db,
                         task,
-                        event_type='AI_SCORING_REUSED',
-                        message='Reusing completed canonical score from an earlier attempt',
-                        payload={'scorer_model': checkpointed_score.model_name},
+                        error_code='RETAKE_SOURCE_NOT_FOUND',
+                        error_message='Source review or original photo not found for retake comparison',
+                        retryable=False,
                     )
-
-                def save_score_checkpoint(score: CanonicalScore) -> None:
-                    checkpoint_task_canonical_score(task, score)
-                    db.add(task)
-                    record_task_event(
+                    return
+                source_review, source_photo = source_row
+                if source_review.status != ReviewStatus.SUCCEEDED or source_photo.status != PhotoStatus.READY:
+                    _handle_failure(
                         db,
                         task,
-                        event_type='AI_SCORING_COMPLETED',
-                        message='Canonical score completed and checkpointed',
-                        payload=_canonical_score_event_payload(score),
+                        error_code='RETAKE_SOURCE_NOT_READY',
+                        error_message='Source review or original photo is not ready for retake comparison',
+                        retryable=False,
                     )
-
-                ai_response = run_ai_review(
-                    task.mode.value if isinstance(task.mode, ReviewMode) else str(task.mode),
-                    image_url=image_url,
+                    return
+                original_image_url = f'{settings.object_base_url.rstrip("/")}/{quote(source_photo.object_key)}'
+                ai_response = run_retake_comparison(
+                    original_image_url=original_image_url,
+                    retake_image_url=image_url,
+                    original_review_id=source_review.public_id,
+                    original_photo_id=source_photo.public_id,
+                    retake_photo_id=photo.public_id,
                     locale=payload_locale,
-                    exif_data=photo.exif_data or None,
                     image_type=payload_image_type,
-                    enforce_suggestion_structure=task.attempt_count < task.max_attempts,
-                    review_model=review_model,
-                    canonical_score=canonical_score,
-                    on_canonical_score=save_score_checkpoint,
+                    **({'goal_context': goal_context} if goal_context is not None else {}),
                 )
+            else:
+                checkpointed_score = load_task_canonical_score_checkpoint(task)
+                score_context = (
+                    nullcontext(checkpointed_score)
+                    if checkpointed_score is not None
+                    else canonical_score_cache_lease(
+                        db,
+                        photo=photo,
+                        image_type=payload_image_type,
+                    )
+                )
+                with score_context as canonical_score:
+                    if checkpointed_score is not None:
+                        record_task_event(
+                            db,
+                            task,
+                            event_type='AI_SCORING_REUSED',
+                            message='Reusing completed canonical score from an earlier attempt',
+                            payload={'scorer_model': checkpointed_score.model_name},
+                        )
+
+                    def save_score_checkpoint(score: CanonicalScore) -> None:
+                        checkpoint_task_canonical_score(task, score)
+                        db.add(task)
+                        record_task_event(
+                            db,
+                            task,
+                            event_type='AI_SCORING_COMPLETED',
+                            message='Canonical score completed and checkpointed',
+                            payload=_canonical_score_event_payload(score),
+                        )
+
+                    ai_response = run_ai_review(
+                        task.mode.value if isinstance(task.mode, ReviewMode) else str(task.mode),
+                        image_url=image_url,
+                        locale=payload_locale,
+                        exif_data=photo.exif_data or None,
+                        image_type=payload_image_type,
+                        enforce_suggestion_structure=task.attempt_count < task.max_attempts,
+                        review_model=review_model,
+                        canonical_score=canonical_score,
+                        on_canonical_score=save_score_checkpoint,
+                    )
+        record_observed_provider_call_costs(db, task=task, calls=provider_calls, failed=False)
     except AIReviewError as exc:
         error_code = {
             'scoring': 'AI_SCORING_FAILED',
             'writing': 'AI_WRITING_FAILED',
         }.get(exc.stage, 'AI_CALL_FAILED')
+        record_observed_provider_call_costs(db, task=task, calls=provider_calls, failed=True)
         logger.warning('AI review failed for task %s at %s stage: %s', task.public_id, exc.stage or 'unknown', exc)
         _handle_failure(db, task, error_code=error_code, error_message=str(exc), retryable=True)
         return
@@ -645,13 +678,19 @@ def _process_task(db: Session, task: ReviewTask) -> None:
     )
     if ai_response.cost_rate_version:
         result_payload.setdefault('billing_info', {})['cost_rate_version'] = ai_response.cost_rate_version
+    if goal_context is None:
+        # Same-image rechecks and legacy reviews cannot claim goal completion.
+        result_payload['goal_assessment'] = None
 
     review = Review(
         public_id=new_public_id('rev'),
         task_id=task.id,
         photo_id=task.photo_id,
         owner_user_id=task.owner_user_id,
-        source_review_id=(task.request_payload or {}).get('source_review_internal_id'),
+        source_review_id=(
+            practice_context.source_review.id if practice_context is not None
+            else (task.request_payload or {}).get('source_review_internal_id')
+        ),
         mode=task.mode,
         status=ReviewStatus.SUCCEEDED,
         image_type=payload_image_type,
@@ -701,6 +740,9 @@ def _process_task(db: Session, task: ReviewTask) -> None:
     }
     review.result_json = result_payload
     db.add(review)
+    if practice_context is not None:
+        attach_practice_review(db, task, review)
+        record_practice_analysis_completed(db, task, review)
 
     task.status = TaskStatus.SUCCEEDED
     task.progress = 100

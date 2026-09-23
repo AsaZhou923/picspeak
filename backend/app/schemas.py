@@ -5,6 +5,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
 
+from app.goal_assessment import GoalAssessment
+
 
 REVIEW_SCHEMA_VERSION = '1.0'
 
@@ -66,6 +68,7 @@ class ReviewCreateRequest(BaseModel):
     review_model: str = Field(default='qwen', pattern=r'^(qwen|gpt-5\.5|gpt-5\.6-(?:terra|luna))$')
     image_type: str = Field(default='default', pattern='^(default|landscape|portrait|street|still_life|architecture)$')
     source_review_id: str | None = None
+    practice_session_id: str | None = None
     analysis_type: str = Field(default='single', pattern='^(single|retake_compare)$')
     async_mode: bool = Field(default=True, alias='async')
     idempotency_key: str | None = None
@@ -158,12 +161,15 @@ class ReviewResult(BaseModel):
     exif_info: dict[str, Any] = Field(default_factory=dict)
     share_info: dict[str, Any] = Field(default_factory=dict)
     comparison: RetakeComparisonResult | None = None
+    goal_assessment: GoalAssessment | None = None
 
 
 class ReviewCreateAsyncResponse(BaseModel):
     task_id: str
     status: str
     estimated_seconds: int
+    practice_session_id: str | None = None
+    practice_attempt_id: str | None = None
 
 
 class InternalTaskExecuteRequest(BaseModel):
@@ -174,6 +180,8 @@ class ReviewCreateSyncResponse(BaseModel):
     review_id: str
     status: str
     result: ReviewResult
+    practice_session_id: str | None = None
+    practice_attempt_id: str | None = None
 
 
 class TaskStatusResponse(BaseModel):
@@ -290,6 +298,9 @@ class ReviewGetResponse(BaseModel):
     status: str
     image_type: str = 'default'
     source_review_id: str | None = None
+    practice: dict[str, Any] | None = None
+    practice_session_id: str | None = None
+    goal_assessment: GoalAssessment | None = None
     viewer_is_owner: bool = False
     favorite: bool = False
     gallery_visible: bool = False
@@ -323,7 +334,10 @@ class ReviewHistoryItem(BaseModel):
     status: str
     image_type: str = 'default'
     source_review_id: str | None = None
+    practice: dict[str, Any] | None = None
+    practice_session_id: str | None = None
     comparison: RetakeComparisonResult | None = None
+    goal_assessment: GoalAssessment | None = None
     final_score: float
     scores: dict[str, int] = Field(default_factory=default_review_scores)
     model_name: str = ''
@@ -353,6 +367,18 @@ class ReviewShareResponse(BaseModel):
     share_token: str
     share_url: str
     enabled: bool = True
+
+
+class ReviewVisibilityResponse(BaseModel):
+    review_id: str
+    is_public: bool = False
+    gallery_visible: bool = False
+    gallery_audit_status: str = 'none'
+    gallery_added_at: datetime | None = None
+    gallery_rejected_reason: str | None = None
+    share_enabled: bool = False
+    share_token: str | None = None
+    share_url: str | None = None
 
 
 class ReviewMetaUpdateRequest(BaseModel):
@@ -442,6 +468,8 @@ class ReviewExportPhoto(BaseModel):
 class ReviewExportData(BaseModel):
     review_id: str
     source_review_id: str | None = None
+    practice: dict[str, Any] | None = None
+    practice_session_id: str | None = None
     mode: str
     status: str
     image_type: str = 'default'
@@ -459,6 +487,7 @@ class ReviewExportData(BaseModel):
     critique: str = ''
     suggestions: str = ''
     comparison: RetakeComparisonResult | None = None
+    goal_assessment: GoalAssessment | None = None
     favorite: bool = False
     tags: list[str] = Field(default_factory=default_review_tags)
     note: str | None = None

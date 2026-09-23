@@ -62,6 +62,8 @@ export function useReplayContext() {
     clearReplay,
     initialMode: searchParams.get('mode'),
     initialImageType: searchParams.get('image_type'),
+    practiceSessionId: searchParams.get('practice_session_id'),
+    initialPracticeKind: searchParams.get('practice_kind'),
     retakeIntent: searchParams.get('retake_intent'),
     nextShootAction: searchParams.get('next_shoot_action'),
     nextShootDimension: searchParams.get('next_shoot_dimension'),

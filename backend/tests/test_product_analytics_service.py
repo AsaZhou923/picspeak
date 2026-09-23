@@ -20,6 +20,20 @@ from app.services.product_analytics import (  # noqa: E402
 
 
 class ProductAnalyticsServiceTests(unittest.TestCase):
+    def test_retake_coach_source_is_reported_without_counting_other_workspace_visits(self) -> None:
+        when = datetime(2026, 9, 19, 10, tzinfo=timezone.utc)
+        snapshot = build_stage_a_snapshot(
+            events=[
+                AnalyticsEventSample(event_name='workspace_viewed', occurred_at=when,
+                                     device_id='practice-device', source='retake_coach'),
+                AnalyticsEventSample(event_name='workspace_viewed', occurred_at=when,
+                                     device_id='other-device', source='home_direct'),
+            ], reviews=[], start_date=when.date(), end_date=when.date(),
+        )
+        self.assertEqual(snapshot['source_breakdown']['retake_coach']['visitors'], 1)
+        self.assertEqual(snapshot['content_conversion_weekly']['retake_coach']['visitors'], 1)
+        self.assertIn('retake_coach', snapshot['generation_funnel']['by_source'])
+
     def test_stage_a_event_catalog_covers_required_funnel_events(self) -> None:
         required_events = {
             'home_viewed',

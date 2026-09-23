@@ -1,4 +1,4 @@
-import { PublicGalleryItem } from '@/lib/types';
+import type { PublicGalleryItem } from '@/lib/gallery-ux-types';
 
 export const GALLERY_RESTORE_STORAGE_KEY = 'picspeak.gallery.restore.v2';
 

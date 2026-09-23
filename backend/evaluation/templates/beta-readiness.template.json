@@ -1,0 +1,31 @@
+{
+  "participants": [],
+  "resources": {
+    "data_origin": "",
+    "real_participant_attestation": false,
+    "usability_protocol_ref": "",
+    "participant_consent_ref": "",
+    "baseline_prompt_ref": ""
+  },
+  "operator": {
+    "operator_id": "",
+    "name": "",
+    "contact": "",
+    "scope": "",
+    "quota_plan_ref": ""
+  },
+  "feature_flag": {
+    "flag_name": "",
+    "environment": "",
+    "intended_state": "",
+    "owner": "",
+    "switch_off_verified_ref": "",
+    "old_result_readable_verified_ref": ""
+  },
+  "quality_gates": {
+    "local_contracts_passed": false,
+    "local_contracts_ref": "",
+    "code_revision": "",
+    "goal_evaluation_report_ref": ""
+  }
+}

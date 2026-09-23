@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { memo } from 'react';
 import { Camera, ChevronRight, Gauge, Heart, Sparkles, Star, Zap } from 'lucide-react';
-import { PublicGalleryItem } from '@/lib/types';
+import type { PublicGalleryItem, GalleryDensityPreference } from '@/lib/gallery-ux-types';
 import { useI18n } from '@/lib/i18n';
 import { getGalleryWorkspaceCtas, type ContentConversionEntrypoint } from '@/lib/content-conversion';
 import { markProductAttributionSource, trackProductEvent } from '@/lib/product-analytics';
@@ -17,7 +17,9 @@ interface GalleryCardProps {
   handleLikeToggle: (item: PublicGalleryItem) => Promise<void>;
   persistGalleryState: (reviewId: string) => void;
   backHref: string;
+  galleryQuery: string;
   dateLocale: string;
+  density?: GalleryDensityPreference;
 }
 
 function scoreTone(score: number): string {
@@ -66,14 +68,18 @@ function GalleryCard({
   handleLikeToggle,
   persistGalleryState,
   backHref,
+  galleryQuery,
   dateLocale,
+  density = 'full',
 }: GalleryCardProps) {
   const { t, locale } = useI18n();
   const author = getAuthorBadge(item.owner_username);
   const modeBadge = getModeBadgeConfig(item.mode);
   const ModeIcon = modeBadge.icon;
   const workspaceCtas = getGalleryWorkspaceCtas(locale, item);
+  const isCompact = density === 'compact';
   const generateHref = `/generate?source=gallery&entrypoint=gallery_reference_generation&gallery_review_id=${encodeURIComponent(item.review_id)}&image_type=${encodeURIComponent(item.image_type)}`;
+  const reviewHref = `/reviews/${item.review_id}?back=${encodeURIComponent(backHref)}&gallery_query=${encodeURIComponent(galleryQuery)}`;
 
   const handleWorkspaceCtaClick = (entrypoint: ContentConversionEntrypoint) => {
     markProductAttributionSource('gallery');
@@ -100,7 +106,7 @@ function GalleryCard({
       }}
     >
       <div className="relative overflow-hidden px-3 pt-3">
-        <GalleryCardImage item={item} alt={t('photo_thumbnail_alt')} />
+        <GalleryCardImage item={item} alt={t('photo_thumbnail_alt')} compact={isCompact} />
 
         <div className="absolute inset-x-6 top-6 flex items-start justify-between gap-2">
           <div className="flex flex-col items-start gap-2">
@@ -139,12 +145,22 @@ function GalleryCard({
               {author.initial}
             </span>
           )}
-          <span className="max-w-[96px] truncate text-xs text-ink">{author.label}</span>
+          {item.owner_profile_url ? (
+            <Link
+              href={item.owner_profile_url}
+              className="max-w-[96px] truncate text-xs text-ink transition-colors hover:text-gold"
+              onClick={(event) => event.stopPropagation()}
+            >
+              {author.label}
+            </Link>
+          ) : (
+            <span className="max-w-[96px] truncate text-xs text-ink">{author.label}</span>
+          )}
         </div>
       </div>
 
-      <div className="flex flex-1 flex-col px-4 pb-4 pt-4">
-        <div className="rounded-control border border-border-subtle bg-raised/55 px-3.5 py-3">
+      <div className={`flex flex-1 flex-col px-4 pb-4 ${isCompact ? 'pt-3' : 'pt-4'}`}>
+        <div className={`rounded-control border border-border-subtle bg-raised/55 px-3.5 ${isCompact ? 'py-2.5' : 'py-3'}`}>
           <p className="text-[11px] uppercase tracking-[0.22em] text-ink-subtle">{t('gallery_saved_at')}</p>
           <p className="mt-2 text-sm font-medium text-ink">
             {new Date(item.gallery_added_at).toLocaleDateString(dateLocale, {
@@ -155,6 +171,7 @@ function GalleryCard({
           </p>
         </div>
 
+        {!isCompact && (
         <div className="mt-3 rounded-control border border-gold/20 bg-gold/5 px-3.5 py-3.5">
           <p
             className="text-xs leading-6 text-ink-muted"
@@ -168,8 +185,9 @@ function GalleryCard({
             {trimSummary(item.summary || t('gallery_summary_fallback'))}
           </p>
         </div>
+        )}
 
-        <div className="mt-3 grid gap-2">
+        <div className={`grid gap-2 ${isCompact ? 'mt-2' : 'mt-3'}`}>
           <Link
             href={workspaceCtas.practice.href}
             onClick={() => handleWorkspaceCtaClick(workspaceCtas.practice.entrypoint)}
@@ -191,6 +209,7 @@ function GalleryCard({
             <Gauge size={13} />
             {workspaceCtas.standard.cta}
           </Link>
+          {!isCompact && (
           <Link
             href={generateHref}
             onClick={() => {
@@ -211,6 +230,7 @@ function GalleryCard({
             <Sparkles size={13} />
             {locale === 'zh' ? '生成同题材练习参考' : locale === 'ja' ? '同じ題材の参考を生成' : 'Generate practice reference'}
           </Link>
+          )}
         </div>
 
         <div className="mt-auto flex items-center gap-2 pt-4">
@@ -234,7 +254,7 @@ function GalleryCard({
           </button>
 
           <Link
-            href={`/reviews/${item.review_id}?back=${encodeURIComponent(backHref)}`}
+            href={reviewHref}
             onClick={() => persistGalleryState(item.review_id)}
             className="ui-action-primary flex-1 px-3 py-2 text-sm active:scale-[0.98]"
           >

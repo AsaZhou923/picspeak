@@ -1,0 +1,26 @@
+{
+  "provenance": {
+    "data_origin": "",
+    "real_human_attestation": false,
+    "synthetic": true,
+    "photo_authorization_ref": "",
+    "dataset_manifest_ref": "",
+    "blind_rating_protocol_ref": "",
+    "rater_assignment_ref": "",
+    "holdout_freeze_ref": "",
+    "freeze": {
+      "diagnostic_manifest_ref": "",
+      "holdout_manifest_ref": "",
+      "threshold_config_ref": "",
+      "frozen_at": "",
+      "thresholds_frozen_before_holdout": false
+    },
+    "run_manifest": {
+      "run_manifest_ref": "",
+      "model_version": "",
+      "prompt_version": "",
+      "preprocess_version": ""
+    }
+  },
+  "records": []
+}

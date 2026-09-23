@@ -16,7 +16,7 @@ from app.core.config import settings
 from app.core.errors import api_error
 from app.core.http_client import PooledHTTPRequestError, PooledHTTPStatusError, pooled_request
 from app.core.security import create_access_token
-from app.db.models import Photo, Review, ReviewTask, User, UserPlan, UserStatus
+from app.db.models import IdempotencyKey, Photo, PracticeAttempt, PracticeFeedback, PracticeSession, Review, ReviewTask, User, UserPlan, UserStatus
 from app.schemas import AuthTokenResponse
 from app.services.clerk_auth import ClerkIdentity
 from app.services.clerk_webhooks import ClerkWebhookEvent
@@ -309,6 +309,51 @@ def _migrate_guest_records(
         .all()
     )
     guest_tasks = db.query(ReviewTask).filter(ReviewTask.owner_user_id == guest_user.id).all()
+    guest_sessions = db.query(PracticeSession).filter(PracticeSession.owner_user_id == guest_user.id).all()
+    guest_attempts = db.query(PracticeAttempt).filter(PracticeAttempt.owner_user_id == guest_user.id).all()
+    guest_feedback = db.query(PracticeFeedback).filter(PracticeFeedback.owner_user_id == guest_user.id).all()
+
+    practice_review_ids = {session.source_review_id for session in guest_sessions}
+    practice_photo_ids = {session.source_photo_id for session in guest_sessions}
+    practice_task_ids = {attempt.task_id for attempt in guest_attempts}
+    for attempt in guest_attempts:
+        practice_review_ids.add(attempt.source_review_id)
+        if attempt.review_id:
+            practice_review_ids.add(attempt.review_id)
+        practice_photo_ids.add(attempt.photo_id)
+
+    if practice_review_ids:
+        for review in db.query(Review).filter(Review.id.in_(practice_review_ids), Review.owner_user_id == guest_user.id).all():
+            if review not in guest_reviews:
+                guest_reviews.append(review)
+    if practice_photo_ids:
+        for photo in db.query(Photo).filter(Photo.id.in_(practice_photo_ids), Photo.owner_user_id == guest_user.id).all():
+            if photo not in guest_photos:
+                guest_photos.append(photo)
+    if practice_task_ids:
+        for task in db.query(ReviewTask).filter(ReviewTask.id.in_(practice_task_ids), ReviewTask.owner_user_id == guest_user.id).all():
+            if task not in guest_tasks:
+                guest_tasks.append(task)
+
+    guest_idempotency_records = db.query(IdempotencyKey).filter(IdempotencyKey.user_id == guest_user.id).all()
+    target_idempotency_keys = {
+        (endpoint, key)
+        for endpoint, key in db.query(IdempotencyKey.endpoint, IdempotencyKey.idempotency_key)
+        .filter(IdempotencyKey.user_id == target_user.id)
+        .all()
+    }
+    target_task_idempotency_keys = {
+        key
+        for (key,) in db.query(ReviewTask.idempotency_key)
+        .filter(ReviewTask.owner_user_id == target_user.id, ReviewTask.idempotency_key.isnot(None))
+        .all()
+    }
+    target_session_idempotency_keys = {
+        key
+        for (key,) in db.query(PracticeSession.idempotency_key)
+        .filter(PracticeSession.owner_user_id == target_user.id, PracticeSession.idempotency_key.isnot(None))
+        .all()
+    }
 
     migrated_reviews = 0
     for review in guest_reviews:
@@ -326,10 +371,46 @@ def _migrate_guest_records(
 
     for task in guest_tasks:
         if task.owner_user_id != target_user.id:
+            if task.idempotency_key and task.idempotency_key in target_task_idempotency_keys:
+                task.idempotency_key = None
             task.owner_user_id = target_user.id
             db.add(task)
 
-    if migrated_reviews or migrated_photos:
+    # Cost facts follow their task across guest-to-account ownership changes.
+    from app.db.models import ReviewCallCost
+    migrated_task_ids = [task.id for task in guest_tasks]
+    if migrated_task_ids:
+        for call in db.query(ReviewCallCost).filter(
+            ReviewCallCost.task_id.in_(migrated_task_ids), ReviewCallCost.owner_user_id == guest_user.id,
+        ).all():
+            call.owner_user_id = target_user.id
+            db.add(call)
+
+    for session in guest_sessions:
+        if session.owner_user_id != target_user.id:
+            if session.idempotency_key and session.idempotency_key in target_session_idempotency_keys:
+                session.idempotency_key = None
+            session.owner_user_id = target_user.id
+            db.add(session)
+
+    for attempt in guest_attempts:
+        if attempt.owner_user_id != target_user.id:
+            attempt.owner_user_id = target_user.id
+            db.add(attempt)
+
+    for feedback in guest_feedback:
+        if feedback.owner_user_id != target_user.id:
+            feedback.owner_user_id = target_user.id
+            db.add(feedback)
+
+    for record in guest_idempotency_records:
+        if (record.endpoint, record.idempotency_key) in target_idempotency_keys:
+            db.delete(record)
+        else:
+            record.user_id = target_user.id
+            db.add(record)
+
+    if migrated_reviews or migrated_photos or guest_sessions or guest_attempts or guest_feedback:
         guest_user.status = UserStatus.deleted
         db.add(guest_user)
         db.flush()

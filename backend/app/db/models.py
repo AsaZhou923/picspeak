@@ -75,6 +75,8 @@ class User(Base):
     public_id: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
     clerk_user_id: Mapped[str | None] = mapped_column(Text, unique=True)
     avatar_url: Mapped[str | None] = mapped_column(Text)
+    public_profile_id: Mapped[str | None] = mapped_column(Text, unique=True)
+    public_profile_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default='false')
     email: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
     username: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
     password_hash: Mapped[str | None] = mapped_column(Text)
@@ -154,6 +156,33 @@ class ReviewTask(Base):
     photo: Mapped[Photo] = relationship()
 
 
+class ReviewCallCost(Base):
+    __tablename__ = 'review_call_costs'
+    __table_args__ = (
+        UniqueConstraint('task_id', 'call_key', name='uq_review_call_costs_task_call_key'),
+        Index('idx_review_call_costs_task_created', 'task_id', 'created_at'),
+        Index('idx_review_call_costs_owner_created', 'owner_user_id', 'created_at'),
+        Index('idx_review_call_costs_stage_outcome_created', 'stage', 'outcome', 'created_at'),
+        CheckConstraint("stage IN ('scorer', 'writer', 'pair')", name='chk_review_call_costs_stage'),
+        CheckConstraint("outcome IN ('succeeded', 'failed', 'unknown')", name='chk_review_call_costs_outcome'),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    task_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('review_tasks.id'), nullable=False)
+    owner_user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('users.id'), nullable=False)
+    call_key: Mapped[str] = mapped_column(Text, nullable=False)
+    stage: Mapped[str] = mapped_column(Text, nullable=False)
+    outcome: Mapped[str] = mapped_column(Text, nullable=False)
+    model_name: Mapped[str | None] = mapped_column(Text)
+    input_tokens: Mapped[int | None] = mapped_column(Integer)
+    output_tokens: Mapped[int | None] = mapped_column(Integer)
+    cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(12, 6))
+    cost_rate_version: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    task: Mapped[ReviewTask] = relationship()
+
+
 class Review(Base):
     __tablename__ = 'reviews'
     __table_args__ = (
@@ -215,6 +244,107 @@ class Review(Base):
     writer_model_name: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+
+
+class PracticeSession(Base):
+    __tablename__ = 'practice_sessions'
+    __table_args__ = (
+        UniqueConstraint('owner_user_id', 'idempotency_key', name='uq_practice_sessions_user_idempotency'),
+        Index('idx_practice_sessions_owner_created', 'owner_user_id', 'created_at'),
+        Index('idx_practice_sessions_owner_lifecycle_created', 'owner_user_id', 'lifecycle', 'created_at'),
+        CheckConstraint("practice_kind IN ('capture_retake', 'edit_revision', 'same_image_recheck')", name='chk_practice_sessions_kind'),
+        CheckConstraint("lifecycle IN ('active', 'completed', 'archived')", name='chk_practice_sessions_lifecycle'),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    public_id: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
+    owner_user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('users.id'), nullable=False)
+    source_review_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('reviews.id'), nullable=False)
+    source_photo_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('photos.id'), nullable=False)
+    practice_kind: Mapped[str] = mapped_column(Text, nullable=False)
+    lifecycle: Mapped[str] = mapped_column(Text, nullable=False, default='active', server_default='active')
+    goal_snapshot: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    success_criteria: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    locale: Mapped[str] = mapped_column(Text, nullable=False, default='en', server_default='en')
+    idempotency_key: Mapped[str | None] = mapped_column(Text)
+    request_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+
+    source_review: Mapped[Review] = relationship(foreign_keys=[source_review_id])
+    source_photo: Mapped[Photo] = relationship(foreign_keys=[source_photo_id])
+
+
+class PracticeSceneGroup(Base):
+    __tablename__ = 'practice_scene_groups'
+    __table_args__ = (
+        UniqueConstraint('session_id', name='uq_practice_scene_groups_session'),
+        Index('idx_practice_scene_groups_owner_label', 'owner_user_id', 'label'),
+        Index('idx_practice_scene_groups_owner_updated', 'owner_user_id', 'updated_at'),
+        CheckConstraint("visibility IN ('private')", name='chk_practice_scene_groups_visibility'),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    public_id: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
+    owner_user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('users.id'), nullable=False)
+    session_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('practice_sessions.id'), nullable=False)
+    label: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    visibility: Mapped[str] = mapped_column(Text, nullable=False, default='private', server_default='private')
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+
+    session: Mapped[PracticeSession] = relationship()
+
+
+class PracticeAttempt(Base):
+    __tablename__ = 'practice_attempts'
+    __table_args__ = (
+        UniqueConstraint('task_id', name='uq_practice_attempts_task'),
+        UniqueConstraint('review_id', name='uq_practice_attempts_review'),
+        UniqueConstraint('session_id', 'sequence', name='uq_practice_attempts_session_sequence'),
+        Index('idx_practice_attempts_session_created', 'session_id', 'created_at'),
+        Index('idx_practice_attempts_owner_created', 'owner_user_id', 'created_at'),
+        CheckConstraint("attempt_kind IN ('capture_retake', 'edit_revision', 'same_image_recheck')", name='chk_practice_attempts_kind'),
+        CheckConstraint('sequence > 0', name='chk_practice_attempts_sequence_positive'),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    public_id: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
+    session_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('practice_sessions.id'), nullable=False)
+    owner_user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('users.id'), nullable=False)
+    task_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('review_tasks.id'), nullable=False)
+    review_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey('reviews.id'))
+    sequence: Mapped[int] = mapped_column(Integer, nullable=False)
+    photo_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('photos.id'), nullable=False)
+    source_review_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('reviews.id'), nullable=False)
+    attempt_kind: Mapped[str] = mapped_column(Text, nullable=False)
+    request_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+
+    session: Mapped[PracticeSession] = relationship()
+    task: Mapped[ReviewTask] = relationship()
+    review: Mapped[Review | None] = relationship(foreign_keys=[review_id])
+
+
+class PracticeFeedback(Base):
+    __tablename__ = 'practice_feedback'
+    __table_args__ = (
+        Index('idx_practice_feedback_session_created', 'session_id', 'created_at'),
+        Index('idx_practice_feedback_owner_created', 'owner_user_id', 'created_at'),
+        CheckConstraint("verdict IN ('helpful', 'not_helpful', 'incorrect')", name='chk_practice_feedback_verdict'),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    public_id: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
+    session_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('practice_sessions.id'), nullable=False)
+    attempt_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey('practice_attempts.id'))
+    review_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey('reviews.id'))
+    owner_user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('users.id'), nullable=False)
+    verdict: Mapped[str] = mapped_column(Text, nullable=False)
+    reason: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
 class ReviewLike(Base):
@@ -558,6 +688,7 @@ class ProductAnalyticsEvent(Base):
         Index('idx_product_analytics_events_plan_created', 'plan', 'created_at'),
         Index('idx_product_analytics_events_user_created', 'user_public_id', 'created_at'),
         Index('idx_product_analytics_events_device_created', 'device_id', 'created_at'),
+        Index('uq_product_analytics_events_dedupe_key', 'dedupe_key', unique=True),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
@@ -569,5 +700,6 @@ class ProductAnalyticsEvent(Base):
     source: Mapped[str] = mapped_column(Text, nullable=False, default='unknown', server_default='unknown')
     page_path: Mapped[str | None] = mapped_column(Text)
     locale: Mapped[str | None] = mapped_column(Text)
+    dedupe_key: Mapped[str | None] = mapped_column(Text)
     metadata_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())

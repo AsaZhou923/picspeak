@@ -4,8 +4,11 @@ from fastapi import APIRouter
 
 from .review_actions import (
     delete_review,
+    disable_review_public_visibility,
     enable_review_share,
     export_review,
+    get_review_visibility,
+    revoke_review_share,
     router as actions_router,
     update_review_meta,
 )
@@ -22,6 +25,7 @@ from .review_support import (
     REVIEW_TAG_LIMIT,
     REVIEW_TAG_MAX_LENGTH,
     _apply_review_history_filters,
+    _apply_review_history_organization_filters,
     _apply_review_history_visibility,
     _attach_billing_info,
     _build_review_export_payload,
@@ -39,10 +43,13 @@ from .review_support import (
     _review_history_item,
     _review_image_type,
     _review_meta_payload,
+    _review_public_enabled,
     _review_model_version,
     _review_result_payload,
     _review_share_info,
     _review_source_public_id,
+    _review_visibility_payload,
+    _sync_review_public_flag,
 )
 
 router = APIRouter(tags=['reviews'])
