@@ -16,21 +16,21 @@ const COPY: Record<Locale, {
   viewAll: string;
 }> = {
   zh: {
-    eyebrow: 'PicSpeak Release Note',
+    eyebrow: 'PicSpeak Updates',
     latest: '本次更新',
     close: '关闭更新弹窗',
     dismiss: '知道了',
     viewAll: '查看完整更新记录',
   },
   en: {
-    eyebrow: 'PicSpeak Release Note',
+    eyebrow: 'PicSpeak Updates',
     latest: 'What changed',
     close: 'Close update dialog',
     dismiss: 'Got it',
     viewAll: 'View the full update log',
   },
   ja: {
-    eyebrow: 'PicSpeak Release Note',
+    eyebrow: 'PicSpeak Updates',
     latest: '今回の更新',
     close: '更新ダイアログを閉じる',
     dismiss: '確認しました',

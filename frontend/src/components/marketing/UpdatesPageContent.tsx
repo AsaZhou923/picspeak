@@ -15,9 +15,9 @@ function getPageCopy(locale: Locale) {
   if (locale === 'ja') {
     return {
       label: '更新履歴',
-      title: '最新リリース詳細と更新一覧',
-      intro: '最新リリースの全文を先頭に配置し、その下に最近のプロダクト更新をまとめています。',
-      latestLabel: '最新リリース',
+      title: '最新の更新内容と更新一覧',
+      intro: '最近の変更や準備中の内容を、新しい順にまとめています。',
+      latestLabel: '最近の更新',
       listLabel: '最近の更新',
       latestBadge: '最新',
       docLabel: 'ドキュメント',
@@ -28,10 +28,10 @@ function getPageCopy(locale: Locale) {
   if (locale === 'en') {
     return {
       label: 'Update Log',
-      title: 'Latest Release Detail and Update List',
-      intro: 'The newest release is shown in full at the top, followed by a list of recent product updates.',
-      latestLabel: 'Latest Release',
-      listLabel: 'Recent Releases',
+      title: 'Latest Updates and Recent Changes',
+      intro: 'Browse recent changes and upcoming work, with the newest update first.',
+      latestLabel: 'Latest Update',
+      listLabel: 'Recent Updates',
       latestBadge: 'Latest',
       docLabel: 'Doc path',
       backHome: 'Back home',
@@ -41,8 +41,8 @@ function getPageCopy(locale: Locale) {
   return {
     label: '更新记录',
     title: '最新更新详情与历史更新列表',
-    intro: '页面顶部展示最新一条更新的完整内容，下方保留最近多条更新记录，方便快速回看。',
-    latestLabel: '最新发布',
+    intro: '按时间查看最近的产品变化和准备中的内容，最新一条更新展示在顶部。',
+    latestLabel: '最近更新',
     listLabel: '近期更新',
     latestBadge: '最新',
     docLabel: '文档路径',
