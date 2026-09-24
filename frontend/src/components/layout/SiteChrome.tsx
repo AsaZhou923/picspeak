@@ -6,9 +6,11 @@ import { usePathname } from 'next/navigation';
 import Footer from '@/components/layout/Footer';
 import { useI18n } from '@/lib/i18n';
 import { isMarketingRoute } from '@/lib/route-shell';
+import { isUpdateNoticeRoute } from '@/lib/update-notice';
 
 const Header = dynamic(() => import('@/components/layout/Header'));
 const MarketingHeader = dynamic(() => import('@/components/layout/MarketingHeader'));
+const HomeUpdateDialog = dynamic(() => import('@/components/home/HomeUpdateDialog'), { ssr: false });
 
 export default function SiteChrome({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -25,6 +27,7 @@ export default function SiteChrome({ children }: { children: ReactNode }) {
         {children}
       </main>
       <Footer />
+      {isUpdateNoticeRoute(pathname) && <HomeUpdateDialog />}
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   galleryGridClassName,
   GALLERY_PREFERENCES_STORAGE_KEY,
@@ -56,6 +57,25 @@ test('gallery grid class caps explicit layouts at one two or three columns', () 
   assert.match(galleryGridClassName('2'), /md:grid-cols-2/);
   assert.match(galleryGridClassName('3'), /xl:grid-cols-3/);
   assert.doesNotMatch(galleryGridClassName('auto'), /xl:grid-cols-4/);
+});
+
+test('unavailable storage cannot break live gallery layout selection', () => {
+  globalThis.window = {
+    get localStorage() { throw new Error('Storage blocked'); },
+  } as unknown as Window & typeof globalThis;
+  try {
+    assert.deepEqual(readGalleryPreferences(), { columns: 'auto', density: 'full' });
+    assert.doesNotThrow(() => writeGalleryPreferences({ columns: '2', density: 'compact' }));
+  } finally {
+    delete (globalThis as { window?: unknown }).window;
+  }
+});
+
+test('loaded gallery cards use the selected grid instead of a fixed responsive layout', () => {
+  const source = readFileSync(new URL('../src/app/gallery/GalleryClientPage.tsx', import.meta.url), 'utf8');
+  assert.match(source, /data-testid="gallery-grid" className=\{`[^`]*galleryGridClassName\(preferences\.columns\)/);
+  assert.match(source, /if \(preferencesLoaded\) writeGalleryPreferences\(preferences\)/);
+  assert.doesNotMatch(source, /xl:grid-cols-4/);
 });
 
 test('scoreboard view-more link converts half-open UTC end to inclusive gallery date', () => {

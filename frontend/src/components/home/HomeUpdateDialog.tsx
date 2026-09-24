@@ -153,7 +153,6 @@ export default function HomeUpdateDialog() {
               </div>
               <div className="text-right sm:mt-10 sm:text-left">
                 <p className="font-mono text-xs text-ink-subtle">{latest.date}</p>
-                <p className="mt-1 text-xs text-ink-muted">#{latest.id.slice(-11)}</p>
               </div>
             </div>
           </aside>

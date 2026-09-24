@@ -25,6 +25,7 @@ import { useModalFocusTrap } from '@/lib/hooks/useModalFocusTrap';
 import {
   galleryGridClassName,
   readGalleryPreferences,
+  sanitizeGalleryPreferences,
   writeGalleryPreferences,
   type GalleryPreferences,
 } from '@/lib/gallery-preferences';
@@ -68,7 +69,8 @@ function GalleryPageContent() {
   const [error, setError] = useState('');
   const [actionError, setActionError] = useState('');
   const [likeBusyId, setLikeBusyId] = useState<string | null>(null);
-  const [preferences, setPreferences] = useState<GalleryPreferences>(() => readGalleryPreferences());
+  const [preferences, setPreferences] = useState<GalleryPreferences>(() => sanitizeGalleryPreferences(null));
+  const [preferencesLoaded, setPreferencesLoaded] = useState(false);
   const [guestLikePromptOpen, setGuestLikePromptOpen] = useState(false);
   const guestLikePromptCloseRef = useRef<HTMLButtonElement>(null);
   const closeGuestLikePrompt = useCallback(() => setGuestLikePromptOpen(false), []);
@@ -117,8 +119,13 @@ function GalleryPageContent() {
   }, [appliedFilters]);
 
   useEffect(() => {
-    writeGalleryPreferences(preferences);
-  }, [preferences]);
+    setPreferences(readGalleryPreferences());
+    setPreferencesLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (preferencesLoaded) writeGalleryPreferences(preferences);
+  }, [preferences, preferencesLoaded]);
 
   useEffect(() => {
     pagesRef.current = pages;
@@ -484,7 +491,7 @@ function GalleryPageContent() {
           </section>
         ) : (
           <>
-            <section className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <section data-testid="gallery-grid" className={`mt-8 grid gap-4 ${galleryGridClassName(preferences.columns)}`}>
               {items.map((item, idx) => (
                 <GalleryCard
                   key={item.review_id}

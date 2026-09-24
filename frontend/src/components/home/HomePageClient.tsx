@@ -40,11 +40,6 @@ const HomeFaq = dynamic(() => import('@/components/home/HomeFaq'), {
   ),
 });
 
-const HomeUpdateDialog = dynamic(() => import('@/components/home/HomeUpdateDialog'), {
-  ssr: false,
-  loading: () => null,
-});
-
 const CRITIQUE_ENTRY_COPY = {
   zh: { start: '上传照片，开始评图', results: '五维评分 · 优点与问题 · 具体改进建议' },
   en: { start: 'Upload a photo for critique', results: 'Five scores · Strengths and issues · Actionable suggestions' },
@@ -86,7 +81,6 @@ export function HomePageContent() {
   return (
     <>
       <HomeAuthWidgets />
-      {practiceEnabled === false && <HomeUpdateDialog />}
 
       <section className="relative overflow-hidden px-5 py-12 sm:px-6 sm:py-16 lg:py-20">
         <div

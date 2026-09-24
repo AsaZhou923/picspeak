@@ -1,5 +1,12 @@
 [
   {
+    "id": "2026-09-24-gallery-browsing-fixes",
+    "date": "2026-09-24",
+    "title": "Gallery browsing and update reminder fixes",
+    "summary": "Recent work now keeps one representative item per author in a more compact module, the 1 / 2 / 3 column choice applies to the real gallery list and is saved, and the version reminder appears the first time you enter Home or Gallery without repeating after confirmation.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-09-24-gallery-browsing-fixes"
+  },
+  {
     "id": "2026-09-24-critique-organization-and-sharing",
     "date": "2026-09-24",
     "title": "Organizing, browsing, and sharing after critique",

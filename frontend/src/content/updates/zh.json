@@ -1,5 +1,12 @@
 [
   {
+    "id": "2026-09-24-gallery-browsing-fixes",
+    "date": "2026-09-24",
+    "title": "图库浏览与更新提醒修复",
+    "summary": "近期作品每位作者只保留 1 件且更紧凑，图库 1 / 2 / 3 列会作用到实际作品列表并保存偏好，新版本提醒会在首页或图库首次进入时显示且确认后不反复弹出。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-09-24-gallery-browsing-fixes"
+  },
+  {
     "id": "2026-09-24-critique-organization-and-sharing",
     "date": "2026-09-24",
     "title": "点评后的整理、浏览与分享",

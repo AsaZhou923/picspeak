@@ -154,9 +154,9 @@ class GalleryScoreboardPostgresTests(unittest.TestCase):
                 review = self._review(db, suffix, owner, photo, index, as_of - timedelta(days=1, minutes=index))
                 reviews.append(review)
 
-            duplicate_photo = self._photo(db, suffix, owners[0], 50, as_of - timedelta(days=2))
-            older_duplicate = self._review(db, suffix, owners[0], duplicate_photo, 50, as_of - timedelta(days=2))
-            newer_duplicate = self._review(db, suffix, owners[0], duplicate_photo, 51, as_of - timedelta(hours=2))
+            duplicate_photo = self._photo(db, suffix, owners[2], 50, as_of - timedelta(days=2))
+            older_duplicate = self._review(db, suffix, owners[2], duplicate_photo, 50, as_of - timedelta(days=2))
+            newer_duplicate = self._review(db, suffix, owners[2], duplicate_photo, 51, as_of - timedelta(hours=2))
             boundary_in = self._review(
                 db,
                 suffix,
@@ -216,7 +216,8 @@ class GalleryScoreboardPostgresTests(unittest.TestCase):
             self.assertNotIn(share_only.public_id, ids)
             self.assertLess(ids.index(reviews[0].public_id), ids.index(newer_duplicate.public_id))
             owner0_count = sum(1 for item in payload.items if item.owner_username == owners[0].username)
-            self.assertEqual(owner0_count, 2)
+            self.assertEqual(owner0_count, 1)
+            self.assertNotIn(reviews[6].public_id, ids)
 
             newer_duplicate.gallery_visible = False
             newer_duplicate.gallery_added_at = None
@@ -254,7 +255,7 @@ class GalleryScoreboardPostgresTests(unittest.TestCase):
             self.assertIn('not_enough_photos', payload.cold_start_reasons)
             self.assertIn('not_enough_authors', payload.cold_start_reasons)
             self.assertIn('all_zero_likes', payload.cold_start_reasons)
-            self.assertEqual([item.review_id for item in payload.items], newest_ids[:2])
+            self.assertEqual([item.review_id for item in payload.items], newest_ids[:1])
         finally:
             db.close()
 
@@ -300,7 +301,7 @@ class GalleryScoreboardPostgresTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         body = response.json()
-        self.assertEqual(body['ranking_rule_version'], 'gallery-scoreboard-v1')
+        self.assertEqual(body['ranking_rule_version'], 'gallery-scoreboard-v2')
         self.assertEqual(body['ranking_sort'], ['like_count_desc', 'gallery_added_at_desc', 'review_id_desc'])
         self.assertGreaterEqual(body['eligible_photo_count'], 10)
         self.assertGreaterEqual(body['eligible_author_count'], 5)

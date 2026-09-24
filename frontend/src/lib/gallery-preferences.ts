@@ -36,14 +36,22 @@ export function readGalleryPreferences(): GalleryPreferences {
     if (!raw) return DEFAULT_GALLERY_PREFERENCES;
     return sanitizeGalleryPreferences(JSON.parse(raw) as unknown);
   } catch {
-    window.localStorage.removeItem(GALLERY_PREFERENCES_STORAGE_KEY);
+    try {
+      window.localStorage.removeItem(GALLERY_PREFERENCES_STORAGE_KEY);
+    } catch {
+      // Blocked browser storage must not prevent gallery browsing.
+    }
     return DEFAULT_GALLERY_PREFERENCES;
   }
 }
 
 export function writeGalleryPreferences(preferences: GalleryPreferences): void {
   if (typeof window === 'undefined') return;
-  window.localStorage.setItem(GALLERY_PREFERENCES_STORAGE_KEY, JSON.stringify(sanitizeGalleryPreferences(preferences)));
+  try {
+    window.localStorage.setItem(GALLERY_PREFERENCES_STORAGE_KEY, JSON.stringify(sanitizeGalleryPreferences(preferences)));
+  } catch {
+    // Keep the selected layout in React state even when persistence is unavailable.
+  }
 }
 
 export function galleryGridClassName(columns: GalleryColumnPreference): string {
