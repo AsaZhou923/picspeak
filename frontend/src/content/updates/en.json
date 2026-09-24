@@ -2,9 +2,34 @@
   {
     "id": "2026-09-24-critique-organization-and-sharing",
     "date": "2026-09-24",
-    "title": "Organizing, browsing, and sharing after critique",
-    "summary": "Private tags, notes, and search; gallery columns, compact view, zoom, previous/next navigation, and recent work; independent share revocation, selected public profiles, PNG image cards, and print summaries now sit together after critique.",
-    "docPath": "docs/changelog/CHANGELOG.md#2026-09-24-critique-organization-and-sharing"
+    "title": "Clearer history, sharing, exports, and practice",
+    "summary": "Critiques and history are easier to browse, shared links open a photo and critique page, and exports keep the full text. Practice now connects an original and a saved goal to each comparison result.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-09-24-critique-organization-and-sharing",
+    "sections": [
+      {
+        "title": "Sharing, exports, and critique results",
+        "items": [
+          "Shared links open the photo and critique page, including links created earlier. Revoked links clearly show that they are no longer available.",
+          "Image cards preview automatically and save directly as PNG, with room for longer critiques. Print and Markdown reports include strengths, issues, improvements, and all five scores, without private tags or notes.",
+          "Results lead with the photo, scores, and main issue. Reference generation, photo details, notes, and sharing settings start collapsed, with direct sharing and export actions still available."
+        ]
+      },
+      {
+        "title": "History, edited-photo comparisons, and practice records",
+        "items": [
+          "History shows critique or practice records first. Filters are more compact, while organization, sharing, statistics, and promotions start collapsed.",
+          "To check an edit, first make your changes in a photo editor, then upload the edited file for comparison with the original. Retakes also use a new photo instead of defaulting to another critique of the unchanged original.",
+          "The practice entry is available again. Choose an original from past critiques, use a suggestion or template or write your own goal, save it, then upload an edit or retake. If you have no critiques yet, start with your first photo critique.",
+          "Saved goals, attempts, and comparison results stay in the same practice record. Open that record directly from the result page, or revisit results and continue from the practice page."
+        ]
+      },
+      {
+        "title": "Organizing and browsing after critique",
+        "items": [
+          "Private tags, notes, and search organize your critiques. The gallery supports column choices, compact view, zoom, previous/next navigation, and recent work. Sharing can be revoked independently, and you choose what appears on your public profile."
+        ]
+      }
+    ]
   },
   {
     "id": "2026-09-23-critique-practice-and-sharing",

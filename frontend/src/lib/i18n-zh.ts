@@ -21,8 +21,8 @@ export const zhTranslations = {
   pro_offer_label: '',
   pro_offer_highlight: 'Pro',
   updates_label: '更新记录',
-  updates_hint_home: '查看点评后的整理、浏览与分享更新',
-  updates_hint_latest: '查看点评后的整理、浏览与分享更新',
+  updates_hint_home: '查看点评历史、分享导出与练习更新',
+  updates_hint_latest: '查看点评历史、分享导出与练习更新',
   contact_label: '联系',
   contact_headline: '联系我',
 
