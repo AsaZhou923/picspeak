@@ -9,8 +9,29 @@ export interface ReviewExportCanvasOptions {
   token?: string | null;
 }
 
+interface WrappedTextMetrics {
+  lines: string[];
+  fontSize: number;
+  lineHeight: number;
+  height: number;
+}
+
+export interface ReviewExportCanvasLayout {
+  textTop: number;
+  supportTop: number;
+  evidenceTop: number;
+  textEnd: number;
+  footerY: number;
+  footerHeight: number;
+  finalHeight: number;
+  summaryMetrics: WrappedTextMetrics;
+  supportMetrics: WrappedTextMetrics;
+  evidenceMetrics: WrappedTextMetrics;
+}
+
 const CARD_WIDTH = 1200;
 const CARD_HEIGHT = 1500;
+const CARD_MARGIN = 72;
 
 function getTrustedApiOrigins(): Set<string> {
   const origins = new Set<string>();
@@ -96,11 +117,13 @@ export function getWrappedLines(ctx: Pick<CanvasRenderingContext2D, 'measureText
   const chars = [...text];
   const lines: string[] = [];
   let line = '';
+  const listPrefixRe = /^\s*\d+[.、]\s*$/u;
   for (const char of chars) {
     const next = line + char;
     if (ctx.measureText(next).width > maxWidth && line) {
       const boundary = line.lastIndexOf(' ');
-      if (boundary > 0) {
+      const beforeBoundary = boundary > 0 ? line.slice(0, boundary + 1) : '';
+      if (boundary > 0 && !listPrefixRe.test(beforeBoundary)) {
         lines.push(line.slice(0, boundary).trimEnd());
         line = line.slice(boundary + 1) + char;
       } else {
@@ -118,6 +141,99 @@ export function getWrappedLines(ctx: Pick<CanvasRenderingContext2D, 'measureText
 
 function drawWrappedLines(ctx: CanvasRenderingContext2D, lines: string[], x: number, y: number, lineHeight: number) {
   lines.forEach((line, index) => ctx.fillText(line, x, y + index * lineHeight));
+}
+
+function getAllWrappedLines(ctx: Pick<CanvasRenderingContext2D, 'measureText'>, text: string, maxWidth: number): string[] {
+  return getWrappedLines(ctx, text, maxWidth, Number.POSITIVE_INFINITY) ?? [];
+}
+
+function measureWrappedText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+  fontWeight: number,
+  fontSize: number,
+  fontFamily: string
+): WrappedTextMetrics {
+  const normalized = text.trim();
+  const lineHeight = Math.round(fontSize * 1.36);
+  ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
+  const lines = normalized ? getAllWrappedLines(ctx, normalized, maxWidth) : [];
+  return {
+    lines,
+    fontSize,
+    lineHeight,
+    height: lines.length ? (lines.length - 1) * lineHeight + fontSize : 0,
+  };
+}
+
+export function shouldDrawEvidenceBadge(model: Pick<ReviewExportCardModel, 'evidenceState' | 'evidenceLines' | 'target'>): boolean {
+  return model.evidenceState !== 'unassessed' || model.evidenceLines.length > 0 || Boolean(model.target);
+}
+
+function drawFooter(ctx: CanvasRenderingContext2D, model: ReviewExportCardModel, copy: ReviewExportCardCopy, y: number, height: number) {
+  const hasEvidence = shouldDrawEvidenceBadge(model);
+  ctx.fillStyle = '#ffffff';
+  roundRect(ctx, CARD_MARGIN, y, CARD_WIDTH - CARD_MARGIN * 2, height, 24);
+  ctx.fill();
+
+  const date = Number.isNaN(Date.parse(model.createdAt)) ? model.createdAt : new Date(model.createdAt).toLocaleDateString();
+  ctx.fillStyle = '#6f6758';
+  ctx.font = '500 22px ui-sans-serif, system-ui, sans-serif';
+
+  if (hasEvidence) {
+    ctx.fillStyle = model.evidenceState === 'achieved' ? '#587d55' : model.evidenceState === 'not_achieved' ? '#9b4a37' : '#a87828';
+    ctx.font = '700 26px ui-sans-serif, system-ui, sans-serif';
+    ctx.fillText(`${copy.evidence}: ${model.evidenceLabel}`, 104, y + 38);
+    ctx.fillStyle = '#6f6758';
+    ctx.font = '500 22px ui-sans-serif, system-ui, sans-serif';
+    ctx.fillText(`${copy.createdAt}: ${date}`, 104, y + 70);
+  } else {
+    ctx.fillText(`${copy.createdAt}: ${date}`, 104, y + Math.round(height / 2) + 8);
+  }
+
+  if (model.confidence) {
+    ctx.textAlign = 'right';
+    const confidence = copy.confidenceLevels[model.confidence as keyof typeof copy.confidenceLevels] || model.confidence;
+    ctx.fillText(`${copy.confidence}: ${confidence}`, 1096, hasEvidence ? y + 70 : y + Math.round(height / 2) + 8);
+    ctx.textAlign = 'left';
+  }
+}
+
+export function getReviewExportCanvasLayout(
+  ctx: CanvasRenderingContext2D,
+  model: ReviewExportCardModel,
+  copy: ReviewExportCardCopy
+): ReviewExportCanvasLayout {
+  const textTop = model.mode === 'retake' ? 790 : 948;
+  const summaryMetrics = measureWrappedText(ctx, model.summary, 1056, 700, 38, 'ui-sans-serif, system-ui, sans-serif');
+  const supportText = [model.target ? `${copy.target}: ${model.target}` : '', model.suggestion].filter(Boolean).join('  ');
+  const supportTop = textTop + Math.max(112, summaryMetrics.height + 46);
+  const supportMetrics = measureWrappedText(ctx, supportText, 1056, 500, 26, 'ui-sans-serif, system-ui, sans-serif');
+  const evidenceMetrics = model.mode === 'retake' && model.evidenceLines.length > 0
+    ? measureWrappedText(ctx, `${copy.evidence}: ${model.evidenceLines.join(' / ')}`, 1056, 500, 22, 'ui-sans-serif, system-ui, sans-serif')
+    : { lines: [], fontSize: 22, lineHeight: 30, height: 0 };
+  const evidenceTop = supportTop + Math.max(84, supportMetrics.height + 34);
+  const textEnd = Math.max(
+    supportTop + supportMetrics.height,
+    evidenceMetrics.lines.length ? evidenceTop + evidenceMetrics.height : 0,
+  );
+  const footerHeight = shouldDrawEvidenceBadge(model) || model.confidence ? 92 : 66;
+  const footerY = Math.max(1320, textEnd + 56);
+  const editedNoticeHeight = model.excerptEdited ? 46 : 0;
+  const finalHeight = Math.max(CARD_HEIGHT, footerY + footerHeight + 54 + editedNoticeHeight);
+  return {
+    textTop,
+    supportTop,
+    evidenceTop,
+    textEnd,
+    footerY,
+    footerHeight,
+    finalHeight,
+    summaryMetrics,
+    supportMetrics,
+    evidenceMetrics,
+  };
 }
 
 function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
@@ -159,15 +275,19 @@ export async function renderReviewExportCardPng(
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('CANVAS_CONTEXT_UNAVAILABLE');
 
+  const layout = getReviewExportCanvasLayout(ctx, model, copy);
+
+  if (layout.finalHeight !== CARD_HEIGHT) {
+    canvas.height = layout.finalHeight;
+  }
+
   ctx.fillStyle = '#f4efe4';
-  ctx.fillRect(0, 0, CARD_WIDTH, CARD_HEIGHT);
+  ctx.fillRect(0, 0, CARD_WIDTH, canvas.height);
   ctx.fillStyle = '#252018';
   ctx.font = '700 54px ui-serif, Georgia, serif';
-  if (ctx.measureText(model.title).width > 650) throw new Error(copy.textTooLong);
+  if (ctx.measureText(model.title).width > 760) ctx.font = '700 44px ui-serif, Georgia, serif';
+  if (ctx.measureText(model.title).width > 760) throw new Error(copy.textTooLong);
   ctx.fillText(model.title, 72, 104);
-  ctx.font = '500 28px ui-sans-serif, system-ui, sans-serif';
-  ctx.fillStyle = '#6f6758';
-  ctx.fillText(`#${model.reviewId.slice(0, 8)}`, 72, 150);
 
   if (model.showScore) {
     ctx.fillStyle = '#b98a2d';
@@ -177,7 +297,7 @@ export async function renderReviewExportCardPng(
     ctx.font = '500 24px ui-sans-serif, system-ui, sans-serif';
     ctx.fillText('/ 10', CARD_WIDTH - 72, 158);
     ctx.font = '500 18px ui-sans-serif, system-ui, sans-serif';
-    ctx.fillText(`${copy.scoreContext} · ${model.scoreVersion || 'legacy'}`, CARD_WIDTH - 72, 185);
+    ctx.fillText(copy.scoreContext, CARD_WIDTH - 72, 185);
     ctx.textAlign = 'left';
   } else {
     ctx.fillStyle = '#6f6758';
@@ -203,48 +323,24 @@ export async function renderReviewExportCardPng(
     drawContainedImage(ctx, currentImage, 72, photoY, 1056, 704, 30);
   }
 
-  const textTop = model.mode === 'retake' ? 790 : 970;
   ctx.fillStyle = '#2f2a22';
-  ctx.font = '700 40px ui-sans-serif, system-ui, sans-serif';
-  const summaryLines = getWrappedLines(ctx, model.summary, 1056, 3);
-  if (!summaryLines) throw new Error(copy.textTooLong);
-  drawWrappedLines(ctx, summaryLines, 72, textTop, 52);
+  ctx.font = `700 ${layout.summaryMetrics.fontSize}px ui-sans-serif, system-ui, sans-serif`;
+  drawWrappedLines(ctx, layout.summaryMetrics.lines, 72, layout.textTop, layout.summaryMetrics.lineHeight);
 
   ctx.fillStyle = '#5f574a';
-  ctx.font = '500 28px ui-sans-serif, system-ui, sans-serif';
-  const supportText = [model.target ? `${copy.target}: ${model.target}` : '', model.suggestion].filter(Boolean).join('  ');
-  const supportLines = getWrappedLines(ctx, supportText, 1056, 4);
-  if (!supportLines) throw new Error(copy.textTooLong);
-  drawWrappedLines(ctx, supportLines, 72, textTop + 180, 42);
-  if (model.mode === 'retake' && model.evidenceLines.length > 0) {
+  ctx.font = `500 ${layout.supportMetrics.fontSize}px ui-sans-serif, system-ui, sans-serif`;
+  drawWrappedLines(ctx, layout.supportMetrics.lines, 72, layout.supportTop, layout.supportMetrics.lineHeight);
+  if (layout.evidenceMetrics.lines.length > 0) {
     ctx.fillStyle = '#6f6758';
-    ctx.font = '500 22px ui-sans-serif, system-ui, sans-serif';
-    const evidenceLines = getWrappedLines(ctx, `${copy.evidence}: ${model.evidenceLines.join(' / ')}`, 1056, 2);
-    if (!evidenceLines) throw new Error(copy.textTooLong);
-    drawWrappedLines(ctx, evidenceLines, 72, textTop + 360, 32);
+    ctx.font = `500 ${layout.evidenceMetrics.fontSize}px ui-sans-serif, system-ui, sans-serif`;
+    drawWrappedLines(ctx, layout.evidenceMetrics.lines, 72, layout.evidenceTop, layout.evidenceMetrics.lineHeight);
   }
 
-  const badgeY = 1320;
-  ctx.fillStyle = '#ffffff';
-  roundRect(ctx, 72, badgeY, 1056, 92, 24);
-  ctx.fill();
-  ctx.fillStyle = model.evidenceState === 'achieved' ? '#587d55' : model.evidenceState === 'not_achieved' ? '#9b4a37' : '#a87828';
-  ctx.font = '700 26px ui-sans-serif, system-ui, sans-serif';
-  ctx.fillText(`${copy.evidence}: ${model.evidenceLabel}`, 104, badgeY + 38);
-  ctx.fillStyle = '#6f6758';
-  ctx.font = '500 22px ui-sans-serif, system-ui, sans-serif';
-  const date = Number.isNaN(Date.parse(model.createdAt)) ? model.createdAt : new Date(model.createdAt).toLocaleDateString();
-  ctx.fillText(`${copy.createdAt}: ${date}`, 104, badgeY + 70);
-  if (model.confidence) {
-    ctx.textAlign = 'right';
-    const confidence = copy.confidenceLevels[model.confidence as keyof typeof copy.confidenceLevels] || model.confidence;
-    ctx.fillText(`${copy.confidence}: ${confidence}`, 1096, badgeY + 70);
-    ctx.textAlign = 'left';
-  }
+  drawFooter(ctx, model, copy, layout.footerY, layout.footerHeight);
   if (model.excerptEdited) {
     ctx.fillStyle = '#8a7a62';
     ctx.font = '500 18px ui-sans-serif, system-ui, sans-serif';
-    ctx.fillText(copy.editedExcerptNotice, 72, CARD_HEIGHT - 34);
+    ctx.fillText(copy.editedExcerptNotice, 72, canvas.height - 34);
   }
 
     const blob = await canvasToBlob(canvas);

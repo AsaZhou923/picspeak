@@ -1,12 +1,5 @@
 [
   {
-    "id": "2026-09-24-gallery-browsing-fixes",
-    "date": "2026-09-24",
-    "title": "ギャラリー閲覧と更新通知の修正",
-    "summary": "最近の作品は作者ごとに代表作 1 件だけを表示し、モジュールをよりコンパクトにしました。1 / 2 / 3 列の選択は実際の作品一覧に反映されて保存され、新バージョン通知はホームまたはギャラリー初回表示時に出て、確認後は繰り返し表示されません。",
-    "docPath": "docs/changelog/CHANGELOG.md#2026-09-24-gallery-browsing-fixes"
-  },
-  {
     "id": "2026-09-24-critique-organization-and-sharing",
     "date": "2026-09-24",
     "title": "講評後の整理、閲覧、共有",

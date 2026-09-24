@@ -16,6 +16,7 @@ from app.services.content_audit import ContentAuditError, run_content_audit
 from .review_support import (
     _build_review_export_payload,
     _find_review_owned,
+    _frontend_share_url,
     _generate_review_share_token,
     _normalize_review_note,
     _normalize_review_tags,
@@ -45,7 +46,7 @@ def enable_review_share(
     return ReviewShareResponse(
         review_id=review.public_id,
         share_token=review.share_token,
-        share_url=str(request.url_for('get_public_review', share_token=review.share_token)),
+        share_url=_frontend_share_url(review.share_token),
         enabled=True,
     )
 

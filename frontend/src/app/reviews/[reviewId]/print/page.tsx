@@ -11,7 +11,9 @@ import { formatUserFacingError } from '@/lib/error-utils';
 import type { ReviewExportResponse, ReviewGetResponse, ReviewScores } from '@/lib/types';
 import {
   buildReviewExportCardModel,
+  buildReviewExportFileStem,
   buildReviewPrintMarkdown,
+  compactExportSentence,
   getReviewExportCardCopy,
 } from '@/features/reviews/helpers/reviewExportPresentation';
 import { SkeletonBlock } from '@/components/ui/LoadingSpinner';
@@ -120,14 +122,18 @@ export default function ReviewPrintPage() {
   const hasPhoto = Boolean(exportPayload.photo.photo_url || exportPayload.photo.photo_thumbnail_url);
   const lowConfidence = model.comparison?.comparison_confidence === 'low' || model.evidenceState === 'indeterminate';
   const negativeResult = model.evidenceState === 'not_achieved';
+  const hasGoalEvidence = model.evidenceState !== 'unassessed' || model.evidenceLines.length > 0 || Boolean(model.target);
   const scoreEntries = Object.entries(exportPayload.review.scores) as Array<[keyof ReviewScores, number]>;
+  const advantageText = compactExportSentence(exportPayload.review.advantage);
+  const critiqueText = compactExportSentence(exportPayload.review.critique);
+  const suggestionsText = compactExportSentence(exportPayload.review.suggestions);
 
   function downloadMarkdown() {
     const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = `picspeak-report-${exportPayload.review.review_id.slice(0, 8)}.md`;
+    anchor.download = `${buildReviewExportFileStem({ createdAt: exportPayload.review.created_at, title: copy.cardTitle })}.md`;
     document.body.appendChild(anchor);
     anchor.click();
     document.body.removeChild(anchor);
@@ -193,30 +199,42 @@ export default function ReviewPrintPage() {
           </div>
 
           <div className="space-y-4">
-            <div className="rounded-control border border-border-subtle bg-raised/70 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-ink-subtle">{copy.evidence}</p>
-              <p className="mt-2 text-2xl font-semibold text-ink">{model.evidenceLabel}</p>
-              {lowConfidence && <p className="mt-2 text-sm leading-6 text-gold">{model.caveat || copy.noGoal}</p>}
-              {negativeResult && <p className="mt-2 text-sm leading-6 text-rust">{model.summary}</p>}
-            </div>
+            {(hasGoalEvidence || lowConfidence || negativeResult) && (
+              <div className="rounded-control border border-border-subtle bg-raised/70 p-4">
+                {hasGoalEvidence && (
+                  <>
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-ink-subtle">{copy.evidence}</p>
+                    <p className="mt-2 text-2xl font-semibold text-ink">{model.evidenceLabel}</p>
+                  </>
+                )}
+                {lowConfidence && <p className="mt-2 text-sm leading-6 text-gold">{model.caveat || copy.noGoal}</p>}
+                {negativeResult && <p className="mt-2 text-sm leading-6 text-rust">{critiqueText || model.fullSummary || model.summary}</p>}
+              </div>
+            )}
             <section>
-              <h2 className="text-lg font-semibold text-ink">{locale === 'zh' ? '点评摘要' : locale === 'ja' ? '講評の要約' : 'Summary'}</h2>
-              <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-ink-muted">{model.summary}</p>
+              <h2 className="text-lg font-semibold text-ink">{copy.printAdvantageTitle}</h2>
+              <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-ink-muted">{advantageText || '-'}</p>
             </section>
             <section>
-              <h2 className="text-lg font-semibold text-ink">{copy.target}</h2>
-              <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-ink-muted">{model.target ?? copy.noFrozenGoal}</p>
+              <h2 className="text-lg font-semibold text-ink">{copy.printIssueTitle}</h2>
+              <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-ink-muted">{critiqueText || model.fullSummary || model.summary || '-'}</p>
             </section>
+            {model.target && (
+              <section>
+                <h2 className="text-lg font-semibold text-ink">{copy.target}</h2>
+                <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-ink-muted">{model.target}</p>
+              </section>
+            )}
             <section>
-              <h2 className="text-lg font-semibold text-ink">{copy.suggestionInput}</h2>
-              <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-ink-muted">{model.suggestion}</p>
+              <h2 className="text-lg font-semibold text-ink">{copy.printImprovementTitle}</h2>
+              <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-ink-muted">{suggestionsText || model.fullSuggestion || model.suggestion || '-'}</p>
             </section>
           </div>
         </div>
       </article>
 
       <article className="mt-6 rounded-card border border-border-subtle bg-surface p-8 shadow-level-1 print:mt-0 print:break-before-page print:rounded-none print:border-0 print:bg-white print:p-10 print:shadow-none">
-        <h2 className="text-2xl font-semibold text-ink">{model.comparison ? copy.retakeCard : copy.scoreContext}</h2>
+        <h2 className="text-2xl font-semibold text-ink">{model.comparison ? copy.retakeCard : copy.printScoresTitle}</h2>
 
         {model.comparison ? (
           <div className="mt-5 space-y-6">
@@ -245,7 +263,7 @@ export default function ReviewPrintPage() {
 
             <section className="rounded-control border border-border-subtle bg-raised/70 p-4">
               <h3 className="text-lg font-semibold text-ink">{copy.confidence}: {model.confidence ? (copy.confidenceLevels[model.confidence as keyof typeof copy.confidenceLevels] || model.confidence) : '-'}</h3>
-              <p className="mt-2 text-sm leading-7 text-ink-muted">{model.caveat || model.summary}</p>
+              <p className="mt-2 text-sm leading-7 text-ink-muted">{model.caveat || model.fullSummary || model.summary}</p>
             </section>
 
             <div className="grid gap-3 md:grid-cols-2">

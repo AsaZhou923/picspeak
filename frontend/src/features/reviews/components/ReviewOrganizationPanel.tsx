@@ -101,6 +101,7 @@ export function ReviewOrganizationPanel({
   locale,
   busy,
   status,
+  showItemSelect = true,
   onSelect,
   onSave,
 }: {
@@ -109,6 +110,7 @@ export function ReviewOrganizationPanel({
   locale: string;
   busy: boolean;
   status: string;
+  showItemSelect?: boolean;
   onSelect: (reviewId: string) => void;
   onSave: (payload: { tags: string[]; note: string }) => Promise<void>;
 }) {
@@ -178,25 +180,27 @@ export function ReviewOrganizationPanel({
       {items.length === 0 ? (
         <p className="text-sm text-ink-subtle">{copy.empty}</p>
       ) : (
-        <div className="grid gap-4 lg:grid-cols-[minmax(180px,0.72fr)_minmax(0,1.28fr)]">
-          <label className="space-y-2 text-xs text-ink-muted">
-            <span>{copy.selected}</span>
-            <select
-              value={item?.review_id ?? ''}
-              onChange={(event) => {
-                if (!confirmDiscard()) return;
-                onSelect(event.target.value);
-              }}
-              className="min-h-11 w-full rounded-control border border-border bg-void/60 px-3 py-2.5 text-sm text-ink outline-none focus:border-gold/40"
-            >
-              <option value="">{copy.noSelection}</option>
-              {items.map((entry) => (
-                <option key={entry.review_id} value={entry.review_id}>
-                  {new Date(entry.created_at).toLocaleDateString()} · {entry.final_score.toFixed(1)}
-                </option>
-              ))}
-            </select>
-          </label>
+        <div className={`grid gap-4 ${showItemSelect ? 'lg:grid-cols-[minmax(180px,0.72fr)_minmax(0,1.28fr)]' : ''}`}>
+          {showItemSelect && (
+            <label className="space-y-2 text-xs text-ink-muted">
+              <span>{copy.selected}</span>
+              <select
+                value={item?.review_id ?? ''}
+                onChange={(event) => {
+                  if (!confirmDiscard()) return;
+                  onSelect(event.target.value);
+                }}
+                className="min-h-11 w-full rounded-control border border-border bg-void/60 px-3 py-2.5 text-sm text-ink outline-none focus:border-gold/40"
+              >
+                <option value="">{copy.noSelection}</option>
+                {items.map((entry) => (
+                  <option key={entry.review_id} value={entry.review_id}>
+                    {new Date(entry.created_at).toLocaleDateString()} · {entry.final_score.toFixed(1)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
 
           <div className="grid gap-3 md:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
             <label className="space-y-2 text-xs text-ink-muted">

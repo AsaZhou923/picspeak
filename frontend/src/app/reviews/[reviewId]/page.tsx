@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { AlertCircle, ArrowLeft, History, Lightbulb, ThumbsDown, ThumbsUp, TrendingDown } from 'lucide-react';
+import { AlertCircle, ArrowLeft, ChevronDown, History, Lightbulb, ThumbsDown, ThumbsUp, TrendingDown } from 'lucide-react';
 import ProPromoCard from '@/components/marketing/ProPromoCard';
 import { useAuth } from '@/lib/auth-context';
 import { FinalScoreRing } from '@/components/ui/ScoreRing';
@@ -35,7 +35,6 @@ import {
 } from '@/features/reviews/components/ReviewScorePanel';
 import { ReviewActionBar } from '@/features/reviews/components/ReviewActionBar';
 import { ReviewGrowthLoopPanel } from '@/features/reviews/components/ReviewGrowthLoopPanel';
-import { ReviewNextActionPanel } from '@/features/reviews/components/ReviewNextActionPanel';
 import { ReviewReferenceGenerationPanel } from '@/features/reviews/components/ReviewReferenceGenerationPanel';
 import { ReviewGalleryPanel } from '@/features/reviews/components/ReviewGalleryPanel';
 import { ImageZoomOverlay } from '@/features/reviews/components/ImageZoomOverlay';
@@ -44,7 +43,6 @@ import { usePracticeExposure } from '@/features/reviews/hooks/usePracticeExposur
 import { buildNextShootChecklist, type NextShootChecklistItem } from '@/lib/review-growth';
 import { getProUpgradeTriggerCopy, type ProUpgradeTrigger } from '@/lib/pro-conversion';
 import { trackProductEvent } from '@/lib/product-analytics';
-import { getReviewContinuationPlan } from '@/features/reviews/hooks/reviewContinuationSupport';
 import GalleryReviewNeighborNav from '@/components/gallery/GalleryReviewNeighborNav';
 import ReviewExportPanel from '@/features/reviews/components/ReviewExportPanel';
 import { ReviewOwnerTools } from '@/features/reviews/components/ReviewOwnerTools';
@@ -86,6 +84,11 @@ function getReviewHierarchyCopy(locale: 'zh' | 'en' | 'ja') {
       evidenceTitle: '評価の根拠を確認する',
       secondaryLabel: 'Review record',
       secondaryTitle: '記録、共有、その他の操作',
+      referenceTool: '参考画像を生成',
+      metaTool: '撮影情報',
+      exportTool: '共有画像と印刷用レポート',
+      exportAction: '共有画像を作る',
+      galleryTool: 'Gallery 表示',
     };
   }
   if (locale === 'en') {
@@ -96,6 +99,11 @@ function getReviewHierarchyCopy(locale: 'zh' | 'en' | 'ja') {
       evidenceTitle: 'Inspect the critique evidence',
       secondaryLabel: 'Review record',
       secondaryTitle: 'Record, share, and secondary actions',
+      referenceTool: 'Generate a visual reference',
+      metaTool: 'Photo metadata',
+      exportTool: 'Share image and print report',
+      exportAction: 'Open export',
+      galleryTool: 'Gallery visibility',
     };
   }
   return {
@@ -105,6 +113,11 @@ function getReviewHierarchyCopy(locale: 'zh' | 'en' | 'ja') {
     evidenceTitle: '查看评分与点评依据',
     secondaryLabel: '点评记录',
     secondaryTitle: '记录、分享与次要操作',
+    referenceTool: '生成参考图',
+    metaTool: '拍摄信息',
+    exportTool: '分享图片与打印报告',
+    exportAction: '打开导出',
+    galleryTool: 'Gallery 展示',
   };
 }
 
@@ -141,6 +154,8 @@ export default function ReviewPage() {
 
   const [activeDim, setActiveDim] = useState<string | null>(null);
   const [highlightedCardId, setHighlightedCardId] = useState<string | null>(null);
+  const [exportToolsOpen, setExportToolsOpen] = useState(false);
+  const exportToolsRef = useRef<HTMLDetailsElement | null>(null);
 
   const { review, setReview, loading, error, initialPhotoUrl } = useReviewDetail(reviewId);
   const recheckExposureRef = usePracticeExposure(
@@ -155,7 +170,7 @@ export default function ReviewPage() {
     linkCopied, galleryConfirmOpen, setGalleryConfirmOpen, actionBusy, actionFeedback, actionError,
     galleryActionCopy, favoriteCopy,
     handleGalleryToggle, submitGalleryToggle, handleBackendShareLink,
-    handleBackendExportSummary, handleFavoriteToggle, handleReplayReview,
+    handleFavoriteToggle, handleReplayReview,
   } = useReviewActions({ review, setReview });
   const { usage, usageError } = useReviewUsage();
 
@@ -258,13 +273,6 @@ export default function ReviewPage() {
   const sourceContextCopy = getReviewSourceContextCopy(locale);
   const hierarchyCopy = getReviewHierarchyCopy(locale);
   const strongestFinding = r.comparison?.summary || displayCritique;
-  const continuationPlan = getReviewContinuationPlan({
-    viewerIsOwner: canManageReview,
-    hasSourceReview: Boolean(activeReview.source_review_id),
-    isComparison: Boolean(r.comparison),
-    retakeAvailable: showOwnerActions,
-    generateAvailable: showOwnerActions,
-  });
   const isGoalPracticeReview = Boolean(
     r.comparison &&
     activeReview.practice?.session_id &&
@@ -334,10 +342,10 @@ export default function ReviewPage() {
     router.push(`/workspace?${nextParams.toString()}`);
   }
 
-  function handleGenerateSetup() {
-    document.getElementById('review-reference-generator')?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'start',
+  function handleOpenExportTools() {
+    setExportToolsOpen(true);
+    window.requestAnimationFrame(() => {
+      exportToolsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   }
 
@@ -440,12 +448,6 @@ export default function ReviewPage() {
                   </p>
                 </section>
 
-                <ReviewNextActionPanel
-                  locale={locale}
-                  plan={continuationPlan}
-                  onRetake={handleUploadNewRound}
-                  onGenerate={handleGenerateSetup}
-                />
               </>
             )}
           </div>
@@ -513,20 +515,6 @@ export default function ReviewPage() {
             </div>
 
             {showOwnerActions && (
-              <div id="review-reference-generator" className="scroll-mt-32 md:scroll-mt-20">
-                <ReviewReferenceGenerationPanel
-                  reviewId={activeReview.review_id}
-                  photoId={activeReview.photo_id}
-                  imageType={activeReview.image_type ?? activeReview.result.image_type ?? 'default'}
-                  suggestions={visualReferenceBrief}
-                  plan={plan}
-                  locale={locale}
-                  sourceAspect={imgNaturalSize}
-                />
-              </div>
-            )}
-
-            {showOwnerActions && (
               <ReviewGrowthLoopPanel
                 sourceReviewId={review.review_id}
                 locale={locale}
@@ -547,40 +535,86 @@ export default function ReviewPage() {
             {hierarchyCopy.secondaryTitle}
           </h2>
 
-          <div className="mt-6 grid items-start gap-6 lg:grid-cols-2">
-            <ReviewMetadataPanel review={review} imgNaturalSize={imgNaturalSize} />
-            <div className="space-y-4">
-              {showOwnerActions && (
-                <ReviewActionBar
-                  review={review}
-                  showOwnerActions={showOwnerActions}
-                  showGuestHistoryLink={userInfo?.plan === 'guest'}
-                  linkCopied={linkCopied}
-                  actionBusy={actionBusy}
-                  favoriteCopy={favoriteCopy}
-                  onFavoriteToggle={handleFavoriteToggle}
-                  onShareLink={handleBackendShareLink}
-                  onExportSummary={handleBackendExportSummary}
-                  t={t}
-                />
-              )}
+          {showOwnerActions && (
+            <div className="mt-5 space-y-3">
+              <ReviewActionBar
+                review={review}
+                showOwnerActions={showOwnerActions}
+                showGuestHistoryLink={userInfo?.plan === 'guest'}
+                linkCopied={linkCopied}
+                actionBusy={actionBusy}
+                favoriteCopy={favoriteCopy}
+                exportLabel={hierarchyCopy.exportAction}
+                onFavoriteToggle={handleFavoriteToggle}
+                onShareLink={handleBackendShareLink}
+                onExportSummary={handleOpenExportTools}
+                t={t}
+              />
               {(actionFeedback || actionError) && (
                 <div role={actionError ? 'alert' : 'status'} className={`rounded-control border px-4 py-3 text-sm ${actionError ? 'border-rust/25 bg-rust/5 text-rust' : 'border-sage/25 bg-sage/5 text-sage'}`}>
                   {actionError || actionFeedback}
                 </div>
               )}
             </div>
+          )}
+
+          <div className="mt-6 space-y-3">
+            {showOwnerActions && (
+              <details id="review-reference-generator" className="group ui-panel scroll-mt-32 p-0 md:scroll-mt-20">
+                <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-sm font-semibold text-ink marker:content-none">
+                  <span>{hierarchyCopy.referenceTool}</span>
+                  <ChevronDown size={16} className="text-ink-subtle transition-transform group-open:rotate-180" aria-hidden="true" />
+                </summary>
+                <div className="border-t border-border-subtle p-4 sm:p-5">
+                  <ReviewReferenceGenerationPanel
+                    reviewId={activeReview.review_id}
+                    photoId={activeReview.photo_id}
+                    imageType={activeReview.image_type ?? activeReview.result.image_type ?? 'default'}
+                    suggestions={visualReferenceBrief}
+                    plan={plan}
+                    locale={locale}
+                    sourceAspect={imgNaturalSize}
+                  />
+                </div>
+              </details>
+            )}
+
+            <details className="group ui-panel p-0">
+              <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-sm font-semibold text-ink marker:content-none">
+                <span>{hierarchyCopy.metaTool}</span>
+                <ChevronDown size={16} className="text-ink-subtle transition-transform group-open:rotate-180" aria-hidden="true" />
+              </summary>
+              <div className="border-t border-border-subtle p-4 sm:p-5">
+                <ReviewMetadataPanel review={review} imgNaturalSize={imgNaturalSize} />
+              </div>
+            </details>
           </div>
 
           {showOwnerActions && (
-            <div className="mt-6 space-y-6">
+            <div className="mt-3 space-y-3">
               <ReviewOwnerTools
                 key={`owner-${review.review_id}`}
                 review={review}
                 externalVersion={`${actionBusy ?? ''}:${actionFeedback}:${review.gallery_visible}`}
                 onUpdated={(patch) => setReview((previous) => previous?.review_id === review.review_id ? { ...previous, ...patch } : previous)}
               />
-              <ReviewExportPanel key={`export-${review.review_id}`} review={review} />
+
+              <details
+                ref={exportToolsRef}
+                open={exportToolsOpen}
+                className="group ui-panel p-0"
+                onToggle={(event) => setExportToolsOpen(event.currentTarget.open)}
+              >
+                <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-sm font-semibold text-ink marker:content-none">
+                  <span>{hierarchyCopy.exportTool}</span>
+                  <ChevronDown size={16} className="text-ink-subtle transition-transform group-open:rotate-180" aria-hidden="true" />
+                </summary>
+                {exportToolsOpen && (
+                  <div className="border-t border-border-subtle p-4 sm:p-5">
+                    <ReviewExportPanel key={`export-${review.review_id}`} review={review} />
+                  </div>
+                )}
+              </details>
             </div>
           )}
 
@@ -595,16 +629,22 @@ export default function ReviewPage() {
           )}
 
           {showOwnerActions && (
-            <div className="mt-6">
-              <ReviewGalleryPanel
-                review={review}
-                gallerySaved={gallerySaved}
-                actionBusy={actionBusy}
-                reviewGalleryCardCopy={reviewGalleryCardCopy}
-                onGalleryToggle={handleGalleryToggle}
-                t={t}
-              />
-            </div>
+            <details className="group ui-panel mt-3 p-0">
+              <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-sm font-semibold text-ink marker:content-none">
+                <span>{hierarchyCopy.galleryTool}</span>
+                <ChevronDown size={16} className="text-ink-subtle transition-transform group-open:rotate-180" aria-hidden="true" />
+              </summary>
+              <div className="border-t border-border-subtle p-4 sm:p-5">
+                <ReviewGalleryPanel
+                  review={review}
+                  gallerySaved={gallerySaved}
+                  actionBusy={actionBusy}
+                  reviewGalleryCardCopy={reviewGalleryCardCopy}
+                  onGalleryToggle={handleGalleryToggle}
+                  t={t}
+                />
+              </div>
+            </details>
           )}
 
           <p className="mt-6 border-t border-border-subtle pt-4 text-xs leading-5 text-ink-subtle">

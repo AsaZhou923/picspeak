@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import CurrentActor, get_current_actor, get_db
@@ -16,6 +17,7 @@ from .review_support import (
     _apply_review_history_filters,
     _apply_review_history_organization_filters,
     _apply_review_history_visibility,
+    _frontend_share_url,
     _normalize_review_tags,
     _public_goal_assessment_payload,
     _review_gallery_audit_status,
@@ -30,6 +32,13 @@ from .review_support import (
 from app.services.practice import owner_practice_context_for_review
 
 router = APIRouter(tags=['reviews'])
+
+
+def _prefers_html_response(request: Request) -> bool:
+    headers = getattr(request, 'headers', None)
+    raw_accept = headers.get('accept', '') if headers is not None else ''
+    accept = raw_accept.lower() if isinstance(raw_accept, str) else ''
+    return 'text/html' in accept and 'application/json' not in accept
 
 
 @router.get('/reviews/{review_id}', response_model=ReviewGetResponse)
@@ -121,6 +130,9 @@ def get_public_review(
     if row is None:
         raise api_error(status.HTTP_404_NOT_FOUND, 'REVIEW_NOT_FOUND', 'Review not found')
     review, photo, photo_owner = row
+
+    if _prefers_html_response(request):
+        return RedirectResponse(_frontend_share_url(share_token), status_code=status.HTTP_307_TEMPORARY_REDIRECT)
 
     photo_url = _build_photo_proxy_url(request, photo.public_id, photo_owner.public_id)
 

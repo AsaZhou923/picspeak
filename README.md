@@ -187,7 +187,7 @@ The frontend and backend can be deployed independently. The backend includes a c
 
 ## Documentation
 
-- [Latest changelog](docs/changelog/CHANGELOG.md#2026-09-24-gallery-browsing-fixes)
+- [Latest changelog](docs/changelog/CHANGELOG.md#2026-09-24-critique-organization-and-sharing)
 - [Earlier preparation record](docs/changelog/CHANGELOG.md#2026-09-23-critique-practice-and-sharing)
 - [Frontend design system](DESIGN.md)
 - [SEO / GEO audit](docs/seo/seo-audit-2026-05-01.md)

@@ -1,6 +1,6 @@
 'use client';
 
-import { Copy, Eye, EyeOff, Link2, RotateCcw, Share2 } from 'lucide-react';
+import { Copy, ExternalLink, Eye, EyeOff, Link2, RotateCcw, Share2 } from 'lucide-react';
 import type { ReviewVisibilityResponse } from '@/features/reviews/api/reviewOrganizationApi';
 
 type Locale = 'zh' | 'en' | 'ja';
@@ -26,8 +26,9 @@ const COPY: Record<Locale, {
   retry: string;
   externalCache: string;
   copyLink: string;
+  openShare: string;
   copyOk: string;
-  copyFail: string;
+  copyManual: string;
 }> = {
   zh: {
     title: '公开渠道',
@@ -49,8 +50,9 @@ const COPY: Record<Locale, {
     retry: '重试',
     externalCache: '撤销只影响 PicSpeak 当前访问，不承诺收回第三方缓存或已下载副本。',
     copyLink: '复制链接',
+    openShare: '打开分享页',
     copyOk: '已复制',
-    copyFail: '复制失败',
+    copyManual: '请手动复制链接',
   },
   en: {
     title: 'Public Channels',
@@ -72,8 +74,9 @@ const COPY: Record<Locale, {
     retry: 'Retry',
     externalCache: 'Revocation controls current PicSpeak access. It cannot recall third-party caches or downloaded copies.',
     copyLink: 'Copy Link',
+    openShare: 'Open Share Page',
     copyOk: 'Copied',
-    copyFail: 'Copy failed',
+    copyManual: 'Copy the link manually',
   },
   ja: {
     title: '公開チャネル',
@@ -95,8 +98,9 @@ const COPY: Record<Locale, {
     retry: '再試行',
     externalCache: '撤回は PicSpeak の現在のアクセスにのみ効きます。外部キャッシュや保存済みコピーは回収できません。',
     copyLink: 'リンクをコピー',
+    openShare: '共有ページを開く',
     copyOk: 'コピーしました',
-    copyFail: 'コピー失敗',
+    copyManual: 'リンクを手動でコピーしてください',
   },
 };
 
@@ -154,11 +158,15 @@ export function ReviewVisibilityPanel({
 
   const copyShare = async () => {
     if (!shareUrl || typeof navigator === 'undefined') return;
+    if (!navigator.clipboard?.writeText) {
+      onStatus?.(copy.copyManual);
+      return;
+    }
     try {
-      await navigator.clipboard?.writeText(shareUrl);
+      await navigator.clipboard.writeText(shareUrl);
       onStatus?.(copy.copyOk);
     } catch {
-      onStatus?.(copy.copyFail);
+      onStatus?.(copy.copyManual);
     }
   };
 
@@ -233,6 +241,26 @@ export function ReviewVisibilityPanel({
               {copy.copyLink}
             </button>
           </div>
+          {shareUrl && (
+            <div className="mt-3 flex flex-col gap-2 rounded-md border border-border-subtle bg-void/30 p-2 sm:flex-row sm:items-center">
+              <input
+                readOnly
+                value={shareUrl}
+                onFocus={(event) => event.currentTarget.select()}
+                className="min-w-0 flex-1 truncate rounded border border-border-subtle bg-void/60 px-2 py-1.5 text-xs text-ink-muted outline-none"
+                aria-label={copy.share}
+              />
+              <a
+                href={shareUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ui-action-secondary justify-center px-3 py-1.5 text-xs"
+              >
+                <ExternalLink size={12} />
+                {copy.openShare}
+              </a>
+            </div>
+          )}
         </div>
       </div>
 

@@ -54,6 +54,14 @@ export interface ReviewExportCardCopy {
   targetInput: string;
   evidenceInput: string;
   downloadMarkdown: string;
+  editExcerpts: string;
+  quickCardNote: string;
+  fullReportNote: string;
+  noGoalShort: string;
+  printIssueTitle: string;
+  printAdvantageTitle: string;
+  printImprovementTitle: string;
+  printScoresTitle: string;
   dimensions: Record<keyof ReviewScores, string>;
   states: Record<ReviewExportEvidenceState, string>;
 }
@@ -71,6 +79,8 @@ export interface ReviewExportCardModel {
   sourceImageUrl: string | null;
   summary: string;
   suggestion: string;
+  fullSummary: string;
+  fullSuggestion: string;
   target: string | null;
   evidenceState: ReviewExportEvidenceState;
   evidenceLabel: string;
@@ -88,19 +98,19 @@ const GPS_RE =
 export function getReviewExportCardCopy(locale: ReviewExportLocale): ReviewExportCardCopy {
   if (locale === 'ja') {
     return {
-      panelLabel: '端末への書き出し',
-      panelTitle: '共有用カードと印刷レポート',
-      panelBody: '端末内で画像を書き出します。公開リンクは作成されません。',
+      panelLabel: '保存',
+      panelTitle: 'この講評を保存',
+      panelBody: '画像には講評を含めます。タグと非公開メモは書き出しません。',
       previewTitle: 'カードプレビュー',
-      downloadCard: 'PNG を保存',
-      printReport: '印刷ページ',
+      downloadCard: '画像を保存',
+      printReport: '講評全文を印刷',
       loadPreview: 'プレビューを作成',
       hideScore: 'スコアを隠す',
       showScore: 'スコアを表示',
       includeSource: '元画像も表示',
       imageMissing: '書き出せる画像がありません。',
       imageFailed: '画像を読み込めませんでした。欠けた画像のまま保存しません。',
-      privateNote: 'ノート、EXIF、メール、位置情報は含めません。',
+      privateNote: 'タグ、メモ、EXIF、メール、位置情報は含めません。',
       scoreHidden: 'スコア非表示',
       before: '元の写真',
       after: '今回の写真',
@@ -128,6 +138,14 @@ export function getReviewExportCardCopy(locale: ReviewExportLocale): ReviewExpor
       targetInput: '目標摘録',
       evidenceInput: '根拠摘録',
       downloadMarkdown: 'Markdown を保存',
+      editExcerpts: '画像の文章を編集',
+      quickCardNote: '全文は印刷にも使えます。',
+      fullReportNote: '必要なときだけ、画像に入れる文章を調整します。',
+      noGoalShort: '目標記録なし',
+      printIssueTitle: '気になる点',
+      printAdvantageTitle: '良い点',
+      printImprovementTitle: '改善提案',
+      printScoresTitle: '5つの評価',
       dimensions: {
         composition: '構図',
         lighting: '光',
@@ -148,19 +166,19 @@ export function getReviewExportCardCopy(locale: ReviewExportLocale): ReviewExpor
   }
   if (locale === 'en') {
     return {
-      panelLabel: 'Local export',
-      panelTitle: 'Share card and print report',
-      panelBody: 'Export on this device. No public link is created.',
+      panelLabel: 'Save',
+      panelTitle: 'Save this critique',
+      panelBody: 'The image keeps the critique content. Tags and private notes are not exported.',
       previewTitle: 'Card preview',
-      downloadCard: 'Save PNG',
-      printReport: 'Print page',
+      downloadCard: 'Save image',
+      printReport: 'Print full critique',
       loadPreview: 'Build preview',
       hideScore: 'Hide score',
       showScore: 'Show score',
       includeSource: 'Show source image',
       imageMissing: 'No exportable image is available.',
       imageFailed: 'The image could not be loaded. A card with a missing image will not be saved.',
-      privateNote: 'Notes, EXIF, email, and location fields are omitted.',
+      privateNote: 'Tags, notes, EXIF, email, and location fields are omitted.',
       scoreHidden: 'Score hidden',
       before: 'Before',
       after: 'After',
@@ -188,6 +206,14 @@ export function getReviewExportCardCopy(locale: ReviewExportLocale): ReviewExpor
       targetInput: 'Target excerpt',
       evidenceInput: 'Evidence excerpt',
       downloadMarkdown: 'Save Markdown',
+      editExcerpts: 'Edit image text',
+      quickCardNote: 'The full critique is also available for printing.',
+      fullReportNote: 'Adjust the text placed into the image when needed.',
+      noGoalShort: 'No target recorded',
+      printIssueTitle: 'Issues',
+      printAdvantageTitle: 'Strengths',
+      printImprovementTitle: 'Improvements',
+      printScoresTitle: 'Five scores',
       dimensions: {
         composition: 'Composition',
         lighting: 'Lighting',
@@ -207,19 +233,19 @@ export function getReviewExportCardCopy(locale: ReviewExportLocale): ReviewExpor
     };
   }
   return {
-    panelLabel: '本地导出',
-    panelTitle: '分享图片卡与打印报告',
-    panelBody: '只在本机生成导出文件，不自动创建公开分享链接。',
+    panelLabel: '保存',
+    panelTitle: '保存这次点评',
+    panelBody: '图片保留点评内容；标签和私人备注不会导出。',
     previewTitle: '图片卡预览',
-    downloadCard: '保存 PNG',
-    printReport: '打印页',
+    downloadCard: '保存图片',
+    printReport: '打印完整点评',
     loadPreview: '生成预览',
     hideScore: '隐藏分数',
     showScore: '显示分数',
     includeSource: '显示原图',
     imageMissing: '没有可导出的图片。',
     imageFailed: '图片加载失败，不会导出缺图卡片。',
-    privateNote: '不包含笔记、EXIF、邮箱和位置信息。',
+    privateNote: '不包含标签、笔记、EXIF、邮箱和位置信息。',
     scoreHidden: '已隐藏分数',
     before: '之前',
     after: '之后',
@@ -247,6 +273,14 @@ export function getReviewExportCardCopy(locale: ReviewExportLocale): ReviewExpor
     targetInput: '目标摘录',
     evidenceInput: '证据摘录',
     downloadMarkdown: '保存 Markdown',
+    editExcerpts: '编辑图片文字',
+    quickCardNote: '完整点评也可用于打印。',
+    fullReportNote: '需要时再调整图片中的文字。',
+    noGoalShort: '无目标记录',
+    printIssueTitle: '问题',
+    printAdvantageTitle: '优点',
+    printImprovementTitle: '改进建议',
+    printScoresTitle: '五维评分',
     dimensions: {
       composition: '构图',
       lighting: '光线',
@@ -276,6 +310,27 @@ export function stripPrivateExportText(value: string | null | undefined): string
 export function compactExportSentence(value: string | null | undefined, maxChars = 180): string {
   const normalized = stripPrivateExportText(value).replace(/\s+/g, ' ');
   return normalized;
+}
+
+export function buildCardExcerpt(value: string | null | undefined, maxChars = 210): string {
+  const normalized = compactExportSentence(value);
+  void maxChars;
+  return normalized;
+}
+
+export function buildReviewExportFileStem(args: {
+  createdAt?: string | null;
+  title?: string | null;
+}): string {
+  const date = args.createdAt && !Number.isNaN(Date.parse(args.createdAt))
+    ? new Date(args.createdAt).toISOString().slice(0, 10)
+    : new Date().toISOString().slice(0, 10);
+  const slug = stripPrivateExportText(args.title)
+    .toLowerCase()
+    .replace(/[^a-z0-9\u4e00-\u9fff\u3040-\u30ff\u3400-\u4dbf]+/gi, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48);
+  return slug ? `picspeak-review-${date}-${slug}` : `picspeak-review-${date}`;
 }
 
 function normalizeGoalStatus(status: GoalAssessmentStatus | null | undefined): ReviewExportEvidenceState {
@@ -353,8 +408,10 @@ export function buildReviewExportCardModel(args: {
     showScore,
     imageUrl: imageUrl ?? null,
     sourceImageUrl: sourceAvailable ? sourceImageUrl : null,
-    summary: compactExportSentence(summary ?? defaultSummary),
-    suggestion: compactExportSentence(suggestion ?? defaultSuggestion),
+    summary: buildCardExcerpt(summary ?? defaultSummary, 230),
+    suggestion: buildCardExcerpt(suggestion ?? defaultSuggestion, 210),
+    fullSummary: compactExportSentence(defaultSummary),
+    fullSuggestion: compactExportSentence(defaultSuggestion),
     target: compactExportSentence(target ?? defaultTarget) || null,
     evidenceState: goalStatus,
     evidenceLabel: copy.states[goalStatus],
@@ -373,20 +430,23 @@ export function buildReviewPrintMarkdown(args: {
 }): string {
   const { payload, locale, copy = getReviewExportCardCopy(locale) } = args;
   const model = buildReviewExportCardModel({ review: payload, locale });
+  const evidenceState = model.evidenceState !== 'unassessed' ? [`- ${copy.evidence}: ${model.evidenceLabel}`] : [];
   const lines = [
     '# PicSpeak Export',
     '',
-    `- Review: ${model.reviewId}`,
     `- ${copy.createdAt}: ${new Date(model.createdAt).toLocaleString(locale)}`,
-    `- ${copy.evidence}: ${model.evidenceLabel}`,
+    ...evidenceState,
     '',
-    '## Summary',
-    model.summary || '-',
+    `## ${copy.printAdvantageTitle}`,
+    compactExportSentence(payload.review.advantage) || '-',
     '',
-    '## Suggestions',
-    model.suggestion || '-',
+    `## ${copy.printIssueTitle}`,
+    compactExportSentence(payload.review.critique) || '-',
     '',
-    '## Scores',
+    `## ${copy.printImprovementTitle}`,
+    compactExportSentence(payload.review.suggestions) || '-',
+    '',
+    `## ${copy.printScoresTitle}`,
     ...Object.entries(model.scores).map(([key, value]) => `- ${copy.dimensions[key as keyof ReviewScores]}: ${value.toFixed(1)}`),
   ];
 

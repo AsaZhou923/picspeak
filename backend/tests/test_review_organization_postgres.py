@@ -6,6 +6,7 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -137,13 +138,17 @@ class ReviewOrganizationPostgresTests(unittest.TestCase):
     def test_share_revoke_is_idempotent_preserves_gallery_and_invalidates_old_token(self) -> None:
         review_id = f'rev_org_{self.suffix}_0'
         old_token = f'share-org-{self.suffix}-0'
-        with self._client() as client:
+        with patch('app.api.routers.review_support.settings.frontend_origin', 'https://www.picspeak.art'), self._client() as client:
             public_before = client.get(f'/api/v1/public/reviews/{old_token}')
             first = client.delete(f'/api/v1/reviews/{review_id}/share')
             second = client.delete(f'/api/v1/reviews/{review_id}/share')
             public_response = client.get(f'/api/v1/public/reviews/{old_token}')
 
         self.assertEqual(public_before.status_code, 200)
+        self.assertEqual(
+            public_before.json()['result']['share_info']['share_url'],
+            f'https://www.picspeak.art/share/{old_token}',
+        )
         self.assertEqual(first.status_code, 200)
         self.assertEqual(second.status_code, 200)
         self.assertTrue(first.json()['gallery_visible'])
@@ -152,16 +157,37 @@ class ReviewOrganizationPostgresTests(unittest.TestCase):
         self.assertIsNone(first.json()['share_token'])
         self.assertEqual(public_response.status_code, 404)
 
+    def test_public_review_api_redirects_browser_navigation_but_preserves_json_contract(self) -> None:
+        token = f'share-org-{self.suffix}-0'
+        with patch('app.api.routers.review_support.settings.frontend_origin', 'https://www.picspeak.art'), self._client() as client:
+            browser_response = client.get(
+                f'/api/v1/public/reviews/{token}',
+                headers={'accept': 'text/html,application/xhtml+xml'},
+                follow_redirects=False,
+            )
+            json_response = client.get(
+                f'/api/v1/public/reviews/{token}',
+                headers={'accept': 'application/json'},
+            )
+
+        self.assertEqual(browser_response.status_code, 307)
+        self.assertEqual(browser_response.headers['location'], f'https://www.picspeak.art/share/{token}')
+        self.assertEqual(json_response.status_code, 200)
+        self.assertEqual(json_response.json()['review_id'], f'rev_org_{self.suffix}_0')
+        self.assertEqual(json_response.json()['result']['share_info']['share_url'], f'https://www.picspeak.art/share/{token}')
+
     def test_recreate_share_uses_new_token_and_stop_all_closes_both_channels_atomically(self) -> None:
         review_id = f'rev_org_{self.suffix}_0'
         old_token = f'share-org-{self.suffix}-0'
-        with self._client() as client:
+        with patch('app.api.routers.review_support.settings.frontend_origin', 'https://www.picspeak.art'), self._client() as client:
             client.delete(f'/api/v1/reviews/{review_id}/share')
             created = client.post(f'/api/v1/reviews/{review_id}/share')
             stopped = client.delete(f'/api/v1/reviews/{review_id}/visibility')
 
         self.assertEqual(created.status_code, 200)
         self.assertNotEqual(created.json()['share_token'], old_token)
+        self.assertTrue(created.json()['share_url'].startswith('https://www.picspeak.art/share/'))
+        self.assertNotIn('/api/v1/public/reviews/', created.json()['share_url'])
         self.assertEqual(stopped.status_code, 200)
         self.assertFalse(stopped.json()['is_public'])
         self.assertFalse(stopped.json()['gallery_visible'])

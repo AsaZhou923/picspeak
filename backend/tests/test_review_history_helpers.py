@@ -4,6 +4,7 @@ import sys
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
+from unittest.mock import patch
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
@@ -16,6 +17,7 @@ from app.api.routers.reviews import (
     _review_meta_payload,
     _review_share_info,
 )
+from app.api.routers.review_support import _frontend_share_url
 from app.api.routers.gallery import _review_gallery_summary
 from app.db.models import Review, ReviewMode, ReviewStatus
 from app.services.ai_prompts import SCORE_VERSION
@@ -119,12 +121,20 @@ class ReviewHistoryHelperTests(unittest.TestCase):
         review.is_public = True
         review.share_token = 'share_123'
 
-        owner_payload = _review_share_info(_RequestStub(), review, include_token=True)
-        public_payload = _review_share_info(_RequestStub(), review, include_token=False)
+        with patch('app.api.routers.review_support.settings.frontend_origin', 'https://www.picspeak.art'):
+            owner_payload = _review_share_info(_RequestStub(), review, include_token=True)
+            public_payload = _review_share_info(_RequestStub(), review, include_token=False)
 
         self.assertEqual(owner_payload['share_token'], 'share_123')
         self.assertNotIn('share_token', public_payload)
-        self.assertTrue(public_payload['share_url'].endswith('/api/v1/public/reviews/share_123'))
+        self.assertEqual(public_payload['share_url'], 'https://www.picspeak.art/share/share_123')
+
+    def test_frontend_share_url_uses_configured_origin_and_escapes_token(self) -> None:
+        with patch('app.api.routers.review_support.settings.frontend_origin', 'https://www.picspeak.art/api'):
+            self.assertEqual(
+                _frontend_share_url('token/with space'),
+                'https://www.picspeak.art/share/token%2Fwith%20space',
+            )
 
 
 if __name__ == '__main__':

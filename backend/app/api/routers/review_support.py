@@ -6,6 +6,7 @@ import re
 import secrets
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import quote, urlsplit, urlunsplit
 
 from fastapi import Request, status
 from sqlalchemy import exists, func, or_, select
@@ -17,6 +18,7 @@ from app.api.routers.photos import (
     PHOTO_THUMBNAIL_SIZE,
     _build_photo_proxy_url,
 )
+from app.core.config import settings
 from app.core.errors import api_error
 from app.db.models import Photo, PhotoStatus, Review, ReviewMode, ReviewStatus, User, UserPlan
 from app.schemas import (
@@ -184,6 +186,15 @@ def _review_public_enabled(review: Review) -> bool:
     return _review_has_gallery_public_channel(review) or _review_has_share_public_channel(review)
 
 
+def _frontend_share_url(share_token: str) -> str:
+    origin_parts = urlsplit(settings.frontend_origin)
+    if origin_parts.scheme not in {'http', 'https'} or not origin_parts.netloc:
+        origin = 'http://localhost:3000'
+    else:
+        origin = urlunsplit((origin_parts.scheme, origin_parts.netloc, '', '', '')).rstrip('/')
+    return f"{origin}/share/{quote(share_token, safe='')}"
+
+
 def _sync_review_public_flag(review: Review) -> None:
     review.is_public = _review_public_enabled(review)
 
@@ -199,7 +210,7 @@ def _review_visibility_payload(request: Request, review: Review) -> ReviewVisibi
         gallery_rejected_reason=review.gallery_rejected_reason,
         share_enabled=share_enabled,
         share_token=review.share_token if share_enabled else None,
-        share_url=str(request.url_for('get_public_review', share_token=review.share_token)) if share_enabled else None,
+        share_url=_frontend_share_url(review.share_token) if share_enabled and review.share_token else None,
     )
 
 
@@ -279,7 +290,7 @@ def _review_share_info(request: Request, review: Review, *, include_token: bool)
 
     payload: dict[str, Any] = {
         'enabled': True,
-        'share_url': str(request.url_for('get_public_review', share_token=review.share_token)),
+        'share_url': _frontend_share_url(review.share_token),
     }
     if include_token:
         payload['share_token'] = review.share_token

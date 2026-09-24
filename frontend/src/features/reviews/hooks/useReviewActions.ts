@@ -99,7 +99,7 @@ export function useReviewActions({
     try {
       const tok = await ensureToken();
       const payload = await createReviewShare(review.review_id, tok);
-      const sharePageUrl = new URL(`/share/${payload.share_token}`, window.location.origin).toString();
+      const sharePageUrl = payload.share_url || new URL(`/share/${payload.share_token}`, window.location.origin).toString();
       await navigator.clipboard.writeText(sharePageUrl);
       setLinkCopied(true);
       setActionFeedback(actionCopy.shareDone);

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronDown } from 'lucide-react';
 import type { ReviewGetResponse } from '@/lib/types';
 import { useAuth } from '@/lib/auth-context';
 import { useI18n } from '@/lib/i18n';
@@ -87,6 +88,16 @@ export function ReviewOwnerTools({
   }, [itemReviewId, loadVisibility, externalVersion]);
 
   if (!item) return null;
+  const organizationSummary = locale === 'zh'
+    ? '标签与备注'
+    : locale === 'ja'
+      ? 'タグとメモ'
+      : 'Tags and notes';
+  const visibilitySummary = locale === 'zh'
+    ? '分享设置'
+    : locale === 'ja'
+      ? '共有設定'
+      : 'Share settings';
 
   const handleSaveOrganization = async (payload: { tags: string[]; note: string }) => {
     setOrganizationBusy(true);
@@ -183,30 +194,47 @@ export function ReviewOwnerTools({
   };
 
   return (
-    <>
-      <ReviewOrganizationPanel
-        item={item}
-        items={[item]}
-        locale={locale}
-        busy={organizationBusy}
-        status={organizationStatus}
-        onSelect={() => undefined}
-        onSave={handleSaveOrganization}
-      />
-      <ReviewVisibilityPanel
-        item={{ review_id: item.review_id }}
-        locale={locale}
-        visibility={visibility}
-        busy={visibilityBusy}
-        error={visibilityError}
-        status={visibilityStatus}
-        onStatus={setVisibilityStatus}
-        onRefresh={() => loadVisibility(item.review_id)}
-        onCreateShare={handleCreateShare}
-        onRevokeShare={handleRevokeShare}
-        onRemoveGallery={handleRemoveGallery}
-        onStopAll={handleStopAll}
-      />
-    </>
+    <div className="space-y-3">
+      <details className="group rounded-card border border-border-subtle bg-void/20">
+        <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-4 px-4 py-3 text-sm font-semibold text-ink marker:content-none">
+          <span>{organizationSummary}</span>
+          <ChevronDown size={15} className="text-ink-subtle transition-transform group-open:rotate-180" aria-hidden="true" />
+        </summary>
+        <div className="border-t border-border-subtle p-3 sm:p-4">
+          <ReviewOrganizationPanel
+            item={item}
+            items={[item]}
+            locale={locale}
+            busy={organizationBusy}
+            status={organizationStatus}
+            showItemSelect={false}
+            onSelect={() => undefined}
+            onSave={handleSaveOrganization}
+          />
+        </div>
+      </details>
+      <details className="group rounded-card border border-border-subtle bg-void/20">
+        <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-4 px-4 py-3 text-sm font-semibold text-ink marker:content-none">
+          <span>{visibilitySummary}</span>
+          <ChevronDown size={15} className="text-ink-subtle transition-transform group-open:rotate-180" aria-hidden="true" />
+        </summary>
+        <div className="border-t border-border-subtle p-3 sm:p-4">
+          <ReviewVisibilityPanel
+            item={{ review_id: item.review_id }}
+            locale={locale}
+            visibility={visibility}
+            busy={visibilityBusy}
+            error={visibilityError}
+            status={visibilityStatus}
+            onStatus={setVisibilityStatus}
+            onRefresh={() => loadVisibility(item.review_id)}
+            onCreateShare={handleCreateShare}
+            onRevokeShare={handleRevokeShare}
+            onRemoveGallery={handleRemoveGallery}
+            onStopAll={handleStopAll}
+          />
+        </div>
+      </details>
+    </div>
   );
 }

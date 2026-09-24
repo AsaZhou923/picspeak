@@ -3,12 +3,19 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import {
   buildReviewExportCardModel,
+  buildReviewExportFileStem,
   buildReviewPrintMarkdown,
+  buildCardExcerpt,
   compactExportSentence,
   getReviewExportCardCopy,
   stripPrivateExportText,
 } from '../src/features/reviews/helpers/reviewExportPresentation.ts';
-import { getWrappedLines, shouldAttachBearerForImageFetch } from '../src/features/reviews/helpers/reviewExportCanvas.ts';
+import {
+  getReviewExportCanvasLayout,
+  getWrappedLines,
+  shouldAttachBearerForImageFetch,
+  shouldDrawEvidenceBadge,
+} from '../src/features/reviews/helpers/reviewExportCanvas.ts';
 import type { ReviewExportResponse, ReviewGetResponse } from '../src/lib/types.ts';
 
 const baseReview: ReviewGetResponse = {
@@ -49,6 +56,16 @@ const baseReview: ReviewGetResponse = {
   },
 };
 
+function createMeasureContext(): CanvasRenderingContext2D {
+  return {
+    font: '',
+    measureText(text: string) {
+      const fontSize = Number.parseInt(String(this.font).match(/(\d+)px/)?.[1] ?? '24', 10);
+      return { width: [...text].length * fontSize * 0.62 } as TextMetrics;
+    },
+  } as CanvasRenderingContext2D;
+}
+
 test('card wrapping preserves complete words and rejects overflow instead of dropping negatives', () => {
   const context = { measureText: (text: string) => ({ width: [...text].length } as TextMetrics) };
   const text = 'Do not crop the subject.';
@@ -60,6 +77,18 @@ test('card wrapping preserves complete words and rejects overflow instead of dro
   assert.deepEqual(getWrappedLines(context, '主体を切らない', 4, 2), ['主体を切', 'らない']);
 });
 
+test('card wrapping keeps numeric Chinese prefixes with their following phrase', () => {
+  const context = { measureText: (text: string) => ({ width: [...text].length } as TextMetrics) };
+  const lines = getWrappedLines(context, '1. 中文长段需要继续换行，同时不要把编号单独放一行。', 6, 20);
+  assert.ok(lines);
+  assert.match(lines[0], /^1\. 中文/u);
+  assert.doesNotMatch(lines[0], /^\s*\d+[.、]\s*$/u);
+
+  const english = getWrappedLines(context, 'Do not crop the subject near the edge.', 12, 10);
+  assert.ok(english);
+  assert.equal(english.join(' ').replace(/\s+/g, ' '), 'Do not crop the subject near the edge.');
+});
+
 test('review export helpers redact private text without rewriting meaningful negatives', () => {
   const redacted = stripPrivateExportText('Email x@example.com. GPS: 35.0,139.0. Do not crop the hand.');
   assert.doesNotMatch(redacted, /x@example\.com|35\.0,139\.0/);
@@ -68,12 +97,66 @@ test('review export helpers redact private text without rewriting meaningful neg
   assert.equal(compactExportSentence(longText, 80), longText.trim());
 });
 
+test('export filenames use user-facing review dates and safe titles', () => {
+  assert.equal(
+    buildReviewExportFileStem({ createdAt: '2026-09-24T12:10:22Z', title: 'PicSpeak 评图 / Keep light' }),
+    'picspeak-review-2026-09-24-picspeak-评图-keep-light'
+  );
+  assert.match(buildReviewExportFileStem({ createdAt: 'bad-date', title: '***' }), /^picspeak-review-\d{4}-\d{2}-\d{2}$/);
+});
+
+
+test('default card excerpts handle the real short-Chinese regression shape', () => {
+  const critique = '1. 画面上缘那片亮云目前比主体受光面更早抢到视线，尤其在深色窗框与墙面纹理旁形成了偏硬的亮度跳跃；结果是主体虽然占据大面积，视觉重心却被抬到画外。';
+  const suggestions = '1. 观察：上缘亮云是画面里最强的亮斑，主体的轮廓与暖色墙面才承担主要识别信息；原因：亮斑与主体之间的明暗差过大，先截走注意力，但天空又是轮廓和侧光的必要对照；可执行动作：只在上缘高亮区域做轻微局部压暗，停在云层仍有层次、天空仍通透而主体重新成为第一落点的位置，保留暖亮天空与主体之间的明暗关系。';
+  const review: ReviewGetResponse = {
+    ...baseReview,
+    result: {
+      ...baseReview.result,
+      critique,
+      suggestions,
+    },
+  };
+  const model = buildReviewExportCardModel({ review, locale: 'zh' });
+
+  assert.equal(model.fullSummary, critique);
+  assert.equal(model.fullSuggestion, suggestions);
+  assert.equal(model.summary, critique);
+  assert.equal(model.suggestion, suggestions);
+  const layout = getReviewExportCanvasLayout(createMeasureContext(), model, getReviewExportCardCopy('zh'));
+  assert.equal(layout.finalHeight, 1500);
+  assert.ok(layout.footerY > layout.textEnd);
+});
+
+test('long image card text keeps full content and grows the canvas without overlap', () => {
+  const longChinese = '不要删除暗部。观察画面左侧高光仍然抢眼，但主体边缘不能被压成一团。'.repeat(24);
+  const review: ReviewGetResponse = {
+    ...baseReview,
+    result: {
+      ...baseReview.result,
+      critique: longChinese,
+      suggestions: `${longChinese} 下一次只压暗高光，不要改变建筑立面的暖色关系。`,
+    },
+  };
+
+  const model = buildReviewExportCardModel({ review, locale: 'zh' });
+  assert.equal(model.summary, model.fullSummary);
+  assert.equal(model.suggestion, model.fullSuggestion);
+  assert.match(model.fullSuggestion, /不要改变建筑立面的暖色关系/);
+  assert.equal(buildCardExcerpt('Do not crop the hand. '.repeat(80), 90), 'Do not crop the hand. '.repeat(80).trim());
+  const layout = getReviewExportCanvasLayout(createMeasureContext(), model, getReviewExportCardCopy('zh'));
+  assert.ok(layout.finalHeight > 1500);
+  assert.ok(layout.footerY > layout.textEnd);
+  assert.ok(layout.finalHeight > layout.footerY + layout.footerHeight);
+});
+
 test('single-card model omits notes and EXIF while allowing score hiding', () => {
   const model = buildReviewExportCardModel({ review: baseReview, locale: 'en', showScore: false });
 
   assert.equal(model.mode, 'single');
   assert.equal(model.evidenceState, 'unassessed');
   assert.equal(model.evidenceLabel, 'No recorded goal assessment');
+  assert.equal(shouldDrawEvidenceBadge(model), false);
   assert.equal(model.showScore, false);
   assert.equal(model.imageUrl, baseReview.photo_url);
   assert.doesNotMatch(JSON.stringify(model), /private user note|GPSLatitude|person@example\.com/);
@@ -192,6 +275,7 @@ test('export payload top-level goal assessment is honored when nested comparison
 
   const model = buildReviewExportCardModel({ review: payload, locale: 'en' });
   assert.equal(model.evidenceState, 'achieved');
+  assert.equal(shouldDrawEvidenceBadge(model), true);
   assert.deepEqual(model.evidenceLines, ['Export top evidence.']);
 });
 
@@ -329,7 +413,12 @@ test('print markdown is based on export payload and excludes user note fields', 
     },
   };
   const markdown = buildReviewPrintMarkdown({ payload, locale: 'en' });
+  assert.match(markdown, /## Strengths\nClean color\./);
+  assert.match(markdown, /## Issues\nNo private fields\./);
+  assert.match(markdown, /## Improvements\nKeep the subject centered\./);
   assert.match(markdown, /Keep the subject centered/);
+  assert.doesNotMatch(markdown, /No recorded goal assessment/);
+  assert.doesNotMatch(markdown, /Review: review-1/);
   assert.doesNotMatch(markdown, /must not be printed/);
 });
 
@@ -348,9 +437,19 @@ test('export UI files keep local privacy boundaries and avoid public link genera
   assert.match(panel, /review\.practice\s*\?\s*review\.practice\.source_review_id\s*:/);
   assert.doesNotMatch(panel, /review\.practice\?\.source_review_id \?\?/);
   assert.match(panel, /getPracticeSession\(practiceSessionId, authToken/);
+  assert.match(panel, /excerptDirtyRef/);
+  assert.match(panel, /setTargetExcerpt\(\(current\) => \(excerptDirtyRef\.current \|\| current \? current : goal\)\)/);
+  assert.doesNotMatch(panel, /copy\.cardTitle, frozenGoal, locale, review/);
   assert.match(panel, /readOnly/);
-  assert.match(panel, /copy\.noFrozenGoal/);
-  assert.match(panel, /excerptEdited: true/);
+  assert.doesNotMatch(panel, /copy\.noFrozenGoal/);
+  assert.match(panel, /excerptEdited: excerptDirty/);
+  assert.match(panel, /previewRequestRef/);
+  assert.match(panel, /URL\.revokeObjectURL\(result\.url\)/);
+  assert.match(panel, /buildPreview\(false\)/);
+  assert.match(panel, /copy\.editExcerpts/);
+  assert.match(panel, /copy\.quickCardNote/);
+  assert.match(panel, /text-action-ink/);
+  assert.match(panel, /buildReviewExportFileStem/);
   assert.match(panel, /copy\.summaryInput/);
   assert.match(panel, /copy\.suggestionInput/);
   assert.match(panel, /copy\.targetInput/);
@@ -365,14 +464,28 @@ test('export UI files keep local privacy boundaries and avoid public link genera
   assert.doesNotMatch(printPage, /<main|<\/main>|createReview|generation|PDF|pdf/i);
   assert.doesNotMatch(printPage, /<pre/);
   assert.match(printPage, /downloadMarkdown/);
+  assert.match(printPage, /buildReviewExportFileStem/);
+  assert.match(printPage, /hasGoalEvidence/);
+  assert.match(printPage, /copy\.printAdvantageTitle/);
+  assert.match(printPage, /copy\.printIssueTitle/);
+  assert.match(printPage, /copy\.printImprovementTitle/);
+  assert.match(printPage, /\{hasGoalEvidence && \(/);
+  assert.match(printPage, /model\.evidenceLabel/);
+  assert.doesNotMatch(printPage, /copy\.suggestionInput/);
   assert.match(canvas, /Math\.min\(width \/ image\.naturalWidth, height \/ image\.naturalHeight\)/);
   assert.doesNotMatch(canvas, /crossOrigin/);
   assert.match(canvas, /shouldAttachBearerForImageFetch/);
-  assert.match(canvas, /throw new Error\(copy\.textTooLong\)/);
+  assert.match(canvas, /getReviewExportCanvasLayout/);
+  assert.match(canvas, /shouldDrawEvidenceBadge/);
+  assert.doesNotMatch(canvas, /const badgeY = 1320/);
+  assert.doesNotMatch(canvas, /reviewId\.slice/);
   assert.match(canvas, /model\.evidenceLines/);
   assert.match(canvas, /copy\.editedExcerptNotice/);
-  assert.match(copyText, /不自动创建公开分享链接/);
-  assert.match(copyText, /摘录/);
+  assert.match(copyText, /保存这次点评/);
+  assert.match(copyText, /标签和私人备注不会导出/);
+  assert.match(copyText, /优点/);
+  assert.match(copyText, /问题/);
+  assert.match(copyText, /改进建议/);
 });
 
 test('authorized image fetch only attaches bearer to trusted API paths', () => {

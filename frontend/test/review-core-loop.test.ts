@@ -41,17 +41,40 @@ test('review continuation availability is deterministic from structured capabili
   });
 });
 
-test('review first-reading DOM order is photo, result, strongest finding, then next action', async () => {
+test('review first-reading DOM order is photo, result, strongest finding, evidence, then growth loop', async () => {
   const source = await readFile('src/app/reviews/[reviewId]/page.tsx', 'utf8');
   const photo = source.indexOf('<ReviewPhotoPanel');
   const result = source.indexOf("<ReviewResultHeading className=\"mt-2 text-3xl");
   const strongest = source.indexOf('review-strongest-finding-title');
-  const nextAction = source.indexOf('<ReviewNextActionPanel');
+  const evidence = source.indexOf('review-evidence-title');
+  const growthLoop = source.indexOf('<ReviewGrowthLoopPanel');
 
   assert.ok(photo >= 0 && photo < result);
   assert.ok(result < strongest);
-  assert.ok(strongest < nextAction);
+  assert.ok(strongest < evidence);
+  assert.ok(evidence < growthLoop);
+  assert.doesNotMatch(source, /<ReviewNextActionPanel/);
   assert.doesNotMatch(source, /className="pt-14 min-h-screen"/);
+});
+
+test('review secondary tools keep quick actions visible and mount export only after expansion', async () => {
+  const source = await readFile('src/app/reviews/[reviewId]/page.tsx', 'utf8');
+  const ownerTools = await readFile('src/features/reviews/components/ReviewOwnerTools.tsx', 'utf8');
+  const organizationPanel = await readFile('src/features/reviews/components/ReviewOrganizationPanel.tsx', 'utf8');
+  const growthLoopPanel = await readFile('src/features/reviews/components/ReviewGrowthLoopPanel.tsx', 'utf8');
+
+  assert.match(source, /<details id="review-reference-generator"/);
+  assert.ok(source.indexOf('<ReviewActionBar') < source.indexOf('hierarchyCopy.metaTool'));
+  assert.match(source, /onExportSummary=\{handleOpenExportTools\}/);
+  assert.match(source, /<details[\s\S]*\{exportToolsOpen && \(/);
+  assert.ok(source.indexOf('hierarchyCopy.metaTool') < source.indexOf('hierarchyCopy.exportTool'));
+  assert.doesNotMatch(source, /hierarchyCopy\.ownerTool/);
+  assert.match(ownerTools, /showItemSelect=\{false\}/);
+  assert.match(ownerTools, /标签与备注/);
+  assert.match(ownerTools, /分享设置/);
+  assert.match(organizationPanel, /showItemSelect = true/);
+  assert.match(organizationPanel, /\{showItemSelect && \(/);
+  assert.doesNotMatch(growthLoopPanel, /这 3 件事|three things|この 3 つ/);
 });
 
 test('review score controls use native buttons with focus and touch-readable descriptions', async () => {

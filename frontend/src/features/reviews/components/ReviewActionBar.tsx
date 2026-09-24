@@ -11,6 +11,7 @@ interface ReviewActionBarProps {
   linkCopied: boolean;
   actionBusy: string | null;
   favoriteCopy: { add: string; remove: string };
+  exportLabel?: string;
   onFavoriteToggle: () => void;
   onShareLink: () => void;
   onExportSummary: () => void;
@@ -24,6 +25,7 @@ export const ReviewActionBar = memo(function ReviewActionBar({
   linkCopied,
   actionBusy,
   favoriteCopy,
+  exportLabel,
   onFavoriteToggle,
   onShareLink,
   onExportSummary,
@@ -68,7 +70,7 @@ export const ReviewActionBar = memo(function ReviewActionBar({
             className="flex items-center gap-2 rounded-xl border border-border px-3.5 py-2 text-[13px] text-ink-muted transition-colors hover:border-gold/40 hover:text-gold disabled:opacity-60"
           >
             <Download size={13} />
-            {t('review_export_summary')}
+            {exportLabel ?? t('review_export_summary')}
           </button>
         </>
       )}

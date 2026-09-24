@@ -6,7 +6,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { AlertCircle, ArrowRight, Share2 } from 'lucide-react';
 import { getPublicReview } from '@/lib/api';
-import type { ReviewGetResponse } from '@/lib/types';
+import { ApiException, type ReviewGetResponse } from '@/lib/types';
 import { SkeletonBlock } from '@/components/ui/LoadingSpinner';
 import { useI18n } from '@/lib/i18n';
 import { formatUserFacingError } from '@/lib/error-utils';
@@ -18,6 +18,9 @@ function getSharePageCopy(locale: 'zh' | 'en' | 'ja') {
       label: 'Shared Review',
       title: '共有された評価結果',
       openWorkspace: '自分の写真を評価する',
+      unavailableTitle: '共有リンクは無効です',
+      unavailableBody: 'この共有リンクは期限切れ、または所有者によって取り消されました。元の評価結果は表示できません。',
+      errorTitle: '共有結果を読み込めません',
     };
   }
 
@@ -26,6 +29,9 @@ function getSharePageCopy(locale: 'zh' | 'en' | 'ja') {
       label: 'Shared Review',
       title: 'Shared Critique Result',
       openWorkspace: 'Critique your own photo',
+      unavailableTitle: 'This share link is no longer available',
+      unavailableBody: 'This share link has expired or was revoked by the owner. The original critique cannot be viewed from this link.',
+      errorTitle: 'Unable to load this shared result',
     };
   }
 
@@ -33,6 +39,9 @@ function getSharePageCopy(locale: 'zh' | 'en' | 'ja') {
     label: '分享结果',
     title: '公开评图结果',
     openWorkspace: '去评自己的照片',
+    unavailableTitle: '分享链接已失效',
+    unavailableBody: '这个分享链接已过期或已被所有者撤销，不能继续查看原点评。',
+    errorTitle: '无法加载分享结果',
   };
 }
 
@@ -44,7 +53,7 @@ export default function SharedReviewPage() {
 
   const [review, setReview] = useState<ReviewGetResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<{ title: string; body: string } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -57,14 +66,18 @@ export default function SharedReviewPage() {
       })
       .catch((err) => {
         if (cancelled) return;
-        setError(formatUserFacingError(t, err, t('review_err_fetch')));
+        if (err instanceof ApiException && err.status === 404) {
+          setError({ title: copy.unavailableTitle, body: copy.unavailableBody });
+        } else {
+          setError({ title: copy.errorTitle, body: formatUserFacingError(t, err, t('review_err_fetch')) });
+        }
         setLoading(false);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [shareToken, t]);
+  }, [copy.errorTitle, copy.unavailableBody, copy.unavailableTitle, shareToken, t]);
 
   if (loading) {
     return (
@@ -90,7 +103,10 @@ export default function SharedReviewPage() {
       <div className="flex min-h-screen items-center justify-center px-6">
         <div className="space-y-4 text-center">
           <AlertCircle size={40} className="mx-auto text-rust" />
-          <p className="text-sm text-rust">{error || t('review_err_fetch')}</p>
+          <div>
+            <h1 className="text-2xl font-semibold text-ink">{error?.title ?? copy.errorTitle}</h1>
+            <p className="mt-2 max-w-md text-sm leading-6 text-rust">{error?.body ?? t('review_err_fetch')}</p>
+          </div>
           <Link
             href="/workspace"
             onClick={() => markProductAttributionSource('share')}
