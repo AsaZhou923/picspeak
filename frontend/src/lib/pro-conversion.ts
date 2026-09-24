@@ -98,7 +98,7 @@ const COPY: Record<ProConversionLocale, LocaleCopy> = {
       retake_compare: {
         badge: '复拍对比',
         title: '准备复拍时，Pro 能把对比做完整',
-        body: '同图再分析适合验证修图，新照片复拍更需要 Pro 的复拍对比、下一步清单和长期历史。',
+        body: '上传修改版或新照片后，Pro 会把原片、目标、对比结论、下一步清单和长期历史串起来。',
       },
       standard: {
         badge: '下一轮提升',
@@ -174,7 +174,7 @@ const COPY: Record<ProConversionLocale, LocaleCopy> = {
       retake_compare: {
         badge: 'Retake comparison',
         title: 'Before a retake, Pro gives the comparison more structure',
-        body: 'Same-photo reruns verify edits. New-photo retakes benefit more from Pro comparison, next-step checklists, and long-term history.',
+        body: 'After you upload an edited version or a new photo, Pro connects the original, goal, comparison result, next-step checklist, and long-term history.',
       },
       standard: {
         badge: 'Next-round progress',
@@ -250,7 +250,7 @@ const COPY: Record<ProConversionLocale, LocaleCopy> = {
       retake_compare: {
         badge: '撮り直し比較',
         title: '撮り直す前に、Pro で比較を構造化する',
-        body: '同じ写真の再分析は編集確認向き。新しい写真の撮り直しには、Pro の比較・次の一手・長期履歴が効きます。',
+        body: '編集後の写真または新しい写真をアップロードすると、Pro が元写真・目標・比較結果・次の一手・長期履歴をつなげます。',
       },
       standard: {
         badge: '次の上達',

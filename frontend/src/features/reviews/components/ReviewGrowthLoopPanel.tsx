@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, Camera, ListTodo, RotateCcw, Shuffle, X } from 'lucide-react';
+import { ArrowRight, Camera, ListTodo, PenLine, Shuffle, X } from 'lucide-react';
 import { getPracticeConfig } from '@/lib/api';
 import { type Translator } from '@/lib/i18n';
 import { type NextShootChecklistItem } from '@/lib/review-growth';
-import { getReplayIntentCopy } from '@/lib/replay-intent-copy';
 import { usePracticeExposure } from '@/features/reviews/hooks/usePracticeExposure';
 
 interface ReviewGrowthLoopPanelProps {
@@ -11,7 +10,7 @@ interface ReviewGrowthLoopPanelProps {
   locale: 'zh' | 'en' | 'ja';
   checklist: NextShootChecklistItem[];
   actionBusy: string | null;
-  onReplayReview: () => void;
+  onUploadEdited: () => void;
   onUploadNew: () => void;
   onChecklistAction: (item: NextShootChecklistItem, index: number) => void;
   t: Translator;
@@ -22,9 +21,9 @@ function getLoopCopy(locale: 'zh' | 'en' | 'ja') {
     return {
       label: 'Next Round',
       title: '今回の講評を次の一枚につなげる',
-      body: 'まず進み方を選びます。同じ写真で修正を検証するか、新しい写真で改善をやり直すかです。',
-      replayTitle: '同じ写真で修正の効き目を確認する',
-      replayBody: '露出、色温度、トリミング、局所コントラストのような短い調整を確かめるのに向いています。',
+      body: 'まず進み方を選びます。編集後の写真をアップロードして修正を検証するか、新しく撮り直して比較します。',
+      editTitle: '編集後の写真をアップロードして検証する',
+      editBody: 'トリミング、露出、色温度、局所コントラストを外部で直した後、その新しいファイルを比較します。',
       uploadTitle: '新しい写真でチェックリストを持って撮り直す',
       uploadBody: '機位、タイミング、背景整理、主題分離のように撮り直しが必要な改善に向いています。',
       checklistLabel: 'Next-Shoot Checklist',
@@ -33,7 +32,7 @@ function getLoopCopy(locale: 'zh' | 'en' | 'ja') {
       checklistEmpty: '次回は最低スコアの項目を最優先で撮り直してください。',
       observationLabel: 'Observation',
       reasonLabel: 'Why',
-      primaryBadge: 'Priority',
+      editBadge: 'Edited Photo',
       uploadBadge: 'New Photo',
       actionCta: 'ワークスペースへ持ち込む',
       goalLabel: 'Practice Goal',
@@ -47,9 +46,9 @@ function getLoopCopy(locale: 'zh' | 'en' | 'ja') {
     return {
       label: 'Next Round',
       title: 'Turn this critique into the next shot',
-      body: 'Choose the next loop first: verify a fix on the same photo, or retake with a new frame and apply the checklist.',
-      replayTitle: 'Use the same photo to verify a fix',
-      replayBody: 'Best for quick adjustments such as exposure, crop, white balance, or local contrast.',
+      body: 'Choose the next loop first: upload the edited file to verify a fix, or retake with a new frame and apply the checklist.',
+      editTitle: 'Upload the edited photo to verify the fix',
+      editBody: 'Use this after you changed crop, exposure, white balance, or local contrast outside PicSpeak. The upload must be the revised file.',
       uploadTitle: 'Retake with a new photo and carry the checklist',
       uploadBody: 'Best for changes that need a new capture, like camera position, timing, background cleanup, or subject separation.',
       checklistLabel: 'Next-Shoot Checklist',
@@ -58,7 +57,7 @@ function getLoopCopy(locale: 'zh' | 'en' | 'ja') {
       checklistEmpty: 'Start the next round by targeting the weakest scored dimension first.',
       observationLabel: 'Observation',
       reasonLabel: 'Why',
-      primaryBadge: 'Priority',
+      editBadge: 'Edited Photo',
       uploadBadge: 'New Photo',
       actionCta: 'Carry this to workspace',
       goalLabel: 'Practice Goal',
@@ -71,9 +70,9 @@ function getLoopCopy(locale: 'zh' | 'en' | 'ja') {
   return {
     label: '下一轮',
     title: '把这次点评直接转成下一次拍摄',
-    body: '先选路径：要么用同一张照片验证修正，要么换一张新照片，带着清单重拍。',
-    replayTitle: '同一张照片，先验证修正有没有生效',
-    replayBody: '适合曝光、色温、裁切、局部反差这类能快速调整的问题。',
+    body: '先选路径：上传已经修改后的照片来验证修正，或者换一张新照片，带着清单重拍。',
+    editTitle: '上传修改后的照片，验证修正有没有生效',
+    editBody: '适合你已经在外部改过裁切、曝光、白平衡或局部反差之后，用新文件和原片做对比。',
     uploadTitle: '换一张新照片，把清单真正拍出来',
     uploadBody: '适合机位、时机、背景整理、主体分离这类必须重新拍摄的改动。',
     checklistLabel: '下次拍摄清单',
@@ -82,7 +81,7 @@ function getLoopCopy(locale: 'zh' | 'en' | 'ja') {
     checklistEmpty: '下一轮先围绕最低分维度做一轮针对性重拍。',
     observationLabel: '观察',
     reasonLabel: '原因',
-    primaryBadge: '第一优先级',
+    editBadge: '修改后照片',
     uploadBadge: '新照片',
     actionCta: '带到工作台',
     goalLabel: '练习目标',
@@ -98,13 +97,12 @@ export function ReviewGrowthLoopPanel({
   locale,
   checklist,
   actionBusy,
-  onReplayReview,
+  onUploadEdited,
   onUploadNew,
   onChecklistAction,
   t,
 }: ReviewGrowthLoopPanelProps) {
   const copy = getLoopCopy(locale);
-  const replayCopy = getReplayIntentCopy(locale);
   const [practiceEnabled, setPracticeEnabled] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [editedGoal, setEditedGoal] = useState('');
@@ -154,22 +152,22 @@ export function ReviewGrowthLoopPanel({
         <div className="grid gap-3 lg:grid-cols-2">
           <button
             type="button"
-            onClick={onReplayReview}
+            onClick={onUploadEdited}
             disabled={actionBusy !== null}
             className="group rounded-card border border-gold/25 bg-gold/5 p-4 text-left transition-colors hover:border-gold/45 hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <div className="flex items-start gap-3">
               <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-control border border-gold/25 bg-surface text-gold">
-                <RotateCcw size={16} aria-hidden="true" />
+                <PenLine size={16} aria-hidden="true" />
               </span>
               <span className="min-w-0">
                 <span className="mb-2 inline-flex rounded-full border border-gold/30 bg-gold/12 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-gold/85">
-                  {copy.primaryBadge}
+                  {copy.editBadge}
                 </span>
-                <span className="block text-base font-semibold leading-6 text-ink">{replayCopy.samePhotoPanelTitle}</span>
-                <span className="mt-1 block text-sm leading-6 text-ink-muted">{replayCopy.samePhotoPanelBody}</span>
+                <span className="block text-base font-semibold leading-6 text-ink">{copy.editTitle}</span>
+                <span className="mt-1 block text-sm leading-6 text-ink-muted">{copy.editBody}</span>
                 <span className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-gold">
-                  {t('review_btn_again')}
+                  {t('review_btn_upload_next')}
                   <ArrowRight size={13} className="transition-transform group-hover:translate-x-0.5" />
                 </span>
               </span>
@@ -189,8 +187,8 @@ export function ReviewGrowthLoopPanel({
                 <span className="rounded-full border border-gold/30 bg-gold/12 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-gold/85">
                   {copy.uploadBadge}
                 </span>
-                <span className="mt-2 block text-base font-semibold leading-6 text-ink">{replayCopy.newPhotoPanelTitle}</span>
-                <span className="mt-1 block text-sm leading-6 text-ink-muted">{replayCopy.newPhotoPanelBody}</span>
+                <span className="mt-2 block text-base font-semibold leading-6 text-ink">{copy.uploadTitle}</span>
+                <span className="mt-1 block text-sm leading-6 text-ink-muted">{copy.uploadBody}</span>
                 <span className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-ink transition-colors group-hover:text-gold">
                   {t('review_btn_upload_next')}
                   <ArrowRight size={13} className="transition-transform group-hover:translate-x-0.5" />

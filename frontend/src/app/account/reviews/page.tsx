@@ -174,8 +174,33 @@ export default function ReviewHistoryPage() {
   const growthCopy = useMemo(() => getHistoryGrowthCopy(locale), [locale]);
   const plan = userInfo?.plan ?? 'guest';
   const historyPromoCopy = useMemo(() => getProUpgradeTriggerCopy(locale, 'history_trend'), [locale]);
+  const reviewSectionCopy = useMemo(() => {
+    if (locale === 'zh') {
+      return {
+        organize: '整理与分享',
+        retake: '复评进度',
+        growth: '成长摘要',
+        pro: 'Pro 历史',
+      };
+    }
+    if (locale === 'ja') {
+      return {
+        organize: '整理と共有',
+        retake: '再撮影の進捗',
+        growth: '成長サマリー',
+        pro: 'Pro 履歴',
+      };
+    }
+    return {
+      organize: 'Organize and share',
+      retake: 'Retake progress',
+      growth: 'Growth summary',
+      pro: 'Pro history',
+    };
+  }, [locale]);
 
   const initialView = searchParams.get('view') === 'practice' ? 'practice' : 'reviews';
+  const focusedSessionId = searchParams.get('session_id');
   const [view, setView] = useState<HistoryView>(initialView);
   const [items, setItems] = useState<ReviewHistoryItem[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -241,6 +266,10 @@ export default function ReviewHistoryPage() {
   const selectedReview = useMemo(
     () => items.find((item) => item.review_id === selectedReviewId) ?? items[0] ?? null,
     [items, selectedReviewId],
+  );
+  const selectedSessionIsListed = useMemo(
+    () => Boolean(selectedSessionId && practiceItems.some((item) => item.session_id === selectedSessionId)),
+    [practiceItems, selectedSessionId],
   );
   const practiceThemeCopy = useMemo(
     () => getHistoryPracticeThemeCopy(
@@ -352,7 +381,7 @@ export default function ReviewHistoryPage() {
           setPracticeItems((prev) => [...prev, ...sessionData.items]);
         } else {
           setPracticeItems(sessionData.items);
-          if (reset) setSelectedSessionId(sessionData.items[0]?.session_id ?? null);
+          if (reset) setSelectedSessionId(focusedSessionId ?? sessionData.items[0]?.session_id ?? null);
         }
         setPracticeCursor(sessionData.next_cursor);
         setPracticeHasMore(sessionData.next_cursor !== null);
@@ -362,7 +391,7 @@ export default function ReviewHistoryPage() {
         setPracticeError(formatUserFacingError(t, err, t('practice_err_fetch')));
       }
     },
-    [ensureToken, practiceFilters, t]
+    [ensureToken, focusedSessionId, practiceFilters, t]
   );
 
   const fetchLegacyComparisons = useCallback(
@@ -407,6 +436,12 @@ export default function ReviewHistoryPage() {
     const nextView = searchParams.get('view') === 'practice' ? 'practice' : 'reviews';
     setView(nextView);
   }, [searchParams]);
+
+  useEffect(() => {
+    if (view === 'practice' && focusedSessionId) {
+      setSelectedSessionId(focusedSessionId);
+    }
+  }, [focusedSessionId, view]);
 
   useEffect(() => {
     if (view !== 'reviews' || items.length === 0) return;
@@ -755,13 +790,13 @@ export default function ReviewHistoryPage() {
 
   return (
     <div className="min-h-screen">
-      <div className="mx-auto max-w-task px-6 py-12 animate-fade-in">
-        <div className="mb-10 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+      <div className="mx-auto max-w-task px-4 py-6 sm:px-6 sm:py-8 animate-fade-in">
+        <div className="mb-5 flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
           <div>
             <p className="ui-eyebrow mb-2">
               {t('account_reviews_label')}
             </p>
-            <h1 className="font-display text-4xl sm:text-5xl">{view === 'practice' ? t('practice_journal_headline') : t('account_reviews_headline')}</h1>
+            <h1 className="font-display text-3xl sm:text-4xl">{view === 'practice' ? t('practice_journal_headline') : t('account_reviews_headline')}</h1>
           </div>
           <Link
             href="/retake"
@@ -772,7 +807,7 @@ export default function ReviewHistoryPage() {
           </Link>
         </div>
 
-        <div className="mb-6 inline-flex rounded-lg border border-border bg-raised p-1">
+        <div className="mb-3 inline-flex rounded-lg border border-border bg-raised p-1">
           <button
             type="button"
             onClick={() => handleViewChange('reviews')}
@@ -791,86 +826,10 @@ export default function ReviewHistoryPage() {
 
         {view === 'reviews' ? (
           <>
-            <section className="ui-panel mb-6 p-5">
-              <div className="mb-4 flex items-center gap-2 text-sm text-ink">
-                <SlidersHorizontal size={15} className="text-gold" />
-                <span>{copy.filtersLabel}</span>
-              </div>
-
-              <div className="grid gap-3 xl:grid-cols-2 2xl:grid-cols-[minmax(0,1.28fr)_minmax(0,1.28fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.05fr)]">
-                <DateFilterField
-                  label={copy.from}
-                  value={draftFilters.createdFrom}
-                  error={createdFromInvalid ? copy.invalidDate : undefined}
-                  onChange={(value) =>
-                    setDraftFilters((prev) => ({ ...prev, createdFrom: value }))
-                  }
-                />
-
-                <DateFilterField
-                  label={copy.to}
-                  value={draftFilters.createdTo}
-                  error={createdToInvalid ? copy.invalidDate : undefined}
-                  onChange={(value) =>
-                    setDraftFilters((prev) => ({ ...prev, createdTo: value }))
-                  }
-                />
-
-                <label className="min-w-0 space-y-2 text-xs text-ink-muted">
-                  <span>{copy.minScore}</span>
-                  <input
-                    type="number"
-                    min="0"
-                    max="10"
-                    step="0.1"
-                    value={draftFilters.minScore}
-                    onChange={(event) =>
-                      setDraftFilters((prev) => ({ ...prev, minScore: event.target.value }))
-                    }
-                    className="min-h-11 w-full min-w-0 rounded-control border border-border bg-void/60 px-3 py-2.5 text-sm text-ink outline-none transition-colors focus:border-gold/40"
-                  />
-                </label>
-
-                <label className="min-w-0 space-y-2 text-xs text-ink-muted">
-                  <span>{copy.maxScore}</span>
-                  <input
-                    type="number"
-                    min="0"
-                    max="10"
-                    step="0.1"
-                    value={draftFilters.maxScore}
-                    onChange={(event) =>
-                      setDraftFilters((prev) => ({ ...prev, maxScore: event.target.value }))
-                    }
-                    className="min-h-11 w-full min-w-0 rounded-control border border-border bg-void/60 px-3 py-2.5 text-sm text-ink outline-none transition-colors focus:border-gold/40"
-                  />
-                </label>
-
-                <label className="min-w-0 space-y-2 text-xs text-ink-muted">
-                  <span>{copy.imageType}</span>
-                  <select
-                    value={draftFilters.imageType}
-                    onChange={(event) =>
-                      setDraftFilters((prev) => ({
-                        ...prev,
-                        imageType: event.target.value as '' | ImageType,
-                      }))
-                    }
-                    className="min-h-11 w-full min-w-0 rounded-control border border-border bg-void/60 px-3 py-2.5 text-sm text-ink outline-none transition-colors focus:border-gold/40"
-                  >
-                    <option value="">{copy.allTypes}</option>
-                    {IMAGE_TYPES.map((type) => (
-                      <option key={type} value={type}>
-                        {getImageTypeLabel(locale, type)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-
-              <div className="mt-3 grid gap-3 md:grid-cols-2">
-                <label className="min-w-0 space-y-2 text-xs text-ink-muted">
-                  <span>q</span>
+            <section className="ui-panel mb-4 p-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+                <label className="min-w-0 flex-1 space-y-2 text-xs text-ink-muted">
+                  <span>{locale === 'zh' ? '搜索点评' : locale === 'ja' ? '講評を検索' : 'Search critiques'}</span>
                   <input
                     type="search"
                     maxLength={100}
@@ -878,90 +837,117 @@ export default function ReviewHistoryPage() {
                     onChange={(event) =>
                       setDraftFilters((prev) => ({ ...prev, q: event.target.value }))
                     }
-                    className="min-h-11 w-full min-w-0 rounded-control border border-border bg-void/60 px-3 py-2.5 text-sm text-ink outline-none transition-colors focus:border-gold/40"
+                    className="min-h-10 w-full min-w-0 rounded-control border border-border bg-void/60 px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-gold/40"
                   />
                 </label>
-                <label className="min-w-0 space-y-2 text-xs text-ink-muted">
-                  <span>tag</span>
+                <label className="min-w-0 flex-1 space-y-2 text-xs text-ink-muted">
+                  <span>{locale === 'zh' ? '标签' : locale === 'ja' ? 'タグ' : 'Tag'}</span>
                   <input
                     type="search"
                     value={draftFilters.tag}
                     onChange={(event) =>
                       setDraftFilters((prev) => ({ ...prev, tag: event.target.value }))
                     }
-                    className="min-h-11 w-full min-w-0 rounded-control border border-border bg-void/60 px-3 py-2.5 text-sm text-ink outline-none transition-colors focus:border-gold/40"
+                    className="min-h-10 w-full min-w-0 rounded-control border border-border bg-void/60 px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-gold/40"
                   />
                 </label>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={handleApplyFilters}
+                    disabled={hasInvalidDate}
+                    className="ui-action-primary px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {copy.apply}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleResetFilters}
+                    className="ui-action-secondary px-4 py-2 text-sm"
+                  >
+                    {copy.reset}
+                  </button>
+                </div>
               </div>
 
-              <div className="mt-4 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={handleApplyFilters}
-                  disabled={hasInvalidDate}
-                  className="ui-action-primary px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {copy.apply}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleResetFilters}
-                  className="ui-action-secondary px-4 py-2 text-sm"
-                >
-                  {copy.reset}
-                </button>
-              </div>
+              <details className="mt-3 rounded-lg border border-border-subtle bg-void/30 px-3 py-2" open={hasInvalidDate}>
+                <summary className="flex cursor-pointer list-none items-center gap-2 text-sm text-ink">
+                  <SlidersHorizontal size={15} className="text-gold" />
+                  <span>{copy.filtersLabel}</span>
+                </summary>
+
+                <div className="mt-3 grid gap-3 xl:grid-cols-2 2xl:grid-cols-[minmax(0,1.28fr)_minmax(0,1.28fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.05fr)]">
+                  <DateFilterField
+                    label={copy.from}
+                    value={draftFilters.createdFrom}
+                    error={createdFromInvalid ? copy.invalidDate : undefined}
+                    onChange={(value) =>
+                      setDraftFilters((prev) => ({ ...prev, createdFrom: value }))
+                    }
+                  />
+
+                  <DateFilterField
+                    label={copy.to}
+                    value={draftFilters.createdTo}
+                    error={createdToInvalid ? copy.invalidDate : undefined}
+                    onChange={(value) =>
+                      setDraftFilters((prev) => ({ ...prev, createdTo: value }))
+                    }
+                  />
+
+                  <label className="min-w-0 space-y-2 text-xs text-ink-muted">
+                    <span>{copy.minScore}</span>
+                    <input
+                      type="number"
+                      min="0"
+                      max="10"
+                      step="0.1"
+                      value={draftFilters.minScore}
+                      onChange={(event) =>
+                        setDraftFilters((prev) => ({ ...prev, minScore: event.target.value }))
+                      }
+                      className="min-h-10 w-full min-w-0 rounded-control border border-border bg-void/60 px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-gold/40"
+                    />
+                  </label>
+
+                  <label className="min-w-0 space-y-2 text-xs text-ink-muted">
+                    <span>{copy.maxScore}</span>
+                    <input
+                      type="number"
+                      min="0"
+                      max="10"
+                      step="0.1"
+                      value={draftFilters.maxScore}
+                      onChange={(event) =>
+                        setDraftFilters((prev) => ({ ...prev, maxScore: event.target.value }))
+                      }
+                      className="min-h-10 w-full min-w-0 rounded-control border border-border bg-void/60 px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-gold/40"
+                    />
+                  </label>
+
+                  <label className="min-w-0 space-y-2 text-xs text-ink-muted">
+                    <span>{copy.imageType}</span>
+                    <select
+                      value={draftFilters.imageType}
+                      onChange={(event) =>
+                        setDraftFilters((prev) => ({
+                          ...prev,
+                          imageType: event.target.value as '' | ImageType,
+                        }))
+                      }
+                      className="min-h-10 w-full min-w-0 rounded-control border border-border bg-void/60 px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-gold/40"
+                    >
+                      <option value="">{copy.allTypes}</option>
+                      {IMAGE_TYPES.map((type) => (
+                        <option key={type} value={type}>
+                          {getImageTypeLabel(locale, type)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              </details>
             </section>
-
-            {!loading && !error && items.length > 0 && (
-              <>
-                <ReviewOrganizationPanel
-                  item={selectedReview}
-                  items={items}
-                  locale={locale}
-                  busy={organizationBusy}
-                  status={organizationStatus}
-                  onSelect={setSelectedReviewId}
-                  onSave={handleSaveOrganization}
-                />
-                <ReviewVisibilityPanel
-                  item={selectedReview}
-                  locale={locale}
-                  visibility={reviewVisibility}
-                  busy={visibilityBusy}
-                  onRefresh={refreshSelectedVisibility}
-                  onCreateShare={handleCreateShare}
-                  onRevokeShare={handleRevokeShare}
-                  onRemoveGallery={handleRemoveGallery}
-                  onStopAll={handleStopAllPublic}
-                />
-              </>
-            )}
-
-            {!loading && !error && items.length > 0 && (
-              <RetakeProgressPanel items={items} locale={locale} />
-            )}
-
-            {!loading && !error && items.length > 0 && (
-              <ReviewGrowthPanel
-                growthCopy={growthCopy}
-                practiceThemeCopy={practiceThemeCopy}
-                growthSnapshot={growthSnapshot}
-                dimensionLabels={dimensionLabels}
-                locale={locale}
-              />
-            )}
-
-            {!loading && !error && items.length > 0 && plan !== 'pro' && (
-              <ProPromoCard
-                plan={plan === 'guest' ? 'guest' : 'free'}
-                scene="usage"
-                title={historyPromoCopy.title}
-                body={historyPromoCopy.body}
-                fallbackRedirectUrl="/account/reviews"
-                className="mb-6"
-              />
-            )}
 
             {loading ? (
               <ReviewHistorySkeletonList />
@@ -1003,37 +989,89 @@ export default function ReviewHistoryPage() {
                 )}
               </>
             )}
+
+            {!loading && !error && items.length > 0 && (
+              <div className="mt-8 space-y-3">
+                <details className="rounded-lg border border-border-subtle bg-raised/60">
+                  <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-ink">
+                    {reviewSectionCopy.organize}
+                  </summary>
+                  <div className="space-y-4 border-t border-border-subtle p-4">
+                    <ReviewOrganizationPanel
+                      item={selectedReview}
+                      items={items}
+                      locale={locale}
+                      busy={organizationBusy}
+                      status={organizationStatus}
+                      onSelect={setSelectedReviewId}
+                      onSave={handleSaveOrganization}
+                    />
+                    <ReviewVisibilityPanel
+                      item={selectedReview}
+                      locale={locale}
+                      visibility={reviewVisibility}
+                      busy={visibilityBusy}
+                      onRefresh={refreshSelectedVisibility}
+                      onCreateShare={handleCreateShare}
+                      onRevokeShare={handleRevokeShare}
+                      onRemoveGallery={handleRemoveGallery}
+                      onStopAll={handleStopAllPublic}
+                    />
+                  </div>
+                </details>
+
+                <details className="rounded-lg border border-border-subtle bg-raised/60">
+                  <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-ink">
+                    {reviewSectionCopy.retake}
+                  </summary>
+                  <div className="border-t border-border-subtle p-4">
+                    <RetakeProgressPanel items={items} locale={locale} />
+                  </div>
+                </details>
+
+                <details className="rounded-lg border border-border-subtle bg-raised/60">
+                  <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-ink">
+                    {reviewSectionCopy.growth}
+                  </summary>
+                  <div className="border-t border-border-subtle p-4">
+                    <ReviewGrowthPanel
+                      growthCopy={growthCopy}
+                      practiceThemeCopy={practiceThemeCopy}
+                      growthSnapshot={growthSnapshot}
+                      dimensionLabels={dimensionLabels}
+                      locale={locale}
+                    />
+                  </div>
+                </details>
+
+                {plan !== 'pro' && (
+                  <details className="rounded-lg border border-border-subtle bg-raised/60">
+                    <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-ink">
+                      {reviewSectionCopy.pro}
+                    </summary>
+                    <div className="border-t border-border-subtle p-4">
+                      <ProPromoCard
+                        plan={plan === 'guest' ? 'guest' : 'free'}
+                        scene="usage"
+                        title={historyPromoCopy.title}
+                        body={historyPromoCopy.body}
+                        fallbackRedirectUrl="/account/reviews"
+                      />
+                    </div>
+                  </details>
+                )}
+              </div>
+            )}
           </>
         ) : (
           <>
-            <PracticeSummaryPanel
-              summary={practiceSummary}
-              copy={{
-                title: t('practice_summary_title'),
-                body: t('practice_summary_body'),
-                sessions: t('practice_summary_sessions'),
-                attempts: t('practice_summary_attempts'),
-                samples: t('practice_summary_samples'),
-                indeterminate: t('practice_summary_indeterminate'),
-                range: t('practice_summary_range'),
-                allScope: t('practice_summary_all_scope'),
-                unavailable: t('practice_summary_unavailable'),
-                loading: t('practice_loading'),
-                retry: t('reviews_err_retry'),
-              }}
-              labels={practiceLabels}
-              locale={locale}
-              loading={summaryLoading}
-              error={summaryError}
-              onRetry={handleSummaryRetry}
-            />
-
-            <section className="ui-panel mb-6 p-5">
-              <div className="mb-4 flex items-center gap-2 text-sm text-ink">
-                <SlidersHorizontal size={15} className="text-gold" />
-                <span>{t('practice_filters_label')}</span>
-              </div>
-              <div className="grid gap-3 md:grid-cols-3">
+            <section className="ui-panel mb-4 p-4">
+              <details>
+                <summary className="flex cursor-pointer list-none items-center gap-2 text-sm text-ink">
+                  <SlidersHorizontal size={15} className="text-gold" />
+                  <span>{t('practice_filters_label')}</span>
+                </summary>
+                <div className="mt-3 grid gap-3 md:grid-cols-3">
                 <label className="space-y-2 text-xs text-ink-muted">
                   <span>{t('practice_filter_lifecycle')}</span>
                   <select
@@ -1073,7 +1111,8 @@ export default function ReviewHistoryPage() {
                     ))}
                   </select>
                 </label>
-              </div>
+                </div>
+              </details>
             </section>
 
             {practiceLoading ? (
@@ -1085,66 +1124,97 @@ export default function ReviewHistoryPage() {
                   {t('reviews_err_retry')}
                 </button>
               </div>
-            ) : practiceItems.length === 0 ? (
+            ) : practiceItems.length === 0 && !selectedSessionId ? (
               <PracticeJournalEmpty copy={{ title: t('practice_empty_title'), body: t('practice_empty_body') }} />
             ) : (
               <>
-                <p className="mb-3 text-xs text-ink-subtle">
-                  {t('practice_page_count').replace('{count}', String(practiceItems.length))}
-                </p>
-                <div className="space-y-3">
-                  {practiceItems.map((item) => (
-                    <div key={item.session_id}>
-                      <PracticeSessionCard
-                        item={item}
-                        copy={{
-                          attempts: t('practice_card_attempts'),
-                          latest: t('practice_card_latest'),
-                          continue: t('practice_continue'),
-                          viewDetail: t('practice_view_detail'),
-                          readonly: t('practice_readonly'),
-                          archive: t('practice_archive'),
-                          restore: t('practice_restore'),
-                          complete: t('practice_complete'),
-                        }}
-                        labels={practiceLabels}
-                        dimensionLabel={(dimension) => dimensionLabels[dimension]}
-                        genreLabel={(genre) => formatPracticeGenre(locale, genre)}
-                        locale={locale}
-                        selected={selectedSessionId === item.session_id}
-                        busyLifecycle={lifecycleBusyId === item.session_id}
-                        onSelect={() => setSelectedSessionId(item.session_id)}
-                        onLifecycle={(lifecycle) => handleLifecycle(item.session_id, lifecycle)}
-                      />
-                      {selectedSessionId === item.session_id && (
-                        selectedLoading ? (
-                          <div className="mt-3 rounded-lg border border-border-subtle bg-raised/70 px-4 py-3 text-sm text-ink-muted">
-                            {t('practice_loading')}
-                          </div>
-                        ) : (
-                          <PracticeSessionDetail
-                            session={selectedSession}
+                {selectedSessionId && !selectedSessionIsListed && (
+                  selectedLoading ? (
+                    <div className="rounded-lg border border-border-subtle bg-raised/70 px-4 py-3 text-sm text-ink-muted">
+                      {t('practice_loading')}
+                    </div>
+                  ) : (
+                    <PracticeSessionDetail
+                      session={selectedSession}
+                      copy={{
+                        detailTitle: t('practice_detail_title'),
+                        criteria: t('practice_detail_criteria'),
+                        timeline: t('practice_detail_timeline'),
+                        noAttempts: t('practice_detail_no_attempts'),
+                        task: t('practice_detail_task'),
+                        review: t('practice_detail_review'),
+                        error: t('practice_detail_error'),
+                        retry: t('reviews_err_retry'),
+                      }}
+                      labels={practiceLabels}
+                      locale={locale}
+                      loading={selectedLoading}
+                      error={selectedError}
+                      onRetry={handleDetailRetry}
+                    />
+                  )
+                )}
+
+                {practiceItems.length > 0 && (
+                  <>
+                    <p className="mb-3 text-xs text-ink-subtle">
+                      {t('practice_page_count').replace('{count}', String(practiceItems.length))}
+                    </p>
+                    <div className="space-y-3">
+                      {practiceItems.map((item) => (
+                        <div key={item.session_id}>
+                          <PracticeSessionCard
+                            item={item}
                             copy={{
-                              detailTitle: t('practice_detail_title'),
-                              criteria: t('practice_detail_criteria'),
-                              timeline: t('practice_detail_timeline'),
-                              noAttempts: t('practice_detail_no_attempts'),
-                              task: t('practice_detail_task'),
-                              review: t('practice_detail_review'),
-                              error: t('practice_detail_error'),
-                              retry: t('reviews_err_retry'),
+                              attempts: t('practice_card_attempts'),
+                              latest: t('practice_card_latest'),
+                              continue: t('practice_continue'),
+                              viewDetail: t('practice_view_detail'),
+                              readonly: t('practice_readonly'),
+                              archive: t('practice_archive'),
+                              restore: t('practice_restore'),
+                              complete: t('practice_complete'),
                             }}
                             labels={practiceLabels}
+                            dimensionLabel={(dimension) => dimensionLabels[dimension]}
+                            genreLabel={(genre) => formatPracticeGenre(locale, genre)}
                             locale={locale}
-                            loading={selectedLoading}
-                            error={selectedError}
-                            onRetry={handleDetailRetry}
+                            selected={selectedSessionId === item.session_id}
+                            busyLifecycle={lifecycleBusyId === item.session_id}
+                            onSelect={() => setSelectedSessionId(item.session_id)}
+                            onLifecycle={(lifecycle) => handleLifecycle(item.session_id, lifecycle)}
                           />
-                        )
-                      )}
+                          {selectedSessionId === item.session_id && (
+                            selectedLoading ? (
+                              <div className="mt-3 rounded-lg border border-border-subtle bg-raised/70 px-4 py-3 text-sm text-ink-muted">
+                                {t('practice_loading')}
+                              </div>
+                            ) : (
+                              <PracticeSessionDetail
+                                session={selectedSession}
+                                copy={{
+                                  detailTitle: t('practice_detail_title'),
+                                  criteria: t('practice_detail_criteria'),
+                                  timeline: t('practice_detail_timeline'),
+                                  noAttempts: t('practice_detail_no_attempts'),
+                                  task: t('practice_detail_task'),
+                                  review: t('practice_detail_review'),
+                                  error: t('practice_detail_error'),
+                                  retry: t('reviews_err_retry'),
+                                }}
+                                labels={practiceLabels}
+                                locale={locale}
+                                loading={selectedLoading}
+                                error={selectedError}
+                                onRetry={handleDetailRetry}
+                              />
+                            )
+                          )}
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  </>
+                )}
 
                 {practiceHasMore && (
                   <div className="mt-8 text-center">
@@ -1160,6 +1230,29 @@ export default function ReviewHistoryPage() {
                 )}
               </>
             )}
+            <div className="mt-8">
+              <PracticeSummaryPanel
+                summary={practiceSummary}
+                copy={{
+                  title: t('practice_summary_title'),
+                  body: t('practice_summary_body'),
+                  sessions: t('practice_summary_sessions'),
+                  attempts: t('practice_summary_attempts'),
+                  samples: t('practice_summary_samples'),
+                  indeterminate: t('practice_summary_indeterminate'),
+                  range: t('practice_summary_range'),
+                  allScope: t('practice_summary_all_scope'),
+                  unavailable: t('practice_summary_unavailable'),
+                  loading: t('practice_loading'),
+                  retry: t('reviews_err_retry'),
+                }}
+                labels={practiceLabels}
+                locale={locale}
+                loading={summaryLoading}
+                error={summaryError}
+                onRetry={handleSummaryRetry}
+              />
+            </div>
             <LegacyRetakeList
               items={legacyRetakes}
               copy={{

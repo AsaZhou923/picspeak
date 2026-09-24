@@ -21,7 +21,6 @@ import { useUploadFlow } from '@/features/workspace/hooks/useUploadFlow';
 import { useReplayContext } from '@/features/workspace/hooks/useReplayContext';
 import { QuotaModal } from '@/features/workspace/components/QuotaModal';
 import { QuotaBanner } from '@/features/workspace/components/QuotaBanner';
-import { ReplayBanner } from '@/features/workspace/components/ReplayBanner';
 import { RetakeWorkspaceIntro } from '@/features/workspace/components/RetakeWorkspaceIntro';
 import { WorkspaceSettingsPanel } from '@/features/workspace/components/WorkspaceSettingsPanel';
 import { WorkspaceSubmitPanel } from '@/features/workspace/components/WorkspaceSubmitPanel';
@@ -65,7 +64,9 @@ function retakeTargetCopy(locale: 'zh' | 'en' | 'ja') {
       coachTitle: 'GPT-5.6 Retake Coach',
       originalLabel: '元の写真',
       retakeLabel: '再撮影',
+      editedLabel: '編集後の写真',
       uploadHint: '新しい写真をアップロードすると、この目標と流入元の文脈を保ったまま講評できます。',
+      editUploadHint: '編集後の写真をアップロードすると、元の写真との比較文脈を保ったまま修正を検証できます。',
       accept: 'この目標を保存',
       acceptBusy: '保存中…',
       acceptHint: '保存すると目標、成功条件、練習パスがサーバーに固定されます。',
@@ -98,7 +99,9 @@ function retakeTargetCopy(locale: 'zh' | 'en' | 'ja') {
       coachTitle: 'GPT-5.6 Retake Coach',
       originalLabel: 'Original',
       retakeLabel: 'Retake',
+      editedLabel: 'Edited photo',
       uploadHint: 'Upload a new photo and PicSpeak will keep this goal and source context attached to the critique.',
+      editUploadHint: 'Upload the edited photo and PicSpeak will compare it with the original while keeping the saved goal attached.',
       accept: 'Save this goal',
       acceptBusy: 'Saving…',
       acceptHint: 'Saving freezes the goal, success checks, and practice path on the server.',
@@ -130,7 +133,9 @@ function retakeTargetCopy(locale: 'zh' | 'en' | 'ja') {
     coachTitle: 'GPT-5.6 重拍教练',
     originalLabel: '原片',
     retakeLabel: '重拍图',
+    editedLabel: '修改版照片',
     uploadHint: '上传新照片后，PicSpeak 会保留这次练习目标和来源上下文，方便继续复盘。',
+    editUploadHint: '上传已经修改后的照片后，PicSpeak 会把它和原片放在同一个练习目标下对比。',
     accept: '保存这个目标',
     acceptBusy: '正在保存…',
     acceptHint: '保存后，目标、成功条件和练习路径会冻结到服务端。',
@@ -225,7 +230,6 @@ function WorkspacePageContent() {
   const trustedSourcePhotoUrl = practiceSession ? sessionSourcePhotoUrl : replayPhotoUrl;
   const trustedSourceLoading = practiceSession ? sessionSourceLoading : sourcePhotoLoading;
   const trustedSourceError = practiceSession ? sessionSourceError : sourcePhotoError;
-  const canReplayWithoutUpload = Boolean(!practiceSessionId && !practiceSession && sourceReviewId && replayPhotoId && !preview);
   const canUseNextShootTarget = !unresolvedPracticeSession && Boolean(practiceSession || (practiceEnabled && nextShootAction));
   const targetCopy = retakeTargetCopy(locale);
   const coachCopy = getRetakeCoachCopy(locale);
@@ -261,7 +265,7 @@ function WorkspacePageContent() {
   const hasPracticeDraft = Boolean(practiceEnabled && practiceGoalDraft);
   const savedPracticeClosed = unresolvedPracticeSession || Boolean(practiceSession && (!practiceEnabled || savedPracticeSourceUnavailable || !canContinuePractice(practiceSession)));
   const canUploadRetake =
-    !hasPracticeDraft && !savedPracticeClosed && (!isRetakeCoachFlow || Boolean(trustedSourcePhotoUrl)) && trustedPracticeKind !== 'same_image_recheck';
+    !hasPracticeDraft && !savedPracticeClosed && (!isRetakeCoachFlow || Boolean(trustedSourcePhotoUrl)) && (!practiceSession || trustedPracticeKind !== 'same_image_recheck');
   const canSubmitSameImageRecheck = Boolean(
     practiceSession && !savedPracticeClosed && trustedPracticeKind === 'same_image_recheck' && trustedSourcePhotoId
   );
@@ -279,8 +283,13 @@ function WorkspacePageContent() {
   }, [initialImageType]);
 
   useEffect(() => {
-    if (isPracticeKind(initialPracticeKind)) setPracticeKind(initialPracticeKind);
-  }, [initialPracticeKind]);
+    if (!isPracticeKind(initialPracticeKind)) return;
+    if (!practiceSessionId && initialPracticeKind === 'same_image_recheck') {
+      setPracticeKind('edit_revision');
+      return;
+    }
+    setPracticeKind(initialPracticeKind);
+  }, [initialPracticeKind, practiceSessionId]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -401,7 +410,7 @@ function WorkspacePageContent() {
   }, [ensurePracticeSession, ensureToken, practiceAccepting, practiceGoalDraft, router, t, targetCopy.disabled]);
 
   const handleReview = useCallback(async () => {
-    const draftPhotoId = photo?.photo_id ?? (!practiceSession ? replayPhotoId : null);
+    const draftPhotoId = photo?.photo_id;
     if (!draftPhotoId && !canSubmitSameImageRecheck) return;
     void trackProductEvent('start_review_clicked', {
       token: token ?? undefined,
@@ -446,7 +455,7 @@ function WorkspacePageContent() {
       }
       const activePhotoId = session?.practice_kind === 'same_image_recheck'
         ? session.source_photo_id
-        : (photo?.photo_id ?? (!session ? replayPhotoId : null));
+        : photo?.photo_id;
       if (!activePhotoId) {
         throw new ApiException(400, 'PRACTICE_PHOTO_MISSING', targetCopy.disabled);
       }
@@ -595,12 +604,14 @@ function WorkspacePageContent() {
         setErrMessage(formatUserFacingError(t, err, t('err_upload')));
       }
     }
-  }, [photo, practiceSession, unresolvedPracticeSession, replayPhotoId, canSubmitSameImageRecheck, reviewMode, selectedReviewModel, locale, trustedLocale, imageType, trustedSourceReviewId, sourceReviewId, retakeIntent, nextShootAction, nextShootDimension, sourceGenerationId, contentEntrypoint, contentSlug, galleryReviewId, promptExampleId, ensureToken, router, t, token, usage, remainingQuota, practiceEnabled, savedPracticeSourceUnavailable, setStage, setErrMessage, targetCopy.disabled]);
+  }, [photo, practiceSession, unresolvedPracticeSession, canSubmitSameImageRecheck, reviewMode, selectedReviewModel, locale, trustedLocale, imageType, trustedSourceReviewId, sourceReviewId, retakeIntent, nextShootAction, nextShootDimension, sourceGenerationId, contentEntrypoint, contentSlug, galleryReviewId, promptExampleId, ensureToken, router, t, token, usage, remainingQuota, practiceEnabled, savedPracticeSourceUnavailable, setStage, setErrMessage, targetCopy.disabled]);
 
   const flowCopy = getWorkspaceTaskFlowCopy(locale);
   const hasReadyPhoto = Boolean(photo && (stage === 'ready' || stage === 'reviewing'));
   const hasSubmitError = Boolean(stage === 'ready' && errMessage);
   const activeTaskStep = resolveWorkspaceTaskStep(stage, hasReadyPhoto, hasSubmitError);
+  const uploadedPracticePhotoLabel = trustedPracticeKind === 'edit_revision' ? targetCopy.editedLabel : targetCopy.retakeLabel;
+  const practiceUploadHint = trustedPracticeKind === 'edit_revision' ? targetCopy.editUploadHint : targetCopy.uploadHint;
   const completedTaskSteps =
     activeTaskStep === 'submit'
       ? (['image', 'settings'] as const)
@@ -631,8 +642,8 @@ function WorkspacePageContent() {
           <legend className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-ink-subtle">
             {targetCopy.kind}
           </legend>
-          <div className="grid gap-2 sm:grid-cols-3">
-            {(['capture_retake', 'edit_revision', 'same_image_recheck'] as const).map((kind) => (
+          <div className="grid gap-2 sm:grid-cols-2">
+            {(['capture_retake', 'edit_revision'] as const).map((kind) => (
               <button
                 key={kind}
                 type="button"
@@ -752,7 +763,7 @@ function WorkspacePageContent() {
         </div>
       )}
       {practiceSession?.practice_kind !== 'same_image_recheck' && (
-        <p className="mt-4 text-xs leading-5 text-ink-muted">{targetCopy.uploadHint}</p>
+        <p className="mt-4 text-xs leading-5 text-ink-muted">{practiceUploadHint}</p>
       )}
     </section>
   ) : null;
@@ -800,26 +811,7 @@ function WorkspacePageContent() {
                   sourceError={trustedSourceError}
                 />
               )}
-              {canReplayWithoutUpload && (
-                <ReplayBanner
-                  replayPhotoUrl={replayPhotoUrl}
-                  imageType={imageType}
-                  reviewMode={reviewMode}
-                  reviewModel={reviewModel}
-                  isGuest={isGuest}
-                  stage={stage}
-                  errorMessage={errMessage}
-                  remainingQuota={remainingQuota}
-                  totalQuota={totalQuota}
-                  onImageTypeChange={setImageType}
-                  onReviewModeChange={setReviewMode}
-                  onReviewModelChange={setReviewModel}
-                  onStartReview={handleReview}
-                  onUploadNew={() => { clearReplay({ preserveSourcePhoto: true }); setStage('idle'); }}
-                  t={t}
-                />
-              )}
-              {canUploadRetake && !canReplayWithoutUpload && (
+              {canUploadRetake && (
                 <WorkspaceTaskShell
                   copy={flowCopy}
                   activeStep="image"
@@ -857,9 +849,9 @@ function WorkspacePageContent() {
                           </div>
                         </div>
                         <div className="bg-raised p-2 sm:p-3">
-                          <p className="mb-2 text-xs font-medium text-ink-subtle">{targetCopy.retakeLabel}</p>
+                          <p className="mb-2 text-xs font-medium text-ink-subtle">{uploadedPracticePhotoLabel}</p>
                           <div className="relative aspect-[4/3] overflow-hidden rounded-control bg-surface">
-                            <Image src={preview} alt={targetCopy.retakeLabel} fill className="object-contain" unoptimized />
+                            <Image src={preview} alt={uploadedPracticePhotoLabel} fill className="object-contain" unoptimized />
                           </div>
                         </div>
                       </div>

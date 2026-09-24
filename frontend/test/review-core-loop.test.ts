@@ -91,10 +91,24 @@ test('review transitions preserve analytics metadata and source-review query con
   const source = await readFile('src/app/reviews/[reviewId]/page.tsx', 'utf8');
 
   assert.match(source, /trackProductEvent\('next_shoot_action_clicked'/);
-  assert.match(source, /trigger: 'new_photo_panel'/);
+  assert.match(source, /trigger: practiceKind === 'edit_revision' \? 'edited_photo_panel' : 'new_photo_panel'/);
   assert.match(source, /trigger: 'checklist_item'/);
+  assert.match(source, /practice_kind: practiceKind/);
+  assert.match(source, /onUploadEdited=\{handleUploadEditedRound\}/);
+  assert.doesNotMatch(source, /onReplayReview/);
   assert.match(source, /source_review_id: activeReview\.review_id/);
   assert.match(source, /router\.push\(`\/workspace\?\$\{nextParams\.toString\(\)\}`\)/);
+});
+
+test('practice results link back to the saved practice record', async () => {
+  const source = await readFile('src/app/reviews/[reviewId]/page.tsx', 'utf8');
+  const practiceRecord = source.indexOf('practiceRecordHref && (');
+  const goalComparison = source.indexOf('{isGoalPracticeReview && r.comparison && (');
+
+  assert.match(source, /practiceRecordSessionId = activeReview\.practice\?\.session_id \?\? activeReview\.practice_session_id/);
+  assert.match(source, /\/account\/reviews\?view=practice&session_id=/);
+  assert.match(source, /已保存到练习记录/);
+  assert.ok(practiceRecord >= 0 && practiceRecord < goalComparison);
 });
 
 test('retake surfaces expose original, target, retake, compare and visible trend labels', async () => {
@@ -112,4 +126,19 @@ test('retake surfaces expose original, target, retake, compare and visible trend
   assert.match(page, /copy\.currentStep/);
   assert.match(page, /copy\.upcomingStep/);
   assert.doesNotMatch(page, /min-h-screen pt-14/);
+});
+
+test('comparison panel switches edit revisions away from retake wording', async () => {
+  const comparison = await readFile('src/features/reviews/components/RetakeComparisonPanel.tsx', 'utf8');
+
+  assert.match(comparison, /practiceKind !== 'edit_revision'/);
+  assert.match(comparison, /title: '修改前后对比'/);
+  assert.match(comparison, /retake: '修改版照片'/);
+  assert.match(comparison, /title: 'Before vs\. edited version'/);
+  assert.match(comparison, /retake: 'Edited photo'/);
+  assert.match(comparison, /title: '変更前と変更後を比較'/);
+  assert.match(comparison, /retake: '編集後の写真'/);
+  assert.doesNotMatch(comparison, /goalAssessment\.goal_version\}<\/span>/);
+  assert.match(comparison, /getReviewExportCardCopy\(locale\)\.confidenceLevels/);
+  assert.match(comparison, /confidenceLevels\[comparison\.comparison_confidence\]/);
 });

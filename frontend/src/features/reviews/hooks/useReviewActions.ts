@@ -1,5 +1,4 @@
 import { Dispatch, SetStateAction, useCallback, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { createReviewShare, exportReview, updateReviewMeta } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { ReviewGetResponse } from '@/lib/types';
@@ -21,7 +20,6 @@ export function useReviewActions({
   review: ReviewGetResponse | null;
   setReview: Dispatch<SetStateAction<ReviewGetResponse | null>>;
 }) {
-  const router = useRouter();
   const { ensureToken, token } = useAuth();
   const { t, locale } = useI18n();
   const actionCopy = getReviewActionCopy(locale);
@@ -164,28 +162,6 @@ export function useReviewActions({
     }
   }, [review, actionBusy, favoriteCopy, ensureToken, setReview, t]);
 
-  const handleReplayReview = useCallback(() => {
-    if (!review || actionBusy || !review.viewer_is_owner) return;
-    void trackProductEvent('reanalysis_clicked', {
-      token: token ?? undefined,
-      pagePath: `/reviews/${review.review_id}`,
-      locale,
-      metadata: { review_id: review.review_id, photo_id: review.photo_id, mode: review.mode, retake_intent: 'same_photo_fix' },
-    });
-    setActionBusy('replay');
-    setActionError('');
-    setActionFeedback(actionCopy.replayPending);
-    const nextParams = new URLSearchParams({
-      source_review_id: review.review_id,
-      photo_id: review.photo_id,
-      mode: review.mode,
-      image_type: review.image_type ?? review.result.image_type ?? 'default',
-      retake_intent: 'same_photo_fix',
-      practice_kind: 'same_image_recheck',
-    });
-    router.push(`/workspace?${nextParams.toString()}`);
-  }, [review, actionBusy, token, locale, actionCopy, router]);
-
   return {
     linkCopied,
     galleryConfirmOpen,
@@ -200,6 +176,5 @@ export function useReviewActions({
     handleBackendShareLink,
     handleBackendExportSummary,
     handleFavoriteToggle,
-    handleReplayReview,
   };
 }

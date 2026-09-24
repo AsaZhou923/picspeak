@@ -77,6 +77,16 @@ test('workspace redesign preserves critique analytics, attribution and destinati
   assert.doesNotMatch(workspacePageSource, /session\?\.source_review_id \?\? sourceReviewId/);
   assert.match(workspacePageSource, /if \(unresolvedPracticeSession\)/);
   assert.match(workspacePageSource, /photo && !savedPracticeClosed &&/);
+  assert.match(workspacePageSource, /const draftPhotoId = photo\?\.photo_id/);
+  assert.match(workspacePageSource, /!practiceSessionId && initialPracticeKind === 'same_image_recheck'/);
+  assert.match(workspacePageSource, /setPracticeKind\('edit_revision'\)/);
+  assert.match(workspacePageSource, /editedLabel: '修改版照片'/);
+  assert.match(workspacePageSource, /trustedPracticeKind === 'edit_revision' \? targetCopy\.editedLabel : targetCopy\.retakeLabel/);
+  assert.match(workspacePageSource, /trustedPracticeKind === 'edit_revision' \? targetCopy\.editUploadHint : targetCopy\.uploadHint/);
+  assert.doesNotMatch(workspacePageSource, /canReplayWithoutUpload/);
+  assert.doesNotMatch(workspacePageSource, /ReplayBanner/);
+  assert.doesNotMatch(workspacePageSource, /photo\?\.photo_id \?\? \(!session \? replayPhotoId : null\)/);
+  assert.match(workspacePageSource, /\(\['capture_retake', 'edit_revision'\] as const\)\.map/);
   assert.match(workspacePageSource, /taskParams\.set\('practice_session_id', session\.session_id\)/);
   assert.match(workspacePageSource, /router\.push\(`\/reviews\/\$\{syncResult\.review_id\}`\)/);
 });

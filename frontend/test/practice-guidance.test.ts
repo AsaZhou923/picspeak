@@ -107,7 +107,7 @@ test('practice page wires recommendation CTA, scene group save, stale-load guard
 
 test('practice guidance copy is localized for Japanese helper headings', () => {
   const copy = getPracticeGuidanceCopy('ja');
-  assert.equal(copy.title, '練習プロフィール');
+  assert.equal(copy.title, '写真の練習');
   assert.equal(copy.evidence, '証拠');
   assert.equal(copy.recommendations, '次のおすすめ練習');
   assert.equal(copy.templates, '練習テンプレート');

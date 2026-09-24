@@ -8,8 +8,9 @@ import { getPracticeSession, getReview, isAbortError, submitPracticeFeedback } f
 import { useAuth } from '@/lib/auth-context';
 import { usePracticeExposure } from '@/features/reviews/hooks/usePracticeExposure';
 import { canContinuePractice } from '@/features/practice/journal';
+import { getReviewExportCardCopy } from '@/features/reviews/helpers/reviewExportPresentation';
 import { formatRetakeDelta } from '@/lib/retake-coach';
-import type { GoalAssessmentStatus, PracticeFeedbackVote, PracticeSessionResponse, RetakeDimensionKey, ReviewGetResponse } from '@/lib/types';
+import type { GoalAssessmentStatus, PracticeFeedbackVote, PracticeKind, PracticeSessionResponse, RetakeDimensionKey, ReviewGetResponse } from '@/lib/types';
 
 const DIMENSIONS: RetakeDimensionKey[] = ['composition', 'lighting', 'color', 'impact', 'technical'];
 
@@ -43,6 +44,18 @@ function getCopy(locale: 'zh' | 'en' | 'ja') {
         unavailable: '保存済みの目標判定はありません。',
       },
       dimensions: { composition: '構図', lighting: '光', color: '色', impact: '訴求力', technical: '技術' },
+      editRevision: {
+        label: 'GPT-5.6 Revision Coach',
+        title: '変更前と変更後を比較',
+        original: '変更前の写真',
+        retake: '編集後の写真',
+        target: '編集目標',
+        compare: '変更前後を比較',
+        before: '変更前',
+        after: '変更後',
+        actions: '次の編集アクション',
+        notComparable: 'この2枚は編集前後として直接比較しにくい可能性があります。',
+      },
     };
   }
   if (locale === 'en') {
@@ -74,6 +87,18 @@ function getCopy(locale: 'zh' | 'en' | 'ja') {
         unavailable: 'No saved goal judgment is attached.',
       },
       dimensions: { composition: 'Composition', lighting: 'Lighting', color: 'Color', impact: 'Impact', technical: 'Technical' },
+      editRevision: {
+        label: 'GPT-5.6 Revision Coach',
+        title: 'Before vs. edited version',
+        original: 'Before edit',
+        retake: 'Edited photo',
+        target: 'Edit goal',
+        compare: 'Compare before and after',
+        before: 'Before edit',
+        after: 'After edit',
+        actions: 'Next edit actions',
+        notComparable: 'These images may not be a reliable before-and-after edit comparison.',
+      },
     };
   }
   return {
@@ -104,7 +129,27 @@ function getCopy(locale: 'zh' | 'en' | 'ja') {
       unavailable: '这次结果没有保存的目标判断。',
     },
     dimensions: { composition: '构图', lighting: '光线', color: '色彩', impact: '感染力', technical: '技术' },
+    editRevision: {
+      label: 'GPT-5.6 修图教练',
+      title: '修改前后对比',
+      original: '修改前照片',
+      retake: '修改版照片',
+      target: '修改目标',
+      compare: '修改前后对比',
+      before: '修改前',
+      after: '修改后',
+      actions: '下一次修改行动',
+      notComparable: '这两张照片可能不适合直接判断修改前后的变化。',
+    },
   };
+}
+
+function applyPracticeKindCopy(
+  copy: ReturnType<typeof getCopy>,
+  practiceKind: PracticeKind | null | undefined,
+) {
+  if (practiceKind !== 'edit_revision') return copy;
+  return { ...copy, ...copy.editRevision };
 }
 
 function goalStatusTone(status: GoalAssessmentStatus): string {
@@ -148,7 +193,8 @@ export function RetakeComparisonPanel({ review, locale }: { review: ReviewGetRes
   const [practiceSessionState, setPracticeSessionState] = useState<'idle' | 'loading' | 'loaded' | 'unavailable'>('idle');
   const [feedbackState, setFeedbackState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [feedbackReason, setFeedbackReason] = useState('');
-  const copy = useMemo(() => getCopy(locale), [locale]);
+  const copy = useMemo(() => applyPracticeKindCopy(getCopy(locale), review.practice?.kind), [locale, review.practice?.kind]);
+  const confidenceLevels = useMemo(() => getReviewExportCardCopy(locale).confidenceLevels, [locale]);
   const sourceReviewId = review.practice ? review.practice.source_review_id : comparison?.original_review_id;
   const sourceAvailable = !review.practice?.source_access || review.practice.source_access === 'available';
 
@@ -233,7 +279,6 @@ export function RetakeComparisonPanel({ review, locale }: { review: ReviewGetRes
               {goalAssessment.status === 'indeterminate' ? <AlertTriangle size={13} /> : <CheckCircle2 size={13} />}
               {copy.goal[goalAssessment.status]}
             </span>
-            <span className="text-xs text-ink-subtle">{goalAssessment.goal_version}</span>
           </div>
 
           {goalAssessment.evidence.length > 0 && (
@@ -324,7 +369,7 @@ export function RetakeComparisonPanel({ review, locale }: { review: ReviewGetRes
       </ol>
 
       <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
-        <span className="rounded-full border border-border-subtle bg-raised/70 px-3 py-1.5 text-ink-muted">{copy.confidence}: {comparison.comparison_confidence}</span>
+        <span className="rounded-full border border-border-subtle bg-raised/70 px-3 py-1.5 text-ink-muted">{copy.confidence}: {confidenceLevels[comparison.comparison_confidence]}</span>
         {!reliableComparison && <span className="rounded-full border border-rust/30 bg-rust/10 px-3 py-1.5 font-medium text-rust">{copy.notComparable}</span>}
       </div>
       {comparison.comparison_caveat && <p className="mt-3 rounded-control border border-gold/20 bg-gold/5 px-4 py-3 text-sm leading-6 text-ink-muted">{comparison.comparison_caveat}</p>}

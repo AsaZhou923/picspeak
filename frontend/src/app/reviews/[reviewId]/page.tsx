@@ -170,7 +170,7 @@ export default function ReviewPage() {
     linkCopied, galleryConfirmOpen, setGalleryConfirmOpen, actionBusy, actionFeedback, actionError,
     galleryActionCopy, favoriteCopy,
     handleGalleryToggle, submitGalleryToggle, handleBackendShareLink,
-    handleFavoriteToggle, handleReplayReview,
+    handleFavoriteToggle,
   } = useReviewActions({ review, setReview });
   const { usage, usageError } = useReviewUsage();
 
@@ -279,7 +279,7 @@ export default function ReviewPage() {
     (activeReview.goal_assessment || r.goal_assessment || r.comparison.goal_assessment)
   );
 
-  function handleUploadNewRound() {
+  function handleUploadNextRound(practiceKind: 'capture_retake' | 'edit_revision') {
     const primaryAction = nextShootChecklist[0];
     if (primaryAction) {
       void trackProductEvent('next_shoot_action_clicked', {
@@ -295,7 +295,7 @@ export default function ReviewPage() {
           action_index: 1,
           action_title: primaryAction.title,
           retake_intent: 'new_photo_retake',
-          trigger: 'new_photo_panel',
+          trigger: practiceKind === 'edit_revision' ? 'edited_photo_panel' : 'new_photo_panel',
         },
       });
     }
@@ -304,13 +304,21 @@ export default function ReviewPage() {
       mode: activeReview.mode,
       image_type: activeReview.image_type ?? activeReview.result.image_type ?? 'default',
       retake_intent: 'new_photo_retake',
-      practice_kind: 'capture_retake',
+      practice_kind: practiceKind,
     });
     if (primaryAction) {
       nextParams.set('next_shoot_action', primaryAction.detail || primaryAction.title);
       nextParams.set('next_shoot_dimension', primaryAction.dimension);
     }
     router.push(`/workspace?${nextParams.toString()}`);
+  }
+
+  function handleUploadEditedRound() {
+    handleUploadNextRound('edit_revision');
+  }
+
+  function handleUploadNewRound() {
+    handleUploadNextRound('capture_retake');
   }
 
   function handleChecklistAction(item: NextShootChecklistItem, index: number) {
@@ -349,6 +357,28 @@ export default function ReviewPage() {
     });
   }
 
+  const practiceRecordSessionId = activeReview.practice?.session_id ?? activeReview.practice_session_id ?? null;
+  const practiceRecordHref = practiceRecordSessionId
+    ? `/account/reviews?view=practice&session_id=${encodeURIComponent(practiceRecordSessionId)}`
+    : null;
+  const practiceRecordCopy = locale === 'zh'
+    ? {
+        title: '已保存到练习记录',
+        body: '这次结果已经挂到对应练习，会出现在练习记录里，后续对比和回看都从那里继续。',
+        cta: '查看这次练习',
+      }
+    : locale === 'ja'
+      ? {
+          title: '練習記録に保存済み',
+          body: 'この結果は対応する練習に保存されました。以後の比較と振り返りは練習記録から続けられます。',
+          cta: 'この練習を見る',
+        }
+      : {
+          title: 'Saved to practice history',
+          body: 'This result is attached to its practice record, so future comparisons and review continue from that history.',
+          cta: 'View this practice',
+        };
+
   const reviewPromoTrigger: ProUpgradeTrigger =
     plan === 'guest'
       ? 'guest_save'
@@ -386,6 +416,23 @@ export default function ReviewPage() {
           <div role="status" className="mb-6 flex items-center gap-2 rounded-control border border-rust/25 bg-rust/5 px-4 py-3 text-sm text-rust">
             <AlertCircle size={16} className="shrink-0" aria-hidden="true" />
             <span>{usageError}</span>
+          </div>
+        )}
+
+        {showOwnerActions && practiceRecordHref && (
+          <div className="ui-panel mb-6 p-4 sm:p-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-sage">{practiceRecordCopy.title}</p>
+                <p className="mt-1 text-sm leading-6 text-ink-muted">{practiceRecordCopy.body}</p>
+              </div>
+              <Link
+                href={practiceRecordHref}
+                className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-control border border-sage/25 px-3 py-2 text-sm font-semibold text-sage transition-colors hover:border-sage/45 hover:bg-sage/10"
+              >
+                {practiceRecordCopy.cta}
+              </Link>
+            </div>
           </div>
         )}
 
@@ -520,7 +567,7 @@ export default function ReviewPage() {
                 locale={locale}
                 checklist={nextShootChecklist}
                 actionBusy={actionBusy}
-                onReplayReview={handleReplayReview}
+                onUploadEdited={handleUploadEditedRound}
                 onUploadNew={handleUploadNewRound}
                 onChecklistAction={handleChecklistAction}
                 t={t}

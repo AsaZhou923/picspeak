@@ -22,7 +22,10 @@ test('upgrade triggers speak to quota, deeper advice, history trend, and retake 
   assert.match(getProUpgradeTriggerCopy('zh', 'quota_floor').body, /不用反复计算额度/);
   assert.match(getProUpgradeTriggerCopy('zh', 'deeper_result').body, /下一次拍摄/);
   assert.match(getProUpgradeTriggerCopy('zh', 'history_trend').title, /趋势/);
-  assert.match(getProUpgradeTriggerCopy('zh', 'retake_compare').body, /复拍对比/);
+  assert.match(getProUpgradeTriggerCopy('zh', 'retake_compare').body, /上传修改版或新照片/);
+  assert.doesNotMatch(getProUpgradeTriggerCopy('zh', 'retake_compare').body, /同图再分析/);
+  assert.doesNotMatch(getProUpgradeTriggerCopy('en', 'retake_compare').body, /same-photo reruns/i);
+  assert.doesNotMatch(getProUpgradeTriggerCopy('ja', 'retake_compare').body, /同じ写真の再分析/);
 });
 
 test('usage page copy frames billing as an upgrade decision page', () => {

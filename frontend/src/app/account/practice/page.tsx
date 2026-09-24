@@ -12,6 +12,7 @@ import {
   updatePracticeSceneGroup,
 } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import PracticeStartPanel from '@/features/practice/components/PracticeStartPanel';
 import { usePracticeEnabled } from '@/features/practice/usePracticeEnabled';
 import { useI18n } from '@/lib/i18n';
 import { formatUserFacingError } from '@/lib/error-utils';
@@ -75,6 +76,12 @@ export default function PracticeAccountPage() {
   const practiceEnabled = usePracticeEnabled();
   const { t, locale } = useI18n();
   const copy = useMemo(() => getPracticeGuidanceCopy(locale), [locale]);
+  const loadError = locale === 'zh' ? '未能加载练习记录，请重试。' : locale === 'ja' ? '練習履歴を読み込めませんでした。' : 'Could not load practice records. Please retry.';
+  const flowCopy = locale === 'zh'
+    ? { recent: '我的练习', start: '开始新练习', continue: '继续练习', result: '查看结果', pending: '查看进度', details: '查看记录', attempts: '次尝试', insights: '练习观察与场景整理', empty: '还没有保存的练习。从已有点评选一张原片，确定目标后就会出现在这里。' }
+    : locale === 'ja'
+      ? { recent: '自分の練習', start: '新しい練習', continue: '練習を続ける', result: '結果を見る', pending: '進捗を見る', details: '履歴を見る', attempts: '回の試行', insights: '練習の観察とシーン整理', empty: '保存された練習はまだありません。講評済みの元写真を選び、目標を保存するとここに表示されます。' }
+      : { recent: 'My practice', start: 'Start a new practice', continue: 'Continue practice', result: 'View result', pending: 'View progress', details: 'View record', attempts: 'attempts', insights: 'Practice observations and scenes', empty: 'No saved practice yet. Choose a reviewed original and save a goal to see it here.' };
   const requestIdRef = useRef(0);
   const [profile, setProfile] = useState<PracticeGuidanceProfileResponse | null>(null);
   const [recommendations, setRecommendations] = useState<PracticeRecommendationsResponse | null>(null);
@@ -82,6 +89,7 @@ export default function PracticeAccountPage() {
   const [recommendationIndex, setRecommendationIndex] = useState(0);
   const [sceneDrafts, setSceneDrafts] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+  const [startOpen, setStartOpen] = useState(false);
   const [error, setError] = useState('');
   const [actionError, setActionError] = useState('');
   const [acceptingRecommendationId, setAcceptingRecommendationId] = useState<string | null>(null);
@@ -104,18 +112,19 @@ export default function PracticeAccountPage() {
         setSceneDrafts({});
         return;
       }
-      const [nextProfile, nextRecommendations, nextPracticeSessions] = await Promise.all([
+      const [nextProfile, nextRecommendations, nextPracticeSessions] = await Promise.allSettled([
         getPracticeGuidanceProfile(token, locale, signal),
         getPracticeRecommendations(token, locale, signal),
         loadAllPracticeSessions(token, signal),
       ]);
       if (!isCurrent()) return;
-      setProfile(nextProfile);
-      setRecommendations(nextRecommendations);
-      setPracticeSessions(nextPracticeSessions);
+      setProfile(nextProfile.status === 'fulfilled' ? nextProfile.value : null);
+      setRecommendations(nextRecommendations.status === 'fulfilled' ? nextRecommendations.value : null);
+      if (nextPracticeSessions.status === 'rejected') throw nextPracticeSessions.reason;
+      setPracticeSessions(nextPracticeSessions.value);
       setSceneDrafts((current) => {
         const next: Record<string, string> = {};
-        for (const session of nextPracticeSessions) {
+        for (const session of nextPracticeSessions.value) {
           next[session.session_id] = current[session.session_id] ?? session.scene_group ?? '';
         }
         return next;
@@ -123,11 +132,11 @@ export default function PracticeAccountPage() {
       setRecommendationIndex(0);
     } catch (err) {
       if (!isCurrent()) return;
-      setError(formatUserFacingError(t, err, copy.acceptError));
+      setError(formatUserFacingError(t, err, loadError));
     } finally {
       if (isCurrent()) setLoading(false);
     }
-  }, [copy.acceptError, ensureToken, locale, t]);
+  }, [ensureToken, loadError, locale, t]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -199,7 +208,7 @@ export default function PracticeAccountPage() {
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gold">{copy.coverage}</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gold">{flowCopy.recent}</p>
           <h1 className="mt-2 font-display text-3xl text-ink sm:text-4xl">{copy.title}</h1>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-ink-subtle">{copy.subtitle}</p>
         </div>
@@ -221,13 +230,47 @@ export default function PracticeAccountPage() {
         </>}
       </nav>
 
-      {!loading && !error && practiceSessions.length === 0 && (
-        <section className="ui-feature-panel px-6 py-7 sm:p-8">
-          <h2 className="font-display text-3xl leading-tight text-ink">{practiceEnabled === true ? copy.firstPracticeTitle : copy.noPracticeRecords}</h2>
-          <p className="mt-4 max-w-2xl text-sm leading-7 text-ink-muted">{practiceEnabled === true ? copy.firstPracticeBody : t('hero_desc')}</p>
-          <Link href="/workspace" className="ui-action-primary mt-6 w-fit px-5 py-3 text-sm">{practiceEnabled === true ? copy.startPractice : t('hero_cta_start')}<ArrowRight size={15} aria-hidden="true" /></Link>
+      {loading && practiceSessions.length === 0 && <p role="status" className="text-sm text-ink-muted">{copy.loading}</p>}
+
+      {!loading && practiceSessions.length > 0 && (
+        <section aria-labelledby="recent-practice-heading">
+          <div className="mb-3 flex items-center justify-between gap-4">
+            <h2 id="recent-practice-heading" className="text-lg font-semibold text-ink">{flowCopy.recent}</h2>
+            <Link href="/account/reviews?view=practice" className="text-sm text-gold">{copy.viewLog}</Link>
+          </div>
+          <div className="space-y-3">
+            {practiceSessions.slice(0, 6).map((session) => {
+              const latest = session.latest_attempt;
+              const resultHref = latest?.review_id && latest.review_access === 'available' ? `/reviews/${latest.review_id}` : null;
+              const taskHref = !resultHref && latest?.task_id && session.latest_assessment_status !== 'failed' ? `/tasks/${latest.task_id}` : null;
+              return <article key={session.session_id} className="rounded-card border border-border-subtle bg-raised/40 p-4">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-ink-muted">
+                  <span>{guidanceDimensionLabel(session.dimension, locale)}</span><span>·</span>
+                  <span>{session.attempt_count} {flowCopy.attempts}</span><span>·</span>
+                  <time dateTime={session.created_at}>{new Date(session.created_at).toLocaleDateString(locale)}</time>
+                </div>
+                <p className="mt-2 text-sm font-medium leading-6 text-ink">{session.goal}</p>
+                <div className="mt-3 flex flex-wrap gap-4 text-sm">
+                  {resultHref && <Link href={resultHref} className="font-medium text-gold">{flowCopy.result}</Link>}
+                  {taskHref && <Link href={taskHref} className="font-medium text-gold">{flowCopy.pending}</Link>}
+                  {practiceEnabled && session.continue_available && <Link href={`/workspace?practice_session_id=${encodeURIComponent(session.session_id)}`} className="font-medium text-gold">{flowCopy.continue}</Link>}
+                  <Link href={`/account/reviews?view=practice&session_id=${encodeURIComponent(session.session_id)}`} className="text-ink-muted hover:text-ink">{flowCopy.details}</Link>
+                </div>
+              </article>;
+            })}
+          </div>
         </section>
       )}
+
+      {!loading && !error && practiceEnabled === true && (
+        practiceSessions.length === 0
+          ? <PracticeStartPanel templates={profile?.templates ?? []} />
+          : <details className="rounded-card border border-border-subtle" onToggle={(event) => setStartOpen(event.currentTarget.open)}>
+              <summary className="cursor-pointer px-5 py-4 text-sm font-semibold text-ink">{flowCopy.start}</summary>
+              {startOpen && <PracticeStartPanel templates={profile?.templates ?? []} />}
+            </details>
+      )}
+      {!loading && !error && practiceEnabled === false && practiceSessions.length === 0 && <p className="text-sm text-ink-muted">{copy.noPracticeRecords}</p>}
 
       {(error || actionError) && (
         <div className="flex items-start gap-3 rounded-card border border-danger/35 bg-danger/10 p-4 text-sm text-danger">
@@ -242,6 +285,9 @@ export default function PracticeAccountPage() {
         </div>
       )}
 
+      {practiceSessions.length > 0 && <details className="rounded-card border border-border-subtle">
+        <summary className="cursor-pointer px-5 py-4 text-sm font-semibold text-ink">{flowCopy.insights}</summary>
+        <div className="space-y-5 p-4 pt-0">
       <section className="rounded-card border border-border-subtle bg-raised/45 p-5">
         {loading && !profile ? (
           <p className="text-sm text-ink-subtle">{copy.loading}</p>
@@ -417,22 +463,9 @@ export default function PracticeAccountPage() {
         </aside>
       </section>
 
-      <section className="rounded-card border border-border-subtle bg-raised/35 p-5">
-        <h2 className="text-lg font-semibold text-ink">{copy.templates}</h2>
-        <div className="mt-4 grid gap-3 md:grid-cols-2">
-          {(profile?.templates ?? []).map((template) => (
-            <article key={template.template_id} className="rounded-card border border-border-subtle bg-void/35 p-4">
-              <div className="flex items-start justify-between gap-3">
-                <p className="text-sm font-semibold text-ink">{localizePracticeDimensionText(template.title, locale)}</p>
-                <span className="shrink-0 rounded-full border border-border-subtle px-2 py-0.5 text-xs text-ink-muted">
-                  {guidanceDimensionLabel(template.dimension, locale)}
-                </span>
-              </div>
-              <p className="mt-2 text-sm leading-6 text-ink-subtle">{template.goal_example}</p>
-            </article>
-          ))}
         </div>
-      </section>
+      </details>}
+
     </div>
   );
 }
