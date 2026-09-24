@@ -45,6 +45,7 @@ type GuidanceCopy = {
   statusNotAchieved: string;
   firstPracticeTitle: string;
   firstPracticeBody: string;
+  noPracticeRecords: string;
   startPractice: string;
   photoHistory: string;
   publicPortfolio: string;
@@ -54,6 +55,7 @@ type GuidanceCopy = {
 const COPY: Record<Locale, GuidanceCopy> = {
   en: {
     title: 'Practice profile',
+    noPracticeRecords: 'No saved practice records yet.',
     firstPracticeTitle: 'Your first practice starts with one photo.',
     firstPracticeBody: 'Upload a photo, choose “Practise this goal” in its critique, then take a new photo. Your saved goals, attempts and evidence will appear here.',
     startPractice: 'Start a practice', photoHistory: 'Organise my photos', publicPortfolio: 'Public portfolio', refresh: 'Refresh',
@@ -93,6 +95,7 @@ const COPY: Record<Locale, GuidanceCopy> = {
   },
   zh: {
     title: '练习档案',
+    noPracticeRecords: '还没有保存的练习记录。',
     firstPracticeTitle: '从一张照片，开始第一次练习。',
     firstPracticeBody: '上传照片，在点评中选择“练习这个目标”，再带着目标拍一张。保存的目标、每次尝试和比较证据，会逐步汇集到这里。',
     startPractice: '开始一次练习', photoHistory: '整理我的照片', publicPortfolio: '公开作品主页', refresh: '刷新',
@@ -132,6 +135,7 @@ const COPY: Record<Locale, GuidanceCopy> = {
   },
   ja: {
     title: '練習プロフィール',
+    noPracticeRecords: '保存された練習記録はまだありません。',
     firstPracticeTitle: '最初の練習は、1枚の写真から。',
     firstPracticeBody: '写真をアップロードし、講評で「この目標で練習」を選んで撮り直します。保存した目標、試行、比較の根拠がここに集まります。',
     startPractice: '練習を始める', photoHistory: '自分の写真を整理', publicPortfolio: '公開作品プロフィール', refresh: '更新',

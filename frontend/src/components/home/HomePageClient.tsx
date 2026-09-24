@@ -2,7 +2,6 @@
 
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
 import {
   Aperture,
   ArrowRight,
@@ -16,7 +15,7 @@ import HomeContactSection from '@/components/home/HomeContactSection';
 import HomeCritiqueArtifact from '@/components/home/HomeCritiqueArtifact';
 import HomeGenerationPricingSection from '@/components/home/HomeGenerationPricingSection';
 import HomeImprovementLoop from '@/components/home/HomeImprovementLoop';
-import { getPracticeConfig } from '@/lib/api';
+import { usePracticeEnabled } from '@/features/practice/usePracticeEnabled';
 import { getHomeIntentEntrances, type HomeIntent } from '@/lib/content-conversion';
 import { useI18n } from '@/lib/i18n';
 import { markProductAttributionSource, trackProductEvent } from '@/lib/product-analytics';
@@ -54,14 +53,7 @@ const CRITIQUE_ENTRY_COPY = {
 
 export function HomePageContent() {
   const { t, locale } = useI18n();
-  const [practiceEnabled, setPracticeEnabled] = useState<boolean | null>(null);
-  useEffect(() => {
-    const controller = new AbortController();
-    getPracticeConfig(undefined, controller.signal)
-      .then((config) => { if (!controller.signal.aborted) setPracticeEnabled(config.practice_enabled); })
-      .catch(() => { if (!controller.signal.aborted) setPracticeEnabled(false); });
-    return () => controller.abort();
-  }, []);
+  const practiceEnabled = usePracticeEnabled();
   const entryCopy = CRITIQUE_ENTRY_COPY[locale];
   const homeIntentEntrances = getHomeIntentEntrances(locale);
   const retakeCopy = getRetakeCoachCopy(locale);

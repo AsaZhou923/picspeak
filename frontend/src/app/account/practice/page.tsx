@@ -12,6 +12,7 @@ import {
   updatePracticeSceneGroup,
 } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { usePracticeEnabled } from '@/features/practice/usePracticeEnabled';
 import { useI18n } from '@/lib/i18n';
 import { formatUserFacingError } from '@/lib/error-utils';
 import type {
@@ -71,6 +72,7 @@ function acceptSemanticKey(recommendation: PracticeRecommendation): string | nul
 export default function PracticeAccountPage() {
   const router = useRouter();
   const { ensureToken, userInfo } = useAuth();
+  const practiceEnabled = usePracticeEnabled();
   const { t, locale } = useI18n();
   const copy = useMemo(() => getPracticeGuidanceCopy(locale), [locale]);
   const requestIdRef = useRef(0);
@@ -221,9 +223,9 @@ export default function PracticeAccountPage() {
 
       {!loading && !error && practiceSessions.length === 0 && (
         <section className="ui-feature-panel px-6 py-7 sm:p-8">
-          <h2 className="font-display text-3xl leading-tight text-ink">{copy.firstPracticeTitle}</h2>
-          <p className="mt-4 max-w-2xl text-sm leading-7 text-ink-muted">{copy.firstPracticeBody}</p>
-          <Link href="/workspace" className="ui-action-primary mt-6 w-fit px-5 py-3 text-sm">{copy.startPractice}<ArrowRight size={15} aria-hidden="true" /></Link>
+          <h2 className="font-display text-3xl leading-tight text-ink">{practiceEnabled === true ? copy.firstPracticeTitle : copy.noPracticeRecords}</h2>
+          <p className="mt-4 max-w-2xl text-sm leading-7 text-ink-muted">{practiceEnabled === true ? copy.firstPracticeBody : t('hero_desc')}</p>
+          <Link href="/workspace" className="ui-action-primary mt-6 w-fit px-5 py-3 text-sm">{practiceEnabled === true ? copy.startPractice : t('hero_cta_start')}<ArrowRight size={15} aria-hidden="true" /></Link>
         </section>
       )}
 

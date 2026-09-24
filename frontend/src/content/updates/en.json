@@ -1,5 +1,12 @@
 [
   {
+    "id": "2026-09-24-critique-organization-and-sharing",
+    "date": "2026-09-24",
+    "title": "Organizing, browsing, and sharing after critique",
+    "summary": "Private tags, notes, and search; gallery columns, compact view, zoom, previous/next navigation, and recent work; independent share revocation, selected public profiles, PNG image cards, and print summaries now sit together after critique.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-09-24-critique-organization-and-sharing"
+  },
+  {
     "id": "2026-09-23-critique-practice-and-sharing",
     "date": "2026-09-23",
     "title": "Coming soon: organizing, retakes, and sharing after critique",

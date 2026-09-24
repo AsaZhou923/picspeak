@@ -1,5 +1,12 @@
 [
   {
+    "id": "2026-09-24-critique-organization-and-sharing",
+    "date": "2026-09-24",
+    "title": "点评后的整理、浏览与分享",
+    "summary": "私人标签备注与搜索、图库列数/紧凑/缩放/上下篇和近期作品、独立撤销分享、自选公开主页、PNG 图片卡与打印摘要现在统一进入点评后的整理路径。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-09-24-critique-organization-and-sharing"
+  },
+  {
     "id": "2026-09-23-critique-practice-and-sharing",
     "date": "2026-09-23",
     "title": "准备中：点评后的整理、复拍与分享",

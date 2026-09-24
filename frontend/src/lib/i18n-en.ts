@@ -230,8 +230,8 @@ export const enTranslations = {
     pro_offer_label: '',
     pro_offer_highlight: 'Pro',
     updates_label: 'Updates',
-    updates_hint_home: 'See the organizing, retake, and sharing update in progress',
-    updates_hint_latest: 'See the organizing, retake, and sharing update in progress',
+    updates_hint_home: 'See the organizing, browsing, and sharing update',
+    updates_hint_latest: 'See the organizing, browsing, and sharing update',
     contact_label: 'Contact',
     contact_headline: 'Get in Touch',
 

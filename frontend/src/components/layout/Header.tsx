@@ -11,9 +11,11 @@ import { useState, useEffect } from 'react';
 import { HeaderRightControls } from './HeaderControls';
 import { getHeaderVisibilityState } from './header-auth-visibility';
 import { getRetakeCoachCopy } from '@/lib/retake-coach-copy';
+import { usePracticeEnabled } from '@/features/practice/usePracticeEnabled';
 
 export default function Header() {
   const { userInfo } = useAuth();
+  const practiceEnabled = usePracticeEnabled();
   const pathname = usePathname();
   const { t, locale } = useI18n();
   const blogUi = getBlogUi(locale);
@@ -74,9 +76,9 @@ export default function Header() {
           <Link href="/workspace" className={`transition-colors ${isActive('/workspace')}`}>
             {t('nav_critique')}
           </Link>
-          <Link href="/account/practice" className={`transition-colors ${isActive('/account/practice')}`}>
+          {practiceEnabled === true && <Link href="/account/practice" className={`transition-colors ${isActive('/account/practice')}`}>
             {t('nav_practice')}
-          </Link>
+          </Link>}
           <Link href="/generate" className={`transition-colors ${isActive('/generate')}`}>
             {t('nav_generate')}
           </Link>
@@ -143,7 +145,7 @@ export default function Header() {
               <Wand2 size={14} />
               <span className="tracking-wide">{t('nav_generate_short')}</span>
             </Link>
-            <Link
+            {practiceEnabled === true && <Link
               href="/account/practice"
               className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-control text-[10px] font-medium transition-all duration-200 ${
                 pathname === '/account/practice'
@@ -153,7 +155,7 @@ export default function Header() {
             >
               <Target size={14} />
               <span className="tracking-wide">{t('nav_practice')}</span>
-            </Link>
+            </Link>}
           </nav>
         </div>
       )}

@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react';
 import { HeaderRightControls } from './HeaderControls';
 import { getHeaderVisibilityState } from './header-auth-visibility';
 import { getRetakeCoachCopy } from '@/lib/retake-coach-copy';
+import { usePracticeEnabled } from '@/features/practice/usePracticeEnabled';
 
 const MARKETING_LINKS: Array<
   | { href: string; key: 'nav_home' | 'nav_critique' | 'nav_practice' | 'nav_generate' | 'nav_gallery' | 'nav_usage' }
@@ -40,6 +41,7 @@ const MOBILE_MARKETING_LINKS: Array<{
 
 export default function MarketingHeader() {
   const { userInfo } = useAuth();
+  const practiceEnabled = usePracticeEnabled();
   const pathname = usePathname();
   const { t, locale } = useI18n();
   const blogUi = getBlogUi(locale);
@@ -99,6 +101,7 @@ export default function MarketingHeader() {
 
         <nav className="hidden md:flex items-center gap-4 text-[13px] lg:gap-6 lg:text-sm">
           {MARKETING_LINKS.map((link) => {
+            if ('href' in link && link.href === '/account/practice' && practiceEnabled !== true) return null;
             if (!('href' in link)) {
               return (
                 <Link key="blog" href={`/${locale}/blog`} className={`transition-colors ${activeClass('/blog')}`}>
@@ -120,7 +123,7 @@ export default function MarketingHeader() {
       </div>
       <div className="md:hidden border-t border-border-subtle/40 px-3 py-2">
         <nav className="flex items-stretch rounded-card bg-surface/70 p-1 gap-0.5">
-          {MOBILE_MARKETING_LINKS.map(({ href, key, kind, icon: Icon }) => (
+          {MOBILE_MARKETING_LINKS.filter((link) => link.href !== '/account/practice' || practiceEnabled === true).map(({ href, key, kind, icon: Icon }) => (
             <Link
               key={href}
               href={href}
