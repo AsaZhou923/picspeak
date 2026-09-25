@@ -224,6 +224,7 @@ Frontend values live in `frontend/.env.local`; `NEXT_PUBLIC_API_URL` and site/pu
 - Keep gallery, favorites, sharing, and export entry points visible beside an owner's critique result, including when opened from the gallery. Use `features/reviews/reviewVisibility.ts` to distinguish submission from approved public display; gallery access and share links remain independent. History gallery controls submit directly after confirmation, and disabled creation controls explain what is missing.
 - Header visibility is intentionally split: `showUsageNav` and `showMobileTabs` are public navigation, while authenticated account controls still wait for hydrated non-guest user state.
 - Follow `docs/changelog/CHANGELOG_WORKFLOW.md`; keep `docs/changelog/CHANGELOG.md`, `/updates` docPath anchors, homepage update hints, README links, and the external Update Logs mirror synchronized for user-facing feature work.
+- Maintenance fixes stay in the changelog and all three update bundles with `showPopup: false`. Announcements require explicit `showPopup: true` on the latest record; do not fall back to an older announcement or change latest-update metadata to suppress a popup.
 
 ## Verification Checklist
 

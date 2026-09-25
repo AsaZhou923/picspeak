@@ -15,6 +15,7 @@ export interface ProductUpdateEntry {
   title: string;
   summary: string;
   docPath: string;
+  showPopup?: boolean;
   sections?: ProductUpdateSection[];
 }
 
@@ -39,6 +40,10 @@ export function getLatestProductUpdate(locale: UpdateLocale): ProductUpdateEntry
     (latest, entry) => (!latest || entry.date > latest.date ? entry : latest),
     undefined,
   );
+}
+
+export function shouldShowProductUpdatePopup(update: ProductUpdateEntry | undefined): boolean {
+  return update?.showPopup === true;
 }
 
 export function getLatestProductUpdateDate(): string {

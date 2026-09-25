@@ -10,6 +10,7 @@ type UpdateEntry = {
   title: string;
   summary: string;
   docPath: string;
+  showPopup?: boolean;
   sections?: Array<{ title: string; items: string[] }>;
 };
 
@@ -43,12 +44,17 @@ test('update content bundles keep the same ids across locales', () => {
       bundles[locale].map((entry) => entry.date),
       canonicalDates,
     );
+    assert.deepEqual(
+      bundles[locale].map((entry) => entry.showPopup),
+      bundles.en.map((entry) => entry.showPopup),
+    );
 
     for (const entry of bundles[locale]) {
       assert.match(entry.date, /^\d{4}-\d{2}-\d{2}$/);
       assert.ok(entry.title);
       assert.ok(entry.summary);
       assert.ok(entry.docPath);
+      if (entry.showPopup !== undefined) assert.equal(typeof entry.showPopup, 'boolean');
       for (const section of entry.sections ?? []) {
         assert.ok(section.title);
         assert.ok(section.items.length > 0);

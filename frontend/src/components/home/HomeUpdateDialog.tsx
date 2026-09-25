@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowUpRight, Clock3, Sparkles, X } from 'lucide-react';
 import { useI18n, type Locale } from '@/lib/i18n';
-import { getLatestProductUpdate } from '@/lib/updates-data';
+import { getLatestProductUpdate, shouldShowProductUpdatePopup } from '@/lib/updates-data';
 
 const STORAGE_PREFIX = 'picspeak:update-seen:';
 
@@ -45,6 +45,7 @@ function storageKey(updateId: string): string {
 export default function HomeUpdateDialog() {
   const { locale } = useI18n();
   const latest = useMemo(() => getLatestProductUpdate(locale), [locale]);
+  const showPopup = shouldShowProductUpdatePopup(latest);
   const copy = COPY[locale];
   const [open, setOpen] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -62,7 +63,8 @@ export default function HomeUpdateDialog() {
   }, [latest]);
 
   useEffect(() => {
-    if (!latest) return;
+    setOpen(false);
+    if (!latest || !showPopup) return;
 
     let seen = false;
     try {
@@ -74,10 +76,10 @@ export default function HomeUpdateDialog() {
 
     const timer = window.setTimeout(() => setOpen(true), 650);
     return () => window.clearTimeout(timer);
-  }, [latest]);
+  }, [latest, showPopup]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || !showPopup) return;
 
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const previousOverflow = document.body.style.overflow;
@@ -116,9 +118,9 @@ export default function HomeUpdateDialog() {
       document.body.style.overflow = previousOverflow;
       previousFocus?.focus();
     };
-  }, [dismiss, open]);
+  }, [dismiss, open, showPopup]);
 
-  if (!open || !latest) return null;
+  if (!open || !latest || !showPopup) return null;
 
   return (
     <div

@@ -54,6 +54,24 @@ PicSpeak 现在只维护一份仓库内 changelog：
 10. 每次更新仓库内 `docs/changelog/CHANGELOG.md` 或 `docs/changelog/CHANGELOG_WORKFLOW.md` 后，立即同步外部 Update Logs 目录，并用 SHA256 对比仓库文件与外部副本。
 11. 对外公告只保留用户可感知的变化；技术证据留在 PR、CI、发布检查或内部记录中。
 12. 同一件事在 changelog、`/updates` 和首页提示中使用一致的用户语言，不把后台名词逐层复制到产品页面。
+13. 修复性更新必须保留更新记录，但不触发公告弹窗；更新记录与弹窗通知分开控制，遵循下节规则。
+
+## 更新记录与公告弹窗分开控制
+
+修复 bug、恢复已有功能、调整 UI 文案/按钮/布局、兼容性与稳定性维护，都应正常写入统一 changelog、三语 `/updates` 和对应首页更新记录入口，不能因为“不弹窗”而省略记录。
+
+每条新增 `/updates` 记录必须在 zh / en / ja 中一致设置 `showPopup`：
+
+| 更新类型 | `showPopup` | 行为 |
+| --- | --- | --- |
+| 修复性或维护性更新 | `false` | 保留完整更新记录和普通入口，不弹出公告 |
+| 值得主动通知的重要新功能或需要用户注意的产品变化 | 明确选择 `true` | 可展示一次公告，沿用按更新 ID 记忆已读状态 |
+| 历史记录未设置字段 | 缺省不弹窗 | 可继续浏览记录，不补发旧公告 |
+
+- `HomeUpdateDialog` 只检查最新记录；只有显式 `showPopup: true` 才能弹出。最新记录为修复性更新时，不得跳过它去弹更早的公告。
+- `getLatestProductUpdate` 仍返回真实最新记录；不要为了关闭弹窗而删除记录、修改日期/ID、改成旧版记录，或影响 `/updates`、站点地图与首页普通链接。
+- 同一轮修复直接在对应记录设置 `showPopup: false`，不要再新增一条“关闭弹窗”的公告。
+- 发布前验证三语字段一致、更新页仍有本条记录、未读用户访问首页/长廊也不会出现修复公告，并验证显式 `true` 的公告机制仍可用。
 
 ## 数据库迁移与部署类更新的附加规则
 
@@ -325,6 +343,7 @@ sha256sum docs/changelog/CHANGELOG.md "$archive/CHANGELOG.md" docs/changelog/CHA
 3. `docPath` 必须指向 `docs/changelog/CHANGELOG.md#<id>`。
 4. `summary` 用一句话说清用户价值；通常不补 `sections`。只有一句话无法解释用户可见的多个变化时，才增加不超过 2 组、每组不超过 3 条的 `sections`。
 5. 复查 `frontend/src/lib/updates-data.ts` 是否仍从三份 JSON 导入；除非 loader 结构变化，通常不需要改它。
+6. 按“更新记录与公告弹窗分开控制”规则设置 `showPopup`，三语值必须一致；修复性更新必须为 `false`。
 
 ### 7. 更新首页“更新记录”入口
 
@@ -349,6 +368,7 @@ sha256sum docs/changelog/CHANGELOG.md "$archive/CHANGELOG.md" docs/changelog/CHA
 - 三份 `/updates` JSON 的 `id` 与 `docPath` 锚点是否一致
 - README 最新 changelog 链接是否指向最新锚点
 - 首页三语 hint 是否指向本次更新主题
+- 修复性更新的三语 `showPopup` 是否均为 `false`，且没有回退弹出旧公告
 - 仓库中是否还残留 `docs/changelog/update-log-*.md` 引用
 - 外部 Update Logs 目录是否已经删除旧的 `update-log-*.md`
 - 外部 `CHANGELOG.md` / `CHANGELOG_WORKFLOW.md` 是否与仓库内文件哈希一致
@@ -498,6 +518,7 @@ git push origin <branch>
 验证：
 
 - JSON parse
+- 修复性更新记录可见、不弹窗；三语 `showPopup` 一致
 - 外部 changelog 副本 SHA256
 - 相关前端 typecheck / build
 - 相关后端测试

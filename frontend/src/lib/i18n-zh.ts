@@ -21,8 +21,8 @@ export const zhTranslations = {
   pro_offer_label: '',
   pro_offer_highlight: 'Pro',
   updates_label: '更新记录',
-  updates_hint_home: '预览长廊入口与操作提示改进',
-  updates_hint_latest: '预览长廊入口与操作提示改进',
+  updates_hint_home: '查看长廊入口与操作提示改进',
+  updates_hint_latest: '查看长廊入口与操作提示改进',
   contact_label: '联系',
   contact_headline: '联系我',
 

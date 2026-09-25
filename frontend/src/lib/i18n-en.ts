@@ -232,8 +232,8 @@ export const enTranslations = {
     pro_offer_label: '',
     pro_offer_highlight: 'Pro',
     updates_label: 'Updates',
-    updates_hint_home: 'Preview clearer gallery and sharing controls',
-    updates_hint_latest: 'Preview clearer gallery and sharing controls',
+    updates_hint_home: 'See clearer gallery and sharing controls',
+    updates_hint_latest: 'See clearer gallery and sharing controls',
     contact_label: 'Contact',
     contact_headline: 'Get in Touch',
 
