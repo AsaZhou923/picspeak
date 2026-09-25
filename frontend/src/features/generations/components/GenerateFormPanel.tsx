@@ -1,7 +1,7 @@
 'use client';
 
 import type { RefObject } from 'react';
-import { Copy, Sparkles, Wand2 } from 'lucide-react';
+import { SlidersHorizontal, Sparkles, Wand2 } from 'lucide-react';
 import type { Translator } from '@/lib/i18n';
 import type { GenerationQuality, GenerationSize } from '@/lib/types';
 import {
@@ -131,7 +131,7 @@ export default function GenerateFormPanel({
             onClick={onToggleNegative}
             className="inline-flex min-h-11 items-center gap-2 rounded-control border border-border bg-raised/60 px-3 py-2 text-xs text-ink-muted transition-colors hover:border-gold/40 hover:text-ink"
           >
-            <Copy size={13} aria-hidden="true" />
+            <SlidersHorizontal size={13} aria-hidden="true" />
             {t('generation_negative_toggle')}
           </button>
           {showNegative && (

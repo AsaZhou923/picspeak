@@ -111,7 +111,7 @@ export function PromptExampleGallery({ onApply }: PromptExampleGalleryProps) {
       <div className="flex flex-col gap-4 border-l-2 border-gold/50 pl-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0">
           <p className="mb-2 inline-flex items-center gap-2 font-mono text-xs uppercase tracking-[0.18em] text-gold/70">
-            <Sparkles size={14} />
+            <Sparkles size={14} aria-hidden="true" />
             {t('generation_examples_label')}
           </p>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -195,7 +195,7 @@ export function PromptExampleGallery({ onApply }: PromptExampleGalleryProps) {
                         aria-label={t('generation_examples_source')}
                         className="mt-0.5 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-control border border-border-subtle text-ink-subtle transition-colors hover:border-gold/30 hover:text-gold"
                       >
-                        <ExternalLink size={13} />
+                        <ExternalLink size={13} aria-hidden="true" />
                       </a>
                     </div>
                     <p className="mt-1 truncate text-[11px] text-ink-subtle">
@@ -214,7 +214,7 @@ export function PromptExampleGallery({ onApply }: PromptExampleGalleryProps) {
                       onClick={() => onApply(example)}
                       className="ui-action-primary min-w-0 px-3 text-xs"
                     >
-                      <Wand2 size={13} />
+                      <Wand2 size={13} aria-hidden="true" />
                       <span className="truncate">{t('generation_examples_apply')}</span>
                     </button>
                     <button
@@ -224,7 +224,7 @@ export function PromptExampleGallery({ onApply }: PromptExampleGalleryProps) {
                       aria-label={copied ? t('generation_examples_copied') : t('generation_examples_copy')}
                       className="inline-flex h-11 w-11 items-center justify-center rounded-control border border-border bg-raised/70 text-ink-muted transition-colors hover:border-gold/30 hover:text-gold"
                     >
-                      {copied ? <Check size={14} /> : <Copy size={14} />}
+                      {copied ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
                     </button>
                   </div>
                 </div>

@@ -59,6 +59,7 @@ test('review first-reading DOM order is photo, result, strongest finding, eviden
 
 test('review secondary tools keep quick actions visible and mount export only after expansion', async () => {
   const source = await readFile('src/app/reviews/[reviewId]/page.tsx', 'utf8');
+  const accountReviews = await readFile('src/app/account/reviews/page.tsx', 'utf8');
   const ownerTools = await readFile('src/features/reviews/components/ReviewOwnerTools.tsx', 'utf8');
   const organizationPanel = await readFile('src/features/reviews/components/ReviewOrganizationPanel.tsx', 'utf8');
   const growthLoopPanel = await readFile('src/features/reviews/components/ReviewGrowthLoopPanel.tsx', 'utf8');
@@ -71,7 +72,16 @@ test('review secondary tools keep quick actions visible and mount export only af
   assert.doesNotMatch(source, /hierarchyCopy\.ownerTool/);
   assert.match(ownerTools, /showItemSelect=\{false\}/);
   assert.match(ownerTools, /标签与备注/);
-  assert.match(ownerTools, /分享设置/);
+  assert.ok(ownerTools.indexOf('<ReviewVisibilityPanel') < ownerTools.indexOf('<details'));
+  assert.match(ownerTools, /onAddGallery=\{onAddGallery\}/);
+  assert.match(accountReviews, /<GalleryConfirmDialog/);
+  assert.match(accountReviews, /galleryConfirmReviewId/);
+  assert.match(accountReviews, /updateOrganizedReviewMeta\(reviewId, \{ gallery_visible: true \}, token\)/);
+  assert.match(accountReviews, /selectedReviewIdRef\.current === reviewId/);
+  assert.match(accountReviews, /onAddGallery=\{\(\) => \{/);
+  assert.ok(source.indexOf('<ReviewActionBar') < source.indexOf('review-evidence-title'));
+  assert.doesNotMatch(source, /<ReviewGalleryPanel/);
+  assert.match(source, /const showOwnerActions = canManageReview;/);
   assert.match(organizationPanel, /showItemSelect = true/);
   assert.match(organizationPanel, /\{showItemSelect && \(/);
   assert.doesNotMatch(growthLoopPanel, /这 3 件事|three things|この 3 つ/);

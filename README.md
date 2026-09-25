@@ -187,9 +187,11 @@ The frontend and backend can be deployed independently. The backend includes a c
 
 ## Documentation
 
-- [Latest changelog](docs/changelog/CHANGELOG.md#2026-09-24-critique-organization-and-sharing)
+- [Latest changelog — coming soon](docs/changelog/CHANGELOG.md#2026-09-25-gallery-actions-and-clearer-controls)
+- [Previous history, sharing, and practice update](docs/changelog/CHANGELOG.md#2026-09-24-critique-organization-and-sharing)
 - [Earlier preparation record](docs/changelog/CHANGELOG.md#2026-09-23-critique-practice-and-sharing)
 - [Frontend design system](DESIGN.md)
+- [UI copy and controls review](docs/frontend/ui-review-2026-09-25.md)
 - [SEO / GEO audit](docs/seo/seo-audit-2026-05-01.md)
 - [System architecture](docs/architecture/系统架构.md)
 - [Google sign-in integration](docs/guides/Google登录接入指南.md)

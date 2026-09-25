@@ -149,16 +149,17 @@ export function getFavoriteActionCopy(locale: 'zh' | 'en' | 'ja') {
 export function getGalleryActionCopy(locale: 'zh' | 'en' | 'ja') {
   if (locale === 'ja') {
     return {
-      dialogLabel: 'Public Gallery',
+      dialogLabel: '公開ギャラリー',
       dialogTitle: '公開ギャラリーに追加',
       dialogBody: '追加すると公開展示候補として画像審査が行われます。お気に入りにも自動保存され、承認後に公開ギャラリーへ表示されます。',
-      dialogFootnote: 'あとで履歴詳細ページからギャラリー解除できます。',
+      dialogFootnote: 'このページからいつでも外せます。共有リンクは別に無効にしてください。',
       dialogConfirm: '追加する',
       dialogCancel: 'キャンセル',
       confirmPublic: 'この評価をギャラリーに追加すると、公開展示候補として画像監査が行われます。追加時にお気に入りにも保存され、監査通過後に公開ギャラリーへ表示されます。後で履歴詳細ページから外せます。続行しますか？',
       pendingAdd: 'ギャラリー掲載を申請中...',
       pendingRemove: 'ギャラリーから外しています...',
       doneApproved: 'ギャラリーに追加され、お気に入りにも保存されました',
+      donePending: '申請を受け付けました。審査後に公開されます。',
       doneRejected: 'お気に入りには保存しましたが、画像監査未通過のため公開ギャラリーには表示されません',
       doneRemove: 'ギャラリーから外しました',
       guestBlocked: '公開ギャラリーへの投稿はログイン後に利用できます。閲覧はそのままできます。',
@@ -169,51 +170,34 @@ export function getGalleryActionCopy(locale: 'zh' | 'en' | 'ja') {
       dialogLabel: 'Public Gallery',
       dialogTitle: 'Submit to Public Gallery',
       dialogBody: 'This will send the image through gallery moderation. It will also be saved to favorites by default and will appear publicly after approval.',
-      dialogFootnote: 'You can remove it later from the history detail page.',
-      dialogConfirm: 'Submit',
+      dialogFootnote: 'You can remove it from this page at any time. Share links must be disabled separately.',
+      dialogConfirm: 'Add to gallery',
       dialogCancel: 'Cancel',
       confirmPublic: 'Adding this critique submits the image for gallery moderation. It will also be saved to favorites by default, and will appear in the public gallery after approval. You can remove it later from the history detail page. Continue?',
       pendingAdd: 'Submitting to gallery...',
       pendingRemove: 'Removing from gallery...',
       doneApproved: 'Added to gallery and saved to favorites',
+      donePending: 'Submitted. Your photo will appear after approval.',
       doneRejected: 'Saved to favorites, but the image did not pass gallery moderation and will not appear publicly',
       doneRemove: 'Removed from gallery',
       guestBlocked: 'Sign in to submit to the public gallery. Browsing the gallery is still available.',
     };
   }
   return {
-    dialogLabel: 'Public Gallery',
-    dialogTitle: '加入公开影像长廊',
+    dialogLabel: '公开长廊',
+    dialogTitle: '将照片加入长廊？',
     dialogBody: '加入后会进入公开长廊审核，默认也会加入收藏；审核通过后才会出现在公开长廊。',
-    dialogFootnote: '之后可在历史记录详情页里移出长廊。',
-    dialogConfirm: '确认加入',
+    dialogFootnote: '你可以随时在本页移出长廊。已有的分享链接需要单独关闭。',
+    dialogConfirm: '加入长廊',
     dialogCancel: '取消',
-    confirmPublic: '加入影像长廊后，图片会进入公开长廊审核，默认也会加入收藏；审核通过后才会出现在公开长廊。之后你可以在历史记录详情页里移出长廊。是否继续？',
-    pendingAdd: '正在提交到影像长廊...',
-    pendingRemove: '正在移出影像长廊...',
-    doneApproved: '已加入影像长廊，并默认加入收藏',
+    confirmPublic: '照片和点评会在审核通过后公开展示，并同时加入收藏。之后可随时移出长廊。是否继续？',
+    pendingAdd: '正在提交到长廊…',
+    pendingRemove: '正在移出长廊…',
+    doneApproved: '已在长廊公开展示，并加入收藏',
+    donePending: '已提交，审核通过后会在长廊公开展示。',
     doneRejected: '已加入收藏，但图片未通过长廊审核，不会出现在公开长廊',
-    doneRemove: '已移出影像长廊',
+    doneRemove: '已移出长廊，已有分享链接不受影响',
     guestBlocked: '游客可以浏览公开长廊，但不能提交到长廊，请先登录。',
-  };
-}
-
-export function getReviewGalleryCardCopy(locale: 'zh' | 'en' | 'ja') {
-  if (locale === 'ja') {
-    return {
-      title: 'この評価をギャラリーに追加できます',
-      body: 'この評価はギャラリー申請できます。追加すると公開審査に進み、同時にお気に入りにも保存されます。承認後に公開ギャラリーへ掲載され、あとから履歴詳細ページで外せます。',
-    };
-  }
-  if (locale === 'en') {
-    return {
-      title: 'You can add this critique to your gallery',
-      body: 'This critique can be submitted to the gallery. It will go through gallery moderation and be saved to favorites by default. After approval, it will appear in the public gallery, and you can remove it later from the history detail page.',
-    };
-  }
-  return {
-    title: '这次评图很值得收进影像长廊',
-    body: '这次结果很适合留档，也值得尝试公开展示。加入后会先进入公开长廊审核，并默认加入收藏；审核通过后会出现在公开长廊，之后也可以在历史记录详情页移出。',
   };
 }
 

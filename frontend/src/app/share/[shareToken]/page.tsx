@@ -15,7 +15,7 @@ import { markProductAttributionSource } from '@/lib/product-analytics';
 function getSharePageCopy(locale: 'zh' | 'en' | 'ja') {
   if (locale === 'ja') {
     return {
-      label: 'Shared Review',
+      label: '共有された講評',
       title: '共有された評価結果',
       openWorkspace: '自分の写真を評価する',
       unavailableTitle: '共有リンクは無効です',

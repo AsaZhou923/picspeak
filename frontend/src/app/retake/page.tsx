@@ -18,6 +18,7 @@ import { useAuth } from '@/lib/auth-context';
 import { formatUserFacingError } from '@/lib/error-utils';
 import { useI18n } from '@/lib/i18n';
 import { localeToIntlLocale } from '@/lib/locale';
+import { getImageTypeLabel } from '@/lib/review-history-copy';
 import { getRetakeCoachCopy } from '@/lib/retake-coach-copy';
 import { buildRetakeWorkspaceHref, getEligibleRetakeSources } from '@/lib/retake-coach';
 import type { RetakeDimensionKey, ReviewHistoryItem } from '@/lib/types';
@@ -79,7 +80,7 @@ function SourceCard({ item }: { item: ReviewHistoryItem }) {
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-[11px] uppercase tracking-[0.18em] text-ink-subtle">{date}</p>
-            <p className="mt-1 text-sm text-ink-muted">{item.image_type.replace('_', ' ')}</p>
+            <p className="mt-1 text-sm text-ink-muted">{getImageTypeLabel(locale, item.image_type)}</p>
           </div>
           <span className="inline-flex min-h-11 items-center gap-2 rounded-control border border-sage/30 bg-sage/10 px-3 py-2 text-xs font-semibold text-sage transition-colors group-hover:bg-sage group-hover:text-void">
             {copy.select}
@@ -174,7 +175,7 @@ export default function RetakeCoachPage() {
         <div className="mx-auto max-w-workspace">
           <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
             <div>
-              <p className="ui-eyebrow">01 / Original</p>
+              <p className="ui-eyebrow">{copy.sourceStepLabel}</p>
               <h2 className="mt-2 text-3xl font-semibold text-ink sm:text-4xl">{copy.sourceTitle}</h2>
               <p className="mt-3 max-w-2xl text-sm leading-7 text-ink-muted">{copy.sourceBody}</p>
             </div>

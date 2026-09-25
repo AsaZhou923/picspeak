@@ -284,7 +284,7 @@ export default function TaskPage() {
 
         {isFinal ? (
           <div className="space-y-4">
-            <AlertCircle size={48} className="text-rust mx-auto" />
+            <AlertCircle size={48} className="text-rust mx-auto" aria-hidden="true" />
             <div>
               <h1 className="font-display text-3xl mb-2">{stageInfo?.label}</h1>
               <p className="text-sm text-ink-muted">{stageInfo?.detail}</p>
@@ -316,7 +316,7 @@ export default function TaskPage() {
                             : 'bg-raised border-border text-ink-subtle'
                         }`}
                       >
-                        <Icon size={16} />
+                        <Icon size={16} aria-hidden="true" />
                       </div>
                       <p
                         className={`text-xs font-mono whitespace-nowrap ${
@@ -338,7 +338,14 @@ export default function TaskPage() {
 
             {task && !isSuccess && (
               <div className="space-y-2">
-                <div className="w-full h-0.5 bg-border rounded-full overflow-hidden">
+                <div
+                  role="progressbar"
+                  aria-label={activeStep.label}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={task.progress}
+                  className="h-1.5 w-full overflow-hidden rounded-full bg-border"
+                >
                   <div
                     className="h-full bg-gold rounded-full transition-all duration-700"
                     style={{ width: `${task.progress}%` }}
@@ -351,13 +358,13 @@ export default function TaskPage() {
         )}
 
         {!isFinal && !error && (
-          <section className="rounded-lg border border-border-subtle bg-surface/70 p-4 text-left shadow-[0_18px_50px_rgba(0,0,0,0.12)]">
+          <section className="rounded-card border border-border-subtle bg-surface/70 p-4 text-left shadow-level-1">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
                 <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-gold/80">{t('task_wait_label')}</p>
                 <h2 className="mt-1 text-sm font-medium text-ink">{t(waitNote.title)}</h2>
               </div>
-              <Aperture size={18} className="shrink-0 animate-spin-slow text-gold/80" />
+              <Aperture size={18} className="shrink-0 animate-spin-slow text-gold/80" aria-hidden="true" />
             </div>
             <p className="text-xs leading-6 text-ink-muted">{t(waitNote.body)}</p>
             <div className="mt-4 grid grid-cols-5 gap-1.5">
@@ -374,25 +381,25 @@ export default function TaskPage() {
                 </div>
               ))}
             </div>
-            <p className="mt-4 rounded-md border border-sage/20 bg-sage/5 px-3 py-2 text-xs leading-5 text-sage">
+            <p className="mt-4 rounded-control border border-sage/20 bg-sage/5 px-3 py-2 text-xs leading-5 text-sage">
               {t('task_wait_prompt')}
             </p>
           </section>
         )}
 
         {urlMode === 'pro' && activeStep?.id === 'ai' && !isFinal && !isSuccess && (
-          <p className="text-xs text-ink-muted bg-raised border border-border rounded px-4 py-2">
+          <p className="rounded-control border border-border bg-raised px-4 py-2 text-xs text-ink-muted">
             {t('task_pro_analysis_hint')}
           </p>
         )}
 
         {error && (
-          <p className="text-sm text-rust bg-rust/5 border border-rust/20 rounded px-4 py-2">
+          <p role="alert" className="rounded-control border border-rust/25 bg-rust/10 px-4 py-2.5 text-sm text-rust">
             {error}
           </p>
         )}
         {task?.error && (
-          <p className="text-sm text-rust bg-rust/5 border border-rust/20 rounded px-4 py-2">
+          <p role="alert" className="rounded-control border border-rust/25 bg-rust/10 px-4 py-2.5 text-sm text-rust">
             {taskErrorMessage}
           </p>
         )}
@@ -400,17 +407,19 @@ export default function TaskPage() {
         {(isFinal || error) && (
           <div className="flex flex-col gap-2">
             <button
+              type="button"
               onClick={() => router.push('/workspace')}
-              className="flex items-center justify-center gap-2 px-6 py-2.5 bg-gold text-void text-sm font-medium rounded hover:bg-gold-light transition-colors"
+              className="ui-action-primary min-h-11 px-6 text-sm"
             >
-              <RotateCcw size={14} />
+              <RotateCcw size={14} aria-hidden="true" />
               {t('task_retry')}
             </button>
             <button
+              type="button"
               onClick={() => router.back()}
-              className="flex items-center justify-center gap-2 text-xs text-ink-muted hover:text-ink transition-colors"
+              className="ui-action-secondary min-h-11 px-6 text-sm"
             >
-              <ArrowLeft size={11} />
+              <ArrowLeft size={14} aria-hidden="true" />
               {t('task_back')}
             </button>
           </div>

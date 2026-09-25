@@ -93,6 +93,9 @@ export function ReviewReferenceGenerationPanel({
   );
   const promptToSubmit = customPrompt.trim();
   const promptCustomized = promptToSubmit !== defaultPrompt.trim();
+  const disabledReason = !creditsReady
+    ? t('generation_submit_disabled_credits_pending')
+    : promptToSubmit.length < 3 ? t('generation_submit_disabled_prompt_too_short') : '';
 
   useEffect(() => {
     setCustomPrompt(defaultPrompt);
@@ -236,6 +239,7 @@ export function ReviewReferenceGenerationPanel({
                 <button
                   key={item.value}
                   type="button"
+                  aria-pressed={selected}
                   onClick={() => {
                     setIntent(item.value);
                     setCustomPrompt(buildReviewLinkedUserPrompt(suggestions, t(item.labelKey), t('review_reference_prompt_seed')));
@@ -274,7 +278,7 @@ export function ReviewReferenceGenerationPanel({
           </div>
 
           {error && (
-            <div className="rounded-lg border border-rust/20 bg-rust/5 px-3 py-2 text-sm text-rust">
+            <div role="alert" className="rounded-lg border border-rust/20 bg-rust/5 px-3 py-2 text-sm text-rust">
               <p>{error}</p>
               {error.toLowerCase().includes('credit') && plan !== 'guest' && (
                 <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -301,7 +305,7 @@ export function ReviewReferenceGenerationPanel({
             {plan === 'guest' ? (
               <ClerkSignInTrigger
                 fallbackRedirectUrl={`/reviews/${reviewId}`}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-gold px-5 py-3 text-sm font-bold text-void transition-colors hover:bg-gold-light sm:w-auto xl:w-full"
+                className="ui-action-primary w-full px-5 py-3 text-sm sm:w-auto xl:w-full"
               >
                 {t('review_reference_login_cta')} <ArrowRight size={14} />
               </ClerkSignInTrigger>
@@ -310,12 +314,15 @@ export function ReviewReferenceGenerationPanel({
                 type="button"
                 onClick={handleGenerate}
                 disabled={busy || !creditsReady || promptToSubmit.length < 3}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-gold px-5 py-3 text-sm font-bold text-void transition-colors hover:bg-gold-light disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto xl:w-full"
+                aria-busy={busy}
+                aria-describedby={disabledReason ? 'reference-submit-reason' : undefined}
+                className="ui-action-primary w-full px-5 py-3 text-sm disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto xl:w-full"
               >
                 {busy ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
                 {busy ? t('review_reference_busy_cta') : t('review_reference_submit_cta')}
               </button>
             )}
+            {plan !== 'guest' && disabledReason && <p id="reference-submit-reason" role="status" className="mt-3 text-sm leading-6 text-ink-muted">{disabledReason}</p>}
           </div>
         </div>
       </div>

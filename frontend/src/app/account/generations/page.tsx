@@ -43,7 +43,9 @@ function GenerationCard({ item }: { item: GeneratedImageItem }) {
           <span className="rounded-full border border-gold/30 bg-gold/10 px-2 py-0.5 text-[11px] text-gold">{t('generation_ai_badge')}</span>
           <span className="rounded-full border border-border px-2 py-0.5 text-[11px] text-ink-muted">{item.quality}</span>
           <span className="rounded-full border border-border px-2 py-0.5 text-[11px] text-ink-muted">{formatGenerationOutputSpec(item.quality, item.size)}</span>
-          <span className="rounded-full border border-border px-2 py-0.5 text-[11px] text-ink-muted">{item.credits_charged} credits</span>
+          <span className="rounded-full border border-border px-2 py-0.5 text-[11px] text-ink-muted">
+            {item.credits_charged} {t('generation_credits_unit')}
+          </span>
         </div>
         <p className="line-clamp-2 text-sm leading-6 text-ink">{item.prompt}</p>
         <p className="mt-2 font-mono text-xs text-ink-subtle">{formatDate(item.created_at, locale)}</p>

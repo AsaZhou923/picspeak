@@ -14,9 +14,9 @@ test('profile api helper targets the dedicated profiles surface', () => {
 });
 
 test('profile copy is local to the feature and covers three languages', () => {
-  assert.equal(getProfileCopy('zh').enable, '开启公开主页');
+  assert.equal(getProfileCopy('zh').enable, '发布公开主页');
   assert.equal(getProfileCopy('en').enable, 'Enable public profile');
-  assert.equal(getProfileCopy('ja').enable, '公開プロフィールを有効にする');
+  assert.equal(getProfileCopy('ja').enable, 'プロフィールを公開');
 });
 
 test('public profile page does not render notes, tags, exif, clerk, email or internal user ids', async () => {

@@ -28,13 +28,19 @@ export function ReviewOwnerTools({
   onUpdated,
   onRefresh,
   externalVersion,
+  onAddGallery,
+  actionBusy = false,
+  onBusyChange,
 }: {
   review: ReviewGetResponse | null;
   onUpdated?: (patch: ReviewOwnerToolsPatch) => void;
   onRefresh?: () => void;
   externalVersion?: string;
+  onAddGallery: () => void;
+  actionBusy?: boolean;
+  onBusyChange?: (busy: boolean) => void;
 }) {
-  const { ensureToken } = useAuth();
+  const { ensureToken, userInfo } = useAuth();
   const { locale, t } = useI18n();
   const [visibility, setVisibility] = useState<ReviewVisibilityResponse | null>(null);
   const [visibilityBusy, setVisibilityBusy] = useState(false);
@@ -43,6 +49,12 @@ export function ReviewOwnerTools({
   const [organizationBusy, setOrganizationBusy] = useState(false);
   const [organizationStatus, setOrganizationStatus] = useState('');
   const requestRef = useRef(0);
+  const onUpdatedRef = useRef(onUpdated);
+  onUpdatedRef.current = onUpdated;
+
+  useEffect(() => {
+    onBusyChange?.(visibilityBusy || organizationBusy);
+  }, [visibilityBusy, organizationBusy, onBusyChange]);
 
   const item = useMemo(() => {
     if (!review?.viewer_is_owner) return null;
@@ -56,6 +68,11 @@ export function ReviewOwnerTools({
   }, [review]);
   const itemReviewId = item?.review_id ?? null;
 
+  useEffect(() => {
+    setVisibilityStatus('');
+    setOrganizationStatus('');
+  }, [locale, itemReviewId]);
+
   const loadVisibility = useCallback(async (reviewId: string, signal?: AbortSignal) => {
     const requestId = ++requestRef.current;
     setVisibilityBusy(true);
@@ -65,6 +82,12 @@ export function ReviewOwnerTools({
       const nextVisibility = await getReviewVisibility(reviewId, token, signal);
       if (signal?.aborted || requestId !== requestRef.current) return null;
       setVisibility(nextVisibility);
+      onUpdatedRef.current?.({
+        gallery_visible: nextVisibility.gallery_visible,
+        gallery_audit_status: nextVisibility.gallery_audit_status,
+        gallery_added_at: nextVisibility.gallery_added_at,
+        gallery_rejected_reason: nextVisibility.gallery_rejected_reason,
+      });
       return nextVisibility;
     } catch (err) {
       if (isAbortError(err) || signal?.aborted || requestId !== requestRef.current) return null;
@@ -93,11 +116,6 @@ export function ReviewOwnerTools({
     : locale === 'ja'
       ? 'タグとメモ'
       : 'Tags and notes';
-  const visibilitySummary = locale === 'zh'
-    ? '分享设置'
-    : locale === 'ja'
-      ? '共有設定'
-      : 'Share settings';
 
   const handleSaveOrganization = async (payload: { tags: string[]; note: string }) => {
     setOrganizationBusy(true);
@@ -195,6 +213,24 @@ export function ReviewOwnerTools({
 
   return (
     <div className="space-y-3">
+      <div id="review-sharing" tabIndex={-1} className="scroll-mt-28 rounded-card">
+        <ReviewVisibilityPanel
+          item={{ review_id: item.review_id }}
+          locale={locale}
+          visibility={visibility}
+          busy={visibilityBusy || organizationBusy || actionBusy}
+          error={visibilityError}
+          status={visibilityStatus}
+          onStatus={setVisibilityStatus}
+          onRefresh={() => loadVisibility(item.review_id)}
+          onCreateShare={handleCreateShare}
+          onRevokeShare={handleRevokeShare}
+          onRemoveGallery={handleRemoveGallery}
+          onStopAll={handleStopAll}
+          onAddGallery={onAddGallery}
+          galleryRequiresSignIn={userInfo?.plan === 'guest'}
+        />
+      </div>
       <details className="group rounded-card border border-border-subtle bg-void/20">
         <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-4 px-4 py-3 text-sm font-semibold text-ink marker:content-none">
           <span>{organizationSummary}</span>
@@ -205,33 +241,11 @@ export function ReviewOwnerTools({
             item={item}
             items={[item]}
             locale={locale}
-            busy={organizationBusy}
+            busy={organizationBusy || visibilityBusy || actionBusy}
             status={organizationStatus}
             showItemSelect={false}
             onSelect={() => undefined}
             onSave={handleSaveOrganization}
-          />
-        </div>
-      </details>
-      <details className="group rounded-card border border-border-subtle bg-void/20">
-        <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-4 px-4 py-3 text-sm font-semibold text-ink marker:content-none">
-          <span>{visibilitySummary}</span>
-          <ChevronDown size={15} className="text-ink-subtle transition-transform group-open:rotate-180" aria-hidden="true" />
-        </summary>
-        <div className="border-t border-border-subtle p-3 sm:p-4">
-          <ReviewVisibilityPanel
-            item={{ review_id: item.review_id }}
-            locale={locale}
-            visibility={visibility}
-            busy={visibilityBusy}
-            error={visibilityError}
-            status={visibilityStatus}
-            onStatus={setVisibilityStatus}
-            onRefresh={() => loadVisibility(item.review_id)}
-            onCreateShare={handleCreateShare}
-            onRevokeShare={handleRevokeShare}
-            onRemoveGallery={handleRemoveGallery}
-            onStopAll={handleStopAll}
           />
         </div>
       </details>

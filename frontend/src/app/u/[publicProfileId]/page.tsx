@@ -147,7 +147,7 @@ export default function PublicProfilePage() {
             <div className="p-6">
               <div className="grid gap-3 sm:grid-cols-3">
                 <div className="rounded-control border border-border-subtle bg-raised/55 p-4">
-                  <p className="text-[11px] uppercase tracking-[0.22em] text-ink-subtle">Gallery</p>
+                  <p className="text-[11px] uppercase tracking-[0.22em] text-ink-subtle">{copy.galleryMetric}</p>
                   <p className="mt-2 text-2xl font-semibold text-ink">{profile.gallery_review_count}</p>
                 </div>
                 <div className="rounded-control border border-border-subtle bg-raised/55 p-4">

@@ -4,7 +4,13 @@ import { Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { AlertTriangle, ArrowLeft, Home, RotateCcw } from 'lucide-react';
-import { useI18n } from '@/lib/i18n';
+import { useI18n, type Locale } from '@/lib/i18n';
+
+const ERROR_ACTION_COPY: Record<Locale, { goBack: string; home: string }> = {
+  zh: { goBack: '返回上一页', home: '返回首页' },
+  en: { goBack: 'Go back', home: 'Go home' },
+  ja: { goBack: '前のページへ戻る', home: 'ホームへ戻る' },
+};
 
 export default function ErrorPage() {
   return (
@@ -17,7 +23,8 @@ export default function ErrorPage() {
 function ErrorContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const actionCopy = ERROR_ACTION_COPY[locale];
 
   const ERROR_CONFIGS: Record<
     string,
@@ -106,14 +113,14 @@ function ErrorContent() {
             className="flex items-center gap-1.5 text-xs text-ink-subtle hover:text-ink-muted transition-colors"
           >
             <ArrowLeft size={11} />
-            {t('err_back_home')}
+            {actionCopy.goBack}
           </button>
           <Link
             href="/"
             className="flex items-center gap-1.5 text-xs text-ink-subtle hover:text-ink-muted transition-colors"
           >
             <Home size={11} />
-            {t('err_back_home')}
+            {actionCopy.home}
           </Link>
         </div>
       </div>

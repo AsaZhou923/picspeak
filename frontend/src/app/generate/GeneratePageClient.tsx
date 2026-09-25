@@ -76,6 +76,12 @@ export default function GeneratePage() {
   const credits = estimateGenerationCredits(creditsTable, quality, size);
   const creditsReady = creditsTable?.[quality]?.[size] !== undefined;
   const outputSpec = formatGenerationOutputSpec(quality, size);
+  const promptReady = prompt.trim().length >= 3;
+  const submitDisabledReason = !creditsReady
+    ? t('generation_submit_disabled_credits_pending')
+    : !promptReady
+      ? t('generation_submit_disabled_prompt_too_short')
+      : '';
   const creditPackCheckout = useCreditPackCheckout({
     ensureToken,
     locale,
@@ -427,6 +433,7 @@ export default function GeneratePage() {
                 <button
                   type="button"
                   disabled
+                  aria-busy="true"
                   className="ui-action-primary mt-5 w-full px-5 text-sm opacity-70 disabled:cursor-wait"
                 >
                   {t('generation_auth_loading_cta')}
@@ -444,12 +451,22 @@ export default function GeneratePage() {
                 <button
                   type="button"
                   onClick={isFreeQualityBlocked ? () => void handleGenerationProUpgrade('quality_gate') : handleGenerate}
-                  disabled={submitting || !creditsReady || prompt.trim().length < 3}
+                  disabled={submitting || (!isFreeQualityBlocked && (!creditsReady || !promptReady))}
                   aria-busy={submitting}
+                  aria-describedby={!isFreeQualityBlocked && submitDisabledReason ? 'generation-submit-disabled-reason' : undefined}
                   className="ui-action-primary mt-5 w-full px-5 text-sm disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {ctaLabel}
                 </button>
+              )}
+              {!isGuest && !isFreeQualityBlocked && submitDisabledReason && (
+                <p
+                  id="generation-submit-disabled-reason"
+                  role="status"
+                  className="mt-3 rounded-control border border-border-subtle bg-surface/60 px-3 py-2 text-xs leading-5 text-ink-muted"
+                >
+                  {submitDisabledReason}
+                </p>
               )}
             </section>
 

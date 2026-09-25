@@ -5,6 +5,7 @@ import { Camera, X, AlertCircle, Loader, CheckCircle2 } from 'lucide-react';
 import { compressImage, formatBytes, compressionRatio, CompressionResult } from '@/lib/compress';
 import { extractExif, ExifData } from '@/lib/exif';
 import { useI18n } from '@/lib/i18n';
+import { createUploadSelectionLock } from './uploadSelectionLock';
 
 export interface UploadPreprocessMetrics {
   exif_extract_ms: number;
@@ -24,6 +25,7 @@ interface ImageUploaderProps {
     preprocessMetrics?: UploadPreprocessMetrics
   ) => void;
   disabled?: boolean;
+  disabledReason?: string;
   maxBytes?: number;
 }
 
@@ -33,6 +35,7 @@ const DEFAULT_MAX = 20 * 1024 * 1024; // 20 MB
 export default function ImageUploader({
   onFileSelected,
   disabled = false,
+  disabledReason,
   maxBytes = DEFAULT_MAX,
 }: ImageUploaderProps) {
   const [dragOver, setDragOver] = useState(false);
@@ -40,6 +43,7 @@ export default function ImageUploader({
   const [compressing, setCompressing] = useState(false);
   const [compressionInfo, setCompressionInfo] = useState<CompressionResult | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const processLockRef = useRef(createUploadSelectionLock());
   const { t } = useI18n();
   const maxMB = Math.round(maxBytes / 1024 / 1024);
 
@@ -59,105 +63,144 @@ export default function ImageUploader({
 
   const process = useCallback(
     async (file: File) => {
-      const preprocessStartedAt = performance.now();
-      const err = validate(file);
-      if (err) {
-        setError(err);
-        return;
-      }
-      setError(null);
-      setCompressionInfo(null);
-      setCompressing(true);
+      await processLockRef.current.tryRun(async () => {
+        const preprocessStartedAt = performance.now();
+        const err = validate(file);
+        if (err) {
+          setError(err);
+          return;
+        }
+        setError(null);
+        setCompressionInfo(null);
+        setCompressing(true);
 
-      // Extract EXIF from the original file before compression strips metadata
-      let exifData: ExifData = {};
-      const exifStartedAt = performance.now();
-      try {
-        exifData = await extractExif(file);
-      } catch {
-        // non-critical
-      }
-      const exifElapsedMs = Math.round(performance.now() - exifStartedAt);
+        try {
+          // Extract EXIF from the original file before compression strips metadata
+          let exifData: ExifData = {};
+          const exifStartedAt = performance.now();
+          try {
+            exifData = await extractExif(file);
+          } catch {
+            // non-critical
+          }
+          const exifElapsedMs = Math.round(performance.now() - exifStartedAt);
 
-      let result: CompressionResult;
-      const compressionStartedAt = performance.now();
-      try {
-        result = await compressImage(file);
-      } catch {
-        // If compression fails for any reason, fall back to original file
-        result = {
-          file,
-          originalSize: file.size,
-          compressedSize: file.size,
-          originalWidth: 0,
-          originalHeight: 0,
-          compressedWidth: 0,
-          compressedHeight: 0,
-          compressed: false,
-        };
-      }
-      const compressionElapsedMs = Math.round(performance.now() - compressionStartedAt);
+          let result: CompressionResult;
+          const compressionStartedAt = performance.now();
+          try {
+            result = await compressImage(file);
+          } catch {
+            // If compression fails for any reason, fall back to original file
+            result = {
+              file,
+              originalSize: file.size,
+              compressedSize: file.size,
+              originalWidth: 0,
+              originalHeight: 0,
+              compressedWidth: 0,
+              compressedHeight: 0,
+              compressed: false,
+            };
+          }
+          const compressionElapsedMs = Math.round(performance.now() - compressionStartedAt);
 
-      setCompressing(false);
-      setCompressionInfo(result);
+          setCompressionInfo(result);
 
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const fileReadElapsedMs = Math.round(performance.now() - fileReadStartedAt);
-        onFileSelected(result.file, e.target?.result as string, exifData, {
-          exif_extract_ms: exifElapsedMs,
-          compression_ms: compressionElapsedMs,
-          file_read_ms: fileReadElapsedMs,
-          preprocess_total_ms: Math.round(performance.now() - preprocessStartedAt),
-          compressed: result.compressed,
-          original_size_bytes: result.originalSize,
-          final_size_bytes: result.compressedSize,
-        });
-      };
-      const fileReadStartedAt = performance.now();
-      reader.readAsDataURL(result.file);
+          const fileReadStartedAt = performance.now();
+          const preview = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (event) => resolve(event.target?.result as string);
+            reader.onerror = () => reject(reader.error ?? new Error('FILE_READ_FAILED'));
+            reader.readAsDataURL(result.file);
+          });
+          const fileReadElapsedMs = Math.round(performance.now() - fileReadStartedAt);
+          onFileSelected(result.file, preview, exifData, {
+            exif_extract_ms: exifElapsedMs,
+            compression_ms: compressionElapsedMs,
+            file_read_ms: Math.max(0, fileReadElapsedMs),
+            preprocess_total_ms: Math.round(performance.now() - preprocessStartedAt),
+            compressed: result.compressed,
+            original_size_bytes: result.originalSize,
+            final_size_bytes: result.compressedSize,
+          });
+        } finally {
+          setCompressing(false);
+        }
+      });
     },
     [validate, onFileSelected]
+  );
+
+  const isInteractionLocked = useCallback(
+    () => disabled || processLockRef.current.isLocked(),
+    [disabled]
+  );
+
+  const handleProcess = useCallback(
+    (file: File | undefined | null) => {
+      if (!file || isInteractionLocked()) return;
+      void process(file).catch(() => setError(t('uploader_read_failed')));
+    },
+    [isInteractionLocked, process, t]
   );
 
   const onDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
       setDragOver(false);
-      if (disabled) return;
-      const file = e.dataTransfer.files[0];
-      if (file) process(file);
+      handleProcess(e.dataTransfer.files[0]);
     },
-    [disabled, process]
+    [handleProcess]
   );
 
   const onInputChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (file) process(file);
+      handleProcess(e.target.files?.[0]);
       // Reset input so same file can be re-selected
       e.target.value = '';
     },
-    [process]
+    [handleProcess]
   );
 
   const ratio = compressionInfo
     ? compressionRatio(compressionInfo.originalSize, compressionInfo.compressedSize)
     : 0;
+  const isUploaderDisabled = disabled || compressing;
+  const uploaderHintId = 'image-uploader-state';
+
+  const openFileDialog = useCallback(() => {
+    if (!isInteractionLocked()) inputRef.current?.click();
+  }, [isInteractionLocked]);
+
+  const onUploaderKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      openFileDialog();
+    },
+    [openFileDialog]
+  );
 
   return (
     <div className="space-y-3">
       <div
-        onDragOver={(e) => { e.preventDefault(); if (!disabled && !compressing) setDragOver(true); }}
+        onDragOver={(e) => { e.preventDefault(); if (!isInteractionLocked()) setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
         onDrop={onDrop}
-        onClick={() => !disabled && !compressing && inputRef.current?.click()}
+        onClick={openFileDialog}
+        onKeyDown={onUploaderKeyDown}
+        role="button"
+        aria-label={t('uploader_file_label')}
+        tabIndex={isUploaderDisabled ? -1 : 0}
+        aria-disabled={isUploaderDisabled}
+        aria-busy={compressing}
+        aria-describedby={disabledReason || compressing ? uploaderHintId : undefined}
         className={`
           relative cursor-pointer border border-dashed rounded-lg
           flex flex-col items-center justify-center gap-4
           min-h-52 transition-all duration-200
           ${dragOver ? 'drop-zone-active' : 'border-border hover:border-gold/40 hover:bg-raised/50'}
-          ${disabled || compressing ? 'opacity-60 cursor-not-allowed' : ''}
+          ${isUploaderDisabled ? 'opacity-60 cursor-not-allowed' : 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold/70'}
         `}
       >
         <input
@@ -166,6 +209,7 @@ export default function ImageUploader({
           accept={ALLOWED_TYPES.join(',')}
           className="hidden"
           onChange={onInputChange}
+          onClick={(event) => event.stopPropagation()}
           disabled={disabled || compressing}
           aria-label={t('uploader_file_label')}
         />
@@ -174,7 +218,7 @@ export default function ImageUploader({
           {compressing ? (
             <>
               <div className="w-14 h-14 border border-gold/30 rounded-lg flex items-center justify-center bg-raised">
-                <Loader size={22} className="text-gold animate-spin" style={{ animationDuration: '1.5s' }} />
+                <Loader size={22} className="text-gold animate-spin" style={{ animationDuration: '1.5s' }} aria-hidden="true" />
               </div>
               <div>
                 <p className="text-sm text-ink-muted">{t('uploader_compressing')}</p>
@@ -184,7 +228,7 @@ export default function ImageUploader({
           ) : (
             <>
               <div className="w-14 h-14 border border-border rounded-lg flex items-center justify-center bg-raised">
-                <Camera size={22} className="text-ink-muted" />
+                <Camera size={22} className="text-ink-muted" aria-hidden="true" />
               </div>
               <div>
                 <p className="text-sm text-ink-muted">
@@ -196,13 +240,18 @@ export default function ImageUploader({
               </div>
             </>
           )}
+          {(disabledReason || compressing) && (
+            <p id={uploaderHintId} className="max-w-sm text-xs leading-5 text-ink-subtle">
+              {disabledReason ?? t('uploader_compressing_wait')}
+            </p>
+          )}
         </div>
       </div>
 
       {/* Compression result badge */}
       {compressionInfo && !compressing && (
         <div className="flex items-center gap-2 text-xs font-mono px-3 py-2 rounded border border-border bg-raised">
-          <CheckCircle2 size={13} className="text-sage shrink-0" />
+          <CheckCircle2 size={13} className="text-sage shrink-0" aria-hidden="true" />
           {compressionInfo.compressed ? (
             <span className="text-ink-muted">
               {t('uploader_compressed')}&nbsp;
@@ -228,7 +277,7 @@ export default function ImageUploader({
 
       {error && (
         <div className="flex items-center gap-2 text-rust text-sm bg-rust/5 border border-rust/20 rounded px-3 py-2">
-          <AlertCircle size={14} className="shrink-0" />
+          <AlertCircle size={14} className="shrink-0" aria-hidden="true" />
           <span>{error}</span>
           <button
             type="button"
@@ -237,7 +286,7 @@ export default function ImageUploader({
             onClick={() => setError(null)}
             className="ml-auto text-rust/60 hover:text-rust"
           >
-            <X size={12} />
+            <X size={12} aria-hidden="true" />
           </button>
         </div>
       )}

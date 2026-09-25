@@ -36,6 +36,7 @@ const RETAKE_COACH_COPY = {
     originalReady: '原片已就位',
     uploadStep: '下一步：上传重拍图',
     originalAlt: '用于重拍比较的原片',
+    sourceStepLabel: '01 / 原片',
   },
   en: {
     nav: 'Retake Coach',
@@ -72,6 +73,7 @@ const RETAKE_COACH_COPY = {
     originalReady: 'Original ready',
     uploadStep: 'Next: upload the retake',
     originalAlt: 'Original photo selected for retake comparison',
+    sourceStepLabel: '01 / Original',
   },
   ja: {
     nav: '再撮影コーチ',
@@ -108,6 +110,7 @@ const RETAKE_COACH_COPY = {
     originalReady: '元の写真を設定済み',
     uploadStep: '次へ：再撮影をアップロード',
     originalAlt: '再撮影比較に選んだ元の写真',
+    sourceStepLabel: '01 / 元の写真',
   },
 } as const;
 

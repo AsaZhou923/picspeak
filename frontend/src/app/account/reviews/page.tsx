@@ -45,7 +45,9 @@ import {
   ReviewGrowthPanel,
   ReviewHistorySkeletonList,
 } from '@/features/reviews/components/ReviewHistoryPanels';
+import { GalleryConfirmDialog } from '@/features/reviews/components/GalleryConfirmDialog';
 import { RetakeProgressPanel } from '@/features/reviews/components/RetakeProgressPanel';
+import { getGalleryActionCopy } from '@/lib/review-page-copy';
 import { getRetakeCoachCopy } from '@/lib/retake-coach-copy';
 import {
   isFreshPracticeRequest,
@@ -172,28 +174,29 @@ export default function ReviewHistoryPage() {
   const copy = useMemo(() => getHistoryCopy(locale), [locale]);
   const retakeCopy = useMemo(() => getRetakeCoachCopy(locale), [locale]);
   const growthCopy = useMemo(() => getHistoryGrowthCopy(locale), [locale]);
+  const galleryActionCopy = useMemo(() => getGalleryActionCopy(locale), [locale]);
   const plan = userInfo?.plan ?? 'guest';
   const historyPromoCopy = useMemo(() => getProUpgradeTriggerCopy(locale, 'history_trend'), [locale]);
   const reviewSectionCopy = useMemo(() => {
     if (locale === 'zh') {
       return {
-        organize: '整理与分享',
-        retake: '复评进度',
+        organize: '分享、标签与备注',
+        retake: '重拍记录与进度',
         growth: '成长摘要',
         pro: 'Pro 历史',
       };
     }
     if (locale === 'ja') {
       return {
-        organize: '整理と共有',
-        retake: '再撮影の進捗',
+        organize: '共有・タグ・メモ',
+        retake: '再撮影の記録と進捗',
         growth: '成長サマリー',
         pro: 'Pro 履歴',
       };
     }
     return {
-      organize: 'Organize and share',
-      retake: 'Retake progress',
+      organize: 'Sharing, tags and notes',
+      retake: 'Retake records and progress',
       growth: 'Growth summary',
       pro: 'Pro history',
     };
@@ -237,6 +240,8 @@ export default function ReviewHistoryPage() {
   const [organizationBusy, setOrganizationBusy] = useState(false);
   const [organizationStatus, setOrganizationStatus] = useState('');
   const [visibilityBusy, setVisibilityBusy] = useState(false);
+  const [visibilityStatus, setVisibilityStatus] = useState('');
+  const [galleryConfirmReviewId, setGalleryConfirmReviewId] = useState<string | null>(null);
   const practiceListRequestRef = useRef(0);
   const practiceListAbortRef = useRef<AbortController | null>(null);
   const practiceSummaryRequestRef = useRef(0);
@@ -244,6 +249,7 @@ export default function ReviewHistoryPage() {
   const practiceDetailRequestRef = useRef(0);
   const legacyRequestRef = useRef(0);
   const legacyAbortRef = useRef<AbortController | null>(null);
+  const selectedReviewIdRef = useRef<string | null>(null);
 
   const createdFromInvalid = isInvalidCompletedDate(draftFilters.createdFrom);
   const createdToInvalid = isInvalidCompletedDate(draftFilters.createdTo);
@@ -316,6 +322,10 @@ export default function ReviewHistoryPage() {
       photo_unavailable: t('practice_source_photo_unavailable'),
     },
   }), [t]);
+
+  useEffect(() => {
+    selectedReviewIdRef.current = selectedReview?.review_id ?? null;
+  }, [selectedReview?.review_id]);
 
   const fetchPage = useCallback(
     async (nextCursor?: string, activeFilters: FilterDraft = appliedFilters, signal?: AbortSignal) => {
@@ -564,19 +574,27 @@ export default function ReviewHistoryPage() {
     setItems((prev) => prev.map((item) => (item.review_id === reviewId ? { ...item, ...patch } : item)));
   };
 
+  const patchReviewVisibility = (reviewId: string, visibility: ReviewVisibilityResponse) => {
+    if (selectedReviewIdRef.current === reviewId) {
+      setReviewVisibility(visibility);
+    }
+    patchSelectedReview(reviewId, {
+      gallery_visible: visibility.gallery_visible,
+      gallery_audit_status: visibility.gallery_audit_status,
+      gallery_added_at: visibility.gallery_added_at,
+      is_shared: visibility.share_enabled,
+    });
+  };
+
   const refreshSelectedVisibility = async () => {
-    if (!selectedReview) return;
+    if (!selectedReview || visibilityBusy || organizationBusy) return;
+    const reviewId = selectedReview.review_id;
     setVisibilityBusy(true);
+    setVisibilityStatus('');
     try {
       const token = await ensureToken();
-      const visibility = await getReviewVisibility(selectedReview.review_id, token);
-      setReviewVisibility(visibility);
-      patchSelectedReview(selectedReview.review_id, {
-        gallery_visible: visibility.gallery_visible,
-        gallery_audit_status: visibility.gallery_audit_status,
-        gallery_added_at: visibility.gallery_added_at,
-        is_shared: visibility.share_enabled,
-      });
+      const visibility = await getReviewVisibility(reviewId, token);
+      patchReviewVisibility(reviewId, visibility);
     } catch (err) {
       setError(formatUserFacingError(t, err, t('reviews_err_fetch')));
     } finally {
@@ -585,15 +603,17 @@ export default function ReviewHistoryPage() {
   };
 
   const handleSaveOrganization = async (payload: { tags: string[]; note: string }) => {
-    if (!selectedReview) return;
+    if (!selectedReview || visibilityBusy || organizationBusy) return;
+    const reviewId = selectedReview.review_id;
     setOrganizationBusy(true);
     setOrganizationStatus('');
     try {
       const token = await ensureToken();
-      const meta = await updateOrganizedReviewMeta(selectedReview.review_id, payload, token);
-      patchSelectedReview(selectedReview.review_id, {
+      const meta = await updateOrganizedReviewMeta(reviewId, payload, token);
+      patchSelectedReview(reviewId, {
         tags: meta.tags,
         note: meta.note,
+        favorite: meta.favorite,
         gallery_visible: meta.gallery_visible,
         gallery_audit_status: meta.gallery_audit_status,
         gallery_added_at: meta.gallery_added_at,
@@ -607,14 +627,15 @@ export default function ReviewHistoryPage() {
   };
 
   const handleCreateShare = async () => {
-    if (!selectedReview) return;
+    if (!selectedReview || visibilityBusy || organizationBusy) return;
+    const reviewId = selectedReview.review_id;
     setVisibilityBusy(true);
+    setVisibilityStatus('');
     try {
       const token = await ensureToken();
-      await createOrganizedReviewShare(selectedReview.review_id, token);
-      const visibility = await getReviewVisibility(selectedReview.review_id, token);
-      setReviewVisibility(visibility);
-      patchSelectedReview(selectedReview.review_id, { is_shared: visibility.share_enabled });
+      await createOrganizedReviewShare(reviewId, token);
+      const visibility = await getReviewVisibility(reviewId, token);
+      patchReviewVisibility(reviewId, visibility);
     } catch (err) {
       setError(formatUserFacingError(t, err, t('reviews_err_fetch')));
     } finally {
@@ -623,13 +644,14 @@ export default function ReviewHistoryPage() {
   };
 
   const handleRevokeShare = async () => {
-    if (!selectedReview) return;
+    if (!selectedReview || visibilityBusy || organizationBusy) return;
+    const reviewId = selectedReview.review_id;
     setVisibilityBusy(true);
+    setVisibilityStatus('');
     try {
       const token = await ensureToken();
-      const visibility = await revokeReviewShare(selectedReview.review_id, token);
-      setReviewVisibility(visibility);
-      patchSelectedReview(selectedReview.review_id, { is_shared: visibility.share_enabled });
+      const visibility = await revokeReviewShare(reviewId, token);
+      patchReviewVisibility(reviewId, visibility);
     } catch (err) {
       setError(formatUserFacingError(t, err, t('reviews_err_fetch')));
     } finally {
@@ -638,20 +660,57 @@ export default function ReviewHistoryPage() {
   };
 
   const handleRemoveGallery = async () => {
-    if (!selectedReview) return;
+    if (!selectedReview || visibilityBusy || organizationBusy) return;
+    const reviewId = selectedReview.review_id;
     setVisibilityBusy(true);
+    setVisibilityStatus(galleryActionCopy.pendingRemove);
     try {
       const token = await ensureToken();
-      const meta = await updateOrganizedReviewMeta(selectedReview.review_id, { gallery_visible: false }, token);
-      patchSelectedReview(selectedReview.review_id, {
+      const meta = await updateOrganizedReviewMeta(reviewId, { gallery_visible: false }, token);
+      patchSelectedReview(reviewId, {
+        favorite: meta.favorite,
         gallery_visible: meta.gallery_visible,
         gallery_audit_status: meta.gallery_audit_status,
         gallery_added_at: meta.gallery_added_at,
       });
-      const visibility = await getReviewVisibility(selectedReview.review_id, token);
-      setReviewVisibility(visibility);
-      patchSelectedReview(selectedReview.review_id, { is_shared: visibility.share_enabled });
+      const visibility = await getReviewVisibility(reviewId, token);
+      patchReviewVisibility(reviewId, visibility);
+      setVisibilityStatus(galleryActionCopy.doneRemove);
     } catch (err) {
+      setVisibilityStatus('');
+      setError(formatUserFacingError(t, err, t('reviews_err_fetch')));
+    } finally {
+      setVisibilityBusy(false);
+    }
+  };
+
+  const handleAddGallery = async (reviewId: string) => {
+    if (visibilityBusy || organizationBusy) return;
+    setGalleryConfirmReviewId(null);
+    setVisibilityBusy(true);
+    setVisibilityStatus(galleryActionCopy.pendingAdd);
+    try {
+      const token = await ensureToken();
+      const meta = await updateOrganizedReviewMeta(reviewId, { gallery_visible: true }, token);
+      patchSelectedReview(reviewId, {
+        favorite: meta.favorite,
+        gallery_visible: meta.gallery_visible,
+        gallery_audit_status: meta.gallery_audit_status,
+        gallery_added_at: meta.gallery_added_at,
+      });
+      if (!meta.gallery_visible) {
+        setVisibilityStatus(galleryActionCopy.doneRemove);
+      } else if (meta.gallery_audit_status === 'approved') {
+        setVisibilityStatus(galleryActionCopy.doneApproved);
+      } else if (meta.gallery_audit_status === 'rejected') {
+        setVisibilityStatus(meta.gallery_rejected_reason || galleryActionCopy.doneRejected);
+      } else {
+        setVisibilityStatus(galleryActionCopy.donePending);
+      }
+      const visibility = await getReviewVisibility(reviewId, token);
+      patchReviewVisibility(reviewId, visibility);
+    } catch (err) {
+      setVisibilityStatus('');
       setError(formatUserFacingError(t, err, t('reviews_err_fetch')));
     } finally {
       setVisibilityBusy(false);
@@ -659,18 +718,14 @@ export default function ReviewHistoryPage() {
   };
 
   const handleStopAllPublic = async () => {
-    if (!selectedReview) return;
+    if (!selectedReview || visibilityBusy || organizationBusy) return;
+    const reviewId = selectedReview.review_id;
     setVisibilityBusy(true);
+    setVisibilityStatus('');
     try {
       const token = await ensureToken();
-      const visibility = await disableReviewPublicVisibility(selectedReview.review_id, token);
-      setReviewVisibility(visibility);
-      patchSelectedReview(selectedReview.review_id, {
-        gallery_visible: visibility.gallery_visible,
-        gallery_audit_status: visibility.gallery_audit_status,
-        gallery_added_at: visibility.gallery_added_at,
-        is_shared: visibility.share_enabled,
-      });
+      const visibility = await disableReviewPublicVisibility(reviewId, token);
+      patchReviewVisibility(reviewId, visibility);
     } catch (err) {
       setError(formatUserFacingError(t, err, t('reviews_err_fetch')));
     } finally {
@@ -790,6 +845,17 @@ export default function ReviewHistoryPage() {
 
   return (
     <div className="min-h-screen">
+      {galleryConfirmReviewId && (
+        <GalleryConfirmDialog
+          onClose={() => {
+            if (!visibilityBusy) setGalleryConfirmReviewId(null);
+          }}
+          onConfirm={() => void handleAddGallery(galleryConfirmReviewId)}
+          actionBusy={visibilityBusy ? 'gallery' : null}
+          galleryActionCopy={galleryActionCopy}
+        />
+      )}
+
       <div className="mx-auto max-w-task px-4 py-6 sm:px-6 sm:py-8 animate-fade-in">
         <div className="mb-5 flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
           <div>
@@ -992,7 +1058,7 @@ export default function ReviewHistoryPage() {
 
             {!loading && !error && items.length > 0 && (
               <div className="mt-8 space-y-3">
-                <details className="rounded-lg border border-border-subtle bg-raised/60">
+                <details open className="rounded-lg border border-border-subtle bg-raised/60">
                   <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-ink">
                     {reviewSectionCopy.organize}
                   </summary>
@@ -1001,7 +1067,7 @@ export default function ReviewHistoryPage() {
                       item={selectedReview}
                       items={items}
                       locale={locale}
-                      busy={organizationBusy}
+                      busy={organizationBusy || visibilityBusy}
                       status={organizationStatus}
                       onSelect={setSelectedReviewId}
                       onSave={handleSaveOrganization}
@@ -1010,12 +1076,19 @@ export default function ReviewHistoryPage() {
                       item={selectedReview}
                       locale={locale}
                       visibility={reviewVisibility}
-                      busy={visibilityBusy}
+                      busy={visibilityBusy || organizationBusy}
+                      status={visibilityStatus}
+                      onStatus={setVisibilityStatus}
                       onRefresh={refreshSelectedVisibility}
                       onCreateShare={handleCreateShare}
                       onRevokeShare={handleRevokeShare}
                       onRemoveGallery={handleRemoveGallery}
                       onStopAll={handleStopAllPublic}
+                      onAddGallery={() => {
+                        if (selectedReview && !visibilityBusy && !organizationBusy) {
+                          setGalleryConfirmReviewId(selectedReview.review_id);
+                        }
+                      }}
                     />
                   </div>
                 </details>

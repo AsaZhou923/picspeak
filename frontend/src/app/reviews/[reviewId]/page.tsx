@@ -17,7 +17,6 @@ import {
   generateScoreSummary,
   getDimDescByType,
   getEffectiveQuota,
-  getReviewGalleryCardCopy,
   getScoreLabelColor,
   getScoreLabelKey,
   getWeakestDimKey,
@@ -36,7 +35,6 @@ import {
 import { ReviewActionBar } from '@/features/reviews/components/ReviewActionBar';
 import { ReviewGrowthLoopPanel } from '@/features/reviews/components/ReviewGrowthLoopPanel';
 import { ReviewReferenceGenerationPanel } from '@/features/reviews/components/ReviewReferenceGenerationPanel';
-import { ReviewGalleryPanel } from '@/features/reviews/components/ReviewGalleryPanel';
 import { ImageZoomOverlay } from '@/features/reviews/components/ImageZoomOverlay';
 import { RetakeComparisonPanel } from '@/features/reviews/components/RetakeComparisonPanel';
 import { usePracticeExposure } from '@/features/reviews/hooks/usePracticeExposure';
@@ -50,10 +48,10 @@ import { ReviewOwnerTools } from '@/features/reviews/components/ReviewOwnerTools
 function getReviewSourceContextCopy(locale: 'zh' | 'en' | 'ja') {
   if (locale === 'ja') {
     return {
-      label: 'Replay Context',
+      label: '前回の講評',
       title: '元の講評につながる再分析です',
       body: '今回の結果は、以前の講評から続く撮影または修正として記録されています。',
-      sourceReview: 'Source review',
+      sourceReview: '元の講評',
       openSource: '元の講評を見る',
     };
   }
@@ -67,7 +65,7 @@ function getReviewSourceContextCopy(locale: 'zh' | 'en' | 'ja') {
     };
   }
   return {
-    label: '复拍上下文',
+    label: '上一次点评',
     title: '这次点评已关联来源点评',
     body: '你可以回到来源点评，对照这次复拍或同图修正是否推进了上一轮目标。',
     sourceReview: '来源点评',
@@ -78,46 +76,46 @@ function getReviewSourceContextCopy(locale: 'zh' | 'en' | 'ja') {
 function getReviewHierarchyCopy(locale: 'zh' | 'en' | 'ja') {
   if (locale === 'ja') {
     return {
-      strongestLabel: 'Strongest finding',
+      strongestLabel: '改善の優先点',
       strongestTitle: '最初に直すべきこと',
-      evidenceLabel: 'Detailed evidence',
+      evidenceLabel: '評価の詳細',
       evidenceTitle: '評価の根拠を確認する',
-      secondaryLabel: 'Review record',
-      secondaryTitle: '記録、共有、その他の操作',
+      secondaryLabel: '写真と講評',
+      secondaryTitle: '共有と写真の管理',
       referenceTool: '参考画像を生成',
       metaTool: '撮影情報',
       exportTool: '共有画像と印刷用レポート',
-      exportAction: '共有画像を作る',
-      galleryTool: 'Gallery 表示',
+      exportAction: 'ダウンロードと印刷',
+      shareAction: '講評を共有',
     };
   }
   if (locale === 'en') {
     return {
-      strongestLabel: 'Strongest finding',
+      strongestLabel: 'Priority improvement',
       strongestTitle: 'The first thing to address',
       evidenceLabel: 'Detailed evidence',
       evidenceTitle: 'Inspect the critique evidence',
       secondaryLabel: 'Review record',
-      secondaryTitle: 'Record, share, and secondary actions',
+      secondaryTitle: 'Sharing and photo details',
       referenceTool: 'Generate a visual reference',
       metaTool: 'Photo metadata',
       exportTool: 'Share image and print report',
-      exportAction: 'Open export',
-      galleryTool: 'Gallery visibility',
+      exportAction: 'Download and print',
+      shareAction: 'Share critique',
     };
   }
   return {
-    strongestLabel: '最强发现',
+    strongestLabel: '优先改进',
     strongestTitle: '最先要处理的问题',
     evidenceLabel: '详细依据',
     evidenceTitle: '查看评分与点评依据',
     secondaryLabel: '点评记录',
-    secondaryTitle: '记录、分享与次要操作',
+    secondaryTitle: '分享与照片管理',
     referenceTool: '生成参考图',
     metaTool: '拍摄信息',
     exportTool: '分享图片与打印报告',
-    exportAction: '打开导出',
-    galleryTool: 'Gallery 展示',
+    exportAction: '下载与打印',
+    shareAction: '分享点评',
   };
 }
 
@@ -155,6 +153,7 @@ export default function ReviewPage() {
   const [activeDim, setActiveDim] = useState<string | null>(null);
   const [highlightedCardId, setHighlightedCardId] = useState<string | null>(null);
   const [exportToolsOpen, setExportToolsOpen] = useState(false);
+  const [ownerToolsBusy, setOwnerToolsBusy] = useState(false);
   const exportToolsRef = useRef<HTMLDetailsElement | null>(null);
 
   const { review, setReview, loading, error, initialPhotoUrl } = useReviewDetail(reviewId);
@@ -167,9 +166,9 @@ export default function ReviewPage() {
     zoomOpen, setZoomOpen, zoomMounted, setZoomMounted,
   } = useReviewPhoto({ review, setReview, initialPhotoUrl });
   const {
-    linkCopied, galleryConfirmOpen, setGalleryConfirmOpen, actionBusy, actionFeedback, actionError,
+    galleryConfirmOpen, setGalleryConfirmOpen, actionBusy, actionFeedback, actionError,
     galleryActionCopy, favoriteCopy,
-    handleGalleryToggle, submitGalleryToggle, handleBackendShareLink,
+    handleGalleryToggle, submitGalleryToggle,
     handleFavoriteToggle,
   } = useReviewActions({ review, setReview });
   const { usage, usageError } = useReviewUsage();
@@ -257,10 +256,8 @@ export default function ReviewPage() {
   const plan = userInfo?.plan ?? 'guest';
   const canManageReview = Boolean(review.viewer_is_owner);
   const showPersonalActions = !isGalleryBackHref;
-  const showOwnerActions = canManageReview && !isGalleryBackHref;
-  const gallerySaved = Boolean(review.gallery_visible);
+  const showOwnerActions = canManageReview;
   const isLowScore = r.final_score < 5.0;
-  const reviewGalleryCardCopy = getReviewGalleryCardCopy(locale);
   const nextShootChecklist = buildNextShootChecklist(displaySuggestions, 3, r.scores);
   const visualReferenceBrief = r.comparison
     ? [
@@ -354,7 +351,20 @@ export default function ReviewPage() {
     setExportToolsOpen(true);
     window.requestAnimationFrame(() => {
       exportToolsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      exportToolsRef.current?.querySelector('summary')?.focus({ preventScroll: true });
     });
+  }
+
+  function handleOpenSharing() {
+    void trackProductEvent('share_clicked', {
+      token: token ?? undefined,
+      pagePath: `/reviews/${activeReview.review_id}`,
+      locale,
+      metadata: { review_id: activeReview.review_id, mode: activeReview.mode },
+    });
+    const sharing = document.getElementById('review-sharing');
+    sharing?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    sharing?.focus({ preventScroll: true });
   }
 
   const practiceRecordSessionId = activeReview.practice?.session_id ?? activeReview.practice_session_id ?? null;
@@ -479,6 +489,31 @@ export default function ReviewPage() {
               )}
             </header>
 
+            {showOwnerActions && (
+              <div className="space-y-3 border-y border-border-subtle py-4">
+                <ReviewActionBar
+                  review={review}
+                  showOwnerActions={showOwnerActions}
+                  showGuestHistoryLink={userInfo?.plan === 'guest'}
+                  locale={locale}
+                  actionBusy={actionBusy ?? (ownerToolsBusy ? 'visibility' : null)}
+                  favoriteCopy={favoriteCopy}
+                  exportLabel={hierarchyCopy.exportAction}
+                  shareLabel={hierarchyCopy.shareAction}
+                  onGalleryToggle={handleGalleryToggle}
+                  onFavoriteToggle={handleFavoriteToggle}
+                  onShareLink={handleOpenSharing}
+                  onExportSummary={handleOpenExportTools}
+                  t={t}
+                />
+                {(actionFeedback || actionError) && (
+                  <div role={actionError ? 'alert' : 'status'} className={`rounded-control border px-4 py-3 text-sm ${actionError ? 'border-rust/25 bg-rust/5 text-rust' : 'border-sage/25 bg-sage/5 text-sage'}`}>
+                    {actionError || actionFeedback}
+                  </div>
+                )}
+              </div>
+            )}
+
             {!isGoalPracticeReview && (
               <>
                 <section className="ui-panel border-l-4 border-l-rust p-5" aria-labelledby="review-strongest-finding-title">
@@ -583,25 +618,16 @@ export default function ReviewPage() {
           </h2>
 
           {showOwnerActions && (
-            <div className="mt-5 space-y-3">
-              <ReviewActionBar
+            <div className="mt-5">
+              <ReviewOwnerTools
+                key={`owner-${review.review_id}`}
                 review={review}
-                showOwnerActions={showOwnerActions}
-                showGuestHistoryLink={userInfo?.plan === 'guest'}
-                linkCopied={linkCopied}
-                actionBusy={actionBusy}
-                favoriteCopy={favoriteCopy}
-                exportLabel={hierarchyCopy.exportAction}
-                onFavoriteToggle={handleFavoriteToggle}
-                onShareLink={handleBackendShareLink}
-                onExportSummary={handleOpenExportTools}
-                t={t}
+                externalVersion={`${actionBusy ?? ''}:${actionFeedback}:${review.gallery_visible}`}
+                actionBusy={actionBusy !== null}
+                onBusyChange={setOwnerToolsBusy}
+                onAddGallery={handleGalleryToggle}
+                onUpdated={(patch) => setReview((previous) => previous?.review_id === review.review_id ? { ...previous, ...patch } : previous)}
               />
-              {(actionFeedback || actionError) && (
-                <div role={actionError ? 'alert' : 'status'} className={`rounded-control border px-4 py-3 text-sm ${actionError ? 'border-rust/25 bg-rust/5 text-rust' : 'border-sage/25 bg-sage/5 text-sage'}`}>
-                  {actionError || actionFeedback}
-                </div>
-              )}
             </div>
           )}
 
@@ -639,13 +665,6 @@ export default function ReviewPage() {
 
           {showOwnerActions && (
             <div className="mt-3 space-y-3">
-              <ReviewOwnerTools
-                key={`owner-${review.review_id}`}
-                review={review}
-                externalVersion={`${actionBusy ?? ''}:${actionFeedback}:${review.gallery_visible}`}
-                onUpdated={(patch) => setReview((previous) => previous?.review_id === review.review_id ? { ...previous, ...patch } : previous)}
-              />
-
               <details
                 ref={exportToolsRef}
                 open={exportToolsOpen}
@@ -673,25 +692,6 @@ export default function ReviewPage() {
               search={searchParams.get('gallery_query') ?? ''}
               className="mt-6"
             />
-          )}
-
-          {showOwnerActions && (
-            <details className="group ui-panel mt-3 p-0">
-              <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-sm font-semibold text-ink marker:content-none">
-                <span>{hierarchyCopy.galleryTool}</span>
-                <ChevronDown size={16} className="text-ink-subtle transition-transform group-open:rotate-180" aria-hidden="true" />
-              </summary>
-              <div className="border-t border-border-subtle p-4 sm:p-5">
-                <ReviewGalleryPanel
-                  review={review}
-                  gallerySaved={gallerySaved}
-                  actionBusy={actionBusy}
-                  reviewGalleryCardCopy={reviewGalleryCardCopy}
-                  onGalleryToggle={handleGalleryToggle}
-                  t={t}
-                />
-              </div>
-            </details>
           )}
 
           <p className="mt-6 border-t border-border-subtle pt-4 text-xs leading-5 text-ink-subtle">

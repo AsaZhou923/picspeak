@@ -45,7 +45,7 @@ export function GalleryConfirmDialog({ onClose, onConfirm, actionBusy, galleryAc
           ref={closeButtonRef}
           type="button"
           onClick={onClose}
-          className="absolute right-4 top-4 rounded-full border border-border-subtle p-2 text-ink-muted transition-colors hover:border-gold/30 hover:text-gold"
+          className="absolute right-4 top-4 flex min-h-11 min-w-11 items-center justify-center rounded-full border border-border-subtle text-ink-muted transition-colors hover:border-gold/30 hover:text-gold"
           aria-label={galleryActionCopy.dialogCancel}
         >
           <X size={14} />
@@ -67,7 +67,7 @@ export function GalleryConfirmDialog({ onClose, onConfirm, actionBusy, galleryAc
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full border border-border px-4 py-2.5 text-sm text-ink-muted transition-colors hover:border-gold/30 hover:text-ink"
+            className="ui-action-secondary px-4 py-2.5 text-sm"
           >
             {galleryActionCopy.dialogCancel}
           </button>
@@ -75,7 +75,7 @@ export function GalleryConfirmDialog({ onClose, onConfirm, actionBusy, galleryAc
             type="button"
             onClick={onConfirm}
             disabled={actionBusy !== null}
-            className="rounded-full bg-gold px-5 py-2.5 text-sm font-medium text-void transition-colors hover:bg-gold-light disabled:opacity-60"
+            className="ui-action-primary px-5 py-2.5 text-sm disabled:opacity-60"
           >
             {galleryActionCopy.dialogConfirm}
           </button>

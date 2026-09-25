@@ -34,6 +34,12 @@ export function useReviewActions({
   const [actionError, setActionError] = useState('');
 
   useEffect(() => {
+    setActionFeedback('');
+    setActionError('');
+    setLinkCopied(false);
+  }, [locale, review?.review_id]);
+
+  useEffect(() => {
     if (!galleryConfirmOpen) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setGalleryConfirmOpen(false);
@@ -44,7 +50,6 @@ export function useReviewActions({
 
   const handleGalleryToggle = useCallback(async () => {
     if (!review || actionBusy) return;
-    const plan = review.viewer_is_owner ? 'owner' : 'guest';
     if (!review.viewer_is_owner) {
       setActionError(galleryActionCopy.guestBlocked);
       setActionFeedback('');
@@ -72,8 +77,10 @@ export function useReviewActions({
         setActionFeedback(galleryActionCopy.doneRemove);
       } else if (payload.gallery_audit_status === 'approved') {
         setActionFeedback(galleryActionCopy.doneApproved);
-      } else {
+      } else if (payload.gallery_audit_status === 'rejected') {
         setActionFeedback(payload.gallery_rejected_reason || galleryActionCopy.doneRejected);
+      } else {
+        setActionFeedback(galleryActionCopy.donePending);
       }
     } catch (err) {
       setActionFeedback('');

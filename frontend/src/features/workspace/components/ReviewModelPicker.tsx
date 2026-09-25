@@ -10,6 +10,7 @@ function modelCopy(locale: 'zh' | 'en' | 'ja') {
       gptTitle: 'GPT-5.6',
       gptBadge: 'Deep vision',
       gptBody: 'Uses OpenAI image reasoning and strict structured output. Usually takes longer.',
+      groupLabel: 'Critique model',
     };
   }
   if (locale === 'ja') {
@@ -20,6 +21,7 @@ function modelCopy(locale: 'zh' | 'en' | 'ja') {
       gptTitle: 'GPT-5.6',
       gptBadge: '深い視覚分析',
       gptBody: 'OpenAI の画像推論と厳密な構造化出力を使用します。通常は時間がかかります。',
+      groupLabel: '講評モデル',
     };
   }
   return {
@@ -29,6 +31,7 @@ function modelCopy(locale: 'zh' | 'en' | 'ja') {
     gptTitle: 'GPT-5.6',
     gptBadge: '深度视觉',
     gptBody: '使用 OpenAI 图片推理和严格结构化输出，通常需要更长时间。',
+    groupLabel: '评图模型',
   };
 }
 
@@ -62,7 +65,7 @@ export function ReviewModelPicker({
   ];
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2" role="radiogroup">
+    <div className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label={copy.groupLabel}>
       {options.map((option) => {
         const selected = value === option.value;
         const Icon = option.icon;
@@ -85,7 +88,7 @@ export function ReviewModelPicker({
               <span className={`flex h-9 w-9 items-center justify-center rounded-xl border ${
                 option.tone === 'sage' ? 'border-sage/30 text-sage' : 'border-gold/30 text-gold'
               }`}>
-                <Icon size={16} />
+                <Icon size={16} aria-hidden="true" />
               </span>
               <span className={`inline-flex items-center gap-1 rounded-control border px-2 py-1 text-[10px] ${
                 option.tone === 'sage' ? 'border-sage/30 text-sage' : 'border-gold/30 text-gold'

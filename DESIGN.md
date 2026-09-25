@@ -1,6 +1,6 @@
 # PicSpeak Design System
 
-Status: approved direction for the 2026 frontend optimization
+Status: Active; refreshed 2026-09-25 after the site-wide UI copy and action review
 Owner: product/frontend
 Applies to: `frontend/src/app`, `frontend/src/components`, `frontend/src/features`
 
@@ -16,6 +16,10 @@ Supporting product context:
 - Result-page history: `/Users/ze/Documents/docs/01 - Projects/PicSpeak/03 - Frontend/PicSpeak 结果页前端 TODO.md`
 
 The screenshots under `docs/assets/screenshots/` are historical evidence, not pixel-perfect targets.
+
+Current evidence: the user-provided result-page screenshots, all frontend route families,
+shared navigation, review visibility handlers, and the zh/en/ja UI dictionaries. The
+2026-09-25 audit and verification record lives in `docs/frontend/ui-review-2026-09-25.md`.
 
 ## 2. Brand
 
@@ -145,6 +149,11 @@ Context moves with the user from critique into Retake or Generate. Re-entry and 
 
 Show the strongest conclusion and next step first; expose technical detail, metadata and alternatives on demand.
 
+Publishing to the gallery, sharing, saving and downloading are explicit user jobs.
+Their entry points must remain visible beside the result, including when an owner
+opens their own work from the gallery. Collapse optional settings and metadata,
+never the only entry point to a core action.
+
 ### 6.6 Honest AI state
 
 Make processing, failure, confidence limits, quotas and paid actions explicit. Never use animation as a substitute for status text.
@@ -262,7 +271,8 @@ Use warm/black translucent shadows tied to the theme. Avoid unique arbitrary sha
 
 - First view: image, overall result, strongest insight and next recommended action.
 - Second view: dimension evidence and prioritized findings.
-- Third view: metadata, export/share, history and secondary actions.
+- Result actions: a visible “Add to gallery” button beside the photo/result, followed by favorites, sharing and export. Distinguish not submitted, awaiting approval, public and rejected states; the stored submission flag alone does not prove publication.
+- Third view: metadata, tags/notes, export options and public-access management. Keep gallery and link access together with a clear action for the current state.
 - Retake is the preferred continuation when advice is shootable; Generate is the preferred reference path when a visual example is useful.
 - Recommended actions are selected from stable structured state such as ownership, comparison/source-review context and existing capability availability. Do not infer the primary CTA from free-text critique keywords; preserve explicit user choice when both Retake and Generate are valid.
 - AI limitations remain visible but quiet.
@@ -294,6 +304,7 @@ Gallery, Blog, Updates and account/history pages adopt the shared container, pan
 - Destructive: explicit rust/red semantics with confirmation where needed.
 - Minimum target: 44×44px on touch surfaces.
 - Loading retains label context and prevents duplicate submission.
+- Inactive features offer their next action instead of a row of disabled reverse actions. Unknown state offers retry and must not appear as a confirmed private state.
 
 ### Panels
 
@@ -392,6 +403,8 @@ Task flows additionally define draft preservation, navigation-away behavior and 
 - Concise controls: verb-first labels such as “Critique photo”, “Plan a retake”, “Generate reference”.
 - Avoid hype, blame, excessive exclamation marks and unexplained model terminology.
 - Localized copy preserves intent and hierarchy rather than mirroring sentence length.
+- Chinese gallery UI uses “长廊”; Japanese uses “ギャラリー”. “收藏” is private saving; “加入长廊” requests public display after moderation. Sharing links grant access separately, so removing from the gallery must not imply all public access is closed.
+- Name outcomes and destinations: “下载与打印”, “创建分享链接”, “查看点评”. Do not expose internal design language such as “次要操作”, “公开渠道” or “上下文” as navigation labels.
 
 ## 14. Technical constraints
 
@@ -417,4 +430,4 @@ Task flows additionally define draft preservation, navigation-away behavior and 
 - Supporting routes inherit the new visual system without breaking functionality.
 - Automated frontend checks and a production build pass.
 - Representative screenshots are reviewed against the brand hierarchy and page-pattern requirements above.
-- A dated implementation record is published in the external PicSpeak frontend documentation directory.
+- A dated implementation and verification record is kept in `docs/frontend/` alongside the code.

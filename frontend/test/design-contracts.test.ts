@@ -77,6 +77,23 @@ test('global design tokens and reduced-motion behavior remain defined', () => {
   assert.doesNotMatch(css, /\.bg-orb-(?:indigo|teal)|\.bg-star/);
 });
 
+test('theme text roles remain readable on every base panel surface', () => {
+  const css = read('src/app/globals.css');
+  for (const selector of [':root', '.dark']) {
+    const block = css.slice(css.indexOf(`${selector} {`)).split('}')[0];
+    const color = (name: string) => {
+      const match = block.match(new RegExp(`--color-${name}:\\s*(\\d+)\\s+(\\d+)\\s+(\\d+)`));
+      assert.ok(match, `${selector} defines ${name}`);
+      return match.slice(1).map(Number);
+    };
+    for (const ink of ['ink', 'ink-muted', 'ink-subtle']) {
+      for (const surface of ['void', 'surface', 'raised', 'overlay']) {
+        assert.ok(contrast(color(ink), color(surface)) >= 4.5, `${selector} ${ink} on ${surface}`);
+      }
+    }
+  }
+});
+
 test('shared chrome participates in normal flow and owns the route main landmark', () => {
   const siteChrome = read('src/components/layout/SiteChrome.tsx');
   const marketingHeader = read('src/components/layout/MarketingHeader.tsx');

@@ -53,7 +53,7 @@ export default function GalleryScoreboard({
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <p className="ui-eyebrow inline-flex items-center gap-2 text-[10px]">
               <Trophy size={12} />
-              Scoreboard
+              {copy.scoreboardLabel}
             </p>
             {payload && (
               <p className="text-[11px] leading-5 text-ink-subtle">

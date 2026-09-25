@@ -1,5 +1,28 @@
 [
   {
+    "id": "2026-09-25-gallery-actions-and-clearer-controls",
+    "date": "2026-09-25",
+    "title": "Coming soon: easier gallery publishing and clearer controls",
+    "summary": "We are preparing a visible gallery action, clearer publishing and sharing states, and more helpful controls for uploads and generation in English, Chinese, and Japanese.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-09-25-gallery-actions-and-clearer-controls",
+    "sections": [
+      {
+        "title": "Gallery and sharing",
+        "items": [
+          "Add to gallery will sit beside your critique result and work directly from history, with distinct actions for unsubmitted, pending, public, and unapproved photos.",
+          "Gallery visibility and share links can be turned off separately. Link controls reflect their current state, and gallery publication still requires your confirmation and approval."
+        ]
+      },
+      {
+        "title": "Clearer controls",
+        "items": [
+          "Button labels and guidance will be more consistent across all three languages, with explanations when generation is unavailable.",
+          "Uploads will support keyboard interaction and retry after errors, with more readable supporting text in the dark theme."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-09-24-critique-organization-and-sharing",
     "date": "2026-09-24",
     "title": "Clearer history, sharing, exports, and practice",

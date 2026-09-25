@@ -58,7 +58,7 @@ export default function GalleryReviewNeighborNav({
   const neighborSearch = query.toString();
 
   return (
-    <nav className={`rounded-card border border-border-subtle bg-surface/80 p-3 ${className}`} aria-label="Gallery">
+    <nav className={`rounded-card border border-border-subtle bg-surface/80 p-3 ${className}`} aria-label={copy.neighborNavLabel}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Link href={payloadBackHref} className="inline-flex min-h-10 items-center gap-2 rounded-control px-2 text-sm text-ink-muted hover:text-ink">
           <Images size={15} />

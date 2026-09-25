@@ -610,6 +610,15 @@ function WorkspacePageContent() {
   const hasReadyPhoto = Boolean(photo && (stage === 'ready' || stage === 'reviewing'));
   const hasSubmitError = Boolean(stage === 'ready' && errMessage);
   const activeTaskStep = resolveWorkspaceTaskStep(stage, hasReadyPhoto, hasSubmitError);
+  const uploaderDisabledReason = stage === 'uploading'
+    ? `${t('stage_uploading')} ${uploadProgress}%`
+    : stage === 'confirming'
+      ? t('stage_confirming')
+      : stage === 'ready'
+        ? flowCopy.stepHints.settings
+        : stage === 'reviewing'
+          ? t('stage_reviewing')
+          : undefined;
   const uploadedPracticePhotoLabel = trustedPracticeKind === 'edit_revision' ? targetCopy.editedLabel : targetCopy.retakeLabel;
   const practiceUploadHint = trustedPracticeKind === 'edit_revision' ? targetCopy.editUploadHint : targetCopy.uploadHint;
   const completedTaskSteps =
@@ -826,6 +835,7 @@ function WorkspacePageContent() {
                       <ImageUploader
                         onFileSelected={handleFileSelected}
                         disabled={stage !== 'idle' && stage !== 'error'}
+                        disabledReason={uploaderDisabledReason}
                       />
                     </div>
                   }
