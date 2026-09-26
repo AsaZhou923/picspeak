@@ -3,22 +3,22 @@
     "id": "2026-09-26-gallery-and-critique-clarity",
     "date": "2026-09-26",
     "showPopup": false,
-    "title": "Coming soon: photos first in the gallery, clearer critiques",
-    "summary": "Public photos will appear sooner in the gallery, with clearer critique evidence and controls, plus a retry when loading fails.",
+    "title": "Photos first in the gallery, clearer critiques",
+    "summary": "Public photos now appear sooner in the gallery, with clearer critique evidence and controls, plus a retry when loading fails.",
     "docPath": "docs/changelog/CHANGELOG.md#2026-09-26-gallery-and-critique-clarity",
     "sections": [
       {
         "title": "Photos and critiques",
         "items": [
-          "The gallery will show public works first, with less framing around the photo and clearer author and score details.",
-          "The public critique example will lead into the result sooner; the weakest score explanation will stay visible on phones."
+          "The gallery shows public works first, with less framing around the photo and clearer author and score details.",
+          "The public critique example leads into the result sooner; the weakest score explanation stays visible on phones."
         ]
       },
       {
         "title": "Controls and recovery",
         "items": [
-          "Navigation and filters will be easier to use by keyboard or touch, with more readable small labels.",
-          "A loading failure will be distinguished from an empty gallery and offer a retry."
+          "Navigation and filters are easier to use by keyboard or touch, with more readable small labels.",
+          "A loading failure is distinguished from an empty gallery and offers a retry."
         ]
       }
     ]

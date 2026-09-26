@@ -187,7 +187,7 @@ npm run build
 
 ## 文档
 
-- [最新更新日志（准备中）](docs/changelog/CHANGELOG.md#2026-09-26-gallery-and-critique-clarity)
+- [最新更新日志](docs/changelog/CHANGELOG.md#2026-09-26-gallery-and-critique-clarity)
 - [此前长廊与操作提示更新](docs/changelog/CHANGELOG.md#2026-09-25-gallery-actions-and-clearer-controls)
 - [此前历史、分享与练习更新](docs/changelog/CHANGELOG.md#2026-09-24-critique-organization-and-sharing)
 - [此前准备记录](docs/changelog/CHANGELOG.md#2026-09-23-critique-practice-and-sharing)
