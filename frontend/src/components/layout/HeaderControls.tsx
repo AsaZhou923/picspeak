@@ -58,7 +58,7 @@ export function LanguageSwitcher() {
         ref={triggerRef}
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="flex min-h-11 items-center gap-1 rounded-control px-2 text-sm text-ink-muted transition-colors hover:text-ink"
+        className="flex h-11 items-center gap-1 rounded-control px-2 text-sm text-ink-muted transition-colors hover:text-ink"
         aria-label={t('language_switcher_label')}
         aria-expanded={open}
         aria-controls="header-language-options"
@@ -135,7 +135,7 @@ function QuickLinksMenu() {
         aria-label={t('nav_more')}
         aria-expanded={open}
         aria-controls="header-quick-links"
-        className={`flex min-h-11 items-center gap-1 rounded-full border border-border-subtle bg-raised/55 px-2.5 text-xs text-ink-muted transition-all hover:border-gold/30 hover:text-gold ${
+        className={`flex h-11 items-center gap-1 rounded-full border border-border-subtle bg-raised/55 px-2.5 text-sm text-ink-muted transition-all hover:border-gold/30 hover:text-gold ${
           open ? 'border-gold/40 text-gold' : ''
         }`}
       >
@@ -200,7 +200,7 @@ export function HeaderRightControls({
   const renderedTheme = themeControlMounted ? theme : 'dark';
 
   return (
-    <div className={`flex items-center gap-1.5 sm:gap-2 ${className}`}>
+    <div className={`flex h-11 items-center gap-1.5 sm:gap-2 ${className}`}>
       <LanguageSwitcher />
 
       <button
@@ -238,7 +238,7 @@ export function HeaderRightControls({
                 <SignInButton mode="modal" fallbackRedirectUrl="/workspace">
                   <button
                     type="button"
-                    className="min-h-11 rounded-control border border-gold/40 px-2.5 py-1.5 text-sm text-gold transition-colors hover:bg-gold/10 sm:px-3 whitespace-nowrap"
+                    className="inline-flex h-11 items-center justify-center whitespace-nowrap rounded-control border border-gold/40 px-2.5 text-sm text-gold transition-colors hover:bg-gold/10 sm:px-3"
                   >
                     {authLabels.signIn}
                   </button>
@@ -246,7 +246,7 @@ export function HeaderRightControls({
                 <SignUpButton mode="modal" fallbackRedirectUrl="/workspace">
                   <button
                     type="button"
-                    className="hidden min-h-11 rounded-control border border-border px-2.5 py-1.5 text-sm text-ink-muted transition-colors hover:border-gold/40 hover:text-gold sm:inline-flex sm:px-3 whitespace-nowrap"
+                    className="hidden h-11 items-center justify-center whitespace-nowrap rounded-control border border-border px-2.5 text-sm text-ink-muted transition-colors hover:border-gold/40 hover:text-gold sm:inline-flex sm:px-3"
                   >
                     {authLabels.signUp}
                   </button>
@@ -265,7 +265,7 @@ export function HeaderRightControls({
             <SignInButton mode="modal" fallbackRedirectUrl="/workspace">
               <button
                 type="button"
-                className="min-h-11 rounded-control border border-gold/40 px-2.5 py-1.5 text-sm text-gold transition-colors hover:bg-gold/10 sm:px-3 whitespace-nowrap"
+                className="inline-flex h-11 items-center justify-center whitespace-nowrap rounded-control border border-gold/40 px-2.5 text-sm text-gold transition-colors hover:bg-gold/10 sm:px-3"
               >
                 {authLabels.signIn}
               </button>
@@ -273,7 +273,7 @@ export function HeaderRightControls({
             <SignUpButton mode="modal" fallbackRedirectUrl="/workspace">
               <button
                 type="button"
-                className="hidden min-h-11 rounded-control border border-border px-2.5 py-1.5 text-sm text-ink-muted transition-colors hover:border-gold/40 hover:text-gold sm:inline-flex sm:px-3 whitespace-nowrap"
+                className="hidden h-11 items-center justify-center whitespace-nowrap rounded-control border border-border px-2.5 text-sm text-ink-muted transition-colors hover:border-gold/40 hover:text-gold sm:inline-flex sm:px-3"
               >
                 {authLabels.signUp}
               </button>
