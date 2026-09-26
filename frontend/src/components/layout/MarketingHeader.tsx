@@ -66,7 +66,7 @@ export default function MarketingHeader() {
 
   const activeClass = (href: string) =>
     isActive(href)
-      ? 'text-gold'
+      ? 'font-semibold text-gold underline decoration-gold decoration-2 underline-offset-8'
       : 'text-ink-muted hover:text-ink';
 
   return (
@@ -75,11 +75,12 @@ export default function MarketingHeader() {
         <div className="flex items-center gap-3">
           <Link
             href={homeHref}
+            aria-label="PicSpeak"
             className="flex items-center gap-2 text-ink hover:text-gold transition-colors shrink-0"
           >
             <Image
-              src="/logo.png"
-              alt="PicSpeak"
+              src="/brand-mark.svg"
+              alt=""
               width={28}
               height={28}
               className="rounded object-contain"
@@ -89,6 +90,7 @@ export default function MarketingHeader() {
           </Link>
           <Link
             href={homeHref}
+            aria-current={isActive('/') ? 'page' : undefined}
             className={`md:hidden flex h-7 items-center rounded-full px-3 text-xs font-medium transition-colors ${
               isActive('/')
                 ? 'bg-gold/10 text-gold'
@@ -104,7 +106,7 @@ export default function MarketingHeader() {
             if ('href' in link && link.href === '/account/practice' && practiceEnabled !== true) return null;
             if (!('href' in link)) {
               return (
-                <Link key="blog" href={`/${locale}/blog`} className={`transition-colors ${activeClass('/blog')}`}>
+                <Link key="blog" href={`/${locale}/blog`} aria-current={isActive('/blog') ? 'page' : undefined} className={`transition-colors ${activeClass('/blog')}`}>
                   {blogUi.navLabel}
                 </Link>
               );
@@ -112,7 +114,7 @@ export default function MarketingHeader() {
 
             const href = link.href === '/' ? homeHref : link.href;
             return (
-              <Link key={href} href={href} className={`transition-colors ${activeClass(link.href)}`}>
+              <Link key={href} href={href} aria-current={isActive(link.href) ? 'page' : undefined} className={`transition-colors ${activeClass(link.href)}`}>
                 {t(link.key)}
               </Link>
             );
@@ -127,6 +129,7 @@ export default function MarketingHeader() {
             <Link
               key={href}
               href={href}
+              aria-current={isActive(href) ? 'page' : undefined}
               className={`flex-1 flex flex-col items-center justify-center gap-1 rounded-control py-2 text-[10px] font-medium transition-all duration-200 ${
                 isActive(href)
                   ? 'bg-void shadow-sm text-gold'

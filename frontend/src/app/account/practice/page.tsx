@@ -273,12 +273,12 @@ export default function PracticeAccountPage() {
       {!loading && !error && practiceEnabled === false && practiceSessions.length === 0 && <p className="text-sm text-ink-muted">{copy.noPracticeRecords}</p>}
 
       {(error || actionError) && (
-        <div className="flex items-start gap-3 rounded-card border border-danger/35 bg-danger/10 p-4 text-sm text-danger">
+        <div className="flex items-start gap-3 rounded-card border border-rust/35 bg-rust/10 p-4 text-sm text-rust">
           <AlertCircle size={18} className="mt-0.5 shrink-0" />
           <div className="space-y-2">
             {error && <p>{error}</p>}
             {actionError && <p>{actionError}</p>}
-            <button type="button" onClick={() => void load()} className="font-medium text-danger underline underline-offset-4">
+            <button type="button" onClick={() => void load()} className="font-medium text-rust underline underline-offset-4">
               {copy.retry}
             </button>
           </div>

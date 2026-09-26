@@ -55,6 +55,7 @@ test('review first-reading DOM order is photo, result, strongest finding, eviden
   assert.ok(evidence < growthLoop);
   assert.doesNotMatch(source, /<ReviewNextActionPanel/);
   assert.doesNotMatch(source, /className="pt-14 min-h-screen"/);
+  assert.match(source, /isDemoReview \? 'py-6 sm:py-8' : 'py-10 sm:py-12'/);
 });
 
 test('review secondary tools keep quick actions visible and mount export only after expansion', async () => {
@@ -91,7 +92,10 @@ test('review score controls use native buttons with focus and touch-readable des
   const source = await readFile('src/features/reviews/components/ReviewScorePanel.tsx', 'utf8');
 
   assert.match(source, /aria-label=\{t\('img_zoom_label'\)\}/);
+  assert.match(source, /className="font-body text-lg font-semibold text-ink"/);
   assert.match(source, /aria-describedby=\{descriptionId\}/);
+  assert.match(source, /const showDescription = isWeakest \|\| isActive \|\| !hasTarget;/);
+  assert.match(source, /showDescription \? 'block' : 'hidden group-hover:block group-focus-within:block'/);
   assert.match(source, /group-focus-within:block/);
   assert.match(source, /aria-pressed=\{isActive\}/);
   assert.doesNotMatch(source, /<div[\s\S]{0,180}onClick=/);

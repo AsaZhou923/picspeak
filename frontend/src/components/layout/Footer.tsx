@@ -16,7 +16,7 @@ export default function Footer() {
   const blogUi = getBlogUi(locale);
   const badgeLinkClass =
     'group flex shrink-0 min-w-[220px] items-center gap-3 rounded-full border border-border-subtle bg-raised/60 px-4 py-2.5 text-left text-ink-subtle transition-all hover:border-gold/25 hover:bg-raised/85 hover:text-ink';
-  const badgeEyebrowClass = 'text-[10px] uppercase tracking-[0.24em] text-ink-muted/75';
+  const badgeEyebrowClass = 'text-[10px] uppercase tracking-[0.24em] text-ink-muted';
   const badgeTitleClass = 'text-sm font-medium text-ink';
 
   const badgeLinks = (
@@ -106,11 +106,11 @@ export default function Footer() {
       <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-ink-subtle">
         <div className="flex items-center gap-2">
           <Image
-            src="/logo.png"
-            alt="PicSpeak"
-            width={14}
-            height={14}
-            className="rounded object-contain opacity-60"
+            src="/brand-mark.svg"
+            alt=""
+            width={24}
+            height={24}
+            className="rounded object-contain"
           />
           <span className="font-display text-sm text-ink-muted tracking-wider">PicSpeak</span>
         </div>
@@ -164,7 +164,7 @@ export default function Footer() {
             <Twitter size={14} />
             <span>@Zzw_Prime</span>
           </a>
-          <p className="text-ink-subtle/60">
+          <p className="text-ink-subtle">
             Copyright {new Date().getFullYear()} PicSpeak. AI Photography Critique.
           </p>
         </div>

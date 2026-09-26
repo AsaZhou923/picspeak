@@ -241,7 +241,7 @@ export default async function AsaZhouAuthorPage() {
       <div className="min-h-screen pt-10">
         <section className="mx-auto grid max-w-[1120px] gap-8 px-6 py-12 lg:grid-cols-[minmax(0,1fr)_340px] lg:py-16">
           <div>
-            <p className="mb-3 text-xs uppercase tracking-[0.32em] text-gold/70">{copy.eyebrow}</p>
+            <p className="mb-3 text-xs uppercase tracking-[0.32em] text-accent-muted">{copy.eyebrow}</p>
             <h1 className="max-w-3xl font-display text-4xl text-ink sm:text-5xl">Asa Zhou</h1>
             <p className="mt-5 max-w-2xl text-base leading-8 text-ink-muted">{copy.description}</p>
 
@@ -291,7 +291,7 @@ export default async function AsaZhouAuthorPage() {
           </div>
 
           <aside className="rounded-[28px] border border-border-subtle bg-[radial-gradient(circle_at_top_left,rgba(200,171,90,0.14),transparent_34%),rgb(var(--color-surface)/0.82)] p-6 text-ink">
-            <p className="text-xs uppercase tracking-[0.26em] text-gold/72">{copy.entitySignals}</p>
+            <p className="text-xs uppercase tracking-[0.26em] text-accent-muted">{copy.entitySignals}</p>
             <dl className="mt-5 grid gap-5 text-sm">
               <div>
                 <dt className="text-ink-subtle">{copy.role}</dt>

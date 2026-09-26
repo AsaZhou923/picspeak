@@ -26,6 +26,10 @@ const config: Config = {
           light:   'rgb(var(--color-gold-light)  / <alpha-value>)',
           dim:     'rgb(var(--color-gold-dim)    / <alpha-value>)',
         },
+        accent: {
+          DEFAULT: 'rgb(var(--color-accent)       / <alpha-value>)',
+          muted:   'rgb(var(--color-accent-muted) / <alpha-value>)',
+        },
         sage: {
           DEFAULT: 'rgb(var(--color-sage)       / <alpha-value>)',
           light:   'rgb(var(--color-sage-light)  / <alpha-value>)',

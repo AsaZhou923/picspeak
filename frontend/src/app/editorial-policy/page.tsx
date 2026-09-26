@@ -265,7 +265,7 @@ export default async function EditorialPolicyPage() {
 
       <div className="min-h-screen px-6 py-16">
         <article className="mx-auto max-w-4xl">
-          <p className="text-xs uppercase tracking-[0.32em] text-gold/70">{copy.eyebrow}</p>
+          <p className="text-xs uppercase tracking-[0.32em] text-accent-muted">{copy.eyebrow}</p>
           <h1 className="mt-4 font-display text-4xl leading-tight text-ink sm:text-5xl">
             {copy.title}
           </h1>

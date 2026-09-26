@@ -43,11 +43,17 @@ function contrast(left: readonly number[], right: readonly number[]): number {
   return (bright + 0.05) / (dark + 0.05);
 }
 
+function blend(foreground: readonly number[], background: readonly number[], alpha: number): number[] {
+  return foreground.map((channelValue, index) => Math.round((channelValue * alpha) + (background[index] * (1 - alpha))));
+}
+
 test('light-theme semantic accent text meets normal-text contrast on core surfaces', () => {
   const canvas = [250, 249, 247] as const;
   const surface = [243, 239, 233] as const;
   const accents = {
     gold: [132, 88, 32],
+    accent: [116, 77, 27],
+    accentMuted: [93, 68, 38],
     sage: [66, 107, 70],
     rust: [139, 70, 57],
   } as const;
@@ -56,6 +62,11 @@ test('light-theme semantic accent text meets normal-text contrast on core surfac
     assert.ok(contrast(color, canvas) >= 4.5, `${name} must pass on the canvas`);
     assert.ok(contrast(color, surface) >= 4.5, `${name} must pass on a surface`);
   }
+
+  const oldSmallGold = [132, 88, 32] as const;
+  assert.ok(contrast(blend(oldSmallGold, canvas, 0.7), canvas) < 4.5, 'gold/70 demonstrates why small accent text needs a solid semantic role');
+  assert.ok(contrast(accents.accentMuted, canvas) >= 4.5, 'accent muted must pass on the canvas');
+  assert.ok(contrast(accents.accentMuted, surface) >= 4.5, 'accent muted must pass on a surface');
 });
 
 test('global design tokens and reduced-motion behavior remain defined', () => {
@@ -64,6 +75,8 @@ test('global design tokens and reduced-motion behavior remain defined', () => {
   for (const token of [
     '--color-action',
     '--color-action-ink',
+    '--color-accent',
+    '--color-accent-muted',
     '--radius-control',
     '--radius-card',
     '--radius-feature',
@@ -75,6 +88,25 @@ test('global design tokens and reduced-motion behavior remain defined', () => {
 
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
   assert.doesNotMatch(css, /\.bg-orb-(?:indigo|teal)|\.bg-star/);
+});
+
+test('small accent labels avoid translucent gold text in owned route surfaces', () => {
+  const excluded = [
+    'src/components/gallery/',
+    'src/features/generations/components/PromptExampleGallery.tsx',
+    'src/components/layout/Header.tsx',
+    'src/components/layout/MarketingHeader.tsx',
+    'src/components/layout/Footer.tsx',
+    'src/app/layout.tsx',
+    'src/app/reviews/[reviewId]/',
+    'src/features/reviews/components/ReviewScorePanel.tsx',
+  ];
+  const offenders = listTsx('src/')
+    .filter((file) => !excluded.some((prefix) => file.startsWith(prefix)))
+    .filter((file) => /\btext-gold\/(?:70|72|75|80)\b/.test(read(file)))
+    .sort();
+
+  assert.deepEqual(offenders, []);
 });
 
 test('theme text roles remain readable on every base panel surface', () => {

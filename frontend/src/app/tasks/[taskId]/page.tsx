@@ -361,10 +361,10 @@ export default function TaskPage() {
           <section className="rounded-card border border-border-subtle bg-surface/70 p-4 text-left shadow-level-1">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
-                <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-gold/80">{t('task_wait_label')}</p>
+                <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-accent-muted">{t('task_wait_label')}</p>
                 <h2 className="mt-1 text-sm font-medium text-ink">{t(waitNote.title)}</h2>
               </div>
-              <Aperture size={18} className="shrink-0 animate-spin-slow text-gold/80" aria-hidden="true" />
+              <Aperture size={18} className="shrink-0 animate-spin-slow text-accent-muted" aria-hidden="true" />
             </div>
             <p className="text-xs leading-6 text-ink-muted">{t(waitNote.body)}</p>
             <div className="mt-4 grid grid-cols-5 gap-1.5">

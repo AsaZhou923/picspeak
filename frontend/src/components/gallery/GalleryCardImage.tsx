@@ -32,38 +32,24 @@ function GalleryCardImage({
   };
 
   return (
-    <div className={`relative w-full overflow-hidden rounded-card border border-border-subtle bg-raised shadow-level-1 ${compact ? 'aspect-[5/4]' : 'aspect-[4/5]'}`}>
+    <div className={`relative flex w-full items-center justify-center overflow-hidden rounded-t-card bg-void/35 ${compact ? 'min-h-48 sm:aspect-[5/4] sm:min-h-0' : 'min-h-56 sm:aspect-[4/3] sm:min-h-0'}`}>
       {!broken && src ? (
-        <>
+        <div className="w-full sm:h-full">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={src}
-            alt=""
-            aria-hidden="true"
+            alt={alt}
             loading="lazy"
             decoding="async"
-            className="absolute inset-0 h-full w-full scale-110 object-cover opacity-30 blur-[26px] saturate-[0.85] transition-transform duration-1000 group-hover:scale-[1.2] dark:opacity-45"
+            className={`w-full object-contain transition-transform duration-700 group-hover:scale-[1.015] ${compact ? 'h-48 p-1 sm:h-full' : 'h-auto max-h-[36rem] p-1.5 sm:h-full sm:max-h-none'}`}
+            onError={handleError}
           />
-          <div className={`absolute flex items-center justify-center overflow-hidden rounded-card border border-border bg-surface/70 shadow-level-1 backdrop-blur-[3px] ${compact ? 'inset-3' : 'inset-x-4 bottom-6 top-4'}`}>
-            <div className="relative h-full w-full">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={src}
-                alt={alt}
-                loading="lazy"
-                decoding="async"
-                className={`absolute inset-0 h-full w-full object-contain transition-transform duration-700 group-hover:scale-[1.05] ${compact ? 'px-2 py-2' : 'px-3 py-4'}`}
-                onError={handleError}
-              />
-            </div>
-          </div>
-        </>
+        </div>
       ) : (
         <div className="flex h-full w-full items-center justify-center bg-surface px-6 text-center text-sm leading-6 text-ink-subtle">
           {alt}
         </div>
       )}
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-void/75" />
     </div>
   );
 }

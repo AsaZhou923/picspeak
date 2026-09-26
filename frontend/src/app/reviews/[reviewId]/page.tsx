@@ -412,7 +412,10 @@ export default function ReviewPage() {
         />
       )}
 
-      <div ref={recheckExposureRef} className="mx-auto max-w-workspace px-5 py-10 sm:px-6 sm:py-12">
+      <div
+        ref={recheckExposureRef}
+        className={`mx-auto max-w-workspace px-5 sm:px-6 ${isDemoReview ? 'py-6 sm:py-8' : 'py-10 sm:py-12'}`}
+      >
         <button
           type="button"
           onClick={handleBackNavigation}

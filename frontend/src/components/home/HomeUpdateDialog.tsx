@@ -194,7 +194,7 @@ export default function HomeUpdateDialog() {
                     className="rounded-card border border-border-subtle bg-void/35 p-4"
                   >
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-[10px] text-gold/80">
+                      <span className="font-mono text-[10px] text-accent-muted">
                         {String(sectionIndex + 1).padStart(2, '0')}
                       </span>
                       <h3 className="font-display text-lg leading-tight text-ink">{section.title}</h3>

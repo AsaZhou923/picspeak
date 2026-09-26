@@ -116,7 +116,7 @@ export default function ActivationCodeModal({
         </button>
 
         <div className="space-y-4 pr-8">
-          <p className="text-xs font-mono uppercase tracking-[0.24em] text-gold/80">{t('activation_code_label')}</p>
+          <p className="text-xs font-mono uppercase tracking-[0.24em] text-accent-muted">{t('activation_code_label')}</p>
           <h2 className="font-display text-4xl leading-none text-white">{t('activation_code_title')}</h2>
           <p className="max-w-[420px] text-lg leading-8 text-white/72">
             {t('activation_code_body')}

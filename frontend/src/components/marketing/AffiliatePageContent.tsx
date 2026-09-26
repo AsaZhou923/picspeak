@@ -77,7 +77,7 @@ export default function AffiliatePageContent() {
   return (
     <div className="px-6 pt-28 pb-24">
       <section className="max-w-5xl mx-auto">
-        <div className="inline-flex items-center gap-2 mb-6 px-4 py-1.5 border border-gold/20 rounded-full text-xs text-gold/80">
+        <div className="inline-flex items-center gap-2 mb-6 px-4 py-1.5 border border-gold/20 rounded-full text-xs text-accent-muted">
           <BadgeDollarSign size={12} />
           <span>{t('affiliate_badge')}</span>
         </div>
@@ -147,13 +147,13 @@ export default function AffiliatePageContent() {
 
       <section className="max-w-5xl mx-auto mt-20 grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
         <article className="rounded-2xl border border-border-subtle bg-raised/25 p-8">
-          <p className="text-xs text-gold/70 font-mono tracking-widest uppercase">{seoCopy.proofLabel}</p>
+          <p className="text-xs text-accent-muted font-mono tracking-widest uppercase">{seoCopy.proofLabel}</p>
           <h2 className="mt-3 font-display text-3xl text-ink">{seoCopy.proofTitle}</h2>
           <p className="mt-5 text-sm leading-7 text-ink-muted">{seoCopy.proofBody}</p>
         </article>
 
         <aside className="rounded-2xl border border-border-subtle bg-raised/25 p-8">
-          <p className="text-xs text-gold/70 font-mono tracking-widest uppercase">{seoCopy.stepsLabel}</p>
+          <p className="text-xs text-accent-muted font-mono tracking-widest uppercase">{seoCopy.stepsLabel}</p>
           <div className="mt-5 space-y-4">
             {seoCopy.steps.map((step, index) => (
               <div key={step} className="flex gap-3">
@@ -184,7 +184,7 @@ export default function AffiliatePageContent() {
       <section className="max-w-5xl mx-auto mt-20">
         <div className="rounded-2xl border border-border-subtle bg-raised/20 p-8 sm:p-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
           <div>
-            <p className="text-xs text-gold/70 font-mono tracking-widest uppercase">{t('affiliate_join_label')}</p>
+            <p className="text-xs text-accent-muted font-mono tracking-widest uppercase">{t('affiliate_join_label')}</p>
             <h2 className="mt-3 font-display text-3xl sm:text-4xl max-w-2xl">
               {t('affiliate_join_title')}
             </h2>

@@ -70,7 +70,7 @@ function UsageDecisionPanel({
   return (
     <section className="ui-panel border-gold/20 p-5">
       <div className="mb-5">
-        <p className="mb-2 text-[11px] font-mono uppercase tracking-[0.22em] text-gold/75">
+        <p className="mb-2 text-[11px] font-mono uppercase tracking-[0.22em] text-accent-muted">
           {decisionCopy.label}
         </p>
         <h2 className="font-display text-2xl text-ink">
@@ -87,7 +87,7 @@ function UsageDecisionPanel({
           <p className="mt-2 text-sm leading-6 text-ink-muted">{boundaryCopy.free.body}</p>
         </div>
         <div className="rounded-2xl border border-gold/25 bg-gold/10 p-4">
-          <p className="text-xs uppercase tracking-[0.16em] text-gold/80">{boundaryCopy.pro.title}</p>
+          <p className="text-xs uppercase tracking-[0.16em] text-accent-muted">{boundaryCopy.pro.title}</p>
           <p className="mt-2 text-sm leading-6 text-ink">{boundaryCopy.pro.body}</p>
         </div>
       </div>
@@ -313,10 +313,10 @@ export default function UsagePage() {
                       <p className="text-xs text-ink-muted">{fixedSubscriptionCopy[locale].label}</p>
                       <p className="text-sm text-ink">{subscriptionEndText}</p>
                       {isZhLocale && isActivationCodeSubscription && (
-                        <p className="text-xs text-gold/80">{activationUiCopy.zh.subscriptionHint}</p>
+                        <p className="text-xs text-accent-muted">{activationUiCopy.zh.subscriptionHint}</p>
                       )}
                       {usage.subscription?.cancelled && (
-                        <p className="text-xs text-gold/80">{fixedSubscriptionCopy[locale].cancelledHint}</p>
+                        <p className="text-xs text-accent-muted">{fixedSubscriptionCopy[locale].cancelledHint}</p>
                       )}
                     </div>
                   )}

@@ -201,14 +201,14 @@ export function ReviewGrowthLoopPanel({
         <div className="rounded-card border border-border-subtle bg-void/25 p-4 sm:p-5">
           <div className="mb-3 flex items-center gap-2">
             <ListTodo size={15} className="text-gold" />
-            <span className="text-xs font-medium uppercase tracking-[0.18em] text-gold/80">{copy.checklistLabel}</span>
+            <span className="text-xs font-medium uppercase tracking-[0.18em] text-accent-muted">{copy.checklistLabel}</span>
           </div>
           <h3 className="text-lg font-semibold leading-7 text-ink">{copy.checklistTitle}</h3>
           <p className="mt-2 text-sm leading-6 text-ink-muted">{copy.checklistBody}</p>
 
           {practiceEnabled && !skipped && effectiveGoal && (
             <div ref={goalExposureRef} className="mt-4 rounded-[22px] border border-gold/25 bg-gold/5 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gold/80">{copy.goalLabel}</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent-muted">{copy.goalLabel}</p>
               {editing ? (
                 <textarea
                   value={editedGoal || effectiveGoal.detail || effectiveGoal.title}

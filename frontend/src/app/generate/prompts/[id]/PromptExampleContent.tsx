@@ -120,7 +120,7 @@ export default function PromptExampleContent({ example }: { example: GenerationP
           <Link href="/generate/prompts" className="text-sm text-gold transition-colors hover:text-gold-light">
             {copy.back}
           </Link>
-          <p className="mt-6 text-xs uppercase tracking-[0.28em] text-gold/75">{categoryLabel}</p>
+          <p className="mt-6 text-xs uppercase tracking-[0.28em] text-accent-muted">{categoryLabel}</p>
           <h1 className="mt-4 font-display text-5xl leading-tight text-ink sm:text-6xl">{title}</h1>
           <p className="mt-5 max-w-2xl text-sm leading-7 text-ink-muted">{copy.body}</p>
           <p className="mt-4 max-w-2xl text-sm leading-7 text-ink-subtle">
@@ -130,7 +130,7 @@ export default function PromptExampleContent({ example }: { example: GenerationP
             <Link
               href={generateHref}
               onClick={handleGenerateClick}
-              className="rounded bg-gold px-5 py-2.5 text-sm font-bold text-void transition-colors hover:bg-gold-light"
+              className="ui-action-primary px-5 py-2.5 text-sm"
             >
               {copy.primaryCta}
             </Link>
@@ -153,46 +153,46 @@ export default function PromptExampleContent({ example }: { example: GenerationP
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-lg border border-border-subtle bg-raised/45 p-3">
-          <div className="relative aspect-[4/3] rounded-md bg-void/75">
+        <div className="overflow-hidden rounded-card border border-border-subtle bg-raised/45 p-3">
+          <div className="relative aspect-[4/3] rounded-control bg-void/75">
             <Image
               src={example.imagePath}
               alt={title}
               fill
               priority
               sizes="(min-width: 1024px) 50vw, 100vw"
-              className="rounded-md object-contain"
+              className="rounded-control object-contain"
             />
           </div>
         </div>
       </article>
 
       <section className="mx-auto mt-10 grid max-w-7xl gap-4 md:grid-cols-3">
-        <div className="rounded-lg border border-border-subtle bg-raised/35 p-5">
+        <div className="rounded-control border border-border-subtle bg-raised/35 p-5">
           <p className="text-xs uppercase tracking-[0.22em] text-ink-subtle">{copy.template}</p>
-          <p className="mt-3 font-display text-2xl text-ink">{example.suggestedTemplateKey.replace(/_/g, ' ')}</p>
+          <p className="mt-3 text-lg font-semibold text-ink">{example.suggestedTemplateKey.replace(/_/g, ' ')}</p>
         </div>
-        <div className="rounded-lg border border-border-subtle bg-raised/35 p-5">
+        <div className="rounded-control border border-border-subtle bg-raised/35 p-5">
           <p className="text-xs uppercase tracking-[0.22em] text-ink-subtle">{copy.style}</p>
-          <p className="mt-3 font-display text-2xl text-ink">{example.suggestedStyle}</p>
+          <p className="mt-3 text-lg font-semibold text-ink">{example.suggestedStyle}</p>
         </div>
-        <div className="rounded-lg border border-border-subtle bg-raised/35 p-5">
+        <div className="rounded-control border border-border-subtle bg-raised/35 p-5">
           <p className="text-xs uppercase tracking-[0.22em] text-ink-subtle">{copy.ratio}</p>
-          <p className="mt-3 font-display text-2xl text-ink">{example.suggestedSize}</p>
+          <p className="mt-3 text-lg font-semibold text-ink">{example.suggestedSize}</p>
         </div>
       </section>
 
-      <section className="mx-auto mt-4 max-w-7xl rounded-lg border border-border-subtle bg-raised/35 p-5">
+      <section className="mx-auto mt-4 max-w-7xl rounded-card border border-border-subtle bg-raised/35 p-5">
         <p className="text-xs uppercase tracking-[0.22em] text-ink-subtle">{copy.language}</p>
         <p className="mt-2 text-sm text-ink-muted">
           {getPromptExampleLanguageLabel(promptPresentation.textLocale, locale, promptPresentation.localized)}
         </p>
       </section>
 
-      <section className="mx-auto mt-8 max-w-7xl rounded-lg border border-border-subtle bg-void/40 p-5 sm:p-6">
-        <h2 className="font-display text-3xl text-ink">{copy.fullPrompt}</h2>
+      <section className="mx-auto mt-8 max-w-7xl rounded-card border border-border-subtle bg-void/40 p-5 sm:p-6">
+        <h2 className="font-body text-2xl font-semibold text-ink">{copy.fullPrompt}</h2>
         <p className="mt-3 text-sm leading-7 text-ink-subtle">{copy.provenanceNote}</p>
-        <p className="mt-4 whitespace-pre-wrap break-words rounded-lg border border-border-subtle bg-surface/70 p-4 text-sm leading-7 text-ink-muted">
+        <p className="mt-4 whitespace-pre-wrap break-words rounded-control border border-border-subtle bg-surface/70 p-4 text-sm leading-7 text-ink-muted">
           {prompt}
         </p>
       </section>

@@ -122,5 +122,7 @@ test('indexable interactive pages expose exactly one server-visible primary head
   assert.doesNotMatch(generateFallback, /<h1/);
   assert.match(generateClient, /<h1/);
   assert.match(reviewLayout, /AI Photo Critique Example: Scores, Evidence, and Retake Guidance/);
+  assert.match(reviewLayout, /<h1 className="mt-2 max-w-3xl font-display text-2xl/);
+  assert.match(reviewLayout, /className="border-b border-border-subtle px-6 py-5 sm:py-6"/);
   assert.match(reviewPage, /const ReviewResultHeading = isDemoReview \? 'h2' : 'h1'/);
 });

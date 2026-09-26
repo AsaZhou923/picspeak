@@ -65,8 +65,8 @@ export const metadata: Metadata = {
     },
   },
   icons: {
-    icon: siteConfig.logoImage,
-    shortcut: siteConfig.logoImage,
+    icon: '/brand-mark.svg',
+    shortcut: '/brand-mark.svg',
     apple: siteConfig.logoImage,
   },
   openGraph: {

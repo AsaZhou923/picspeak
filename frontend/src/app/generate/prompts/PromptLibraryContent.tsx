@@ -63,7 +63,7 @@ export default function PromptLibraryContent() {
     <div className="min-h-screen px-6 pb-20 pt-16">
       <section className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:items-end">
         <div>
-          <p className="text-xs uppercase tracking-[0.28em] text-gold/75">{copy.eyebrow}</p>
+          <p className="text-xs uppercase tracking-[0.28em] text-accent-muted">{copy.eyebrow}</p>
           <h1 className="mt-4 max-w-3xl font-display text-5xl leading-tight text-ink sm:text-6xl">
             {copy.title}
           </h1>
@@ -71,13 +71,13 @@ export default function PromptLibraryContent() {
           <div className="mt-7 flex flex-wrap gap-3">
             <Link
               href="/generate?source=prompt_library&entrypoint=prompt_library_home"
-              className="rounded bg-gold px-5 py-2.5 text-sm font-bold text-void transition-colors hover:bg-gold-light"
+              className="ui-action-primary px-5 py-2.5 text-sm"
             >
               {copy.primaryCta}
             </Link>
             <Link
               href="/gallery"
-              className="rounded border border-border-subtle px-5 py-2.5 text-sm text-ink-muted transition-colors hover:border-gold/30 hover:text-ink"
+              className="ui-action-secondary px-5 py-2.5 text-sm"
             >
               {copy.secondaryCta}
             </Link>
@@ -85,8 +85,8 @@ export default function PromptLibraryContent() {
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           {GENERATION_PROMPT_EXAMPLE_CATEGORIES.map((category) => (
-            <div key={category} className="rounded-lg border border-border-subtle bg-raised/45 p-4">
-              <p className="font-display text-2xl text-ink">
+            <div key={category} className="ui-panel p-4">
+              <p className="text-lg font-semibold text-ink">
                 {getLocalizedPromptExampleCategoryLabel(category, locale)}
               </p>
               <p className="mt-2 text-sm text-ink-muted">
@@ -105,7 +105,7 @@ export default function PromptLibraryContent() {
           return (
             <article
               key={example.id}
-              className="group overflow-hidden rounded-lg border border-border-subtle bg-raised/45 transition-colors hover:border-gold/35"
+              className="ui-panel group overflow-hidden transition-colors hover:border-gold/35"
             >
               <Link href={`/generate/prompts/${example.id}`} className="block">
                 <div className="relative aspect-[4/3] bg-void/75 p-2">
@@ -114,11 +114,11 @@ export default function PromptLibraryContent() {
                     alt={title}
                     fill
                     sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
-                    className="rounded-md object-contain transition-transform duration-500 group-hover:scale-[1.02]"
+                    className="object-contain transition-transform duration-500 group-hover:scale-[1.02]"
                   />
                 </div>
                 <div className="p-4">
-                  <p className="text-[11px] uppercase tracking-[0.22em] text-gold/75">
+                  <p className="text-[11px] uppercase tracking-[0.22em] text-accent-muted">
                     {getLocalizedPromptExampleCategoryLabel(example.category, locale)}
                   </p>
                   <h2 className="mt-2 line-clamp-2 font-display text-2xl text-ink">{title}</h2>

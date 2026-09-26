@@ -107,15 +107,15 @@ export default function BlogIndexPageContent({ locale }: { locale?: string }) {
 
                 <div className="mt-6 grid gap-3 sm:grid-cols-3">
                   <div className="ui-panel px-4 py-4">
-                    <p className="text-[11px] uppercase tracking-[0.22em] text-gold/75">{ui.starterPostsLabel}</p>
+                    <p className="text-[11px] uppercase tracking-[0.22em] text-accent-muted">{ui.starterPostsLabel}</p>
                     <p className="mt-2 font-mono text-2xl text-ink">{starterPosts.length}</p>
                   </div>
                   <div className="ui-panel px-4 py-4">
-                    <p className="text-[11px] uppercase tracking-[0.22em] text-gold/75">{ui.primaryTopicsLabel}</p>
+                    <p className="text-[11px] uppercase tracking-[0.22em] text-accent-muted">{ui.primaryTopicsLabel}</p>
                     <p className="mt-2 text-sm leading-6 text-ink-muted">{ui.primaryTopicsText}</p>
                   </div>
                   <div className="ui-panel px-4 py-4">
-                    <p className="text-[11px] uppercase tracking-[0.22em] text-gold/75">{ui.seoDirectionLabel}</p>
+                    <p className="text-[11px] uppercase tracking-[0.22em] text-accent-muted">{ui.seoDirectionLabel}</p>
                     <p className="mt-2 text-sm leading-6 text-ink-muted">{ui.seoDirectionText}</p>
                   </div>
                 </div>
@@ -123,7 +123,7 @@ export default function BlogIndexPageContent({ locale }: { locale?: string }) {
                 {featuredPost ? (
                   <section className="ui-feature-panel mt-8 overflow-hidden">
                     <div className="px-6 py-7 lg:px-8">
-                      <p className="text-xs uppercase tracking-[0.26em] text-gold/72">{ui.featuredLabel}</p>
+                      <p className="text-xs uppercase tracking-[0.26em] text-accent-muted">{ui.featuredLabel}</p>
                       <h2 className="mt-4 max-w-3xl font-display text-3xl text-ink sm:text-4xl">{featuredPost.title}</h2>
                       <p className="mt-4 max-w-3xl text-sm leading-7 text-ink-muted sm:text-base">{featuredPost.excerpt}</p>
                       <div className="mt-6 flex flex-wrap gap-3 text-xs text-ink-subtle">
@@ -166,7 +166,7 @@ export default function BlogIndexPageContent({ locale }: { locale?: string }) {
                 <div className="mt-6 grid gap-3 text-sm text-ink-muted">
                   {starterPosts.map((post, index) => (
                     <Link key={post.slug} href={`/${pinnedLocale}/blog/${post.slug}`} className="rounded-control border border-border-subtle bg-raised/40 px-4 py-3 transition-colors hover:border-gold/30 hover:text-ink">
-                      <p className="text-[11px] uppercase tracking-[0.22em] text-gold/75">0{index + 1}</p>
+                      <p className="text-[11px] uppercase tracking-[0.22em] text-accent-muted">0{index + 1}</p>
                       <p className="mt-2 leading-6">{post.title}</p>
                     </Link>
                   ))}
@@ -177,7 +177,7 @@ export default function BlogIndexPageContent({ locale }: { locale?: string }) {
             <section className="mt-8">
               <div className="mb-5 flex items-center justify-between gap-4">
                 <div>
-                  <p className="text-xs uppercase tracking-[0.22em] text-gold/70">{ui.allPostsLabel}</p>
+                  <p className="text-xs uppercase tracking-[0.22em] text-accent-muted">{ui.allPostsLabel}</p>
                   <h2 className="mt-2 font-display text-3xl text-ink">{ui.allPostsHeading}</h2>
                 </div>
                 <p className="text-xs uppercase tracking-[0.22em] text-ink-subtle">{posts.length}</p>

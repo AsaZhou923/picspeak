@@ -66,7 +66,7 @@ export default function PhotoReviewsPage() {
         </button>
 
         <div className="mb-10">
-          <p className="text-xs text-gold/70 font-mono mb-2 tracking-widest uppercase">
+          <p className="text-xs text-accent-muted font-mono mb-2 tracking-widest uppercase">
             — {t('review_btn_photo_history')}
           </p>
           <h1 className="font-display text-4xl sm:text-5xl mb-2">{t('account_reviews_headline')}</h1>

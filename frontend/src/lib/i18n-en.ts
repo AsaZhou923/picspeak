@@ -208,7 +208,7 @@ export const enTranslations = {
     affiliate_product_site: 'Product site',
 
     // Home page
-    hero_label: 'AI Photography Critique',
+    hero_label: 'PicSpeak · AI Photography Critique',
     hero_headline_1: 'Professional Photography Critique',
     hero_headline_2: 'in Seconds',
     hero_desc: 'Upload your photo and get detailed AI critique on composition, lighting, color, impact and technique.',
@@ -232,8 +232,8 @@ export const enTranslations = {
     pro_offer_label: '',
     pro_offer_highlight: 'Pro',
     updates_label: 'Updates',
-    updates_hint_home: 'See clearer gallery and sharing controls',
-    updates_hint_latest: 'See clearer gallery and sharing controls',
+    updates_hint_home: 'Gallery and critique improvements coming soon',
+    updates_hint_latest: 'Gallery and critique improvements coming soon',
     contact_label: 'Contact',
     contact_headline: 'Get in Touch',
 
@@ -255,7 +255,7 @@ export const enTranslations = {
     feature_pro_title: 'Pro Review Loop',
     feature_pro_body: 'Turn issues into next-shoot actions and keep a long-term review trail.',
     feature_history_title: 'Progress Tracking',
-    feature_history_body: 'Track multiple critique results for the same photo and quantify your improvement over time.',
+    feature_history_body: 'Compare critiques for the same photo or practice goal, with score changes and visual evidence for each result.',
 
     quota_label: 'Free / Pro Boundary',
     quota_headline: 'Free diagnoses fast. Pro guides the next shoot.',
@@ -438,6 +438,7 @@ export const enTranslations = {
     gallery_headline: 'Gallery',
     gallery_intro: 'The gallery publicly shows approved critique results that users chose to publish. Visitors can browse those photos and critiques here.',
     gallery_count_label: 'Collected',
+    gallery_err_fetch: 'Could not load gallery works. Please try again.',
     gallery_empty: 'The gallery is still empty',
     gallery_empty_body: 'No approved public submissions yet. After signing in, add a critique from its detail page and it will appear here once moderation passes.',
     gallery_empty_cta: 'Analyze a photo first',

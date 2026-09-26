@@ -873,7 +873,7 @@ export default function ReviewHistoryPage() {
           </Link>
         </div>
 
-        <div className="mb-3 inline-flex rounded-lg border border-border bg-raised p-1">
+        <div className="mb-3 inline-flex rounded-control border border-border bg-raised p-1">
           <button
             type="button"
             onClick={() => handleViewChange('reviews')}
@@ -936,7 +936,7 @@ export default function ReviewHistoryPage() {
                 </div>
               </div>
 
-              <details className="mt-3 rounded-lg border border-border-subtle bg-void/30 px-3 py-2" open={hasInvalidDate}>
+              <details className="mt-3 rounded-control border border-border-subtle bg-void/30 px-3 py-2" open={hasInvalidDate}>
                 <summary className="flex cursor-pointer list-none items-center gap-2 text-sm text-ink">
                   <SlidersHorizontal size={15} className="text-gold" />
                   <span>{copy.filtersLabel}</span>
@@ -1058,7 +1058,7 @@ export default function ReviewHistoryPage() {
 
             {!loading && !error && items.length > 0 && (
               <div className="mt-8 space-y-3">
-                <details open className="rounded-lg border border-border-subtle bg-raised/60">
+                <details open className="rounded-card border border-border-subtle bg-raised/60">
                   <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-ink">
                     {reviewSectionCopy.organize}
                   </summary>
@@ -1093,7 +1093,7 @@ export default function ReviewHistoryPage() {
                   </div>
                 </details>
 
-                <details className="rounded-lg border border-border-subtle bg-raised/60">
+                <details className="rounded-card border border-border-subtle bg-raised/60">
                   <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-ink">
                     {reviewSectionCopy.retake}
                   </summary>
@@ -1102,7 +1102,7 @@ export default function ReviewHistoryPage() {
                   </div>
                 </details>
 
-                <details className="rounded-lg border border-border-subtle bg-raised/60">
+                <details className="rounded-card border border-border-subtle bg-raised/60">
                   <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-ink">
                     {reviewSectionCopy.growth}
                   </summary>
@@ -1118,7 +1118,7 @@ export default function ReviewHistoryPage() {
                 </details>
 
                 {plan !== 'pro' && (
-                  <details className="rounded-lg border border-border-subtle bg-raised/60">
+                  <details className="rounded-card border border-border-subtle bg-raised/60">
                     <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-ink">
                       {reviewSectionCopy.pro}
                     </summary>
@@ -1203,7 +1203,7 @@ export default function ReviewHistoryPage() {
               <>
                 {selectedSessionId && !selectedSessionIsListed && (
                   selectedLoading ? (
-                    <div className="rounded-lg border border-border-subtle bg-raised/70 px-4 py-3 text-sm text-ink-muted">
+                    <div className="rounded-card border border-border-subtle bg-raised/70 px-4 py-3 text-sm text-ink-muted">
                       {t('practice_loading')}
                     </div>
                   ) : (
@@ -1259,7 +1259,7 @@ export default function ReviewHistoryPage() {
                           />
                           {selectedSessionId === item.session_id && (
                             selectedLoading ? (
-                              <div className="mt-3 rounded-lg border border-border-subtle bg-raised/70 px-4 py-3 text-sm text-ink-muted">
+                              <div className="mt-3 rounded-card border border-border-subtle bg-raised/70 px-4 py-3 text-sm text-ink-muted">
                                 {t('practice_loading')}
                               </div>
                             ) : (

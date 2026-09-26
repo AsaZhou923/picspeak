@@ -34,6 +34,7 @@ export function LanguageSwitcher() {
   const handleSwitch = (nextLocale: Locale) => {
     setLocale(nextLocale);
     setOpen(false);
+    triggerRef.current?.focus();
 
     const segments = pathname.split('/');
     if (segments.length >= 2 && LOCALE_PREFIXES.includes(segments[1])) {
@@ -55,23 +56,24 @@ export function LanguageSwitcher() {
     <div ref={ref} className="relative" onKeyDown={handleMenuKeyDown}>
       <button
         ref={triggerRef}
+        type="button"
         onClick={() => setOpen((value) => !value)}
-        className="flex items-center gap-1 text-sm text-ink-muted hover:text-ink transition-colors px-2 py-1 rounded"
+        className="flex min-h-11 items-center gap-1 rounded-control px-2 text-sm text-ink-muted transition-colors hover:text-ink"
         aria-label={t('language_switcher_label')}
         aria-expanded={open}
-        aria-haspopup="menu"
+        aria-controls="header-language-options"
       >
         {LOCALE_LABELS[locale]}
         <ChevronDown size={13} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-1.5 w-28 border border-border-subtle rounded-md bg-void shadow-lg z-50 overflow-hidden" role="menu">
+        <div id="header-language-options" aria-label={t('language_switcher_label')} role="group" className="absolute right-0 top-full z-50 mt-1.5 w-28 overflow-hidden rounded-card border border-border-subtle bg-void shadow-level-3">
           {(Object.keys(LOCALE_LABELS) as Locale[]).map((item) => (
             <button
               key={item}
               onClick={() => handleSwitch(item)}
-              role="menuitem"
-              className={`w-full text-left px-3 py-2 text-sm transition-colors ${
+              aria-pressed={locale === item}
+              className={`min-h-11 w-full px-3 py-2 text-left text-sm transition-colors ${
                 locale === item ? 'text-gold bg-gold/5' : 'text-ink-muted hover:text-ink hover:bg-raised'
               }`}
             >
@@ -132,8 +134,8 @@ function QuickLinksMenu() {
         onClick={() => setOpen((value) => !value)}
         aria-label={t('nav_more')}
         aria-expanded={open}
-        aria-haspopup="menu"
-        className={`flex h-8 items-center gap-1 rounded-full border border-border-subtle bg-raised/55 px-2.5 text-xs text-ink-muted transition-all hover:border-gold/30 hover:text-gold ${
+        aria-controls="header-quick-links"
+        className={`flex min-h-11 items-center gap-1 rounded-full border border-border-subtle bg-raised/55 px-2.5 text-xs text-ink-muted transition-all hover:border-gold/30 hover:text-gold ${
           open ? 'border-gold/40 text-gold' : ''
         }`}
       >
@@ -142,15 +144,15 @@ function QuickLinksMenu() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-2 w-48 overflow-hidden rounded-2xl border border-border-subtle bg-void/95 p-1.5 shadow-[0_18px_48px_rgba(0,0,0,0.28)] backdrop-blur-xl" role="menu">
+        <nav id="header-quick-links" aria-label={t('nav_more')} className="absolute right-0 top-full z-50 mt-2 w-48 overflow-hidden rounded-card border border-border-subtle bg-void/95 p-1.5 shadow-level-3 backdrop-blur-xl">
           {links.map(({ href, label, icon: Icon, className }) => {
             const active = pathname === href;
             return (
               <Link
                 key={href}
                 href={href}
-                role="menuitem"
-                className={`${className ?? ''} flex items-center gap-3 rounded-[14px] px-3 py-2.5 text-sm transition-colors ${
+                aria-current={active ? 'page' : undefined}
+                className={`${className ?? ''} flex min-h-11 items-center gap-3 rounded-control px-3 py-2.5 text-sm transition-colors ${
                   active
                     ? 'bg-gold/10 text-gold'
                     : 'text-ink-muted hover:bg-raised hover:text-ink'
@@ -162,7 +164,7 @@ function QuickLinksMenu() {
               </Link>
             );
           })}
-        </div>
+        </nav>
       )}
     </div>
   );
@@ -204,7 +206,7 @@ export function HeaderRightControls({
       <button
         onClick={toggleTheme}
         aria-label={renderedTheme === 'dark' ? t('theme_dark') : t('theme_light')}
-        className="w-7 h-7 flex items-center justify-center rounded text-ink-muted hover:text-gold transition-colors"
+        className="flex h-11 w-11 items-center justify-center rounded-control text-ink-muted transition-colors hover:text-gold"
       >
         {renderedTheme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
       </button>
@@ -236,7 +238,7 @@ export function HeaderRightControls({
                 <SignInButton mode="modal" fallbackRedirectUrl="/workspace">
                   <button
                     type="button"
-                    className="px-2.5 sm:px-3 py-1.5 text-sm border border-gold/40 text-gold rounded hover:bg-gold/10 transition-colors whitespace-nowrap"
+                    className="min-h-11 rounded-control border border-gold/40 px-2.5 py-1.5 text-sm text-gold transition-colors hover:bg-gold/10 sm:px-3 whitespace-nowrap"
                   >
                     {authLabels.signIn}
                   </button>
@@ -244,7 +246,7 @@ export function HeaderRightControls({
                 <SignUpButton mode="modal" fallbackRedirectUrl="/workspace">
                   <button
                     type="button"
-                    className="hidden sm:inline-flex px-2.5 sm:px-3 py-1.5 text-sm border border-border text-ink-muted rounded hover:border-gold/40 hover:text-gold transition-colors whitespace-nowrap"
+                    className="hidden min-h-11 rounded-control border border-border px-2.5 py-1.5 text-sm text-ink-muted transition-colors hover:border-gold/40 hover:text-gold sm:inline-flex sm:px-3 whitespace-nowrap"
                   >
                     {authLabels.signUp}
                   </button>
@@ -263,7 +265,7 @@ export function HeaderRightControls({
             <SignInButton mode="modal" fallbackRedirectUrl="/workspace">
               <button
                 type="button"
-                className="px-2.5 sm:px-3 py-1.5 text-sm border border-gold/40 text-gold rounded hover:bg-gold/10 transition-colors whitespace-nowrap"
+                className="min-h-11 rounded-control border border-gold/40 px-2.5 py-1.5 text-sm text-gold transition-colors hover:bg-gold/10 sm:px-3 whitespace-nowrap"
               >
                 {authLabels.signIn}
               </button>
@@ -271,7 +273,7 @@ export function HeaderRightControls({
             <SignUpButton mode="modal" fallbackRedirectUrl="/workspace">
               <button
                 type="button"
-                className="hidden sm:inline-flex px-2.5 sm:px-3 py-1.5 text-sm border border-border text-ink-muted rounded hover:border-gold/40 hover:text-gold transition-colors whitespace-nowrap"
+                className="hidden min-h-11 rounded-control border border-border px-2.5 py-1.5 text-sm text-ink-muted transition-colors hover:border-gold/40 hover:text-gold sm:inline-flex sm:px-3 whitespace-nowrap"
               >
                 {authLabels.signUp}
               </button>

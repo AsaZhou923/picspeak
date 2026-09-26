@@ -154,7 +154,7 @@ function BlogPostContent({ slug }: { slug: string }) {
           </Link>
 
           <header className="mt-8 rounded-[30px] border border-border-subtle bg-[radial-gradient(circle_at_top_left,rgba(200,171,90,0.12),transparent_35%),rgb(var(--color-surface)/0.8)] px-6 py-8 sm:px-8">
-            <p className="text-xs uppercase tracking-[0.28em] text-gold/72">{post.category}</p>
+            <p className="text-xs uppercase tracking-[0.28em] text-accent-muted">{post.category}</p>
             <h1 className="mt-4 font-display text-4xl text-ink sm:text-5xl">{post.title}</h1>
             <p data-speakable="blog-intro" className="mt-5 text-sm leading-8 text-ink-muted sm:text-base">{post.intro}</p>
             <p className="mt-5 text-sm text-ink-subtle">
@@ -194,7 +194,7 @@ function BlogPostContent({ slug }: { slug: string }) {
           </header>
 
           <section className="mt-8 rounded-[28px] border border-border-subtle bg-raised/35 p-6 sm:p-7">
-            <p className="text-xs uppercase tracking-[0.22em] text-gold/70">{post.takeawayTitle}</p>
+            <p className="text-xs uppercase tracking-[0.22em] text-accent-muted">{post.takeawayTitle}</p>
             <div className="mt-4 grid gap-3">
               {post.takeawayItems.map((item) => (
                 <p key={item} className="flex gap-3 text-sm leading-7 text-ink-muted">
@@ -232,7 +232,7 @@ function BlogPostContent({ slug }: { slug: string }) {
 
           {references.length > 0 ? (
             <section className="mt-10 rounded-[28px] border border-border-subtle bg-raised/35 p-6 sm:p-7">
-              <p className="text-xs uppercase tracking-[0.22em] text-gold/70">{trustCopy.sources}</p>
+              <p className="text-xs uppercase tracking-[0.22em] text-accent-muted">{trustCopy.sources}</p>
               <p className="mt-3 text-sm leading-7 text-ink-muted">{trustCopy.sourceIntro}</p>
               <ol className="mt-5 space-y-3">
                 {references.map((reference) => (
@@ -252,7 +252,7 @@ function BlogPostContent({ slug }: { slug: string }) {
           ) : null}
 
           <section className="mt-10 rounded-[30px] border border-border-subtle bg-[linear-gradient(135deg,rgba(200,162,104,0.12),transparent_42%),rgb(var(--color-surface)/0.78)] p-6 sm:p-7">
-            <p className="text-xs uppercase tracking-[0.22em] text-gold/70">{workspaceCta.label}</p>
+            <p className="text-xs uppercase tracking-[0.22em] text-accent-muted">{workspaceCta.label}</p>
             <h2 className="mt-3 font-display text-3xl text-ink">{workspaceCta.title}</h2>
             <p className="mt-4 text-sm leading-7 text-ink-muted">{workspaceCta.body}</p>
             <div className="mt-6 flex flex-wrap gap-3">
@@ -300,7 +300,7 @@ function BlogPostContent({ slug }: { slug: string }) {
           {relatedPosts.length > 0 ? (
             <section className="mt-10">
               <div className="mb-5">
-                <p className="text-xs uppercase tracking-[0.22em] text-gold/70">{ui.relatedLabel}</p>
+                <p className="text-xs uppercase tracking-[0.22em] text-accent-muted">{ui.relatedLabel}</p>
                 <h2 className="mt-2 font-display text-3xl text-ink">{ui.relatedHeading}</h2>
               </div>
               <div className="grid gap-5 md:grid-cols-2">

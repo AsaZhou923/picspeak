@@ -109,7 +109,7 @@ export function CritiqueSection({
                   {tags.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 mt-2">
                       {tags.map((tag) => (
-                        <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-gold/10 text-gold/80 border border-gold/20 font-medium tracking-wide">
+                        <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-gold/10 text-accent-muted border border-gold/20 font-medium tracking-wide">
                           {t(`tag_${tag}` as Parameters<typeof t>[0])}
                         </span>
                       ))}

@@ -23,6 +23,8 @@
   --color-gold:         132 88  32;
   --color-gold-light:   164 116 54;
   --color-gold-dim:     104 75  39;
+  --color-accent:       116 77  27;
+  --color-accent-muted: 93  68  38;
   --color-sage:         66  107 70;
   --color-sage-light:   88  132 91;
   --color-rust:         139 70  57;
@@ -58,6 +60,8 @@
   --color-gold:         220 182 122;
   --color-gold-light:   237 207 160;
   --color-gold-dim:     168 132 82;
+  --color-accent:       229 196 142;
+  --color-accent-muted: 201 166 108;
   --color-sage:         157 193 157;
   --color-sage-light:   185 216 183;
   --color-rust:         214 145 130;
@@ -228,7 +232,7 @@ h3 {
     letter-spacing: 0.18em;
     line-height: 1.2;
     text-transform: uppercase;
-    color: rgb(var(--color-gold));
+    color: rgb(var(--color-accent));
   }
 
   .ui-action-primary {
@@ -289,6 +293,8 @@ h3 {
   .text-ink        { color: rgb(var(--color-ink)); }
   .text-ink-muted  { color: rgb(var(--color-ink-muted)); }
   .text-ink-subtle { color: rgb(var(--color-ink-subtle)); }
+  .text-accent       { color: rgb(var(--color-accent)); }
+  .text-accent-muted { color: rgb(var(--color-accent-muted)); }
 
   .border-border-subtle { border-color: rgb(var(--color-border-subtle)); }
   .border-border        { border-color: rgb(var(--color-border)); }

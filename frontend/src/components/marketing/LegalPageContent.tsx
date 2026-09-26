@@ -508,7 +508,7 @@ export default function LegalPageContent({ kind }: { kind: LegalPageKind }) {
         <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
           <section className="min-w-0">
             <div className="mb-10 max-w-3xl">
-              <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-gold/20 bg-gold/10 px-4 py-2 text-xs uppercase tracking-[0.24em] text-gold/80">
+              <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-gold/20 bg-gold/10 px-4 py-2 text-xs uppercase tracking-[0.24em] text-accent-muted">
                 <HeroIcon size={14} />
                 <span>{copy.badge}</span>
               </div>

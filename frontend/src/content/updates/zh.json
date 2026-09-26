@@ -1,5 +1,29 @@
 [
   {
+    "id": "2026-09-26-gallery-and-critique-clarity",
+    "date": "2026-09-26",
+    "showPopup": false,
+    "title": "准备中：长廊先看作品，点评说明更清楚",
+    "summary": "长廊将先呈现公开照片，点评依据与操作更容易读懂；加载失败时也能直接重试。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-09-26-gallery-and-critique-clarity",
+    "sections": [
+      {
+        "title": "照片与点评",
+        "items": [
+          "长廊会先展示公开作品，卡片减少装饰，让照片、作者和评分更容易看清。",
+          "公开点评示例会更快进入结果；手机上会直接显示最需改进维度的说明。"
+        ]
+      },
+      {
+        "title": "操作与恢复",
+        "items": [
+          "导航和筛选会更方便使用键盘与触屏，小号文字也会更容易辨认。",
+          "长廊加载失败与作品为空会分别提示，并提供重试入口。"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-09-25-gallery-actions-and-clearer-controls",
     "date": "2026-09-25",
     "showPopup": false,

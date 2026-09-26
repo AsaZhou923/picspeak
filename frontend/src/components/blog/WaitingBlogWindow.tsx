@@ -57,7 +57,7 @@ export function WaitingBlogWindow({ variant }: { variant: WaitingBlogWindowVaria
           <span className="h-2 w-2 rounded-full bg-gold/75" />
           <span className="h-2 w-2 rounded-full bg-sage/75" />
         </div>
-        <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-gold/75">
+        <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-accent-muted">
           <BookOpenText size={13} />
           <span>{t('wait_blog_window_label')}</span>
         </div>
@@ -65,7 +65,7 @@ export function WaitingBlogWindow({ variant }: { variant: WaitingBlogWindowVaria
 
       <div className="mt-4 flex items-start justify-between gap-4">
         <div>
-          <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-gold/75">{ui.label}</p>
+          <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-accent-muted">{ui.label}</p>
           <h2 className="mt-2 font-display text-2xl leading-tight text-ink">{title}</h2>
         </div>
         <span className="rounded-full border border-gold/25 bg-gold/10 px-2.5 py-1 font-mono text-[10px] text-gold">
@@ -98,7 +98,7 @@ export function WaitingBlogWindow({ variant }: { variant: WaitingBlogWindowVaria
           <div className="flex flex-wrap items-center gap-2 text-[10px] text-ink-subtle">
             <span className="rounded-full border border-border-subtle px-2.5 py-1">{activePost.category}</span>
             <span className="inline-flex items-center gap-1.5 rounded-full border border-border-subtle px-2.5 py-1">
-              <Clock3 size={12} className="text-gold/75" />
+              <Clock3 size={12} className="text-accent-muted" />
               {activePost.readingTime}
             </span>
           </div>

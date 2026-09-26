@@ -232,7 +232,7 @@ export default function ProPromoCard({
         </div>
 
         <div className="w-full max-w-sm rounded-[22px] border border-gold/20 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] p-5 backdrop-blur-sm">
-          <p className="text-[11px] uppercase tracking-[0.24em] text-gold/75">{copy.discount}</p>
+          <p className="text-[11px] uppercase tracking-[0.24em] text-accent-muted">{copy.discount}</p>
           <div className="mt-3 flex items-end gap-3">
             <p className="font-display text-4xl text-gold">{copy.price}</p>
             {copy.oldPrice && copy.oldPrice !== copy.price && (

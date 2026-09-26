@@ -68,6 +68,7 @@ function GalleryPageContent() {
   const [paging, setPaging] = useState(false);
   const [error, setError] = useState('');
   const [actionError, setActionError] = useState('');
+  const [retryKey, setRetryKey] = useState(0);
   const [likeBusyId, setLikeBusyId] = useState<string | null>(null);
   const [preferences, setPreferences] = useState<GalleryPreferences>(() => sanitizeGalleryPreferences(null));
   const [preferencesLoaded, setPreferencesLoaded] = useState(false);
@@ -186,14 +187,14 @@ function GalleryPageContent() {
       })
       .catch((err) => {
         if (cancelled) return;
-        setError(formatUserFacingError(t, err, t('review_err_fetch')));
+        setError(formatUserFacingError(t, err, t('gallery_err_fetch')));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
 
     return () => { cancelled = true; };
-  }, [loadPage, restoreKey, shouldRestore, t]);
+  }, [loadPage, restoreKey, shouldRestore, t, retryKey]);
 
   useEffect(() => {
     const restoreState = pendingRestoreRef.current;
@@ -289,7 +290,7 @@ function GalleryPageContent() {
       setNextCursor(cursor);
       setPageIndex(Math.min(normalizedTarget, loadedPages.length - 1));
     } catch (err) {
-      setError(formatUserFacingError(t, err, t('review_err_fetch')));
+      setError(formatUserFacingError(t, err, t('gallery_err_fetch')));
     } finally {
       setPaging(false);
     }
@@ -411,62 +412,30 @@ function GalleryPageContent() {
         </div>
       )}
 
-      <div className="mx-auto max-w-editorial px-6 pb-12 animate-fade-in">
-        <section className="ui-panel flex flex-col gap-5 p-5 md:flex-row md:items-start md:justify-between">
-          <div className="max-w-3xl text-sm leading-7 text-ink-muted">
-            <p className="inline-flex items-center gap-2 font-medium text-gold">
-              <Info size={14} />
-              {t('gallery_score_upgrade_badge')}
-            </p>
-            <p className="mt-2">{t('gallery_score_upgrade_body')}</p>
-            <p className="mt-1 text-ink-subtle">{t('gallery_score_upgrade_detail')}</p>
-          </div>
-          <div className="shrink-0 rounded-control border border-border-subtle bg-void/45 px-5 py-3 text-center md:text-left">
-            <p className="text-[11px] uppercase tracking-[0.22em] text-ink-subtle">{t('gallery_count_label')}</p>
-            <p className="mt-1 font-display text-3xl text-gold">{totalCount}</p>
-          </div>
-        </section>
-
-        <GalleryFilters
-          draftFilters={draftFilters}
-          setDraftFilters={setDraftFilters}
-          onApply={handleApplyFilters}
-          onReset={handleResetFilters}
-          onSortChange={handleSortChange}
-          hasInvalidDate={hasInvalidDate}
-          createdFromInvalid={createdFromInvalid}
-          createdToInvalid={createdToInvalid}
-        />
-
-        <GalleryViewControls
-          locale={locale}
-          preferences={preferences}
-          onChange={setPreferences}
-        />
-
-        <GalleryScoreboard
-          locale={locale}
-          imageType={appliedFilters.imageType}
-          token={viewerToken}
-          onOpenReview={persistGalleryState}
-          buildReviewHref={buildReviewHref}
-        />
-
-        {(error || actionError) && (
-          <div className="mt-6 flex items-center gap-2 rounded-lg border border-rust/20 bg-rust/5 px-4 py-3 text-sm text-rust animate-fade-in">
+      <div className="mx-auto max-w-editorial px-6 pb-12 pt-4 animate-fade-in">
+        {((error && items.length > 0) || actionError) && (
+          <div className="mt-6 flex items-center gap-2 rounded-control border border-rust/20 bg-rust/5 px-4 py-3 text-sm text-rust animate-fade-in">
             <AlertCircle size={14} />
             {error || actionError}
           </div>
         )}
 
         {loading ? (
-          <section className={`mt-8 grid gap-4 ${galleryGridClassName(preferences.columns)}`}>
+          <section className={`mt-4 grid gap-4 ${galleryGridClassName(preferences.columns)}`}>
             {Array.from({ length: 8 }).map((_, index) => (
               <div key={index} className="h-[420px] animate-pulse rounded-card border border-border-subtle bg-raised/45" />
             ))}
           </section>
+        ) : error && items.length === 0 ? (
+          <section role="alert" className="mt-4 rounded-card border border-rust/30 bg-rust/5 px-6 py-8 text-center">
+            <AlertCircle size={24} className="mx-auto text-rust" aria-hidden="true" />
+            <p className="mx-auto mt-3 max-w-md text-sm leading-7 text-rust">{error}</p>
+            <button type="button" onClick={() => setRetryKey((current) => current + 1)} className="ui-action-secondary mt-5 px-5 py-2 text-sm">
+              {t('app_error_retry')}
+            </button>
+          </section>
         ) : items.length === 0 ? (
-          <section className="ui-panel mt-8 px-6 py-10 text-center">
+          <section className="ui-panel mt-4 px-6 py-10 text-center">
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-gold/20 bg-gold/10 text-gold">
               <Star size={20} />
             </div>
@@ -491,7 +460,7 @@ function GalleryPageContent() {
           </section>
         ) : (
           <>
-            <section data-testid="gallery-grid" className={`mt-8 grid gap-4 ${galleryGridClassName(preferences.columns)}`}>
+            <section data-testid="gallery-grid" className={`mt-4 grid gap-4 ${galleryGridClassName(preferences.columns)}`}>
               {items.map((item, idx) => (
                 <GalleryCard
                   key={item.review_id}
@@ -521,6 +490,42 @@ function GalleryPageContent() {
             />
           </>
         )}
+
+        <GalleryViewControls
+          locale={locale}
+          preferences={preferences}
+          onChange={setPreferences}
+        />
+
+        <GalleryFilters
+          draftFilters={draftFilters}
+          setDraftFilters={setDraftFilters}
+          onApply={handleApplyFilters}
+          onReset={handleResetFilters}
+          onSortChange={handleSortChange}
+          hasInvalidDate={hasInvalidDate}
+          createdFromInvalid={createdFromInvalid}
+          createdToInvalid={createdToInvalid}
+        />
+
+        <section className="mt-8 flex flex-col gap-4 border-y border-border-subtle py-5 md:flex-row md:items-start md:justify-between">
+          <div className="max-w-3xl text-sm leading-7 text-ink-muted">
+            <p className="inline-flex items-center gap-2 font-medium text-gold">
+              <Info size={14} />
+              {t('gallery_score_upgrade_badge')}
+            </p>
+            <p className="mt-2">{t('gallery_score_upgrade_body')}</p>
+            <p className="mt-1 text-ink-subtle">{t('gallery_score_upgrade_detail')}</p>
+          </div>
+        </section>
+
+        <GalleryScoreboard
+          locale={locale}
+          imageType={appliedFilters.imageType}
+          token={viewerToken}
+          onOpenReview={persistGalleryState}
+          buildReviewHref={buildReviewHref}
+        />
 
         <section className="ui-feature-panel mt-16 px-6 py-8 sm:px-8">
           <div className="max-w-4xl">

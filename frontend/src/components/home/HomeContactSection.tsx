@@ -31,7 +31,7 @@ export default function HomeContactSection({ locale, t }: HomeContactSectionProp
   return (
     <section className="px-6 py-16 border-t border-border-subtle">
       <div className="max-w-5xl mx-auto">
-        <p className="text-xs text-gold/70 font-mono mb-4 tracking-widest uppercase">{t('contact_label')}</p>
+        <p className="text-xs text-accent-muted font-mono mb-4 tracking-widest uppercase">{t('contact_label')}</p>
         <h2 className="font-display text-2xl sm:text-3xl mb-8">{t('contact_headline')}</h2>
         <div className="flex flex-col sm:flex-row gap-4">
           <a
@@ -67,9 +67,9 @@ export default function HomeContactSection({ locale, t }: HomeContactSectionProp
               href={`/${locale}/blog`}
               className="inline-flex items-center gap-2 text-xs text-ink-subtle transition-colors hover:text-gold group"
             >
-              <BookOpenText size={12} className="text-gold/75 transition-colors group-hover:text-gold" />
+              <BookOpenText size={12} className="text-accent-muted transition-colors group-hover:text-gold" />
               <span>{blogHomeCopy.label}</span>
-              <span className="hidden sm:inline opacity-60 group-hover:opacity-100 transition-opacity">
+              <span className="hidden sm:inline text-ink-subtle">
                 {blogHomeCopy.hint}
               </span>
               <ArrowRight size={11} className="transition-transform group-hover:translate-x-0.5" />
@@ -79,7 +79,7 @@ export default function HomeContactSection({ locale, t }: HomeContactSectionProp
               className="inline-flex items-center gap-2 text-xs text-ink-subtle transition-colors hover:text-gold group"
             >
               <span>{t('updates_label')}</span>
-              <span className="hidden sm:inline opacity-60 group-hover:opacity-100 transition-opacity">{t('updates_hint_home')}</span>
+              <span className="hidden text-ink-subtle sm:inline">{t('updates_hint_home')}</span>
               <ArrowRight size={11} className="transition-transform group-hover:translate-x-0.5" />
             </Link>
           </div>

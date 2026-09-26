@@ -209,7 +209,7 @@ export function ReviewReferenceGenerationPanel({
               <ImagePlus size={18} />
             </div>
             <div className="min-w-0">
-              <p className="font-mono text-xs uppercase tracking-[0.18em] text-gold/70">{t('review_reference_label')}</p>
+              <p className="font-mono text-xs uppercase tracking-[0.18em] text-accent-muted">{t('review_reference_label')}</p>
               <h2 className="mt-1 font-display text-xl text-ink sm:text-2xl">{t('review_reference_title')}</h2>
               <p className="mt-2 text-sm leading-7 text-ink-muted">
                 {t('review_reference_body')}

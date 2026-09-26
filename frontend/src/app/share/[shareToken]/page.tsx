@@ -126,7 +126,7 @@ export default function SharedReviewPage() {
     <div className="min-h-screen">
       <div className="mx-auto max-w-5xl px-6 py-12 animate-fade-in">
         <div className="mb-8">
-          <p className="mb-2 inline-flex items-center gap-2 rounded-full border border-gold/20 bg-gold/10 px-3 py-1 text-[11px] uppercase tracking-[0.26em] text-gold/80">
+          <p className="mb-2 inline-flex items-center gap-2 rounded-full border border-gold/20 bg-gold/10 px-3 py-1 text-[11px] uppercase tracking-[0.26em] text-accent-muted">
             <Share2 size={12} />
             {copy.label}
           </p>
@@ -168,7 +168,7 @@ export default function SharedReviewPage() {
             </section>
 
             <section className="rounded-xl border border-gold/20 bg-gold/5 px-5 py-4">
-              <p className="text-xs uppercase tracking-[0.26em] text-gold/80">{t('review_suggestions')}</p>
+              <p className="text-xs uppercase tracking-[0.26em] text-accent-muted">{t('review_suggestions')}</p>
               <p className="mt-3 text-sm leading-7 text-ink">{result.suggestions}</p>
             </section>
 

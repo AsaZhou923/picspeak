@@ -32,10 +32,12 @@ export default function Header() {
     userInfo,
   });
 
-  const isActive = (href: string) =>
-    (href === '/' ? pathname === href : pathname === href || pathname?.startsWith(`${href}/`))
-      ? 'text-gold'
-      : 'text-ink-muted hover:text-ink';
+  const homeActive = pathname === '/' || pathname === homeHref;
+  const isActive = (href: string) => pathname === href || pathname?.startsWith(`${href}/`);
+  const desktopLinkClass = (active: boolean) =>
+    `transition-colors ${active
+      ? 'font-semibold text-gold underline decoration-gold decoration-2 underline-offset-8'
+      : 'text-ink-muted hover:text-ink'}`;
 
   return (
     <header className="sticky top-0 z-50 border-b border-border-subtle bg-void/90 backdrop-blur-xl">
@@ -44,11 +46,12 @@ export default function Header() {
         <div className="flex items-center gap-3">
           <Link
             href={homeHref}
+            aria-label="PicSpeak"
             className="flex items-center gap-2 text-ink hover:text-gold transition-colors"
           >
             <Image
-              src="/logo.png"
-              alt="PicSpeak"
+              src="/brand-mark.svg"
+              alt=""
               width={28}
               height={28}
               className="rounded object-contain"
@@ -59,10 +62,11 @@ export default function Header() {
           <Link 
             href={homeHref}
             className={`md:hidden flex h-7 items-center rounded-full px-3 text-xs font-medium transition-colors ${
-              pathname === '/' || pathname === homeHref
+              homeActive
                 ? 'bg-gold/10 text-gold' 
                 : 'bg-raised/55 text-ink-muted hover:bg-raised hover:text-ink'
             }`}
+            aria-current={homeActive ? 'page' : undefined}
           >
             {t('nav_home')}
           </Link>
@@ -70,26 +74,26 @@ export default function Header() {
 
         {/* Nav */}
         <nav className="hidden md:flex items-center gap-4 text-[13px] lg:gap-6 lg:text-sm">
-          <Link href={homeHref} className={`transition-colors ${pathname === '/' || pathname === homeHref ? 'text-gold' : 'text-ink-muted hover:text-ink'}`}>
+          <Link href={homeHref} aria-current={homeActive ? 'page' : undefined} className={desktopLinkClass(homeActive)}>
             {t('nav_home')}
           </Link>
-          <Link href="/workspace" className={`transition-colors ${isActive('/workspace')}`}>
+          <Link href="/workspace" aria-current={isActive('/workspace') ? 'page' : undefined} className={desktopLinkClass(isActive('/workspace'))}>
             {t('nav_critique')}
           </Link>
-          {practiceEnabled === true && <Link href="/account/practice" className={`transition-colors ${isActive('/account/practice')}`}>
+          {practiceEnabled === true && <Link href="/account/practice" aria-current={isActive('/account/practice') ? 'page' : undefined} className={desktopLinkClass(isActive('/account/practice'))}>
             {t('nav_practice')}
           </Link>}
-          <Link href="/generate" className={`transition-colors ${isActive('/generate')}`}>
+          <Link href="/generate" aria-current={isActive('/generate') ? 'page' : undefined} className={desktopLinkClass(isActive('/generate'))}>
             {t('nav_generate')}
           </Link>
-          <Link href="/gallery" className={`transition-colors ${isActive('/gallery')}`}>
+          <Link href="/gallery" aria-current={isActive('/gallery') ? 'page' : undefined} className={desktopLinkClass(isActive('/gallery'))}>
             {t('nav_gallery')}
           </Link>
-          <Link href={`/${locale}/blog`} className={`transition-colors ${isActive(`/${locale}/blog`)}`}>
+          <Link href={`/${locale}/blog`} aria-current={isActive(`/${locale}/blog`) ? 'page' : undefined} className={desktopLinkClass(isActive(`/${locale}/blog`))}>
             {blogUi.navLabel}
           </Link>
           {headerVisibility.showUsageNav && (
-            <Link href="/account/usage" className={`transition-colors ${isActive('/account/usage')}`}>
+            <Link href="/account/usage" aria-current={isActive('/account/usage') ? 'page' : undefined} className={desktopLinkClass(isActive('/account/usage'))}>
               {t('nav_usage')}
             </Link>
           )}
@@ -103,8 +107,9 @@ export default function Header() {
           <nav className="flex items-stretch bg-surface/70 rounded-card p-1 gap-0.5">
             <Link
               href="/workspace"
+              aria-current={isActive('/workspace') ? 'page' : undefined}
               className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-control text-[10px] font-medium transition-all duration-200 ${
-                pathname === '/workspace'
+                isActive('/workspace')
                   ? 'bg-void shadow-sm text-gold'
                   : 'text-ink-subtle hover:text-ink-muted active:scale-95'
               }`}
@@ -114,8 +119,9 @@ export default function Header() {
             </Link>
             <Link
               href="/gallery"
+              aria-current={isActive('/gallery') ? 'page' : undefined}
               className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-control text-[10px] font-medium transition-all duration-200 ${
-                pathname === '/gallery'
+                isActive('/gallery')
                   ? 'bg-void shadow-sm text-gold'
                   : 'text-ink-subtle hover:text-ink-muted active:scale-95'
               }`}
@@ -125,8 +131,9 @@ export default function Header() {
             </Link>
             <Link
               href="/retake"
+              aria-current={isActive('/retake') ? 'page' : undefined}
               className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-control text-[10px] font-medium transition-all duration-200 ${
-                pathname === '/retake'
+                isActive('/retake')
                   ? 'bg-void shadow-sm text-sage'
                   : 'text-ink-subtle hover:text-ink-muted active:scale-95'
               }`}
@@ -136,8 +143,9 @@ export default function Header() {
             </Link>
             <Link
               href="/generate"
+              aria-current={isActive('/generate') ? 'page' : undefined}
               className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-control text-[10px] font-medium transition-all duration-200 ${
-                pathname === '/generate'
+                isActive('/generate')
                   ? 'bg-void shadow-sm text-gold'
                   : 'text-ink-subtle hover:text-ink-muted active:scale-95'
               }`}
@@ -147,8 +155,9 @@ export default function Header() {
             </Link>
             {practiceEnabled === true && <Link
               href="/account/practice"
+              aria-current={isActive('/account/practice') ? 'page' : undefined}
               className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-control text-[10px] font-medium transition-all duration-200 ${
-                pathname === '/account/practice'
+                isActive('/account/practice')
                   ? 'bg-void shadow-sm text-gold'
                   : 'text-ink-subtle hover:text-ink-muted active:scale-95'
               }`}

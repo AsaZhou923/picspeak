@@ -105,7 +105,7 @@ export function ReviewScorePanel({
   return (
     <section className="ui-panel p-5" aria-labelledby="review-score-panel-title">
       <div className="mb-4">
-        <h2 id="review-score-panel-title" className="text-lg font-semibold text-ink">
+        <h2 id="review-score-panel-title" className="font-body text-lg font-semibold text-ink">
           {t('review_score_dims_basis')}
         </h2>
         <p className="mt-2 text-xs text-ink-subtle">
@@ -119,6 +119,7 @@ export function ReviewScorePanel({
           const isActive = activeDim === dimension.key;
           const hasTarget = (DIM_TO_TAGS[dimension.key]?.length ?? 0) > 0;
           const descriptionId = `review-dimension-${dimension.key}-description`;
+          const showDescription = isWeakest || isActive || !hasTarget;
           const rowContent = (
             <>
               <span className="flex items-center gap-2.5">
@@ -148,7 +149,7 @@ export function ReviewScorePanel({
               </span>
               <span
                 id={descriptionId}
-                className={`mt-2 text-left text-xs leading-5 text-ink-muted ${hasTarget ? 'hidden group-hover:block group-focus-within:block' : 'block'}`}
+                className={`mt-2 text-left text-xs leading-5 text-ink-muted ${showDescription ? 'block' : 'hidden group-hover:block group-focus-within:block'}`}
               >
                 {dimension.desc}
                 {hasTarget && (

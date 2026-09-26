@@ -22,8 +22,8 @@ export const jaTranslations = {
     pro_offer_label: '',
     pro_offer_highlight: 'Pro',
     updates_label: '更新履歴',
-    updates_hint_home: 'ギャラリー追加と操作案内の改善を見る',
-    updates_hint_latest: 'ギャラリー追加と操作案内の改善を見る',
+    updates_hint_home: 'ギャラリーと講評の改善を準備中',
+    updates_hint_latest: 'ギャラリーと講評の改善を準備中',
     contact_label: 'コンタクト',
     contact_headline: 'お問い合わせ',
     features_label: '主な機能',
@@ -274,7 +274,7 @@ export const jaTranslations = {
     affiliate_product_site: '製品サイト',
 
     // Home page
-    hero_label: 'AI写真評価',
+    hero_label: 'PicSpeak · AI写真評価',
     hero_headline_1: 'プロの写真評価を',
     hero_headline_2: '秒単位で取得',
     hero_desc: '写真をアップロードすると、AIが構図・光・色彩・インパクト・技術の5つの次元から詳細な評価と具体的な改善提案をお届けします。',
@@ -311,7 +311,7 @@ export const jaTranslations = {
     feature_pro_title: 'Pro レビューループ',
     feature_pro_body: '問題点を次回撮影の行動に変え、長期の振り返りを残します',
     feature_history_title: '進捗トラッキング',
-    feature_history_body: '同じ写真に対する複数の評価結果を記録し、成長を数値化',
+    feature_history_body: '同じ写真や練習目標の講評を比較し、スコアの変化と写真上の根拠を確認できます。',
 
     quota_label: 'Free / Pro の境界',
     quota_headline: 'Free は素早い診断、Pro は次の撮影を導く',
@@ -493,6 +493,7 @@ export const jaTranslations = {
     gallery_headline: 'ギャラリー',
     gallery_intro: 'ギャラリーには、審査を通過し、ユーザーが公開を選んだ評価結果だけが掲載されます。ゲストも作品と講評を閲覧できます。',
     gallery_count_label: '掲載数',
+    gallery_err_fetch: 'ギャラリーの作品を読み込めませんでした。再試行してください。',
     gallery_empty: 'ギャラリーはまだ空です',
     gallery_empty_body: 'まだ公開審査を通過した作品がありません。ログイン後、評価詳細ページからギャラリーへ追加すると、承認後にここへ表示されます。',
     gallery_empty_cta: 'まずは1枚分析する',

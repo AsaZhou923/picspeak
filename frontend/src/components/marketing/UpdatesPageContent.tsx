@@ -75,11 +75,11 @@ export default function UpdatesPageContent({ homeHref }: UpdatesPageContentProps
                   <Clock3 size={16} />
                 </div>
                 <div>
-                  <p className="text-xs uppercase tracking-[0.26em] text-gold/70">{copy.latestLabel}</p>
+                  <p className="text-xs uppercase tracking-[0.26em] text-accent-muted">{copy.latestLabel}</p>
                   <p className="font-mono text-sm text-ink-muted">{latest.date}</p>
                 </div>
               </div>
-              <span className="rounded-full border border-gold/25 bg-gold/10 px-3 py-1 text-[11px] uppercase tracking-[0.2em] text-gold/80">
+              <span className="rounded-full border border-gold/25 bg-gold/10 px-3 py-1 text-[11px] uppercase tracking-[0.2em] text-accent-muted">
                 {copy.latestBadge}
               </span>
             </div>
@@ -151,7 +151,7 @@ export default function UpdatesPageContent({ homeHref }: UpdatesPageContentProps
                 <div className="flex items-center justify-between gap-3">
                   <p className="font-mono text-xs text-ink-subtle">{entry.date}</p>
                   {index === 0 && (
-                    <span className="rounded-full border border-gold/20 bg-gold/10 px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-gold/80">
+                    <span className="rounded-full border border-gold/20 bg-gold/10 px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-accent-muted">
                       {copy.latestBadge}
                     </span>
                   )}

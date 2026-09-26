@@ -113,7 +113,7 @@ export default function PublicProfilePage() {
         <section className="overflow-hidden rounded-card border border-gold/20 bg-surface/85 shadow-level-1">
           <div className="grid gap-0 lg:grid-cols-[minmax(0,0.72fr)_minmax(0,1.28fr)]">
             <div className="border-b border-border-subtle bg-void/25 p-6 lg:border-b-0 lg:border-r">
-              <p className="mb-5 inline-flex items-center gap-2 rounded-full border border-gold/20 bg-gold/10 px-3 py-1 text-[11px] uppercase tracking-[0.24em] text-gold/80">
+              <p className="mb-5 inline-flex items-center gap-2 rounded-full border border-gold/20 bg-gold/10 px-3 py-1 text-[11px] uppercase tracking-[0.24em] text-accent-muted">
                 <Camera size={13} />
                 {copy.publicLabel}
               </p>
@@ -159,7 +159,7 @@ export default function PublicProfilePage() {
                   <p className="mt-2 text-2xl font-semibold text-ink">{profile.total_like_count}</p>
                 </div>
                 <Link href="/gallery" className="rounded-control border border-gold/25 bg-gold/10 p-4 transition-colors hover:bg-gold/15">
-                  <p className="text-[11px] uppercase tracking-[0.22em] text-gold/80">PicSpeak</p>
+                  <p className="text-[11px] uppercase tracking-[0.22em] text-accent-muted">PicSpeak</p>
                   <p className="mt-2 flex items-center gap-2 text-sm font-medium text-gold">
                     {copy.backGallery}
                     <ArrowRight size={14} />

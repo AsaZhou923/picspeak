@@ -33,7 +33,7 @@ export default function HomeGenerationPricingSection({ t }: HomeGenerationPricin
       <div className="max-w-5xl mx-auto">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-xs text-gold/70 font-mono mb-4 tracking-widest uppercase">
+            <p className="text-xs text-accent-muted font-mono mb-4 tracking-widest uppercase">
               {t('home_generation_pricing_label')}
             </p>
             <h2 className="font-display text-3xl sm:text-4xl">{t('home_generation_pricing_headline')}</h2>

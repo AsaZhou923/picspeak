@@ -1,7 +1,7 @@
 'use client';
 
-import { CalendarDays, SlidersHorizontal, Clock, Star, Heart, Zap } from 'lucide-react';
-import { useRef } from 'react';
+import { CalendarDays, ChevronDown, SlidersHorizontal, Clock, Star, Heart, Zap } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { ImageType } from '@/lib/types';
 import { type TranslationKey, useI18n } from '@/lib/i18n';
 import { displayDateToIso, isoDateToDisplay, normalizeDateDisplay } from '@/lib/date-filters';
@@ -119,16 +119,28 @@ export default function GalleryFilters({
     { id: 'score', label: t('gallery_sort_score'), icon: Star },
     { id: 'likes', label: t('gallery_sort_likes'), icon: Heart },
   ];
+  const hasAdvancedFilters = Boolean(
+    draftFilters.createdFrom ||
+    draftFilters.createdTo ||
+    draftFilters.minScore ||
+    draftFilters.maxScore ||
+    draftFilters.imageType
+  );
+  const [advancedOpen, setAdvancedOpen] = useState(hasAdvancedFilters || hasInvalidDate);
+
+  useEffect(() => {
+    if (hasAdvancedFilters || hasInvalidDate) setAdvancedOpen(true);
+  }, [hasAdvancedFilters, hasInvalidDate]);
 
   return (
-    <section className="ui-panel mt-6 p-5 transition-all duration-300 hover:border-gold/20">
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
+    <section className="mt-5 rounded-card border border-border-subtle bg-surface/70 p-3 shadow-level-1">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-sm text-ink">
           <SlidersHorizontal size={15} className="text-gold" />
           <span>{t('filter_label')}</span>
         </div>
 
-        <div className="flex flex-wrap gap-1.5 rounded-control border border-border/40 bg-void/40 p-1.5">
+        <div className="flex flex-wrap gap-1 rounded-control border border-border/40 bg-void/35 p-1">
           {sortOptions.map((opt) => {
             const Icon = opt.icon;
             const active = draftFilters.sort === opt.id;
@@ -137,6 +149,7 @@ export default function GalleryFilters({
                 key={opt.id}
                 type="button"
                 onClick={() => onSortChange(opt.id)}
+                aria-pressed={active}
                 className={`flex min-h-11 items-center gap-1.5 rounded-control px-3 py-1.5 text-xs font-medium transition-all active:scale-95 ${
                   active
                     ? 'bg-action text-action-ink shadow-level-1'
@@ -151,98 +164,109 @@ export default function GalleryFilters({
         </div>
       </div>
 
-      <div className="grid gap-3 xl:grid-cols-2 2xl:grid-cols-[minmax(0,1.28fr)_minmax(0,1.28fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.05fr)]">
-        <DateFilterField
-          label={t('filter_from')}
-          value={draftFilters.createdFrom}
-          error={createdFromInvalid ? t('err_unknown_body') : undefined}
-          onChange={(value) =>
-            setDraftFilters((prev) => ({ ...prev, createdFrom: value }))
-          }
-          placeholder={t('filter_date_placeholder')}
-          calendarLabel={t('filter_calendar_label').replace('{label}', t('filter_from'))}
-        />
+      <details
+        className="group mt-3 border-t border-border-subtle pt-3"
+        open={advancedOpen}
+        onToggle={(event) => setAdvancedOpen(event.currentTarget.open)}
+      >
+        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-control px-2 text-xs font-medium uppercase tracking-[0.16em] text-ink-subtle transition-colors hover:bg-gold/5 hover:text-gold [&::-webkit-details-marker]:hidden">
+          <span>{t('filter_label')}</span>
+          <ChevronDown size={14} className="transition-transform group-open:rotate-180" />
+        </summary>
 
-        <DateFilterField
-          label={t('filter_to')}
-          value={draftFilters.createdTo}
-          error={createdToInvalid ? t('err_unknown_body') : undefined}
-          onChange={(value) =>
-            setDraftFilters((prev) => ({ ...prev, createdTo: value }))
-          }
-          placeholder={t('filter_date_placeholder')}
-          calendarLabel={t('filter_calendar_label').replace('{label}', t('filter_to'))}
-        />
-
-        <label className="min-w-0 space-y-2 text-xs text-ink-muted">
-          <span>{t('filter_min_score')}</span>
-          <input
-            type="number"
-            min="0"
-            max="10"
-            step="0.1"
-            value={draftFilters.minScore}
-            onChange={(event) =>
-              setDraftFilters((prev) => ({ ...prev, minScore: event.target.value }))
+        <div className="mt-3 grid gap-3 xl:grid-cols-2 2xl:grid-cols-[minmax(0,1.28fr)_minmax(0,1.28fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.05fr)]">
+          <DateFilterField
+            label={t('filter_from')}
+            value={draftFilters.createdFrom}
+            error={createdFromInvalid ? t('err_unknown_body') : undefined}
+            onChange={(value) =>
+              setDraftFilters((prev) => ({ ...prev, createdFrom: value }))
             }
-            className="min-h-11 w-full min-w-0 rounded-control border border-border bg-void/60 px-3 py-2.5 text-sm text-ink outline-none transition-colors focus:border-gold/40"
+            placeholder={t('filter_date_placeholder')}
+            calendarLabel={t('filter_calendar_label').replace('{label}', t('filter_from'))}
           />
-        </label>
 
-        <label className="min-w-0 space-y-2 text-xs text-ink-muted">
-          <span>{t('filter_max_score')}</span>
-          <input
-            type="number"
-            min="0"
-            max="10"
-            step="0.1"
-            value={draftFilters.maxScore}
-            onChange={(event) =>
-              setDraftFilters((prev) => ({ ...prev, maxScore: event.target.value }))
+          <DateFilterField
+            label={t('filter_to')}
+            value={draftFilters.createdTo}
+            error={createdToInvalid ? t('err_unknown_body') : undefined}
+            onChange={(value) =>
+              setDraftFilters((prev) => ({ ...prev, createdTo: value }))
             }
-            className="min-h-11 w-full min-w-0 rounded-control border border-border bg-void/60 px-3 py-2.5 text-sm text-ink outline-none transition-colors focus:border-gold/40"
+            placeholder={t('filter_date_placeholder')}
+            calendarLabel={t('filter_calendar_label').replace('{label}', t('filter_to'))}
           />
-        </label>
 
-        <label className="min-w-0 space-y-2 text-xs text-ink-muted">
-          <span>{t('filter_image_type')}</span>
-          <select
-            value={draftFilters.imageType}
-            onChange={(event) =>
-              setDraftFilters((prev) => ({
-                ...prev,
-                imageType: event.target.value as '' | ImageType,
-              }))
-            }
-            className="min-h-11 w-full min-w-0 rounded-control border border-border bg-void/60 px-3 py-2.5 text-sm text-ink outline-none transition-colors focus:border-gold/40"
+          <label className="min-w-0 space-y-2 text-xs text-ink-muted">
+            <span>{t('filter_min_score')}</span>
+            <input
+              type="number"
+              min="0"
+              max="10"
+              step="0.1"
+              value={draftFilters.minScore}
+              onChange={(event) =>
+                setDraftFilters((prev) => ({ ...prev, minScore: event.target.value }))
+              }
+              className="min-h-11 w-full min-w-0 rounded-control border border-border bg-void/60 px-3 py-2.5 text-sm text-ink outline-none transition-colors focus:border-gold/40"
+            />
+          </label>
+
+          <label className="min-w-0 space-y-2 text-xs text-ink-muted">
+            <span>{t('filter_max_score')}</span>
+            <input
+              type="number"
+              min="0"
+              max="10"
+              step="0.1"
+              value={draftFilters.maxScore}
+              onChange={(event) =>
+                setDraftFilters((prev) => ({ ...prev, maxScore: event.target.value }))
+              }
+              className="min-h-11 w-full min-w-0 rounded-control border border-border bg-void/60 px-3 py-2.5 text-sm text-ink outline-none transition-colors focus:border-gold/40"
+            />
+          </label>
+
+          <label className="min-w-0 space-y-2 text-xs text-ink-muted">
+            <span>{t('filter_image_type')}</span>
+            <select
+              value={draftFilters.imageType}
+              onChange={(event) =>
+                setDraftFilters((prev) => ({
+                  ...prev,
+                  imageType: event.target.value as '' | ImageType,
+                }))
+              }
+              className="min-h-11 w-full min-w-0 rounded-control border border-border bg-void/60 px-3 py-2.5 text-sm text-ink outline-none transition-colors focus:border-gold/40"
+            >
+              <option value="">{t('filter_all_types')}</option>
+              {(['default', 'landscape', 'portrait', 'street', 'still_life', 'architecture'] as ImageType[]).map((type) => (
+                <option key={type} value={type}>
+                  {getImageTypeLabel(t, type)}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={onApply}
+            disabled={hasInvalidDate}
+            className="ui-action-primary px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50 active:scale-95"
           >
-            <option value="">{t('filter_all_types')}</option>
-            {(['default', 'landscape', 'portrait', 'street', 'still_life', 'architecture'] as ImageType[]).map((type) => (
-              <option key={type} value={type}>
-                {getImageTypeLabel(t, type)}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-
-      <div className="mt-4 flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={onApply}
-          disabled={hasInvalidDate}
-          className="ui-action-primary px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50 active:scale-95"
-        >
-          {t('filter_apply')}
-        </button>
-        <button
-          type="button"
-          onClick={onReset}
-          className="ui-action-secondary px-4 py-2 text-sm active:scale-95"
-        >
-          {t('filter_reset')}
-        </button>
-      </div>
+            {t('filter_apply')}
+          </button>
+          <button
+            type="button"
+            onClick={onReset}
+            className="ui-action-secondary px-4 py-2 text-sm active:scale-95"
+          >
+            {t('filter_reset')}
+          </button>
+        </div>
+      </details>
     </section>
   );
 }

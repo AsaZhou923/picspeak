@@ -1,6 +1,6 @@
 'use client';
 
-import { KeyboardEvent, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Check, Copy, ExternalLink, Sparkles, Wand2 } from 'lucide-react';
@@ -78,39 +78,11 @@ export function PromptExampleGallery({ onApply }: PromptExampleGalleryProps) {
     }
   }
 
-  function focusCategory(category: CategoryFilter) {
-    window.requestAnimationFrame(() => {
-      document.querySelector<HTMLButtonElement>(`[data-category-tab="${category}"]`)?.focus();
-    });
-  }
-
-  function handleCategoryKeyDown(event: KeyboardEvent<HTMLButtonElement>, category: CategoryFilter) {
-    const currentIndex = CATEGORY_FILTERS.indexOf(category);
-    let nextIndex: number | null = null;
-
-    if (event.key === 'ArrowRight') {
-      nextIndex = (currentIndex + 1) % CATEGORY_FILTERS.length;
-    } else if (event.key === 'ArrowLeft') {
-      nextIndex = (currentIndex - 1 + CATEGORY_FILTERS.length) % CATEGORY_FILTERS.length;
-    } else if (event.key === 'Home') {
-      nextIndex = 0;
-    } else if (event.key === 'End') {
-      nextIndex = CATEGORY_FILTERS.length - 1;
-    }
-
-    if (nextIndex === null) return;
-
-    event.preventDefault();
-    const nextCategory = CATEGORY_FILTERS[nextIndex];
-    setActiveCategory(nextCategory);
-    focusCategory(nextCategory);
-  }
-
   return (
     <section className="space-y-4">
       <div className="flex flex-col gap-4 border-l-2 border-gold/50 pl-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0">
-          <p className="mb-2 inline-flex items-center gap-2 font-mono text-xs uppercase tracking-[0.18em] text-gold/70">
+          <p className="mb-2 inline-flex items-center gap-2 font-mono text-xs uppercase tracking-[0.18em] text-accent-muted">
             <Sparkles size={14} aria-hidden="true" />
             {t('generation_examples_label')}
           </p>
@@ -118,7 +90,7 @@ export function PromptExampleGallery({ onApply }: PromptExampleGalleryProps) {
             <h2 className="font-display text-2xl text-ink">{t('generation_examples_title')}</h2>
             <Link
               href="/generate/prompts"
-              className="text-xs font-medium text-gold/80 transition-colors hover:text-gold"
+              className="text-xs font-medium text-accent-muted transition-colors hover:text-gold"
             >
               {locale === 'zh'
                 ? 'GPT Image 2 提示词案例'
@@ -130,7 +102,7 @@ export function PromptExampleGallery({ onApply }: PromptExampleGalleryProps) {
           <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-muted">{t('generation_examples_body')}</p>
         </div>
         <div
-          role="tablist"
+          role="group"
           aria-label={t('generation_examples_label')}
           className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 lg:mx-0 lg:flex-wrap lg:justify-end lg:overflow-visible lg:px-0 lg:pb-0"
         >
@@ -138,12 +110,8 @@ export function PromptExampleGallery({ onApply }: PromptExampleGalleryProps) {
             <button
               key={category}
               type="button"
-              role="tab"
-              data-category-tab={category}
-              aria-selected={activeCategory === category}
-              tabIndex={activeCategory === category ? 0 : -1}
+              aria-pressed={activeCategory === category}
               onClick={() => setActiveCategory(category)}
-              onKeyDown={(event) => handleCategoryKeyDown(event, category)}
               className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-control border px-3 text-xs font-medium transition-colors ${
                 activeCategory === category
                   ? 'border-gold/45 bg-gold/10 text-gold'
@@ -156,6 +124,10 @@ export function PromptExampleGallery({ onApply }: PromptExampleGalleryProps) {
           ))}
         </div>
       </div>
+
+      <p className="sr-only" role="status">
+        {t('generation_examples_label')}: {examples.length}
+      </p>
 
       <div className="lg:max-h-[760px] lg:overflow-y-auto lg:pr-1">
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -184,7 +156,7 @@ export function PromptExampleGallery({ onApply }: PromptExampleGalleryProps) {
                 <div className="grid min-h-[188px] grid-rows-[auto_1fr_auto] gap-3 p-3">
                   <div className="min-w-0">
                     <div className="flex items-start justify-between gap-2">
-                      <h3 className="line-clamp-2 min-h-[2.5rem] text-sm font-semibold leading-5 text-ink">
+                      <h3 className="line-clamp-2 min-h-[2.5rem] font-body text-sm font-semibold leading-5 text-ink">
                         {title}
                       </h3>
                       <a

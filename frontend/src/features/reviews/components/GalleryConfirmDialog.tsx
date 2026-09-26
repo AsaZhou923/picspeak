@@ -51,7 +51,7 @@ export function GalleryConfirmDialog({ onClose, onConfirm, actionBusy, galleryAc
           <X size={14} />
         </button>
         <div className="mb-5">
-          <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-gold/20 bg-gold/10 px-3 py-1 text-[11px] uppercase tracking-[0.24em] text-gold/80">
+          <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-gold/20 bg-gold/10 px-3 py-1 text-[11px] uppercase tracking-[0.24em] text-accent-muted">
             <LayoutGrid size={12} />
             {galleryActionCopy.dialogLabel}
           </p>

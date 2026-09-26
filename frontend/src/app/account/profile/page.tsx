@@ -90,7 +90,7 @@ export default function AccountProfilePage() {
     <section className="min-h-screen px-6 py-12">
       <div className="mx-auto max-w-4xl animate-fade-in">
         <div className="mb-8">
-          <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-gold/20 bg-gold/10 px-3 py-1 text-[11px] uppercase tracking-[0.24em] text-gold/80">
+          <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-gold/20 bg-gold/10 px-3 py-1 text-[11px] uppercase tracking-[0.24em] text-accent-muted">
             <UserRound size={13} />
             {copy.accountLabel}
           </p>

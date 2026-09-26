@@ -1,6 +1,6 @@
 # PicSpeak Design System
 
-Status: Active; refreshed 2026-09-25 after the site-wide UI copy and action review
+Status: Active; refreshed 2026-09-26 after the image-led Gallery and accessibility pass
 Owner: product/frontend
 Applies to: `frontend/src/app`, `frontend/src/components`, `frontend/src/features`
 
@@ -241,6 +241,7 @@ Use warm/black translucent shadows tied to the theme. Avoid unique arbitrary sha
 - Prefer contact-sheet crops, before/after pairs and focused details over abstract AI illustrations.
 - Generated examples must be labeled as examples and retain source/license metadata where required.
 - Image overlays must preserve subject readability and never make photography look like a background texture.
+- Compact navigation and browser icons use a text-free brand mark; use the full logo only where its lettering remains legible.
 
 ### 7.7 Motion
 
@@ -290,9 +291,16 @@ Use warm/black translucent shadows tied to the theme. Avoid unique arbitrary sha
 - Preserve context when entering from a review.
 - Show cost before submission, state during generation and clear reuse/download/retake actions after completion.
 
+### Gallery
+
+- Keep a server-visible title and short introduction while letting real public photographs enter the first viewport on desktop and mobile.
+- Place the work grid before advanced filters, view preferences, scoring notices and the scoreboard. Never present the public demo as a live Gallery submission.
+- Let each card show the photograph clearly, then its author, score, short evidence and one dominant action; keep secondary paths reachable with touch-sized targets.
+- Distinguish a failed Gallery request from a confirmed empty collection and offer a retry for failure.
+
 ### Supporting routes
 
-Gallery, Blog, Updates and account/history pages adopt the shared container, panel, heading, filter, empty-state and action patterns. They are not functionally restructured in the first pass unless a shared-shell defect requires it.
+Blog, Updates and account/history pages adopt the shared container, panel, heading, filter, empty-state and action patterns. They are not functionally restructured in the first pass unless a shared-shell defect requires it.
 
 ## 9. Component contract
 

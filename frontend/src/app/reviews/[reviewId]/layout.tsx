@@ -20,7 +20,7 @@ const DEMO_HERO_COPY: Record<Locale, {
     eyebrow: 'Public AI photo critique example',
     title: 'AI Photo Critique Example: Scores, Evidence, and Retake Guidance',
     body:
-      'See how PicSpeak evaluates composition, lighting, color, impact, and technique, then turns the weakest dimension into a concrete next-shoot action. This public example is a product walkthrough, not a private user result.',
+      'See how five scores become a concrete next-shoot action. This public walkthrough is not a private user result.',
     galleryCta: 'Browse critique examples',
     retakeCta: 'Open Retake Coach',
   },
@@ -28,7 +28,7 @@ const DEMO_HERO_COPY: Record<Locale, {
     eyebrow: '公开 AI 摄影点评示例',
     title: 'AI 摄影点评示例：评分、依据与复拍建议',
     body:
-      '查看 PicSpeak 如何评估构图、光线、色彩、表达和技术质量，并把最弱维度转化为下一次拍摄可执行的行动。这个公开示例是产品演示，不是私人用户结果。',
+      '看五维评分如何转成下一次拍摄建议。这是公开产品演示，不是私人用户结果。',
     galleryCta: '浏览点评示例',
     retakeCta: '打开复拍教练',
   },
@@ -36,7 +36,7 @@ const DEMO_HERO_COPY: Record<Locale, {
     eyebrow: '公開 AI 写真批評サンプル',
     title: 'AI 写真批評サンプル：スコア、根拠、撮り直しガイド',
     body:
-      'PicSpeak が構図、光、色、印象、技術をどう評価し、最も弱い要素を次の撮影アクションへ変えるかを確認できます。この公開例は製品ウォークスルーであり、非公開ユーザー結果ではありません。',
+      '5 項目のスコアから次の撮影アクションへつなぐ公開サンプルです。非公開ユーザーの結果ではありません。',
     galleryCta: '批評例を見る',
     retakeCta: 'Retake Coach を開く',
   },
@@ -133,20 +133,20 @@ export default async function ReviewDetailLayout({
         />
       )}
       {demoReviewJsonLd && (
-        <section className="border-b border-border-subtle px-6 py-10">
+        <section className="border-b border-border-subtle px-6 py-5 sm:py-6">
           <div className="mx-auto max-w-workspace">
             <p className="ui-eyebrow">{demoHeroCopy.eyebrow}</p>
-            <h1 className="mt-3 max-w-4xl font-display text-4xl leading-tight text-ink sm:text-5xl">
+            <h1 className="mt-2 max-w-3xl font-display text-2xl leading-tight text-ink sm:text-3xl">
               {demoHeroCopy.title}
             </h1>
-            <p className="mt-4 max-w-3xl text-sm leading-7 text-ink-muted sm:text-base">
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-muted">
               {demoHeroCopy.body}
             </p>
-            <div className="mt-6 flex flex-wrap gap-3 text-sm">
-              <Link href="/gallery" className="ui-action-secondary px-5 py-2.5">
+            <div className="mt-4 flex flex-wrap gap-2 text-sm">
+              <Link href="/gallery" className="ui-action-secondary px-4 py-2">
                 {demoHeroCopy.galleryCta}
               </Link>
-              <Link href="/retake" className="ui-action-secondary px-5 py-2.5">
+              <Link href="/retake" className="ui-action-secondary px-4 py-2">
                 {demoHeroCopy.retakeCta}
               </Link>
             </div>

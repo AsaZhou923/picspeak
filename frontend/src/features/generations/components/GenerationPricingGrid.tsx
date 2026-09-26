@@ -29,7 +29,7 @@ export default function GenerationPricingGrid({ t }: GenerationPricingGridProps)
     <section className="mt-10" aria-labelledby="generation-pricing-heading">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="font-mono text-xs uppercase tracking-[0.22em] text-gold/70">
+          <p className="font-mono text-xs uppercase tracking-[0.22em] text-accent-muted">
             {t('home_generation_pricing_label')}
           </p>
           <h2 id="generation-pricing-heading" className="mt-2 text-xl font-semibold text-ink sm:text-2xl">
