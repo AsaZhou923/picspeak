@@ -26,7 +26,7 @@ Upload a photo
   -> save progress and generate the next visual target
 ```
 
-- **Single-photo critique:** choose the backward-compatible Qwen path or GPT-5.6 Luna with `xhigh` reasoning through the OpenAI Responses API.
+- **Single-photo critique:** the workspace uses GPT-5.6 Luna with `xhigh` reasoning through the OpenAI Responses API. The Qwen-compatible backend API remains available for existing clients.
 - **Retake Coach:** GPT-5.6 Luna receives the original and retake together with `xhigh` reasoning; the server calculates every score delta deterministically.
 - **AI Create:** generate visual references with GPT Image 2, including review-linked composition, lighting, color, and retake directions.
 - **Learning surfaces:** move between critiques, the public gallery, Lens Notes, prompt examples, review history, and same-source retake chains.
@@ -76,7 +76,7 @@ Next.js 15 / React 18
   -> direct image upload to S3-compatible storage
   -> FastAPI review and generation APIs
   -> in-process or standalone async worker
-  -> Qwen-compatible critique / OpenAI Responses / GPT Image 2
+  -> OpenAI Responses critique / GPT Image 2
   -> PostgreSQL review, task, billing, and progress records
 ```
 
@@ -132,7 +132,7 @@ source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r backend/requirements.txt
 ```
 
-The model-specific OpenAI settings are independent from the default Qwen-compatible path:
+The workspace uses the model-specific OpenAI settings below. The retained Qwen-compatible backend path is configured independently:
 
 ```dotenv
 OPENAI_API_KEY=
@@ -187,7 +187,8 @@ The frontend and backend can be deployed independently. The backend includes a c
 
 ## Documentation
 
-- [Latest changelog](docs/changelog/CHANGELOG.md#2026-09-26-gallery-and-critique-clarity)
+- [Latest changelog](docs/changelog/CHANGELOG.md#2026-09-30-workspace-gpt-review-only)
+- [Previous gallery and critique clarity update](docs/changelog/CHANGELOG.md#2026-09-26-gallery-and-critique-clarity)
 - [Previous gallery and controls update](docs/changelog/CHANGELOG.md#2026-09-25-gallery-actions-and-clearer-controls)
 - [Previous history, sharing, and practice update](docs/changelog/CHANGELOG.md#2026-09-24-critique-organization-and-sharing)
 - [Earlier preparation record](docs/changelog/CHANGELOG.md#2026-09-23-critique-practice-and-sharing)

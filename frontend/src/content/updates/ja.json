@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-09-30-workspace-gpt-review-only",
+    "date": "2026-09-30",
+    "showPopup": false,
+    "title": "準備中：ワークスペースの講評を GPT-5.6 に統一",
+    "summary": "ワークスペースは GPT-5.6 を標準で使い、アップロード後のモデル選択が不要になります。保存済みの講評は引き続き閲覧できます。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-09-30-workspace-gpt-review-only"
+  },
+  {
     "id": "2026-09-26-gallery-and-critique-clarity",
     "date": "2026-09-26",
     "showPopup": false,

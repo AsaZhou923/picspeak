@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-09-30-workspace-gpt-review-only",
+    "date": "2026-09-30",
+    "showPopup": false,
+    "title": "准备中：工作台评图统一使用 GPT-5.6",
+    "summary": "工作台将默认使用 GPT-5.6，上传后无需再选择评图模型；已保存的点评仍可查看。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-09-30-workspace-gpt-review-only"
+  },
+  {
     "id": "2026-09-26-gallery-and-critique-clarity",
     "date": "2026-09-26",
     "showPopup": false,

@@ -26,7 +26,7 @@
   -> 保存进步，并生成下一轮视觉目标
 ```
 
-- **单张照片点评：** 可选择兼容默认的 Qwen 路径，或通过 OpenAI Responses API 使用 `xhigh` 推理强度的 GPT-5.6 Luna。
+- **单张照片点评：** 工作台使用 OpenAI Responses API 的 GPT-5.6 Luna，推理强度为 `xhigh`；后端保留 Qwen 兼容接口，供已有客户端继续调用。
 - **复拍教练：** GPT-5.6 Luna 以 `xhigh` 推理强度在同一次请求中接收原片和复拍；所有分差均由服务端确定性计算。
 - **AI 创作：** 使用 GPT Image 2 生成视觉参考，包括点评关联的构图、光线、色彩与复拍方向。
 - **学习入口：** 在点评、公开长廊、镜头手记、提示词案例、点评历史和同源复拍链之间继续练习。
@@ -76,7 +76,7 @@ Next.js 15 / React 18
   -> 图片直传 S3 兼容对象存储
   -> FastAPI 点评与生图 API
   -> 内嵌或独立异步 worker
-  -> Qwen 兼容点评 / OpenAI Responses / GPT Image 2
+  -> OpenAI Responses 点评 / GPT Image 2
   -> PostgreSQL 点评、任务、计费与进步记录
 ```
 
@@ -132,7 +132,7 @@ source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r backend/requirements.txt
 ```
 
-模型专属的 OpenAI 配置与默认 Qwen 兼容路径相互独立：
+工作台使用下列模型专属的 OpenAI 配置；保留的 Qwen 兼容后端路径独立配置：
 
 ```dotenv
 OPENAI_API_KEY=
@@ -187,7 +187,8 @@ npm run build
 
 ## 文档
 
-- [最新更新日志](docs/changelog/CHANGELOG.md#2026-09-26-gallery-and-critique-clarity)
+- [最新更新日志](docs/changelog/CHANGELOG.md#2026-09-30-workspace-gpt-review-only)
+- [此前长廊与点评说明更新](docs/changelog/CHANGELOG.md#2026-09-26-gallery-and-critique-clarity)
 - [此前长廊与操作提示更新](docs/changelog/CHANGELOG.md#2026-09-25-gallery-actions-and-clearer-controls)
 - [此前历史、分享与练习更新](docs/changelog/CHANGELOG.md#2026-09-24-critique-organization-and-sharing)
 - [此前准备记录](docs/changelog/CHANGELOG.md#2026-09-23-critique-practice-and-sharing)

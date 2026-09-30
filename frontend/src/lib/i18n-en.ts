@@ -232,8 +232,8 @@ export const enTranslations = {
     pro_offer_label: '',
     pro_offer_highlight: 'Pro',
     updates_label: 'Updates',
-    updates_hint_home: 'See gallery and critique improvements',
-    updates_hint_latest: 'See gallery and critique improvements',
+    updates_hint_home: 'GPT-5.6 workspace critiques are coming soon',
+    updates_hint_latest: 'GPT-5.6 workspace critiques are coming soon',
     contact_label: 'Contact',
     contact_headline: 'Get in Touch',
 

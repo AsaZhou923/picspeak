@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-09-30-workspace-gpt-review-only",
+    "date": "2026-09-30",
+    "showPopup": false,
+    "title": "Coming soon: workspace critiques use GPT-5.6",
+    "summary": "The workspace will use GPT-5.6 by default, with no model choice needed after upload. Saved critiques remain available.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-09-30-workspace-gpt-review-only"
+  },
+  {
     "id": "2026-09-26-gallery-and-critique-clarity",
     "date": "2026-09-26",
     "showPopup": false,

@@ -25,7 +25,7 @@ Core product areas:
 - **Backend**: FastAPI, SQLAlchemy 2.x, Alembic, Uvicorn
 - **Database**: PostgreSQL
 - **Object storage**: Cloudflare R2 / S3-compatible storage
-- **AI critique**: Qwen-compatible single-photo critique by default, optional GPT-5.6 Luna single-photo review through OpenAI Responses, and GPT-5.6 Luna paired original/retake comparison; both OpenAI paths use `xhigh` reasoning
+- **AI critique**: GPT-5.6 Luna single-photo review and paired original/retake comparison through OpenAI Responses with `xhigh` reasoning; the Qwen-compatible backend API remains available for existing clients
 - **AI generation**: OpenAI-compatible image generation endpoint, task queue, credit pricing, and object-storage persistence
 - **Task processing**: In-process async worker by default, optional standalone worker and Cloud Tasks configuration
 - **Authentication**: Clerk plus legacy Google OAuth/guest JWT support
@@ -167,7 +167,7 @@ Practice analytics uses server-owned accepted/submitted/completed/feedback event
 
 Keep execution records, evaluation protocols, and generated analytics reports in the sibling docs vault under `E:\Project Code\docs\01 - Projects\PicSpeak` (Testing, Architecture, and Analytics subfolders). Keep machine-readable test fixtures and evaluator input templates in the code repository.
 
-Normal single-photo review is a separate path: the Qwen-compatible route remains the default and the workspace currently labels it as Qwen 3.7, while an explicit GPT-5.6 selection uses GPT-5.6 Luna with `xhigh` reasoning through the OpenAI Responses API. Do not reuse one model's completed review for another model choice.
+Normal single-photo review is a separate path: the workspace defaults to GPT-5.6 Luna with `xhigh` reasoning through the OpenAI Responses API and only exposes that model. The Qwen-compatible backend route and its API default remain available for existing clients. Do not reuse one model's completed review for another model choice.
 
 ### Auth and quota
 

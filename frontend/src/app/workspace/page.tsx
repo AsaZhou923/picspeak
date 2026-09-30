@@ -164,7 +164,7 @@ function WorkspacePageContent() {
   const { t, locale } = useI18n();
 
   const [reviewMode, setReviewMode] = useState<'flash' | 'pro'>('flash');
-  const [reviewModel, setReviewModel] = useState<ReviewModel>('qwen');
+  const [reviewModel, setReviewModel] = useState<ReviewModel>('gpt-5.6-luna');
   const [imageType, setImageType] = useState<ImageType>('default');
   const [showQuotaModal, setShowQuotaModal] = useState(false);
   const [practiceEnabled, setPracticeEnabled] = useState(false);

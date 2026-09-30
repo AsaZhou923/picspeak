@@ -48,8 +48,8 @@ test('normal workspace and retake flow both route to GPT-5.6 Luna', async () => 
   assert.match(source, /showReviewModel=\{!isRetakeCoachFlow && !isPracticePairedFlow\}/);
   assert.match(source, /<WorkspaceSettingsPanel/);
   assert.match(settings, /<ReviewModelPicker/);
-  assert.match(picker, /Qwen 3\.7/);
-  assert.doesNotMatch(picker, /Qwen 3\.5/);
+  assert.match(source, /useState<ReviewModel>\('gpt-5\.6-luna'\)/);
+  assert.doesNotMatch(picker, /qwen|Qwen|千问/);
   assert.match(picker, /GPT-5\.6/);
   assert.doesNotMatch(picker, /GPT-5\.5/);
   assert.match(header, /href="\/account\/practice"/);

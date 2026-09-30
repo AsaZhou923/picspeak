@@ -12,6 +12,7 @@ import {
   makePracticeIdempotencyKey,
   readPendingPracticeState,
   resolveWorkspaceTaskStep,
+  reviewModelLabel,
   shouldReusePracticeReviewIdempotencyKey,
   writePendingPracticeState,
 } from '../src/features/workspace/workspaceTaskFlow.ts';
@@ -21,6 +22,11 @@ const workspacePageSource = readFileSync(
   path.join(TEST_DIR, '..', 'src', 'app', 'workspace', 'page.tsx'),
   'utf8'
 );
+
+test('workspace model summaries show the active GPT model and retain the legacy GPT label', () => {
+  assert.equal(reviewModelLabel('gpt-5.6-luna'), 'GPT-5.6');
+  assert.equal(reviewModelLabel('gpt-5.5'), 'GPT-5.5');
+});
 
 test('workspace task flow keeps the image, settings and submit hierarchy localized', () => {
   assert.deepEqual(getWorkspaceTaskFlowCopy('zh').steps, {
