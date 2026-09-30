@@ -21,8 +21,8 @@ export const zhTranslations = {
   pro_offer_label: '',
   pro_offer_highlight: 'Pro',
   updates_label: '更新记录',
-  updates_hint_home: '即将统一使用 GPT-5.6 评图',
-  updates_hint_latest: '即将统一使用 GPT-5.6 评图',
+  updates_hint_home: '工作台统一使用 GPT-5.6 评图',
+  updates_hint_latest: '工作台统一使用 GPT-5.6 评图',
   contact_label: '联系',
   contact_headline: '联系我',
 
