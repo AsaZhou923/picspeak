@@ -235,7 +235,7 @@ class ReviewQueryPrivacyTests(unittest.TestCase):
             gallery_rejected_reason=None,
             tags_json=['portfolio'],
             note='owner note',
-            created_at=datetime(2026, 8, 28, tzinfo=timezone.utc),
+            created_at=datetime.now(timezone.utc),
         )
         photo_exif = {'Make': 'Leica'}
         photo = SimpleNamespace(public_id='pho_owner', exif_data=photo_exif)
