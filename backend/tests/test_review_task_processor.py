@@ -314,8 +314,8 @@ class ReviewTaskProcessorTests(unittest.TestCase):
             scores={'composition': 7, 'lighting': 6, 'color': 6, 'impact': 5, 'technical': 6},
             score_evidence=score_evidence_fixture(LOW_SCORES),
             final_score=6.0,
-            model_name='gpt-5.6-luna',
-            model_version='gpt-5.6-luna-2026-08-01',
+            model_name='gpt-6-luna',
+            model_version='gpt-6-luna',
             score_prompt_version=SCORE_PROMPT_VERSION,
             score_version=SCORE_VERSION,
             preprocess_version=SCORER_PREPROCESS_VERSION,
@@ -345,7 +345,9 @@ class ReviewTaskProcessorTests(unittest.TestCase):
             raise AIReviewError('writer timed out', stage='writing')
         observed_cost_batches = []
 
-        with patch('app.services.review_task_processor.settings.cloud_tasks_enabled', False), patch(
+        with patch('app.services.review_task_processor.settings.openai_score_model', 'gpt-6-luna'), patch(
+            'app.services.review_task_processor.settings.cloud_tasks_enabled', False
+        ), patch(
             'app.services.review_task_processor.canonical_score_cache_lease',
             return_value=nullcontext(None),
         ) as cache_lease, patch(

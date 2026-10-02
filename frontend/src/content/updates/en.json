@@ -1,5 +1,23 @@
 [
   {
+    "id": "2026-10-02-photo-scoring-quality",
+    "date": "2026-10-02",
+    "showPopup": false,
+    "title": "Photo scoring update, saved history preserved",
+    "summary": "Preparing: new critiques will use updated scoring ability, while saved critiques and gallery scores stay unchanged. Progress comparisons only use records scored the same way.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-10-02-photo-scoring-quality",
+    "sections": [
+      {
+        "title": "What you will see",
+        "items": [
+          "New photo critiques will use updated scoring ability so the score better follows the photo's actual finish.",
+          "Saved critiques, history, and gallery scores stay unchanged and will not be rewritten in bulk.",
+          "Progress comparisons only use records scored the same way, avoiding mixed scoring contexts."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-09-30-workspace-gpt-review-only",
     "date": "2026-09-30",
     "showPopup": false,

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { buildHistoryGrowthSnapshot, buildNextShootChecklist } from '../src/lib/review-growth.ts';
+import { buildHistoryGrowthSnapshot, buildNextShootChecklist, getScoreVersionLabel } from '../src/lib/review-growth.ts';
 import type { ReviewHistoryItem, ReviewScores } from '../src/lib/types.ts';
 
 function makeScores(values: Partial<ReviewScores>): ReviewScores {
@@ -134,6 +134,58 @@ test('buildHistoryGrowthSnapshot compares only the latest score version', () => 
   assert.equal(snapshot.recentAverage, 6.7);
   assert.equal(snapshot.previousAverage, null);
   assert.equal(snapshot.trend, 'flat');
+});
+
+test('buildHistoryGrowthSnapshot keeps v5 and v6 histories separate', () => {
+  const snapshot = buildHistoryGrowthSnapshot([
+    makeHistoryItem('rev-v6-3', '2026-10-01T10:00:00Z', 7.4, makeScores({ composition: 7, lighting: 7, color: 8, impact: 8, technical: 7 }), 'score-v6-evidence-independent'),
+    makeHistoryItem('rev-v5-high', '2026-09-30T10:00:00Z', 8.8, makeScores({ composition: 9, lighting: 9, color: 9, impact: 9, technical: 8 }), 'score-v5-evidence-calibrated'),
+    makeHistoryItem('rev-v6-2', '2026-09-29T10:00:00Z', 7.2, makeScores({ composition: 7, lighting: 7, color: 7, impact: 8, technical: 7 }), 'score-v6-evidence-independent'),
+    makeHistoryItem('rev-v5-low', '2026-09-28T10:00:00Z', 5.9, makeScores({ composition: 6, lighting: 6, color: 6, impact: 6, technical: 5 }), 'score-v5-evidence-calibrated'),
+    makeHistoryItem('rev-v6-1', '2026-09-27T10:00:00Z', 7.0, makeScores({ composition: 7, lighting: 6, color: 7, impact: 7, technical: 7 }), 'score-v6-evidence-independent'),
+  ]);
+
+  assert.deepEqual(snapshot.analyzedItems.map((item) => item.review_id), [
+    'rev-v6-3',
+    'rev-v6-2',
+    'rev-v6-1',
+  ]);
+  assert.equal(snapshot.scoreVersion, 'score-v6-evidence-independent');
+  assert.equal(snapshot.excludedVersionCount, 2);
+  assert.equal(snapshot.recentAverage, 7.2);
+});
+
+test('buildHistoryGrowthSnapshot keeps v6 and v7 histories separate', () => {
+  const snapshot = buildHistoryGrowthSnapshot([
+    makeHistoryItem('rev-v7-3', '2026-10-03T10:00:00Z', 7.6, makeScores({ composition: 8, lighting: 7, color: 8, impact: 8, technical: 7 }), 'score-v7-canonical-quality'),
+    makeHistoryItem('rev-v6-high', '2026-10-02T10:00:00Z', 8.5, makeScores({ composition: 9, lighting: 8, color: 9, impact: 9, technical: 8 }), 'score-v6-evidence-independent'),
+    makeHistoryItem('rev-v7-2', '2026-10-01T10:00:00Z', 7.3, makeScores({ composition: 7, lighting: 7, color: 7, impact: 8, technical: 7 }), 'score-v7-canonical-quality'),
+    makeHistoryItem('rev-v6-low', '2026-09-30T10:00:00Z', 6.1, makeScores({ composition: 6, lighting: 6, color: 7, impact: 6, technical: 6 }), 'score-v6-evidence-independent'),
+    makeHistoryItem('rev-v7-1', '2026-09-29T10:00:00Z', 7.1, makeScores({ composition: 7, lighting: 6, color: 7, impact: 7, technical: 7 }), 'score-v7-canonical-quality'),
+  ]);
+
+  assert.deepEqual(snapshot.analyzedItems.map((item) => item.review_id), [
+    'rev-v7-3',
+    'rev-v7-2',
+    'rev-v7-1',
+  ]);
+  assert.equal(snapshot.scoreVersion, 'score-v7-canonical-quality');
+  assert.equal(snapshot.excludedVersionCount, 2);
+  assert.equal(snapshot.recentAverage, 7.3);
+});
+
+test('score version labels preserve old labels and identify v7 scoring rubric', () => {
+  assert.equal(getScoreVersionLabel('score-v5-evidence-calibrated', 'zh'), 'v5 证据评分');
+  assert.equal(getScoreVersionLabel('score-v5-evidence-calibrated', 'en'), 'v5 evidence rubric');
+  assert.equal(getScoreVersionLabel('photo-score-v5-evidence-calibrated', 'ja'), 'v5 根拠付き評価');
+
+  assert.equal(getScoreVersionLabel('score-v6-evidence-independent', 'zh'), 'v6 独立复核评分');
+  assert.equal(getScoreVersionLabel('score-v6-evidence-independent', 'en'), 'v6 independent review rubric');
+  assert.equal(getScoreVersionLabel('photo-score-v6-evidence-independent', 'ja'), 'v6 独立レビュー評価');
+
+  assert.equal(getScoreVersionLabel('score-v7-canonical-quality', 'zh'), 'v7 评分标尺');
+  assert.equal(getScoreVersionLabel('score-v7-canonical-quality', 'en'), 'v7 scoring rubric');
+  assert.equal(getScoreVersionLabel('photo-score-v7-canonical-quality', 'ja'), 'v7 採点基準');
 });
 
 test('buildHistoryGrowthSnapshot does not treat a missing latest score version as current', () => {

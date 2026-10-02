@@ -25,14 +25,14 @@ Core product areas:
 - **Backend**: FastAPI, SQLAlchemy 2.x, Alembic, Uvicorn
 - **Database**: PostgreSQL
 - **Object storage**: Cloudflare R2 / S3-compatible storage
-- **AI critique**: GPT-5.6 Luna single-photo review and paired original/retake comparison through OpenAI Responses with `xhigh` reasoning; the Qwen-compatible backend API remains available for existing clients
+- **AI critique**: GPT-6 Luna canonical photo scoring; GPT-5.6 Luna single-photo critique writing and paired original/retake comparison through OpenAI Responses with `xhigh` reasoning; the Qwen-compatible backend API remains available for existing clients
 - **AI generation**: OpenAI-compatible image generation endpoint, task queue, credit pricing, and object-storage persistence
 - **Task processing**: In-process async worker by default, optional standalone worker and Cloud Tasks configuration
 - **Authentication**: Clerk plus legacy Google OAuth/guest JWT support
 - **Billing**: Lemon Squeezy Pro checkout, activation codes, image credit packs, and webhooks
 
 
-Current single-photo code contract: `score-v5-evidence-calibrated` / `photo-score-v5-evidence-calibrated` with `photo-review-v8-image-led` prose. Store dimension evidence and perform one additional canonical-scoring audit for candidates >=8; final dimension scores still determine the arithmetic mean. Judge visible expressive effects, preserve defining strengths, and keep completed scoring evidence/checkpoints through writer retries. Historical gallery re-evaluation requires an explicit maintenance run; changing prompts alone does not update deployed services or stored reviews.
+Current single-photo code contract: `score-v7-canonical-quality` / `photo-score-v7-canonical-quality` with GPT-6 Luna numeric scoring and `photo-review-v8-image-led` prose. Preserve the v5 scoring anchors and dimension evidence; perform one independent second scoring pass for candidates >=8 without exposing the initial scores, rationale, or high-score trigger to that request. Final dimension scores still determine the arithmetic mean. Judge visible expressive effects, preserve defining strengths, and keep completed scoring evidence/checkpoints through writer retries. Historical gallery re-evaluation requires an explicit maintenance run; changing prompts alone does not update deployed services or stored reviews. The v7 model comparison and its limits are documented in `docs/scoring-v7-validation.md`; the preceding v6 workflow-only experiment is retained in `docs/scoring-v6-optimization.md`. Production deployment must set `OPENAI_SCORE_MODEL=gpt-6-luna`; Cloud Build updates this existing runtime override with the new image.
 
 Validate scoring changes with `backend/scripts/evaluate_score_calibration.py` and the protocol in `docs/scoring-calibration.md`. Synthetic fixtures and small live-model probes are diagnostic only; formal calibration requires independent human labels and a held-out test set. Keep ordinary and paired-retake scoring versions separate in growth statistics.
 

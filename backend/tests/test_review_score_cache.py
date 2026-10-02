@@ -84,6 +84,12 @@ class ReviewScoreCacheTests(unittest.TestCase):
             review.result_json['scorer_model_version'] = 'gpt-5.6-luna-2026-08-01'
             review.result_json['score_version'] = 'legacy'
             self.assertFalse(review_uses_current_score_contract(review))
+            review.result_json['score_prompt_version'] = 'photo-score-v5-evidence-calibrated'
+            review.result_json['score_version'] = 'score-v5-evidence-calibrated'
+            self.assertFalse(review_uses_current_score_contract(review))
+            review.result_json['score_prompt_version'] = 'photo-score-v6-evidence-independent'
+            review.result_json['score_version'] = 'score-v6-evidence-independent'
+            self.assertFalse(review_uses_current_score_contract(review))
 
     def test_writer_contract_for_gpt_uses_official_model_alias(self) -> None:
         with patch('app.services.review_score_cache.settings.openai_review_model', 'gpt-5.6-luna'):
@@ -212,6 +218,46 @@ class ReviewScoreCacheTests(unittest.TestCase):
                     'model_version': 'gpt-5.6-luna-2026-08-01',
                     'score_prompt_version': 'stale-prompt',
                     'score_version': SCORE_VERSION,
+                    'preprocess_version': SCORER_PREPROCESS_VERSION,
+                }
+            }
+        )
+
+        with patch('app.services.ai.settings.openai_score_model', 'gpt-5.6-luna'):
+            self.assertIsNone(load_task_canonical_score_checkpoint(task))
+
+    def test_task_checkpoint_rejects_v5_score_contract(self) -> None:
+        task = SimpleNamespace(
+            request_payload={
+                '_canonical_score_checkpoint': {
+                    'checkpoint_version': 2,
+                    'scores': {'composition': 7, 'lighting': 6, 'color': 6, 'impact': 5, 'technical': 6},
+                    'score_evidence': score_evidence_fixture(LOW_SCORES),
+                    'final_score': 6.0,
+                    'model_name': 'gpt-5.6-luna',
+                    'model_version': 'gpt-5.6-luna-2026-08-01',
+                    'score_prompt_version': 'photo-score-v5-evidence-calibrated',
+                    'score_version': 'score-v5-evidence-calibrated',
+                    'preprocess_version': SCORER_PREPROCESS_VERSION,
+                }
+            }
+        )
+
+        with patch('app.services.ai.settings.openai_score_model', 'gpt-5.6-luna'):
+            self.assertIsNone(load_task_canonical_score_checkpoint(task))
+
+    def test_task_checkpoint_rejects_v6_score_contract(self) -> None:
+        task = SimpleNamespace(
+            request_payload={
+                '_canonical_score_checkpoint': {
+                    'checkpoint_version': 2,
+                    'scores': {'composition': 7, 'lighting': 6, 'color': 6, 'impact': 5, 'technical': 6},
+                    'score_evidence': score_evidence_fixture(LOW_SCORES),
+                    'final_score': 6.0,
+                    'model_name': 'gpt-5.6-luna',
+                    'model_version': 'gpt-5.6-luna-2026-08-01',
+                    'score_prompt_version': 'photo-score-v6-evidence-independent',
+                    'score_version': 'score-v6-evidence-independent',
                     'preprocess_version': SCORER_PREPROCESS_VERSION,
                 }
             }

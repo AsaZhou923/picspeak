@@ -123,7 +123,7 @@ class Settings(BaseSettings):
 
     openai_api_key: str = ''
     openai_api_base_url: str = 'https://api.openai.com/v1'
-    openai_score_model: str = 'gpt-5.6-luna'
+    openai_score_model: str = 'gpt-6-luna'
     openai_score_reasoning_effort: str = 'xhigh'
     openai_score_timeout_seconds: int = 180
     openai_review_model: str = 'gpt-5.6-luna'

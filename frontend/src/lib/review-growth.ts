@@ -4,7 +4,7 @@ export type GrowthTrend = 'up' | 'down' | 'flat';
 export type GrowthDimensionKey = keyof ReviewScores;
 export type HistoryPracticeIntensity = 'recover' | 'stabilize' | 'extend';
 
-export const CURRENT_SCORE_VERSION = 'score-v5-evidence-calibrated';
+export const CURRENT_SCORE_VERSION = 'score-v7-canonical-quality';
 
 export interface NextShootChecklistItem {
   title: string;
@@ -53,7 +53,13 @@ export function getScoreVersionLabel(version?: string | null, locale: 'zh' | 'en
   if (!normalized) {
     return locale === 'zh' ? '未知标尺' : locale === 'ja' ? '不明な基準' : 'Unknown rubric';
   }
-  if (normalized === CURRENT_SCORE_VERSION) {
+  if (normalized === 'score-v7-canonical-quality' || normalized === 'photo-score-v7-canonical-quality') {
+    return locale === 'zh' ? 'v7 评分标尺' : locale === 'ja' ? 'v7 採点基準' : 'v7 scoring rubric';
+  }
+  if (normalized === 'score-v6-evidence-independent' || normalized === 'photo-score-v6-evidence-independent') {
+    return locale === 'zh' ? 'v6 独立复核评分' : locale === 'ja' ? 'v6 独立レビュー評価' : 'v6 independent review rubric';
+  }
+  if (normalized === 'score-v5-evidence-calibrated' || normalized === 'photo-score-v5-evidence-calibrated') {
     return locale === 'zh' ? 'v5 证据评分' : locale === 'ja' ? 'v5 根拠付き評価' : 'v5 evidence rubric';
   }
   if (normalized === 'score-v4-intent-aware') {

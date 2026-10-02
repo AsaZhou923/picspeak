@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 
 PROMPT_VERSION = 'photo-review-v8-image-led'
-SCORE_PROMPT_VERSION = 'photo-score-v5-evidence-calibrated'
-SCORE_VERSION = 'score-v5-evidence-calibrated'
+SCORE_PROMPT_VERSION = 'photo-score-v7-canonical-quality'
+SCORE_VERSION = 'score-v7-canonical-quality'
 SCORER_PREPROCESS_VERSION = 'openai-input-image-high-v1'
 
 
@@ -419,24 +419,16 @@ def _score_prompt(exif_data: dict | None = None, image_type: str = 'default') ->
 
 def _score_audit_prompt(
     *,
-    candidate_scores: dict[str, int],
-    candidate_score_evidence: dict,
     exif_data: dict | None = None,
     image_type: str = 'default',
 ) -> str:
-    candidate_payload = {
-        'scores': candidate_scores,
-        'score_evidence': candidate_score_evidence,
-    }
     return (
         f'{_score_prompt(exif_data, image_type=image_type)}'
-        '\n\nHIGH SCORE AUDIT\n'
-        'The first scoring pass produced a high-score candidate. Re-review the same image independently, then decide whether the candidate is actually supported by visible photographic control. '
-        'You may keep, raise, or lower any dimension. Do not average with the candidate and do not simply choose the lower value. '
-        'Accept 8+ only when the visible evidence meets the selected portfolio-worthy threshold described above. '
-        'Reject high scores based mainly on attractive subject matter, location, flowers, architecture, cinematic mood, or generic atmosphere. '
-        'Use the candidate only as an audit target, not as authority: '
-        f'{json.dumps(candidate_payload, ensure_ascii=False, separators=(",", ":"))}.'
+        '\n\nINDEPENDENT SECOND SCORING PASS\n'
+        'Assess the same image from scratch using the full rubric above. '
+        'Do not rely on, infer, or reconstruct any earlier score, rationale, or expectation. '
+        'Your scores may be higher, unchanged, or lower than another pass; choose only what the visible evidence supports. '
+        'Do not lower scores by default.'
     )
 
 

@@ -2,6 +2,10 @@
 
 This document defines the offline gate for PicSpeak scoring calibration. It is a local diagnostic tool only: it does not call model APIs, does not connect to the database, and does not rewrite historical reviews.
 
+The current local scorer contract is `score-v7-canonical-quality`, using GPT-6 Luna. The v5 examples below remain valid historical input examples; select the exact version under evaluation with `--version`. See [v7 comparison and validation limits](scoring-v7-validation.md) and the preceding [v6 behavior diagnostics](scoring-v6-optimization.md). Unlabelled probes and aggregate AVA votes do not satisfy this professional calibration gate.
+
+`backend/scripts/evaluate_scoring_rank_benchmark.py` is a separate diagnostic comparator for prompt variants. It accepts a fixed manifest with aggregate vote histograms plus scorer-only result files for `baseline` and `candidate`, then reports whether the candidate improves holdout ranking. It never fabricates individual raters, never rewrites reviews, and never produces a formal calibration pass; `human_calibration_status` remains `INSUFFICIENT_INVALID`.
+
 ## Data contract
 
 Use `backend/scripts/evaluate_score_calibration.py` with a JSON array, a JSON object containing `records`, or JSONL with one record per line.

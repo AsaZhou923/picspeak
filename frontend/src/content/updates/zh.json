@@ -1,5 +1,23 @@
 [
   {
+    "id": "2026-10-02-photo-scoring-quality",
+    "date": "2026-10-02",
+    "showPopup": false,
+    "title": "照片评分更新，历史记录保留",
+    "summary": "准备中：新的评图会使用更新后的评分能力；已保存的点评和长廊分数保持不变，进步对比只比较同一评分方式下的记录。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-10-02-photo-scoring-quality",
+    "sections": [
+      {
+        "title": "你会看到什么",
+        "items": [
+          "新提交的照片会使用更新后的评分能力，帮助点评更贴近照片本身的完成度。",
+          "已保存的点评、历史记录和长廊分数保持不变，不会被批量改写。",
+          "进步对比只比较采用同一评分方式的记录，避免把不同口径的分数混在一起。"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-09-30-workspace-gpt-review-only",
     "date": "2026-09-30",
     "showPopup": false,

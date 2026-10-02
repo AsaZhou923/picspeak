@@ -18,6 +18,21 @@ from app.services.review_pricing import (  # noqa: E402
 
 
 class ReviewPricingTests(unittest.TestCase):
+    def test_openai_gpt6_luna_standard_and_long_context_tiers(self) -> None:
+        boundary = estimate_review_usage_cost(
+            [ReviewModelUsage(model_name='gpt-6-luna', input_tokens=272_000, output_tokens=10_000)]
+        )
+        long = estimate_review_usage_cost(
+            [ReviewModelUsage(model_name='gpt-6-luna', input_tokens=272_001, output_tokens=10_000)]
+        )
+
+        self.assertEqual(boundary.cost_usd, Decimal('0.032200'))
+        self.assertEqual(long.cost_usd, Decimal('0.061900'))
+        self.assertEqual(
+            boundary.rate_version,
+            'review-pricing-2026-10-01:openai:gpt-6-luna:standard',
+        )
+
     def test_openai_luna_standard_and_long_context_tiers(self) -> None:
         short = estimate_review_usage_cost(
             [ReviewModelUsage(model_name='gpt-5.6-luna', input_tokens=200_000, output_tokens=10_000)]
@@ -49,10 +64,14 @@ class ReviewPricingTests(unittest.TestCase):
         missing = estimate_review_usage_cost(
             [ReviewModelUsage(model_name='gpt-5.6-luna', input_tokens=None, output_tokens=20)]
         )
+        missing_gpt6 = estimate_review_usage_cost(
+            [ReviewModelUsage(model_name='gpt-6-luna', input_tokens=20, output_tokens=None)]
+        )
 
         self.assertIsNone(unknown.cost_usd)
         self.assertIsNone(unknown.rate_version)
         self.assertIsNone(missing.cost_usd)
+        self.assertIsNone(missing_gpt6.cost_usd)
 
     def test_json_overrides_define_explicit_rate_version(self) -> None:
         overrides = parse_review_pricing_overrides(

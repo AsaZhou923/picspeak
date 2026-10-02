@@ -187,7 +187,8 @@ The frontend and backend can be deployed independently. The backend includes a c
 
 ## Documentation
 
-- [Latest changelog](docs/changelog/CHANGELOG.md#2026-09-30-workspace-gpt-review-only)
+- [Latest changelog: photo scoring update in preparation](docs/changelog/CHANGELOG.md#2026-10-02-photo-scoring-quality)
+- [Previous workspace GPT review update](docs/changelog/CHANGELOG.md#2026-09-30-workspace-gpt-review-only)
 - [Previous gallery and critique clarity update](docs/changelog/CHANGELOG.md#2026-09-26-gallery-and-critique-clarity)
 - [Previous gallery and controls update](docs/changelog/CHANGELOG.md#2026-09-25-gallery-actions-and-clearer-controls)
 - [Previous history, sharing, and practice update](docs/changelog/CHANGELOG.md#2026-09-24-critique-organization-and-sharing)

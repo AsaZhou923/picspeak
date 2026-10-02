@@ -873,8 +873,6 @@ def _run_canonical_scoring(
 
     audited_score = _request_canonical_score_once(
         prompt=_score_audit_prompt(
-            candidate_scores=canonical_score.scores,
-            candidate_score_evidence=canonical_score.score_evidence,
             exif_data=exif_data,
             image_type=image_type,
         ),

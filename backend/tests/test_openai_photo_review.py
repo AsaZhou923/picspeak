@@ -35,6 +35,16 @@ def _response(payload: dict, *, model: str = 'gpt-5.6-luna', input_tokens: int =
     return SimpleNamespace(data=json.dumps(body).encode('utf-8'))
 
 
+def _cached_score():
+    with patch('app.services.ai.settings.openai_score_model', 'gpt-6-luna'):
+        return build_cached_canonical_score(
+            LOW_SCORES,
+            scorer_model_name='gpt-6-luna',
+            scorer_model_version='gpt-6-luna',
+            score_evidence=score_evidence_fixture(LOW_SCORES),
+        )
+
+
 class OpenAIPhotoReviewTests(unittest.TestCase):
     def test_gpt_review_uses_responses_image_input_and_locks_scores(self) -> None:
         scoring = _response(
@@ -114,12 +124,7 @@ class OpenAIPhotoReviewTests(unittest.TestCase):
                 )
 
     def test_gpt_writer_reuses_cached_canonical_score(self) -> None:
-        cached_score = build_cached_canonical_score(
-            LOW_SCORES,
-            scorer_model_name='gpt-5.6-luna',
-            scorer_model_version='gpt-5.6-luna',
-            score_evidence=score_evidence_fixture(LOW_SCORES),
-        )
+        cached_score = _cached_score()
         writing = _response(
             {
                 'advantage': '1. Clear subject separation.',
@@ -135,7 +140,7 @@ class OpenAIPhotoReviewTests(unittest.TestCase):
         )
 
         with patch('app.services.ai.settings.openai_api_key', 'test-key'), patch(
-            'app.services.ai.settings.openai_score_model', 'gpt-5.6-luna'
+            'app.services.ai.settings.openai_score_model', 'gpt-6-luna'
         ), patch('app.services.ai.settings.openai_review_model', 'gpt-5.6-luna'), patch(
             'app.services.ai.pooled_request', return_value=writing
         ) as request_mock:
@@ -154,12 +159,7 @@ class OpenAIPhotoReviewTests(unittest.TestCase):
         self.assertEqual(response.input_tokens, 180)
 
     def test_malformed_billed_writer_response_is_observed_before_validation_failure(self) -> None:
-        cached_score = build_cached_canonical_score(
-            LOW_SCORES,
-            scorer_model_name='gpt-5.6-luna',
-            scorer_model_version='gpt-5.6-luna',
-            score_evidence=score_evidence_fixture(LOW_SCORES),
-        )
+        cached_score = _cached_score()
         malformed = _response(
             {'advantage': '', 'critique': '', 'suggestions': ''},
             model='gpt-5.6-luna-2026-08-01',
@@ -169,6 +169,8 @@ class OpenAIPhotoReviewTests(unittest.TestCase):
         observed = []
 
         with patch('app.services.ai.settings.openai_api_key', 'test-key'), patch(
+            'app.services.ai.settings.openai_score_model', 'gpt-6-luna'
+        ), patch(
             'app.services.ai.settings.openai_review_model', 'gpt-5.6-luna'
         ), patch('app.services.ai.pooled_request', return_value=malformed), observe_ai_provider_calls(observed.append):
             with self.assertRaises(AIReviewError) as raised:
@@ -189,15 +191,12 @@ class OpenAIPhotoReviewTests(unittest.TestCase):
         self.assertIn('openai:gpt-5.6-luna', observed[0].cost_rate_version or '')
 
     def test_network_writer_failure_is_observed_without_usage_or_cost(self) -> None:
-        cached_score = build_cached_canonical_score(
-            LOW_SCORES,
-            scorer_model_name='gpt-5.6-luna',
-            scorer_model_version='gpt-5.6-luna',
-            score_evidence=score_evidence_fixture(LOW_SCORES),
-        )
+        cached_score = _cached_score()
         observed = []
 
         with patch('app.services.ai.settings.openai_api_key', 'test-key'), patch(
+            'app.services.ai.settings.openai_score_model', 'gpt-6-luna'
+        ), patch(
             'app.services.ai.settings.openai_review_model', 'gpt-5.6-luna'
         ), patch(
             'app.services.ai.pooled_request',

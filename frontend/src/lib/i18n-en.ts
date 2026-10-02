@@ -232,8 +232,8 @@ export const enTranslations = {
     pro_offer_label: '',
     pro_offer_highlight: 'Pro',
     updates_label: 'Updates',
-    updates_hint_home: 'Workspace critiques now use GPT-5.6',
-    updates_hint_latest: 'Workspace critiques now use GPT-5.6',
+    updates_hint_home: 'Preparing: photo scoring update, saved history preserved',
+    updates_hint_latest: 'Preparing: photo scoring update, saved history preserved',
     contact_label: 'Contact',
     contact_headline: 'Get in Touch',
 
