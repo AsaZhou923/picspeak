@@ -1,5 +1,35 @@
 [
   {
+    "id": "2026-10-02-gpt6-workspace-upgrade",
+    "date": "2026-10-02",
+    "showPopup": true,
+    "title": "Photo critique upgraded to GPT-6",
+    "summary": "New workspace submissions now use GPT-6 for single-photo scoring, detailed critique, and original-versus-retake comparison. Saved historical results stay unchanged.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-10-02-gpt6-workspace-upgrade",
+    "primaryAction": {
+      "label": "Try GPT-6 critique",
+      "href": "/workspace"
+    },
+    "sections": [
+      {
+        "title": "GPT-6 critique",
+        "items": [
+          "The workspace defaults to GPT-6 critique, with no old-model switching needed after upload.",
+          "New single-photo scores, detailed written feedback, and original-versus-retake comparison all use GPT-6.",
+          "Retake comparison evaluates the original and new frame together in the same comparison."
+        ]
+      },
+      {
+        "title": "History stays stable",
+        "items": [
+          "Saved critiques, gallery scores, and history are not recalculated in bulk.",
+          "Older retake results still show the model or scoring version saved with that result instead of being relabeled as GPT-6.",
+          "Progress comparisons continue to use records from the same scoring rubric so different score versions are not mixed."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-10-02-photo-scoring-quality",
     "date": "2026-10-02",
     "showPopup": false,

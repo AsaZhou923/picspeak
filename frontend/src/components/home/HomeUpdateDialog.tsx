@@ -187,7 +187,7 @@ export default function HomeUpdateDialog() {
             </div>
 
             {latest.sections && latest.sections.length > 0 && (
-              <div className="mt-6 grid gap-3 md:grid-cols-3">
+              <div className={`mt-6 grid gap-3 ${latest.sections.length <= 2 ? 'md:grid-cols-2' : 'md:grid-cols-3'}`}>
                 {latest.sections.map((section, sectionIndex) => (
                   <article
                     key={section.title}
@@ -220,14 +220,26 @@ export default function HomeUpdateDialog() {
               >
                 {copy.dismiss}
               </button>
-              <Link
-                href={`/${locale}/updates#${latest.id}`}
-                onClick={dismiss}
-                className="ui-action-primary justify-center px-5 py-3 text-sm"
-              >
-                {copy.viewAll}
-                <ArrowUpRight size={14} aria-hidden="true" />
-              </Link>
+              <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center">
+                <Link
+                  href={`/${locale}/updates#${latest.id}`}
+                  onClick={dismiss}
+                  className="ui-action-secondary justify-center px-5 py-3 text-sm"
+                >
+                  {copy.viewAll}
+                  <ArrowUpRight size={14} aria-hidden="true" />
+                </Link>
+                {latest.primaryAction && (
+                  <Link
+                    href={latest.primaryAction.href}
+                    onClick={dismiss}
+                    className="ui-action-primary justify-center px-5 py-3 text-sm"
+                  >
+                    {latest.primaryAction.label}
+                    <ArrowUpRight size={14} aria-hidden="true" />
+                  </Link>
+                )}
+              </div>
             </div>
           </div>
         </div>

@@ -208,10 +208,10 @@ export const enTranslations = {
     affiliate_product_site: 'Product site',
 
     // Home page
-    hero_label: 'PicSpeak · AI Photography Critique',
+    hero_label: 'PicSpeak · GPT-6 AI Photography Critique',
     hero_headline_1: 'Professional Photography Critique',
     hero_headline_2: 'in Seconds',
-    hero_desc: 'Upload your photo and get detailed AI critique on composition, lighting, color, impact and technique.',
+    hero_desc: 'Upload your photo and get GPT-6 critique on composition, lighting, color, impact and technique.',
     hero_cta_start: 'Start Critiquing',
     hero_cta_login: 'Sign in with Google',
     home_gpt_image_badge: 'New · GPT Image 2',
@@ -232,8 +232,8 @@ export const enTranslations = {
     pro_offer_label: '',
     pro_offer_highlight: 'Pro',
     updates_label: 'Updates',
-    updates_hint_home: 'Photo scoring updated, saved history preserved',
-    updates_hint_latest: 'Photo scoring updated, saved history preserved',
+    updates_hint_home: 'Photo critique upgraded to GPT-6',
+    updates_hint_latest: 'Photo critique upgraded to GPT-6',
     contact_label: 'Contact',
     contact_headline: 'Get in Touch',
 

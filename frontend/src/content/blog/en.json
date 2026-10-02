@@ -263,7 +263,7 @@
         "title": "4. Case study: a verifiable feedback loop",
         "paragraphs": [
           "Suppose the last street critique says: \"The background is too cluttered and the subject is lost in the environment.\" Translate it into: ① Find a solid wall or open sky ② Use 50mm+ to compress the background ③ Wait until the subject enters a clean zone. The success condition is an intact subject outline with no bright sign or overlapping person around it.",
-          "After the retake, select the original review in PicSpeak Retake Coach and upload the new frame. One GPT-5.6 Terra comparison rescores both images, shows before/after changes across five dimensions, cites visible evidence, and proposes the next action. The server calculates the deltas rather than asking the model to do arithmetic.",
+          "After the retake, select the original review in PicSpeak Retake Coach and upload the new frame. One GPT-6 comparison rescores both images, shows before/after changes across five dimensions, cites visible evidence, and proposes the next action. The server calculates the deltas rather than asking the model to do arithmetic.",
           "If the images pursue different goals or the scenes are too different, the analysis remains available but is marked non-comparable and excluded from the progress curve. This feedback → translate → execute → evidence cycle is what turns critique into training."
         ]
       },

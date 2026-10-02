@@ -7,6 +7,7 @@ import {
   getEligibleRetakeSources,
   resolveReviewAnalysisType,
 } from '../src/lib/retake-coach.ts';
+import { getStoredRetakeModelLabel } from '../src/lib/retake-model-label.ts';
 
 test('new uploads with a source review use paired analysis while same-photo reruns stay single', () => {
   assert.equal(resolveReviewAnalysisType('rev_source', true), 'retake_compare');
@@ -35,27 +36,79 @@ test('retake entry keeps only completed sources and carries the selected review 
   );
 });
 
-test('normal workspace and retake flow both route to GPT-5.6 Luna', async () => {
+test('normal workspace and retake flow both route to GPT-6 Luna while preserving legacy result labels', async () => {
   const source = await readFile('src/app/workspace/page.tsx', 'utf8');
   const picker = await readFile('src/features/workspace/components/ReviewModelPicker.tsx', 'utf8');
   const settings = await readFile('src/features/workspace/components/WorkspaceSettingsPanel.tsx', 'utf8');
   const header = await readFile('src/components/layout/Header.tsx', 'utf8');
   const headerControls = await readFile('src/components/layout/HeaderControls.tsx', 'utf8');
   const coachCopy = await readFile('src/lib/retake-coach-copy.ts', 'utf8');
+  const comparisonPanel = await readFile('src/features/reviews/components/RetakeComparisonPanel.tsx', 'utf8');
 
   assert.match(source, /review_model: selectedReviewModel/);
-  assert.match(source, /isRetakeCoachFlow \|\| isPracticePairedFlow \? 'gpt-5\.6-luna' : reviewModel/);
+  assert.match(source, /isRetakeCoachFlow \|\| isPracticePairedFlow \? 'gpt-6-luna' : reviewModel/);
   assert.match(source, /showReviewModel=\{!isRetakeCoachFlow && !isPracticePairedFlow\}/);
   assert.match(source, /<WorkspaceSettingsPanel/);
   assert.match(settings, /<ReviewModelPicker/);
-  assert.match(source, /useState<ReviewModel>\('gpt-5\.6-luna'\)/);
+  assert.match(source, /useState<ReviewModel>\('gpt-6-luna'\)/);
   assert.doesNotMatch(picker, /qwen|Qwen|千问/);
-  assert.match(picker, /GPT-5\.6/);
+  assert.match(picker, /GPT-6/);
   assert.doesNotMatch(picker, /GPT-5\.5/);
   assert.match(header, /href="\/account\/practice"/);
   assert.match(headerControls, /href: '\/retake'/);
   assert.doesNotMatch(header, />Terra<\/span>/);
   assert.doesNotMatch(coachCopy, /Terra/);
+  assert.match(coachCopy, /GPT-6/);
+  assert.match(comparisonPanel, /getStoredRetakeModelLabel/);
+});
+
+test('retake result model labels prefer stored result metadata before score-version fallback', () => {
+  const legacyResultWithNewerGoalMetadata = {
+    result: {
+      model_name: 'gpt-5.6-luna',
+      scorer_model_name: 'gpt-5.6-luna',
+      writer_model_name: 'gpt-5.6-luna',
+      score_version: 'retake-paired-v1',
+    },
+    goal_assessment: {
+      model_name: 'gpt-6-luna',
+    },
+  } as Parameters<typeof getStoredRetakeModelLabel>[0];
+
+  assert.equal(getStoredRetakeModelLabel(legacyResultWithNewerGoalMetadata), 'GPT-5.6');
+  assert.equal(
+    getStoredRetakeModelLabel({
+      result: {
+        model_name: 'gpt-5.6-luna',
+        scorer_model_name: 'gpt-5.6-luna',
+        writer_model_name: 'gpt-5.6-luna',
+        score_version: 'retake-paired-v2',
+      },
+    }),
+    'GPT-5.6',
+  );
+  assert.equal(
+    getStoredRetakeModelLabel({
+      result: {
+        model_name: null,
+        scorer_model_name: null,
+        writer_model_name: null,
+        score_version: 'retake-paired-v2',
+      },
+    }),
+    'GPT-6',
+  );
+  assert.equal(
+    getStoredRetakeModelLabel({
+      result: {
+        model_name: 'unknown-model',
+        scorer_model_name: null,
+        writer_model_name: null,
+        score_version: 'retake-paired-v1',
+      },
+    }),
+    'GPT-5.6',
+  );
 });
 
 test('retake comparison keeps original before retake and handles inaccessible source photos', async () => {

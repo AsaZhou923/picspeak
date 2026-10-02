@@ -10,6 +10,7 @@ import { usePracticeExposure } from '@/features/reviews/hooks/usePracticeExposur
 import { canContinuePractice } from '@/features/practice/journal';
 import { getReviewExportCardCopy } from '@/features/reviews/helpers/reviewExportPresentation';
 import { formatRetakeDelta } from '@/lib/retake-coach';
+import { getStoredRetakeModelLabel } from '@/lib/retake-model-label';
 import type { GoalAssessmentStatus, PracticeFeedbackVote, PracticeKind, PracticeSessionResponse, RetakeDimensionKey, ReviewGetResponse } from '@/lib/types';
 
 const DIMENSIONS: RetakeDimensionKey[] = ['composition', 'lighting', 'color', 'impact', 'technical'];
@@ -17,7 +18,7 @@ const DIMENSIONS: RetakeDimensionKey[] = ['composition', 'lighting', 'color', 'i
 function getCopy(locale: 'zh' | 'en' | 'ja') {
   if (locale === 'ja') {
     return {
-      label: 'GPT-5.6 Retake Coach', title: '元の写真と再撮影を比較', original: '元の写真', retake: '再撮影',
+      label: 'Retake Coach', title: '元の写真と再撮影を比較', original: '元の写真', retake: '再撮影',
       target: '撮影目標', compare: '変化を比較', targetLoading: '元の講評から撮影目標を読み込み中', targetUnavailable: '元の講評の目標を表示できません。',
       before: 'Before', after: 'After', evidence: '見える根拠', remaining: '次の課題', actions: '次回の撮影アクション',
       strongest: '最大の改善',
@@ -45,7 +46,7 @@ function getCopy(locale: 'zh' | 'en' | 'ja') {
       },
       dimensions: { composition: '構図', lighting: '光', color: '色', impact: '訴求力', technical: '技術' },
       editRevision: {
-        label: 'GPT-5.6 Revision Coach',
+        label: 'Revision Coach',
         title: '変更前と変更後を比較',
         original: '変更前の写真',
         retake: '編集後の写真',
@@ -60,7 +61,7 @@ function getCopy(locale: 'zh' | 'en' | 'ja') {
   }
   if (locale === 'en') {
     return {
-      label: 'GPT-5.6 Retake Coach', title: 'Original vs. retake', original: 'Original', retake: 'Retake',
+      label: 'Retake Coach', title: 'Original vs. retake', original: 'Original', retake: 'Retake',
       target: 'Target', compare: 'Compare the change', targetLoading: 'Loading the shooting target from the original critique', targetUnavailable: 'The original shooting target is unavailable.',
       before: 'Before', after: 'After', evidence: 'Visible evidence', remaining: 'Remaining gap', actions: 'Next-shoot actions',
       strongest: 'Strongest improvement',
@@ -88,7 +89,7 @@ function getCopy(locale: 'zh' | 'en' | 'ja') {
       },
       dimensions: { composition: 'Composition', lighting: 'Lighting', color: 'Color', impact: 'Impact', technical: 'Technical' },
       editRevision: {
-        label: 'GPT-5.6 Revision Coach',
+        label: 'Revision Coach',
         title: 'Before vs. edited version',
         original: 'Before edit',
         retake: 'Edited photo',
@@ -102,7 +103,7 @@ function getCopy(locale: 'zh' | 'en' | 'ja') {
     };
   }
   return {
-    label: 'GPT-5.6 重拍教练', title: '原片与重拍对比', original: '原片', retake: '重拍图',
+    label: '重拍教练', title: '原片与重拍对比', original: '原片', retake: '重拍图',
     target: '拍摄目标', compare: '对比变化', targetLoading: '正在从原点评读取拍摄目标', targetUnavailable: '暂时无法显示原点评中的拍摄目标。',
     before: '重拍前', after: '重拍后', evidence: '画面依据', remaining: '仍需改善', actions: '下一次拍摄行动',
     strongest: '最大改善',
@@ -130,7 +131,7 @@ function getCopy(locale: 'zh' | 'en' | 'ja') {
     },
     dimensions: { composition: '构图', lighting: '光线', color: '色彩', impact: '感染力', technical: '技术' },
     editRevision: {
-      label: 'GPT-5.6 修图教练',
+      label: '修图教练',
       title: '修改前后对比',
       original: '修改前照片',
       retake: '修改版照片',
@@ -194,6 +195,7 @@ export function RetakeComparisonPanel({ review, locale }: { review: ReviewGetRes
   const [feedbackState, setFeedbackState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [feedbackReason, setFeedbackReason] = useState('');
   const copy = useMemo(() => applyPracticeKindCopy(getCopy(locale), review.practice?.kind), [locale, review.practice?.kind]);
+  const storedModelLabel = useMemo(() => getStoredRetakeModelLabel(review), [review]);
   const confidenceLevels = useMemo(() => getReviewExportCardCopy(locale).confidenceLevels, [locale]);
   const sourceReviewId = review.practice ? review.practice.source_review_id : comparison?.original_review_id;
   const sourceAvailable = !review.practice?.source_access || review.practice.source_access === 'available';
@@ -268,7 +270,7 @@ export function RetakeComparisonPanel({ review, locale }: { review: ReviewGetRes
 
   return (
     <section className="ui-feature-panel p-5 sm:p-6">
-      <p className="ui-eyebrow text-sage">{copy.label}</p>
+      <p className="ui-eyebrow text-sage">{storedModelLabel} {copy.label}</p>
       <h2 className="mt-2 text-3xl font-semibold text-ink">{copy.title}</h2>
       <p className="mt-3 max-w-3xl text-sm leading-7 text-ink-muted">{comparison.summary}</p>
 

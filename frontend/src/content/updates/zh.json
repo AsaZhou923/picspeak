@@ -1,5 +1,35 @@
 [
   {
+    "id": "2026-10-02-gpt6-workspace-upgrade",
+    "date": "2026-10-02",
+    "showPopup": true,
+    "title": "评图全面升级 GPT-6",
+    "summary": "工作台新提交的单图评分、详细点评和原片/复拍对比已切换到 GPT-6。已保存的历史结果保持原样，不会被重新改分。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-10-02-gpt6-workspace-upgrade",
+    "primaryAction": {
+      "label": "体验 GPT-6 评图",
+      "href": "/workspace"
+    },
+    "sections": [
+      {
+        "title": "GPT-6 评图能力",
+        "items": [
+          "工作台默认使用 GPT-6 评图，上传后无需再切换旧模型。",
+          "新提交的单图评分、详细点评和原片/复拍对比都使用 GPT-6。",
+          "复拍对比会把原片和新照片放在同一次比较中重新评估。"
+        ]
+      },
+      {
+        "title": "历史记录保持稳定",
+        "items": [
+          "已保存的点评、长廊分数和历史记录不会被批量重算。",
+          "旧复拍结果仍按当时保存的模型或评分版本显示，不会被改名成 GPT-6。",
+          "进步对比继续按同一评分口径比较，避免把不同版本的分数混在一起。"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-10-02-photo-scoring-quality",
     "date": "2026-10-02",
     "showPopup": false,

@@ -22,8 +22,8 @@ export const jaTranslations = {
     pro_offer_label: '',
     pro_offer_highlight: 'Pro',
     updates_label: '更新履歴',
-    updates_hint_home: '写真スコアを更新、履歴はそのまま',
-    updates_hint_latest: '写真スコアを更新、履歴はそのまま',
+    updates_hint_home: '写真講評を GPT-6 に全面更新',
+    updates_hint_latest: '写真講評を GPT-6 に全面更新',
     contact_label: 'コンタクト',
     contact_headline: 'お問い合わせ',
     features_label: '主な機能',
@@ -274,10 +274,10 @@ export const jaTranslations = {
     affiliate_product_site: '製品サイト',
 
     // Home page
-    hero_label: 'PicSpeak · AI写真評価',
+    hero_label: 'PicSpeak · GPT-6 AI写真評価',
     hero_headline_1: 'プロの写真評価を',
     hero_headline_2: '秒単位で取得',
-    hero_desc: '写真をアップロードすると、AIが構図・光・色彩・インパクト・技術の5つの次元から詳細な評価と具体的な改善提案をお届けします。',
+    hero_desc: '写真をアップロードすると、GPT-6 が構図・光・色彩・インパクト・技術の5つの次元から評価と改善提案を届けます。',
     hero_cta_start: '今すぐ評価する',
     hero_cta_login: 'Googleでサインイン',
     home_gpt_image_badge: '新機能 · GPT Image 2',

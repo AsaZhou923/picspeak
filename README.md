@@ -26,14 +26,14 @@ Upload a photo
   -> save progress and generate the next visual target
 ```
 
-- **Single-photo critique:** the workspace uses GPT-5.6 Luna with `xhigh` reasoning through the OpenAI Responses API. The Qwen-compatible backend API remains available for existing clients.
-- **Retake Coach:** GPT-5.6 Luna receives the original and retake together with `xhigh` reasoning; the server calculates every score delta deterministically.
+- **Single-photo critique:** the workspace uses GPT-6 Luna with `xhigh` reasoning through the OpenAI Responses API. The Qwen-compatible backend API remains available for existing clients.
+- **Retake Coach:** GPT-6 Luna receives the original and retake together with `xhigh` reasoning; the server calculates every score delta deterministically.
 - **AI Create:** generate visual references with GPT Image 2, including review-linked composition, lighting, color, and retake directions.
 - **Learning surfaces:** move between critiques, the public gallery, Lens Notes, prompt examples, review history, and same-source retake chains.
 
 ## Product tour
 
-| Public critique | GPT-5.6 Retake Coach |
+| Public critique | GPT-6 Retake Coach |
 |---|---|
 | ![Public critique with score, evidence, and next-shoot guidance](docs/assets/screenshots/review.jpg) | ![Retake Coach original-target-retake-compare workflow](docs/assets/screenshots/retake.jpg) |
 
@@ -93,7 +93,7 @@ Next.js 15 / React 18
 
 PicSpeak existed before the submission window. The Build Week contribution extended the existing single-photo product into an auditable retake loop rather than only replacing a model name. The pre-event baseline is [`b74ddfb`](https://github.com/AsaZhou923/picspeak/commit/b74ddfb88ae32e37965ba8b29f40c9ebcbbf77fc); the core paired-comparison implementation landed in [`2a626aa`](https://github.com/AsaZhou923/picspeak/commit/2a626aabab30d5cdb45ca0450fdd1ce7a5387b4c).
 
-The original Build Week implementation used GPT-5.6 Terra. The current runtime default is `gpt-5.6-luna` with `reasoning.effort: xhigh`; the paired scoring and server-owned delta contract remain unchanged.
+The original Build Week implementation used GPT-5.6 Terra. The current runtime default is `gpt-6-luna` with `reasoning.effort: xhigh`; the paired scoring and server-owned delta contract remain unchanged.
 
 | Before Build Week | Added during Build Week |
 |---|---|
@@ -118,7 +118,7 @@ Three implementation rules keep the result auditable:
 - PostgreSQL 14+
 - S3-compatible object storage
 - An OpenAI-compatible critique API key
-- An OpenAI API key with GPT-5.6 Luna access
+- An OpenAI API key with GPT-6 Luna access
 
 ### 1. Clone and configure the backend
 
@@ -137,13 +137,14 @@ The workspace uses the model-specific OpenAI settings below. The retained Qwen-c
 ```dotenv
 OPENAI_API_KEY=
 OPENAI_API_BASE_URL=https://api.openai.com/v1
-OPENAI_REVIEW_MODEL=gpt-5.6-luna
+OPENAI_SCORE_MODEL=gpt-6-luna
+OPENAI_REVIEW_MODEL=gpt-6-luna
 OPENAI_REVIEW_REASONING_EFFORT=xhigh
 OPENAI_REVIEW_TIMEOUT_SECONDS=180
 
 # Optional complete endpoint override; otherwise /responses is appended.
 RETAKE_ANALYSIS_API_URL=
-RETAKE_ANALYSIS_MODEL=gpt-5.6-luna
+RETAKE_ANALYSIS_MODEL=gpt-6-luna
 RETAKE_ANALYSIS_REASONING_EFFORT=xhigh
 RETAKE_ANALYSIS_TIMEOUT_SECONDS=180
 ```
@@ -187,7 +188,7 @@ The frontend and backend can be deployed independently. The backend includes a c
 
 ## Documentation
 
-- [Latest changelog: photo scoring update](docs/changelog/CHANGELOG.md#2026-10-02-photo-scoring-quality)
+- [Latest changelog: GPT-6 critique upgrade](docs/changelog/CHANGELOG.md#2026-10-02-gpt6-workspace-upgrade)
 - [Previous workspace GPT review update](docs/changelog/CHANGELOG.md#2026-09-30-workspace-gpt-review-only)
 - [Previous gallery and critique clarity update](docs/changelog/CHANGELOG.md#2026-09-26-gallery-and-critique-clarity)
 - [Previous gallery and controls update](docs/changelog/CHANGELOG.md#2026-09-25-gallery-actions-and-clearer-controls)

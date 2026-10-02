@@ -9,6 +9,11 @@ export interface ProductUpdateSection {
   items: string[];
 }
 
+export interface ProductUpdateAction {
+  label: string;
+  href: string;
+}
+
 export interface ProductUpdateEntry {
   id: string;
   date: string;
@@ -16,6 +21,7 @@ export interface ProductUpdateEntry {
   summary: string;
   docPath: string;
   showPopup?: boolean;
+  primaryAction?: ProductUpdateAction;
   sections?: ProductUpdateSection[];
 }
 
@@ -28,6 +34,7 @@ const UPDATE_BUNDLES = {
 export function getProductUpdates(locale: UpdateLocale): ProductUpdateEntry[] {
   return UPDATE_BUNDLES[locale].map((entry) => ({
     ...entry,
+    primaryAction: entry.primaryAction ? { ...entry.primaryAction } : undefined,
     sections: entry.sections?.map((section) => ({
       ...section,
       items: [...section.items],

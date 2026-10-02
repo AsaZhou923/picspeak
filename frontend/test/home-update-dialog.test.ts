@@ -23,6 +23,11 @@ test('latest update bundle is aligned across locales for the homepage dialog', (
   assert.equal(updates.every(Boolean), true);
   assert.match(updates[0]!.id, /^\d{4}-\d{2}-\d{2}-.+/);
   assert.deepEqual(updates.map((entry) => entry!.id), Array(3).fill(updates[0]!.id));
+  assert.equal(updates[0]!.id, '2026-10-02-gpt6-workspace-upgrade');
+  assert.equal(updates[0]!.date, '2026-10-02');
+  assert.equal(updates[0]!.showPopup, true);
+  assert.equal(updates[0]!.primaryAction?.href, '/workspace');
+  assert.match(updates[0]!.primaryAction?.label ?? '', /GPT-6/);
 });
 
 test('homepage update dialog is version-scoped, dismissible and accessible', () => {
@@ -36,20 +41,41 @@ test('homepage update dialog is version-scoped, dismissible and accessible', () 
   assert.match(dialogSource, /document\.body\.style\.overflow = 'hidden'/);
   assert.match(dialogSource, /localStorage\.setItem/);
   assert.match(dialogSource, /\/updates#\$\{latest\.id\}/);
+  assert.match(dialogSource, /latest\.primaryAction/);
+  assert.match(dialogSource, /latest\.primaryAction\.href/);
+  assert.match(dialogSource, /onClick=\{dismiss\}/);
+  assert.match(dialogSource, /latest\.sections\.length <= 2 \? 'md:grid-cols-2' : 'md:grid-cols-3'/);
 });
 
 test('maintenance updates remain in the log while popup eligibility stays separate from latest-update metadata', () => {
   for (const locale of ['zh', 'en', 'ja'] as const) {
     const updates = getProductUpdates(locale);
     const maintenance = updates.find((entry) => entry.id === '2026-09-25-gallery-actions-and-clearer-controls');
+    const previousSameDay = updates.find((entry) => entry.id === '2026-10-02-photo-scoring-quality');
     const latest = getLatestProductUpdate(locale);
     assert.ok(latest);
     assert.ok(maintenance);
+    assert.ok(previousSameDay);
     assert.equal(maintenance.showPopup, false);
+    assert.equal(previousSameDay.showPopup, false);
     assert.equal(shouldShowProductUpdatePopup(maintenance), false);
+    assert.equal(shouldShowProductUpdatePopup(previousSameDay), false);
     assert.equal(updates[0].id, latest.id);
     assert.equal(getLatestProductUpdateDate(), latest.date);
   }
+});
+
+test('product update data clones nested actions and section items for callers', () => {
+  const firstRead = getProductUpdates('en');
+  firstRead[0].primaryAction!.label = 'Mutated action';
+  firstRead[0].sections![0].items[0] = 'Mutated item';
+
+  const secondRead = getProductUpdates('en');
+  assert.equal(secondRead[0].primaryAction!.label, 'Try GPT-6 critique');
+  assert.equal(
+    secondRead[0].sections![0].items[0],
+    'The workspace defaults to GPT-6 critique, with no old-model switching needed after upload.',
+  );
 });
 
 test('announcement popups require explicit opt-in', () => {

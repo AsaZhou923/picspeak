@@ -196,5 +196,6 @@ export function resolveWorkspaceTaskStep(stage: Stage, hasReadyPhoto: boolean, h
 
 export function reviewModelLabel(model: ReviewModel): string {
   if (model === 'gpt-5.5') return 'GPT-5.5';
+  if (model === 'gpt-6-luna') return 'GPT-6';
   return 'GPT-5.6';
 }
