@@ -93,7 +93,7 @@ def _response_body(
     text = output_text if output_text is not None else json.dumps(comparison)
     return {
         'id': 'resp_retake_123',
-        'model': 'gpt-5.6-luna',
+        'model': 'gpt-6-luna',
         'usage': {'input_tokens': 321, 'output_tokens': 210},
         'output': [
             {
@@ -138,7 +138,7 @@ class RetakeComparisonTests(unittest.TestCase):
         )
         with patch('app.services.retake_comparison.settings') as mocked_settings:
             mocked_settings.openai_api_key = 'test-openai-key'
-            mocked_settings.retake_analysis_model = 'gpt-5.6-luna'
+            mocked_settings.retake_analysis_model = 'gpt-6-luna'
             mocked_settings.retake_analysis_reasoning_effort = 'xhigh'
             mocked_settings.retake_analysis_api_url = 'https://api.openai.com/v1/responses'
             mocked_settings.retake_analysis_timeout_seconds = 180
@@ -149,7 +149,7 @@ class RetakeComparisonTests(unittest.TestCase):
         payload = json.loads(request.call_args.kwargs['body'])
         content = payload['input'][0]['content']
         images = [item for item in content if item['type'] == 'input_image']
-        self.assertEqual(payload['model'], 'gpt-5.6-luna')
+        self.assertEqual(payload['model'], 'gpt-6-luna')
         self.assertEqual(payload['reasoning'], {'effort': 'xhigh'})
         self.assertFalse(payload['store'])
         self.assertEqual(payload['text']['format']['type'], 'json_schema')
@@ -171,8 +171,11 @@ class RetakeComparisonTests(unittest.TestCase):
         self.assertEqual(comparison.overall_delta, 1.2)
         self.assertEqual(ai_response.input_tokens, 321)
         self.assertEqual(ai_response.output_tokens, 210)
-        self.assertEqual(ai_response.cost_usd, 0.000316)
-        self.assertIn('openai:gpt-5.6-luna:standard', ai_response.cost_rate_version or '')
+        self.assertEqual(ai_response.cost_usd, 0.000137)
+        self.assertIn('openai:gpt-6-luna:standard', ai_response.cost_rate_version or '')
+        self.assertEqual(ai_response.result.prompt_version, 'retake-coach-v2-gpt6-image-led')
+        self.assertEqual(ai_response.result.score_version, 'retake-paired-v2')
+        self.assertEqual(ai_response.result.score_prompt_version, 'retake-coach-v2-gpt6-image-led')
         self.assertIsNone(ai_response.result.goal_assessment)
 
     def test_goal_context_requires_goal_assessment_and_does_not_infer_from_score_delta(self) -> None:
@@ -184,7 +187,7 @@ class RetakeComparisonTests(unittest.TestCase):
         )
         with patch('app.services.retake_comparison.settings') as mocked_settings:
             mocked_settings.openai_api_key = 'test-openai-key'
-            mocked_settings.retake_analysis_model = 'gpt-5.6-luna'
+            mocked_settings.retake_analysis_model = 'gpt-6-luna'
             mocked_settings.retake_analysis_reasoning_effort = 'xhigh'
             mocked_settings.retake_analysis_api_url = 'https://api.openai.com/v1/responses'
             mocked_settings.retake_analysis_timeout_seconds = 180
@@ -206,10 +209,10 @@ class RetakeComparisonTests(unittest.TestCase):
         self.assertIsNotNone(ai_response.result.goal_assessment)
         assert ai_response.result.goal_assessment is not None
         self.assertEqual(ai_response.result.goal_assessment.status, 'not_achieved')
-        self.assertEqual(ai_response.prompt_version, 'retake-coach-goal-v1')
-        self.assertEqual(ai_response.score_prompt_version, 'retake-coach-goal-v1')
-        self.assertEqual(ai_response.result.prompt_version, 'retake-coach-goal-v1')
-        self.assertEqual(ai_response.result.score_prompt_version, 'retake-coach-goal-v1')
+        self.assertEqual(ai_response.prompt_version, 'retake-coach-goal-v2-gpt6-image-led')
+        self.assertEqual(ai_response.score_prompt_version, 'retake-coach-goal-v2-gpt6-image-led')
+        self.assertEqual(ai_response.result.prompt_version, 'retake-coach-goal-v2-gpt6-image-led')
+        self.assertEqual(ai_response.result.score_prompt_version, 'retake-coach-goal-v2-gpt6-image-led')
 
     def test_accepts_each_goal_status_with_valid_evidence_contract(self) -> None:
         for status in ('achieved', 'partial', 'not_achieved', 'indeterminate'):
@@ -223,7 +226,7 @@ class RetakeComparisonTests(unittest.TestCase):
                 )
                 with patch('app.services.retake_comparison.settings') as mocked_settings:
                     mocked_settings.openai_api_key = 'test-openai-key'
-                    mocked_settings.retake_analysis_model = 'gpt-5.6-luna'
+                    mocked_settings.retake_analysis_model = 'gpt-6-luna'
                     mocked_settings.retake_analysis_reasoning_effort = 'xhigh'
                     mocked_settings.retake_analysis_api_url = 'https://api.openai.com/v1/responses'
                     mocked_settings.retake_analysis_timeout_seconds = 180
@@ -255,7 +258,7 @@ class RetakeComparisonTests(unittest.TestCase):
         )
         with patch('app.services.retake_comparison.settings') as mocked_settings:
             mocked_settings.openai_api_key = 'test-openai-key'
-            mocked_settings.retake_analysis_model = 'gpt-5.6-luna'
+            mocked_settings.retake_analysis_model = 'gpt-6-luna'
             mocked_settings.retake_analysis_reasoning_effort = 'xhigh'
             mocked_settings.retake_analysis_api_url = 'https://api.openai.com/v1/responses'
             mocked_settings.retake_analysis_timeout_seconds = 180
@@ -282,7 +285,7 @@ class RetakeComparisonTests(unittest.TestCase):
         )
         with patch('app.services.retake_comparison.settings') as mocked_settings:
             mocked_settings.openai_api_key = 'test-openai-key'
-            mocked_settings.retake_analysis_model = 'gpt-5.6-luna'
+            mocked_settings.retake_analysis_model = 'gpt-6-luna'
             mocked_settings.retake_analysis_reasoning_effort = 'xhigh'
             mocked_settings.retake_analysis_api_url = 'https://api.openai.com/v1/responses'
             mocked_settings.retake_analysis_timeout_seconds = 180
@@ -310,7 +313,7 @@ class RetakeComparisonTests(unittest.TestCase):
         )
         with patch('app.services.retake_comparison.settings') as mocked_settings:
             mocked_settings.openai_api_key = 'test-openai-key'
-            mocked_settings.retake_analysis_model = 'gpt-5.6-luna'
+            mocked_settings.retake_analysis_model = 'gpt-6-luna'
             mocked_settings.retake_analysis_reasoning_effort = 'xhigh'
             mocked_settings.retake_analysis_api_url = 'https://api.openai.com/v1/responses'
             mocked_settings.retake_analysis_timeout_seconds = 180
@@ -345,7 +348,7 @@ class RetakeComparisonTests(unittest.TestCase):
                 )
                 with patch('app.services.retake_comparison.settings') as mocked_settings:
                     mocked_settings.openai_api_key = 'test-openai-key'
-                    mocked_settings.retake_analysis_model = 'gpt-5.6-luna'
+                    mocked_settings.retake_analysis_model = 'gpt-6-luna'
                     mocked_settings.retake_analysis_reasoning_effort = 'xhigh'
                     mocked_settings.retake_analysis_api_url = 'https://api.openai.com/v1/responses'
                     mocked_settings.retake_analysis_timeout_seconds = 180
@@ -369,7 +372,7 @@ class RetakeComparisonTests(unittest.TestCase):
         )
         with patch('app.services.retake_comparison.settings') as mocked_settings:
             mocked_settings.openai_api_key = 'test-openai-key'
-            mocked_settings.retake_analysis_model = 'gpt-5.6-luna'
+            mocked_settings.retake_analysis_model = 'gpt-6-luna'
             mocked_settings.retake_analysis_reasoning_effort = 'xhigh'
             mocked_settings.retake_analysis_api_url = 'https://api.openai.com/v1/responses'
             mocked_settings.retake_analysis_timeout_seconds = 180
@@ -387,7 +390,7 @@ class RetakeComparisonTests(unittest.TestCase):
         )
         with patch('app.services.retake_comparison.settings') as mocked_settings:
             mocked_settings.openai_api_key = 'test-openai-key'
-            mocked_settings.retake_analysis_model = 'gpt-5.6-luna'
+            mocked_settings.retake_analysis_model = 'gpt-6-luna'
             mocked_settings.retake_analysis_reasoning_effort = 'xhigh'
             mocked_settings.retake_analysis_api_url = 'https://api.openai.com/v1/responses'
             mocked_settings.retake_analysis_timeout_seconds = 180
@@ -406,7 +409,7 @@ class RetakeComparisonTests(unittest.TestCase):
         )
         with patch('app.services.retake_comparison.settings') as mocked_settings:
             mocked_settings.openai_api_key = 'test-openai-key'
-            mocked_settings.retake_analysis_model = 'gpt-5.6-luna'
+            mocked_settings.retake_analysis_model = 'gpt-6-luna'
             mocked_settings.retake_analysis_reasoning_effort = 'xhigh'
             mocked_settings.retake_analysis_api_url = 'https://api.openai.com/v1/responses'
             mocked_settings.retake_analysis_timeout_seconds = 180
@@ -425,7 +428,7 @@ class RetakeComparisonTests(unittest.TestCase):
         )
         with patch('app.services.retake_comparison.settings') as mocked_settings:
             mocked_settings.openai_api_key = 'test-openai-key'
-            mocked_settings.retake_analysis_model = 'gpt-5.6-luna'
+            mocked_settings.retake_analysis_model = 'gpt-6-luna'
             mocked_settings.retake_analysis_reasoning_effort = 'xhigh'
             mocked_settings.retake_analysis_api_url = 'https://api.openai.com/v1/responses'
             mocked_settings.retake_analysis_timeout_seconds = 180
@@ -449,7 +452,7 @@ class RetakeComparisonTests(unittest.TestCase):
         )
         with patch('app.services.retake_comparison.settings') as mocked_settings:
             mocked_settings.openai_api_key = 'test-openai-key'
-            mocked_settings.retake_analysis_model = 'gpt-5.6-luna'
+            mocked_settings.retake_analysis_model = 'gpt-6-luna'
             mocked_settings.retake_analysis_reasoning_effort = 'xhigh'
             mocked_settings.retake_analysis_api_url = 'https://api.openai.com/v1/responses'
             mocked_settings.retake_analysis_timeout_seconds = 180
@@ -463,11 +466,11 @@ class RetakeComparisonTests(unittest.TestCase):
 
     def test_pricing_uses_configured_model_while_storing_provider_snapshot(self) -> None:
         body = _response_body()
-        body['model'] = 'gpt-5.6-luna-2026-08-20'
+        body['model'] = 'gpt-6-luna-2026-08-20'
         response = PooledHTTPResponse(status=200, data=json.dumps(body).encode('utf-8'), headers={}, reason='OK')
         with patch('app.services.retake_comparison.settings') as mocked_settings:
             mocked_settings.openai_api_key = 'test-openai-key'
-            mocked_settings.retake_analysis_model = 'gpt-5.6-luna'
+            mocked_settings.retake_analysis_model = 'gpt-6-luna'
             mocked_settings.retake_analysis_reasoning_effort = 'xhigh'
             mocked_settings.retake_analysis_api_url = 'https://api.openai.com/v1/responses'
             mocked_settings.retake_analysis_timeout_seconds = 180
@@ -475,11 +478,11 @@ class RetakeComparisonTests(unittest.TestCase):
             with patch('app.services.retake_comparison.pooled_request', return_value=response):
                 ai_response = self._run()
 
-        self.assertEqual(ai_response.model_name, 'gpt-5.6-luna')
-        self.assertEqual(ai_response.model_version, 'gpt-5.6-luna-2026-08-20')
-        self.assertEqual(ai_response.result.model_name, 'gpt-5.6-luna')
-        self.assertEqual(ai_response.result.model_version, 'gpt-5.6-luna-2026-08-20')
-        self.assertEqual(ai_response.cost_usd, 0.000316)
+        self.assertEqual(ai_response.model_name, 'gpt-6-luna')
+        self.assertEqual(ai_response.model_version, 'gpt-6-luna-2026-08-20')
+        self.assertEqual(ai_response.result.model_name, 'gpt-6-luna')
+        self.assertEqual(ai_response.result.model_version, 'gpt-6-luna-2026-08-20')
+        self.assertEqual(ai_response.cost_usd, 0.000137)
 
     def test_requires_openai_api_key(self) -> None:
         with patch('app.services.retake_comparison.settings') as mocked_settings:
@@ -498,7 +501,7 @@ class RetakeComparisonTests(unittest.TestCase):
             mocked_settings.openai_api_key = 'test-openai-key'
             mocked_settings.openai_api_base_url = 'https://gateway.example/v1/'
             mocked_settings.retake_analysis_api_url = ''
-            mocked_settings.retake_analysis_model = 'gpt-5.6-luna'
+            mocked_settings.retake_analysis_model = 'gpt-6-luna'
             mocked_settings.retake_analysis_reasoning_effort = 'xhigh'
             mocked_settings.retake_analysis_timeout_seconds = 180
             with patch('app.services.retake_comparison.pooled_request', return_value=response) as request:
@@ -515,7 +518,7 @@ class RetakeComparisonTests(unittest.TestCase):
         )
         with patch('app.services.retake_comparison.settings') as mocked_settings:
             mocked_settings.openai_api_key = 'test-openai-key'
-            mocked_settings.retake_analysis_model = 'gpt-5.6-luna'
+            mocked_settings.retake_analysis_model = 'gpt-6-luna'
             mocked_settings.retake_analysis_reasoning_effort = 'xhigh'
             mocked_settings.retake_analysis_api_url = 'https://api.openai.com/v1/responses'
             mocked_settings.retake_analysis_timeout_seconds = 180
@@ -526,7 +529,7 @@ class RetakeComparisonTests(unittest.TestCase):
     def test_rejects_incomplete_response(self) -> None:
         body = {
             'id': 'resp_incomplete',
-            'model': 'gpt-5.6-luna',
+            'model': 'gpt-6-luna',
             'status': 'incomplete',
             'incomplete_details': {'reason': 'max_output_tokens'},
             'output': [],
@@ -534,7 +537,7 @@ class RetakeComparisonTests(unittest.TestCase):
         response = PooledHTTPResponse(status=200, data=json.dumps(body).encode('utf-8'), headers={}, reason='OK')
         with patch('app.services.retake_comparison.settings') as mocked_settings:
             mocked_settings.openai_api_key = 'test-openai-key'
-            mocked_settings.retake_analysis_model = 'gpt-5.6-luna'
+            mocked_settings.retake_analysis_model = 'gpt-6-luna'
             mocked_settings.retake_analysis_reasoning_effort = 'xhigh'
             mocked_settings.retake_analysis_api_url = 'https://api.openai.com/v1/responses'
             mocked_settings.retake_analysis_timeout_seconds = 180
@@ -545,7 +548,7 @@ class RetakeComparisonTests(unittest.TestCase):
     def test_rejects_model_refusal(self) -> None:
         body = {
             'id': 'resp_refused',
-            'model': 'gpt-5.6-luna',
+            'model': 'gpt-6-luna',
             'output': [{
                 'type': 'message',
                 'content': [{'type': 'refusal', 'refusal': 'Unable to analyze this image.'}],
@@ -554,7 +557,7 @@ class RetakeComparisonTests(unittest.TestCase):
         response = PooledHTTPResponse(status=200, data=json.dumps(body).encode('utf-8'), headers={}, reason='OK')
         with patch('app.services.retake_comparison.settings') as mocked_settings:
             mocked_settings.openai_api_key = 'test-openai-key'
-            mocked_settings.retake_analysis_model = 'gpt-5.6-luna'
+            mocked_settings.retake_analysis_model = 'gpt-6-luna'
             mocked_settings.retake_analysis_reasoning_effort = 'xhigh'
             mocked_settings.retake_analysis_api_url = 'https://api.openai.com/v1/responses'
             mocked_settings.retake_analysis_timeout_seconds = 180
@@ -578,7 +581,7 @@ class RetakeComparisonTests(unittest.TestCase):
         response = PooledHTTPResponse(status=200, data=json.dumps(body).encode('utf-8'), headers={}, reason='OK')
         with patch('app.services.retake_comparison.settings') as mocked_settings:
             mocked_settings.openai_api_key = 'test-openai-key'
-            mocked_settings.retake_analysis_model = 'gpt-5.6-luna'
+            mocked_settings.retake_analysis_model = 'gpt-6-luna'
             mocked_settings.retake_analysis_reasoning_effort = 'xhigh'
             mocked_settings.retake_analysis_api_url = 'https://api.openai.com/v1/responses'
             mocked_settings.retake_analysis_timeout_seconds = 180

@@ -149,8 +149,8 @@ def create_review(
             Review.status == ReviewStatus.SUCCEEDED,
             Review.deleted_at.is_(None),
         )
-        if payload.review_model == 'gpt-5.6-luna':
-            existing_query = existing_query.filter(Review.model_name.ilike('%gpt-5.6-luna%'))
+        if payload.review_model in {'gpt-5.5', 'gpt-5.6-luna', 'gpt-6-luna'}:
+            existing_query = existing_query.filter(Review.model_name.ilike('%gpt-%'))
         else:
             existing_query = existing_query.filter(
                 or_(Review.model_name.is_(None), ~Review.model_name.ilike('%gpt-%'))

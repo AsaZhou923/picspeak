@@ -19,9 +19,9 @@ from app.services.ai import AIReviewError, AIReviewResponse, notify_ai_provider_
 from app.services.review_pricing import ReviewModelUsage, estimate_review_usage_cost
 
 
-RETAKE_PROMPT_VERSION = 'retake-coach-v1'
-RETAKE_GOAL_PROMPT_VERSION = 'retake-coach-goal-v1'
-RETAKE_SCORE_VERSION = 'retake-paired-v1'
+RETAKE_PROMPT_VERSION = 'retake-coach-v2-gpt6-image-led'
+RETAKE_GOAL_PROMPT_VERSION = 'retake-coach-goal-v2-gpt6-image-led'
+RETAKE_SCORE_VERSION = 'retake-paired-v2'
 RETAKE_PREPROCESS_VERSION = 'openai-paired-input-image-high-v1'
 DIMENSION_KEYS = ('composition', 'lighting', 'color', 'impact', 'technical')
 
@@ -232,7 +232,7 @@ def _extract_output_text(body: dict) -> str:
         details = body.get('incomplete_details')
         reason = details.get('reason') if isinstance(details, dict) else None
         suffix = f': {reason}' if isinstance(reason, str) and reason.strip() else ''
-        raise AIReviewError(f'GPT-5.6 response was incomplete{suffix}')
+        raise AIReviewError(f'OpenAI retake comparison response was incomplete{suffix}')
     for output in body.get('output') or []:
         if not isinstance(output, dict) or output.get('type') != 'message':
             continue
@@ -241,10 +241,10 @@ def _extract_output_text(body: dict) -> str:
                 continue
             refusal = content.get('refusal')
             if isinstance(refusal, str) and refusal.strip():
-                raise AIReviewError(f'GPT-5.6 refused the retake comparison: {refusal[:300]}')
+                raise AIReviewError(f'OpenAI retake comparison was refused: {refusal[:300]}')
             if content.get('type') == 'output_text' and isinstance(content.get('text'), str):
                 return content['text']
-    raise AIReviewError('GPT-5.6 response did not contain structured output text')
+    raise AIReviewError('OpenAI retake comparison response did not contain structured output text')
 
 
 def _trend(delta: int) -> str:
@@ -363,14 +363,14 @@ def _safe_goal_assessment(
     if goal_context is None:
         return None
     if comparison.goal_assessment is None:
-        raise AIReviewError('GPT-5.6 structured output omitted required goal_assessment')
+        raise AIReviewError('OpenAI retake comparison structured output omitted required goal_assessment')
     if not comparison.is_comparable or comparison.comparison_confidence == 'low':
         reason_key = 'not_comparable' if not comparison.is_comparable else 'low_confidence'
         return _fallback_indeterminate_assessment(goal_context, locale=locale, reason_key=reason_key, caveat=comparison.comparison_caveat)
     try:
         return validate_goal_assessment_for_context(comparison.goal_assessment, goal_context)
     except ValueError as exc:
-        raise AIReviewError(f'GPT-5.6 goal assessment failed validation: {exc}') from exc
+        raise AIReviewError(f'OpenAI retake comparison goal assessment failed validation: {exc}') from exc
 
 
 def _fallback_indeterminate_assessment(
@@ -421,7 +421,7 @@ def run_retake_comparison(
     goal_context: GoalAssessmentContext | None = None,
 ) -> AIReviewResponse:
     if not settings.openai_api_key:
-        raise AIReviewError('OPENAI_API_KEY is not configured for GPT-5.6 retake comparison')
+        raise AIReviewError('OPENAI_API_KEY is not configured for OpenAI retake comparison')
 
     payload = {
         'model': settings.retake_analysis_model,
@@ -465,13 +465,13 @@ def run_retake_comparison(
     except PooledHTTPStatusError as exc:
         notify_ai_provider_call(stage='pair', outcome='failed', model_name=settings.retake_analysis_model)
         error_body = exc.response.data.decode('utf-8', errors='ignore')
-        raise AIReviewError(f'GPT-5.6 API HTTP {exc.response.status}: {error_body[:300]}') from exc
+        raise AIReviewError(f'OpenAI retake comparison API HTTP {exc.response.status}: {error_body[:300]}') from exc
     except PooledHTTPRequestError as exc:
         notify_ai_provider_call(stage='pair', outcome='failed', model_name=settings.retake_analysis_model)
-        raise AIReviewError(f'GPT-5.6 API request failed: {exc}') from exc
+        raise AIReviewError(f'OpenAI retake comparison API request failed: {exc}') from exc
     except json.JSONDecodeError as exc:
         notify_ai_provider_call(stage='pair', outcome='failed', model_name=settings.retake_analysis_model)
-        raise AIReviewError('GPT-5.6 API returned invalid JSON') from exc
+        raise AIReviewError('OpenAI retake comparison API returned invalid JSON') from exc
 
     latency_ms = int((time.perf_counter() - started) * 1000)
     configured_model_name = settings.retake_analysis_model
@@ -487,9 +487,9 @@ def run_retake_comparison(
         parsed = json.loads(_extract_output_text(body))
         comparison = _ModelComparison.model_validate(parsed)
     except json.JSONDecodeError as exc:
-        raise AIReviewError('GPT-5.6 structured output was not valid JSON') from exc
+        raise AIReviewError('OpenAI retake comparison structured output was not valid JSON') from exc
     except ValidationError as exc:
-        raise AIReviewError(f'GPT-5.6 structured output failed validation: {exc}') from exc
+        raise AIReviewError(f'OpenAI retake comparison structured output failed validation: {exc}') from exc
 
     result = _build_result(
         comparison,

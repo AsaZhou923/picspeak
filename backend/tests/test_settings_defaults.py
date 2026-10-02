@@ -47,12 +47,12 @@ class SettingsDefaultsTestCase(unittest.TestCase):
 
     def test_retake_analysis_defaults_to_luna_xhigh(self):
         settings = self._settings()
-        self.assertEqual(settings.retake_analysis_model, 'gpt-5.6-luna')
+        self.assertEqual(settings.retake_analysis_model, 'gpt-6-luna')
         self.assertEqual(settings.retake_analysis_reasoning_effort, 'xhigh')
 
     def test_single_photo_openai_review_defaults_to_luna_xhigh(self):
         settings = self._settings()
-        self.assertEqual(settings.openai_review_model, 'gpt-5.6-luna')
+        self.assertEqual(settings.openai_review_model, 'gpt-6-luna')
         self.assertEqual(settings.openai_review_reasoning_effort, 'xhigh')
 
     def test_single_photo_openai_score_defaults_to_gpt6_luna_xhigh(self):

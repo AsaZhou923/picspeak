@@ -65,7 +65,7 @@ class PhotoCreateResponse(BaseModel):
 class ReviewCreateRequest(BaseModel):
     photo_id: str
     mode: str = Field(pattern='^(flash|pro)$')
-    review_model: str = Field(default='qwen', pattern=r'^(qwen|gpt-5\.5|gpt-5\.6-(?:terra|luna))$')
+    review_model: str = Field(default='qwen', pattern=r'^(qwen|gpt-5\.5|gpt-5\.6-(?:terra|luna)|gpt-6-luna)$')
     image_type: str = Field(default='default', pattern='^(default|landscape|portrait|street|still_life|architecture)$')
     source_review_id: str | None = None
     practice_session_id: str | None = None
@@ -77,7 +77,8 @@ class ReviewCreateRequest(BaseModel):
     @model_validator(mode='after')
     def align_review_model_with_analysis_type(self):
         if self.analysis_type == 'retake_compare':
-            self.review_model = 'gpt-5.6-luna'
+            if self.review_model != 'gpt-6-luna':
+                self.review_model = 'gpt-5.6-luna'
         elif self.review_model == 'gpt-5.5':
             self.review_model = 'gpt-5.6-luna'
         elif self.review_model == 'gpt-5.6-terra':

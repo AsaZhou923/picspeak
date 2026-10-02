@@ -42,7 +42,7 @@ from scoring_fixtures import (
 
 class AIPromptTests(unittest.TestCase):
     def test_prompt_versions_identify_canonical_gpt_scoring(self) -> None:
-        self.assertEqual(PROMPT_VERSION, 'photo-review-v8-image-led')
+        self.assertEqual(PROMPT_VERSION, 'photo-review-v9-gpt6-image-led')
         self.assertEqual(SCORE_PROMPT_VERSION, 'photo-score-v7-canonical-quality')
         self.assertEqual(SCORE_VERSION, 'score-v7-canonical-quality')
 

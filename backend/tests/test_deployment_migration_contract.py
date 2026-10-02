@@ -46,14 +46,13 @@ class DeploymentMigrationContractTests(unittest.TestCase):
         self.assertIn('Service deployment was blocked', script)
         self.assertIn('Refusing to deploy from a dirty working tree', script)
 
-    def test_deploy_paths_activate_the_canonical_scorer_without_changing_writer(self) -> None:
+    def test_deploy_paths_activate_all_openai_review_models(self) -> None:
         config = (REPO_ROOT / 'cloudbuild.yaml').read_text(encoding='utf-8')
         script = (REPO_ROOT / 'deploy' / 'deploy-backend.bat').read_text(encoding='utf-8')
 
-        self.assertIn('--update-env-vars=OPENAI_SCORE_MODEL=gpt-6-luna', config)
-        self.assertIn('--update-env-vars OPENAI_SCORE_MODEL=gpt-6-luna ^', script)
-        self.assertNotIn('OPENAI_REVIEW_MODEL', config)
-        self.assertNotIn('OPENAI_REVIEW_MODEL', script)
+        expected = 'OPENAI_SCORE_MODEL=gpt-6-luna,OPENAI_REVIEW_MODEL=gpt-6-luna,RETAKE_ANALYSIS_MODEL=gpt-6-luna'
+        self.assertIn(f'--update-env-vars={expected}', config)
+        self.assertIn(f'--update-env-vars {expected} ^', script)
 
     def test_ci_runs_real_postgres_migration_cycles(self) -> None:
         for workflow_name in ('ci.yml', 'pr-ci.yml'):

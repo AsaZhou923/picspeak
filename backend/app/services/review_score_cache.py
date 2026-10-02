@@ -126,7 +126,7 @@ def review_uses_current_score_contract(review: Review) -> bool:
 
 
 def writer_contract_for_review_request(*, mode: str, review_model: str) -> str:
-    if review_model in {'gpt-5.5', 'gpt-5.6-luna'}:
+    if review_model in {'gpt-5.5', 'gpt-5.6-luna', 'gpt-6-luna'}:
         writer_model_name = settings.openai_review_model
     else:
         writer_model_name = model_name_for_mode(mode)

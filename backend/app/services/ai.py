@@ -909,7 +909,7 @@ def _run_openai_review(
     on_canonical_score: Callable[[CanonicalScore], None] | None,
 ) -> AIReviewResponse:
     if not settings.openai_api_key:
-        raise AIReviewError('OPENAI_API_KEY is not configured for GPT-5.6 photo review')
+        raise AIReviewError('OPENAI_API_KEY is not configured for OpenAI photo review')
     if not settings.openai_review_model:
         raise AIReviewError('OPENAI_REVIEW_MODEL is not configured')
 
@@ -1012,7 +1012,7 @@ def run_ai_review(
     canonical_score: CanonicalScore | None = None,
     on_canonical_score: Callable[[CanonicalScore], None] | None = None,
 ) -> AIReviewResponse:
-    if review_model in {'gpt-5.5', 'gpt-5.6-luna'}:
+    if review_model in {'gpt-5.5', 'gpt-5.6-luna', 'gpt-6-luna'}:
         return _run_openai_review(
             mode=mode,
             image_url=image_url,

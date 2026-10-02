@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-PROMPT_VERSION = 'photo-review-v8-image-led'
+PROMPT_VERSION = 'photo-review-v9-gpt6-image-led'
 SCORE_PROMPT_VERSION = 'photo-score-v7-canonical-quality'
 SCORE_VERSION = 'score-v7-canonical-quality'
 SCORER_PREPROCESS_VERSION = 'openai-input-image-high-v1'

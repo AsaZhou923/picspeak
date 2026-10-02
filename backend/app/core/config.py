@@ -126,12 +126,12 @@ class Settings(BaseSettings):
     openai_score_model: str = 'gpt-6-luna'
     openai_score_reasoning_effort: str = 'xhigh'
     openai_score_timeout_seconds: int = 180
-    openai_review_model: str = 'gpt-5.6-luna'
+    openai_review_model: str = 'gpt-6-luna'
     openai_review_reasoning_effort: str = 'xhigh'
     openai_review_timeout_seconds: int = 180
     review_pricing_overrides: dict[str, Any] = Field(default_factory=dict)
     retake_analysis_api_url: str = ''
-    retake_analysis_model: str = 'gpt-5.6-luna'
+    retake_analysis_model: str = 'gpt-6-luna'
     retake_analysis_reasoning_effort: str = 'xhigh'
     retake_analysis_timeout_seconds: int = 180
     image_generation_api_key: str = ''

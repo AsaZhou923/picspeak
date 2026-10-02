@@ -1,12 +1,19 @@
 from __future__ import annotations
 
+import sys
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from fastapi import HTTPException
 
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+if str(BACKEND_ROOT) not in sys.path:
+    sys.path.insert(0, str(BACKEND_ROOT))
+
 from app.api.routers.review_support import _public_comparison_payload, _resolve_source_review, _review_result_payload
+from app.api.routers.review_create import _review_request_hash_payload
 from app.db.models import ReviewStatus
 from app.schemas import GenerationCreateRequest, ReviewCreateRequest
 from app.services.review_task_processor import _normalize_review_result_payload
@@ -41,10 +48,14 @@ class RetakeReviewContractTests(unittest.TestCase):
 
         self.assertEqual(payload.locale, 'en')
 
-    def test_retake_analysis_is_always_pinned_to_luna(self) -> None:
+    def test_omitted_retake_selector_keeps_legacy_canonical_payload(self) -> None:
         payload = _request(source_review_id='rev_source')
 
         self.assertEqual(payload.review_model, 'gpt-5.6-luna')
+        self.assertEqual(
+            payload.model_dump(by_alias=True)['review_model'],
+            'gpt-5.6-luna',
+        )
 
     def test_luna_can_be_selected_for_normal_review(self) -> None:
         payload = ReviewCreateRequest(
@@ -56,6 +67,16 @@ class RetakeReviewContractTests(unittest.TestCase):
 
         self.assertEqual(payload.review_model, 'gpt-5.6-luna')
 
+    def test_gpt6_luna_can_be_selected_for_normal_review(self) -> None:
+        payload = ReviewCreateRequest(
+            photo_id='pho_1',
+            mode='flash',
+            analysis_type='single',
+            review_model='gpt-6-luna',
+        )
+
+        self.assertEqual(payload.review_model, 'gpt-6-luna')
+
     def test_legacy_gpt55_single_request_is_normalized_to_luna(self) -> None:
         payload = ReviewCreateRequest(
             photo_id='pho_1',
@@ -66,7 +87,20 @@ class RetakeReviewContractTests(unittest.TestCase):
 
         self.assertEqual(payload.review_model, 'gpt-5.6-luna')
 
-    def test_legacy_terra_retake_request_is_normalized_to_luna(self) -> None:
+    def test_explicit_gpt6_retake_selector_stays_gpt6(self) -> None:
+        payload = ReviewCreateRequest(
+            photo_id='pho_retake',
+            mode='pro',
+            source_review_id='rev_source',
+            analysis_type='retake_compare',
+            review_model='gpt-6-luna',
+            locale='en',
+        )
+
+        self.assertEqual(payload.review_model, 'gpt-6-luna')
+        self.assertEqual(payload.model_dump(by_alias=True)['review_model'], 'gpt-6-luna')
+
+    def test_legacy_terra_retake_request_uses_legacy_canonical_payload(self) -> None:
         payload = ReviewCreateRequest(
             photo_id='pho_retake',
             mode='pro',
@@ -77,6 +111,45 @@ class RetakeReviewContractTests(unittest.TestCase):
         )
 
         self.assertEqual(payload.review_model, 'gpt-5.6-luna')
+        self.assertEqual(payload.model_dump(by_alias=True)['review_model'], 'gpt-5.6-luna')
+
+    def test_legacy_retake_selectors_use_legacy_canonical_payload(self) -> None:
+        for selector in ('qwen', 'gpt-5.5', 'gpt-5.6-luna'):
+            with self.subTest(selector=selector):
+                payload = ReviewCreateRequest(
+                    photo_id='pho_retake',
+                    mode='pro',
+                    source_review_id='rev_source',
+                    analysis_type='retake_compare',
+                    review_model=selector,
+                    locale='en',
+                )
+
+                self.assertEqual(payload.review_model, 'gpt-5.6-luna')
+                self.assertEqual(payload.model_dump(by_alias=True)['review_model'], 'gpt-5.6-luna')
+
+    def test_legacy_retake_hash_payload_matches_old_normalized_selector(self) -> None:
+        legacy_payload = ReviewCreateRequest(
+            photo_id='pho_retake',
+            mode='pro',
+            source_review_id='rev_source',
+            analysis_type='retake_compare',
+            review_model='qwen',
+            locale='en',
+        )
+        old_normalized_payload = ReviewCreateRequest(
+            photo_id='pho_retake',
+            mode='pro',
+            source_review_id='rev_source',
+            analysis_type='retake_compare',
+            review_model='gpt-5.6-luna',
+            locale='en',
+        )
+
+        self.assertEqual(
+            _review_request_hash_payload(self.db, self.actor, legacy_payload),
+            _review_request_hash_payload(self.db, self.actor, old_normalized_payload),
+        )
 
     def test_retake_requires_source_review(self) -> None:
         with self.assertRaises(HTTPException) as raised:
@@ -148,8 +221,8 @@ class RetakeReviewContractTests(unittest.TestCase):
             raw,
             final_score=7.2,
             prompt_version='retake-coach-v1',
-            model_name='gpt-5.6-luna',
-            model_version='gpt-5.6-luna',
+            model_name='gpt-6-luna',
+            model_version='gpt-6-luna',
             exif_info=None,
         )
         public = _review_result_payload(stored, 7.2)

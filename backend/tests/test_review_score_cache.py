@@ -92,10 +92,14 @@ class ReviewScoreCacheTests(unittest.TestCase):
             self.assertFalse(review_uses_current_score_contract(review))
 
     def test_writer_contract_for_gpt_uses_official_model_alias(self) -> None:
-        with patch('app.services.review_score_cache.settings.openai_review_model', 'gpt-5.6-luna'):
+        with patch('app.services.review_score_cache.settings.openai_review_model', 'gpt-6-luna'):
+            self.assertEqual(
+                writer_contract_for_review_request(mode='flash', review_model='gpt-6-luna'),
+                'gpt-6-luna',
+            )
             self.assertEqual(
                 writer_contract_for_review_request(mode='flash', review_model='gpt-5.6-luna'),
-                'gpt-5.6-luna',
+                'gpt-6-luna',
             )
 
     def test_cached_score_requires_exact_integer_scores(self) -> None:
