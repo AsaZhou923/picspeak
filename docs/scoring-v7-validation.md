@@ -1,6 +1,6 @@
 # v7 评分模型对照与发布验证
 
-开始日期：2026-10-01；发布准备日期：2026-10-02。此文为内部证据记录。当前代码准备发布；生产核验结果将在实际部署后补充。没有重算历史评图。
+开始日期：2026-10-01；发布日期：2026-10-02。此文为内部证据记录。评分实现已完成并核验生产部署，公告状态随发布事实同步。没有重算历史评图。
 
 ## 实际采纳的修改
 
@@ -8,7 +8,7 @@
 - 普通评图合同更新为 `score-v7-canonical-quality` / `photo-score-v7-canonical-quality`。初评 rubric、五维整数及算术均分没有变；保留 v6 的中性独立高分复核。
 - 旧评分缓存和 checkpoint 不作为 v7 命中；历史点评继续可读。v5/v6/v7 均保持下界等级显示，只有 >=8.0 开始高分颜色；成长统计按精确版本分组。
 - 添加该模型的官方 Standard 估算费率，旧费率版本保持不变。未知模型或缺失用量继续为未知费用，不用零值替代。
-- 生产环境当前显式设置了旧 `OPENAI_SCORE_MODEL`，因此 Cloud Build 的 Deploy 步骤和手动部署入口在更新镜像时同步设置 `OPENAI_SCORE_MODEL=gpt-6-luna`。没有新增或重命名变量，不改变 writer、认证、数据库或对象存储配置。
+- 发布前生产环境显式设置了旧 `OPENAI_SCORE_MODEL`，因此 Cloud Build 的 Deploy 步骤和手动部署入口在更新镜像时同步设置 `OPENAI_SCORE_MODEL=gpt-6-luna`。没有新增或重命名变量，不改变 writer、认证、数据库或对象存储配置。
 - 新增离线排序诊断工具；它读取已有的人类聚合投票直方图，不生成个人评审身份，不写数据库，也不宣布正式校准成功。
 
 ## 固定公开基准与隔离
@@ -75,7 +75,11 @@
 - 本地实现：完成。
 - 本地工程验证：完成，包含发布文案改动后的检查与最终复核。
 - 自动发布触发器：已读取，`disabled=false`，Developer Connect 的 push branch 为 `main`，使用仓库 `cloudbuild.yaml`；触发器 ID `9bb60fbc-6953-4c7f-b73c-d8dd177b3e23`。
-- 提交 / 推送：未执行。
-- 生产部署：未执行。本轮之前服务 revision 为 `picspeak-api-00217-2v5`，打分模型仍是 `gpt-5.6-luna`。
-- 生产 schema / 新模型配置 / API / 三语更新页：本轮部署后的核验待执行。
+- 评分实现提交 / 推送：`9027bb823b966eda4440da4f20646dfee80e579f`，正常推送 main，远端 SHA 一致。
+- [GitHub CI 36944370834](https://github.com/AsaZhou923/picspeak/actions/runs/36944370834)：success；[Vercel Production](https://vercel.com/asazhou923s-projects/picspeak/Bo9P3xgBpVwGVarjChL3ZycbwCEH)：success。
+- Cloud Build `a5847649-cf96-422a-b9bc-5a383367a11b`：Pull / Build / Push / Migrate / Deploy 均 success，完成时间 `2026-10-02T00:11:34Z`。
+- 该实现发布核验时服务 revision 为 `picspeak-api-00218-mmk`，接收 100% 流量，镜像和 commit label 均对应上述 SHA；scorer 为 `gpt-6-luna`，writer 为 `gpt-5.6-luna`。Cloud Tasks 的评图 callback 指向同一 API service，没有遗漏独立旧 worker。
+- migration execution `picspeak-db-migrate-c4nsp`：`EXECUTION_SUCCEEDED`；以生产凭据执行只读事务并 rollback，`alembic_version=20260922_0010`。
+- OpenAPI、gallery API 与中英日 `/updates` 全部 HTTP 200，三语更新页包含新 release ID。公开历史样本 `rev_4380c0945dcf42e8` 仍为 8.60 / `score-v4-intent-aware`。
+- 公告随后从准备中同步为已发布，最终公告提交和部署状态以本次交付回报为准；这一步不再改变评分实现。
 - 历史重评：未执行，也不在本轮范围。

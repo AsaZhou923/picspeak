@@ -187,7 +187,7 @@ npm run build
 
 ## 文档
 
-- [最新更新日志：照片评分更新准备中](docs/changelog/CHANGELOG.md#2026-10-02-photo-scoring-quality)
+- [最新更新日志：照片评分更新](docs/changelog/CHANGELOG.md#2026-10-02-photo-scoring-quality)
 - [此前工作台评图更新](docs/changelog/CHANGELOG.md#2026-09-30-workspace-gpt-review-only)
 - [此前长廊与点评说明更新](docs/changelog/CHANGELOG.md#2026-09-26-gallery-and-critique-clarity)
 - [此前长廊与操作提示更新](docs/changelog/CHANGELOG.md#2026-09-25-gallery-actions-and-clearer-controls)

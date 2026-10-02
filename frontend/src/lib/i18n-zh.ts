@@ -21,8 +21,8 @@ export const zhTranslations = {
   pro_offer_label: '',
   pro_offer_highlight: 'Pro',
   updates_label: '更新记录',
-  updates_hint_home: '准备中：照片评分更新，历史记录保留',
-  updates_hint_latest: '准备中：照片评分更新，历史记录保留',
+  updates_hint_home: '照片评分已更新，历史记录保留',
+  updates_hint_latest: '照片评分已更新，历史记录保留',
   contact_label: '联系',
   contact_headline: '联系我',
 
