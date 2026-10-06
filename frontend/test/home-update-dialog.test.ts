@@ -67,14 +67,18 @@ test('maintenance updates remain in the log while popup eligibility stays separa
 
 test('product update data clones nested actions and section items for callers', () => {
   const firstRead = getProductUpdates('en');
+  const originalLabel = firstRead[0].primaryAction!.label;
+  const sectionEntry = firstRead.find((entry) => entry.sections?.length);
+  assert.ok(sectionEntry);
+  const originalItem = sectionEntry.sections![0].items[0];
   firstRead[0].primaryAction!.label = 'Mutated action';
-  firstRead[0].sections![0].items[0] = 'Mutated item';
+  sectionEntry.sections![0].items[0] = 'Mutated item';
 
   const secondRead = getProductUpdates('en');
-  assert.equal(secondRead[0].primaryAction!.label, 'View the updated gallery');
+  assert.equal(secondRead[0].primaryAction!.label, originalLabel);
   assert.equal(
-    secondRead[0].sections![0].items[0],
-    'Scores and critique text for these 22 public works now use the current GPT-6 critique standard.',
+    secondRead.find((entry) => entry.id === sectionEntry.id)!.sections![0].items[0],
+    originalItem,
   );
 });
 

@@ -188,7 +188,7 @@ npm run build
 
 ## 文档
 
-- [最新更新日志：22 条长廊点评完成重评](docs/changelog/CHANGELOG.md#2026-10-06-gallery-critique-reassessment)
+- [最新更新日志：长廊里的 v5 版本评图已免费重评](docs/changelog/CHANGELOG.md#2026-10-06-gallery-critique-reassessment)
 - [此前评图全面升级 GPT-6](docs/changelog/CHANGELOG.md#2026-10-02-gpt6-workspace-upgrade)
 - [此前工作台评图更新](docs/changelog/CHANGELOG.md#2026-09-30-workspace-gpt-review-only)
 - [此前长廊与点评说明更新](docs/changelog/CHANGELOG.md#2026-09-26-gallery-and-critique-clarity)

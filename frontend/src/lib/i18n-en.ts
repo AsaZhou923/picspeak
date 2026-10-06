@@ -232,8 +232,8 @@ export const enTranslations = {
     pro_offer_label: '',
     pro_offer_highlight: 'Pro',
     updates_label: 'Updates',
-    updates_hint_home: '22 public gallery critiques re-assessed',
-    updates_hint_latest: '22 public gallery critiques re-assessed',
+    updates_hint_home: 'v5 gallery critiques reassessed for free',
+    updates_hint_latest: 'v5 gallery critiques reassessed for free',
     contact_label: 'Contact',
     contact_headline: 'Get in Touch',
 

@@ -3,30 +3,13 @@
     "id": "2026-10-06-gallery-critique-reassessment",
     "date": "2026-10-06",
     "showPopup": true,
-    "title": "Gallery critique update: 22 public works re-assessed",
-    "summary": "22 older public gallery critiques have been reassessed with GPT-6, with updated scores and feedback. Private historical critiques stay unchanged, and no critique quota is charged.",
+    "title": "v5 gallery critiques reassessed for free",
+    "summary": "Scores and feedback have been updated with GPT-6 at no cost to your critique quota. Visit the gallery to see the results.",
     "docPath": "docs/changelog/CHANGELOG.md#2026-10-06-gallery-critique-reassessment",
     "primaryAction": {
-      "label": "View the updated gallery",
+      "label": "View gallery",
       "href": "/gallery"
-    },
-    "sections": [
-      {
-        "title": "What changed in the gallery",
-        "items": [
-          "Scores and critique text for these 22 public works now use the current GPT-6 critique standard.",
-          "Artwork links, likes, favorites, notes, and publish times stay in place.",
-          "This reassessment does not use your critique quota."
-        ]
-      },
-      {
-        "title": "History is preserved",
-        "items": [
-          "Private historical critiques stay unchanged, and original results have been backed up.",
-          "Gallery works outside this reassessment keep their original results."
-        ]
-      }
-    ]
+    }
   },
   {
     "id": "2026-10-02-gpt6-workspace-upgrade",
