@@ -75,6 +75,7 @@ htmlcov/
 .pnpm-store/
 
 # Internal Documents
+docs/scoring-*.md
 docs/analytics/
 docs/marketing/
 docs/plans/

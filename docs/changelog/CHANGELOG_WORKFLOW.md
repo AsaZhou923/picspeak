@@ -216,7 +216,7 @@ rg -n "getProductUpdates|updates_hint_home|updates_hint_latest|updates_label|/up
 
 ### 项目级说明文件
 
-- `CLAUDE.md`
+- `AGENTS.md`
 - `AGENTS.md`、`AGENT.md` 或 `agent.md`（如果仓库中存在）
 - `README.md`
 - 其他已存在的 README 变体，例如 `README.zh-CN.md`
@@ -430,7 +430,7 @@ python -m unittest discover -s tests -p "test_*.py"
 在 commit 前至少再看一次：
 
 ```bash
-git diff -- docs/changelog frontend/src/content/updates README.md README*.md CLAUDE.md
+git diff -- docs/changelog frontend/src/content/updates README.md README*.md AGENTS.md
 git status --short
 rg -n "docs/changelog/update-log|update-log-[0-9]{4}" .
 find '/mnt/e/Project Code/docs/01 - Projects/PicSpeak/09 - Changelog/Update Logs' -maxdepth 1 -type f -print
@@ -488,7 +488,7 @@ git push origin <branch>
 - 不要只改 `docs/changelog` 而漏掉 `/updates`
 - 不要只改 `docs/changelog` 而漏掉外部 Update Logs 镜像
 - 不要只改 `/updates` JSON 而漏掉首页 i18n hint
-- 不要在确认更新内容无误前提前改 `CLAUDE.md`、agent 说明文件或 README
+- 不要在确认更新内容无误前提前改 `AGENTS.md`、agent 说明文件或 README
 - 不要把未执行的验证写成已通过
 - 不要在工作区有未知冲突时直接提交
 
@@ -513,7 +513,7 @@ git push origin <branch>
 - 更新 `frontend/src/lib/i18n-zh.ts`
 - 更新 `frontend/src/lib/i18n-en.ts`
 - 更新 `frontend/src/lib/i18n-ja.ts`
-- 确认上述内容无误后，更新 `CLAUDE.md`
+- 确认上述内容无误后，更新 `AGENTS.md`
 - 确认上述内容无误后，如果存在则更新 `AGENTS.md` / `AGENT.md` / `agent.md`
 - 确认上述内容无误后，更新 `README.md` 和已存在的 README 变体
 
