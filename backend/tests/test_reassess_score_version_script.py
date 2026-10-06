@@ -46,7 +46,7 @@ class _Result:
         return {
             'schema_version': '1.0',
             'scores': {'composition': 8, 'lighting': 7, 'color': 8, 'impact': 8, 'technical': 7},
-            'score_version': 'score-v7-canonical-quality',
+            'score_version': script.SCORE_VERSION,
             'final_score': self.final_score,
             'advantage': 'Fresh strengths',
             'critique': 'Fresh critique',
@@ -67,7 +67,7 @@ def _ai_response(*, score: float = 7.6) -> SimpleNamespace:
         scorer_model_version='gpt-6-luna-2026',
         writer_model_name='gpt-6-luna',
         writer_model_version='gpt-6-luna-2026',
-        score_prompt_version='photo-score-v7-canonical-quality',
+        score_prompt_version='photo-score-v8-style-relative',
         scorer_preprocess_version='preprocess-v7',
         score_cache_hit=False,
         input_tokens=123,
@@ -253,6 +253,25 @@ class ReassessScoreVersionScriptTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Unsupported source score version'):
             script._validate_source_score_version('score-v6-evidence-independent')
 
+    def test_v7_reassessment_requires_explicit_ids_before_query(self) -> None:
+        with patch.object(script, '_source_rows') as source_rows:
+            for ids in (None, [], ()):
+                with self.subTest(ids=ids), self.assertRaises(ValueError):
+                    script.discover_candidates(object(), source_score_version=script.SOURCE_SCORE_VERSION_V7, review_ids=ids)
+            source_rows.assert_not_called()
+
+    def test_v7_reassessment_selects_only_named_public_source(self) -> None:
+        review = _review('rev_v7_named')
+        review.result_json['score_version'] = script.SOURCE_SCORE_VERSION_V7
+        photo, task = _photo(), _task()
+        with patch.object(script, '_source_rows', return_value=[(review, photo, task)]) as source_rows:
+            candidates, selected = script.discover_candidates(
+                object(), source_score_version=script.SOURCE_SCORE_VERSION_V7, review_ids=['rev_v7_named'],
+            )
+        self.assertEqual(selected, ['rev_v7_named'])
+        self.assertEqual([candidate.review_public_id for candidate in candidates], ['rev_v7_named'])
+        self.assertEqual(source_rows.call_args.kwargs['review_public_ids'], ['rev_v7_named'])
+
     def test_execute_updates_in_place_after_fsynced_backup_and_preserves_usage_fields(self) -> None:
         review = _review()
         photo = _photo()
@@ -292,7 +311,7 @@ class ReassessScoreVersionScriptTests(unittest.TestCase):
         self.assertEqual(review.cost_rate_version, 'old-rates')
         self.assertEqual(review.latency_ms, 999)
         self.assertEqual(review.final_score, Decimal('7.6'))
-        self.assertEqual(review.result_json['score_version'], 'score-v7-canonical-quality')
+        self.assertEqual(review.result_json['score_version'], script.SCORE_VERSION)
         self.assertFalse(review.result_json['billing_info']['quota_charged'])
         self.assertEqual(review.result_json['billing_info']['reason'], 'score_version_reassessment')
         self.assertEqual(review.result_json[script.REASSESSMENT_METADATA_KEY]['source_score_version'], script.SOURCE_SCORE_VERSION_V5)

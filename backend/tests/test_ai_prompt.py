@@ -43,8 +43,8 @@ from scoring_fixtures import (
 class AIPromptTests(unittest.TestCase):
     def test_prompt_versions_identify_canonical_gpt_scoring(self) -> None:
         self.assertEqual(PROMPT_VERSION, 'photo-review-v9-gpt6-image-led')
-        self.assertEqual(SCORE_PROMPT_VERSION, 'photo-score-v7-canonical-quality')
-        self.assertEqual(SCORE_VERSION, 'score-v7-canonical-quality')
+        self.assertEqual(SCORE_PROMPT_VERSION, 'photo-score-v8-style-relative')
+        self.assertEqual(SCORE_VERSION, 'score-v8-style-relative')
 
     def test_chinese_prompt_contains_stricter_scoring_rules(self) -> None:
         prompt = _prompt_for_mode_v3(mode='pro', locale='zh', image_type='street')
@@ -68,7 +68,7 @@ class AIPromptTests(unittest.TestCase):
         self.assertIn('8 means selected portfolio-worthy execution', prompt)
         self.assertIn('9 means exceptional visible control', prompt)
         self.assertIn('Attractive scenery, architecture, flowers, or cinematic mood is not enough', prompt)
-        self.assertIn('For every dimension, provide visible strength, main limitation, and high-score justification', prompt)
+        self.assertIn('For every dimension, provide visible strength, material limitation if one exists', prompt)
         self.assertIn('Impact explicitly rewards specificity, originality, emotional force, narrative', prompt)
         self.assertIn('A high score in one dimension does not require high scores in the other dimensions', prompt)
         self.assertIn('Style is not a bonus by itself', prompt)

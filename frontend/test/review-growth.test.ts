@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { buildHistoryGrowthSnapshot, buildNextShootChecklist, getScoreVersionLabel } from '../src/lib/review-growth.ts';
+import { buildHistoryGrowthSnapshot, buildNextShootChecklist, CURRENT_SCORE_VERSION, getScoreVersionLabel } from '../src/lib/review-growth.ts';
 import type { ReviewHistoryItem, ReviewScores } from '../src/lib/types.ts';
 
 function makeScores(values: Partial<ReviewScores>): ReviewScores {
@@ -172,6 +172,44 @@ test('buildHistoryGrowthSnapshot keeps v6 and v7 histories separate', () => {
   assert.equal(snapshot.scoreVersion, 'score-v7-canonical-quality');
   assert.equal(snapshot.excludedVersionCount, 2);
   assert.equal(snapshot.recentAverage, 7.3);
+});
+
+test('v8 history statistics use only the exact latest rubric version', () => {
+  const snapshot = buildHistoryGrowthSnapshot([
+    makeHistoryItem('rev-v8-recent-2', '2026-10-06T10:00:00Z', 7.8, makeScores({ composition: 8, lighting: 8, color: 8, impact: 8, technical: 7 }), CURRENT_SCORE_VERSION),
+    makeHistoryItem('rev-v7-high', '2026-10-06T09:00:00Z', 9.8, makeScores({ composition: 10, lighting: 10, color: 10, impact: 10, technical: 9 }), 'score-v7-canonical-quality'),
+    makeHistoryItem('rev-v8-recent-1', '2026-10-05T10:00:00Z', 7.4, makeScores({ composition: 7, lighting: 8, color: 8, impact: 8, technical: 6 }), ' SCORE-V8-STYLE-RELATIVE '),
+    makeHistoryItem('rev-paired-high', '2026-10-05T09:00:00Z', 9.6, makeScores({ composition: 10, lighting: 10, color: 10, impact: 10, technical: 8 }), 'retake-paired-v1'),
+    makeHistoryItem('rev-v8-prompt-version', '2026-10-04T10:00:00Z', 9.2, makeScores({ composition: 9, lighting: 9, color: 10, impact: 10, technical: 8 }), 'photo-score-v8-style-relative'),
+    makeHistoryItem('rev-v8-previous-2', '2026-10-03T10:00:00Z', 6.8, makeScores({ composition: 7, lighting: 7, color: 7, impact: 7, technical: 6 }), 'score-v8-style-relative'),
+    makeHistoryItem('rev-unknown', '2026-10-02T10:00:00Z', 9.0, makeScores({ composition: 9, lighting: 9, color: 9, impact: 9, technical: 9 }), 'unknown'),
+    makeHistoryItem('rev-v8-previous-1', '2026-10-01T10:00:00Z', 6.4, makeScores({ composition: 6, lighting: 7, color: 7, impact: 7, technical: 5 }), 'score-v8-style-relative'),
+  ], 2);
+
+  assert.equal(snapshot.scoreVersion, 'score-v8-style-relative');
+  assert.deepEqual(snapshot.recentItems.map((item) => item.review_id), ['rev-v8-recent-2', 'rev-v8-recent-1']);
+  assert.deepEqual(snapshot.previousItems.map((item) => item.review_id), ['rev-v8-previous-2', 'rev-v8-previous-1']);
+  assert.equal(snapshot.excludedVersionCount, 4);
+  assert.equal(snapshot.recentAverage, 7.6);
+  assert.equal(snapshot.previousAverage, 6.6);
+  assert.equal(snapshot.averageDelta, 1.0);
+  assert.equal(snapshot.trend, 'up');
+  assert.deepEqual(snapshot.practiceTheme, { dimension: 'technical', intensity: 'extend', reviewCount: 4 });
+  assert.deepEqual(snapshot.weakDimensions[0], { key: 'technical', lowCount: 3, average: 6 });
+});
+
+test('changing the default rubric preserves cached v7 history and excludes v8 records', () => {
+  const snapshot = buildHistoryGrowthSnapshot([
+    makeHistoryItem('rev-v8-older', '2026-10-04T10:00:00Z', 9.8, makeScores({ composition: 10 }), CURRENT_SCORE_VERSION),
+    makeHistoryItem('rev-v7-latest', '2026-10-06T10:00:00Z', 7.4, makeScores({ composition: 7 }), 'score-v7-canonical-quality'),
+    makeHistoryItem('rev-v7-older', '2026-10-03T10:00:00Z', 7.2, makeScores({ composition: 7 }), 'score-v7-canonical-quality'),
+  ]);
+
+  assert.equal(snapshot.scoreVersion, 'score-v7-canonical-quality');
+  assert.deepEqual(snapshot.analyzedItems.map((item) => item.review_id), ['rev-v7-latest', 'rev-v7-older']);
+  assert.equal(snapshot.excludedVersionCount, 1);
+  assert.equal(snapshot.recentAverage, 7.3);
+  assert.equal(snapshot.averageDelta, null);
 });
 
 test('score version labels preserve old labels and identify v7 scoring rubric', () => {

@@ -1,5 +1,17 @@
 [
   {
+    "id": "2026-10-06-photo-rubric-and-gallery-reassessment",
+    "date": "2026-10-06",
+    "showPopup": true,
+    "title": "採点基準を改善し、ギャラリーの v5 講評を無料で再評価",
+    "summary": "採点は写真が実際に見せる効果を重視し、モノクロ、控えめな色彩、表現に役立つ暗部だけを理由に減点しません。ギャラリーの v5 講評はすでに無料で再評価済みで、今回はさらに風景写真 6 点のスコアと講評を新しい基準で更新しました。評価回数は消費せず、非公開の過去の講評はそのままです。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-10-06-photo-rubric-and-gallery-reassessment",
+    "primaryAction": {
+      "label": "ギャラリーを見る",
+      "href": "/gallery"
+    }
+  },
+  {
     "id": "2026-10-06-gallery-critique-reassessment",
     "date": "2026-10-06",
     "showPopup": true,

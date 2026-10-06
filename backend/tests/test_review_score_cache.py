@@ -90,6 +90,9 @@ class ReviewScoreCacheTests(unittest.TestCase):
             review.result_json['score_prompt_version'] = 'photo-score-v6-evidence-independent'
             review.result_json['score_version'] = 'score-v6-evidence-independent'
             self.assertFalse(review_uses_current_score_contract(review))
+            review.result_json['score_prompt_version'] = 'photo-score-v7-canonical-quality'
+            review.result_json['score_version'] = 'score-v7-canonical-quality'
+            self.assertFalse(review_uses_current_score_contract(review))
 
     def test_writer_contract_for_gpt_uses_official_model_alias(self) -> None:
         with patch('app.services.review_score_cache.settings.openai_review_model', 'gpt-6-luna'):
@@ -269,6 +272,18 @@ class ReviewScoreCacheTests(unittest.TestCase):
 
         with patch('app.services.ai.settings.openai_score_model', 'gpt-5.6-luna'):
             self.assertIsNone(load_task_canonical_score_checkpoint(task))
+
+    def test_task_checkpoint_rejects_v7_with_the_same_current_model(self) -> None:
+        task = SimpleNamespace(request_payload={})
+        score = build_cached_canonical_score(
+            dict(LOW_SCORES), scorer_model_name='gpt-6-luna', scorer_model_version='gpt-6-luna',
+            final_score=6.0, score_evidence=score_evidence_fixture(LOW_SCORES),
+        )
+        checkpoint_task_canonical_score(task, score)
+        checkpoint = task.request_payload['_canonical_score_checkpoint']
+        checkpoint['score_prompt_version'] = 'photo-score-v7-canonical-quality'
+        checkpoint['score_version'] = 'score-v7-canonical-quality'
+        self.assertIsNone(load_task_canonical_score_checkpoint(task))
 
 
 if __name__ == '__main__':

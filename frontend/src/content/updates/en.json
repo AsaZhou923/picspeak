@@ -1,5 +1,17 @@
 [
   {
+    "id": "2026-10-06-photo-rubric-and-gallery-reassessment",
+    "date": "2026-10-06",
+    "showPopup": true,
+    "title": "Scoring refined, v5 gallery critiques reassessed for free",
+    "summary": "Scoring focuses more on the finished image: monochrome, muted color, and expressive shadows do not automatically lose points. v5 gallery critiques were previously reassessed for free; this time, 6 landscape photos have also had their scores and feedback updated under the revised rubric, with no critique quota charged and private historical critiques kept unchanged.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-10-06-photo-rubric-and-gallery-reassessment",
+    "primaryAction": {
+      "label": "View gallery",
+      "href": "/gallery"
+    }
+  },
+  {
     "id": "2026-10-06-gallery-critique-reassessment",
     "date": "2026-10-06",
     "showPopup": true,

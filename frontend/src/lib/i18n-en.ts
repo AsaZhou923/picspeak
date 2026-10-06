@@ -232,8 +232,8 @@ export const enTranslations = {
     pro_offer_label: '',
     pro_offer_highlight: 'Pro',
     updates_label: 'Updates',
-    updates_hint_home: 'v5 gallery critiques reassessed for free',
-    updates_hint_latest: 'v5 gallery critiques reassessed for free',
+    updates_hint_home: 'Scoring refined, v5 gallery critiques reassessed for free',
+    updates_hint_latest: 'Scoring refined, v5 gallery critiques reassessed for free',
     contact_label: 'Contact',
     contact_headline: 'Get in Touch',
 
@@ -456,7 +456,7 @@ export const enTranslations = {
     gallery_score_upgrade_badge: 'Critique standard upgraded',
     gallery_score_upgrade_title: 'Gallery critiques now value each image on its own terms',
     gallery_score_upgrade_body: 'The new critique standard gives more weight to what each photograph actually communicates. Distinctive style, honest emotion, silhouettes, negative space, and monochrome work can all be recognized when the image holds together.',
-    gallery_score_upgrade_detail: 'Gallery works have completed a free re-evaluation, with refreshed scores and feedback and no account critique quota charged. Work links, likes, and gallery dates are unchanged.',
+    gallery_score_upgrade_detail: 'v5 gallery critiques have completed a free re-evaluation; 6 landscape photos now also have refreshed scores and feedback under the revised rubric, with no account critique quota charged. Work links, likes, and gallery dates are unchanged.',
     gallery_score_upgrade_ack: 'Understood',
     gallery_summary_fallback: 'This public critique is available for comparison and study.',
 

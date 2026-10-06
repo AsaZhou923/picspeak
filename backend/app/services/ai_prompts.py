@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 
 PROMPT_VERSION = 'photo-review-v9-gpt6-image-led'
-SCORE_PROMPT_VERSION = 'photo-score-v7-canonical-quality'
-SCORE_VERSION = 'score-v7-canonical-quality'
+SCORE_PROMPT_VERSION = 'photo-score-v8-style-relative'
+SCORE_VERSION = 'score-v8-style-relative'
 SCORER_PREPROCESS_VERSION = 'openai-input-image-high-v1'
 
 
@@ -362,12 +362,19 @@ def _intent_aware_scoring_guide() -> str:
         'Personal, quiet, documentary, minimalist, monochrome, or unconventional photos can score highly when their visible choices create coherent effect. '
         'Style is not a bonus by itself: distinguish a defect from a deliberate visual choice by describing its concrete effect on readability, emotion, structure, or meaning. '
         'Do not invent author intent; infer only what the image makes visually plausible and state uncertainty when needed. '
-        'Genre guidance is a lens for interpretation, not a mandatory checklist. '
+        'Genre guidance is a lens for interpretation, not a mandatory checklist; these style-relative outcome rules take priority over genre shortcuts. '
         'For monochrome images, score color by tonal relationships, contrast, grayscale separation, and mood control. '
         'Assess technical clarity relative to expressive purpose; mandatory sharpness, noise-free rendering, bokeh, grandeur, or bright facial detail are not universal requirements. '
         'Negative space, silhouettes, deep shadows, blur, grain, or muted color are weaknesses only when they visibly harm the photo rather than support its strongest quality. '
         'Use EXIF only when provided, and treat missing EXIF as unknown; never guess flash, camera settings, lighting setup, or equipment from the review mode or review tier. '
-        'For every dimension, provide visible strength, main limitation, and high-score justification. '
+        'Judge color by the effectiveness of the chosen palette, including monochrome, muted, narrow, and same-family palettes. A limited palette can support 8 or 9 when its tonal or color relationships clearly organize attention, separate forms, or sustain mood; number of colors, saturation, and warmth are not score requirements. '
+        'Judge technical quality by whether important image information is rendered sufficiently for its visible role. Shadow areas used as silhouettes, framing, scale, or layered depth do not need full surface texture. Lower a score for lost detail only when you identify the essential feature that is lost and the resulting harm to readability or expression. '
+        'Atmospheric softness, distant haze, deep foreground shadows, and bright light are not technical defects merely because more detail could have been shown. Do not claim detail loss or clipping when it cannot be reliably seen. '
+        'Impact can be fully expressed by light, scale, spatial rhythm, atmosphere, or quiet observation. Familiar mountains, a conventional subject, a restrained mood, or absence of a human story are not deductions by themselves; still require photographic control rather than rewarding the subject alone. '
+        'Edge cropping is a limitation only when it damages an important form or relationship, creates an unintended distraction, or prevents reading the image. Cropped secondary repetitions can legitimately imply continuation or scale. '
+        'An optional local-tone adjustment is not proof of deficient execution. Small refinements do not disqualify a photograph from 8 or 9 when the stated anchors are supported. A score below 8 must not be justified solely by a harmless stylistic choice, missing EXIF, or an alternate aesthetic preference. Absence of defects alone does not earn a high score. '
+        'Do not count the same visible issue against multiple dimensions unless you explain a distinct material effect in each. Describe only verifiable framing and scene relationships; do not invent objects, shooting conditions, or aspect ratios. '
+        'For every dimension, provide visible strength, material limitation if one exists, and high-score justification. If no material limitation is visible, say so explicitly instead of inventing one to fill the field. '
         'For any dimension scored 8 or above, high-score justification must explain the specific visible control that supports that score; for lower dimensions it may be an empty string. '
         'If the final arithmetic mean is 8 or above, overall_justification must explain why the whole photograph clears a selected portfolio-worthy threshold. '
     )
@@ -402,7 +409,7 @@ def _score_prompt(exif_data: dict | None = None, image_type: str = 'default') ->
     exif_context = _format_exif_context(exif_data)
     exif_note = f' Use EXIF as secondary evidence only: {exif_context}.' if exif_context else ''
     return (
-        'You are a strict photography scoring engine. '
+        'You are a photography scoring engine assessing finished visual work. '
         f'The image genre is {normalized_image_type}. Use this interpretation guide: {type_guide}.{exif_note} '
         'Evaluate the photo in exactly five dimensions: composition, lighting, color, impact, technical. '
         f'{_intent_aware_scoring_guide()}'

@@ -34,7 +34,8 @@ from app.services.review_task_processor import _normalize_review_result_payload 
 
 
 SOURCE_SCORE_VERSION_V5 = 'score-v5-evidence-calibrated'
-SUPPORTED_SOURCE_SCORE_VERSIONS = {SOURCE_SCORE_VERSION_V5}
+SOURCE_SCORE_VERSION_V7 = 'score-v7-canonical-quality'
+SUPPORTED_SOURCE_SCORE_VERSIONS = {SOURCE_SCORE_VERSION_V5, SOURCE_SCORE_VERSION_V7}
 TARGET_REVIEW_MODEL = 'gpt-6-luna'
 REASSESSMENT_METADATA_KEY = 'version_reassessment'
 REASSESSMENT_METADATA_VERSION = 1
@@ -291,6 +292,8 @@ def discover_candidates(
 ) -> tuple[list[ReassessmentCandidate], list[str]]:
     source = _validate_source_score_version(source_score_version)
     selected_review_ids = _normalize_review_public_ids(review_ids)
+    if source == SOURCE_SCORE_VERSION_V7 and selected_review_ids is None:
+        raise ValueError('Reassessing v7 gallery reviews requires explicit review_ids.')
     rows = _source_rows(db, source_score_version=source, review_public_ids=selected_review_ids)
     if selected_review_ids is not None:
         matched = {review.public_id for review, _photo, _task in rows}

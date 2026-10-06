@@ -7,6 +7,8 @@ const EVIDENCE_RUBRIC_SCORE_VERSIONS = new Set([
   'photo-score-v6-evidence-independent',
   'score-v7-canonical-quality',
   'photo-score-v7-canonical-quality',
+  'score-v8-style-relative',
+  'photo-score-v8-style-relative',
 ]);
 
 function isEvidenceRubricScoreVersion(scoreVersion?: string | null): boolean {
