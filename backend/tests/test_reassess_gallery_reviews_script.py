@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from contextlib import contextmanager
+from contextlib import contextmanager, redirect_stdout
 from datetime import datetime, timezone
 from decimal import Decimal
+import io
 import json
 import os
 from pathlib import Path
@@ -149,6 +150,146 @@ class ReassessGalleryReviewsScriptTests(unittest.TestCase):
         self.assertEqual(stats['pending'], 1)
         db.add.assert_not_called()
         db.commit.assert_not_called()
+
+    def test_dry_run_review_id_allowlist_selects_only_requested_review(self) -> None:
+        db = MagicMock()
+        requested = _review('rev_target')
+        other = _review('rev_extra')
+        db.query.return_value = _Query([(requested, _photo()), (other, _photo())])
+
+        with patch.object(script, 'review_uses_current_full_review_contract', return_value=False):
+            stats = script.reassess_gallery_reviews(db, dry_run=True, review_ids=['rev_target'])
+
+        self.assertEqual(stats['scanned_gallery_reviews'], 1)
+        self.assertEqual(stats['eligible_reviews'], 1)
+        self.assertEqual(stats['pending'], 1)
+        self.assertEqual(stats['selected_review_ids'], ['rev_target'])
+        self.assertEqual(stats['selected_review_count'], 1)
+        db.add.assert_not_called()
+        db.commit.assert_not_called()
+
+    def test_dry_run_review_id_allowlist_deduplicates_targets(self) -> None:
+        db = MagicMock()
+        requested = _review('rev_target')
+        db.query.return_value = _Query([(requested, _photo())])
+
+        with patch.object(script, 'review_uses_current_full_review_contract', return_value=False):
+            stats = script.reassess_gallery_reviews(db, dry_run=True, review_ids=[' rev_target ', 'rev_target'])
+
+        self.assertEqual(stats['selected_review_ids'], ['rev_target'])
+        self.assertEqual(stats['selected_review_count'], 1)
+        self.assertEqual(stats['eligible_reviews'], 1)
+
+    def test_unknown_review_id_is_rejected_without_full_gallery_fallback(self) -> None:
+        db = MagicMock()
+        existing = _review('rev_existing')
+        db.query.return_value = _Query([(existing, _photo())])
+
+        with self.assertRaisesRegex(ValueError, 'rev_missing'):
+            script.reassess_gallery_reviews(db, dry_run=False, review_ids=['rev_missing'])
+
+        db.add.assert_not_called()
+        db.commit.assert_not_called()
+
+    def test_malformed_review_id_is_rejected_before_query(self) -> None:
+        db = MagicMock()
+
+        with self.assertRaisesRegex(ValueError, 'Malformed review_id'):
+            script.reassess_gallery_reviews(db, dry_run=True, review_ids=[''])
+
+        db.query.assert_not_called()
+
+    def test_empty_review_id_collection_is_rejected_before_query(self) -> None:
+        db = MagicMock()
+
+        with self.assertRaisesRegex(ValueError, 'At least one review_id'):
+            script.reassess_gallery_reviews(db, dry_run=False, review_ids=[])
+
+        db.query.assert_not_called()
+        db.add.assert_not_called()
+        db.commit.assert_not_called()
+
+    def test_current_gallery_rows_empty_allowlist_never_queries_all_rows(self) -> None:
+        db = MagicMock()
+
+        rows = script._current_gallery_rows(db, review_public_ids=[])
+
+        self.assertEqual(rows, [])
+        db.query.assert_not_called()
+
+    def test_non_string_review_id_is_rejected_before_query(self) -> None:
+        db = MagicMock()
+
+        with self.assertRaisesRegex(ValueError, 'Malformed review_id'):
+            script.reassess_gallery_reviews(db, dry_run=True, review_ids=['rev_ok', 123])  # type: ignore[list-item]
+
+        db.query.assert_not_called()
+
+    def test_cli_dry_run_prints_selected_review_ids_and_accepts_gpt6_model(self) -> None:
+        db = MagicMock()
+        stats = {
+            'dry_run': True,
+            'scanned_gallery_reviews': 2,
+            'eligible_reviews': 2,
+            'pending': 2,
+            'skipped_current_contract': 0,
+            'selected_review_count': 2,
+            'selected_review_ids': ['rev_left', 'rev_right'],
+            'journal_path': 'journal.jsonl',
+        }
+
+        with patch.object(
+            sys,
+            'argv',
+            [
+                'reassess_gallery_reviews.py',
+                '--review-id',
+                'rev_left',
+                '--review-id',
+                'rev_right',
+                '--review-model',
+                'gpt-6-luna',
+            ],
+        ), patch.object(script, 'SessionLocal', return_value=db), patch.object(
+            script, 'reassess_gallery_reviews', return_value=stats
+        ) as reassess_mock:
+            stdout = io.StringIO()
+            with redirect_stdout(stdout):
+                exit_code = script.main()
+
+        self.assertEqual(exit_code, 0)
+        reassess_mock.assert_called_once()
+        self.assertEqual(reassess_mock.call_args.kwargs['review_ids'], ['rev_left', 'rev_right'])
+        self.assertEqual(reassess_mock.call_args.kwargs['review_model'], 'gpt-6-luna')
+        self.assertIn('selected_review_count=2', stdout.getvalue())
+        self.assertIn('selected_review_ids=rev_left,rev_right', stdout.getvalue())
+        db.close.assert_called_once()
+
+    def test_cli_without_review_id_preserves_default_unfiltered_mode(self) -> None:
+        db = MagicMock()
+        stats = {
+            'dry_run': True,
+            'scanned_gallery_reviews': 3,
+            'eligible_reviews': 3,
+            'pending': 3,
+            'skipped_current_contract': 0,
+            'selected_review_count': 0,
+            'selected_review_ids': [],
+            'journal_path': 'journal.jsonl',
+        }
+
+        with patch.object(sys, 'argv', ['reassess_gallery_reviews.py']), patch.object(
+            script, 'SessionLocal', return_value=db
+        ), patch.object(script, 'reassess_gallery_reviews', return_value=stats) as reassess_mock:
+            stdout = io.StringIO()
+            with redirect_stdout(stdout):
+                exit_code = script.main()
+
+        self.assertEqual(exit_code, 0)
+        self.assertIsNone(reassess_mock.call_args.kwargs['review_ids'])
+        self.assertIn('selected_review_count=0', stdout.getvalue())
+        self.assertIn('selected_review_ids=-', stdout.getvalue())
+        db.close.assert_called_once()
 
     def test_dry_run_skips_current_reassessment_marker_and_contract(self) -> None:
         db = MagicMock()
@@ -338,6 +479,45 @@ class ReassessGalleryReviewsPostgresTests(unittest.TestCase):
             self.assertEqual(persisted.result_json['billing_info']['quota_charged'], False)
             self.assertEqual(ledgers, 0)
             self.assertEqual(likes, 0)
+        finally:
+            db.close()
+
+    def test_postgres_review_id_allowlist_selects_only_target(self) -> None:
+        db = self.Session()
+        try:
+            target = self._insert_gallery_review(db)
+            other = self._insert_gallery_review(db)
+
+            with patch.object(script, 'review_uses_current_full_review_contract', return_value=False):
+                stats = script.reassess_gallery_reviews(db, dry_run=True, review_ids=[target.public_id])
+
+            self.assertEqual(stats['scanned_gallery_reviews'], 1)
+            self.assertEqual(stats['eligible_reviews'], 1)
+            self.assertEqual(stats['selected_review_ids'], [target.public_id])
+            self.assertNotIn(other.public_id, stats['selected_review_ids'])
+        finally:
+            db.close()
+
+    def test_postgres_unmatched_review_id_rejects_before_mutation(self) -> None:
+        db = self.Session()
+        try:
+            existing = self._insert_gallery_review(db)
+            original_score = existing.final_score
+
+            with patch.object(script, 'run_ai_review') as run_ai_review:
+                with self.assertRaisesRegex(ValueError, 'rev_missing_pg'):
+                    script.reassess_gallery_reviews(
+                        db,
+                        dry_run=False,
+                        review_ids=['rev_missing_pg'],
+                        journal_path=Path(tempfile.gettempdir()) / 'unused-reassessment-journal.jsonl',
+                        lock_connection=self.connection,
+                    )
+
+            run_ai_review.assert_not_called()
+            db.expire_all()
+            persisted = db.query(Review).filter(Review.id == existing.id).one()
+            self.assertEqual(persisted.final_score, original_score)
         finally:
             db.close()
 

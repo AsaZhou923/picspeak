@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import sys
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -34,6 +35,7 @@ from app.services.review_task_processor import _normalize_review_result_payload 
 REASSESSMENT_METADATA_KEY = 'gallery_free_reassessment'
 REASSESSMENT_VERSION = 1
 _LOCK_NAMESPACE = 'picspeak-gallery-free-reassessment-v1'
+_REVIEW_PUBLIC_ID_RE = re.compile(r'^rev_[A-Za-z0-9_-]+$')
 _BACKUP_FIELDS = (
     'schema_version',
     'result_json',
@@ -65,8 +67,37 @@ def _gallery_reassessment_lock(connection: Any) -> Iterator[None]:
         connection.execute(text('SELECT pg_advisory_unlock(:lock_key)'), {'lock_key': _lock_key()})
 
 
-def _current_gallery_rows(db: Any) -> list[tuple[Review, Photo]]:
-    return (
+def _normalize_review_public_ids(review_ids: list[str] | tuple[str, ...] | None) -> list[str] | None:
+    if review_ids is None:
+        return None
+    if not review_ids:
+        raise ValueError('At least one review_id is required when review_ids is provided.')
+
+    normalized: list[str] = []
+    seen: set[str] = set()
+    malformed: list[str] = []
+    for raw_id in review_ids:
+        if not isinstance(raw_id, str):
+            malformed.append(str(raw_id))
+            continue
+        review_id = raw_id.strip()
+        if not review_id or not _REVIEW_PUBLIC_ID_RE.fullmatch(review_id):
+            malformed.append(raw_id)
+            continue
+        if review_id not in seen:
+            normalized.append(review_id)
+            seen.add(review_id)
+
+    if malformed:
+        raise ValueError(f'Malformed review_id values: {", ".join(repr(value) for value in malformed)}')
+    return normalized
+
+
+def _current_gallery_rows(db: Any, *, review_public_ids: list[str] | None = None) -> list[tuple[Review, Photo]]:
+    if review_public_ids == []:
+        return []
+
+    query = (
         db.query(Review, Photo)
         .join(Photo, Photo.id == Review.photo_id)
         .filter(
@@ -75,9 +106,26 @@ def _current_gallery_rows(db: Any) -> list[tuple[Review, Photo]]:
             Review.gallery_audit_status == GALLERY_AUDIT_APPROVED,
             Photo.status == PhotoStatus.READY,
         )
-        .order_by(Review.gallery_added_at.asc(), Review.id.asc())
-        .all()
     )
+    if review_public_ids:
+        query = query.filter(Review.public_id.in_(review_public_ids))
+
+    rows = query.order_by(Review.gallery_added_at.asc(), Review.id.asc()).all()
+    if not review_public_ids:
+        return rows
+
+    selected = set(review_public_ids)
+    return [(review, photo) for review, photo in rows if review.public_id in selected]
+
+
+def _reject_unmatched_review_ids(rows: list[tuple[Review, Photo]], review_public_ids: list[str]) -> None:
+    matched = {review.public_id for review, _photo in rows}
+    unmatched = [review_id for review_id in review_public_ids if review_id not in matched]
+    if unmatched:
+        raise ValueError(
+            'Requested review_id values were not found in the approved READY public gallery set: '
+            + ', '.join(unmatched)
+        )
 
 
 def _stable_json(value: Any) -> str:
@@ -229,13 +277,17 @@ def reassess_gallery_reviews(
     *,
     locale: str = 'zh',
     review_model: str = 'qwen',
+    review_ids: list[str] | tuple[str, ...] | None = None,
     limit: int | None = None,
     dry_run: bool = True,
     journal_path: Path | None = None,
     lock_connection: Any | None = None,
 ) -> dict[str, Any]:
     writer_model_name = writer_contract_for_review_request(mode='pro', review_model=review_model)
-    rows = _current_gallery_rows(db)
+    selected_review_ids = _normalize_review_public_ids(review_ids)
+    rows = _current_gallery_rows(db, review_public_ids=selected_review_ids)
+    if selected_review_ids is not None:
+        _reject_unmatched_review_ids(rows, selected_review_ids)
     candidates: list[tuple[Review, Photo]] = []
     skipped_current = 0
     skipped_marker = 0
@@ -266,6 +318,8 @@ def reassess_gallery_reviews(
         'skipped_reassessment_marker': skipped_marker,
         'review_model': review_model,
         'writer_model_name': writer_model_name,
+        'selected_review_ids': selected_review_ids or [],
+        'selected_review_count': len(selected_review_ids or []),
         'journal_path': str(resolved_journal_path),
         'items': [],
     }
@@ -317,10 +371,21 @@ def main() -> int:
     parser.add_argument('--execute', action='store_true', help='Update gallery critiques in place without charging user quota.')
     parser.add_argument('--limit', type=_positive_int, default=None, help='Maximum gallery reviews to process.')
     parser.add_argument('--locale', choices=['zh', 'en', 'ja'], default='zh')
-    parser.add_argument('--review-model', default='qwen', choices=['qwen', 'gpt-5.5', 'gpt-5.6-luna'])
+    parser.add_argument('--review-model', default='qwen', choices=['qwen', 'gpt-5.5', 'gpt-5.6-luna', 'gpt-6-luna'])
+    parser.add_argument(
+        '--review-id',
+        action='append',
+        default=None,
+        help='Approved public gallery review id to reassess. Repeat for multiple targeted reviews.',
+    )
     parser.add_argument('--journal-path', type=Path, default=None, help='Path for the fsynced JSONL backup journal.')
     parser.add_argument('--json', action='store_true', help='Print the full machine-readable report.')
     args = parser.parse_args()
+
+    try:
+        selected_review_ids = _normalize_review_public_ids(args.review_id)
+    except ValueError as exc:
+        parser.error(str(exc))
 
     if args.execute:
         connection = engine.connect()
@@ -331,6 +396,7 @@ def main() -> int:
                 db,
                 locale=args.locale,
                 review_model=args.review_model,
+                review_ids=selected_review_ids,
                 limit=args.limit,
                 dry_run=False,
                 journal_path=args.journal_path,
@@ -346,6 +412,7 @@ def main() -> int:
                 db,
                 locale=args.locale,
                 review_model=args.review_model,
+                review_ids=selected_review_ids,
                 limit=args.limit,
                 dry_run=True,
                 journal_path=args.journal_path,
@@ -362,6 +429,8 @@ def main() -> int:
             f"eligible_reviews={stats['eligible_reviews']} "
             f"pending={stats['pending']} "
             f"skipped_current_contract={stats['skipped_current_contract']} "
+            f"selected_review_count={stats['selected_review_count']} "
+            f"selected_review_ids={','.join(stats['selected_review_ids']) or '-'} "
             f"journal_path={stats['journal_path']}"
         )
     else:

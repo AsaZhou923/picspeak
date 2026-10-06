@@ -36,6 +36,8 @@ Current single-photo code contract: `score-v7-canonical-quality` / `photo-score-
 
 Validate scoring changes with `backend/scripts/evaluate_score_calibration.py` and the protocol in `docs/scoring-calibration.md`. Synthetic fixtures and small live-model probes are diagnostic only; formal calibration requires independent human labels and a held-out test set. Keep ordinary and paired-retake scoring versions separate in growth statistics.
 
+Authorized gallery maintenance on 2026-10-06 reassessed 22 remaining approved, visible v5 reviews with the existing GPT-6/v7 contract. Private histories were preserved. `scripts/reassess_score_version.py` is gallery-only, defaults to dry-run, preserves the original review language and metadata, and fsyncs per-record backups before applying changes without charging quota. Use its explicit source-version filter and review-id allowlist; private, missing, withdrawn, or concurrently changed sources fail closed. This maintenance did not adopt a new scoring prompt or change runtime model settings. Bulk public reassessment may use an explicitly requested once-per-release announcement; ordinary maintenance remains silent.
+
 ## Common Commands
 
 ### Backend setup
@@ -66,7 +68,8 @@ python scripts/verify_product_analytics_write.py
 python scripts/export_product_analytics_weekly_report.py
 python scripts/export_operational_health_snapshot.py
 python scripts/backfill_gallery_thumbnails.py
-python scripts/reassess_gallery_reviews.py  # dry-run; --execute requires an authorized maintenance run
+python scripts/reassess_gallery_reviews.py  # dry-run; repeat --review-id for targeted public reviews
+python scripts/reassess_score_version.py --from-score-version score-v5-evidence-calibrated  # gallery-only dry-run; --execute requires authorization
 ```
 
 ### Backend tests

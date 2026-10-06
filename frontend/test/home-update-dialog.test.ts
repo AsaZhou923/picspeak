@@ -23,11 +23,11 @@ test('latest update bundle is aligned across locales for the homepage dialog', (
   assert.equal(updates.every(Boolean), true);
   assert.match(updates[0]!.id, /^\d{4}-\d{2}-\d{2}-.+/);
   assert.deepEqual(updates.map((entry) => entry!.id), Array(3).fill(updates[0]!.id));
-  assert.equal(updates[0]!.id, '2026-10-02-gpt6-workspace-upgrade');
-  assert.equal(updates[0]!.date, '2026-10-02');
+  assert.equal(updates[0]!.id, '2026-10-06-gallery-critique-reassessment');
+  assert.equal(updates[0]!.date, '2026-10-06');
   assert.equal(updates[0]!.showPopup, true);
-  assert.equal(updates[0]!.primaryAction?.href, '/workspace');
-  assert.match(updates[0]!.primaryAction?.label ?? '', /GPT-6/);
+  assert.equal(updates[0]!.primaryAction?.href, '/gallery');
+  assert.match(updates[0]!.primaryAction?.label ?? '', /gallery|长廊|ギャラリー/i);
 });
 
 test('homepage update dialog is version-scoped, dismissible and accessible', () => {
@@ -71,10 +71,10 @@ test('product update data clones nested actions and section items for callers', 
   firstRead[0].sections![0].items[0] = 'Mutated item';
 
   const secondRead = getProductUpdates('en');
-  assert.equal(secondRead[0].primaryAction!.label, 'Try GPT-6 critique');
+  assert.equal(secondRead[0].primaryAction!.label, 'View the updated gallery');
   assert.equal(
     secondRead[0].sections![0].items[0],
-    'The workspace defaults to GPT-6 critique, with no old-model switching needed after upload.',
+    'Scores and critique text for these 22 public works now use the current GPT-6 critique standard.',
   );
 });
 
