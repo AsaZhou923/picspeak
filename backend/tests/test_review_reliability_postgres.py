@@ -21,11 +21,11 @@ sys.path.insert(0, str(BACKEND_ROOT))
 from app.core.errors import ApiHTTPException
 from app.core.config import settings
 from app.db.models import (
-    Photo, PhotoStatus, Review, ReviewMode, ReviewQuotaReservation, ReviewTask,
+    Photo, PhotoStatus, Review, ReviewCallCost, ReviewMode, ReviewQuotaReservation, ReviewTask,
     ReviewTaskEvent, TaskStatus, UsageLedger, User, UserPlan, UserStatus,
 )
 from app.services.guard import increment_quota, user_usage_snapshot
-from app.services.ai import AIReviewResponse
+from app.services.ai import AIReviewError, AIReviewResponse, notify_ai_provider_call
 from app.services.review_quota_reservations import (
     reserve_review_quota, consume_review_quota, release_review_quota,
     synchronous_review_quota,
@@ -60,6 +60,7 @@ class ReviewReliabilityPostgresTests(unittest.TestCase):
         with self.Session() as db:
             tasks = db.query(ReviewTask.id).filter(ReviewTask.owner_user_id == self.user_id)
             db.query(ReviewTaskEvent).filter(ReviewTaskEvent.task_id.in_(tasks)).delete(synchronize_session=False)
+            db.query(ReviewCallCost).filter(ReviewCallCost.task_id.in_(tasks)).delete(synchronize_session=False)
             db.query(UsageLedger).filter(UsageLedger.user_id == self.user_id).delete()
             db.query(ReviewQuotaReservation).filter(ReviewQuotaReservation.user_id == self.user_id).delete()
             db.query(Review).filter(Review.owner_user_id == self.user_id).delete()
@@ -249,3 +250,127 @@ class ReviewReliabilityPostgresTests(unittest.TestCase):
             self.assertEqual(db.query(ReviewQuotaReservation).filter_by(task_id=task.id).one().status, 'consumed')
             review = db.query(Review).filter_by(task_id=task.id).one()
             self.assertEqual(review.result_json['billing_info']['remaining_quota']['daily_remaining'], 0)
+
+    def test_superseded_success_persists_provider_cost_without_result_mutation(self):
+        public_id = self._task()
+        response = AIReviewResponse(
+            result=SimpleNamespace(final_score=7.0, model_dump=lambda: {'scores': {}, 'final_score': 7.0}),
+            model_name='fixture', model_version='fixture', prompt_version='fixture',
+        )
+        replacement_claim = 'new:claim'
+
+        def provider(*_args, **_kwargs):
+            notify_ai_provider_call(
+                stage='writer',
+                outcome='succeeded',
+                model_name='gpt-6-luna',
+                usage={'input_tokens': 100, 'output_tokens': 20},
+            )
+            with self.Session() as fresh:
+                fresh.query(ReviewTask).filter_by(public_id=public_id).update({
+                    'claimed_by': replacement_claim,
+                    'attempt_count': ReviewTask.attempt_count + 1,
+                })
+                fresh.commit()
+            return response
+
+        with (
+            patch('app.services.review_task_processor.SessionLocal', self.Session),
+            patch('app.services.review_task_processor.canonical_score_cache_lease', return_value=nullcontext(None)),
+            patch('app.services.review_call_costs.SessionLocal', self.Session),
+            patch('app.services.review_task_processor.run_ai_review', side_effect=provider),
+        ):
+            result = process_review_task(public_id, worker_name='worker')
+
+        self.assertEqual(result['reason'], 'lease_mismatch')
+        with self.Session() as db:
+            task = db.query(ReviewTask).filter_by(public_id=public_id).one()
+            self.assertEqual(task.status, TaskStatus.RUNNING)
+            self.assertEqual(task.claimed_by, 'new:claim')
+            self.assertEqual(task.attempt_count, 2)
+            self.assertEqual(db.query(Review).filter_by(task_id=task.id).count(), 0)
+            self.assertEqual(db.query(UsageLedger).filter_by(task_id=task.id).count(), 0)
+            records = db.query(ReviewCallCost).filter_by(task_id=task.id).all()
+            self.assertEqual(len(records), 1)
+            self.assertEqual(records[0].call_key, 'attempt:1:writer')
+            self.assertEqual(records[0].outcome, 'succeeded')
+            self.assertEqual(records[0].input_tokens, 100)
+
+    def test_superseded_callback_exception_persists_unknown_cost_for_original_attempt(self):
+        public_id = self._task()
+
+        def provider(*_args, **_kwargs):
+            notify_ai_provider_call(
+                stage='scorer',
+                outcome='unknown',
+                model_name='gpt-6-luna',
+                usage={'input_tokens': 90, 'output_tokens': 15},
+                sequence='initial',
+            )
+            with self.Session() as fresh:
+                fresh.query(ReviewTask).filter_by(public_id=public_id).update({
+                    'claimed_by': 'new:claim',
+                    'attempt_count': ReviewTask.attempt_count + 1,
+                })
+                fresh.commit()
+            raise ReviewTaskLeaseLost('checkpoint lost lease')
+
+        with (
+            patch('app.services.review_task_processor.SessionLocal', self.Session),
+            patch('app.services.review_task_processor.canonical_score_cache_lease', return_value=nullcontext(None)),
+            patch('app.services.review_call_costs.SessionLocal', self.Session),
+            patch('app.services.review_task_processor.run_ai_review', side_effect=provider),
+        ):
+            result = process_review_task(public_id, worker_name='worker')
+
+        self.assertEqual(result['reason'], 'lease_mismatch')
+        with self.Session() as db:
+            task = db.query(ReviewTask).filter_by(public_id=public_id).one()
+            self.assertEqual(task.status, TaskStatus.RUNNING)
+            self.assertEqual(task.claimed_by, 'new:claim')
+            self.assertEqual(task.attempt_count, 2)
+            self.assertEqual(db.query(Review).filter_by(task_id=task.id).count(), 0)
+            self.assertEqual(db.query(UsageLedger).filter_by(task_id=task.id).count(), 0)
+            records = db.query(ReviewCallCost).filter_by(task_id=task.id).all()
+            self.assertEqual(len(records), 1)
+            self.assertEqual(records[0].call_key, 'attempt:1:scorer:initial')
+            self.assertEqual(records[0].outcome, 'unknown')
+            self.assertEqual(records[0].input_tokens, 90)
+
+    def test_superseded_failure_persists_provider_cost_without_retry_mutation(self):
+        public_id = self._task()
+
+        def provider(*_args, **_kwargs):
+            notify_ai_provider_call(
+                stage='writer',
+                outcome='failed',
+                model_name='gpt-6-luna',
+                usage={'input_tokens': 80, 'output_tokens': 10},
+            )
+            with self.Session() as fresh:
+                fresh.query(ReviewTask).filter_by(public_id=public_id).update({'claimed_by': 'new:claim'})
+                fresh.commit()
+            raise AIReviewError('writer timed out', stage='writing')
+
+        with (
+            patch('app.services.review_task_processor.SessionLocal', self.Session),
+            patch('app.services.review_task_processor.canonical_score_cache_lease', return_value=nullcontext(None)),
+            patch('app.services.review_call_costs.SessionLocal', self.Session),
+            patch('app.services.review_task_processor.run_ai_review', side_effect=provider),
+        ):
+            result = process_review_task(public_id, worker_name='worker')
+
+        self.assertEqual(result['reason'], 'lease_mismatch')
+        with self.Session() as db:
+            task = db.query(ReviewTask).filter_by(public_id=public_id).one()
+            self.assertEqual(task.status, TaskStatus.RUNNING)
+            self.assertEqual(task.claimed_by, 'new:claim')
+            self.assertIsNone(task.next_attempt_at)
+            self.assertIsNone(task.error_code)
+            self.assertEqual(db.query(Review).filter_by(task_id=task.id).count(), 0)
+            self.assertEqual(db.query(UsageLedger).filter_by(task_id=task.id).count(), 0)
+            records = db.query(ReviewCallCost).filter_by(task_id=task.id).all()
+            self.assertEqual(len(records), 1)
+            self.assertEqual(records[0].call_key, 'attempt:1:writer')
+            self.assertEqual(records[0].outcome, 'failed')
+            self.assertEqual(records[0].input_tokens, 80)

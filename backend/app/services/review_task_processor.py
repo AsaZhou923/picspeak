@@ -23,7 +23,7 @@ from app.services.practice import attach_practice_review, resolve_task_practice
 from app.services.practice_events import record_practice_analysis_completed
 from app.services.retake_comparison import run_retake_comparison
 from app.services.review_call_costs import (
-    record_observed_provider_call_costs,
+    persist_observed_provider_call_costs,
 )
 from app.services.review_pricing import ReviewModelUsage, estimate_review_usage_cost
 from app.services.review_score_cache import (
@@ -611,6 +611,9 @@ def _process_task(db: Session, task: ReviewTask, *, claim_token: str | None = No
         payload_locale = 'en'
     _transition_progress(db, task, 70, 'AI_REVIEW_STARTED', 'Running AI review')
 
+    cost_task_id = int(task.id)
+    cost_owner_user_id = int(task.owner_user_id)
+    cost_attempt_count = int(task.attempt_count or 0)
     provider_calls: list[AIProviderCallUsage] = []
     try:
         with observe_ai_provider_calls(provider_calls.append):
@@ -703,18 +706,39 @@ def _process_task(db: Session, task: ReviewTask, *, claim_token: str | None = No
                         canonical_score=canonical_score,
                         on_canonical_score=save_score_checkpoint,
                     )
+        persist_observed_provider_call_costs(
+            task_id=cost_task_id,
+            owner_user_id=cost_owner_user_id,
+            attempt_count=cost_attempt_count,
+            calls=provider_calls,
+            failed=False,
+        )
         _ensure_review_claim(db, task, claim_token)
-        record_observed_provider_call_costs(db, task=task, calls=provider_calls, failed=False)
     except AIReviewError as exc:
-        _ensure_review_claim(db, task, claim_token)
         error_code = {
             'scoring': 'AI_SCORING_FAILED',
             'writing': 'AI_WRITING_FAILED',
         }.get(exc.stage, 'AI_CALL_FAILED')
-        record_observed_provider_call_costs(db, task=task, calls=provider_calls, failed=True)
+        persist_observed_provider_call_costs(
+            task_id=cost_task_id,
+            owner_user_id=cost_owner_user_id,
+            attempt_count=cost_attempt_count,
+            calls=provider_calls,
+            failed=True,
+        )
+        _ensure_review_claim(db, task, claim_token)
         logger.warning('AI review failed for task %s at %s stage: %s', task.public_id, exc.stage or 'unknown', exc)
         _handle_failure(db, task, error_code=error_code, error_message=str(exc), retryable=True)
         return
+    except Exception:
+        persist_observed_provider_call_costs(
+            task_id=cost_task_id,
+            owner_user_id=cost_owner_user_id,
+            attempt_count=cost_attempt_count,
+            calls=provider_calls,
+            failed=None,
+        )
+        raise
 
     clear_task_canonical_score_checkpoint(task)
 

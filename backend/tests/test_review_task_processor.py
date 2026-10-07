@@ -358,9 +358,9 @@ class ReviewTaskProcessorTests(unittest.TestCase):
         ) as cache_lease, patch(
             'app.services.review_task_processor.run_ai_review', side_effect=fail_writer
         ), patch(
-            'app.services.review_task_processor.record_observed_provider_call_costs',
-            side_effect=lambda _db, *, task, calls, failed: observed_cost_batches.append(
-                [(call.stage, call.sequence, call.outcome) for call in calls]
+            'app.services.review_task_processor.persist_observed_provider_call_costs',
+            side_effect=lambda *, calls, failed, **_kwargs: observed_cost_batches.append(
+                (failed, [(call.stage, call.sequence, call.outcome) for call in calls])
             ),
         ):
             _process_task(db, task)
@@ -370,8 +370,8 @@ class ReviewTaskProcessorTests(unittest.TestCase):
 
         self.assertEqual(scorer_calls, 1)
         self.assertEqual(observed_cost_batches, [
-            [('scorer', 'initial', 'unknown'), ('writer', None, 'failed')],
-            [('writer', None, 'failed')],
+            (True, [('scorer', 'initial', 'unknown'), ('writer', None, 'failed')]),
+            (True, [('writer', None, 'failed')]),
         ])
         cache_lease.assert_called_once()
         self.assertEqual(task.error_code, 'AI_WRITING_FAILED')
