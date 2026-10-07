@@ -3,8 +3,8 @@
     "id": "2026-10-07-review-reliability-and-gallery",
     "date": "2026-10-07",
     "showPopup": false,
-    "title": "More reliable critiques and photo browsing (upcoming)",
-    "summary": "A maintenance update is in preparation: concurrent critiques will count quota accurately, duplicate tasks will be protected, and upload confirmation will check the actual image. History pagination, photo recovery, and gallery scoreboard loading will also be more reliable.",
+    "title": "More reliable critiques and photo browsing",
+    "summary": "This maintenance update is now live: quota accounting handles concurrent critiques, duplicate task processing is prevented, and upload confirmation checks the actual image. History pagination, photo recovery, and gallery scoreboard loading have also been improved.",
     "docPath": "docs/changelog/CHANGELOG.md#2026-10-07-review-reliability-and-gallery",
     "primaryAction": {
       "label": "View gallery",

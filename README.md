@@ -188,7 +188,7 @@ The frontend and backend can be deployed independently. The backend includes a c
 
 ## Documentation
 
-- [Latest changelog: critique reliability and gallery improvements (upcoming)](docs/changelog/CHANGELOG.md#2026-10-07-review-reliability-and-gallery)
+- [Latest changelog: critique reliability and gallery improvements](docs/changelog/CHANGELOG.md#2026-10-07-review-reliability-and-gallery)
 - [Previous scoring refinement and gallery reassessment](docs/changelog/CHANGELOG.md#2026-10-06-photo-rubric-and-gallery-reassessment)
 - [Previous v5 gallery critique reassessment](docs/changelog/CHANGELOG.md#2026-10-06-gallery-critique-reassessment)
 - [Previous GPT-6 critique upgrade](docs/changelog/CHANGELOG.md#2026-10-02-gpt6-workspace-upgrade)

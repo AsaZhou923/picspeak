@@ -21,8 +21,8 @@ export const zhTranslations = {
   pro_offer_label: '',
   pro_offer_highlight: 'Pro',
   updates_label: '更新记录',
-  updates_hint_home: '评分标准已优化，长廊 v5 评图已免费重评',
-  updates_hint_latest: '评分标准已优化，长廊 v5 评图已免费重评',
+  updates_hint_home: '评图与照片浏览稳定性优化',
+  updates_hint_latest: '评图与照片浏览稳定性优化',
   contact_label: '联系',
   contact_headline: '联系我',
 

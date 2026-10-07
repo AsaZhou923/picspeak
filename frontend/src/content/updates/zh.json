@@ -3,8 +3,8 @@
     "id": "2026-10-07-review-reliability-and-gallery",
     "date": "2026-10-07",
     "showPopup": false,
-    "title": "评图与照片浏览稳定性优化（准备中）",
-    "summary": "正在准备一组维护修复：并发评图将更准确地计入额度，重复任务会受到保护，上传确认会检查实际图片。历史列表翻页、详情图片恢复和长廊榜单加载也将更稳定。",
+    "title": "评图与照片浏览稳定性优化",
+    "summary": "本次维护更新已上线：并发评图的额度计算更准确，重复任务受到保护，上传确认会检查实际图片。历史列表翻页、详情图片恢复和长廊榜单加载也已改善。",
     "docPath": "docs/changelog/CHANGELOG.md#2026-10-07-review-reliability-and-gallery",
     "primaryAction": {
       "label": "查看长廊",
