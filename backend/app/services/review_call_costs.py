@@ -1,23 +1,34 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from decimal import Decimal
 from typing import Literal
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.db.models import ReviewCallCost, ReviewTask
+from app.db.session import SessionLocal
 from app.services.ai import AIProviderCallUsage, AIReviewResponse, CanonicalScore
 from app.services.review_pricing import ReviewModelUsage, estimate_review_usage_cost
 
 
 ReviewCallStage = Literal['scorer', 'writer', 'pair']
 ReviewCallOutcome = Literal['succeeded', 'failed', 'unknown']
+_REVIEW_CALL_COST_UNIQUE_CONSTRAINT = 'uq_review_call_costs_task_call_key'
+
+
+@dataclass(frozen=True)
+class _TaskCostIdentity:
+    id: int
+    owner_user_id: int
+    attempt_count: int
 
 
 def review_call_key(
     *,
-    task: ReviewTask,
+    task: ReviewTask | _TaskCostIdentity,
     stage: ReviewCallStage,
     sequence: str | int | None = None,
 ) -> str:
@@ -31,6 +42,13 @@ def _cost_decimal(value: float | Decimal | None) -> Decimal | None:
     if value is None:
         return None
     return Decimal(str(value)).quantize(Decimal('0.000001'))
+
+
+def _is_review_call_cost_duplicate_error(exc: IntegrityError) -> bool:
+    orig = getattr(exc, 'orig', None)
+    pgcode = getattr(orig, 'pgcode', None)
+    constraint_name = getattr(getattr(orig, 'diag', None), 'constraint_name', None)
+    return pgcode == '23505' and constraint_name == _REVIEW_CALL_COST_UNIQUE_CONSTRAINT
 
 
 def record_review_call_cost(
@@ -133,8 +151,10 @@ def record_response_call_cost(
 def _resolved_observed_outcomes(
     calls: list[AIProviderCallUsage],
     *,
-    failed: bool,
+    failed: bool | None,
 ) -> list[tuple[AIProviderCallUsage, ReviewCallOutcome]]:
+    if failed is None:
+        return [(call, call.outcome) for call in calls]
     if not failed:
         return [(call, 'succeeded' if call.outcome == 'unknown' else call.outcome) for call in calls]
 
@@ -165,7 +185,7 @@ def record_observed_provider_call_costs(
     *,
     task: ReviewTask,
     calls: list[AIProviderCallUsage],
-    failed: bool,
+    failed: bool | None,
 ) -> list[ReviewCallCost]:
     records: list[ReviewCallCost] = []
     for call, outcome in _resolved_observed_outcomes(calls, failed=failed):
@@ -184,3 +204,48 @@ def record_observed_provider_call_costs(
             )
         )
     return records
+
+
+def persist_observed_provider_call_costs(
+    *,
+    task_id: int,
+    owner_user_id: int,
+    attempt_count: int,
+    calls: list[AIProviderCallUsage],
+    failed: bool | None,
+) -> None:
+    task_identity = _TaskCostIdentity(
+        id=task_id,
+        owner_user_id=owner_user_id,
+        attempt_count=attempt_count,
+    )
+    for call, outcome in _resolved_observed_outcomes(calls, failed=failed):
+        call_key = review_call_key(task=task_identity, stage=call.stage, sequence=call.sequence)
+        db = SessionLocal()
+        try:
+            record_review_call_cost(
+                db,
+                task=task_identity,
+                stage=call.stage,
+                outcome=outcome,
+                model_name=call.model_name,
+                input_tokens=call.input_tokens,
+                output_tokens=call.output_tokens,
+                cost_usd=call.cost_usd,
+                cost_rate_version=call.cost_rate_version,
+                sequence=call.sequence,
+            )
+            db.commit()
+        except IntegrityError as exc:
+            db.rollback()
+            if not _is_review_call_cost_duplicate_error(exc):
+                raise
+            existing = (
+                db.query(ReviewCallCost.id)
+                .filter(ReviewCallCost.task_id == task_id, ReviewCallCost.call_key == call_key)
+                .first()
+            )
+            if existing is None:
+                raise
+        finally:
+            db.close()

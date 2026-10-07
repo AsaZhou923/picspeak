@@ -90,7 +90,7 @@ class ReviewWorker:
                     continue
 
                 logger.info('Review worker claimed task %s', task.public_id)
-                process_review_task(task.public_id, worker_name=self.worker_name)
+                process_review_task(task.public_id, worker_name=self.worker_name, claim_token=task.claimed_by)
             except Exception:
                 logger.exception(
                     'Review worker loop crashed while processing task %s',

@@ -101,6 +101,35 @@ class PracticeMigrationPostgresTests(unittest.TestCase):
             )
         engine.dispose()
 
+    def test_review_quota_reservations_migration_roundtrip(self) -> None:
+        self._run_alembic(command.upgrade, '20260922_0010')
+        engine = sa.create_engine(self.test_url)
+        try:
+            with engine.begin() as conn:
+                conn.execute(sa.text("""
+                    INSERT INTO users (public_id, email, username, plan, daily_quota_total, daily_quota_used, status)
+                    VALUES ('usr_quota_migration', 'quota-migration@example.test', 'quota_migration', 'free', 5, 2, 'active')
+                """))
+            self._run_alembic(command.upgrade, 'head')
+            inspector = sa.inspect(engine)
+            self.assertTrue(inspector.has_table('review_quota_reservations'))
+            self.assertIn('idx_review_quota_reservations_user_day_status',
+                          {index['name'] for index in inspector.get_indexes('review_quota_reservations')})
+            self.assertIn('chk_review_quota_reservations_status',
+                          {check['name'] for check in inspector.get_check_constraints('review_quota_reservations')})
+            self.assertEqual({fk['referred_table'] for fk in inspector.get_foreign_keys('review_quota_reservations')},
+                             {'review_tasks', 'users'})
+            self._run_alembic(command.downgrade, '20260922_0010')
+            self.assertFalse(sa.inspect(engine).has_table('review_quota_reservations'))
+            self._run_alembic(command.upgrade, 'head')
+            self.assertTrue(sa.inspect(engine).has_table('review_quota_reservations'))
+            with engine.connect() as conn:
+                self.assertEqual(conn.execute(sa.text(
+                    "SELECT daily_quota_used FROM users WHERE public_id='usr_quota_migration'"
+                )).scalar_one(), 2)
+        finally:
+            engine.dispose()
+
 
 if __name__ == '__main__':
     unittest.main()

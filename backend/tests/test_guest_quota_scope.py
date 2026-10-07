@@ -104,7 +104,10 @@ class GuestQuotaScopeTests(unittest.TestCase):
         db = Mock()
         free_user = _user(plan=UserPlan.free, public_id='usr_free001', daily_quota_used=2)
 
-        with patch('app.services.guard.count_monthly_review_usage', return_value=7):
+        with (
+            patch('app.services.guard.count_monthly_review_usage', return_value=7),
+            patch('app.services.guard.count_review_quota_holds', return_value=0),
+        ):
             usage = user_usage_snapshot(db, free_user)
 
         self.assertEqual(usage['daily_used'], 2)

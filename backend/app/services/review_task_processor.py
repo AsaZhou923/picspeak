@@ -6,6 +6,7 @@ from contextlib import nullcontext
 from datetime import datetime, timedelta, timezone
 import logging
 from urllib.parse import quote
+from uuid import uuid4
 
 from sqlalchemy import case
 from sqlalchemy.orm import Session
@@ -17,12 +18,12 @@ from app.core.errors import ApiHTTPException
 from app.db.models import Photo, PhotoStatus, Review, ReviewMode, ReviewStatus, ReviewTask, TaskStatus, UsageLedger, User, UserPlan
 from app.db.session import SessionLocal
 from app.services.ai import AIProviderCallUsage, AIReviewError, CanonicalScore, observe_ai_provider_calls, run_ai_review
-from app.services.guard import enforce_user_quota, guest_usage_snapshot, increment_quota, user_usage_snapshot
+from app.services.guard import guest_usage_snapshot, increment_quota, user_usage_snapshot
 from app.services.practice import attach_practice_review, resolve_task_practice
 from app.services.practice_events import record_practice_analysis_completed
 from app.services.retake_comparison import run_retake_comparison
 from app.services.review_call_costs import (
-    record_observed_provider_call_costs,
+    persist_observed_provider_call_costs,
 )
 from app.services.review_pricing import ReviewModelUsage, estimate_review_usage_cost
 from app.services.review_score_cache import (
@@ -32,9 +33,30 @@ from app.services.review_score_cache import (
     load_task_canonical_score_checkpoint,
 )
 from app.services.task_events import record_task_event
+from app.services.review_quota_reservations import (
+    reserve_review_quota, consume_review_quota, release_task_review_quota,
+)
 
 
 logger = logging.getLogger(__name__)
+
+
+class ReviewTaskLeaseLost(RuntimeError):
+    pass
+
+
+def _ensure_review_claim(db: Session, task: ReviewTask, claim_token: str | None) -> None:
+    if claim_token is None:
+        return
+    with db.no_autoflush:
+        claim = db.query(ReviewTask.id).filter(
+            ReviewTask.id == task.id,
+            ReviewTask.status == TaskStatus.RUNNING,
+            ReviewTask.claimed_by == claim_token,
+        ).with_for_update().first()
+    if claim is None:
+        raise ReviewTaskLeaseLost('Review task lease changed')
+
 
 _PUBLIC_TASK_ERROR_MESSAGES: dict[str, tuple[str, str]] = {
     'AI_CALL_FAILED': (
@@ -220,9 +242,11 @@ def expire_review_tasks(db: Session) -> None:
             ReviewTask.expire_at.is_not(None),
             ReviewTask.expire_at < now,
         )
+        .with_for_update(skip_locked=True)
         .all()
     )
     for task in expired_tasks:
+        release_task_review_quota(db, task.id)
         task.status = TaskStatus.EXPIRED
         task.finished_at = now
         task.error_code = 'TASK_EXPIRED'
@@ -234,7 +258,7 @@ def expire_review_tasks(db: Session) -> None:
 
     stale_timeout = _review_task_stale_timeout_seconds()
     stale_cutoff = now - timedelta(seconds=stale_timeout)
-    stalled_tasks = (
+    stalled_query = (
         db.query(ReviewTask)
         .filter(
             ReviewTask.status == TaskStatus.RUNNING,
@@ -243,9 +267,15 @@ def expire_review_tasks(db: Session) -> None:
             ReviewTask.last_heartbeat_at < stale_cutoff,
             (ReviewTask.expire_at.is_(None) | (ReviewTask.expire_at >= now)),
         )
-        .all()
     )
-    for task in stalled_tasks:
+    stalled_ids = [task.id for task in stalled_query.all()]
+    for task_id in stalled_ids:
+        # Retry commits release locks; recheck each task under its own lock.
+        task = stalled_query.filter(ReviewTask.id == task_id).with_for_update(
+            skip_locked=True,
+        ).populate_existing().first()
+        if task is None:
+            continue
         if task.attempt_count < task.max_attempts:
             _schedule_retry(
                 db,
@@ -293,7 +323,7 @@ def _reconcile_completed_tasks(db: Session) -> None:
     db.commit()
 
 
-def process_review_task(task_public_id: str, *, worker_name: str) -> dict[str, str]:
+def process_review_task(task_public_id: str, *, worker_name: str, claim_token: str | None = None) -> dict[str, str]:
     db = SessionLocal()
     try:
         expire_review_tasks(db)
@@ -305,22 +335,36 @@ def process_review_task(task_public_id: str, *, worker_name: str) -> dict[str, s
         if task.status == TaskStatus.PENDING and task.next_attempt_at and task.next_attempt_at > datetime.now(timezone.utc):
             return {'result': 'delayed', 'status': task.status.value}
         if task.status == TaskStatus.PENDING:
-            if not _claim_task(db, task.id, worker_name):
+            # A delayed invocation must never reuse an earlier attempt's token.
+            claim_token = f'{worker_name}:{uuid4().hex}'
+            if not _claim_task(db, task.id, claim_token):
                 fresh_task = db.query(ReviewTask).filter(ReviewTask.id == task.id).first()
                 if fresh_task is None:
                     return {'result': 'missing'}
                 return {'result': 'noop', 'status': fresh_task.status.value}
-        elif task.status != TaskStatus.RUNNING:
+            db.refresh(task)
+        elif task.status == TaskStatus.RUNNING:
+            if not claim_token or task.claimed_by != claim_token:
+                return {'result': 'noop', 'status': task.status.value, 'reason': 'lease_mismatch'}
+        else:
             return {'result': 'noop', 'status': task.status.value}
         try:
-            _process_task(db, task)
+            _process_task(db, task, claim_token=claim_token)
+        except ReviewTaskLeaseLost:
+            db.rollback()
+            return {'result': 'noop', 'reason': 'lease_mismatch'}
         except Exception as exc:
             logger.exception('Unhandled review task error for task %s', task_public_id)
             db.rollback()
             fresh_task = db.query(ReviewTask).filter(ReviewTask.id == task.id).first()
             if fresh_task is None:
                 return {'result': 'missing'}
-            if fresh_task.status == TaskStatus.RUNNING:
+            if fresh_task.status == TaskStatus.RUNNING and fresh_task.claimed_by == claim_token:
+                try:
+                    _ensure_review_claim(db, fresh_task, claim_token)
+                except ReviewTaskLeaseLost:
+                    db.rollback()
+                    return {'result': 'noop', 'reason': 'lease_mismatch'}
                 _handle_failure(
                     db,
                     fresh_task,
@@ -354,7 +398,7 @@ def claim_next_pending_review_task(db: Session, *, worker_name: str) -> ReviewTa
     )
     if candidate is None:
         return None
-    if not _claim_task(db, candidate.id, worker_name):
+    if not _claim_task(db, candidate.id, f'{worker_name}:{uuid4().hex}'):
         return None
     return db.query(ReviewTask).filter(ReviewTask.id == candidate.id).first()
 
@@ -383,7 +427,7 @@ def _claim_task(db: Session, task_id: int, worker_name: str) -> bool:
         db.rollback()
         return False
     db.commit()
-    task = db.query(ReviewTask).filter(ReviewTask.id == task_id).first()
+    task = db.query(ReviewTask).filter(ReviewTask.id == task_id).populate_existing().first()
     if task is not None:
         record_task_event(db, task, event_type='TASK_CLAIMED', message=f'Claimed by {worker_name}')
         db.commit()
@@ -420,6 +464,8 @@ def _complete_task(
     task.last_heartbeat_at = now
     task.error_code = error_code
     task.error_message = error_message
+    if status != TaskStatus.SUCCEEDED:
+        release_task_review_quota(db, task.id)
     if dead_letter:
         task.dead_lettered_at = now
     db.add(task)
@@ -439,6 +485,8 @@ def _schedule_retry(db: Session, task: ReviewTask, *, error_code: str, error_mes
     delay = _retry_delay_seconds(task.attempt_count)
     retry_at = datetime.now(timezone.utc) + timedelta(seconds=delay)
     task.status = TaskStatus.PENDING
+    task.claimed_by = None
+    release_task_review_quota(db, task.id)
     task.progress = 0
     task.error_code = error_code
     task.error_message = error_message
@@ -492,7 +540,8 @@ def _handle_failure(db: Session, task: ReviewTask, *, error_code: str, error_mes
     )
 
 
-def _process_task(db: Session, task: ReviewTask) -> None:
+def _process_task(db: Session, task: ReviewTask, *, claim_token: str | None = None) -> None:
+    _ensure_review_claim(db, task, claim_token)
     task.next_attempt_at = None
     task.last_heartbeat_at = datetime.now(timezone.utc)
     task.progress = 10
@@ -529,12 +578,18 @@ def _process_task(db: Session, task: ReviewTask) -> None:
         )
         return
 
+    quota_reservation = None
+    _ensure_review_claim(db, task, claim_token)
     if owner.plan != UserPlan.guest:
         try:
-            enforce_user_quota(db, owner, mode=task.mode if isinstance(task.mode, ReviewMode) else ReviewMode(task.mode))
+            quota_reservation = reserve_review_quota(
+                db, owner, task=task,
+                mode=task.mode if isinstance(task.mode, ReviewMode) else ReviewMode(task.mode),
+            )
         except ApiHTTPException as exc:
             db.rollback()
             task = db.query(ReviewTask).filter(ReviewTask.id == task.id).first() or task
+            _ensure_review_claim(db, task, claim_token)
             detail = exc.detail if isinstance(exc.detail, dict) else {'message': str(exc.detail)}
             _handle_failure(
                 db,
@@ -556,6 +611,9 @@ def _process_task(db: Session, task: ReviewTask) -> None:
         payload_locale = 'en'
     _transition_progress(db, task, 70, 'AI_REVIEW_STARTED', 'Running AI review')
 
+    cost_task_id = int(task.id)
+    cost_owner_user_id = int(task.owner_user_id)
+    cost_attempt_count = int(task.attempt_count or 0)
     provider_calls: list[AIProviderCallUsage] = []
     try:
         with observe_ai_provider_calls(provider_calls.append):
@@ -648,16 +706,39 @@ def _process_task(db: Session, task: ReviewTask) -> None:
                         canonical_score=canonical_score,
                         on_canonical_score=save_score_checkpoint,
                     )
-        record_observed_provider_call_costs(db, task=task, calls=provider_calls, failed=False)
+        persist_observed_provider_call_costs(
+            task_id=cost_task_id,
+            owner_user_id=cost_owner_user_id,
+            attempt_count=cost_attempt_count,
+            calls=provider_calls,
+            failed=False,
+        )
+        _ensure_review_claim(db, task, claim_token)
     except AIReviewError as exc:
         error_code = {
             'scoring': 'AI_SCORING_FAILED',
             'writing': 'AI_WRITING_FAILED',
         }.get(exc.stage, 'AI_CALL_FAILED')
-        record_observed_provider_call_costs(db, task=task, calls=provider_calls, failed=True)
+        persist_observed_provider_call_costs(
+            task_id=cost_task_id,
+            owner_user_id=cost_owner_user_id,
+            attempt_count=cost_attempt_count,
+            calls=provider_calls,
+            failed=True,
+        )
+        _ensure_review_claim(db, task, claim_token)
         logger.warning('AI review failed for task %s at %s stage: %s', task.public_id, exc.stage or 'unknown', exc)
         _handle_failure(db, task, error_code=error_code, error_message=str(exc), retryable=True)
         return
+    except Exception:
+        persist_observed_provider_call_costs(
+            task_id=cost_task_id,
+            owner_user_id=cost_owner_user_id,
+            attempt_count=cost_attempt_count,
+            calls=provider_calls,
+            failed=None,
+        )
+        raise
 
     clear_task_canonical_score_checkpoint(task)
 
@@ -716,7 +797,7 @@ def _process_task(db: Session, task: ReviewTask) -> None:
         usage_type='review_request',
         amount=1,
         unit='count',
-        bill_date=datetime.now(timezone.utc).date(),
+        bill_date=quota_reservation.bill_date if quota_reservation is not None else datetime.now(timezone.utc).date(),
         metadata_json={
             'mode': task.mode.value if isinstance(task.mode, ReviewMode) else str(task.mode),
             'analysis_type': analysis_type,
@@ -726,9 +807,13 @@ def _process_task(db: Session, task: ReviewTask) -> None:
         },
     )
     db.add(ledger)
-    increment_quota(db, owner)
+    consume_review_quota(db, quota_reservation)
+    increment_quota(db, owner, **({'bill_date': quota_reservation.bill_date} if quota_reservation is not None else {}))
+    db.flush()
     guest_scope_key = (task.request_payload or {}).get('_guest_scope_key') if owner.plan == UserPlan.guest else None
     usage = guest_usage_snapshot(db, guest_scope_key) if guest_scope_key else user_usage_snapshot(db, owner)
+    # Keep the persisted JSON value intact so SQLAlchemy detects this update.
+    result_payload = deepcopy(result_payload)
     result_payload['billing_info'] = {
         'quota_charged': True,
         'cost_rate_version': ai_response.cost_rate_version,

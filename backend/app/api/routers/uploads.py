@@ -1,12 +1,18 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import logging
 import sys
 import time
+import warnings
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+from io import BytesIO
+
+from botocore.exceptions import BotoCoreError, ClientError
+from PIL import Image, UnidentifiedImageError
 
 from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.exc import IntegrityError
@@ -46,6 +52,57 @@ UPLOAD_METRIC_KEYS = (
     'final_size_bytes',
 )
 UPLOAD_CONFIRM_TOKEN_PURPOSE = 'upload_confirm'
+
+
+def _verify_uploaded_object(token: dict) -> tuple[str, int, int]:
+    """Verify storage bytes before trusting an upload claim or its cache key."""
+    try:
+        storage = get_object_storage_client()
+        head = storage.head_object(Bucket=token['bucket'], Key=token['object_key'])
+        size = head['ContentLength']
+        if size <= 0 or size > settings.max_upload_bytes:
+            raise api_error(400, 'FILE_TOO_LARGE', 'Uploaded file exceeds the size limit')
+        if size != token['size_bytes'] or head.get('ContentType') != token['content_type']:
+            raise api_error(400, 'UPLOAD_CONTENT_MISMATCH', 'Uploaded file does not match the upload request')
+        result = storage.get_object(Bucket=token['bucket'], Key=token['object_key'], IfMatch=head['ETag'])
+        body = result['Body']
+        data = bytearray()
+        digest = hashlib.sha256()
+        try:
+            while chunk := body.read(64 * 1024):
+                data.extend(chunk)
+                if len(data) > size:
+                    raise api_error(400, 'UPLOAD_CONTENT_MISMATCH', 'Uploaded file size changed')
+                digest.update(chunk)
+        finally:
+            body.close()
+        if len(data) != size:
+            raise api_error(400, 'UPLOAD_CONTENT_MISMATCH', 'Uploaded file is incomplete')
+    except ClientError as exc:
+        code = str(exc.response.get('Error', {}).get('Code', ''))
+        if code in {'404', 'NoSuchKey', 'NotFound'}:
+            raise api_error(400, 'UPLOAD_NOT_FOUND', 'Upload the photo before confirming it') from exc
+        if code in {'412', 'PreconditionFailed'}:
+            raise api_error(409, 'UPLOAD_CONTENT_MISMATCH', 'Uploaded file changed during verification') from exc
+        raise api_error(503, 'UPLOAD_VERIFICATION_FAILED', 'Upload verification is temporarily unavailable') from exc
+    except BotoCoreError as exc:
+        raise api_error(503, 'UPLOAD_VERIFICATION_FAILED', 'Upload verification is temporarily unavailable') from exc
+    checksum = digest.hexdigest()
+    if token.get('sha256') and checksum != str(token['sha256']).lower():
+        raise api_error(400, 'UPLOAD_CHECKSUM_MISMATCH', 'Uploaded file checksum does not match')
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter('error', Image.DecompressionBombWarning)
+            with Image.open(BytesIO(data)) as image:
+                if Image.MIME.get(image.format) != token['content_type']:
+                    raise api_error(400, 'UPLOAD_CONTENT_MISMATCH', 'Uploaded file is not the requested image format')
+                width, height = image.size
+                image.verify()
+            with Image.open(BytesIO(data)) as image:
+                image.load()
+    except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError, Image.DecompressionBombWarning) as exc:
+        raise api_error(400, 'UPLOAD_IMAGE_INVALID', 'Uploaded file is not a valid supported image') from exc
+    return checksum, width, height
 
 
 def _duration_ms(started_at: float) -> int:
@@ -190,14 +247,7 @@ def confirm_photo_upload(
     if token.get('uid') != actor.user.public_id:
         raise api_error(status.HTTP_403_FORBIDDEN, 'UPLOAD_OWNER_MISMATCH', 'Upload owner mismatch')
 
-    client_width = payload.client_meta.get('width')
-    client_height = payload.client_meta.get('height')
-    if client_width is not None and int(client_width) <= 0:
-        raise api_error(status.HTTP_400_BAD_REQUEST, 'PHOTO_WIDTH_INVALID', 'Invalid width')
-    if client_height is not None and int(client_height) <= 0:
-        raise api_error(status.HTTP_400_BAD_REQUEST, 'PHOTO_HEIGHT_INVALID', 'Invalid height')
-
-    checksum_sha256 = token.get('sha256')
+    checksum_sha256, client_width, client_height = _verify_uploaded_object(token)
     if checksum_sha256:
         existing_photo = (
             db.query(Photo)

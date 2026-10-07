@@ -504,6 +504,22 @@ class UsageLedger(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
+class ReviewQuotaReservation(Base):
+    __tablename__ = 'review_quota_reservations'
+    __table_args__ = (
+        Index('idx_review_quota_reservations_user_day_status', 'user_id', 'bill_date', 'status'),
+        CheckConstraint("status IN ('held', 'consumed', 'released')", name='chk_review_quota_reservations_status'),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    task_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey('review_tasks.id', ondelete='CASCADE'), unique=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    mode: Mapped[str] = mapped_column(Text, nullable=False)
+    bill_date: Mapped[date] = mapped_column(Date, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
 class GenerationCreditReservation(Base):
     __tablename__ = 'generation_credit_reservations'
     __table_args__ = (

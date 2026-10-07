@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Request, status
@@ -48,6 +49,7 @@ from app.services.review_score_cache import (
     review_uses_current_full_review_contract,
     writer_contract_for_review_request,
 )
+from app.services.review_quota_reservations import synchronous_review_quota, consume_review_quota
 from .review_support import (
     _attach_billing_info,
     _resolve_source_review,
@@ -331,121 +333,125 @@ def create_review(
                 raise api_error(status.HTTP_503_SERVICE_UNAVAILABLE, 'TASK_DISPATCH_FAILED', 'Failed to enqueue async review task') from exc
         return response
 
-    image_url = _build_storage_photo_url(photo.object_key)
-    try:
-        if payload.analysis_type == 'retake_compare':
-            if source_review is None:
-                raise AIReviewError('Retake comparison source review is missing')
-            source_photo = (
-                db.query(Photo)
-                .filter(Photo.id == source_review.photo_id, Photo.owner_user_id == actor.user.id)
-                .first()
-            )
-            if source_photo is None or source_photo.status != PhotoStatus.READY:
-                raise AIReviewError('Retake comparison source photo is not ready')
-            ai_response = run_retake_comparison(
-                original_image_url=_build_storage_photo_url(source_photo.object_key),
-                retake_image_url=image_url,
-                original_review_id=source_review.public_id,
-                original_photo_id=source_photo.public_id,
-                retake_photo_id=photo.public_id,
-                locale=payload.locale,
-                image_type=payload.image_type,
-            )
-        else:
-            with canonical_score_cache_lease(
-                db,
-                photo=photo,
-                image_type=payload.image_type,
-            ) as canonical_score:
-                ai_response = run_ai_review(
-                    payload.mode,
-                    image_url=image_url,
-                    locale=payload.locale,
-                    exif_data=photo.exif_data or None,
-                    image_type=payload.image_type,
-                    review_model=payload.review_model,
-                    canonical_score=canonical_score,
+    with synchronous_review_quota(db, actor.user, mode=mode_enum) as quota_reservation:
+        image_url = _build_storage_photo_url(photo.object_key)
+        try:
+            if payload.analysis_type == 'retake_compare':
+                if source_review is None:
+                    raise AIReviewError('Retake comparison source review is missing')
+                source_photo = (
+                    db.query(Photo)
+                    .filter(Photo.id == source_review.photo_id, Photo.owner_user_id == actor.user.id)
+                    .first()
                 )
-    except AIReviewError as exc:
-        logger.warning('AI review failed for photo %s: %s', photo.public_id, exc)
-        raise api_error(status.HTTP_502_BAD_GATEWAY, 'AI_REVIEW_FAILED', 'AI review could not be completed') from exc
+                if source_photo is None or source_photo.status != PhotoStatus.READY:
+                    raise AIReviewError('Retake comparison source photo is not ready')
+                ai_response = run_retake_comparison(
+                    original_image_url=_build_storage_photo_url(source_photo.object_key),
+                    retake_image_url=image_url,
+                    original_review_id=source_review.public_id,
+                    original_photo_id=source_photo.public_id,
+                    retake_photo_id=photo.public_id,
+                    locale=payload.locale,
+                    image_type=payload.image_type,
+                )
+            else:
+                with canonical_score_cache_lease(
+                    db,
+                    photo=photo,
+                    image_type=payload.image_type,
+                ) as canonical_score:
+                    ai_response = run_ai_review(
+                        payload.mode,
+                        image_url=image_url,
+                        locale=payload.locale,
+                        exif_data=photo.exif_data or None,
+                        image_type=payload.image_type,
+                        review_model=payload.review_model,
+                        canonical_score=canonical_score,
+                    )
+        except AIReviewError as exc:
+            logger.warning('AI review failed for photo %s: %s', photo.public_id, exc)
+            raise api_error(status.HTTP_502_BAD_GATEWAY, 'AI_REVIEW_FAILED', 'AI review could not be completed') from exc
 
-    result_payload = _review_result_payload(
-        ai_response.result.model_dump(),
-        ai_response.result.final_score,
-        prompt_version=ai_response.prompt_version,
-        model_name=ai_response.model_name,
-        model_version=ai_response.model_version,
-        scorer_model_name=ai_response.scorer_model_name,
-        scorer_model_version=ai_response.scorer_model_version,
-        writer_model_name=ai_response.writer_model_name,
-        writer_model_version=ai_response.writer_model_version,
-        score_prompt_version=ai_response.score_prompt_version,
-        scorer_preprocess_version=ai_response.scorer_preprocess_version,
-        score_cache_hit=ai_response.score_cache_hit,
-        exif_info=photo.exif_data if photo.exif_data else None,
-    )
-    if ai_response.cost_rate_version:
-        result_payload.setdefault('billing_info', {})['cost_rate_version'] = ai_response.cost_rate_version
-    review = Review(
-        public_id=new_public_id('rev'),
-        task_id=None,
-        photo_id=photo.id,
-        owner_user_id=actor.user.id,
-        source_review_id=source_review.id if source_review is not None else None,
-        mode=mode_enum,
-        status=ReviewStatus.SUCCEEDED,
-        image_type=payload.image_type,
-        schema_version=result_payload['schema_version'],
-        result_json=result_payload,
-        final_score=result_payload['final_score'],
-        input_tokens=ai_response.input_tokens,
-        output_tokens=ai_response.output_tokens,
-        cost_usd=ai_response.cost_usd,
-        cost_rate_version=ai_response.cost_rate_version,
-        latency_ms=ai_response.latency_ms,
-        model_name=ai_response.model_name,
-        scorer_model_name=ai_response.scorer_model_name,
-        writer_model_name=ai_response.writer_model_name,
-    )
-    db.add(review)
-    db.flush()
-    db.add(
-        UsageLedger(
-            user_id=actor.user.id,
-            review_id=review.id,
+        result_payload = _review_result_payload(
+            ai_response.result.model_dump(),
+            ai_response.result.final_score,
+            prompt_version=ai_response.prompt_version,
+            model_name=ai_response.model_name,
+            model_version=ai_response.model_version,
+            scorer_model_name=ai_response.scorer_model_name,
+            scorer_model_version=ai_response.scorer_model_version,
+            writer_model_name=ai_response.writer_model_name,
+            writer_model_version=ai_response.writer_model_version,
+            score_prompt_version=ai_response.score_prompt_version,
+            scorer_preprocess_version=ai_response.scorer_preprocess_version,
+            score_cache_hit=ai_response.score_cache_hit,
+            exif_info=photo.exif_data if photo.exif_data else None,
+        )
+        if ai_response.cost_rate_version:
+            result_payload.setdefault('billing_info', {})['cost_rate_version'] = ai_response.cost_rate_version
+        review = Review(
+            public_id=new_public_id('rev'),
             task_id=None,
-            usage_type='review_request',
-            amount=1,
-            unit='count',
-            bill_date=datetime.now(timezone.utc).date(),
-            metadata_json={
-                'mode': payload.mode,
-                'analysis_type': payload.analysis_type,
-                'review_model': payload.review_model,
-                'scorer_model': ai_response.scorer_model_name,
-                'writer_model': ai_response.writer_model_name,
-            },
+            photo_id=photo.id,
+            owner_user_id=actor.user.id,
+            source_review_id=source_review.id if source_review is not None else None,
+            mode=mode_enum,
+            status=ReviewStatus.SUCCEEDED,
+            image_type=payload.image_type,
+            schema_version=result_payload['schema_version'],
+            result_json=result_payload,
+            final_score=result_payload['final_score'],
+            input_tokens=ai_response.input_tokens,
+            output_tokens=ai_response.output_tokens,
+            cost_usd=ai_response.cost_usd,
+            cost_rate_version=ai_response.cost_rate_version,
+            latency_ms=ai_response.latency_ms,
+            model_name=ai_response.model_name,
+            scorer_model_name=ai_response.scorer_model_name,
+            writer_model_name=ai_response.writer_model_name,
         )
-    )
-    increment_quota(db, actor.user)
-    _attach_billing_info(result_payload, db=db, user=actor.user, charged=True, guest_scope_key=guest_scope_key)
-    review.result_json = result_payload
-    db.add(review)
-    db.commit()
-    db.refresh(review)
-
-    response_sync = {'review_id': review.public_id, 'status': review.status.value, 'result': result_payload}
-    if idempotency_key:
-        save_idempotency_record(
-            db,
-            user_id=actor.user.id,
-            endpoint='/reviews',
-            key=idempotency_key,
-            request_hash=request_hash,
-            http_status=200,
-            response_json=response_sync,
+        db.add(review)
+        db.flush()
+        db.add(
+            UsageLedger(
+                user_id=actor.user.id,
+                review_id=review.id,
+                task_id=None,
+                usage_type='review_request',
+                amount=1,
+                unit='count',
+                bill_date=quota_reservation.bill_date if quota_reservation is not None else datetime.now(timezone.utc).date(),
+                metadata_json={
+                    'mode': payload.mode,
+                    'analysis_type': payload.analysis_type,
+                    'review_model': payload.review_model,
+                    'scorer_model': ai_response.scorer_model_name,
+                    'writer_model': ai_response.writer_model_name,
+                },
+            )
         )
+        consume_review_quota(db, quota_reservation)
+        increment_quota(db, actor.user, **({'bill_date': quota_reservation.bill_date} if quota_reservation is not None else {}))
+        db.flush()
+        result_payload = deepcopy(result_payload)
+        _attach_billing_info(result_payload, db=db, user=actor.user, charged=True, guest_scope_key=guest_scope_key)
+        review.result_json = result_payload
+        db.add(review)
         db.commit()
-    return response_sync
+        db.refresh(review)
+
+        response_sync = {'review_id': review.public_id, 'status': review.status.value, 'result': result_payload}
+        if idempotency_key:
+            save_idempotency_record(
+                db,
+                user_id=actor.user.id,
+                endpoint='/reviews',
+                key=idempotency_key,
+                request_hash=request_hash,
+                http_status=200,
+                response_json=response_sync,
+            )
+            db.commit()
+        return response_sync

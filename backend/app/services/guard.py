@@ -1,18 +1,18 @@
 from __future__ import annotations
 
 import hashlib
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import TYPE_CHECKING
 
 from fastapi import Request
-from sqlalchemy import func
+from sqlalchemy import case, func
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.errors import api_error
 from app.core.network import client_ip_from_request, device_key_from_request
-from app.db.models import IdempotencyKey, RateLimitCounter, ReviewMode, UsageLedger, User, UserPlan
+from app.db.models import IdempotencyKey, RateLimitCounter, ReviewMode, ReviewQuotaReservation, UsageLedger, User, UserPlan
 
 if TYPE_CHECKING:
     from app.api.deps import CurrentActor
@@ -46,33 +46,66 @@ def month_window_seconds(now: datetime) -> int:
 def refresh_user_quota(db: Session, user: User) -> None:
     today = utc_now().date()
     if user.daily_quota_date != today:
-        user.daily_quota_date = today
-        user.daily_quota_used = 0
+        db.query(User).filter(User.id == user.id, User.daily_quota_date != today).update(
+            {User.daily_quota_date: today, User.daily_quota_used: 0}, synchronize_session='fetch',
+        )
+        db.refresh(user)
     user.daily_quota_total = daily_quota_for_plan(user.plan) or 0
     db.add(user)
 
 
-def enforce_user_quota(db: Session, user: User, *, mode: ReviewMode | None = None) -> None:
+def count_review_quota_holds(
+    db: Session, user: User, *, since: date, mode: ReviewMode | None = None,
+    exclude_reservation_id: int | None = None,
+) -> int:
+    query = db.query(func.count(ReviewQuotaReservation.id)).filter(
+        ReviewQuotaReservation.user_id == user.id,
+        ReviewQuotaReservation.status == 'held',
+        ReviewQuotaReservation.expires_at > utc_now(),
+        ReviewQuotaReservation.bill_date >= since,
+    )
+    if mode is not None:
+        query = query.filter(ReviewQuotaReservation.mode == mode.value)
+    if exclude_reservation_id is not None:
+        query = query.filter(ReviewQuotaReservation.id != exclude_reservation_id)
+    return int(query.scalar() or 0)
+
+
+def enforce_user_quota(
+    db: Session, user: User, *, mode: ReviewMode | None = None,
+    exclude_reservation_id: int | None = None,
+) -> None:
     refresh_user_quota(db, user)
 
     daily_total = daily_quota_for_plan(user.plan)
-    if daily_total is not None and user.daily_quota_used >= daily_total:
+    today = utc_now().date()
+    def held(since, *, mode=None):
+        return count_review_quota_holds(db, user, since=since, mode=mode, exclude_reservation_id=exclude_reservation_id)
+    if daily_total is not None and user.daily_quota_used + held(today) >= daily_total:
         raise api_error(429, 'QUOTA_EXCEEDED', 'Daily quota exceeded')
 
     monthly_total = monthly_quota_for_plan(user.plan)
-    if monthly_total is not None and count_monthly_review_usage(db, user) >= monthly_total:
+    if monthly_total is not None and count_monthly_review_usage(db, user) + held(today.replace(day=1)) >= monthly_total:
         raise api_error(429, 'QUOTA_EXCEEDED', 'Monthly quota exceeded')
 
     pro_monthly_total = pro_mode_monthly_quota_for_plan(user.plan)
     if mode == ReviewMode.pro and pro_monthly_total is not None:
         pro_monthly_used = count_monthly_review_usage(db, user, mode=ReviewMode.pro)
-        if pro_monthly_used >= pro_monthly_total:
+        if pro_monthly_used + held(today.replace(day=1), mode=ReviewMode.pro) >= pro_monthly_total:
             raise api_error(429, 'QUOTA_EXCEEDED', 'Pro review monthly quota exceeded')
 
 
-def increment_quota(db: Session, user: User) -> None:
-    user.daily_quota_used += 1
-    db.add(user)
+def increment_quota(db: Session, user: User, *, bill_date: date | None = None) -> None:
+    today = utc_now().date()
+    if bill_date is not None and bill_date < today:
+        # Admission owns the billing day; a review finishing after midnight
+        # must not consume the new day's allowance as well.
+        return
+    db.query(User).filter(User.id == user.id).update({
+        User.daily_quota_used: case((User.daily_quota_date == today, User.daily_quota_used + 1), else_=1),
+        User.daily_quota_date: today,
+    }, synchronize_session='fetch')
+    db.refresh(user)
 
 
 def daily_quota_for_plan(plan: UserPlan) -> int | None:
@@ -198,16 +231,20 @@ def user_usage_snapshot(db: Session, user: User, *, now: datetime | None = None)
     monthly_total = monthly_quota_for_plan(user.plan)
     pro_monthly_total = pro_mode_monthly_quota_for_plan(user.plan)
     pro_monthly_used = count_monthly_review_usage(db, user, now=now, mode=ReviewMode.pro) if pro_monthly_total is not None else None
+    today = (now or utc_now()).date()
+    daily_held = count_review_quota_holds(db, user, since=today) if daily_total is not None else 0
+    monthly_held = count_review_quota_holds(db, user, since=today.replace(day=1)) if monthly_total is not None else 0
+    pro_monthly_held = count_review_quota_holds(db, user, since=today.replace(day=1), mode=ReviewMode.pro) if pro_monthly_total is not None else 0
     return {
         'daily_total': daily_total,
         'daily_used': user.daily_quota_used if daily_total is not None else None,
-        'daily_remaining': max(daily_total - user.daily_quota_used, 0) if daily_total is not None else None,
+        'daily_remaining': max(daily_total - user.daily_quota_used - daily_held, 0) if daily_total is not None else None,
         'monthly_total': monthly_total,
         'monthly_used': monthly_used if monthly_total is not None else None,
-        'monthly_remaining': max(monthly_total - monthly_used, 0) if monthly_total is not None else None,
+        'monthly_remaining': max(monthly_total - monthly_used - monthly_held, 0) if monthly_total is not None else None,
         'pro_monthly_total': pro_monthly_total,
         'pro_monthly_used': pro_monthly_used,
-        'pro_monthly_remaining': max(pro_monthly_total - pro_monthly_used, 0) if pro_monthly_total is not None and pro_monthly_used is not None else None,
+        'pro_monthly_remaining': max(pro_monthly_total - pro_monthly_used - pro_monthly_held, 0) if pro_monthly_total is not None and pro_monthly_used is not None else None,
     }
 
 

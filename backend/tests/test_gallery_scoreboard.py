@@ -11,7 +11,7 @@ from unittest.mock import patch
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, event
 from sqlalchemy.orm import sessionmaker
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
@@ -36,6 +36,33 @@ def _request_stub():
 
 @unittest.skipUnless(TEST_DATABASE_URL, 'requires disposable PostgreSQL via PICSPEAK_TEST_DATABASE_URL')
 class GalleryScoreboardPostgresTests(unittest.TestCase):
+    def test_large_window_loads_full_reviews_only_for_the_ten_winners(self) -> None:
+        suffix = uuid4().hex[:8]
+        as_of = datetime(2038, 1, 1, 12, 0, tzinfo=timezone.utc)
+        with self.Session() as db:
+            owners = [self._user(db, suffix, index) for index in range(12)]
+            for index in range(60):
+                added_at = as_of - timedelta(hours=1, seconds=index)
+                owner = owners[index % len(owners)]
+                photo = self._photo(db, suffix, owner, index, added_at)
+                review = self._review(db, suffix, owner, photo, index, added_at)
+                review.result_json = {'score_version': 'fixture', 'critique': 'x' * 32_000}
+            db.commit()
+        loaded_ids = []
+        def loaded(review, _context):
+            loaded_ids.append(review.id)
+        event.listen(Review, 'load', loaded)
+        try:
+            with self.Session() as db:
+                result = build_gallery_scoreboard(db, _request_stub(), window_days=7, as_of=as_of)
+        finally:
+            event.remove(Review, 'load', loaded)
+        self.assertEqual(result.eligible_photo_count, 60)
+        self.assertEqual(result.eligible_author_count, 12)
+        self.assertEqual(len(result.items), 10)
+        self.assertEqual(len(loaded_ids), 10)
+        self.assertEqual(len({item.owner_username for item in result.items}), 10)
+
     def setUp(self) -> None:
         self.engine = create_engine(TEST_DATABASE_URL, pool_pre_ping=True)
         self.connection = self.engine.connect()

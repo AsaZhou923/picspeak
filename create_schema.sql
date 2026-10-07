@@ -144,6 +144,24 @@ create index idx_review_tasks_owner_created
 create index idx_review_tasks_next_attempt
     on review_tasks (status, next_attempt_at);
 
+create table review_quota_reservations
+(
+    id         bigserial primary key,
+    task_id    bigint unique references review_tasks (id) on delete cascade,
+    user_id    bigint not null references users (id) on delete cascade,
+    mode       text not null,
+    bill_date  date not null,
+    status     text not null
+        constraint chk_review_quota_reservations_status
+            check (status in ('held', 'consumed', 'released')),
+    expires_at timestamp with time zone not null
+);
+
+alter table review_quota_reservations owner to postgres;
+
+create index idx_review_quota_reservations_user_day_status
+    on review_quota_reservations (user_id, bill_date, status);
+
 create trigger trg_review_tasks_updated_at
     before update
     on review_tasks

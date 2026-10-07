@@ -4,7 +4,10 @@ from decimal import Decimal
 from pathlib import Path
 import sys
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
+
+import pytest
+from sqlalchemy.exc import IntegrityError
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
@@ -12,6 +15,7 @@ if str(BACKEND_ROOT) not in sys.path:
 
 from app.services.ai import AIProviderCallUsage, AIReviewResponse, notify_ai_provider_call, observe_ai_provider_calls
 from app.services.review_call_costs import (
+    persist_observed_provider_call_costs,
     record_observed_provider_call_costs,
     record_response_call_cost,
     record_review_call_cost,
@@ -33,6 +37,12 @@ def _db(existing=None):
     db = MagicMock()
     db.query.return_value = _Query(existing)
     return db
+
+
+def _integrity_error(*, pgcode='23505', constraint_name='uq_review_call_costs_task_call_key'):
+    diag = SimpleNamespace(constraint_name=constraint_name)
+    orig = SimpleNamespace(pgcode=pgcode, diag=diag)
+    return IntegrityError('insert review call cost', params=None, orig=orig)
 
 
 def test_record_review_call_cost_keeps_failed_usage_null():
@@ -150,3 +160,63 @@ def test_observed_network_failure_keeps_usage_and_cost_null():
     assert records[0].input_tokens is None
     assert records[0].output_tokens is None
     assert records[0].cost_usd is None
+
+
+def test_unclassified_observed_calls_preserve_unknown_outcome():
+    task = SimpleNamespace(id=11, owner_user_id=22, attempt_count=1)
+    db = _db()
+    calls = [
+        AIProviderCallUsage(
+            stage='scorer',
+            sequence='initial',
+            outcome='unknown',
+            model_name='gpt-6-luna',
+            input_tokens=90,
+            output_tokens=15,
+            cost_usd=0.012,
+            cost_rate_version='rate-unknown',
+        ),
+    ]
+
+    records = record_observed_provider_call_costs(db, task=task, calls=calls, failed=None)
+
+    assert len(records) == 1
+    assert records[0].call_key == 'attempt:1:scorer:initial'
+    assert records[0].outcome == 'unknown'
+    assert records[0].cost_usd == Decimal('0.012000')
+
+
+def test_persist_observed_provider_call_costs_dedupes_target_unique_violation():
+    db = _db(existing=object())
+    db.commit.side_effect = _integrity_error()
+    calls = [AIProviderCallUsage(stage='writer', outcome='succeeded', model_name='gpt-6-luna')]
+
+    with patch('app.services.review_call_costs.SessionLocal', return_value=db):
+        persist_observed_provider_call_costs(
+            task_id=11,
+            owner_user_id=22,
+            attempt_count=1,
+            calls=calls,
+            failed=False,
+        )
+
+    db.rollback.assert_called_once()
+    db.close.assert_called_once()
+
+
+def test_persist_observed_provider_call_costs_rethrows_unrelated_integrity_error_even_with_existing_row():
+    db = _db(existing=object())
+    db.commit.side_effect = _integrity_error(constraint_name='review_call_costs_task_id_fkey')
+    calls = [AIProviderCallUsage(stage='writer', outcome='succeeded', model_name='gpt-6-luna')]
+
+    with patch('app.services.review_call_costs.SessionLocal', return_value=db), pytest.raises(IntegrityError):
+        persist_observed_provider_call_costs(
+            task_id=11,
+            owner_user_id=22,
+            attempt_count=1,
+            calls=calls,
+            failed=False,
+        )
+
+    db.rollback.assert_called_once()
+    db.close.assert_called_once()
