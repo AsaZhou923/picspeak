@@ -135,6 +135,29 @@ class ReviewOrganizationPostgresTests(unittest.TestCase):
         self.assertEqual(body['items'][0]['tags'], ['Street', 'Night%_Literal'])
         self.assertEqual(body['items'][0]['note'], 'literal 100%_match owner')
 
+    def test_history_cursor_keeps_all_records_with_the_same_timestamp(self) -> None:
+        with self.Session() as db:
+            original = db.query(Review).filter(Review.owner_user_id == self.owner_id).one()
+            expected_ids = [original.public_id]
+            for index in range(2):
+                review = Review(public_id=f'rev_org_equal_{self.suffix}_{index}', photo_id=original.photo_id,
+                                owner_user_id=self.owner_id, mode=original.mode, status=original.status,
+                                schema_version='1.0', result_json={}, final_score=7,
+                                created_at=original.created_at)
+                db.add(review)
+                expected_ids.append(review.public_id)
+            db.commit()
+        with self._client() as client:
+            first = client.get('/api/v1/me/reviews', params={'limit': 2}).json()
+            self.assertTrue(first['next_cursor'].startswith('v1|'))
+            second = client.get('/api/v1/me/reviews', params={'limit': 2, 'cursor': first['next_cursor']}).json()
+            seen = [item['review_id'] for page in (first, second) for item in page['items']]
+            self.assertCountEqual(seen, expected_ids)
+            self.assertEqual(len(set(seen)), 3)
+            self.assertIsNone(second['next_cursor'])
+            for cursor in ('v1|invalid|1', 'v1|2026-01-01|0', 'v1|2026-01-01|-1', 'v1|bad|1|2'):
+                with self.subTest(cursor=cursor):
+                    self.assertEqual(client.get('/api/v1/me/reviews', params={'cursor': cursor}).status_code, 400)
     def test_share_revoke_is_idempotent_preserves_gallery_and_invalidates_old_token(self) -> None:
         review_id = f'rev_org_{self.suffix}_0'
         old_token = f'share-org-{self.suffix}-0'

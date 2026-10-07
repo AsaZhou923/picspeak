@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
+
+from sqlalchemy import and_, or_
 
 from fastapi import APIRouter, Depends, Query, Request, status
 from fastapi.responses import RedirectResponse
@@ -212,10 +214,23 @@ def list_my_reviews(
 
     if cursor:
         try:
-            cursor_dt = datetime.fromisoformat(cursor)
+            if cursor.startswith('v1|'):
+                _version, timestamp, identifier = cursor.split('|')
+                cursor_id = int(identifier)
+                if cursor_id <= 0:
+                    raise ValueError('Invalid review id')
+            else:
+                # Continue accepting cursors issued before the composite format.
+                timestamp, cursor_id = cursor, None
+            cursor_dt = datetime.fromisoformat(timestamp)
+            if cursor_dt.tzinfo is None:
+                cursor_dt = cursor_dt.replace(tzinfo=timezone.utc)
         except ValueError as exc:
             raise api_error(status.HTTP_400_BAD_REQUEST, 'CURSOR_INVALID', 'Invalid cursor') from exc
-        query = query.filter(Review.created_at < cursor_dt)
+        boundary = Review.created_at < cursor_dt
+        if cursor_id is not None:
+            boundary = or_(boundary, and_(Review.created_at == cursor_dt, Review.id < cursor_id))
+        query = query.filter(boundary)
 
     rows = query.limit(limit + 1).all()
     has_next = len(rows) > limit
@@ -243,7 +258,7 @@ def list_my_reviews(
         _review_history_item(request, review, photo, actor.user.public_id, source_review_map.get(review.id))
         for review, photo in rows
     ]
-    next_cursor = rows[-1][0].created_at.isoformat() if has_next and rows else None
+    next_cursor = f'v1|{rows[-1][0].created_at.isoformat()}|{rows[-1][0].id}' if has_next and rows else None
 
     db.commit()
     return ReviewHistoryResponse(items=items, next_cursor=next_cursor)

@@ -50,48 +50,6 @@ def _scoreboard_window(as_of: datetime, window_days: int) -> tuple[datetime, dat
     return normalized_as_of - timedelta(days=window_days), normalized_as_of
 
 
-def _dedupe_latest_owner_photo(rows: list[tuple[Review, Photo, User]]) -> list[tuple[Review, Photo, User]]:
-    selected: dict[tuple[int, int], tuple[Review, Photo, User]] = {}
-    for review, photo, owner in sorted(
-        rows,
-        key=lambda row: (
-            _as_utc_datetime(row[0].gallery_added_at or row[0].created_at),
-            int(row[0].id),
-        ),
-        reverse=True,
-    ):
-        selected.setdefault((int(review.owner_user_id), int(review.photo_id)), (review, photo, owner))
-    return list(selected.values())
-
-
-def _apply_author_cap(rows: list[GalleryScoreboardRow]) -> list[GalleryScoreboardRow]:
-    counts: dict[int, int] = {}
-    capped: list[GalleryScoreboardRow] = []
-    for row in rows:
-        owner_id = int(row.review.owner_user_id)
-        if counts.get(owner_id, 0) >= SCOREBOARD_MAX_ITEMS_PER_AUTHOR:
-            continue
-        counts[owner_id] = counts.get(owner_id, 0) + 1
-        capped.append(row)
-        if len(capped) >= SCOREBOARD_LIMIT:
-            break
-    return capped
-
-
-def _scoreboard_cold_start_reasons(rows: list[GalleryScoreboardRow]) -> list[str]:
-    reasons: list[str] = []
-    owner_ids = {int(row.review.owner_user_id) for row in rows}
-    if len(rows) < SCOREBOARD_MIN_PHOTOS_FOR_POPULAR:
-        reasons.append('not_enough_photos')
-    if len(owner_ids) < SCOREBOARD_MIN_AUTHORS_FOR_POPULAR:
-        reasons.append('not_enough_authors')
-    if rows and all(row.like_count == 0 for row in rows):
-        reasons.append('all_zero_likes')
-    if not rows:
-        reasons.append('empty_window')
-    return reasons
-
-
 def _scoreboard_item_from_public(item: PublicGalleryItem) -> GalleryScoreboardItem:
     return GalleryScoreboardItem(**item.model_dump(), owner_profile_url=None)
 
@@ -115,59 +73,90 @@ def build_gallery_scoreboard(
 ) -> GalleryScoreboardResponse:
     active_as_of = _scoreboard_as_of(as_of)
     window_start, window_end = _scoreboard_window(active_as_of, window_days)
-    candidate_query = (
-        db.query(Review, Photo, User)
-        .join(Photo, Photo.id == Review.photo_id)
-        .join(User, User.id == Review.owner_user_id)
-        .filter(*_public_gallery_filters())
-        .filter(Review.gallery_added_at >= window_start, Review.gallery_added_at < window_end)
+    # Rank only scalar columns. Full critique payloads are loaded for at most
+    # SCOREBOARD_LIMIT winners, rather than every photo in the window.
+    representatives = select(
+        Review.id.label('review_id'),
+        Review.owner_user_id.label('owner_id'),
+        Review.gallery_added_at.label('added_at'),
+        func.row_number().over(
+            partition_by=(Review.owner_user_id, Review.photo_id),
+            order_by=(Review.gallery_added_at.desc(), Review.id.desc()),
+        ).label('photo_rank'),
+    ).where(
+        *_public_gallery_filters(),
+        Review.gallery_added_at >= window_start,
+        Review.gallery_added_at < window_end,
     )
     if image_type:
-        candidate_query = candidate_query.filter(Review.image_type == image_type)
-
-    candidate_rows = _dedupe_latest_owner_photo(candidate_query.all())
-    review_ids = [review.id for review, _photo, _owner in candidate_rows]
-    like_counts = _gallery_like_counts(db, review_ids)
-    rows = [
-        GalleryScoreboardRow(review=review, photo=photo, owner=owner, like_count=like_counts.get(review.id, 0))
-        for review, photo, owner in candidate_rows
+        representatives = representatives.where(Review.image_type == image_type)
+    representatives = representatives.cte('scoreboard_representatives')
+    eligible = select(
+        representatives.c.review_id, representatives.c.owner_id, representatives.c.added_at,
+    ).where(representatives.c.photo_rank == 1).cte('scoreboard_eligible')
+    likes = select(
+        ReviewLike.review_id,
+        func.count(ReviewLike.id).label('like_count'),
+    ).join(eligible, eligible.c.review_id == ReviewLike.review_id).group_by(
+        ReviewLike.review_id,
+    ).cte('scoreboard_likes')
+    candidates = select(
+        eligible.c.review_id, eligible.c.owner_id, eligible.c.added_at,
+        func.coalesce(likes.c.like_count, 0).label('like_count'),
+    ).outerjoin(likes, likes.c.review_id == eligible.c.review_id).cte('scoreboard_candidates')
+    eligible_photo_count, eligible_author_count, max_likes = db.execute(select(
+        func.count(candidates.c.review_id),
+        func.count(func.distinct(candidates.c.owner_id)),
+        func.coalesce(func.max(candidates.c.like_count), 0),
+    )).one()
+    cold_start_reasons = []
+    if eligible_photo_count < SCOREBOARD_MIN_PHOTOS_FOR_POPULAR:
+        cold_start_reasons.append('not_enough_photos')
+    if eligible_author_count < SCOREBOARD_MIN_AUTHORS_FOR_POPULAR:
+        cold_start_reasons.append('not_enough_authors')
+    if eligible_photo_count and max_likes == 0:
+        cold_start_reasons.append('all_zero_likes')
+    if not eligible_photo_count:
+        cold_start_reasons.append('empty_window')
+    ranking_mode = 'collection' if cold_start_reasons else 'popular'
+    ranking_sort = (['like_count_desc'] if ranking_mode == 'popular' else []) + [
+        'gallery_added_at_desc', 'review_id_desc',
     ]
-    eligible_photo_count = len(rows)
-    eligible_author_count = len({int(row.review.owner_user_id) for row in rows})
-    cold_start_reasons = _scoreboard_cold_start_reasons(rows)
-    if cold_start_reasons:
-        ranking_mode = 'collection'
-        ranking_sort = ['gallery_added_at_desc', 'review_id_desc']
-        ordered = sorted(
-            rows,
-            key=lambda row: (_as_utc_datetime(row.review.gallery_added_at or row.review.created_at), int(row.review.id)),
-            reverse=True,
-        )
-    else:
-        ranking_mode = 'popular'
-        ranking_sort = ['like_count_desc', 'gallery_added_at_desc', 'review_id_desc']
-        ordered = sorted(
-            rows,
-            key=lambda row: (
-                int(row.like_count),
-                _as_utc_datetime(row.review.gallery_added_at or row.review.created_at),
-                int(row.review.id),
-            ),
-            reverse=True,
+
+    def order(columns):
+        return ((columns.like_count.desc(),) if ranking_mode == 'popular' else ()) + (
+            columns.added_at.desc(), columns.review_id.desc(),
         )
 
-    capped = _apply_author_cap(ordered)
+    ranked = select(
+        candidates,
+        func.row_number().over(
+            partition_by=candidates.c.owner_id, order_by=order(candidates.c),
+        ).label('author_rank'),
+    ).cte('scoreboard_ranked')
+    winners = select(ranked).where(
+        ranked.c.author_rank <= SCOREBOARD_MAX_ITEMS_PER_AUTHOR,
+    ).order_by(*order(ranked.c)).limit(SCOREBOARD_LIMIT).subquery('scoreboard_winners')
+    winner_rows = (
+        db.query(Review, Photo, User, winners.c.like_count)
+        .join(winners, winners.c.review_id == Review.id)
+        .join(Photo, Photo.id == Review.photo_id)
+        .join(User, User.id == Review.owner_user_id)
+        .order_by(*order(winners.c))
+        .all()
+    )
+    capped = [GalleryScoreboardRow(review, photo, owner, int(count)) for review, photo, owner, count in winner_rows]
     items: list[GalleryScoreboardItem] = []
     for row in capped:
         item = _scoreboard_item_from_public(
             _public_gallery_item(
-              request,
-              row.review,
-              row.photo,
-              row.owner,
-              like_count=row.like_count,
-              liked_by_viewer=False,
-              recommendation=None,
+                request,
+                row.review,
+                row.photo,
+                row.owner,
+                like_count=row.like_count,
+                liked_by_viewer=False,
+                recommendation=None,
             )
         )
         item.owner_profile_url = _owner_profile_url(row.owner)

@@ -23,9 +23,9 @@ test('latest update bundle is aligned across locales for the homepage dialog', (
   assert.equal(updates.every(Boolean), true);
   assert.match(updates[0]!.id, /^\d{4}-\d{2}-\d{2}-.+/);
   assert.deepEqual(updates.map((entry) => entry!.id), Array(3).fill(updates[0]!.id));
-  assert.equal(updates[0]!.id, '2026-10-06-photo-rubric-and-gallery-reassessment');
-  assert.deepEqual(updates.map((entry) => entry!.date), Array(3).fill('2026-10-06'));
-  assert.deepEqual(updates.map((entry) => entry!.showPopup), Array(3).fill(true));
+  assert.equal(updates[0]!.id, '2026-10-07-review-reliability-and-gallery');
+  assert.deepEqual(updates.map((entry) => entry!.date), Array(3).fill('2026-10-07'));
+  assert.deepEqual(updates.map((entry) => entry!.showPopup), Array(3).fill(false));
   assert.deepEqual(updates.map((entry) => entry!.docPath), Array(3).fill(`docs/changelog/CHANGELOG.md#${updates[0]!.id}`));
   assert.deepEqual(updates.map((entry) => entry!.primaryAction?.href), Array(3).fill('/gallery'));
   assert.match(updates[0]!.primaryAction?.label ?? '', /gallery|长廊|ギャラリー/i);
@@ -62,6 +62,10 @@ test('maintenance updates remain in the log while popup eligibility stays separa
     assert.equal(shouldShowProductUpdatePopup(maintenance), false);
     assert.equal(shouldShowProductUpdatePopup(previousSameDay), false);
     assert.equal(updates[0].id, latest.id);
+    assert.equal(shouldShowProductUpdatePopup(latest), false);
+    const previousAnnouncement = updates.find((entry) => entry.id === '2026-10-06-photo-rubric-and-gallery-reassessment');
+    assert.ok(previousAnnouncement);
+    assert.equal(shouldShowProductUpdatePopup(previousAnnouncement), true);
     assert.equal(getLatestProductUpdateDate(), latest.date);
   }
 });

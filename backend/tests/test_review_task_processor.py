@@ -30,6 +30,11 @@ from app.services.review_task_processor import (
 
 
 class ReviewTaskProcessorTests(unittest.TestCase):
+    def setUp(self) -> None:
+        # Reservation transactions are covered with real concurrent PostgreSQL
+        # sessions; these tests isolate the review processor's AI contracts.
+        self.enterContext(patch('app.services.review_task_processor.reserve_review_quota', return_value=None))
+
     def _practice_worker_fixture(self, *, same_image=False):
         db = MagicMock()
         source_photo = SimpleNamespace(id=10, public_id='pho_before', object_key='before.jpg', status=PhotoStatus.READY)
@@ -83,7 +88,7 @@ class ReviewTaskProcessorTests(unittest.TestCase):
             attached.append(review)
         with patch('app.services.review_task_processor.resolve_task_practice', return_value=context), patch(
             'app.services.review_task_processor.attach_practice_review', side_effect=attach
-        ), patch('app.services.review_task_processor.enforce_user_quota'), patch(
+        ), patch('app.services.review_task_processor.reserve_review_quota', return_value=None), patch(
             'app.services.review_task_processor.increment_quota'
         ), patch('app.services.review_task_processor.user_usage_snapshot', return_value={}), patch(
             'app.services.review_task_processor.run_retake_comparison', return_value=response
@@ -113,7 +118,7 @@ class ReviewTaskProcessorTests(unittest.TestCase):
         db, task, context, response = self._practice_worker_fixture(same_image=True)
         with patch('app.services.review_task_processor.resolve_task_practice', return_value=context), patch(
             'app.services.review_task_processor.attach_practice_review'
-        ) as attach, patch('app.services.review_task_processor.enforce_user_quota'), patch(
+        ) as attach, patch('app.services.review_task_processor.reserve_review_quota', return_value=None), patch(
             'app.services.review_task_processor.increment_quota'
         ), patch('app.services.review_task_processor.user_usage_snapshot', return_value={}), patch(
             'app.services.review_task_processor.canonical_score_cache_lease', return_value=nullcontext(None)
@@ -130,7 +135,7 @@ class ReviewTaskProcessorTests(unittest.TestCase):
         db, task, context, _response = self._practice_worker_fixture()
         with patch('app.services.review_task_processor.resolve_task_practice', return_value=context), patch(
             'app.services.review_task_processor.attach_practice_review'
-        ) as attach, patch('app.services.review_task_processor.enforce_user_quota'), patch(
+        ) as attach, patch('app.services.review_task_processor.reserve_review_quota', return_value=None), patch(
             'app.services.review_task_processor.increment_quota'
         ) as charge, patch('app.services.review_task_processor._handle_failure') as failure, patch(
             'app.services.review_task_processor.run_retake_comparison', side_effect=AIReviewError('timeout')
