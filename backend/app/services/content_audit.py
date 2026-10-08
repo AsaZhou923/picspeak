@@ -7,6 +7,7 @@ from dataclasses import dataclass
 
 from app.core.config import settings
 from app.core.http_client import PooledHTTPRequestError, PooledHTTPStatusError, pooled_request
+from app.services.audit import mask_capability_url_text
 
 
 class ContentAuditError(RuntimeError):
@@ -84,7 +85,7 @@ def _normalize_result(parsed: dict) -> ContentAuditResult:
     score = max(0.0, min(score, 1.0))
 
     label = str(parsed.get('label') or ('safe' if safe else 'unsafe'))[:50]
-    reason = str(parsed.get('reason') or '')[:300]
+    reason = mask_capability_url_text(str(parsed.get('reason') or ''))[:300]
     return ContentAuditResult(safe=safe, nsfw_score=score, label=label, reason=reason, latency_ms=0)
 
 
@@ -138,10 +139,10 @@ def run_content_audit(image_url: str) -> ContentAuditResult:
         )
         body = json.loads(response.data.decode('utf-8'))
     except PooledHTTPStatusError as exc:
-        err_body = exc.response.data.decode('utf-8', errors='ignore')
+        err_body = mask_capability_url_text(exc.response.data.decode('utf-8', errors='ignore'))
         raise ContentAuditError(f'AI provider HTTP {exc.response.status}: {err_body[:300]}') from exc
     except PooledHTTPRequestError as exc:
-        raise ContentAuditError(f'AI provider request failed: {exc}') from exc
+        raise ContentAuditError(f'AI provider request failed: {mask_capability_url_text(str(exc))}') from exc
 
     latency_ms = int((time.perf_counter() - start) * 1000)
     try:

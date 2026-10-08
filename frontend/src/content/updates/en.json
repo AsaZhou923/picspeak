@@ -1,5 +1,21 @@
 [
   {
+    "id": "2026-10-08-private-image-access",
+    "date": "2026-10-08",
+    "showPopup": false,
+    "title": "Controlled photo access",
+    "summary": "Photos and generated images use controlled, time-limited access to reduce exposure of direct storage links. Public Gallery browsing remains available. This change does not delete photos or alter saved critiques.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-10-08-private-image-access"
+  },
+  {
+    "id": "2026-10-08-free-history-fifteen-days",
+    "date": "2026-10-08",
+    "showPopup": false,
+    "title": "15-day Free critique history",
+    "summary": "Free critique history access changes from 30 to 15 days after each critique is created, including existing history. This change does not automatically delete original photos. Public works and share links keep their existing access rules, and Pro keeps permanent history. Save photos and critiques for longer-term reference.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-10-08-free-history-fifteen-days"
+  },
+  {
     "id": "2026-10-07-review-reliability-and-gallery",
     "date": "2026-10-07",
     "showPopup": false,

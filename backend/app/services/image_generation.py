@@ -10,6 +10,7 @@ from urllib.parse import quote
 
 from app.core.http_client import PooledHTTPRequestError, PooledHTTPStatusError, pooled_request
 from app.core.config import settings
+from app.services.audit import mask_capability_url_text
 
 
 class ImageGenerationError(RuntimeError):
@@ -153,10 +154,10 @@ class OpenAIImageGenerationClient:
             )
             return json.loads(response.data.decode('utf-8'))
         except PooledHTTPStatusError as exc:
-            detail = exc.response.data.decode('utf-8', errors='replace')
+            detail = mask_capability_url_text(exc.response.data.decode('utf-8', errors='replace'))
             raise ImageGenerationError(f'OpenAI image generation HTTP {exc.response.status}: {detail[:500]}') from exc
         except PooledHTTPRequestError as exc:
-            raise ImageGenerationError(f'OpenAI image generation request failed: {exc}') from exc
+            raise ImageGenerationError(f'OpenAI image generation request failed: {mask_capability_url_text(str(exc))}') from exc
         except json.JSONDecodeError as exc:
             raise ImageGenerationError('OpenAI image generation returned invalid JSON') from exc
 
@@ -185,10 +186,10 @@ class OpenAIImageGenerationClient:
             )
             return json.loads(response.data.decode('utf-8'))
         except PooledHTTPStatusError as exc:
-            detail = exc.response.data.decode('utf-8', errors='replace')
+            detail = mask_capability_url_text(exc.response.data.decode('utf-8', errors='replace'))
             raise ImageGenerationError(f'OpenAI image edit HTTP {exc.response.status}: {detail[:500]}') from exc
         except PooledHTTPRequestError as exc:
-            raise ImageGenerationError(f'OpenAI image edit request failed: {exc}') from exc
+            raise ImageGenerationError(f'OpenAI image edit request failed: {mask_capability_url_text(str(exc))}') from exc
         except json.JSONDecodeError as exc:
             raise ImageGenerationError('OpenAI image edit returned invalid JSON') from exc
 
@@ -242,7 +243,7 @@ class OpenAIImageGenerationClient:
                 )
             if status == 'failed':
                 message = data.get('error') or data.get('message') or 'remote image generation task failed'
-                raise ImageGenerationError(f'OpenAI image generation task failed: {message}')
+                raise ImageGenerationError(f'OpenAI image generation task failed: {mask_capability_url_text(str(message))}')
             time.sleep(poll_interval_seconds)
         raise ImageGenerationError(f'OpenAI image generation task timed out while {last_status}')
 
@@ -261,10 +262,10 @@ class OpenAIImageGenerationClient:
             )
             return json.loads(response.data.decode('utf-8'))
         except PooledHTTPStatusError as exc:
-            detail = exc.response.data.decode('utf-8', errors='replace')
+            detail = mask_capability_url_text(exc.response.data.decode('utf-8', errors='replace'))
             raise ImageGenerationError(f'OpenAI image generation HTTP {exc.response.status}: {detail[:500]}') from exc
         except PooledHTTPRequestError as exc:
-            raise ImageGenerationError(f'OpenAI image generation request failed: {exc}') from exc
+            raise ImageGenerationError(f'OpenAI image generation request failed: {mask_capability_url_text(str(exc))}') from exc
         except json.JSONDecodeError as exc:
             raise ImageGenerationError('OpenAI image generation returned invalid JSON') from exc
 
@@ -278,10 +279,10 @@ class OpenAIImageGenerationClient:
             )
             return response.data, response.headers.get('Content-Type')
         except PooledHTTPStatusError as exc:
-            detail = exc.response.data.decode('utf-8', errors='replace')
+            detail = mask_capability_url_text(exc.response.data.decode('utf-8', errors='replace'))
             raise ImageGenerationError(f'Generated image download HTTP {exc.response.status}: {detail[:500]}') from exc
         except PooledHTTPRequestError as exc:
-            raise ImageGenerationError(f'Generated image download failed: {exc}') from exc
+            raise ImageGenerationError(f'Generated image download failed: {mask_capability_url_text(str(exc))}') from exc
 
 
 def _optional_int(value: Any) -> int | None:
@@ -453,6 +454,8 @@ def _raise_payload_error(payload: dict[str, Any]) -> None:
     error_payload = payload.get('error')
     if not isinstance(error_payload, dict):
         return
-    code = error_payload.get('code') or payload.get('code') or 'unknown'
-    message = error_payload.get('message') or error_payload.get('type') or 'unknown image generation error'
+    code = mask_capability_url_text(str(error_payload.get('code') or payload.get('code') or 'unknown'))
+    message = mask_capability_url_text(
+        str(error_payload.get('message') or error_payload.get('type') or 'unknown image generation error')
+    )
     raise ImageGenerationError(f'OpenAI image generation error {code}: {message}')

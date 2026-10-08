@@ -18,7 +18,7 @@ const homeSource = readFileSync(
 );
 const shellSource = readFileSync(path.join(FRONTEND_DIR, 'src/components/layout/SiteChrome.tsx'), 'utf8');
 
-test('model and pricing announcement is the latest popup only for Chinese users', () => {
+test('model and pricing announcement keeps the latest popup priority only for Chinese users', () => {
   const announcement = getLatestProductUpdate('zh');
   assert.ok(announcement);
   assert.equal(announcement.id, '2026-10-08-gpt6-sol-and-pro-pricing');
@@ -33,13 +33,28 @@ test('model and pricing announcement is the latest popup only for Chinese users'
   for (const locale of ['en', 'ja'] as const) {
     const latest = getLatestProductUpdate(locale);
     assert.ok(latest);
-    assert.equal(latest.id, '2026-10-07-review-reliability-and-gallery');
-    assert.equal(latest.date, '2026-10-07');
+    assert.equal(latest.id, '2026-10-08-private-image-access');
+    assert.equal(latest.date, '2026-10-08');
     assert.equal(shouldShowProductUpdatePopup(latest), false);
     assert.equal(getProductUpdates(locale).some((entry) => entry.id === announcement.id), false);
   }
   assert.equal(getLatestProductUpdateDate('zh'), '2026-10-08');
-  assert.equal(getLatestProductUpdateDate(), '2026-10-07');
+  assert.equal(getLatestProductUpdateDate(), '2026-10-08');
+});
+
+test('Free history change is recorded in every locale while preserving the Chinese announcement priority', () => {
+  for (const locale of ['zh', 'en', 'ja'] as const) {
+    const latest = getLatestProductUpdate(locale);
+    const pending = getProductUpdates(locale).find((entry) => entry.id === '2026-10-08-free-history-fifteen-days');
+    assert.ok(latest);
+    assert.ok(pending);
+    assert.equal(latest.id, locale === 'zh' ? '2026-10-08-gpt6-sol-and-pro-pricing' : '2026-10-08-private-image-access');
+    assert.equal(latest.date, '2026-10-08');
+    assert.equal(pending.showPopup, false);
+    assert.match(pending.summary, /15/);
+    assert.equal(shouldShowProductUpdatePopup(pending), false);
+    assert.equal(shouldShowProductUpdatePopup(latest), locale === 'zh');
+  }
 });
 
 test('homepage update dialog is version-scoped, dismissible and accessible', () => {
@@ -86,15 +101,17 @@ test('maintenance updates remain in the log while popup eligibility stays separa
 
 test('product update data clones nested actions and section items for callers', () => {
   const firstRead = getProductUpdates('en');
-  const originalLabel = firstRead[0].primaryAction!.label;
+  const actionEntry = firstRead.find((entry) => entry.primaryAction);
+  assert.ok(actionEntry);
+  const originalLabel = actionEntry.primaryAction!.label;
   const sectionEntry = firstRead.find((entry) => entry.sections?.length);
   assert.ok(sectionEntry);
   const originalItem = sectionEntry.sections![0].items[0];
-  firstRead[0].primaryAction!.label = 'Mutated action';
+  actionEntry.primaryAction!.label = 'Mutated action';
   sectionEntry.sections![0].items[0] = 'Mutated item';
 
   const secondRead = getProductUpdates('en');
-  assert.equal(secondRead[0].primaryAction!.label, originalLabel);
+  assert.equal(secondRead.find((entry) => entry.id === actionEntry.id)!.primaryAction!.label, originalLabel);
   assert.equal(
     secondRead.find((entry) => entry.id === sectionEntry.id)!.sections![0].items[0],
     originalItem,

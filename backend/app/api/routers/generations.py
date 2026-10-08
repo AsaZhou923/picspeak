@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import logging
 from datetime import datetime, timezone
-from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Request, status
 from fastapi.responses import StreamingResponse
@@ -11,6 +10,7 @@ from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 from app.api.deps import CurrentActor, get_current_actor, get_db
+from app.api.routers.photos import _build_storage_photo_url
 from app.core.config import settings
 from app.core.errors import api_error
 from app.db.models import GeneratedImage, ImageGenerationTask, Photo, PhotoStatus, Review, TaskStatus, User, UserPlan
@@ -554,7 +554,7 @@ def _find_source_photo(db: Session, photo_id: str, owner_user_id: int) -> Photo:
 
 
 def _build_generated_image_url(image: GeneratedImage) -> str:
-    return f'{settings.object_base_url.rstrip("/")}/{quote(image.object_key)}'
+    return _build_storage_photo_url(image.object_key, bucket=image.object_bucket, expires_in=900)
 
 
 def _generation_related_public_ids(db: Session, images: list[GeneratedImage]) -> dict[str, dict[int, str]]:

@@ -13,11 +13,10 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
-from app.core.config import settings
 from app.core.errors import api_error
 from app.core.security import sign_payload, sign_payload_with_exp, verify_payload
-from app.db.models import Photo, User
-from app.services.object_storage import get_object_storage_client
+from app.db.models import Photo, PhotoStatus, Review, ReviewStatus, User
+from app.services.object_storage import get_object_read_url, get_object_storage_client
 
 router = APIRouter(prefix='/photos', tags=['photos'])
 
@@ -30,7 +29,12 @@ PHOTO_THUMBNAIL_TTL_SECONDS = 24 * 3600
 PHOTO_THUMBNAIL_STABLE_WINDOW_SECONDS = 3600
 PHOTO_THUMBNAIL_CACHE_CONTROL = 'private, max-age=86400, stale-while-revalidate=604800'
 GALLERY_THUMBNAIL_CACHE_CONTROL = 'public, max-age=31536000, immutable'
+PUBLIC_GALLERY_THUMBNAIL_CACHE_CONTROL = 'public, max-age=60, must-revalidate'
 IMAGE_RESAMPLING = getattr(Image, 'Resampling', Image).LANCZOS
+
+
+def _gallery_thumbnail_object_key(photo: Photo, *, size: int = PHOTO_THUMBNAIL_MAX_SIZE) -> str:
+    return f'gallery-thumbnails/{photo.public_id}/{size}.webp'
 
 
 def _request_origin(request: Request) -> tuple[str, str]:
@@ -60,9 +64,8 @@ def _request_url_for(request: Request, route_name: str, **path_params: str | int
     return urlunsplit((scheme, host, resolved.path, resolved.query, resolved.fragment))
 
 
-def _build_storage_photo_url(object_key: str) -> str:
-    base = settings.object_base_url.rstrip('/')
-    return f'{base}/{quote(object_key)}'
+def _build_storage_photo_url(object_key: str, *, bucket: str | None = None, expires_in: int = 3600) -> str:
+    return get_object_read_url(object_key, bucket=bucket, expires_in=expires_in)
 
 
 def _photo_client_meta(photo: Photo) -> dict[str, Any]:
@@ -133,6 +136,20 @@ def _get_photo_object(photo: Photo) -> tuple[Any, bytes]:
         body.close()
 
 
+def _get_storage_object_bytes(bucket: str, object_key: str) -> tuple[dict[str, Any], bytes]:
+    try:
+        storage = get_object_storage_client()
+        result = storage.get_object(Bucket=bucket, Key=object_key)
+    except Exception as exc:
+        raise api_error(status.HTTP_502_BAD_GATEWAY, 'PHOTO_FETCH_FAILED', f'Failed to fetch photo: {exc}') from exc
+
+    body = result['Body']
+    try:
+        return result, body.read()
+    finally:
+        body.close()
+
+
 def _build_thumbnail_bytes(source_bytes: bytes, size: int) -> tuple[bytes, str]:
     try:
         with Image.open(BytesIO(source_bytes)) as image:
@@ -153,6 +170,64 @@ def _find_photo_owned(db: Session, photo_public_id: str, owner_user_id: int) -> 
     if photo is None:
         raise api_error(status.HTTP_404_NOT_FOUND, 'PHOTO_NOT_FOUND', 'Photo not found')
     return photo
+
+
+def _find_public_gallery_photo(db: Session, review_public_id: str) -> tuple[Photo, Review]:
+    row = (
+        db.query(Photo, Review)
+        .join(Review, Review.photo_id == Photo.id)
+        .filter(
+            Review.public_id == review_public_id,
+            Review.status == ReviewStatus.SUCCEEDED,
+            Review.deleted_at.is_(None),
+            Review.gallery_visible == True,  # noqa: E712
+            Review.gallery_audit_status == 'approved',
+            Photo.status == PhotoStatus.READY,
+        )
+        .first()
+    )
+    if row is None:
+        raise api_error(status.HTTP_404_NOT_FOUND, 'GALLERY_THUMBNAIL_NOT_FOUND', 'Gallery thumbnail not found')
+    return row
+
+
+@router.get('/gallery/{review_id}/thumbnail', name='get_public_gallery_thumbnail')
+def get_public_gallery_thumbnail(
+    review_id: str,
+    if_none_match: str | None = Header(default=None, alias='If-None-Match'),
+    db: Session = Depends(get_db),
+):
+    photo, review = _find_public_gallery_photo(db, review_id)
+    thumbnail_key = _gallery_thumbnail_object_key(photo)
+    etag = hashlib.sha1(
+        f'{review.public_id}:{review.updated_at.isoformat()}:{photo.updated_at.isoformat()}:{thumbnail_key or photo.object_key}'.encode('utf-8')
+    ).hexdigest()
+    headers = {
+        'Cache-Control': PUBLIC_GALLERY_THUMBNAIL_CACHE_CONTROL,
+        'ETag': etag,
+        'X-Content-Type-Options': 'nosniff',
+    }
+    if if_none_match == etag:
+        return Response(status_code=status.HTTP_304_NOT_MODIFIED, headers=headers)
+
+    try:
+        result, content = _get_storage_object_bytes(photo.bucket, thumbnail_key)
+        media_type = str(
+            result.get('ContentType')
+            or 'image/webp'
+        )
+        headers['Content-Length'] = str(len(content))
+        return Response(content=content, media_type=media_type, headers=headers)
+    except Exception:
+        pass
+
+    _, source_bytes = _get_photo_object(photo)
+    thumbnail_bytes, media_type = _build_thumbnail_bytes(source_bytes, PHOTO_THUMBNAIL_MAX_SIZE)
+    if media_type == 'application/octet-stream':
+        media_type = photo.content_type
+
+    headers['Content-Length'] = str(len(thumbnail_bytes))
+    return Response(content=thumbnail_bytes, media_type=media_type, headers=headers)
 
 
 @router.get('/{photo_id}/image', name='get_photo_image')

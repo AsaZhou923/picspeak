@@ -4,7 +4,7 @@ import json
 import unittest
 from unittest.mock import patch
 
-from app.core.http_client import PooledHTTPResponse
+from app.core.http_client import PooledHTTPResponse, PooledHTTPStatusError
 from app.goal_assessment import GOAL_ASSESSMENT_VERSION, GoalAssessmentContext
 from app.services.ai import AIReviewError
 from app.services.retake_comparison import DIMENSION_KEYS, RETAKE_RESPONSE_SCHEMA, run_retake_comparison
@@ -508,6 +508,36 @@ class RetakeComparisonTests(unittest.TestCase):
                 self._run()
 
         self.assertEqual(request.call_args.args[1], 'https://gateway.example/v1/responses')
+
+    def test_http_error_masks_signed_original_and_retake_urls(self) -> None:
+        body = {
+            'error': {
+                'message': (
+                    'provider echoed https://storage.example.com/original.jpg?X-Amz-Credential=credential-secret'
+                    '&X-Amz-Signature=signature-secret'
+                    '&photo_token=photo-secret'
+                ),
+                'code': 'bad_image',
+            }
+        }
+        status_error = PooledHTTPStatusError(
+            PooledHTTPResponse(status=400, data=json.dumps(body).encode('utf-8'), headers={}, reason='Bad Request')
+        )
+        with patch('app.services.retake_comparison.settings') as mocked_settings:
+            mocked_settings.openai_api_key = 'test-openai-key'
+            mocked_settings.retake_analysis_model = 'gpt-6-luna'
+            mocked_settings.retake_analysis_reasoning_effort = 'xhigh'
+            mocked_settings.retake_analysis_api_url = 'https://api.openai.com/v1/responses'
+            mocked_settings.retake_analysis_timeout_seconds = 180
+            with patch('app.services.retake_comparison.pooled_request', side_effect=status_error):
+                with self.assertRaises(AIReviewError) as raised:
+                    self._run()
+
+        message = str(raised.exception)
+        self.assertIn('OpenAI retake comparison API HTTP 400', message)
+        self.assertIn('bad_image', message)
+        for secret in ('credential-secret', 'signature-secret', 'photo-secret'):
+            self.assertNotIn(secret, message)
 
     def test_rejects_invalid_structured_output_json(self) -> None:
         response = PooledHTTPResponse(

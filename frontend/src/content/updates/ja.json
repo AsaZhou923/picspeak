@@ -1,5 +1,21 @@
 [
   {
+    "id": "2026-10-08-private-image-access",
+    "date": "2026-10-08",
+    "showPopup": false,
+    "title": "写真の閲覧権限を保護",
+    "summary": "写真と生成画像は権限と有効期限を確認して読み込む方式になり、ストレージの直接リンクの露出を減らします。公開ギャラリーの閲覧は引き続き利用できます。この変更で写真が削除されたり、保存済みの講評が書き換わることはありません。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-10-08-private-image-access"
+  },
+  {
+    "id": "2026-10-08-free-history-fifteen-days",
+    "date": "2026-10-08",
+    "showPopup": false,
+    "title": "Free の講評履歴は 15 日間に",
+    "summary": "Free の講評履歴を閲覧できる期間は、各講評の作成から 30 日間から 15 日間へ変更され、既存の履歴にも適用されます。この変更で元の写真が自動削除されることはありません。公開作品と共有リンクは従来の閲覧ルールを維持し、Pro の履歴は引き続き永久保存されます。長期間の振り返りには、写真と講評を保存してください。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-10-08-free-history-fifteen-days"
+  },
+  {
     "id": "2026-10-07-review-reliability-and-gallery",
     "date": "2026-10-07",
     "showPopup": false,

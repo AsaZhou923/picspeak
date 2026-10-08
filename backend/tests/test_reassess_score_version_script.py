@@ -125,6 +125,7 @@ def _photo() -> SimpleNamespace:
     return SimpleNamespace(
         id=201,
         public_id='pho_old',
+        bucket='private-test-bucket',
         object_key='user_usr/2026/09/photo one.jpg',
         exif_data={'Camera': 'A7R3'},
         status=PhotoStatus.READY,
@@ -193,6 +194,17 @@ def _null_cache_lease(*args, **kwargs):
 
 
 class ReassessScoreVersionScriptTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.read_url_patcher = patch.object(
+            script,
+            'get_object_read_url',
+            side_effect=lambda object_key, *, bucket=None: f'https://signed.example/{bucket}/{object_key.replace(" ", "%20")}',
+        )
+        self.get_object_read_url = self.read_url_patcher.start()
+
+    def tearDown(self) -> None:
+        self.read_url_patcher.stop()
+
     def _candidate(self, review=None, photo=None, task=None):
         return script._candidate_from_row(review or _review(), photo or _photo(), task or _task())
 
@@ -299,6 +311,8 @@ class ReassessScoreVersionScriptTests(unittest.TestCase):
         self.assertEqual(item['status'], 'reassessed')
         self.assertEqual(run_review.call_args.kwargs['locale'], 'ja')
         self.assertEqual(run_review.call_args.kwargs['review_model'], 'gpt-6-luna')
+        self.assertEqual(run_review.call_args.kwargs['image_url'], 'https://signed.example/private-test-bucket/user_usr/2026/09/photo%20one.jpg')
+        self.get_object_read_url.assert_called_once_with('user_usr/2026/09/photo one.jpg', bucket='private-test-bucket')
         self.assertEqual(review.public_id, 'rev_old')
         self.assertTrue(review.is_public)
         self.assertTrue(review.gallery_visible)
@@ -528,8 +542,15 @@ class ReassessScoreVersionPostgresTests(unittest.TestCase):
         self.engine = create_engine(TEST_DATABASE_URL, pool_pre_ping=True)
         self.connection = self.engine.connect()
         self.Session = sessionmaker(bind=self.connection, autoflush=False, autocommit=False)
+        self.read_url_patcher = patch.object(
+            script,
+            'get_object_read_url',
+            side_effect=lambda object_key, *, bucket=None: f'https://signed.example/{bucket}/{object_key}',
+        )
+        self.read_url_patcher.start()
 
     def tearDown(self) -> None:
+        self.read_url_patcher.stop()
         self.connection.close()
         self.engine.dispose()
 

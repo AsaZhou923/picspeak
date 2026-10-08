@@ -32,7 +32,7 @@ export function getLlmsText(): string {
 
 ## Pricing and plans
 - Guest: 3 critiques per day, 30 per month, flash only, no saved history
-- Free account: 60 critiques per month, limited Pro previews, 30-day history, and starter AI image credits
+- Free account: 60 critiques per month, limited Pro previews, 15-day history, and starter AI image credits
 - Pro: $3.99/month in English/Japanese flows, with unlimited-style critique usage, permanent history, priority processing, and 199 monthly AI image credits
 - Chinese Pro checkout: $1.99 for 30 days, non-renewing Lemon Squeezy checkout where available
 - Image credit pack: 300 image credits for $3.99 where local payment methods are available

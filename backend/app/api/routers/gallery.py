@@ -191,6 +191,7 @@ def get_gallery_scoreboard(
 
 @router.get('/{review_id}/neighbors', response_model=GalleryNeighborsResponse)
 def get_gallery_neighbors(
+  request: Request,
   review_id: str,
   response: Response,
   created_from: datetime | None = Query(default=None),
@@ -210,6 +211,7 @@ def get_gallery_neighbors(
   response.headers['Cache-Control'] = 'private, no-store'
   return build_gallery_neighbors(
     db,
+    request,
     review_public_id=review_id,
     back_href=back_href if back_href.startswith('/gallery') else '/gallery',
     created_from=created_from,

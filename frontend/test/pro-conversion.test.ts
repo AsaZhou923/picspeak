@@ -18,6 +18,15 @@ test('Pro boundary shifts from model depth to next-round progress value', () => 
   assert.match(proText, /progress tracking/i);
 });
 
+test('Free plan descriptions agree on fifteen-day history in every locale', () => {
+  for (const locale of ['zh', 'en', 'ja'] as const) {
+    const historyFeature = getProPlanBoundaryCopy(locale).free.features.find((feature) => /历史|history|履歴/i.test(feature));
+    assert.ok(historyFeature, locale);
+    assert.match(historyFeature, /15/, locale);
+    assert.doesNotMatch(historyFeature, /30/, locale);
+  }
+});
+
 test('upgrade triggers speak to quota, deeper advice, history trend, and retake comparison', () => {
   assert.match(getProUpgradeTriggerCopy('zh', 'quota_floor').body, /不用反复计算额度/);
   assert.match(getProUpgradeTriggerCopy('zh', 'deeper_result').body, /下一次拍摄/);

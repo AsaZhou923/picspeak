@@ -10,6 +10,7 @@ import {
   buildImageSitemapXml,
   IMAGE_SITEMAP_PATH,
 } from '../src/lib/image-sitemap.ts';
+import { DEMO_IMAGE_FALLBACK_URL } from '../src/lib/demo-review.ts';
 import {
   buildNewsSitemapEntries,
   buildNewsSitemapXml,
@@ -89,6 +90,14 @@ test('image sitemap covers prompt examples, gallery, and the public demo review 
     ),
   );
   assert.ok(entries.some((entry) => entry.loc.startsWith(`${siteConfig.url}/reviews/`)));
+  assert.ok(
+    entries.some(
+      (entry) =>
+        entry.loc === `${siteConfig.url}/reviews/rev_8424d4fbde054759` &&
+        entry.images.some((image) => image.loc === DEMO_IMAGE_FALLBACK_URL),
+    ),
+  );
+  assert.doesNotMatch(DEMO_IMAGE_FALLBACK_URL, /r2\.dev/);
 
   const xml = buildImageSitemapXml(entries);
   assert.match(xml, /xmlns:image="http:\/\/www\.google\.com\/schemas\/sitemap-image\/1\.1"/);

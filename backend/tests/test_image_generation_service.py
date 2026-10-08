@@ -10,7 +10,7 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-from app.services.image_generation import OpenAIImageGenerationClient  # noqa: E402
+from app.services.image_generation import ImageGenerationError, OpenAIImageGenerationClient, _raise_payload_error  # noqa: E402
 
 
 class ImageGenerationServiceTests(unittest.TestCase):
@@ -243,6 +243,28 @@ class ImageGenerationServiceTests(unittest.TestCase):
         self.assertNotIn('quality', request_payload)
         self.assertNotIn('output_format', request_payload)
         self.assertNotIn('response_format', request_payload)
+
+    def test_provider_payload_error_masks_signed_reference_url(self) -> None:
+        signed_url = (
+            'https://storage.example.com/reference.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256'
+            '&X-Amz-Credential=credential-secret'
+            '&X-Amz-Signature=signature-secret'
+            '&photo_token=photo-secret'
+        )
+
+        with self.assertRaises(ImageGenerationError) as raised:
+            _raise_payload_error({
+                'error': {
+                    'code': 'bad_reference',
+                    'message': f'provider could not fetch {signed_url} but metadata stayed useful',
+                }
+            })
+
+        message = str(raised.exception)
+        self.assertIn('bad_reference', message)
+        self.assertIn('metadata stayed useful', message)
+        for secret in ('credential-secret', 'signature-secret', 'photo-secret'):
+            self.assertNotIn(secret, message)
 
 
 if __name__ == '__main__':

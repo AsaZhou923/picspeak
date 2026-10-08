@@ -6,7 +6,6 @@ from io import BytesIO
 import logging
 from numbers import Number
 from typing import Any
-from urllib.parse import quote
 from uuid import uuid4
 
 from PIL import Image, ImageOps, UnidentifiedImageError
@@ -45,7 +44,7 @@ from app.services.image_generation_pricing import (
     normalize_generation_quality,
     normalize_generation_size,
 )
-from app.services.object_storage import get_object_storage_client
+from app.services.object_storage import get_object_read_url, get_object_storage_client
 from app.services.product_analytics import record_product_event
 
 
@@ -685,12 +684,8 @@ def _load_reference_image(db: Session, task: ImageGenerationTask) -> dict[str, A
         'bytes': normalized_bytes,
         'content_type': content_type,
         'filename': _reference_filename(photo.public_id, content_type),
-        'url': _public_object_url(normalized_key),
+        'url': get_object_read_url(normalized_key, bucket=settings.object_bucket),
     }
-
-
-def _public_object_url(object_key: str) -> str:
-    return f'{settings.object_base_url.rstrip("/")}/{quote(str(object_key).lstrip("/"))}'
 
 
 def _reference_input_object_key(task: ImageGenerationTask, photo: Photo) -> str:

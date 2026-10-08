@@ -105,6 +105,7 @@ def _photo() -> SimpleNamespace:
     return SimpleNamespace(
         id=201,
         public_id='pho_old',
+        bucket='private-test-bucket',
         object_key='user_usr/2026/08/photo one.jpg',
         exif_data={'Camera': 'A7R3'},
         status=PhotoStatus.READY,
@@ -137,6 +138,17 @@ def _null_cache_lease(*args, **kwargs):
 
 
 class ReassessGalleryReviewsScriptTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.read_url_patcher = patch.object(
+            script,
+            'get_object_read_url',
+            side_effect=lambda object_key, *, bucket=None: f'https://signed.example/{bucket}/{object_key.replace(" ", "%20")}',
+        )
+        self.get_object_read_url = self.read_url_patcher.start()
+
+    def tearDown(self) -> None:
+        self.read_url_patcher.stop()
+
     def test_dry_run_counts_eligible_without_writes(self) -> None:
         db = MagicMock()
         old_review = _review()
@@ -347,6 +359,7 @@ class ReassessGalleryReviewsScriptTests(unittest.TestCase):
         self.assertEqual(journal_records[0]['original_fields']['final_score'], '5.50')
         self.assertEqual(journal_records[0]['new_ai_usage']['cost_rate_version'], 'test-rates')
         self.assertEqual(len(journal_records[0]['record_digest']), 64)
+        self.get_object_read_url.assert_called_once_with('user_usr/2026/08/photo one.jpg', bucket='private-test-bucket')
         db.add.assert_called_with(old_review)
         db.commit.assert_called_once()
 
@@ -387,8 +400,15 @@ class ReassessGalleryReviewsPostgresTests(unittest.TestCase):
         self.engine = create_engine(TEST_DATABASE_URL, pool_pre_ping=True)
         self.connection = self.engine.connect()
         self.Session = sessionmaker(bind=self.connection, autoflush=False, autocommit=False)
+        self.read_url_patcher = patch.object(
+            script,
+            'get_object_read_url',
+            side_effect=lambda object_key, *, bucket=None: f'https://signed.example/{bucket}/{object_key}',
+        )
+        self.read_url_patcher.start()
 
     def tearDown(self) -> None:
+        self.read_url_patcher.stop()
         self.connection.close()
         self.engine.dispose()
 

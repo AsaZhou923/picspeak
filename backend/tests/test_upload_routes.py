@@ -134,6 +134,25 @@ class UploadRoutesTests(unittest.TestCase):
         db.refresh.assert_not_called()
         db.commit.assert_called_once()
 
+    def test_confirm_upload_discards_server_owned_thumbnail_metadata(self) -> None:
+        client_meta = {
+            'width': 1024,
+            'height': 768,
+            'gallery_thumbnail_key': 'user_victim/private.jpg',
+            'gallery_thumbnail_size': 512,
+            'gallery_thumbnail_content_type': 'text/html',
+            'gallery_thumbnail_future_field': 'untrusted',
+            'upload_metrics': {'object_upload_ms': 33},
+        }
+        _response, db = self._confirm(client_meta=client_meta)
+        photo = db.add.call_args.args[0]
+        self.assertEqual(photo.client_meta, {
+            'width': 1024,
+            'height': 768,
+            'upload_metrics': {'object_upload_ms': 33},
+        })
+        self.assertIn('gallery_thumbnail_key', client_meta)
+
     def test_confirm_photo_upload_rejects_owner_mismatch_before_writes(self) -> None:
         db = MagicMock()
         actor = SimpleNamespace(user=SimpleNamespace(id=8, public_id='usr_other'))

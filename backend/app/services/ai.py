@@ -24,6 +24,7 @@ from app.services.ai_prompts import (
     _score_prompt,
     _writing_prompt,
 )
+from app.services.audit import mask_capability_url_text
 from app.services.review_pricing import ReviewModelUsage, estimate_review_usage_cost
 
 
@@ -592,12 +593,12 @@ def _request_multimodal_json(
     except PooledHTTPStatusError as exc:
         if call_stage is not None:
             notify_ai_provider_call(stage=call_stage, outcome='failed', model_name=model_name, sequence=call_sequence)
-        err_body = exc.response.data.decode('utf-8', errors='ignore')
+        err_body = mask_capability_url_text(exc.response.data.decode('utf-8', errors='ignore'))
         raise AIReviewError(f'AI provider HTTP {exc.response.status}: {err_body[:300]}') from exc
     except PooledHTTPRequestError as exc:
         if call_stage is not None:
             notify_ai_provider_call(stage=call_stage, outcome='failed', model_name=model_name, sequence=call_sequence)
-        raise AIReviewError(f'AI provider request failed: {exc}') from exc
+        raise AIReviewError(f'AI provider request failed: {mask_capability_url_text(str(exc))}') from exc
     except json.JSONDecodeError as exc:
         if call_stage is not None:
             notify_ai_provider_call(stage=call_stage, outcome='failed', model_name=model_name, sequence=call_sequence)
@@ -652,6 +653,7 @@ def _extract_openai_output_text(body: dict) -> str:
                 continue
             refusal = content.get('refusal')
             if isinstance(refusal, str) and refusal.strip():
+                refusal = mask_capability_url_text(refusal)
                 raise AIReviewError(f'OpenAI review was refused: {refusal[:300]}')
             if content.get('type') == 'output_text' and isinstance(content.get('text'), str):
                 return content['text']
@@ -715,7 +717,7 @@ def _request_openai_multimodal_json(
                 model_name=resolved_model_name,
                 sequence=call_sequence,
             )
-        error_body = exc.response.data.decode('utf-8', errors='ignore')
+        error_body = mask_capability_url_text(exc.response.data.decode('utf-8', errors='ignore'))
         raise AIReviewError(f'OpenAI review API HTTP {exc.response.status}: {error_body[:300]}') from exc
     except PooledHTTPRequestError as exc:
         if call_stage is not None:
@@ -725,7 +727,7 @@ def _request_openai_multimodal_json(
                 model_name=resolved_model_name,
                 sequence=call_sequence,
             )
-        raise AIReviewError(f'OpenAI review API request failed: {exc}') from exc
+        raise AIReviewError(f'OpenAI review API request failed: {mask_capability_url_text(str(exc))}') from exc
     except json.JSONDecodeError as exc:
         if call_stage is not None:
             notify_ai_provider_call(

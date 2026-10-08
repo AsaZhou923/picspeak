@@ -106,7 +106,7 @@ const _usage: UsageResponse = {
   },
   features: {
     review_modes: ['flash', 'pro'],
-    history_retention_days: 30,
+    history_retention_days: 15,
     priority_queue: false,
   },
   subscription: null,

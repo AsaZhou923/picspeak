@@ -10,7 +10,6 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, Iterator
-from urllib.parse import quote
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session, sessionmaker
@@ -20,10 +19,10 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 from app.api.routers.gallery_support import GALLERY_AUDIT_APPROVED  # noqa: E402
-from app.core.config import settings  # noqa: E402
 from app.db.models import Photo, PhotoStatus, Review  # noqa: E402
 from app.db.session import SessionLocal, engine  # noqa: E402
 from app.services.ai import AIReviewError, run_ai_review  # noqa: E402
+from app.services.object_storage import get_object_read_url  # noqa: E402
 from app.services.review_score_cache import (  # noqa: E402
     canonical_score_cache_lease,
     review_uses_current_full_review_contract,
@@ -200,7 +199,7 @@ def _reassess_one(
     review_model: str,
     journal: RunJournal,
 ) -> dict[str, Any]:
-    image_url = f'{settings.object_base_url.rstrip("/")}/{quote(photo.object_key)}'
+    image_url = get_object_read_url(photo.object_key, bucket=photo.bucket)
     with canonical_score_cache_lease(db, photo=photo, image_type=review.image_type or 'default') as canonical_score:
         ai_response = run_ai_review(
             review.mode.value if hasattr(review.mode, 'value') else str(review.mode),

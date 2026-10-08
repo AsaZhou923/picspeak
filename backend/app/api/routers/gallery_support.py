@@ -12,13 +12,14 @@ from app.api.routers.photos import (
     GALLERY_THUMBNAIL_CACHE_CONTROL,
     PHOTO_THUMBNAIL_MAX_SIZE,
     _build_photo_proxy_url,
+    _request_url_for,
     _build_storage_photo_url,
     _build_thumbnail_bytes,
     _get_photo_object,
     _photo_client_meta,
 )
 from app.core.errors import api_error
-from app.db.models import Photo, Review, ReviewLike, User
+from app.db.models import Photo, Review, ReviewLike, ReviewStatus, User
 from app.schemas import PublicGalleryItem
 from app.services.gallery_summary import extract_review_gallery_summary
 from app.services.object_storage import get_object_storage_client
@@ -97,18 +98,11 @@ def _gallery_thumbnail_object_key(photo: Photo, *, size: int = PHOTO_THUMBNAIL_M
   return f'gallery-thumbnails/{photo.public_id}/{size}.webp'
 
 
-def _gallery_thumbnail_url(photo: Photo) -> str | None:
-  object_key = _photo_client_meta(photo).get('gallery_thumbnail_key')
-  if not isinstance(object_key, str) or not object_key.strip():
-    return None
-  return _build_storage_photo_url(object_key.strip())
+def _build_public_gallery_thumbnail_url(request: Request, review_public_id: str) -> str:
+  return _request_url_for(request, 'get_public_gallery_thumbnail', review_id=review_public_id)
 
 
 def _ensure_gallery_thumbnail(photo: Photo, *, size: int = PHOTO_THUMBNAIL_MAX_SIZE) -> str:
-  existing_url = _gallery_thumbnail_url(photo)
-  if existing_url:
-    return existing_url
-
   _, source_bytes = _get_photo_object(photo)
   thumbnail_bytes, media_type = _build_thumbnail_bytes(source_bytes, size)
   if media_type != 'image/webp' or not thumbnail_bytes:
@@ -140,7 +134,7 @@ def _ensure_gallery_thumbnail(photo: Photo, *, size: int = PHOTO_THUMBNAIL_MAX_S
   client_meta['gallery_thumbnail_size'] = size
   client_meta['gallery_thumbnail_content_type'] = 'image/webp'
   photo.client_meta = client_meta
-  return _build_storage_photo_url(object_key)
+  return _build_storage_photo_url(object_key, bucket=photo.bucket)
 
 
 def _gallery_like_counts(db: Session, review_ids: list[int]) -> dict[int, int]:
@@ -175,6 +169,7 @@ def _gallery_like_count(db: Session, review_id: int) -> int:
 def _public_gallery_filters() -> tuple[Any, ...]:
   return (
     Review.deleted_at.is_(None),
+    Review.status == ReviewStatus.SUCCEEDED,
     Review.gallery_visible == True,  # noqa: E712
     Review.gallery_audit_status == GALLERY_AUDIT_APPROVED,
   )
@@ -266,17 +261,11 @@ def _public_gallery_item(
   liked_by_viewer: bool = False,
   recommendation: dict[str, float | bool | None] | None = None,
 ) -> PublicGalleryItem:
-  gallery_thumbnail_url = _gallery_thumbnail_url(photo)
   return PublicGalleryItem(
     review_id=review.public_id,
     photo_id=photo.public_id,
     photo_url=_build_photo_proxy_url(request, photo.public_id, owner.public_id),
-    photo_thumbnail_url=gallery_thumbnail_url or _build_photo_proxy_url(
-      request,
-      photo.public_id,
-      owner.public_id,
-      size=PHOTO_THUMBNAIL_MAX_SIZE,
-    ),
+    photo_thumbnail_url=_build_public_gallery_thumbnail_url(request, review.public_id),
     mode=review.mode.value,
     image_type=_review_image_type_gallery(review),
     final_score=float(review.final_score),

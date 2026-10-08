@@ -331,6 +331,7 @@ class ImageGenerationRoutesTests(unittest.TestCase):
         image = SimpleNamespace(
             public_id='gen_source',
             task=None,
+            object_bucket='generated',
             object_key='generated/user_usr/2026/04/gen_source.webp',
             generation_mode='review_linked',
             intent='retake_reference',
@@ -349,11 +350,21 @@ class ImageGenerationRoutesTests(unittest.TestCase):
             metadata_json={'user_prompt': 'next shoot reference'},
         )
 
-        payload = _generation_item_payload(db, image)
+        with patch(
+            'app.api.routers.generations._build_storage_photo_url',
+            return_value='https://signed.example.com/generated/gen_source.webp',
+        ) as build_storage_url:
+            payload = _generation_item_payload(db, image)
 
         self.assertEqual(payload.source_photo_id, 'pho_source')
         self.assertEqual(payload.source_review_id, 'rev_source')
         self.assertEqual(payload.prompt, 'next shoot reference')
+        self.assertEqual(payload.image_url, 'https://signed.example.com/generated/gen_source.webp')
+        build_storage_url.assert_called_once_with(
+            'generated/user_usr/2026/04/gen_source.webp',
+            bucket='generated',
+            expires_in=900,
+        )
 
     def test_generation_task_status_read_does_not_commit(self) -> None:
         db = MagicMock()

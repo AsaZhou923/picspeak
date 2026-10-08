@@ -27,3 +27,18 @@ def get_object_storage_client() -> BaseClient:
         region_name=settings.object_region.strip() or 'auto',
     )
 
+
+def get_object_read_url(object_key: str, *, bucket: str | None = None, expires_in: int = 3600) -> str:
+    resolved_bucket = (bucket or settings.object_bucket).strip()
+    if not resolved_bucket:
+        raise ValueError('OBJECT_BUCKET is not configured')
+
+    return get_object_storage_client().generate_presigned_url(
+        ClientMethod='get_object',
+        Params={
+            'Bucket': resolved_bucket,
+            'Key': object_key,
+        },
+        ExpiresIn=expires_in,
+    )
+

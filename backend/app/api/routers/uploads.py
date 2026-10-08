@@ -294,7 +294,10 @@ def confirm_photo_upload(
         height=client_height,
         status=PhotoStatus.READY,
         exif_data=payload.exif_data,
-        client_meta=payload.client_meta,
+        client_meta={
+            key: value for key, value in payload.client_meta.items()
+            if not key.startswith('gallery_thumbnail_')
+        },
         nsfw_label=None,
         nsfw_score=None,
         rejected_reason=None,

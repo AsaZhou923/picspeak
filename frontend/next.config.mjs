@@ -115,10 +115,27 @@ const securityHeaders = [
 const seoResponseHeaders = [
   {
     key: 'Link',
-    value:
-      '<https://clerk.picspeak.art>; rel=preconnect; crossorigin, <https://pub-7ae066210514433e84a850bc95c5f1a2.r2.dev>; rel=preconnect',
+    value: buildPreconnectLinks(),
   },
 ];
+
+function buildPreconnectLinks() {
+  const links = ['<https://clerk.picspeak.art>; rel=preconnect; crossorigin'];
+  const rawApiUrl = process.env.NEXT_PUBLIC_API_URL;
+
+  if (rawApiUrl) {
+    try {
+      const apiUrl = new URL(rawApiUrl);
+      if (apiUrl.protocol === 'https:' || apiUrl.protocol === 'http:') {
+        appendUniqueSource(links, `<${apiUrl.origin}>; rel=preconnect`);
+      }
+    } catch {
+      // Ignore invalid env values and keep the static preconnect hints.
+    }
+  }
+
+  return links.join(', ');
+}
 
 const publicPageCacheHeaders = [
   {

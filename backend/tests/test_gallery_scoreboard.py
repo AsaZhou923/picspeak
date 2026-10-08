@@ -27,10 +27,15 @@ TEST_DATABASE_URL = os.getenv('PICSPEAK_TEST_DATABASE_URL', '').strip()
 
 
 def _request_stub():
+    def url_for(route_name, **kwargs):
+        if route_name == 'get_public_gallery_thumbnail':
+            return f"http://testserver/api/v1/photos/gallery/{kwargs['review_id']}/thumbnail"
+        return f"http://testserver/api/v1/photos/{kwargs['photo_id']}/image"
+
     return SimpleNamespace(
         base_url='http://testserver/',
         headers={'host': 'testserver'},
-        url_for=lambda _route_name, **kwargs: f"http://testserver/api/v1/photos/{kwargs['photo_id']}/image",
+        url_for=url_for,
     )
 
 
@@ -429,10 +434,13 @@ class GalleryScoreboardPostgresTests(unittest.TestCase):
         self.assertEqual(first.status_code, 200)
         self.assertIsNone(first.json()['previous'])
         self.assertEqual(first.json()['next']['review_id'], review_ids[1])
+        self.assertIn(f"/api/v1/photos/gallery/{review_ids[1]}/thumbnail", first.json()['next']['photo_thumbnail_url'])
         self.assertEqual(first.json()['back_href'], '/gallery')
         self.assertEqual(middle.status_code, 200)
         self.assertEqual(middle.json()['previous']['review_id'], review_ids[0])
+        self.assertIn(f"/api/v1/photos/gallery/{review_ids[0]}/thumbnail", middle.json()['previous']['photo_thumbnail_url'])
         self.assertEqual(middle.json()['next']['review_id'], review_ids[2])
+        self.assertIn(f"/api/v1/photos/gallery/{review_ids[2]}/thumbnail", middle.json()['next']['photo_thumbnail_url'])
         self.assertEqual(last.status_code, 200)
         self.assertEqual(last.json()['previous']['review_id'], review_ids[1])
         self.assertIsNone(last.json()['next'])

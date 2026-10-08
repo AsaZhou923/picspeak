@@ -136,7 +136,7 @@ def history_retention_days_for_plan(plan: UserPlan) -> int | None:
     if plan == UserPlan.guest:
         return 0
     if plan == UserPlan.free:
-        return 30
+        return 15
     if plan == UserPlan.pro:
         return None
     return None

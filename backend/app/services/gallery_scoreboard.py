@@ -18,8 +18,8 @@ from app.schemas import PublicGalleryItem
 from app.api.routers.gallery_support import (
     _apply_review_history_filters_gallery,
     _as_utc_datetime,
+    _build_public_gallery_thumbnail_url,
     _gallery_like_counts,
-    _gallery_thumbnail_url,
     _gallery_rank_score_expr,
     _public_gallery_filters,
     _public_gallery_item,
@@ -192,20 +192,21 @@ def _gallery_order_expr(sort: str, rank_reference_at: datetime | None):
     return _gallery_rank_score_expr(reference_now=rank_reference_at).label('gallery_primary_val')
 
 
-def _neighbor_item(row: tuple[Review, Photo, User, float], like_count: int) -> GalleryNeighborItem:
-    review, photo, owner, _primary = row
+def _neighbor_item(request: Request, row: tuple[Review, Photo, User, float], like_count: int) -> GalleryNeighborItem:
+    review, _photo, owner, _primary = row
     return GalleryNeighborItem(
         review_id=review.public_id,
         gallery_added_at=review.gallery_added_at or review.created_at,
         final_score=float(review.final_score),
         like_count=max(0, int(like_count)),
         owner_username=owner.username,
-        photo_thumbnail_url=_gallery_thumbnail_url(photo),
+        photo_thumbnail_url=_build_public_gallery_thumbnail_url(request, review.public_id),
     )
 
 
 def build_gallery_neighbors(
     db: Session,
+    request: Request,
     *,
     review_public_id: str,
     back_href: str,
@@ -244,6 +245,6 @@ def build_gallery_neighbors(
         rows[current_index + 1] if current_index + 1 < len(rows) else None,
     ]
     like_counts = _gallery_like_counts(db, [row[0].id for row in neighbor_rows if row is not None])
-    previous = _neighbor_item(neighbor_rows[0], like_counts.get(neighbor_rows[0][0].id, 0)) if neighbor_rows[0] else None
-    next_item = _neighbor_item(neighbor_rows[1], like_counts.get(neighbor_rows[1][0].id, 0)) if neighbor_rows[1] else None
+    previous = _neighbor_item(request, neighbor_rows[0], like_counts.get(neighbor_rows[0][0].id, 0)) if neighbor_rows[0] else None
+    next_item = _neighbor_item(request, neighbor_rows[1], like_counts.get(neighbor_rows[1][0].id, 0)) if neighbor_rows[1] else None
     return GalleryNeighborsResponse(review_id=review_public_id, previous=previous, next=next_item, back_href=back_href)

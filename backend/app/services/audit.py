@@ -33,10 +33,20 @@ SENSITIVE_QUERY_FIELDS = {
     'id_token',
     'guest_token',
     'session_token',
+    'photo_token',
     'code',
     'token',
     'state',
+    'x-amz-credential',
+    'x-amz-security-token',
+    'x-amz-signature',
 }
+
+CAPABILITY_QUERY_FIELDS = frozenset({
+    *SENSITIVE_QUERY_FIELDS,
+    'x-goog-signature',
+    'x-goog-credential',
+})
 
 
 def _mask_sensitive_text(text: str) -> str:
@@ -64,6 +74,22 @@ def _mask_form_encoded_text(text: str) -> str:
     return masked
 
 
+def mask_capability_url_text(text: str) -> str:
+    """Mask query values that grant image/object access in provider echoes."""
+    masked = _mask_sensitive_text(str(text))
+    masked = _mask_form_encoded_text(masked)
+    for key in CAPABILITY_QUERY_FIELDS:
+        masked = re.sub(
+            rf'((?:^|[?&]|%3[fF]|%26|\\u0026|\\u003[fF]|&amp;){re.escape(key)}(?:=|%3[dD]|\\u003[dD]))'
+            r'.*?'
+            r'(?=$|[&\s"\'<>]|%26|\\u0026|&amp;)',
+            rf'\1***',
+            masked,
+            flags=re.IGNORECASE,
+        )
+    return masked
+
+
 def _safe_query_string(query_string: str | None) -> str | None:
     if not query_string:
         return None
@@ -73,7 +99,7 @@ def _safe_query_string(query_string: str | None) -> str | None:
         return _mask_form_encoded_text(query_string)
 
     sanitized = [
-        (key, '***' if key.strip().lower() in SENSITIVE_QUERY_FIELDS else value)
+        (key, '***' if key.strip().lower() in CAPABILITY_QUERY_FIELDS else value)
         for key, value in parsed
     ]
     return urlencode(sanitized, doseq=True)
@@ -90,8 +116,7 @@ def _safe_text_from_body(body: bytes) -> str | None:
     content = content.strip()
     if not content:
         return None
-    content = _mask_sensitive_text(content)
-    content = _mask_form_encoded_text(content)
+    content = mask_capability_url_text(content)
     if len(content) > MAX_LOG_BODY_CHARS:
         return content[:MAX_LOG_BODY_CHARS] + '...<truncated>'
     return content

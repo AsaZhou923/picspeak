@@ -89,6 +89,10 @@ Next.js 15 / React 18
 | Authentication | Clerk plus guest sessions and legacy Google OAuth compatibility |
 | Billing | Lemon Squeezy subscriptions, activation codes, and generation credit packs |
 
+Storage reads use short-lived S3 GET URLs for AI requests and generated images. Photo results use the signed backend image proxy; public Gallery thumbnails use a stable backend route that checks the current publication and approval state. `OBJECT_BASE_URL` is retained for configuration compatibility and is no longer required for these image reads.
+
+For an existing public R2 bucket, deploy and verify these read paths before disabling its public development URL and any other public bucket domains. Turning off the public URL before the backend update can interrupt image display and AI requests. Storage cleanup is a separate maintenance operation; changing the Free history window does not delete objects.
+
 ## OpenAI Build Week 2026
 
 PicSpeak existed before the submission window. The Build Week contribution extended the existing single-photo product into an auditable retake loop rather than only replacing a model name. The pre-event baseline is [`b74ddfb`](https://github.com/AsaZhou923/picspeak/commit/b74ddfb88ae32e37965ba8b29f40c9ebcbbf77fc); the core paired-comparison implementation landed in [`2a626aa`](https://github.com/AsaZhou923/picspeak/commit/2a626aabab30d5cdb45ca0450fdd1ce7a5387b4c).
@@ -188,6 +192,8 @@ The frontend and backend can be deployed independently. The backend includes a c
 
 ## Documentation
 
+- [Controlled photo access](docs/changelog/CHANGELOG.md#2026-10-08-private-image-access)
+- [15-day Free critique history](docs/changelog/CHANGELOG.md#2026-10-08-free-history-fifteen-days)
 - [Latest announcement for Chinese users: upcoming model and Pro pricing update](docs/changelog/CHANGELOG.md#2026-10-08-gpt6-sol-and-pro-pricing)
 - [Previous critique reliability and gallery improvements](docs/changelog/CHANGELOG.md#2026-10-07-review-reliability-and-gallery)
 - [Previous scoring refinement and gallery reassessment](docs/changelog/CHANGELOG.md#2026-10-06-photo-rubric-and-gallery-reassessment)

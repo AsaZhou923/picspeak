@@ -66,7 +66,7 @@ const COPY: Record<ProConversionLocale, LocaleCopy> = {
       free: {
         title: 'Free',
         body: '适合快速诊断照片是否成立，并拿到基础建议后马上试下一张。',
-        features: ['快速诊断 + 基础建议', '有限 Pro 预览', '30 天历史保留'],
+        features: ['快速诊断 + 基础建议', '有限 Pro 预览', '15 天历史保留'],
       },
       pro: {
         title: 'Pro',
@@ -142,7 +142,7 @@ const COPY: Record<ProConversionLocale, LocaleCopy> = {
       free: {
         title: 'Free',
         body: 'Best for quick diagnosis and basic next-step advice before trying another frame.',
-        features: ['Quick diagnosis + basic next-step advice', 'Limited Pro preview', '30-day history'],
+        features: ['Quick diagnosis + basic next-step advice', 'Limited Pro preview', '15-day history'],
       },
       pro: {
         title: 'Pro',
@@ -218,7 +218,7 @@ const COPY: Record<ProConversionLocale, LocaleCopy> = {
       free: {
         title: 'Free',
         body: '写真の問題を素早く診断し、基本的な次の一手を得るのに向いています。',
-        features: ['素早い診断 + 基本提案', '限定 Pro プレビュー', '30 日間の履歴'],
+        features: ['素早い診断 + 基本提案', '限定 Pro プレビュー', '15 日間の履歴'],
       },
       pro: {
         title: 'Pro',

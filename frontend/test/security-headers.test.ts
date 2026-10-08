@@ -99,17 +99,28 @@ test('canonical redirects consolidate the demo alias and force HTTPS with www', 
 });
 
 test('public responses advertise third-party preconnects without fake global language variance', async () => {
-  const nextConfig = await loadNextConfig('public-headers');
+  const originalApiUrl = process.env.NEXT_PUBLIC_API_URL;
+  process.env.NEXT_PUBLIC_API_URL = 'https://api.picspeak.art/api/v1';
+  try {
+    const nextConfig = await loadNextConfig('public-headers');
 
-  const routes = await nextConfig.headers();
-  const globalRoute = routes.find((route) => route.source === '/:path*');
-  const headers = new Map(globalRoute?.headers.map((header) => [header.key, header.value]) ?? []);
+    const routes = await nextConfig.headers();
+    const globalRoute = routes.find((route) => route.source === '/:path*');
+    const headers = new Map(globalRoute?.headers.map((header) => [header.key, header.value]) ?? []);
 
-  assert.equal(headers.get('Vary'), undefined);
-  assert.match(headers.get('Link') ?? '', /rel=preconnect/);
-  assert.match(headers.get('Link') ?? '', /https:\/\/clerk\.picspeak\.art/);
-  assert.match(headers.get('Link') ?? '', /https:\/\/pub-7ae066210514433e84a850bc95c5f1a2\.r2\.dev/);
-  assert.equal(headers.get('X-Frame-Options'), 'DENY');
+    assert.equal(headers.get('Vary'), undefined);
+    assert.match(headers.get('Link') ?? '', /rel=preconnect/);
+    assert.match(headers.get('Link') ?? '', /https:\/\/clerk\.picspeak\.art/);
+    assert.match(headers.get('Link') ?? '', /<https:\/\/api\.picspeak\.art>; rel=preconnect/);
+    assert.doesNotMatch(headers.get('Link') ?? '', /r2\.dev|\/api\/v1/);
+    assert.equal(headers.get('X-Frame-Options'), 'DENY');
+  } finally {
+    if (originalApiUrl === undefined) {
+      delete process.env.NEXT_PUBLIC_API_URL;
+    } else {
+      process.env.NEXT_PUBLIC_API_URL = originalApiUrl;
+    }
+  }
 });
 
 test('localized public pages partition shared cache by cookie and accepted language', async () => {

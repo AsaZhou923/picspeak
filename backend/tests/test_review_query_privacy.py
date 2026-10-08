@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sys
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -13,7 +13,9 @@ if str(BACKEND_ROOT) not in sys.path:
 
 from app.api.routers.review_queries import get_public_review, get_review  # noqa: E402
 from app.api.routers.review_support import _review_result_payload  # noqa: E402
+from app.core.errors import ApiHTTPException  # noqa: E402
 from app.db.models import UserPlan  # noqa: E402
+from app.services.guard import history_retention_days_for_plan, review_history_cutoff  # noqa: E402
 
 
 class ReviewQueryPrivacyTests(unittest.TestCase):
@@ -215,7 +217,8 @@ class ReviewQueryPrivacyTests(unittest.TestCase):
         self.assertIsNone(response['note'])
         self.assertEqual(result_payload.call_args.kwargs['exif_info'], {})
 
-    def test_owner_review_keeps_photo_exif(self) -> None:
+    def test_owner_review_keeps_photo_exif_at_free_history_boundary(self) -> None:
+        now = datetime(2026, 10, 8, tzinfo=timezone.utc)
         review = SimpleNamespace(
             public_id='rev_owner',
             task_id=None,
@@ -235,7 +238,7 @@ class ReviewQueryPrivacyTests(unittest.TestCase):
             gallery_rejected_reason=None,
             tags_json=['portfolio'],
             note='owner note',
-            created_at=datetime.now(timezone.utc),
+            created_at=now - timedelta(days=15),
         )
         photo_exif = {'Make': 'Leica'}
         photo = SimpleNamespace(public_id='pho_owner', exif_data=photo_exif)
@@ -248,7 +251,7 @@ class ReviewQueryPrivacyTests(unittest.TestCase):
             owner,
         )
 
-        with patch(
+        with patch('app.services.guard.utc_now', return_value=now), patch(
             'app.api.routers.review_queries._build_photo_proxy_url',
             return_value='https://images.example/owner.jpg',
         ), patch(
@@ -274,6 +277,36 @@ class ReviewQueryPrivacyTests(unittest.TestCase):
         self.assertEqual(response['tags'], ['portfolio'])
         self.assertEqual(response['note'], 'owner note')
         self.assertEqual(result_payload.call_args.kwargs['exif_info'], photo_exif)
+
+    def test_free_private_review_older_than_fifteen_days_is_hidden_without_deletion(self) -> None:
+        now = datetime(2026, 10, 8, tzinfo=timezone.utc)
+        actor = SimpleNamespace(user=SimpleNamespace(id=10), plan=UserPlan.free)
+        for age in (timedelta(days=15, seconds=1), timedelta(days=20)):
+            with self.subTest(age=age):
+                review = SimpleNamespace(
+                    owner_user_id=10,
+                    is_public=False,
+                    created_at=now - age,
+                )
+                db = MagicMock()
+                db.query.return_value.join.return_value.join.return_value.filter.return_value.first.return_value = (
+                    review, SimpleNamespace(), SimpleNamespace(),
+                )
+                with patch('app.services.guard.utc_now', return_value=now), self.assertRaises(ApiHTTPException) as raised:
+                    get_review('rev_expired', MagicMock(), db, actor)
+                self.assertEqual(raised.exception.status_code, 404)
+                self.assertEqual(raised.exception.detail['code'], 'REVIEW_NOT_FOUND')
+                db.delete.assert_not_called()
+                db.commit.assert_not_called()
+
+    def test_history_retention_keeps_guest_and_pro_rules_with_fifteen_day_free_cutoff(self) -> None:
+        now = datetime(2026, 10, 8, 12, 30, tzinfo=timezone.utc)
+        self.assertEqual(history_retention_days_for_plan(UserPlan.free), 15)
+        self.assertEqual(review_history_cutoff(UserPlan.free, now=now), now - timedelta(days=15))
+        self.assertEqual(history_retention_days_for_plan(UserPlan.guest), 0)
+        self.assertIsNone(review_history_cutoff(UserPlan.guest, now=now))
+        self.assertIsNone(history_retention_days_for_plan(UserPlan.pro))
+        self.assertIsNone(review_history_cutoff(UserPlan.pro, now=now))
 
 
 if __name__ == '__main__':

@@ -336,7 +336,7 @@ class ImageGenerationTaskProcessorTests(unittest.TestCase):
         self.assertEqual(_output_format_for_content_type('image/jpeg; charset=binary', fallback='webp'), 'jpeg')
         self.assertEqual(_output_format_for_content_type('', fallback='webp'), 'webp')
 
-    def test_load_reference_image_uploads_normalized_public_object_url(self) -> None:
+    def test_load_reference_image_uploads_normalized_signed_object_url(self) -> None:
         db = MagicMock()
         photo = SimpleNamespace(
             id=11,
@@ -362,17 +362,21 @@ class ImageGenerationTaskProcessorTests(unittest.TestCase):
 
         with (
             unittest.mock.patch(storage_client_path, return_value=storage),
-            unittest.mock.patch(
-                'app.services.image_generation_task_processor.settings.object_base_url',
-                'https://cdn.example.com',
-            ),
             unittest.mock.patch('app.services.image_generation_task_processor.settings.object_bucket', 'reference-bucket'),
+            unittest.mock.patch(
+                'app.services.image_generation_task_processor.get_object_read_url',
+                return_value='https://storage.example.com/reference?X-Amz-Signature=test',
+            ) as signed_url,
         ):
             reference = _load_reference_image(db, task)
 
         self.assertEqual(reference['content_type'], 'image/jpeg')
         self.assertEqual(reference['filename'], 'pho_source.jpg')
-        self.assertEqual(reference['url'], 'https://cdn.example.com/generated/reference-inputs/igt_source/pho_source.jpg')
+        self.assertEqual(reference['url'], 'https://storage.example.com/reference?X-Amz-Signature=test')
+        signed_url.assert_called_once_with(
+            'generated/reference-inputs/igt_source/pho_source.jpg',
+            bucket='reference-bucket',
+        )
         upload = storage.put_object.call_args.kwargs
         self.assertEqual(upload['Bucket'], 'reference-bucket')
         self.assertEqual(upload['Key'], 'generated/reference-inputs/igt_source/pho_source.jpg')

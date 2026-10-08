@@ -5,7 +5,6 @@ from copy import deepcopy
 from contextlib import nullcontext
 from datetime import datetime, timedelta, timezone
 import logging
-from urllib.parse import quote
 from uuid import uuid4
 
 from sqlalchemy import case
@@ -36,6 +35,7 @@ from app.services.task_events import record_task_event
 from app.services.review_quota_reservations import (
     reserve_review_quota, consume_review_quota, release_task_review_quota,
 )
+from app.services.object_storage import get_object_read_url
 
 
 logger = logging.getLogger(__name__)
@@ -600,7 +600,7 @@ def _process_task(db: Session, task: ReviewTask, *, claim_token: str | None = No
             )
             return
 
-    image_url = f'{settings.object_base_url.rstrip("/")}/{quote(photo.object_key)}'
+    image_url = get_object_read_url(photo.object_key, bucket=photo.bucket)
     payload_locale = (task.request_payload or {}).get('locale', 'en')
     if practice_context is not None:
         payload_locale = practice_context.session.locale
@@ -652,7 +652,7 @@ def _process_task(db: Session, task: ReviewTask, *, claim_token: str | None = No
                         retryable=False,
                     )
                     return
-                original_image_url = f'{settings.object_base_url.rstrip("/")}/{quote(source_photo.object_key)}'
+                original_image_url = get_object_read_url(source_photo.object_key, bucket=source_photo.bucket)
                 ai_response = run_retake_comparison(
                     original_image_url=original_image_url,
                     retake_image_url=image_url,

@@ -13,7 +13,6 @@ import re
 import sys
 from threading import Lock
 from typing import Any, Callable, Iterator
-from urllib.parse import quote
 from contextlib import contextmanager
 
 from sqlalchemy import text
@@ -29,6 +28,7 @@ from app.db.models import Photo, PhotoStatus, Review, ReviewStatus, ReviewTask, 
 from app.db.session import SessionLocal, engine  # noqa: E402
 from app.services.ai import AIReviewError, run_ai_review  # noqa: E402
 from app.services.ai_prompts import SCORE_VERSION  # noqa: E402
+from app.services.object_storage import get_object_read_url  # noqa: E402
 from app.services.review_score_cache import canonical_score_cache_lease  # noqa: E402
 from app.services.review_task_processor import _normalize_review_result_payload  # noqa: E402
 
@@ -84,6 +84,7 @@ class ReassessmentCandidate:
     photo_public_id: str
     task_id: int
     task_public_id: str
+    photo_bucket: str
     photo_object_key: str
     locale: str
     mode: str
@@ -274,6 +275,7 @@ def _candidate_from_row(review: Review, photo: Photo, task: ReviewTask) -> Reass
         photo_public_id=photo.public_id,
         task_id=task.id,
         task_public_id=task.public_id,
+        photo_bucket=photo.bucket,
         photo_object_key=photo.object_key,
         locale=_locale_from_task(task),
         mode=_mode_value(review.mode),
@@ -433,7 +435,7 @@ def _reassess_candidate(
             if _digest_payload(_review_field_snapshot(review)) != candidate.original_digest:
                 return {'status': 'skipped', 'reason': 'source_changed', 'review_id': candidate.review_public_id}
 
-            image_url = f'{settings.object_base_url.rstrip("/")}/{quote(photo.object_key)}'
+            image_url = get_object_read_url(photo.object_key, bucket=photo.bucket)
             with canonical_score_cache_lease(db, photo=photo, image_type=candidate.image_type) as canonical_score:
                 ai_response = run_ai_review(
                     candidate.mode,

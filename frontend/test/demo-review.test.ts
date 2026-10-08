@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import {
   buildDemoReviewJsonLd,
   DEMO_IMAGE_FALLBACK_URL,
+  DEMO_IMAGE_PUBLIC_PATH,
   DEMO_REVIEW_ID,
   DEMO_REVIEW_RATING_VALUE,
 } from '../src/lib/demo-review.ts';
@@ -16,7 +17,9 @@ import { zhTranslations } from '../src/lib/i18n-zh.ts';
 const TEST_DIR = path.dirname(fileURLToPath(import.meta.url));
 
 test('demo critique fallback image matches the ginkgo review', () => {
-  assert.match(DEMO_IMAGE_FALLBACK_URL, /obj_4fea1f667283448c\.jpg$/);
+  assert.equal(DEMO_IMAGE_PUBLIC_PATH, '/demo-ginkgo.jpg');
+  assert.equal(DEMO_IMAGE_FALLBACK_URL, 'https://www.picspeak.art/demo-ginkgo.jpg');
+  assert.doesNotMatch(DEMO_IMAGE_FALLBACK_URL, /r2\.dev/);
   assert.doesNotMatch(DEMO_IMAGE_FALLBACK_URL, /photo-soft-airy-35mm/);
 });
 

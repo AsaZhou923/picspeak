@@ -7,12 +7,13 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import CurrentActor, get_current_actor, get_db
 from app.api.routers.gallery import GALLERY_AUDIT_APPROVED, GALLERY_AUDIT_NONE, GALLERY_AUDIT_REJECTED, _ensure_gallery_thumbnail
-from app.api.routers.photos import PHOTO_THUMBNAIL_SIZE, _build_photo_proxy_url, _build_storage_photo_url
+from app.api.routers.photos import PHOTO_THUMBNAIL_SIZE, _build_photo_proxy_url
 from app.core.errors import api_error
 from app.db.models import Photo, UserPlan
 from app.schemas import ReviewExportResponse, ReviewMetaResponse, ReviewMetaUpdateRequest, ReviewShareResponse, ReviewVisibilityResponse
 from app.services.guard import review_history_cutoff
 from app.services.content_audit import ContentAuditError, run_content_audit
+from app.services.object_storage import get_object_read_url
 from .review_support import (
     _build_review_export_payload,
     _find_review_owned,
@@ -121,7 +122,7 @@ def update_review_meta(
             if photo is None:
                 raise api_error(status.HTTP_404_NOT_FOUND, 'PHOTO_NOT_FOUND', 'Photo not found')
             try:
-                audit_result = run_content_audit(_build_storage_photo_url(photo.object_key))
+                audit_result = run_content_audit(get_object_read_url(photo.object_key, bucket=photo.bucket))
             except ContentAuditError as exc:
                 raise api_error(status.HTTP_502_BAD_GATEWAY, 'IMAGE_AUDIT_FAILED', f'Image content audit failed: {exc}') from exc
 

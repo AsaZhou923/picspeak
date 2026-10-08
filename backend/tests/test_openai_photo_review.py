@@ -14,7 +14,7 @@ TESTS_ROOT = Path(__file__).resolve().parent
 if str(TESTS_ROOT) not in sys.path:
     sys.path.insert(0, str(TESTS_ROOT))
 
-from app.core.http_client import PooledHTTPRequestError
+from app.core.http_client import PooledHTTPRequestError, PooledHTTPResponse, PooledHTTPStatusError
 from app.services.ai import AIReviewError, build_cached_canonical_score, observe_ai_provider_calls, run_ai_review
 from scoring_fixtures import LOW_SCORES, model_score_payload, score_evidence_fixture
 
@@ -218,6 +218,43 @@ class OpenAIPhotoReviewTests(unittest.TestCase):
         self.assertIsNone(observed[0].input_tokens)
         self.assertIsNone(observed[0].output_tokens)
         self.assertIsNone(observed[0].cost_usd)
+
+    def test_openai_http_error_masks_signed_image_url_echo(self) -> None:
+        cached_score = _cached_score()
+        body = {
+            'error': {
+                'message': (
+                    'provider echoed https://storage.example.com/photo.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256'
+                    '&X-Amz-Credential=credential-secret'
+                    '&X-Amz-Signature=signature-secret'
+                    '&photo_token=photo-secret'
+                ),
+                'type': 'invalid_request',
+            }
+        }
+        status_error = PooledHTTPStatusError(
+            PooledHTTPResponse(status=400, data=json.dumps(body).encode('utf-8'), headers={}, reason='Bad Request')
+        )
+
+        with patch('app.services.ai.settings.openai_api_key', 'test-key'), patch(
+            'app.services.ai.settings.openai_score_model', 'gpt-6-luna'
+        ), patch(
+            'app.services.ai.settings.openai_review_model', 'gpt-5.6-luna'
+        ), patch('app.services.ai.pooled_request', side_effect=status_error):
+            with self.assertRaises(AIReviewError) as raised:
+                run_ai_review(
+                    mode='flash',
+                    image_url='https://storage.example.com/local.jpg?X-Amz-Signature=local-secret',
+                    locale='en',
+                    canonical_score=cached_score,
+                    review_model='gpt-5.6-luna',
+                )
+
+        message = str(raised.exception)
+        self.assertIn('OpenAI review API HTTP 400', message)
+        self.assertIn('invalid_request', message)
+        for secret in ('credential-secret', 'signature-secret', 'photo-secret', 'local-secret'):
+            self.assertNotIn(secret, message)
 
     def test_unknown_review_model_is_rejected(self) -> None:
         with self.assertRaisesRegex(AIReviewError, 'Unsupported review model'):

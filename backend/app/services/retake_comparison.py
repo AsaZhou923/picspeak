@@ -16,6 +16,7 @@ from app.goal_assessment import (
 )
 from app.schemas import ReviewResult
 from app.services.ai import AIReviewError, AIReviewResponse, notify_ai_provider_call
+from app.services.audit import mask_capability_url_text
 from app.services.review_pricing import ReviewModelUsage, estimate_review_usage_cost
 
 
@@ -241,6 +242,7 @@ def _extract_output_text(body: dict) -> str:
                 continue
             refusal = content.get('refusal')
             if isinstance(refusal, str) and refusal.strip():
+                refusal = mask_capability_url_text(refusal)
                 raise AIReviewError(f'OpenAI retake comparison was refused: {refusal[:300]}')
             if content.get('type') == 'output_text' and isinstance(content.get('text'), str):
                 return content['text']
@@ -464,11 +466,11 @@ def run_retake_comparison(
         body = json.loads(response.data.decode('utf-8'))
     except PooledHTTPStatusError as exc:
         notify_ai_provider_call(stage='pair', outcome='failed', model_name=settings.retake_analysis_model)
-        error_body = exc.response.data.decode('utf-8', errors='ignore')
+        error_body = mask_capability_url_text(exc.response.data.decode('utf-8', errors='ignore'))
         raise AIReviewError(f'OpenAI retake comparison API HTTP {exc.response.status}: {error_body[:300]}') from exc
     except PooledHTTPRequestError as exc:
         notify_ai_provider_call(stage='pair', outcome='failed', model_name=settings.retake_analysis_model)
-        raise AIReviewError(f'OpenAI retake comparison API request failed: {exc}') from exc
+        raise AIReviewError(f'OpenAI retake comparison API request failed: {mask_capability_url_text(str(exc))}') from exc
     except json.JSONDecodeError as exc:
         notify_ai_provider_call(stage='pair', outcome='failed', model_name=settings.retake_analysis_model)
         raise AIReviewError('OpenAI retake comparison API returned invalid JSON') from exc

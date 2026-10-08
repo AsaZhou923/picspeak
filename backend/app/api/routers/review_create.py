@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from pydantic import ValidationError
 
 from app.api.deps import CurrentActor, get_current_actor, get_db, new_public_id
-from app.api.routers.photos import _build_storage_photo_url, _find_photo_owned
+from app.api.routers.photos import _find_photo_owned
 from app.core.config import settings
 from app.core.errors import api_error
 from app.db.models import (
@@ -50,6 +50,7 @@ from app.services.review_score_cache import (
     writer_contract_for_review_request,
 )
 from app.services.review_quota_reservations import synchronous_review_quota, consume_review_quota
+from app.services.object_storage import get_object_read_url
 from .review_support import (
     _attach_billing_info,
     _resolve_source_review,
@@ -334,7 +335,7 @@ def create_review(
         return response
 
     with synchronous_review_quota(db, actor.user, mode=mode_enum) as quota_reservation:
-        image_url = _build_storage_photo_url(photo.object_key)
+        image_url = get_object_read_url(photo.object_key, bucket=photo.bucket)
         try:
             if payload.analysis_type == 'retake_compare':
                 if source_review is None:
@@ -347,7 +348,7 @@ def create_review(
                 if source_photo is None or source_photo.status != PhotoStatus.READY:
                     raise AIReviewError('Retake comparison source photo is not ready')
                 ai_response = run_retake_comparison(
-                    original_image_url=_build_storage_photo_url(source_photo.object_key),
+                    original_image_url=get_object_read_url(source_photo.object_key, bucket=source_photo.bucket),
                     retake_image_url=image_url,
                     original_review_id=source_review.public_id,
                     original_photo_id=source_photo.public_id,

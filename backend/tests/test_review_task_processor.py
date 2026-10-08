@@ -34,11 +34,27 @@ class ReviewTaskProcessorTests(unittest.TestCase):
         # Reservation transactions are covered with real concurrent PostgreSQL
         # sessions; these tests isolate the review processor's AI contracts.
         self.enterContext(patch('app.services.review_task_processor.reserve_review_quota', return_value=None))
+        self.enterContext(patch(
+            'app.services.review_task_processor.get_object_read_url',
+            side_effect=lambda object_key, *, bucket: f'https://signed.example/{bucket}/{object_key}',
+        ))
 
     def _practice_worker_fixture(self, *, same_image=False):
         db = MagicMock()
-        source_photo = SimpleNamespace(id=10, public_id='pho_before', object_key='before.jpg', status=PhotoStatus.READY)
-        photo = SimpleNamespace(id=10 if same_image else 11, public_id='pho_after', object_key='after.jpg', exif_data={})
+        source_photo = SimpleNamespace(
+            id=10,
+            public_id='pho_before',
+            bucket='source-bucket',
+            object_key='before.jpg',
+            status=PhotoStatus.READY,
+        )
+        photo = SimpleNamespace(
+            id=10 if same_image else 11,
+            public_id='pho_after',
+            bucket='retake-bucket',
+            object_key='after.jpg',
+            exif_data={},
+        )
         source = SimpleNamespace(id=12, public_id='rev_before', status=ReviewStatus.SUCCEEDED)
         owner = SimpleNamespace(id=22, plan=UserPlan.free)
         task = SimpleNamespace(
@@ -177,7 +193,7 @@ class ReviewTaskProcessorTests(unittest.TestCase):
 
     def test_cache_lock_contention_is_reported_as_retryable_scoring_failure(self) -> None:
         db = MagicMock()
-        photo = SimpleNamespace(id=11, object_key='photo.jpg', exif_data={})
+        photo = SimpleNamespace(id=11, bucket='review-bucket', object_key='photo.jpg', exif_data={})
         owner = SimpleNamespace(id=22, plan=UserPlan.guest)
         task = SimpleNamespace(
             id=33, public_id='tsk_busy_score', photo_id=photo.id, owner_user_id=owner.id,
@@ -287,7 +303,7 @@ class ReviewTaskProcessorTests(unittest.TestCase):
 
     def test_writer_retry_reuses_checkpointed_score(self) -> None:
         db = MagicMock()
-        photo = SimpleNamespace(id=11, object_key='photo.jpg', exif_data={})
+        photo = SimpleNamespace(id=11, bucket='review-bucket', object_key='photo.jpg', exif_data={})
         owner = SimpleNamespace(id=22, plan=UserPlan.guest)
         task = SimpleNamespace(
             id=33,
