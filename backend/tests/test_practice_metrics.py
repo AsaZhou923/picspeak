@@ -26,6 +26,7 @@ from app.services.practice_metrics import (  # noqa: E402
     render_practice_analytics_markdown,
 )
 from app.services.practice_reconciliation import reconcile_practice_costs  # noqa: E402
+from app.services.guard import review_history_cutoff  # noqa: E402
 from scripts.export_practice_analytics_report import main as export_practice_report  # noqa: E402
 
 
@@ -1728,10 +1729,12 @@ class PracticeMetricsPostgresTests(unittest.TestCase):
         end = datetime(2048, 8, 1, tzinfo=timezone.utc)
         as_of = datetime(2048, 7, 20, tzinfo=timezone.utc)
         visibility = datetime(2048, 7, 31, tzinfo=timezone.utc)
-        cutoff = datetime(2048, 7, 1, tzinfo=timezone.utc)
         user = self.users[0]
         self.db.query(BillingSubscription).filter(BillingSubscription.user_id == user.id).delete(synchronize_session=False)
         user.plan = UserPlan.free
+        cutoff = review_history_cutoff(UserPlan.free, now=visibility)
+        self.assertIsNotNone(cutoff)
+        assert cutoff is not None
 
         source_photo = self._photo(user.id, 'cutoff-source-photo', cutoff)
         source = self._source_review(user.id, source_photo.id, 'cutoff-source', cutoff)

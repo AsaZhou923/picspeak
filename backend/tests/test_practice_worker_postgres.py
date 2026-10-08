@@ -78,6 +78,12 @@ def comparison_response() -> PooledHTTPResponse:
 @unittest.skipUnless(TEST_DATABASE_URL, 'requires disposable PostgreSQL via PICSPEAK_TEST_DATABASE_URL')
 class PracticeWorkerPostgresTests(unittest.TestCase):
     def setUp(self):
+        self._signed_url_patchers = [
+            patch('app.services.review_task_processor.get_object_read_url', return_value='https://signed.example.test/review-worker.jpg'),
+            patch('app.api.routers.review_create.get_object_read_url', return_value='https://signed.example.test/review-create.jpg'),
+        ]
+        for patcher in self._signed_url_patchers:
+            patcher.start()
         self.engine = create_engine(TEST_DATABASE_URL)
         self.sessions = sessionmaker(bind=self.engine, expire_on_commit=False)
         self.db = self.sessions()
@@ -104,24 +110,28 @@ class PracticeWorkerPostgresTests(unittest.TestCase):
         self.db.commit()
 
     def tearDown(self):
-        self.db.rollback()
-        public_ids = [row[0] for row in self.db.query(User.public_id).filter(User.id.in_(self.user_ids)).all()]
-        self.db.query(ProductAnalyticsEvent).filter(ProductAnalyticsEvent.user_public_id.in_(public_ids)).delete(synchronize_session=False)
-        self.db.query(ReviewCallCost).filter(ReviewCallCost.owner_user_id.in_(self.user_ids)).delete(synchronize_session=False)
-        tasks = self.db.query(ReviewTask.id).filter(ReviewTask.owner_user_id.in_(self.user_ids))
-        self.db.query(PracticeFeedback).filter(PracticeFeedback.owner_user_id.in_(self.user_ids)).delete()
-        self.db.query(PracticeAttempt).filter(PracticeAttempt.owner_user_id.in_(self.user_ids)).delete()
-        self.db.query(PracticeSession).filter(PracticeSession.owner_user_id.in_(self.user_ids)).delete()
-        self.db.query(UsageLedger).filter(UsageLedger.user_id.in_(self.user_ids)).delete()
-        self.db.query(ReviewTaskEvent).filter(ReviewTaskEvent.task_id.in_(tasks)).delete(synchronize_session=False)
-        self.db.query(IdempotencyKey).filter(IdempotencyKey.user_id.in_(self.user_ids)).delete()
-        self.db.query(Review).filter(Review.owner_user_id.in_(self.user_ids)).delete()
-        self.db.query(ReviewTask).filter(ReviewTask.owner_user_id.in_(self.user_ids)).delete()
-        self.db.query(Photo).filter(Photo.owner_user_id.in_(self.user_ids)).delete()
-        self.db.query(User).filter(User.id.in_(self.user_ids)).delete()
-        self.db.commit()
-        self.db.close()
-        self.engine.dispose()
+        try:
+            self.db.rollback()
+            public_ids = [row[0] for row in self.db.query(User.public_id).filter(User.id.in_(self.user_ids)).all()]
+            self.db.query(ProductAnalyticsEvent).filter(ProductAnalyticsEvent.user_public_id.in_(public_ids)).delete(synchronize_session=False)
+            self.db.query(ReviewCallCost).filter(ReviewCallCost.owner_user_id.in_(self.user_ids)).delete(synchronize_session=False)
+            tasks = self.db.query(ReviewTask.id).filter(ReviewTask.owner_user_id.in_(self.user_ids))
+            self.db.query(PracticeFeedback).filter(PracticeFeedback.owner_user_id.in_(self.user_ids)).delete()
+            self.db.query(PracticeAttempt).filter(PracticeAttempt.owner_user_id.in_(self.user_ids)).delete()
+            self.db.query(PracticeSession).filter(PracticeSession.owner_user_id.in_(self.user_ids)).delete()
+            self.db.query(UsageLedger).filter(UsageLedger.user_id.in_(self.user_ids)).delete()
+            self.db.query(ReviewTaskEvent).filter(ReviewTaskEvent.task_id.in_(tasks)).delete(synchronize_session=False)
+            self.db.query(IdempotencyKey).filter(IdempotencyKey.user_id.in_(self.user_ids)).delete()
+            self.db.query(Review).filter(Review.owner_user_id.in_(self.user_ids)).delete()
+            self.db.query(ReviewTask).filter(ReviewTask.owner_user_id.in_(self.user_ids)).delete()
+            self.db.query(Photo).filter(Photo.owner_user_id.in_(self.user_ids)).delete()
+            self.db.query(User).filter(User.id.in_(self.user_ids)).delete()
+            self.db.commit()
+            self.db.close()
+            self.engine.dispose()
+        finally:
+            for patcher in reversed(getattr(self, '_signed_url_patchers', [])):
+                patcher.stop()
 
     def create_attempt(self):
         session = create_practice_session(

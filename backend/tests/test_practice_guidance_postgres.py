@@ -271,6 +271,9 @@ class PracticeGuidancePostgresTests(unittest.TestCase):
         self.db.flush()
         return session
 
+    def _recent_base(self, *, hours: int = 0) -> datetime:
+        return datetime.now(timezone.utc).replace(microsecond=0) - timedelta(days=2, hours=hours)
+
     @contextmanager
     def _select_counter(self):
         counts = {'selects': 0}
@@ -286,7 +289,7 @@ class PracticeGuidancePostgresTests(unittest.TestCase):
             event.remove(self.engine, 'before_cursor_execute', before_cursor_execute)
 
     def test_thresholds_require_viewed_valid_capture_and_explicit_scene_groups(self):
-        base = datetime(2026, 9, 22, 10, 0, tzinfo=timezone.utc)
+        base = self._recent_base(hours=10)
         self._practice_row('one', scene='street-day', created_at=base)
         self._practice_row('two', scene='street-night', created_at=base + timedelta(minutes=1))
         self.db.commit()
@@ -311,7 +314,7 @@ class PracticeGuidancePostgresTests(unittest.TestCase):
         self.assertEqual(profile.observations, [])
 
     def test_profile_returns_all_scene_group_gaps_for_manual_labeling(self):
-        base = datetime(2026, 9, 22, 10, 30, tzinfo=timezone.utc)
+        base = self._recent_base(hours=9)
         sessions = [
             self._practice_row(f'gap{index}', scene=None, created_at=base + timedelta(minutes=index))
             for index in range(12)
@@ -326,7 +329,7 @@ class PracticeGuidancePostgresTests(unittest.TestCase):
         self.assertEqual(len(profile.scene_group_gaps), 12)
 
     def test_profile_summary_requires_eight_capture_sessions_three_scenes_two_goals(self):
-        base = datetime(2026, 9, 22, 11, 0, tzinfo=timezone.utc)
+        base = self._recent_base(hours=8)
         for index in range(8):
             self._practice_row(
                 f'summary{index}',
@@ -345,7 +348,7 @@ class PracticeGuidancePostgresTests(unittest.TestCase):
         self.assertEqual(profile.coverage.goal_count, 8)
 
     def test_profile_and_recommendations_use_only_viewed_available_high_confidence_capture_evidence(self):
-        base = datetime(2026, 9, 22, 11, 0, tzinfo=timezone.utc)
+        base = self._recent_base(hours=7)
         kept = [
             self._practice_row('kept1', scene='street-day', status='partial', created_at=base),
             self._practice_row('kept2', scene='window-light', status='not_achieved', created_at=base + timedelta(minutes=1)),
@@ -386,7 +389,7 @@ class PracticeGuidancePostgresTests(unittest.TestCase):
         )
 
     def test_mixed_genre_recommendations_use_matching_template_conditions_and_owner_isolation(self):
-        base = datetime(2026, 9, 22, 12, 0, tzinfo=timezone.utc)
+        base = self._recent_base(hours=6)
         self._practice_row('portrait1', scene='portrait-window', status='partial', image_type='portrait', created_at=base)
         self._practice_row('portrait2', scene='portrait-studio', status='not_achieved', image_type='portrait', created_at=base + timedelta(minutes=1))
         self._practice_row('portrait3', scene='portrait-window', status='partial', image_type='portrait', created_at=base + timedelta(minutes=2))
@@ -426,7 +429,7 @@ class PracticeGuidancePostgresTests(unittest.TestCase):
         self.assertIn(session.public_id, {item.session_id for item in pro_profile.recent_evidence})
 
     def test_profile_query_budget_is_constant_for_large_evidence_sets(self):
-        base = datetime(2026, 9, 22, 13, 0, tzinfo=timezone.utc)
+        base = self._recent_base(hours=5)
         for index in range(100):
             self._practice_row(
                 f'budget{index}',
@@ -443,7 +446,7 @@ class PracticeGuidancePostgresTests(unittest.TestCase):
         self.assertLessEqual(counts['selects'], 20)
 
     def test_scene_group_upsert_is_owner_only(self):
-        session = self._practice_row('owner-scene', created_at=datetime(2026, 9, 22, 12, 0, tzinfo=timezone.utc))
+        session = self._practice_row('owner-scene', created_at=self._recent_base(hours=4))
         self.db.commit()
 
         response = upsert_practice_scene_group(

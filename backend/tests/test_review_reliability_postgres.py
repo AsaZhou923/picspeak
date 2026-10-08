@@ -38,6 +38,11 @@ DATABASE_URL = os.getenv('PICSPEAK_TEST_DATABASE_URL', '')
 @unittest.skipUnless(DATABASE_URL, 'requires disposable PostgreSQL')
 class ReviewReliabilityPostgresTests(unittest.TestCase):
     def setUp(self):
+        self._signed_url_patcher = patch(
+            'app.services.review_task_processor.get_object_read_url',
+            return_value='https://signed.example.test/reliability.jpg',
+        )
+        self._signed_url_patcher.start()
         self.engine = create_engine(DATABASE_URL)
         self.Session = sessionmaker(bind=self.engine, expire_on_commit=False)
         self.suffix = uuid4().hex
@@ -57,18 +62,21 @@ class ReviewReliabilityPostgresTests(unittest.TestCase):
             db.commit()
 
     def tearDown(self):
-        with self.Session() as db:
-            tasks = db.query(ReviewTask.id).filter(ReviewTask.owner_user_id == self.user_id)
-            db.query(ReviewTaskEvent).filter(ReviewTaskEvent.task_id.in_(tasks)).delete(synchronize_session=False)
-            db.query(ReviewCallCost).filter(ReviewCallCost.task_id.in_(tasks)).delete(synchronize_session=False)
-            db.query(UsageLedger).filter(UsageLedger.user_id == self.user_id).delete()
-            db.query(ReviewQuotaReservation).filter(ReviewQuotaReservation.user_id == self.user_id).delete()
-            db.query(Review).filter(Review.owner_user_id == self.user_id).delete()
-            db.query(ReviewTask).filter(ReviewTask.owner_user_id == self.user_id).delete()
-            db.query(Photo).filter(Photo.owner_user_id == self.user_id).delete()
-            db.query(User).filter(User.id == self.user_id).delete()
-            db.commit()
-        self.engine.dispose()
+        try:
+            with self.Session() as db:
+                tasks = db.query(ReviewTask.id).filter(ReviewTask.owner_user_id == self.user_id)
+                db.query(ReviewTaskEvent).filter(ReviewTaskEvent.task_id.in_(tasks)).delete(synchronize_session=False)
+                db.query(ReviewCallCost).filter(ReviewCallCost.task_id.in_(tasks)).delete(synchronize_session=False)
+                db.query(UsageLedger).filter(UsageLedger.user_id == self.user_id).delete()
+                db.query(ReviewQuotaReservation).filter(ReviewQuotaReservation.user_id == self.user_id).delete()
+                db.query(Review).filter(Review.owner_user_id == self.user_id).delete()
+                db.query(ReviewTask).filter(ReviewTask.owner_user_id == self.user_id).delete()
+                db.query(Photo).filter(Photo.owner_user_id == self.user_id).delete()
+                db.query(User).filter(User.id == self.user_id).delete()
+                db.commit()
+            self.engine.dispose()
+        finally:
+            self._signed_url_patcher.stop()
 
     def _task(self):
         with self.Session() as db:

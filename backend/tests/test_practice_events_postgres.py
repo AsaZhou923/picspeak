@@ -53,6 +53,9 @@ class PracticeEventsPostgresTests(unittest.TestCase):
         self.db.commit()
         with patch('app.services.retake_comparison.settings.openai_api_key', 'fixture-only'), patch(
             'app.services.retake_comparison.pooled_request', return_value=worker_fixtures.comparison_response()
+        ), patch(
+            'app.services.review_task_processor.get_object_read_url',
+            return_value='https://signed.example.test/practice-events.jpg',
         ):
             _process_task(self.db, self.task)
         return self.db.query(PracticeAttempt).filter(PracticeAttempt.task_id == self.task.id).one()

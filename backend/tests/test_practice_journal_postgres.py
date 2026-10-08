@@ -237,8 +237,11 @@ class PracticeJournalPostgresTests(unittest.TestCase):
     def _request(self) -> Request:
         return Request({'type': 'http', 'method': 'GET', 'path': '/reviews/rev', 'headers': [(b'host', b'example.test')]})
 
+    def _recent_base(self, *, hours: int = 0) -> datetime:
+        return datetime.now(timezone.utc).replace(microsecond=0) - timedelta(days=2, hours=hours)
+
     def test_list_cursor_uses_created_at_and_id_without_duplicates(self):
-        shared_time = datetime(2026, 9, 19, 10, 0, tzinfo=timezone.utc)
+        shared_time = self._recent_base(hours=10)
         source_photo = self._photo(self.user, 'source')
         source = self._review(self.user, source_photo, 'source', image_type='street', created_at=shared_time)
         first = self._session(self.user, source, source_photo, 'first', dimension='composition', created_at=shared_time)
@@ -258,7 +261,7 @@ class PracticeJournalPostgresTests(unittest.TestCase):
         self.assertEqual(page_one.items[0].source.genre, 'street')
 
     def test_summary_uses_all_sessions_even_when_list_is_filtered(self):
-        base = datetime(2026, 9, 19, 11, 0, tzinfo=timezone.utc)
+        base = self._recent_base(hours=9)
         source_photo = self._photo(self.user, 'sum-source')
         source = self._review(self.user, source_photo, 'sum-source', created_at=base)
         achieved_session = self._session(self.user, source, source_photo, 'achieved', dimension='composition', created_at=base)
@@ -291,7 +294,7 @@ class PracticeJournalPostgresTests(unittest.TestCase):
         self.assertEqual(summary.failed_count, 1)
 
     def test_deleted_source_and_deleted_attempt_review_do_not_leak_ids_or_count_as_sample(self):
-        now = datetime(2026, 9, 19, 12, 0, tzinfo=timezone.utc)
+        now = self._recent_base(hours=8)
         source_photo = self._photo(self.user, 'deleted-source-photo')
         source = self._review(self.user, source_photo, 'deleted-source', deleted=True, created_at=now)
         session = self._session(self.user, source, source_photo, 'deleted-source', created_at=now)
@@ -377,7 +380,7 @@ class PracticeJournalPostgresTests(unittest.TestCase):
                     self.assertEqual(context['source_photo_id'], source_photo.public_id if expect_ids else None)
 
     def test_rejected_source_photo_hides_source_ids_and_disables_continue(self):
-        now = datetime(2026, 9, 19, 13, 0, tzinfo=timezone.utc)
+        now = self._recent_base(hours=7)
         source_photo = self._photo(self.user, 'rejected-source-photo')
         source_photo.status = PhotoStatus.REJECTED
         source = self._review(self.user, source_photo, 'rejected-source', created_at=now)
@@ -413,7 +416,7 @@ class PracticeJournalPostgresTests(unittest.TestCase):
         self.assertEqual(summary.unknown_count, 1)
 
     def test_cross_owner_attempt_review_and_task_do_not_leak_or_count_sample(self):
-        now = datetime(2026, 9, 19, 14, 0, tzinfo=timezone.utc)
+        now = self._recent_base(hours=6)
         source_photo = self._photo(self.user, 'cross-source-photo')
         source = self._review(self.user, source_photo, 'cross-source', created_at=now)
         session = self._session(self.user, source, source_photo, 'cross-source', created_at=now)
@@ -460,7 +463,7 @@ class PracticeJournalPostgresTests(unittest.TestCase):
         self.assertEqual(summary.unknown_count, 1)
 
     def test_pending_attempt_keeps_task_and_photo_ids_for_polling_in_list_and_detail(self):
-        now = datetime(2026, 9, 19, 14, 30, tzinfo=timezone.utc)
+        now = self._recent_base(hours=5)
         source_photo = self._photo(self.user, 'pending-source-photo')
         source = self._review(self.user, source_photo, 'pending-source', created_at=now)
         session = self._session(self.user, source, source_photo, 'pending-session', created_at=now)
@@ -487,7 +490,7 @@ class PracticeJournalPostgresTests(unittest.TestCase):
         self.assertEqual(detail.attempts[0].review_access, 'none')
 
     def test_pending_attempt_with_unowned_task_hides_task_but_keeps_ready_photo(self):
-        now = datetime(2026, 9, 19, 14, 45, tzinfo=timezone.utc)
+        now = self._recent_base(hours=4)
         source_photo = self._photo(self.user, 'pending-cross-task-source-photo')
         source = self._review(self.user, source_photo, 'pending-cross-task-source', created_at=now)
         session = self._session(self.user, source, source_photo, 'pending-cross-task-session', created_at=now)
@@ -530,7 +533,7 @@ class PracticeJournalPostgresTests(unittest.TestCase):
         self.assertEqual(detail.attempts[0].photo_id, attempt_photo.public_id)
 
     def test_source_non_succeeded_and_session_owner_mismatch_hide_source_ids(self):
-        now = datetime(2026, 9, 19, 14, 55, tzinfo=timezone.utc)
+        now = self._recent_base(hours=3)
         failed_photo = self._photo(self.user, 'failed-source-photo')
         failed_source = self._review(self.user, failed_photo, 'failed-source', created_at=now)
         failed_source.status = ReviewStatus.FAILED
@@ -581,7 +584,7 @@ class PracticeJournalPostgresTests(unittest.TestCase):
         self.assertEqual(summary.session_count, 1)
 
     def test_journal_list_summary_and_detail_select_counts_are_bounded(self):
-        base = datetime(2026, 9, 19, 16, 0, tzinfo=timezone.utc)
+        base = self._recent_base(hours=2)
         bulk_session_ids = []
         for index in range(100):
             source_photo = self._photo(self.user, f'budget-source-photo-{index}')
