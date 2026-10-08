@@ -156,7 +156,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     ),
     ...LOCALES.map((locale) => ({
       url: `${siteConfig.url}/${locale}/updates`,
-      lastModified: latestProductUpdateDate,
+      lastModified: new Date(getLatestProductUpdateDate(locale)),
       changeFrequency: 'monthly' as const,
       priority: 0.6,
       alternates: localizedAlternates((entryLocale) => `/${entryLocale}/updates`, '/updates'),

@@ -18,17 +18,28 @@ const homeSource = readFileSync(
 );
 const shellSource = readFileSync(path.join(FRONTEND_DIR, 'src/components/layout/SiteChrome.tsx'), 'utf8');
 
-test('latest update bundle is aligned across locales for the homepage dialog', () => {
-  const updates = ['zh', 'en', 'ja'].map((locale) => getLatestProductUpdate(locale as 'zh' | 'en' | 'ja'));
-  assert.equal(updates.every(Boolean), true);
-  assert.match(updates[0]!.id, /^\d{4}-\d{2}-\d{2}-.+/);
-  assert.deepEqual(updates.map((entry) => entry!.id), Array(3).fill(updates[0]!.id));
-  assert.equal(updates[0]!.id, '2026-10-07-review-reliability-and-gallery');
-  assert.deepEqual(updates.map((entry) => entry!.date), Array(3).fill('2026-10-07'));
-  assert.deepEqual(updates.map((entry) => entry!.showPopup), Array(3).fill(false));
-  assert.deepEqual(updates.map((entry) => entry!.docPath), Array(3).fill(`docs/changelog/CHANGELOG.md#${updates[0]!.id}`));
-  assert.deepEqual(updates.map((entry) => entry!.primaryAction?.href), Array(3).fill('/gallery'));
-  assert.match(updates[0]!.primaryAction?.label ?? '', /gallery|长廊|ギャラリー/i);
+test('model and pricing announcement is the latest popup only for Chinese users', () => {
+  const announcement = getLatestProductUpdate('zh');
+  assert.ok(announcement);
+  assert.equal(announcement.id, '2026-10-08-gpt6-sol-and-pro-pricing');
+  assert.equal(announcement.date, '2026-10-08');
+  assert.equal(shouldShowProductUpdatePopup(announcement), true);
+  assert.equal(announcement.docPath, `docs/changelog/CHANGELOG.md#${announcement.id}`);
+  assert.match(announcement.summary, /将于 10 月 10 日 00:00/);
+  assert.match(announcement.summary, /GPT-6 Sol/);
+  assert.match(announcement.summary, /1\.99 美元\/月恢复至原价 3\.99 美元\/月/);
+  assert.match(announcement.summary, /现有 Pro 用户不受本次价格调整影响/);
+
+  for (const locale of ['en', 'ja'] as const) {
+    const latest = getLatestProductUpdate(locale);
+    assert.ok(latest);
+    assert.equal(latest.id, '2026-10-07-review-reliability-and-gallery');
+    assert.equal(latest.date, '2026-10-07');
+    assert.equal(shouldShowProductUpdatePopup(latest), false);
+    assert.equal(getProductUpdates(locale).some((entry) => entry.id === announcement.id), false);
+  }
+  assert.equal(getLatestProductUpdateDate('zh'), '2026-10-08');
+  assert.equal(getLatestProductUpdateDate(), '2026-10-07');
 });
 
 test('homepage update dialog is version-scoped, dismissible and accessible', () => {
@@ -53,20 +64,23 @@ test('maintenance updates remain in the log while popup eligibility stays separa
     const updates = getProductUpdates(locale);
     const maintenance = updates.find((entry) => entry.id === '2026-09-25-gallery-actions-and-clearer-controls');
     const previousSameDay = updates.find((entry) => entry.id === '2026-10-02-photo-scoring-quality');
+    const latestMaintenance = updates.find((entry) => entry.id === '2026-10-07-review-reliability-and-gallery');
     const latest = getLatestProductUpdate(locale);
     assert.ok(latest);
     assert.ok(maintenance);
     assert.ok(previousSameDay);
+    assert.ok(latestMaintenance);
     assert.equal(maintenance.showPopup, false);
     assert.equal(previousSameDay.showPopup, false);
     assert.equal(shouldShowProductUpdatePopup(maintenance), false);
     assert.equal(shouldShowProductUpdatePopup(previousSameDay), false);
     assert.equal(updates[0].id, latest.id);
-    assert.equal(shouldShowProductUpdatePopup(latest), false);
+    assert.equal(shouldShowProductUpdatePopup(latestMaintenance), false);
+    assert.equal(shouldShowProductUpdatePopup(latest), locale === 'zh');
     const previousAnnouncement = updates.find((entry) => entry.id === '2026-10-06-photo-rubric-and-gallery-reassessment');
     assert.ok(previousAnnouncement);
     assert.equal(shouldShowProductUpdatePopup(previousAnnouncement), true);
-    assert.equal(getLatestProductUpdateDate(), latest.date);
+    assert.equal(getLatestProductUpdateDate(locale), latest.date);
   }
 });
 

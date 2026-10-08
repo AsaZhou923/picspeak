@@ -60,7 +60,9 @@ PicSpeak 现在只维护一份仓库内 changelog：
 
 修复 bug、恢复已有功能、调整 UI 文案/按钮/布局、兼容性与稳定性维护，都应正常写入统一 changelog、三语 `/updates` 和对应首页更新记录入口，不能因为“不弹窗”而省略记录。
 
-每条新增 `/updates` 记录必须在 zh / en / ja 中一致设置 `showPopup`：
+用户明确限定公告语言时，仅在指定语言的 `/updates` JSON 中新增记录并更新该语言的首页提示，其他语言保留原有最新记录和提示。该语言的最新公告仍须显式设置 `showPopup: true`，沿用按公告 ID 记忆已读状态，不回退其他语言或更早的公告。changelog 和 README 保留对应锚点并标明公告面向的语言；共享历史记录继续在三语中严格对齐。各语言 `/updates` 的 sitemap 修改日期使用该语言的最新记录，根 `/updates` 与英文 News sitemap 继续使用英文记录。
+
+除上述用户明确指定的语言限定公告外，每条新增 `/updates` 记录必须在 zh / en / ja 中一致设置 `showPopup`：
 
 | 更新类型 | `showPopup` | 行为 |
 | --- | --- | --- |

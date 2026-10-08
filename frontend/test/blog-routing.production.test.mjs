@@ -263,22 +263,20 @@ test('new articles render at every locale-pinned canonical URL', async () => {
   }
 });
 
-test('regular sitemap excludes Blog aliases and shares the latest update date', async () => {
+test('regular sitemap excludes Blog aliases and uses each locale latest update date', async () => {
   const response = await fetch(`${baseUrl}/sitemap.xml`);
   assert.equal(response.status, 200);
   const xml = await response.text();
   const siteOrigin = 'https://www.picspeak.art';
-  const latestDate = getLatestProductUpdateDate();
 
   assert.doesNotMatch(xml, new RegExp(`<loc>${siteOrigin}/blog(?:/|<)`));
   for (const pathname of ['/updates', '/zh/updates', '/en/updates', '/ja/updates']) {
-    const escapedPath = pathname.replaceAll('/', '\\/');
-    assert.match(
-      xml,
-      new RegExp(
-        `<loc>${siteOrigin}${escapedPath}<\\/loc>[\\s\\S]*?<lastmod>${latestDate}`,
-      ),
-    );
+    const locale = pathname === '/updates' ? 'en' : pathname.split('/')[1];
+    const latestDate = getLatestProductUpdateDate(locale);
+    const urlBlock = [...xml.matchAll(/<url>([\s\S]*?)<\/url>/g)]
+      .find((match) => match[1].includes(`<loc>${siteOrigin}${pathname}</loc>`));
+    assert.ok(urlBlock, `Missing sitemap entry for ${pathname}`);
+    assert.ok(urlBlock[1].includes(`<lastmod>${latestDate}`), pathname);
   }
   for (const { locale } of LOCALE_CASES) {
     for (const slug of NEW_ARTICLE_SLUGS) {

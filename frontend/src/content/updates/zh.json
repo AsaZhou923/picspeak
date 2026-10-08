@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-08-gpt6-sol-and-pro-pricing",
+    "date": "2026-10-08",
+    "showPopup": true,
+    "title": "评图模型升级与订阅价格调整公告",
+    "summary": "为了提升照片点评与评分的准确性，PicSpeak 将于 10 月 10 日 00:00 全面切换至 GPT-6 Sol 模型，为大家提供更可靠的评图结果和更有针对性的改进建议。\n\n自同一时间起，月订阅优惠价格将结束，订阅费用将从 1.99 美元/月恢复至原价 3.99 美元/月。现有 Pro 用户不受本次价格调整影响。\n\n感谢大家一直以来的支持。我们会继续打磨评图体验，让每一次点评都更有参考价值。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-10-08-gpt6-sol-and-pro-pricing"
+  },
+  {
     "id": "2026-10-07-review-reliability-and-gallery",
     "date": "2026-10-07",
     "showPopup": false,

@@ -181,7 +181,7 @@ export default function HomeUpdateDialog() {
               >
                 {latest.title}
               </h2>
-              <p id="home-update-dialog-summary" className="mt-4 text-sm leading-7 text-ink-muted">
+              <p id="home-update-dialog-summary" className="mt-4 whitespace-pre-line text-sm leading-7 text-ink-muted">
                 {latest.summary}
               </p>
             </div>

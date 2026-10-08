@@ -188,7 +188,8 @@ npm run build
 
 ## 文档
 
-- [最新更新日志：评图与照片浏览稳定性优化](docs/changelog/CHANGELOG.md#2026-10-07-review-reliability-and-gallery)
+- [最新中文公告：评图模型升级与 Pro 价格调整预告](docs/changelog/CHANGELOG.md#2026-10-08-gpt6-sol-and-pro-pricing)
+- [此前评图与照片浏览稳定性优化](docs/changelog/CHANGELOG.md#2026-10-07-review-reliability-and-gallery)
 - [此前评分标准优化与长廊重评](docs/changelog/CHANGELOG.md#2026-10-06-photo-rubric-and-gallery-reassessment)
 - [此前长廊 v5 评图免费重评](docs/changelog/CHANGELOG.md#2026-10-06-gallery-critique-reassessment)
 - [此前评图全面升级 GPT-6](docs/changelog/CHANGELOG.md#2026-10-02-gpt6-workspace-upgrade)

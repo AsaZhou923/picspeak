@@ -53,8 +53,8 @@ export function shouldShowProductUpdatePopup(update: ProductUpdateEntry | undefi
   return update?.showPopup === true;
 }
 
-export function getLatestProductUpdateDate(): string {
-  const latest = getLatestProductUpdate('en');
+export function getLatestProductUpdateDate(locale: UpdateLocale = 'en'): string {
+  const latest = getLatestProductUpdate(locale);
   if (!latest) {
     throw new Error('At least one product update is required');
   }

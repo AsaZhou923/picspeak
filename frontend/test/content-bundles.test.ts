@@ -26,26 +26,30 @@ function readJson<T>(relativePath: string): T {
   return JSON.parse(readFileSync(path.join(TEST_DIR, '..', relativePath), 'utf8')) as T;
 }
 
-test('update content bundles keep the same ids across locales', () => {
+test('shared update content stays aligned while the pricing announcement is Chinese-only', () => {
   const bundles = Object.fromEntries(
     LOCALES.map((locale) => [locale, readJson<UpdateEntry[]>(`src/content/updates/${locale}.json`)]),
   ) as Record<(typeof LOCALES)[number], UpdateEntry[]>;
   const canonicalIds = bundles.en.map((entry) => entry.id);
   const canonicalDates = bundles.en.map((entry) => entry.date);
+  const chineseAnnouncementId = '2026-10-08-gpt6-sol-and-pro-pricing';
 
   assert.ok(canonicalIds.length > 0);
 
   for (const locale of LOCALES) {
+    const announcement = bundles[locale].find((entry) => entry.id === chineseAnnouncementId);
+    assert.equal(Boolean(announcement), locale === 'zh');
+    const sharedEntries = bundles[locale].filter((entry) => entry.id !== chineseAnnouncementId);
     assert.deepEqual(
-      bundles[locale].map((entry) => entry.id),
+      sharedEntries.map((entry) => entry.id),
       canonicalIds,
     );
     assert.deepEqual(
-      bundles[locale].map((entry) => entry.date),
+      sharedEntries.map((entry) => entry.date),
       canonicalDates,
     );
     assert.deepEqual(
-      bundles[locale].map((entry) => entry.showPopup),
+      sharedEntries.map((entry) => entry.showPopup),
       bundles.en.map((entry) => entry.showPopup),
     );
 
@@ -63,26 +67,28 @@ test('update content bundles keep the same ids across locales', () => {
   }
 });
 
-test('update entries point to existing unified changelog anchors in newest-first order', () => {
-  const entries = readJson<UpdateEntry[]>('src/content/updates/en.json');
+test('all locale update entries point to existing unified changelog anchors in newest-first order', () => {
   const changelog = readFileSync(
     path.join(TEST_DIR, '..', '..', 'docs', 'changelog', 'CHANGELOG.md'),
     'utf8',
   );
 
-  for (const [index, entry] of entries.entries()) {
-    const [docPath, anchor] = entry.docPath.split('#');
+  for (const locale of LOCALES) {
+    const entries = readJson<UpdateEntry[]>(`src/content/updates/${locale}.json`);
+    for (const [index, entry] of entries.entries()) {
+      const [docPath, anchor] = entry.docPath.split('#');
 
-    assert.equal(docPath, 'docs/changelog/CHANGELOG.md');
-    assert.ok(anchor);
-    assert.ok(changelog.includes(`<a id="${anchor}"></a>`));
+      assert.equal(docPath, 'docs/changelog/CHANGELOG.md');
+      assert.ok(anchor);
+      assert.ok(changelog.includes(`<a id="${anchor}"></a>`));
 
-    if (index === 0) {
-      assert.equal(anchor, entry.id);
-    }
+      if (index === 0) {
+        assert.equal(anchor, entry.id);
+      }
 
-    if (index > 0) {
-      assert.ok(entries[index - 1].date >= entry.date);
+      if (index > 0) {
+        assert.ok(entries[index - 1].date >= entry.date);
+      }
     }
   }
 });
