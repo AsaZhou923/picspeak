@@ -4,7 +4,7 @@
     "date": "2026-10-09",
     "showPopup": false,
     "title": "Photo critique now uses GPT-6 Sol",
-    "summary": "New photo scores, detailed critiques, and original/retake comparisons now use GPT-6 Sol. Saved critiques and scores keep their original model information. Progress statistics compare matching scoring standards and models, while retake results remain separate rounds.",
+    "summary": "New photo scores, detailed critiques, and original/retake comparisons now use GPT-6 Sol with high reasoning. Saved critiques and scores keep their original model information. Progress statistics compare matching scoring standards and models, while retake results remain separate rounds.",
     "docPath": "docs/changelog/CHANGELOG.md#2026-10-09-gpt6-sol-review-rollout",
     "primaryAction": {
       "label": "Try GPT-6 Sol critique",

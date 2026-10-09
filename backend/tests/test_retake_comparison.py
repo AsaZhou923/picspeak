@@ -190,7 +190,7 @@ class RetakeComparisonTests(unittest.TestCase):
         with patch('app.services.retake_comparison.settings') as mocked_settings:
             mocked_settings.openai_api_key = 'test-openai-key'
             mocked_settings.retake_analysis_model = 'gpt-6-sol'
-            mocked_settings.retake_analysis_reasoning_effort = 'xhigh'
+            mocked_settings.retake_analysis_reasoning_effort = 'high'
             mocked_settings.retake_analysis_api_url = 'https://api.openai.com/v1/responses'
             mocked_settings.retake_analysis_timeout_seconds = 180
             mocked_settings.review_pricing_overrides = {}
@@ -199,7 +199,7 @@ class RetakeComparisonTests(unittest.TestCase):
 
         payload = json.loads(request.call_args.kwargs['body'])
         self.assertEqual(payload['model'], 'gpt-6-sol')
-        self.assertEqual(payload['reasoning'], {'effort': 'xhigh'})
+        self.assertEqual(payload['reasoning'], {'effort': 'high'})
         self.assertEqual(ai_response.model_name, 'gpt-6-sol')
         self.assertEqual(ai_response.model_version, 'gpt-6-sol-2026-10-09')
         self.assertIn('openai:gpt-6-sol:standard', ai_response.cost_rate_version or '')

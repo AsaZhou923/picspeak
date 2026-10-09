@@ -294,7 +294,7 @@ class OpenAIPhotoReviewTests(unittest.TestCase):
         with patch('app.services.ai.settings.openai_api_key', 'test-key'), patch(
             'app.services.ai.settings.openai_score_model', 'gpt-6-sol'
         ), patch('app.services.ai.settings.openai_review_model', 'gpt-6-sol'), patch(
-            'app.services.ai.settings.openai_review_reasoning_effort', 'xhigh'
+            'app.services.ai.settings.openai_review_reasoning_effort', 'high'
         ), patch('app.services.ai.pooled_request', return_value=writing) as request_mock:
             response = run_ai_review(
                 mode='flash',
@@ -307,7 +307,7 @@ class OpenAIPhotoReviewTests(unittest.TestCase):
 
         payload = json.loads(request_mock.call_args.kwargs['body'])
         self.assertEqual(payload['model'], 'gpt-6-sol')
-        self.assertEqual(payload['reasoning'], {'effort': 'xhigh'})
+        self.assertEqual(payload['reasoning'], {'effort': 'high'})
         self.assertEqual(response.writer_model_name, 'gpt-6-sol')
         self.assertEqual(response.writer_model_version, 'gpt-6-sol-2026-10-09')
         self.assertIn('openai:gpt-6-sol:standard', response.writer_cost_rate_version or '')

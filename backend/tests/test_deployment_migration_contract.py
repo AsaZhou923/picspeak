@@ -50,7 +50,10 @@ class DeploymentMigrationContractTests(unittest.TestCase):
         config = (REPO_ROOT / 'cloudbuild.yaml').read_text(encoding='utf-8')
         script = (REPO_ROOT / 'deploy' / 'deploy-backend.bat').read_text(encoding='utf-8')
 
-        expected = 'OPENAI_SCORE_MODEL=gpt-6-sol,OPENAI_REVIEW_MODEL=gpt-6-sol,RETAKE_ANALYSIS_MODEL=gpt-6-sol'
+        expected = (
+            'OPENAI_SCORE_MODEL=gpt-6-sol,OPENAI_REVIEW_MODEL=gpt-6-sol,RETAKE_ANALYSIS_MODEL=gpt-6-sol,'
+            'OPENAI_SCORE_REASONING_EFFORT=high,OPENAI_REVIEW_REASONING_EFFORT=high,RETAKE_ANALYSIS_REASONING_EFFORT=high'
+        )
         self.assertIn(f'--update-env-vars={expected}', config)
         self.assertIn(f'--update-env-vars {expected} ^', script)
 
