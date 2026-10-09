@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from contextlib import nullcontext
+from datetime import datetime, timezone
 import sys
 import unittest
 from pathlib import Path
@@ -14,6 +15,7 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 from app.api.routers.tasks import _serialize_task_status
+from app.api.routers.review_support import _review_history_item
 from app.db.models import Photo, PhotoStatus, Review, ReviewMode, ReviewStatus, ReviewTask, TaskStatus, UsageLedger, User, UserPlan
 from app.core.errors import api_error
 from app.goal_assessment import GoalAssessmentContext
@@ -27,6 +29,7 @@ from app.services.review_task_processor import (
     _normalize_review_result_payload,
     _review_task_stale_timeout_seconds,
 )
+from app.services.review_score_cache import review_uses_current_full_review_contract
 
 
 class ReviewTaskProcessorTests(unittest.TestCase):
@@ -117,6 +120,92 @@ class ReviewTaskProcessorTests(unittest.TestCase):
         self.assertEqual(len(attached), 1)
         self.assertEqual(sum(isinstance(call.args[0], UsageLedger) for call in db.add.call_args_list), 1)
 
+    def test_profile_metadata_survives_worker_normalizer_history_and_cache_contract(self) -> None:
+        raw = {
+            'schema_version': '2.0',
+            'prompt_version': 'photo-review-v9-gpt6-image-led',
+            'score_version': SCORE_VERSION,
+            'score_prompt_version': SCORE_PROMPT_VERSION,
+            'model_name': 'gpt-6.1-sol-2026-10-09',
+            'model_version': 'gpt-6.1-sol-2026-10-09',
+            'scorer_model_name': 'gpt-6.1-sol',
+            'scorer_model_version': 'gpt-6.1-sol-2026-10-09',
+            'scorer_reasoning_effort': 'high',
+            'writer_model_name': 'gpt-6.1-sol',
+            'writer_model_version': 'gpt-6.1-sol-2026-10-09',
+            'writer_reasoning_effort': 'high',
+            'scorer_preprocess_version': SCORER_PREPROCESS_VERSION,
+            'scores': {'composition': 7, 'lighting': 6, 'color': 6, 'impact': 5, 'technical': 6},
+            'score_evidence': score_evidence_fixture(LOW_SCORES),
+            'final_score': 6.0,
+            'advantage': '1. Clear subject separation.',
+            'critique': '1. The light is visually flat.',
+            'suggestions': '1. Observation: The face is close to the background; Reason: Separation is weak; Action: Move slightly.',
+        }
+        stored = _normalize_review_result_payload(
+            raw,
+            final_score=6.0,
+            prompt_version='fallback-prompt',
+            model_name='fallback-model',
+            model_version='fallback-version',
+            exif_info=None,
+            scorer_model_name='fallback-scorer',
+            scorer_model_version='fallback-scorer-version',
+            scorer_reasoning_effort='low',
+            writer_model_name='fallback-writer',
+            writer_model_version='fallback-writer-version',
+            writer_reasoning_effort='low',
+            score_prompt_version=SCORE_PROMPT_VERSION,
+            scorer_preprocess_version=SCORER_PREPROCESS_VERSION,
+        )
+        review = Review(
+            public_id='rev_profile',
+            mode=ReviewMode.pro,
+            status=ReviewStatus.SUCCEEDED,
+            image_type='portrait',
+            model_name='gpt-6.1-sol-2026-10-09',
+            scorer_model_name='gpt-6.1-sol',
+            writer_model_name='gpt-6.1-sol',
+            final_score=6.0,
+            result_json=stored,
+            created_at=datetime(2026, 10, 9, tzinfo=timezone.utc),
+        )
+        photo = Photo(public_id='pho_profile')
+
+        self.assertTrue(
+            review_uses_current_full_review_contract(
+                review,
+                writer_model_name='gpt-6.1-sol',
+                writer_reasoning_effort='high',
+                scorer_model_name='gpt-6.1-sol',
+                scorer_reasoning_effort='high',
+            )
+        )
+        self.assertFalse(
+            review_uses_current_full_review_contract(
+                review,
+                writer_model_name='gpt-6.1-sol',
+                writer_reasoning_effort='low',
+                scorer_model_name='gpt-6.1-sol',
+                scorer_reasoning_effort='high',
+            )
+        )
+
+        with patch('app.api.routers.review_support._build_photo_proxy_url', return_value='https://example.test/photo.jpg'):
+            history = _review_history_item(
+                MagicMock(),
+                review,
+                photo,
+                'usr_profile',
+                None,
+                practice_context_override=None,
+            )
+
+        self.assertEqual(stored['scorer_reasoning_effort'], 'high')
+        self.assertEqual(stored['writer_reasoning_effort'], 'high')
+        self.assertEqual(history.scorer_reasoning_effort, 'high')
+        self.assertEqual(history.writer_reasoning_effort, 'high')
+
     def test_invalid_practice_context_fails_before_provider_or_charging(self) -> None:
         db, task, _context, _response = self._practice_worker_fixture()
         with patch('app.services.review_task_processor.resolve_task_practice', side_effect=api_error(
@@ -146,6 +235,39 @@ class ReviewTaskProcessorTests(unittest.TestCase):
         compare.assert_not_called()
         self.assertIsNone(attach.call_args.args[2].result_json['goal_assessment'])
         self.assertEqual(task.status, TaskStatus.SUCCEEDED)
+
+    def test_worker_uses_trusted_task_mode_for_single_review_profile_when_payload_is_tampered(self) -> None:
+        db, task, context, response = self._practice_worker_fixture(same_image=True)
+        task.request_payload['mode'] = 'pro'
+        task.request_payload['review_model'] = 'gpt-6.1-sol'
+        with patch('app.services.review_task_processor.resolve_task_practice', return_value=context), patch(
+            'app.services.review_task_processor.attach_practice_review'
+        ), patch('app.services.review_task_processor.reserve_review_quota', return_value=None), patch(
+            'app.services.review_task_processor.increment_quota'
+        ), patch('app.services.review_task_processor.user_usage_snapshot', return_value={}), patch(
+            'app.services.review_task_processor.canonical_score_cache_lease', return_value=nullcontext(None)
+        ) as cache_lease, patch('app.services.review_task_processor.run_ai_review', return_value=response) as single:
+            _process_task(db, task)
+
+        self.assertEqual(single.call_args.args[0], 'flash')
+        self.assertEqual(single.call_args.kwargs['review_model'], 'gpt-6.1-sol')
+        self.assertEqual(cache_lease.call_args.kwargs['scorer_model_name'], 'gpt-6-sol')
+        self.assertEqual(cache_lease.call_args.kwargs['scorer_reasoning_effort'], 'low')
+
+    def test_worker_uses_trusted_task_mode_for_retake_when_payload_is_tampered(self) -> None:
+        db, task, context, response = self._practice_worker_fixture()
+        task.request_payload['mode'] = 'pro'
+        task.request_payload['review_model'] = 'gpt-6.1-sol'
+        with patch('app.services.review_task_processor.resolve_task_practice', return_value=context), patch(
+            'app.services.review_task_processor.attach_practice_review'
+        ), patch('app.services.review_task_processor.reserve_review_quota', return_value=None), patch(
+            'app.services.review_task_processor.increment_quota'
+        ), patch('app.services.review_task_processor.user_usage_snapshot', return_value={}), patch(
+            'app.services.review_task_processor.run_retake_comparison', return_value=response
+        ) as compare:
+            _process_task(db, task)
+
+        self.assertEqual(compare.call_args.kwargs['mode'], 'flash')
 
     def test_provider_retry_preserves_practice_attempt_and_does_not_charge(self) -> None:
         db, task, context, _response = self._practice_worker_fixture()
@@ -340,6 +462,7 @@ class ReviewTaskProcessorTests(unittest.TestCase):
             score_prompt_version=SCORE_PROMPT_VERSION,
             score_version=SCORE_VERSION,
             preprocess_version=SCORER_PREPROCESS_VERSION,
+            scorer_reasoning_effort='low',
             input_tokens=100,
             output_tokens=20,
             latency_ms=1000,

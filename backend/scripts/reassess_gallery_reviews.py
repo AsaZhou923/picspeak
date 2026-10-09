@@ -21,7 +21,7 @@ if str(BACKEND_ROOT) not in sys.path:
 from app.api.routers.gallery_support import GALLERY_AUDIT_APPROVED  # noqa: E402
 from app.db.models import Photo, PhotoStatus, Review  # noqa: E402
 from app.db.session import SessionLocal, engine  # noqa: E402
-from app.services.ai import AIReviewError, run_ai_review  # noqa: E402
+from app.services.ai import AIReviewError, openai_review_profile_for_mode, run_ai_review  # noqa: E402
 from app.services.object_storage import get_object_read_url  # noqa: E402
 from app.services.review_score_cache import (  # noqa: E402
     canonical_score_cache_lease,
@@ -35,6 +35,7 @@ REASSESSMENT_METADATA_KEY = 'gallery_free_reassessment'
 REASSESSMENT_VERSION = 1
 _LOCK_NAMESPACE = 'picspeak-gallery-free-reassessment-v1'
 _REVIEW_PUBLIC_ID_RE = re.compile(r'^rev_[A-Za-z0-9_-]+$')
+_OPENAI_REVIEW_MODELS = {'gpt-5.5', 'gpt-5.6-luna', 'gpt-6-luna', 'gpt-6-sol', 'gpt-6.1-sol'}
 _BACKUP_FIELDS = (
     'schema_version',
     'result_json',
@@ -200,9 +201,17 @@ def _reassess_one(
     journal: RunJournal,
 ) -> dict[str, Any]:
     image_url = get_object_read_url(photo.object_key, bucket=photo.bucket)
-    with canonical_score_cache_lease(db, photo=photo, image_type=review.image_type or 'default') as canonical_score:
+    mode = review.mode.value if hasattr(review.mode, 'value') else str(review.mode)
+    profile = openai_review_profile_for_mode(mode)
+    with canonical_score_cache_lease(
+        db,
+        photo=photo,
+        image_type=review.image_type or 'default',
+        scorer_model_name=profile.scorer_model_name,
+        scorer_reasoning_effort=profile.scorer_reasoning_effort,
+    ) as canonical_score:
         ai_response = run_ai_review(
-            review.mode.value if hasattr(review.mode, 'value') else str(review.mode),
+            mode,
             image_url=image_url,
             locale=locale,
             exif_data=photo.exif_data or None,
@@ -243,8 +252,10 @@ def _reassess_one(
         exif_info=photo.exif_data or None,
         scorer_model_name=ai_response.scorer_model_name,
         scorer_model_version=ai_response.scorer_model_version,
+        scorer_reasoning_effort=getattr(ai_response.result, 'scorer_reasoning_effort', ''),
         writer_model_name=ai_response.writer_model_name,
         writer_model_version=ai_response.writer_model_version,
+        writer_reasoning_effort=getattr(ai_response.result, 'writer_reasoning_effort', ''),
         score_prompt_version=ai_response.score_prompt_version,
         scorer_preprocess_version=ai_response.scorer_preprocess_version,
         score_cache_hit=ai_response.score_cache_hit,
@@ -282,7 +293,6 @@ def reassess_gallery_reviews(
     journal_path: Path | None = None,
     lock_connection: Any | None = None,
 ) -> dict[str, Any]:
-    writer_model_name = writer_contract_for_review_request(mode='pro', review_model=review_model)
     selected_review_ids = _normalize_review_public_ids(review_ids)
     rows = _current_gallery_rows(db, review_public_ids=selected_review_ids)
     if selected_review_ids is not None:
@@ -292,15 +302,29 @@ def reassess_gallery_reviews(
     skipped_marker = 0
     for review, photo in rows:
         mode = review.mode.value if hasattr(review.mode, 'value') else str(review.mode)
+        profile = openai_review_profile_for_mode(mode)
         expected_writer = writer_contract_for_review_request(mode=mode, review_model=review_model)
+        expected_writer_effort = profile.writer_reasoning_effort if review_model in _OPENAI_REVIEW_MODELS else ''
         metadata = dict(review.result_json or {}).get(REASSESSMENT_METADATA_KEY)
         if isinstance(metadata, dict) and metadata.get('version') == REASSESSMENT_VERSION:
             skipped_marker += 1
-            if review_uses_current_full_review_contract(review, writer_model_name=expected_writer):
+            if review_uses_current_full_review_contract(
+                review,
+                writer_model_name=expected_writer,
+                writer_reasoning_effort=expected_writer_effort,
+                scorer_model_name=profile.scorer_model_name,
+                scorer_reasoning_effort=profile.scorer_reasoning_effort,
+            ):
                 skipped_current += 1
                 continue
             # Marker exists but the current contract moved forward; reassess again.
-        elif review_uses_current_full_review_contract(review, writer_model_name=expected_writer):
+        elif review_uses_current_full_review_contract(
+            review,
+            writer_model_name=expected_writer,
+            writer_reasoning_effort=expected_writer_effort,
+            scorer_model_name=profile.scorer_model_name,
+            scorer_reasoning_effort=profile.scorer_reasoning_effort,
+        ):
             skipped_current += 1
             continue
         candidates.append((review, photo))
@@ -309,6 +333,24 @@ def reassess_gallery_reviews(
 
     run_id = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
     resolved_journal_path = journal_path or _default_journal_path(run_id)
+    candidate_profiles: dict[str, dict[str, str]] = {}
+    for review, _photo in candidates:
+        mode = review.mode.value if hasattr(review.mode, 'value') else str(review.mode)
+        profile = openai_review_profile_for_mode(mode)
+        writer_model_name = writer_contract_for_review_request(mode=mode, review_model=review_model)
+        writer_reasoning_effort = profile.writer_reasoning_effort if review_model in _OPENAI_REVIEW_MODELS else ''
+        candidate_profiles[mode] = {
+            'scorer_model_name': profile.scorer_model_name,
+            'scorer_reasoning_effort': profile.scorer_reasoning_effort,
+            'writer_model_name': writer_model_name,
+            'writer_reasoning_effort': writer_reasoning_effort,
+        }
+    candidate_writer_names = {profile['writer_model_name'] for profile in candidate_profiles.values()}
+    writer_model_name = ''
+    if len(candidate_writer_names) == 1:
+        writer_model_name = next(iter(candidate_writer_names))
+    elif candidate_writer_names:
+        writer_model_name = 'mode-specific'
     stats: dict[str, Any] = {
         'dry_run': dry_run,
         'scanned_gallery_reviews': len(rows),
@@ -317,6 +359,7 @@ def reassess_gallery_reviews(
         'skipped_reassessment_marker': skipped_marker,
         'review_model': review_model,
         'writer_model_name': writer_model_name,
+        'candidate_profiles': candidate_profiles,
         'selected_review_ids': selected_review_ids or [],
         'selected_review_count': len(selected_review_ids or []),
         'journal_path': str(resolved_journal_path),
@@ -370,7 +413,7 @@ def main() -> int:
     parser.add_argument('--execute', action='store_true', help='Update gallery critiques in place without charging user quota.')
     parser.add_argument('--limit', type=_positive_int, default=None, help='Maximum gallery reviews to process.')
     parser.add_argument('--locale', choices=['zh', 'en', 'ja'], default='zh')
-    parser.add_argument('--review-model', default='qwen', choices=['qwen', 'gpt-5.5', 'gpt-5.6-luna', 'gpt-6-luna', 'gpt-6-sol'])
+    parser.add_argument('--review-model', default='qwen', choices=['qwen', 'gpt-5.5', 'gpt-5.6-luna', 'gpt-6-luna', 'gpt-6-sol', 'gpt-6.1-sol'])
     parser.add_argument(
         '--review-id',
         action='append',

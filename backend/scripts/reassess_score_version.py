@@ -26,7 +26,7 @@ from app.api.routers.gallery_support import GALLERY_AUDIT_APPROVED  # noqa: E402
 from app.core.config import settings  # noqa: E402
 from app.db.models import Photo, PhotoStatus, Review, ReviewStatus, ReviewTask, TaskStatus  # noqa: E402
 from app.db.session import SessionLocal, engine  # noqa: E402
-from app.services.ai import AIReviewError, run_ai_review  # noqa: E402
+from app.services.ai import AIReviewError, openai_review_profile_for_mode, run_ai_review  # noqa: E402
 from app.services.ai_prompts import SCORE_VERSION  # noqa: E402
 from app.services.object_storage import get_object_read_url  # noqa: E402
 from app.services.review_score_cache import canonical_score_cache_lease  # noqa: E402
@@ -168,19 +168,29 @@ def _validate_source_score_version(source_score_version: str) -> str:
 def _validate_target_runtime(review_model: str) -> None:
     if review_model != TARGET_REVIEW_MODEL:
         raise ValueError(f'Unsupported target review model {review_model!r}; expected {TARGET_REVIEW_MODEL!r}')
-    if settings.openai_score_model != TARGET_REVIEW_MODEL or settings.openai_review_model != TARGET_REVIEW_MODEL:
+    if (
+        settings.openai_score_model != 'gpt-6-sol'
+        or settings.openai_review_model != 'gpt-6-sol'
+        or settings.openai_score_reasoning_effort != 'low'
+        or settings.openai_review_reasoning_effort != 'low'
+        or settings.openai_pro_model != 'gpt-6.1-sol'
+        or settings.openai_pro_reasoning_effort != 'high'
+    ):
         raise RuntimeError(
-            'Score-version reassessment requires OPENAI_SCORE_MODEL and OPENAI_REVIEW_MODEL to be gpt-6-sol.'
+            'Score-version reassessment requires Flash gpt-6-sol/low and Pro gpt-6.1-sol/high profile settings.'
         )
 
 
-def _validate_result_payload_contract(result_payload: dict[str, Any]) -> None:
+def _validate_result_payload_contract(result_payload: dict[str, Any], *, mode: str) -> None:
+    profile = openai_review_profile_for_mode(mode)
     if (
         str(result_payload.get('score_version') or '') != SCORE_VERSION
-        or str(result_payload.get('scorer_model_name') or '') != settings.openai_score_model
-        or str(result_payload.get('writer_model_name') or '') != settings.openai_review_model
+        or str(result_payload.get('scorer_model_name') or '') != profile.scorer_model_name
+        or str(result_payload.get('scorer_reasoning_effort') or '') != profile.scorer_reasoning_effort
+        or str(result_payload.get('writer_model_name') or '') != profile.writer_model_name
+        or str(result_payload.get('writer_reasoning_effort') or '') != profile.writer_reasoning_effort
     ):
-        raise RuntimeError('AI response did not match the current GPT-6 score/write contract.')
+        raise RuntimeError('AI response did not match the current GPT-6 mode profile contract.')
 
 
 def _normalize_review_public_ids(review_ids: list[str] | tuple[str, ...] | None) -> list[str] | None:
@@ -435,8 +445,15 @@ def _reassess_candidate(
             if _digest_payload(_review_field_snapshot(review)) != candidate.original_digest:
                 return {'status': 'skipped', 'reason': 'source_changed', 'review_id': candidate.review_public_id}
 
+            profile = openai_review_profile_for_mode(candidate.mode)
             image_url = get_object_read_url(photo.object_key, bucket=photo.bucket)
-            with canonical_score_cache_lease(db, photo=photo, image_type=candidate.image_type) as canonical_score:
+            with canonical_score_cache_lease(
+                db,
+                photo=photo,
+                image_type=candidate.image_type,
+                scorer_model_name=profile.scorer_model_name,
+                scorer_reasoning_effort=profile.scorer_reasoning_effort,
+            ) as canonical_score:
                 ai_response = run_ai_review(
                     candidate.mode,
                     image_url=image_url,
@@ -456,13 +473,15 @@ def _reassess_candidate(
                 exif_info=photo.exif_data or None,
                 scorer_model_name=ai_response.scorer_model_name,
                 scorer_model_version=ai_response.scorer_model_version,
+                scorer_reasoning_effort=getattr(ai_response.result, 'scorer_reasoning_effort', ''),
                 writer_model_name=ai_response.writer_model_name,
                 writer_model_version=ai_response.writer_model_version,
+                writer_reasoning_effort=getattr(ai_response.result, 'writer_reasoning_effort', ''),
                 score_prompt_version=ai_response.score_prompt_version,
                 scorer_preprocess_version=ai_response.scorer_preprocess_version,
                 score_cache_hit=ai_response.score_cache_hit,
             )
-            _validate_result_payload_contract(result_payload)
+            _validate_result_payload_contract(result_payload, mode=candidate.mode)
             locked = _recheck_row(db, candidate, source_score_version=source_score_version)
             if locked is None:
                 db.rollback()
@@ -642,7 +661,11 @@ def reassess_score_version(
             'review_model': review_model,
             'score_version': SCORE_VERSION,
             'openai_score_model': settings.openai_score_model,
+            'openai_score_reasoning_effort': settings.openai_score_reasoning_effort,
             'openai_review_model': settings.openai_review_model,
+            'openai_review_reasoning_effort': settings.openai_review_reasoning_effort,
+            'openai_pro_model': settings.openai_pro_model,
+            'openai_pro_reasoning_effort': settings.openai_pro_reasoning_effort,
         },
         'items': [],
     }

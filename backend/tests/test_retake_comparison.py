@@ -105,7 +105,7 @@ def _response_body(
 
 
 class RetakeComparisonTests(unittest.TestCase):
-    def _run(self, *, goal_context: GoalAssessmentContext | None = None):
+    def _run(self, *, goal_context: GoalAssessmentContext | None = None, mode: str = ''):
         return run_retake_comparison(
             original_image_url='https://images.example/original.jpg',
             retake_image_url='https://images.example/retake.jpg',
@@ -114,6 +114,7 @@ class RetakeComparisonTests(unittest.TestCase):
             retake_photo_id='pho_retake',
             locale='en',
             image_type='portrait',
+            mode=mode,
             goal_context=goal_context,
         )
 
@@ -126,6 +127,7 @@ class RetakeComparisonTests(unittest.TestCase):
             retake_photo_id='pho_retake',
             locale=locale,
             image_type='portrait',
+            mode='',
             goal_context=goal_context,
         )
 
@@ -203,6 +205,41 @@ class RetakeComparisonTests(unittest.TestCase):
         self.assertEqual(ai_response.model_name, 'gpt-6-sol')
         self.assertEqual(ai_response.model_version, 'gpt-6-sol-2026-10-09')
         self.assertIn('openai:gpt-6-sol:standard', ai_response.cost_rate_version or '')
+
+    def test_retake_mode_profile_routes_flash_and_pro_models(self) -> None:
+        body = _response_body()
+        body['model'] = 'gpt-6-sol-2026-10-09'
+        flash_response = PooledHTTPResponse(status=200, data=json.dumps(body).encode('utf-8'), headers={}, reason='OK')
+        pro_body = _response_body()
+        pro_body['model'] = 'gpt-6.1-sol-2026-10-09'
+        pro_response = PooledHTTPResponse(status=200, data=json.dumps(pro_body).encode('utf-8'), headers={}, reason='OK')
+
+        with patch('app.services.retake_comparison.settings') as mocked_settings:
+            mocked_settings.openai_api_key = 'test-openai-key'
+            mocked_settings.openai_score_model = 'gpt-6-sol'
+            mocked_settings.openai_score_reasoning_effort = 'low'
+            mocked_settings.openai_review_model = 'gpt-6-sol'
+            mocked_settings.openai_review_reasoning_effort = 'low'
+            mocked_settings.openai_pro_model = 'gpt-6.1-sol'
+            mocked_settings.openai_pro_reasoning_effort = 'high'
+            mocked_settings.retake_analysis_api_url = 'https://api.openai.com/v1/responses'
+            mocked_settings.retake_analysis_timeout_seconds = 180
+            mocked_settings.review_pricing_overrides = {}
+            with patch(
+                'app.services.retake_comparison.pooled_request',
+                side_effect=[flash_response, pro_response],
+            ) as request:
+                flash = self._run(mode='flash')
+                pro = self._run(mode='pro')
+
+        flash_payload = json.loads(request.call_args_list[0].kwargs['body'])
+        pro_payload = json.loads(request.call_args_list[1].kwargs['body'])
+        self.assertEqual(flash_payload['model'], 'gpt-6-sol')
+        self.assertEqual(flash_payload['reasoning'], {'effort': 'low'})
+        self.assertEqual(pro_payload['model'], 'gpt-6.1-sol')
+        self.assertEqual(pro_payload['reasoning'], {'effort': 'high'})
+        self.assertEqual(flash.result.scorer_reasoning_effort, 'low')
+        self.assertEqual(pro.result.scorer_reasoning_effort, 'high')
 
     def test_goal_context_requires_goal_assessment_and_does_not_infer_from_score_delta(self) -> None:
         response = PooledHTTPResponse(

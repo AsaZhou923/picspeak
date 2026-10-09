@@ -45,20 +45,25 @@ class SettingsDefaultsTestCase(unittest.TestCase):
         settings = self._settings()
         self.assertEqual(settings.lemonsqueezy_zh_pro_variant_id, '')
 
-    def test_retake_analysis_defaults_to_sol_high(self):
+    def test_retake_analysis_defaults_to_pro_sol_high(self):
         settings = self._settings()
-        self.assertEqual(settings.retake_analysis_model, 'gpt-6-sol')
+        self.assertEqual(settings.retake_analysis_model, 'gpt-6.1-sol')
         self.assertEqual(settings.retake_analysis_reasoning_effort, 'high')
 
-    def test_single_photo_openai_review_defaults_to_sol_high(self):
+    def test_single_photo_openai_review_defaults_to_sol_low(self):
         settings = self._settings()
         self.assertEqual(settings.openai_review_model, 'gpt-6-sol')
-        self.assertEqual(settings.openai_review_reasoning_effort, 'high')
+        self.assertEqual(settings.openai_review_reasoning_effort, 'low')
 
-    def test_single_photo_openai_score_defaults_to_gpt6_sol_high(self):
+    def test_single_photo_openai_score_defaults_to_gpt6_sol_low(self):
         settings = self._settings()
         self.assertEqual(settings.openai_score_model, 'gpt-6-sol')
-        self.assertEqual(settings.openai_score_reasoning_effort, 'high')
+        self.assertEqual(settings.openai_score_reasoning_effort, 'low')
+
+    def test_openai_pro_profile_defaults_to_gpt61_sol_high(self):
+        settings = self._settings()
+        self.assertEqual(settings.openai_pro_model, 'gpt-6.1-sol')
+        self.assertEqual(settings.openai_pro_reasoning_effort, 'high')
 
     def test_openai_score_reasoning_effort_is_normalized_and_validated(self):
         settings = self._settings(openai_score_reasoning_effort=' HIGH ')

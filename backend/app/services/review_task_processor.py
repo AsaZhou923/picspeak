@@ -16,7 +16,14 @@ from app.core.config import settings
 from app.core.errors import ApiHTTPException
 from app.db.models import Photo, PhotoStatus, Review, ReviewMode, ReviewStatus, ReviewTask, TaskStatus, UsageLedger, User, UserPlan
 from app.db.session import SessionLocal
-from app.services.ai import AIProviderCallUsage, AIReviewError, CanonicalScore, observe_ai_provider_calls, run_ai_review
+from app.services.ai import (
+    AIProviderCallUsage,
+    AIReviewError,
+    CanonicalScore,
+    observe_ai_provider_calls,
+    openai_review_profile_for_mode,
+    run_ai_review,
+)
 from app.services.guard import guest_usage_snapshot, increment_quota, user_usage_snapshot
 from app.services.practice import attach_practice_review, resolve_task_practice
 from app.services.practice_events import record_practice_analysis_completed
@@ -158,8 +165,10 @@ def _normalize_review_result_payload(
     exif_info: dict | None,
     scorer_model_name: str | None = None,
     scorer_model_version: str | None = None,
+    scorer_reasoning_effort: str | None = None,
     writer_model_name: str | None = None,
     writer_model_version: str | None = None,
+    writer_reasoning_effort: str | None = None,
     score_prompt_version: str | None = None,
     scorer_preprocess_version: str | None = None,
     score_cache_hit: bool = False,
@@ -208,8 +217,12 @@ def _normalize_review_result_payload(
         'model_version': str(raw_payload.get('model_version') or model_version),
         'scorer_model_name': str(raw_payload.get('scorer_model_name') or scorer_model_name or ''),
         'scorer_model_version': str(raw_payload.get('scorer_model_version') or scorer_model_version or ''),
+        'scorer_reasoning_effort': str(
+            raw_payload.get('scorer_reasoning_effort') or scorer_reasoning_effort or ''
+        ),
         'writer_model_name': str(raw_payload.get('writer_model_name') or writer_model_name or model_name),
         'writer_model_version': str(raw_payload.get('writer_model_version') or writer_model_version or model_version),
+        'writer_reasoning_effort': str(raw_payload.get('writer_reasoning_effort') or writer_reasoning_effort or ''),
         'scorer_preprocess_version': str(
             raw_payload.get('scorer_preprocess_version') or scorer_preprocess_version or ''
         ),
@@ -607,6 +620,7 @@ def _process_task(db: Session, task: ReviewTask, *, claim_token: str | None = No
     payload_image_type = (task.request_payload or {}).get('image_type', 'default')
     analysis_type = (task.request_payload or {}).get('analysis_type', 'single')
     review_model = (task.request_payload or {}).get('review_model', 'qwen')
+    task_mode = task.mode.value if isinstance(task.mode, ReviewMode) else str(task.mode)
     if payload_locale not in {'zh', 'en', 'ja'}:
         payload_locale = 'en'
     _transition_progress(db, task, 70, 'AI_REVIEW_STARTED', 'Running AI review')
@@ -661,10 +675,16 @@ def _process_task(db: Session, task: ReviewTask, *, claim_token: str | None = No
                     retake_photo_id=photo.public_id,
                     locale=payload_locale,
                     image_type=payload_image_type,
+                    mode=task_mode,
                     **({'goal_context': goal_context} if goal_context is not None else {}),
                 )
             else:
-                checkpointed_score = load_task_canonical_score_checkpoint(task)
+                profile = openai_review_profile_for_mode(task_mode)
+                checkpointed_score = load_task_canonical_score_checkpoint(
+                    task,
+                    scorer_model_name=profile.scorer_model_name,
+                    scorer_reasoning_effort=profile.scorer_reasoning_effort,
+                )
                 score_context = (
                     nullcontext(checkpointed_score)
                     if checkpointed_score is not None
@@ -672,6 +692,8 @@ def _process_task(db: Session, task: ReviewTask, *, claim_token: str | None = No
                         db,
                         photo=photo,
                         image_type=payload_image_type,
+                        scorer_model_name=profile.scorer_model_name,
+                        scorer_reasoning_effort=profile.scorer_reasoning_effort,
                     )
                 )
                 with score_context as canonical_score:
@@ -696,7 +718,7 @@ def _process_task(db: Session, task: ReviewTask, *, claim_token: str | None = No
                         )
 
                     ai_response = run_ai_review(
-                        task.mode.value if isinstance(task.mode, ReviewMode) else str(task.mode),
+                        task_mode,
                         image_url=image_url,
                         locale=payload_locale,
                         exif_data=photo.exif_data or None,
@@ -751,8 +773,10 @@ def _process_task(db: Session, task: ReviewTask, *, claim_token: str | None = No
         exif_info=photo.exif_data or None,
         scorer_model_name=ai_response.scorer_model_name,
         scorer_model_version=ai_response.scorer_model_version,
+        scorer_reasoning_effort=getattr(ai_response.result, 'scorer_reasoning_effort', ''),
         writer_model_name=ai_response.writer_model_name,
         writer_model_version=ai_response.writer_model_version,
+        writer_reasoning_effort=getattr(ai_response.result, 'writer_reasoning_effort', ''),
         score_prompt_version=ai_response.score_prompt_version,
         scorer_preprocess_version=ai_response.scorer_preprocess_version,
         score_cache_hit=ai_response.score_cache_hit,

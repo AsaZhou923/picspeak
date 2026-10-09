@@ -29,7 +29,7 @@ from app.db.models import (
     UserPlan,
 )
 from app.schemas import ReviewCreateAsyncResponse, ReviewCreateRequest, ReviewCreateSyncResponse
-from app.services.ai import AIReviewError, run_ai_review
+from app.services.ai import AIReviewError, openai_review_profile_for_mode, run_ai_review
 from app.services.guard import (
     enforce_guest_review_limits,
     enforce_user_quota,
@@ -61,6 +61,7 @@ from .review_support import (
 
 router = APIRouter(tags=['reviews'])
 logger = logging.getLogger(__name__)
+_OPENAI_REVIEW_MODELS = {'gpt-5.5', 'gpt-5.6-luna', 'gpt-6-luna', 'gpt-6-sol', 'gpt-6.1-sol'}
 
 
 def _replay_review_response(db: Session, actor: CurrentActor, stored_response: dict) -> dict:
@@ -141,9 +142,13 @@ def create_review(
         raise api_error(status.HTTP_400_BAD_REQUEST, 'PRACTICE_ASYNC_REQUIRED', 'Practice attempts must be created asynchronously')
 
     if actor.plan != UserPlan.guest and source_review is None and not payload.practice_session_id:
+        profile = openai_review_profile_for_mode(mode_enum.value)
         requested_writer_model_name = writer_contract_for_review_request(
-            mode=payload.mode,
+            mode=mode_enum.value,
             review_model=payload.review_model,
+        )
+        requested_writer_reasoning_effort = (
+            profile.writer_reasoning_effort if payload.review_model in _OPENAI_REVIEW_MODELS else ''
         )
         existing_query = db.query(Review).filter(
             Review.photo_id == photo.id,
@@ -152,7 +157,7 @@ def create_review(
             Review.status == ReviewStatus.SUCCEEDED,
             Review.deleted_at.is_(None),
         )
-        if payload.review_model in {'gpt-5.5', 'gpt-5.6-luna', 'gpt-6-luna', 'gpt-6-sol'}:
+        if payload.review_model in _OPENAI_REVIEW_MODELS:
             existing_query = existing_query.filter(Review.model_name.ilike('%gpt-%'))
         else:
             existing_query = existing_query.filter(
@@ -171,6 +176,9 @@ def create_review(
                 if review_uses_current_full_review_contract(
                     review,
                     writer_model_name=requested_writer_model_name,
+                    writer_reasoning_effort=requested_writer_reasoning_effort,
+                    scorer_model_name=profile.scorer_model_name,
+                    scorer_reasoning_effort=profile.scorer_reasoning_effort,
                 )
             ),
             None,
@@ -355,15 +363,19 @@ def create_review(
                     retake_photo_id=photo.public_id,
                     locale=payload.locale,
                     image_type=payload.image_type,
+                    mode=mode_enum.value,
                 )
             else:
+                profile = openai_review_profile_for_mode(mode_enum.value)
                 with canonical_score_cache_lease(
                     db,
                     photo=photo,
                     image_type=payload.image_type,
+                    scorer_model_name=profile.scorer_model_name,
+                    scorer_reasoning_effort=profile.scorer_reasoning_effort,
                 ) as canonical_score:
                     ai_response = run_ai_review(
-                        payload.mode,
+                        mode_enum.value,
                         image_url=image_url,
                         locale=payload.locale,
                         exif_data=photo.exif_data or None,

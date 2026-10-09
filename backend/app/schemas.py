@@ -65,7 +65,7 @@ class PhotoCreateResponse(BaseModel):
 class ReviewCreateRequest(BaseModel):
     photo_id: str
     mode: str = Field(pattern='^(flash|pro)$')
-    review_model: str = Field(default='qwen', pattern=r'^(qwen|gpt-5\.5|gpt-5\.6-(?:terra|luna)|gpt-6-(?:luna|sol))$')
+    review_model: str = Field(default='qwen', pattern=r'^(qwen|gpt-5\.5|gpt-5\.6-(?:terra|luna)|gpt-6-(?:luna|sol)|gpt-6\.1-sol)$')
     image_type: str = Field(default='default', pattern='^(default|landscape|portrait|street|still_life|architecture)$')
     source_review_id: str | None = None
     practice_session_id: str | None = None
@@ -77,7 +77,7 @@ class ReviewCreateRequest(BaseModel):
     @model_validator(mode='after')
     def align_review_model_with_analysis_type(self):
         if self.analysis_type == 'retake_compare':
-            if self.review_model not in {'gpt-6-luna', 'gpt-6-sol'}:
+            if self.review_model not in {'gpt-6-luna', 'gpt-6-sol', 'gpt-6.1-sol'}:
                 self.review_model = 'gpt-5.6-luna'
         elif self.review_model == 'gpt-5.5':
             self.review_model = 'gpt-5.6-luna'
@@ -144,8 +144,10 @@ class ReviewResult(BaseModel):
     model_version: str = ''
     scorer_model_name: str = ''
     scorer_model_version: str = ''
+    scorer_reasoning_effort: str = ''
     writer_model_name: str = ''
     writer_model_version: str = ''
+    writer_reasoning_effort: str = ''
     scorer_preprocess_version: str = ''
     score_cache_hit: bool = False
     scores: dict[str, int] = Field(default_factory=default_review_scores)
@@ -345,8 +347,10 @@ class ReviewHistoryItem(BaseModel):
     model_version: str = ''
     scorer_model_name: str = ''
     scorer_model_version: str = ''
+    scorer_reasoning_effort: str = ''
     writer_model_name: str = ''
     writer_model_version: str = ''
+    writer_reasoning_effort: str = ''
     score_version: str = 'legacy'
     favorite: bool = False
     gallery_visible: bool = False
@@ -478,8 +482,10 @@ class ReviewExportData(BaseModel):
     model_version: str = ''
     scorer_model_name: str = ''
     scorer_model_version: str = ''
+    scorer_reasoning_effort: str = ''
     writer_model_name: str = ''
     writer_model_version: str = ''
+    writer_reasoning_effort: str = ''
     score_version: str = 'legacy'
     final_score: float
     scores: dict[str, int] = Field(default_factory=default_review_scores)

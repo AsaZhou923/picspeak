@@ -77,6 +77,7 @@ def test_empty_writer_result_is_a_writing_failure_and_does_not_rescore(provider)
             scorer_model_name='gpt-5.6-luna',
             scorer_model_version='test-snapshot',
             score_evidence=score_evidence_fixture(SCORES, audited=True),
+            scorer_reasoning_effort='low',
         )
         response = AIJSONResponse(parsed={key: '' for key in VALID_TEXT}, usage={}, model_name='test', latency_ms=1)
         with patch('app.services.ai._run_canonical_scoring') as scorer, patch(

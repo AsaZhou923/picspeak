@@ -17,6 +17,7 @@ from app.services.ai import (
     _validate_canonical_score_contract,
     build_cached_canonical_score,
     model_name_for_mode,
+    openai_review_profile_for_mode,
 )
 from app.services.ai_prompts import (
     PROMPT_VERSION,
@@ -39,7 +40,11 @@ def _optional_nonnegative_int(value: object) -> int | None:
 
 
 def checkpoint_task_canonical_score(task: ReviewTask, score: CanonicalScore) -> None:
-    _validate_canonical_score_contract(score)
+    _validate_canonical_score_contract(
+        score,
+        expected_model_name=score.model_name,
+        expected_scorer_reasoning_effort=score.scorer_reasoning_effort,
+    )
     payload = dict(task.request_payload or {})
     payload[_TASK_SCORE_CHECKPOINT_KEY] = {
         'checkpoint_version': _TASK_SCORE_CHECKPOINT_VERSION,
@@ -51,6 +56,7 @@ def checkpoint_task_canonical_score(task: ReviewTask, score: CanonicalScore) -> 
         'score_prompt_version': score.score_prompt_version,
         'score_version': score.score_version,
         'preprocess_version': score.preprocess_version,
+        'scorer_reasoning_effort': score.scorer_reasoning_effort,
         'input_tokens': score.input_tokens,
         'output_tokens': score.output_tokens,
         'latency_ms': score.latency_ms,
@@ -58,7 +64,12 @@ def checkpoint_task_canonical_score(task: ReviewTask, score: CanonicalScore) -> 
     task.request_payload = payload
 
 
-def load_task_canonical_score_checkpoint(task: ReviewTask) -> CanonicalScore | None:
+def load_task_canonical_score_checkpoint(
+    task: ReviewTask,
+    *,
+    scorer_model_name: str | None = None,
+    scorer_reasoning_effort: str | None = None,
+) -> CanonicalScore | None:
     raw = (task.request_payload or {}).get(_TASK_SCORE_CHECKPOINT_KEY)
     if not isinstance(raw, dict):
         return None
@@ -80,6 +91,9 @@ def load_task_canonical_score_checkpoint(task: ReviewTask) -> CanonicalScore | N
             scorer_model_version=str(raw['model_version']),
             final_score=float(raw['final_score']),
             score_evidence=raw.get('score_evidence'),
+            expected_model_name=scorer_model_name,
+            scorer_reasoning_effort=str(raw.get('scorer_reasoning_effort') or ''),
+            expected_scorer_reasoning_effort=scorer_reasoning_effort,
         )
         return replace(
             restored,
@@ -100,12 +114,20 @@ def clear_task_canonical_score_checkpoint(task: ReviewTask) -> None:
     task.request_payload = payload
 
 
-def review_uses_current_score_contract(review: Review) -> bool:
+def review_uses_current_score_contract(
+    review: Review,
+    *,
+    scorer_model_name: str | None = None,
+    scorer_reasoning_effort: str | None = None,
+) -> bool:
     payload = dict(review.result_json or {})
-    scorer_model_name = str(review.scorer_model_name or payload.get('scorer_model_name') or '')
+    review_scorer_model_name = str(review.scorer_model_name or payload.get('scorer_model_name') or '')
+    expected_scorer_model_name = scorer_model_name or settings.openai_score_model
+    review_scorer_reasoning_effort = str(payload.get('scorer_reasoning_effort') or '')
     scorer_model_version = str(payload.get('scorer_model_version') or '')
     if not (
-        scorer_model_name == settings.openai_score_model
+        review_scorer_model_name == expected_scorer_model_name
+        and (scorer_reasoning_effort is None or review_scorer_reasoning_effort == scorer_reasoning_effort)
         and bool(scorer_model_version)
         and str(payload.get('score_prompt_version') or '') == SCORE_PROMPT_VERSION
         and str(payload.get('score_version') or '') == SCORE_VERSION
@@ -115,10 +137,13 @@ def review_uses_current_score_contract(review: Review) -> bool:
     try:
         score = build_cached_canonical_score(
             payload['scores'],
-            scorer_model_name=scorer_model_name,
+            scorer_model_name=review_scorer_model_name,
             scorer_model_version=scorer_model_version,
             final_score=review.final_score,
             score_evidence=payload.get('score_evidence'),
+            expected_model_name=expected_scorer_model_name,
+            scorer_reasoning_effort=review_scorer_reasoning_effort,
+            expected_scorer_reasoning_effort=scorer_reasoning_effort,
         )
         return float(payload['final_score']) == score.final_score
     except (AIReviewError, AttributeError, KeyError, TypeError, ValueError):
@@ -126,8 +151,8 @@ def review_uses_current_score_contract(review: Review) -> bool:
 
 
 def writer_contract_for_review_request(*, mode: str, review_model: str) -> str:
-    if review_model in {'gpt-5.5', 'gpt-5.6-luna', 'gpt-6-luna', 'gpt-6-sol'}:
-        writer_model_name = settings.openai_review_model
+    if review_model in {'gpt-5.5', 'gpt-5.6-luna', 'gpt-6-luna', 'gpt-6-sol', 'gpt-6.1-sol'}:
+        writer_model_name = openai_review_profile_for_mode(mode).writer_model_name
     else:
         writer_model_name = model_name_for_mode(mode)
     return writer_model_name
@@ -137,11 +162,14 @@ def review_uses_current_writer_contract(
     review: Review,
     *,
     writer_model_name: str,
+    writer_reasoning_effort: str | None = None,
 ) -> bool:
     payload = dict(review.result_json or {})
     review_writer_name = str(review.writer_model_name or payload.get('writer_model_name') or review.model_name or '')
+    review_writer_reasoning_effort = str(payload.get('writer_reasoning_effort') or '')
     return (
         review_writer_name == writer_model_name
+        and (writer_reasoning_effort is None or review_writer_reasoning_effort == writer_reasoning_effort)
         and str(payload.get('prompt_version') or '') == PROMPT_VERSION
     )
 
@@ -150,14 +178,29 @@ def review_uses_current_full_review_contract(
     review: Review,
     *,
     writer_model_name: str,
+    writer_reasoning_effort: str | None = None,
+    scorer_model_name: str | None = None,
+    scorer_reasoning_effort: str | None = None,
 ) -> bool:
-    return review_uses_current_score_contract(review) and review_uses_current_writer_contract(
+    return review_uses_current_score_contract(
+        review,
+        scorer_model_name=scorer_model_name,
+        scorer_reasoning_effort=scorer_reasoning_effort,
+    ) and review_uses_current_writer_contract(
         review,
         writer_model_name=writer_model_name,
+        writer_reasoning_effort=writer_reasoning_effort,
     )
 
 
-def _lookup_cached_score(db: Session, *, photo_id: int, image_type: str) -> CanonicalScore | None:
+def _lookup_cached_score(
+    db: Session,
+    *,
+    photo_id: int,
+    image_type: str,
+    scorer_model_name: str | None = None,
+    scorer_reasoning_effort: str | None = None,
+) -> CanonicalScore | None:
     candidates = (
         db.query(Review)
         .filter(
@@ -169,21 +212,30 @@ def _lookup_cached_score(db: Session, *, photo_id: int, image_type: str) -> Cano
         .limit(20)
         .all()
     )
+    expected_scorer_model_name = scorer_model_name or settings.openai_score_model
     for review in candidates:
-        if not review_uses_current_score_contract(review):
+        if not review_uses_current_score_contract(
+            review,
+            scorer_model_name=expected_scorer_model_name,
+            scorer_reasoning_effort=scorer_reasoning_effort,
+        ):
             continue
         payload = dict(review.result_json or {})
         raw_scores = payload.get('scores')
         scorer_model_version = str(payload.get('scorer_model_version') or review.scorer_model_name or '')
+        review_scorer_reasoning_effort = str(payload.get('scorer_reasoning_effort') or '')
         if not isinstance(raw_scores, dict) or not scorer_model_version:
             continue
         try:
             return build_cached_canonical_score(
                 raw_scores,
-                scorer_model_name=settings.openai_score_model,
+                scorer_model_name=expected_scorer_model_name,
                 scorer_model_version=scorer_model_version,
                 final_score=review.final_score,
                 score_evidence=payload.get('score_evidence'),
+                expected_model_name=expected_scorer_model_name,
+                scorer_reasoning_effort=review_scorer_reasoning_effort,
+                expected_scorer_reasoning_effort=scorer_reasoning_effort,
             )
         except (AIReviewError, KeyError, TypeError, ValueError):
             continue
@@ -195,9 +247,17 @@ def find_cached_canonical_score(
     *,
     photo: Photo,
     image_type: str,
+    scorer_model_name: str | None = None,
+    scorer_reasoning_effort: str | None = None,
 ) -> CanonicalScore | None:
     normalized_image_type = image_type or 'default'
-    return _lookup_cached_score(db, photo_id=photo.id, image_type=normalized_image_type)
+    return _lookup_cached_score(
+        db,
+        photo_id=photo.id,
+        image_type=normalized_image_type,
+        scorer_model_name=scorer_model_name,
+        scorer_reasoning_effort=scorer_reasoning_effort,
+    )
 
 
 def _database_dialect_name(db: Session) -> str | None:
@@ -207,18 +267,40 @@ def _database_dialect_name(db: Session) -> str | None:
     return str(name) if name else None
 
 
-def _score_cache_lock_key(*, photo_id: int, image_type: str) -> int:
+def _score_cache_lock_key(
+    *,
+    photo_id: int,
+    image_type: str,
+    scorer_model_name: str,
+    scorer_reasoning_effort: str | None,
+) -> int:
+    digest_input = (
+        f'{_SCORE_CACHE_LOCK_NAMESPACE}:{photo_id}:{image_type}:'
+        f'{scorer_model_name}:{scorer_reasoning_effort or ""}'
+    )
     digest = hashlib.blake2b(
-        f'{_SCORE_CACHE_LOCK_NAMESPACE}:{photo_id}:{image_type}'.encode('utf-8'),
+        digest_input.encode('utf-8'),
         digest_size=8,
     ).digest()
     return int.from_bytes(digest, 'big', signed=False) & ((1 << 63) - 1)
 
 
-def _try_acquire_score_cache_lock(db: Session, *, photo_id: int, image_type: str) -> bool | None:
+def _try_acquire_score_cache_lock(
+    db: Session,
+    *,
+    photo_id: int,
+    image_type: str,
+    scorer_model_name: str,
+    scorer_reasoning_effort: str | None,
+) -> bool | None:
     if _database_dialect_name(db) != 'postgresql':
         return None
-    lock_key = _score_cache_lock_key(photo_id=photo_id, image_type=image_type)
+    lock_key = _score_cache_lock_key(
+        photo_id=photo_id,
+        image_type=image_type,
+        scorer_model_name=scorer_model_name,
+        scorer_reasoning_effort=scorer_reasoning_effort,
+    )
     acquired = db.execute(
         text('SELECT pg_try_advisory_xact_lock(:lock_key)'),
         {'lock_key': lock_key},
@@ -232,16 +314,37 @@ def canonical_score_cache_lease(
     *,
     photo: Photo,
     image_type: str,
+    scorer_model_name: str | None = None,
+    scorer_reasoning_effort: str | None = None,
 ) -> Iterator[CanonicalScore | None]:
     normalized_image_type = image_type or 'default'
-    cached = find_cached_canonical_score(db, photo=photo, image_type=normalized_image_type)
+    expected_scorer_model_name = scorer_model_name or settings.openai_score_model
+    cached = find_cached_canonical_score(
+        db,
+        photo=photo,
+        image_type=normalized_image_type,
+        scorer_model_name=expected_scorer_model_name,
+        scorer_reasoning_effort=scorer_reasoning_effort,
+    )
     if cached is not None:
         yield cached
         return
 
-    lock_acquired = _try_acquire_score_cache_lock(db, photo_id=photo.id, image_type=normalized_image_type)
+    lock_acquired = _try_acquire_score_cache_lock(
+        db,
+        photo_id=photo.id,
+        image_type=normalized_image_type,
+        scorer_model_name=expected_scorer_model_name,
+        scorer_reasoning_effort=scorer_reasoning_effort,
+    )
     if lock_acquired is False:
-        cached = find_cached_canonical_score(db, photo=photo, image_type=normalized_image_type)
+        cached = find_cached_canonical_score(
+            db,
+            photo=photo,
+            image_type=normalized_image_type,
+            scorer_model_name=expected_scorer_model_name,
+            scorer_reasoning_effort=scorer_reasoning_effort,
+        )
         if cached is not None:
             yield cached
             return
@@ -251,4 +354,10 @@ def canonical_score_cache_lease(
     # commits the completed Review (or rolls back on failure). That closes the
     # post-AI/pre-commit race without holding a Photo row lock across provider
     # calls. Non-PostgreSQL test/dev sessions keep the existing best-effort path.
-    yield find_cached_canonical_score(db, photo=photo, image_type=normalized_image_type)
+    yield find_cached_canonical_score(
+        db,
+        photo=photo,
+        image_type=normalized_image_type,
+        scorer_model_name=expected_scorer_model_name,
+        scorer_reasoning_effort=scorer_reasoning_effort,
+    )

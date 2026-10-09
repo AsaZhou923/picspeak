@@ -48,6 +48,21 @@ class ReviewPricingTests(unittest.TestCase):
             'review-pricing-2026-10-09:openai:gpt-6-sol:standard',
         )
 
+    def test_openai_gpt61_sol_standard_and_long_context_tiers(self) -> None:
+        boundary = estimate_review_usage_cost(
+            [ReviewModelUsage(model_name='gpt-6.1-sol', input_tokens=272_000, output_tokens=10_000)]
+        )
+        long = estimate_review_usage_cost(
+            [ReviewModelUsage(model_name='gpt-6.1-sol', input_tokens=272_001, output_tokens=10_000)]
+        )
+
+        self.assertEqual(boundary.cost_usd, Decimal('0.644000'))
+        self.assertEqual(long.cost_usd, Decimal('1.238004'))
+        self.assertEqual(
+            boundary.rate_version,
+            'review-pricing-2026-10-09:openai:gpt-6.1-sol:standard',
+        )
+
     def test_openai_luna_standard_and_long_context_tiers(self) -> None:
         short = estimate_review_usage_cost(
             [ReviewModelUsage(model_name='gpt-5.6-luna', input_tokens=200_000, output_tokens=10_000)]

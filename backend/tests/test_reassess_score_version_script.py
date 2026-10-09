@@ -41,6 +41,8 @@ TEST_DATABASE_URL = os.getenv('PICSPEAK_TEST_DATABASE_URL', '').strip()
 
 class _Result:
     final_score = 7.6
+    scorer_reasoning_effort = 'low'
+    writer_reasoning_effort = 'low'
 
     def model_dump(self) -> dict:
         return {

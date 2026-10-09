@@ -26,6 +26,7 @@ from app.services.review_score_cache import (
     review_uses_current_full_review_contract,
     review_uses_current_score_contract,
     writer_contract_for_review_request,
+    _score_cache_lock_key,
 )
 
 
@@ -52,7 +53,7 @@ class ReviewScoreCacheTests(unittest.TestCase):
         with patch('app.services.review_score_cache.settings.openai_score_model', 'gpt-5.6-luna'), patch(
             'app.services.review_score_cache.settings.openai_review_model', 'gpt-5.6-luna'
         ):
-            writer_name = writer_contract_for_review_request(mode='pro', review_model='gpt-5.6-luna')
+            writer_name = writer_contract_for_review_request(mode='flash', review_model='gpt-5.6-luna')
             self.assertTrue(review_uses_current_score_contract(review))
             self.assertTrue(
                 review_uses_current_full_review_contract(
@@ -95,19 +96,62 @@ class ReviewScoreCacheTests(unittest.TestCase):
             self.assertFalse(review_uses_current_score_contract(review))
 
     def test_writer_contract_for_gpt_uses_official_model_alias(self) -> None:
-        with patch('app.services.review_score_cache.settings.openai_review_model', 'gpt-6-sol'):
+        with patch('app.services.review_score_cache.settings.openai_review_model', 'gpt-6-sol'), patch(
+            'app.services.review_score_cache.settings.openai_pro_model', 'gpt-6.1-sol'
+        ):
             self.assertEqual(
                 writer_contract_for_review_request(mode='flash', review_model='gpt-6-sol'),
                 'gpt-6-sol',
             )
             self.assertEqual(
-                writer_contract_for_review_request(mode='flash', review_model='gpt-5.6-luna'),
-                'gpt-6-sol',
+                writer_contract_for_review_request(mode='pro', review_model='gpt-5.6-luna'),
+                'gpt-6.1-sol',
             )
             self.assertEqual(
-                writer_contract_for_review_request(mode='flash', review_model='gpt-6-luna'),
-                'gpt-6-sol',
+                writer_contract_for_review_request(mode='pro', review_model='gpt-6-luna'),
+                'gpt-6.1-sol',
             )
+
+    def test_qwen_full_review_reuse_requires_blank_writer_reasoning_effort(self) -> None:
+        review = SimpleNamespace(
+            final_score=6.0,
+            scorer_model_name='gpt-6-sol',
+            writer_model_name='qwen3.5-flash',
+            model_name='qwen3.5-flash',
+            result_json={
+                'scores': dict(LOW_SCORES),
+                'final_score': 6.0,
+                'score_evidence': score_evidence_fixture(LOW_SCORES),
+                'prompt_version': PROMPT_VERSION,
+                'score_prompt_version': SCORE_PROMPT_VERSION,
+                'score_version': SCORE_VERSION,
+                'scorer_model_version': 'gpt-6-sol-2026-10-09',
+                'scorer_preprocess_version': SCORER_PREPROCESS_VERSION,
+                'scorer_reasoning_effort': 'low',
+                'writer_model_name': 'qwen3.5-flash',
+                'writer_model_version': 'qwen3.5-flash-2026-10-09',
+                'writer_reasoning_effort': '',
+            },
+        )
+
+        self.assertTrue(
+            review_uses_current_full_review_contract(
+                review,
+                writer_model_name='qwen3.5-flash',
+                writer_reasoning_effort='',
+                scorer_model_name='gpt-6-sol',
+                scorer_reasoning_effort='low',
+            )
+        )
+        self.assertFalse(
+            review_uses_current_full_review_contract(
+                review,
+                writer_model_name='qwen3.5-flash',
+                writer_reasoning_effort='low',
+                scorer_model_name='gpt-6-sol',
+                scorer_reasoning_effort='low',
+            )
+        )
 
     def test_cached_score_requires_exact_integer_scores(self) -> None:
         with patch('app.services.ai.settings.openai_score_model', 'gpt-5.6-luna'):
@@ -301,6 +345,33 @@ class ReviewScoreCacheTests(unittest.TestCase):
         with patch('app.services.ai.settings.openai_score_model', 'gpt-6-sol'):
             self.assertIsNone(load_task_canonical_score_checkpoint(task))
 
+    def test_retry_checkpoint_requires_matching_scorer_reasoning_effort(self) -> None:
+        task = SimpleNamespace(request_payload={})
+        score = build_cached_canonical_score(
+            dict(LOW_SCORES),
+            scorer_model_name='gpt-6-sol',
+            scorer_model_version='gpt-6-sol',
+            final_score=6.0,
+            score_evidence=score_evidence_fixture(LOW_SCORES),
+            scorer_reasoning_effort='high',
+        )
+        checkpoint_task_canonical_score(task, score)
+
+        self.assertIsNone(
+            load_task_canonical_score_checkpoint(
+                task,
+                scorer_model_name='gpt-6-sol',
+                scorer_reasoning_effort='low',
+            )
+        )
+        self.assertIsNotNone(
+            load_task_canonical_score_checkpoint(
+                task,
+                scorer_model_name='gpt-6-sol',
+                scorer_reasoning_effort='high',
+            )
+        )
+
     def test_sol_runtime_rejects_luna_review_score_cache_candidate(self) -> None:
         review = SimpleNamespace(
             final_score=6.0,
@@ -318,6 +389,60 @@ class ReviewScoreCacheTests(unittest.TestCase):
 
         with patch('app.services.review_score_cache.settings.openai_score_model', 'gpt-6-sol'):
             self.assertFalse(review_uses_current_score_contract(review))
+
+    def test_score_cache_requires_matching_scorer_reasoning_effort(self) -> None:
+        review = SimpleNamespace(
+            final_score=6.0,
+            scorer_model_name='gpt-6-sol',
+            result_json={
+                'scores': dict(LOW_SCORES),
+                'final_score': 6.0,
+                'score_evidence': score_evidence_fixture(LOW_SCORES),
+                'score_prompt_version': SCORE_PROMPT_VERSION,
+                'score_version': SCORE_VERSION,
+                'scorer_model_version': 'gpt-6-sol',
+                'scorer_reasoning_effort': 'high',
+                'scorer_preprocess_version': SCORER_PREPROCESS_VERSION,
+            },
+        )
+
+        self.assertFalse(
+            review_uses_current_score_contract(
+                review,
+                scorer_model_name='gpt-6-sol',
+                scorer_reasoning_effort='low',
+            )
+        )
+        self.assertTrue(
+            review_uses_current_score_contract(
+                review,
+                scorer_model_name='gpt-6-sol',
+                scorer_reasoning_effort='high',
+            )
+        )
+
+    def test_advisory_lock_key_includes_scorer_model_and_reasoning_effort(self) -> None:
+        flash_key = _score_cache_lock_key(
+            photo_id=12,
+            image_type='portrait',
+            scorer_model_name='gpt-6-sol',
+            scorer_reasoning_effort='low',
+        )
+        old_sol_high_key = _score_cache_lock_key(
+            photo_id=12,
+            image_type='portrait',
+            scorer_model_name='gpt-6-sol',
+            scorer_reasoning_effort='high',
+        )
+        pro_key = _score_cache_lock_key(
+            photo_id=12,
+            image_type='portrait',
+            scorer_model_name='gpt-6.1-sol',
+            scorer_reasoning_effort='high',
+        )
+
+        self.assertNotEqual(flash_key, old_sol_high_key)
+        self.assertNotEqual(flash_key, pro_key)
 
     def test_sol_runtime_rejects_luna_full_review_cache_candidate(self) -> None:
         review = SimpleNamespace(

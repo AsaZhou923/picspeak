@@ -22,7 +22,7 @@ Core product areas:
 - AI image generation with templates, tasks, generated image detail pages, history, credits, and credit-pack billing
 - Review-to-generation loop for composition, lighting, color, and retake reference images
 - Review-to-workspace retake targets, history practice themes, and in-task Blog reading during critique/generation waits
-- Original-to-retake comparison with GPT-6 Sol at `high` reasoning, deterministic per-request score deltas, evidence-backed next-shoot actions, and separate practice-round records
+- Original-to-retake comparison with mode-specific GPT-6 Sol (Flash) or GPT-6.1 Sol (Pro), deterministic per-request score deltas, evidence-backed next-shoot actions, and separate practice-round records
 - Operational health snapshots for task status, AI costs, credits, payments, and public-content audits
 
 ## Architecture
@@ -31,14 +31,14 @@ Core product areas:
 - **Backend**: FastAPI, SQLAlchemy 2.x, Alembic, Uvicorn
 - **Database**: PostgreSQL
 - **Object storage**: Cloudflare R2 / S3-compatible storage
-- **AI critique**: GPT-6 Sol canonical photo scoring; GPT-6 Sol single-photo critique writing and paired original/retake comparison through OpenAI Responses with `high` reasoning; the Qwen-compatible backend API remains available for existing clients
+- **AI critique**: Mode-specific photo scoring, critique writing and paired comparison through OpenAI Responses: Flash uses GPT-6 Sol with low reasoning, Pro uses GPT-6.1 Sol with high reasoning; the Qwen-compatible backend API remains available for existing clients
 - **AI generation**: OpenAI-compatible image generation endpoint, task queue, credit pricing, and object-storage persistence
 - **Task processing**: In-process async worker by default, optional standalone worker and Cloud Tasks configuration
 - **Authentication**: Clerk plus legacy Google OAuth/guest JWT support
 - **Billing**: Lemon Squeezy Pro checkout, activation codes, image credit packs, and webhooks
 
 
-Current single-photo code contract: `score-v8-style-relative` / `photo-score-v8-style-relative` with GPT-6 Sol numeric scoring and `photo-review-v9-gpt6-image-led` prose. Preserve the scoring anchors and dimension evidence; perform one independent second scoring pass for candidates >=8 without exposing the initial scores, rationale, or high-score trigger to that request. Final dimension scores still determine the arithmetic mean. Judge monochrome, restricted palettes, shadows, haze, cropping and landscape impact by their visible role; a deduction needs material harm, and a limitation field must not force invented criticism. Absence of defects alone does not earn a high score. Keep completed scoring evidence/checkpoints through writer retries. Historical gallery re-evaluation requires an explicit maintenance run; changing prompts alone does not update deployed services or stored reviews. The v8 criteria experiment (`scoring-v8-validation.md`), preceding model comparison (`scoring-v7-validation.md`) and v6 workflow experiment (`scoring-v6-optimization.md`) are stored in the external Scoring documentation directory above. Production deployment must set `OPENAI_SCORE_MODEL`, `OPENAI_REVIEW_MODEL`, and `RETAKE_ANALYSIS_MODEL` to `gpt-6-sol`; Cloud Build and the manual deployment update all three existing runtime overrides and explicitly set OPENAI_SCORE_REASONING_EFFORT, OPENAI_REVIEW_REASONING_EFFORT, and RETAKE_ANALYSIS_REASONING_EFFORT to high. This criteria change adds no environment variables or schema migration. Paired comparisons use `retake-paired-v2` and `retake-coach-v2-gpt6-image-led`; retain historical provenance and legacy request normalization for idempotent retries.
+Current single-photo code contract: `score-v8-style-relative` / `photo-score-v8-style-relative` with mode-specific numeric scoring (Flash GPT-6 Sol/low; Pro GPT-6.1 Sol/high) and `photo-review-v9-gpt6-image-led` prose. Preserve the scoring anchors and dimension evidence; perform one independent second scoring pass for candidates >=8 without exposing the initial scores, rationale, or high-score trigger to that request. Final dimension scores still determine the arithmetic mean. Judge monochrome, restricted palettes, shadows, haze, cropping and landscape impact by their visible role; a deduction needs material harm, and a limitation field must not force invented criticism. Absence of defects alone does not earn a high score. Keep completed scoring evidence/checkpoints through writer retries. Historical gallery re-evaluation requires an explicit maintenance run; changing prompts alone does not update deployed services or stored reviews. The v8 criteria experiment (`scoring-v8-validation.md`), preceding model comparison (`scoring-v7-validation.md`) and v6 workflow experiment (`scoring-v6-optimization.md`) are stored in the external Scoring documentation directory above. Production deployment keeps OPENAI_SCORE_MODEL and OPENAI_REVIEW_MODEL at gpt-6-sol with low efforts for Flash, sets OPENAI_PRO_MODEL=gpt-6.1-sol and OPENAI_PRO_REASONING_EFFORT=high, and defaults retake analysis to gpt-6.1-sol/high while actual paired requests follow their trusted selected mode. Automatic and manual deployment update all eight overrides together. The mode split adds two Pro configuration variables and persists scorer/writer effort provenance in result_json, without a schema migration. Cache and checkpoints must match the requested model and effort; the worker uses task.mode rather than payload.mode. Paired comparisons use `retake-paired-v2` and `retake-coach-v2-gpt6-image-led`; retain historical provenance and legacy request normalization for idempotent retries.
 
 Validate scoring changes with `backend/scripts/evaluate_score_calibration.py` and `scoring-calibration.md` in the external Scoring documentation directory. Synthetic fixtures and small live-model probes are diagnostic only; formal calibration requires independent human labels and a held-out test set. Keep ordinary and paired-retake scoring versions separate in growth statistics.
 
@@ -116,7 +116,7 @@ npm run test
 - `db/models.py` - SQLAlchemy models for users, photos, reviews, tasks, gallery, billing, usage, analytics, and generated images
 - `db/bootstrap.py` - Runtime schema bootstrap helpers
 - `services/ai.py` and `services/ai_prompts.py` - Vision critique client and prompt construction
-- `services/retake_comparison.py` - GPT-6 Sol paired-image schema, Responses API client, deterministic deltas, and comparison normalization
+- `services/retake_comparison.py` - Mode-specific paired-image schema, Responses API client, deterministic deltas, and comparison normalization
 - `services/review_task_processor.py` - Photo review task execution
 - `services/image_generation*.py` - Generation client, prompt building, pricing, and task execution
 - `services/object_storage.py` - Presigned upload/download and generated image persistence
@@ -135,7 +135,7 @@ npm run test
 ### Frontend (`frontend/src/`)
 
 - `app/` - App Router routes, including workspace, retake coach, reviews, tasks, gallery, generate, generation tasks/details, account pages, blog, updates, localized pages, robots, sitemap, and llms.txt routes
-- `features/workspace/` - Upload flow, quota display, mode/image type/model pickers, retake source handoff, and replay context
+- `features/workspace/` - Upload flow, quota display, image type and combined mode/model controls, retake source handoff, and replay context
 - `features/reviews/` - Review detail hooks and UI panels, including action bar, gallery publishing, growth loop, paired retake comparison/progress, retake target handoff, and reference generation
 - `features/generations/` - Generation contracts, config, and prompt example UI
 - `components/` - Shared auth, billing, blog, gallery, home, layout, marketing, provider, upload, and UI components
@@ -165,8 +165,8 @@ npm run test
 
 1. User opens `/retake`, selects a completed source critique, and continues to the workspace with its source review and target context.
 2. The workspace uploads a new photo and creates a review with `analysis_type=retake_compare` and the source review id.
-3. Backend resolves both stored images and sends them together to the OpenAI Responses API with `model=gpt-6-sol`, `reasoning.effort=high`, and a strict paired-comparison schema.
-4. GPT-6 Sol scores both images under one rubric; the server calculates every dimension and overall delta before persisting `Review.result_json.comparison`.
+3. Backend resolves both stored images and sends them together to Responses using the trusted selected mode: Flash uses gpt-6-sol/low and Pro uses gpt-6.1-sol/high, with the strict paired-comparison schema. Guest Pro restrictions and Free Pro quotas remain unchanged.
+4. The selected Flash or Pro model scores both images under one rubric; the server calculates every dimension and overall delta before persisting `Review.result_json.comparison`.
 5. Results appear in `RetakeComparisonPanel` and the per-round `RetakeProgressPanel`; each pair retains its own before/after scores, version, and comparability. Never sum paired deltas or join independently rescored images into an ability curve.
 6. The paired diagnosis can feed the existing GPT Image 2 `review_linked` / `retake_reference` flow, but generated images never affect comparison scores.
 
@@ -176,7 +176,7 @@ Practice analytics uses server-owned accepted/submitted/completed/feedback event
 
 Keep execution records, evaluation protocols, and generated analytics reports in the sibling docs vault under `E:\Project Code\docs\01 - Projects\PicSpeak` (Testing, Architecture, and Analytics subfolders). Keep machine-readable test fixtures and evaluator input templates in the code repository.
 
-Normal single-photo review is a separate path: the workspace defaults to GPT-6 Sol with `high` reasoning through the OpenAI Responses API and only exposes that model. The Qwen-compatible backend route and its API default remain available for existing clients. Do not reuse one model's completed review for another model choice.
+Normal single-photo review uses one combined mode/model choice: Flash defaults to GPT-6 Sol for quick critique and Pro uses the stronger GPT-6.1 Sol for deeper analysis. Scoring and writing both follow the server-validated mode; client selector text cannot upgrade a Flash request to Pro. The Qwen-compatible backend route and its API default remain available for existing clients. Do not reuse one model's completed review for another model choice.
 
 ### Auth and quota
 
@@ -226,8 +226,8 @@ Frontend values live in `frontend/.env.local`; `NEXT_PUBLIC_API_URL` and site/pu
 - Keep backend task state changes transactional and idempotent.
 - Do not bypass quota, credit, or guest/auth helpers when adding new creation endpoints.
 - When touching image generation, update pricing, task processor, API schemas, frontend contracts, and tests together.
-- Keep normal GPT review and `retake_compare` pinned to GPT-6 Sol with `high` reasoning unless model-specific contract tests and redacted live routing evidence are updated together.
-- Retake deltas must always be calculated from the two scores produced inside the same paired request; never subtract a stored Qwen score from a GPT-6 Sol score.
+- Keep normal GPT review and `retake_compare` pinned to their trusted Flash (GPT-6 Sol/low) or Pro (GPT-6.1 Sol/high) profile unless model-specific contract tests and redacted live routing evidence are updated together.
+- Retake deltas must always be calculated from the two scores produced inside the same paired request; never subtract independently scored or mismatched-profile images.
 - When touching public pages, update localized copy and SEO tests together.
 - Use `serializeJsonLd()` for inline JSON-LD scripts, and reuse shared date, locale, and checkout helpers before reintroducing page-local copies.
 - Treat root `DESIGN.md` as the frontend product and UI decision baseline; preserve the professional photography coach plus efficient AI tool hierarchy when changing public or workflow pages.

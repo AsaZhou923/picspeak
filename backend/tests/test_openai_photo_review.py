@@ -42,6 +42,7 @@ def _cached_score():
             scorer_model_name='gpt-6-luna',
             scorer_model_version='gpt-6-luna',
             score_evidence=score_evidence_fixture(LOW_SCORES),
+            scorer_reasoning_effort='low',
         )
 
 
@@ -52,6 +53,7 @@ def _cached_sol_score():
             scorer_model_name='gpt-6-sol',
             scorer_model_version='gpt-6-sol',
             score_evidence=score_evidence_fixture(LOW_SCORES),
+            scorer_reasoning_effort='low',
         )
 
 
@@ -99,8 +101,10 @@ class OpenAIPhotoReviewTests(unittest.TestCase):
         self.assertEqual(response.model_name, 'gpt-5.6-luna-2026-08-01')
         self.assertEqual(response.scorer_model_name, 'gpt-5.6-luna')
         self.assertEqual(response.scorer_model_version, 'gpt-5.6-luna-2026-08-01')
+        self.assertEqual(response.result.scorer_reasoning_effort, 'high')
         self.assertEqual(response.writer_model_name, 'gpt-5.6-luna')
         self.assertEqual(response.writer_model_version, 'gpt-5.6-luna-2026-08-01')
+        self.assertEqual(response.result.writer_reasoning_effort, 'xhigh')
         self.assertEqual(response.result.scores['composition'], 7)
         self.assertEqual(response.result.score_evidence['dimensions']['composition']['strength'], 'The frame gives the main subject a readable position.')
         self.assertEqual(response.result.final_score, 6.0)
@@ -311,6 +315,52 @@ class OpenAIPhotoReviewTests(unittest.TestCase):
         self.assertEqual(response.writer_model_name, 'gpt-6-sol')
         self.assertEqual(response.writer_model_version, 'gpt-6-sol-2026-10-09')
         self.assertIn('openai:gpt-6-sol:standard', response.writer_cost_rate_version or '')
+
+    def test_mode_profiles_route_flash_and_pro_to_distinct_openai_payloads(self) -> None:
+        scoring = _response(
+            model_score_payload(LOW_SCORES),
+            model='gpt-6.1-sol-2026-10-09',
+            input_tokens=120,
+            output_tokens=30,
+        )
+        writing = _response(
+            {
+                'advantage': '1. Clear subject separation.',
+                'critique': '1. The light is visually flat.',
+                'suggestions': (
+                    '1. Observation: The face and background have similar brightness; '
+                    'Reason: Weak tonal separation reduces depth; '
+                    'Action: Move the subject closer to side light.'
+                ),
+            },
+            model='gpt-6.1-sol-2026-10-09',
+            input_tokens=180,
+            output_tokens=70,
+        )
+
+        with patch('app.services.ai.settings.openai_api_key', 'test-key'), patch(
+            'app.services.ai.settings.openai_pro_model', 'gpt-6.1-sol'
+        ), patch('app.services.ai.settings.openai_pro_reasoning_effort', 'high'), patch(
+            'app.services.ai.pooled_request', side_effect=[scoring, writing]
+        ) as request_mock:
+            response = run_ai_review(
+                mode='pro',
+                image_url='data:image/jpeg;base64,abc',
+                locale='en',
+                image_type='portrait',
+                review_model='gpt-6-sol',
+            )
+
+        score_payload = json.loads(request_mock.call_args_list[0].kwargs['body'])
+        writer_payload = json.loads(request_mock.call_args_list[1].kwargs['body'])
+        self.assertEqual(score_payload['model'], 'gpt-6.1-sol')
+        self.assertEqual(score_payload['reasoning'], {'effort': 'high'})
+        self.assertEqual(writer_payload['model'], 'gpt-6.1-sol')
+        self.assertEqual(writer_payload['reasoning'], {'effort': 'high'})
+        self.assertEqual(response.scorer_model_name, 'gpt-6.1-sol')
+        self.assertEqual(response.writer_model_name, 'gpt-6.1-sol')
+        self.assertEqual(response.result.scorer_reasoning_effort, 'high')
+        self.assertEqual(response.result.writer_reasoning_effort, 'high')
 
 
 if __name__ == '__main__':

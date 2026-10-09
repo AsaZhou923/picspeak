@@ -15,7 +15,13 @@ from app.goal_assessment import (
     validate_goal_assessment_for_context,
 )
 from app.schemas import ReviewResult
-from app.services.ai import AIReviewError, AIReviewResponse, notify_ai_provider_call
+from app.services.ai import (
+    AIReviewError,
+    AIReviewResponse,
+    OpenAIReviewProfile,
+    notify_ai_provider_call,
+    openai_review_profile_for_mode,
+)
 from app.services.audit import mask_capability_url_text
 from app.services.review_pricing import ReviewModelUsage, estimate_review_usage_cost
 
@@ -25,6 +31,19 @@ RETAKE_GOAL_PROMPT_VERSION = 'retake-coach-goal-v2-gpt6-image-led'
 RETAKE_SCORE_VERSION = 'retake-paired-v2'
 RETAKE_PREPROCESS_VERSION = 'openai-paired-input-image-high-v1'
 DIMENSION_KEYS = ('composition', 'lighting', 'color', 'impact', 'technical')
+
+
+def _profile_for_retake_mode(mode: str) -> OpenAIReviewProfile:
+    normalized = (mode or '').strip().lower()
+    if normalized in {'flash', 'pro'}:
+        return openai_review_profile_for_mode(normalized)
+    return OpenAIReviewProfile(
+        mode='retake-default',
+        scorer_model_name=settings.retake_analysis_model,
+        scorer_reasoning_effort=settings.retake_analysis_reasoning_effort,
+        writer_model_name=settings.retake_analysis_model,
+        writer_reasoning_effort=settings.retake_analysis_reasoning_effort,
+    )
 
 
 class _StrictModel(BaseModel):
@@ -276,6 +295,7 @@ def _build_result(
     response_id: str,
     model_name: str,
     model_version: str,
+    reasoning_effort: str,
     original_review_id: str,
     original_photo_id: str,
     retake_photo_id: str,
@@ -342,8 +362,10 @@ def _build_result(
         model_version=model_version,
         scorer_model_name=model_name,
         scorer_model_version=model_version,
+        scorer_reasoning_effort=reasoning_effort,
         writer_model_name=model_name,
         writer_model_version=model_version,
+        writer_reasoning_effort=reasoning_effort,
         scorer_preprocess_version=RETAKE_PREPROCESS_VERSION,
         scores=after_scores,
         final_score=overall_after,
@@ -420,15 +442,17 @@ def run_retake_comparison(
     retake_photo_id: str,
     locale: str,
     image_type: str,
+    mode: str = '',
     goal_context: GoalAssessmentContext | None = None,
 ) -> AIReviewResponse:
     if not settings.openai_api_key:
         raise AIReviewError('OPENAI_API_KEY is not configured for OpenAI retake comparison')
+    profile = _profile_for_retake_mode(mode)
 
     payload = {
-        'model': settings.retake_analysis_model,
+        'model': profile.writer_model_name,
         'store': False,
-        'reasoning': {'effort': settings.retake_analysis_reasoning_effort},
+        'reasoning': {'effort': profile.writer_reasoning_effort},
         'input': [
             {
                 'role': 'user',
@@ -465,18 +489,18 @@ def run_retake_comparison(
         )
         body = json.loads(response.data.decode('utf-8'))
     except PooledHTTPStatusError as exc:
-        notify_ai_provider_call(stage='pair', outcome='failed', model_name=settings.retake_analysis_model)
+        notify_ai_provider_call(stage='pair', outcome='failed', model_name=profile.writer_model_name)
         error_body = mask_capability_url_text(exc.response.data.decode('utf-8', errors='ignore'))
         raise AIReviewError(f'OpenAI retake comparison API HTTP {exc.response.status}: {error_body[:300]}') from exc
     except PooledHTTPRequestError as exc:
-        notify_ai_provider_call(stage='pair', outcome='failed', model_name=settings.retake_analysis_model)
+        notify_ai_provider_call(stage='pair', outcome='failed', model_name=profile.writer_model_name)
         raise AIReviewError(f'OpenAI retake comparison API request failed: {mask_capability_url_text(str(exc))}') from exc
     except json.JSONDecodeError as exc:
-        notify_ai_provider_call(stage='pair', outcome='failed', model_name=settings.retake_analysis_model)
+        notify_ai_provider_call(stage='pair', outcome='failed', model_name=profile.writer_model_name)
         raise AIReviewError('OpenAI retake comparison API returned invalid JSON') from exc
 
     latency_ms = int((time.perf_counter() - started) * 1000)
-    configured_model_name = settings.retake_analysis_model
+    configured_model_name = profile.writer_model_name
     provider_model_version = str(body.get('model') or configured_model_name)
     usage = body.get('usage') if isinstance(body.get('usage'), dict) else {}
     notify_ai_provider_call(
@@ -498,6 +522,7 @@ def run_retake_comparison(
         response_id=str(body.get('id') or ''),
         model_name=configured_model_name,
         model_version=provider_model_version,
+        reasoning_effort=profile.writer_reasoning_effort,
         original_review_id=original_review_id,
         original_photo_id=original_photo_id,
         retake_photo_id=retake_photo_id,

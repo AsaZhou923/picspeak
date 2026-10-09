@@ -323,6 +323,8 @@ class AIPromptTests(unittest.TestCase):
         with patch('app.services.ai.settings.ai_api_key', 'test-qwen-key'), patch(
             'app.services.ai.settings.openai_api_key', 'test-openai-key'
         ), patch('app.services.ai.settings.openai_score_model', 'gpt-5.6-luna'), patch(
+            'app.services.ai.settings.openai_pro_model', 'gpt-5.6-luna'
+        ), patch(
             'app.services.ai.model_name_for_mode',
             side_effect=lambda mode: 'qwen3.5-plus' if mode == 'pro' else 'qwen3.5-flash',
         ), patch(
@@ -383,6 +385,7 @@ class AIPromptTests(unittest.TestCase):
                 scorer_model_name='gpt-6-luna',
                 scorer_model_version='gpt-6-luna',
                 score_evidence=score_evidence_fixture(LOW_SCORES),
+                scorer_reasoning_effort='low',
             )
         writer_response = AIJSONResponse(
             parsed={
@@ -407,7 +410,7 @@ class AIPromptTests(unittest.TestCase):
             'app.services.ai._request_multimodal_json', return_value=writer_response
         ):
             response = run_ai_review(
-                mode='pro',
+                mode='flash',
                 image_url='https://example.com/photo.jpg',
                 locale='zh',
                 image_type='architecture',
@@ -455,6 +458,7 @@ class AIPromptTests(unittest.TestCase):
                 scorer_model_name='gpt-6-luna',
                 scorer_model_version='gpt-6-luna',
                 score_evidence=score_evidence_fixture(LOW_SCORES),
+                scorer_reasoning_effort='low',
             )
 
         with patch('app.services.ai.settings.ai_api_key', 'test-qwen-key'), patch(

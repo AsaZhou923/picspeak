@@ -124,14 +124,16 @@ class Settings(BaseSettings):
     openai_api_key: str = ''
     openai_api_base_url: str = 'https://api.openai.com/v1'
     openai_score_model: str = 'gpt-6-sol'
-    openai_score_reasoning_effort: str = 'high'
+    openai_score_reasoning_effort: str = 'low'
     openai_score_timeout_seconds: int = 180
     openai_review_model: str = 'gpt-6-sol'
-    openai_review_reasoning_effort: str = 'high'
+    openai_review_reasoning_effort: str = 'low'
     openai_review_timeout_seconds: int = 180
+    openai_pro_model: str = 'gpt-6.1-sol'
+    openai_pro_reasoning_effort: str = 'high'
     review_pricing_overrides: dict[str, Any] = Field(default_factory=dict)
     retake_analysis_api_url: str = ''
-    retake_analysis_model: str = 'gpt-6-sol'
+    retake_analysis_model: str = 'gpt-6.1-sol'
     retake_analysis_reasoning_effort: str = 'high'
     retake_analysis_timeout_seconds: int = 180
     image_generation_api_key: str = ''
@@ -224,6 +226,7 @@ class Settings(BaseSettings):
         'openai_api_key',
         'openai_score_reasoning_effort',
         'openai_review_reasoning_effort',
+        'openai_pro_reasoning_effort',
         'retake_analysis_reasoning_effort',
         'image_generation_api_key',
         'image_generation_model_snapshot',
@@ -238,7 +241,12 @@ class Settings(BaseSettings):
             return ''
         return value.strip()
 
-    @field_validator('openai_score_reasoning_effort', 'openai_review_reasoning_effort', 'retake_analysis_reasoning_effort')
+    @field_validator(
+        'openai_score_reasoning_effort',
+        'openai_review_reasoning_effort',
+        'openai_pro_reasoning_effort',
+        'retake_analysis_reasoning_effort',
+    )
     @classmethod
     def validate_openai_reasoning_effort(cls, value: str) -> str:
         normalized = value.strip().lower()

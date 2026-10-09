@@ -160,8 +160,41 @@ class ReassessGalleryReviewsScriptTests(unittest.TestCase):
         self.assertEqual(stats['scanned_gallery_reviews'], 1)
         self.assertEqual(stats['eligible_reviews'], 1)
         self.assertEqual(stats['pending'], 1)
+        self.assertEqual(stats['candidate_profiles']['pro']['scorer_model_name'], 'gpt-6.1-sol')
+        self.assertEqual(stats['candidate_profiles']['pro']['scorer_reasoning_effort'], 'high')
+        self.assertEqual(stats['candidate_profiles']['pro']['writer_reasoning_effort'], '')
         db.add.assert_not_called()
         db.commit.assert_not_called()
+
+    def test_dry_run_reports_mode_specific_candidate_profiles(self) -> None:
+        db = MagicMock()
+        flash_review = _review('rev_flash')
+        flash_review.mode = ReviewMode.flash
+        pro_review = _review('rev_pro')
+        pro_review.mode = ReviewMode.pro
+        db.query.return_value = _Query([(flash_review, _photo()), (pro_review, _photo())])
+
+        with patch.object(script, 'review_uses_current_full_review_contract', return_value=False):
+            stats = script.reassess_gallery_reviews(db, dry_run=True, review_model='gpt-6-sol')
+
+        self.assertEqual(stats['writer_model_name'], 'mode-specific')
+        self.assertEqual(
+            stats['candidate_profiles'],
+            {
+                'flash': {
+                    'scorer_model_name': 'gpt-6-sol',
+                    'scorer_reasoning_effort': 'low',
+                    'writer_model_name': 'gpt-6-sol',
+                    'writer_reasoning_effort': 'low',
+                },
+                'pro': {
+                    'scorer_model_name': 'gpt-6.1-sol',
+                    'scorer_reasoning_effort': 'high',
+                    'writer_model_name': 'gpt-6.1-sol',
+                    'writer_reasoning_effort': 'high',
+                },
+            },
+        )
 
     def test_dry_run_review_id_allowlist_selects_only_requested_review(self) -> None:
         db = MagicMock()
@@ -473,8 +506,24 @@ class ReassessGalleryReviewsPostgresTests(unittest.TestCase):
         try:
             review = self._insert_gallery_review(db)
             review_id = review.id
+
+            def current_contract_side_effect(candidate_review, **kwargs):
+                self.assertEqual(
+                    set(kwargs),
+                    {
+                        'writer_model_name',
+                        'writer_reasoning_effort',
+                        'scorer_model_name',
+                        'scorer_reasoning_effort',
+                    },
+                )
+                self.assertEqual(kwargs['writer_reasoning_effort'], '')
+                self.assertEqual(kwargs['scorer_model_name'], 'gpt-6.1-sol')
+                self.assertEqual(kwargs['scorer_reasoning_effort'], 'high')
+                return candidate_review.id != review_id
+
             with tempfile.TemporaryDirectory() as tmpdir, patch.object(
-                script, 'review_uses_current_full_review_contract', side_effect=lambda review, writer_model_name: review.id != review_id
+                script, 'review_uses_current_full_review_contract', side_effect=current_contract_side_effect
             ), patch.object(script, 'canonical_score_cache_lease', side_effect=_null_cache_lease), patch.object(
                 script, 'run_ai_review', return_value=_ai_response()
             ):

@@ -103,10 +103,20 @@ class CanonicalScore:
     score_prompt_version: str
     score_version: str
     preprocess_version: str
+    scorer_reasoning_effort: str = ''
     cache_hit: bool = False
     input_tokens: int | None = None
     output_tokens: int | None = None
     latency_ms: int = 0
+
+
+@dataclass(frozen=True)
+class OpenAIReviewProfile:
+    mode: str
+    scorer_model_name: str
+    scorer_reasoning_effort: str
+    writer_model_name: str
+    writer_reasoning_effort: str
 
 
 @contextmanager
@@ -248,6 +258,34 @@ def model_name_for_mode(mode: str) -> str:
     )
 
 
+def _string_setting(name: str, default: str = '') -> str:
+    value = getattr(settings, name, default)
+    if not isinstance(value, str):
+        return default
+    return value.strip() or default
+
+
+def openai_review_profile_for_mode(mode: str) -> OpenAIReviewProfile:
+    normalized = (mode or '').strip().lower()
+    if normalized == 'pro':
+        model_name = _string_setting('openai_pro_model', 'gpt-6.1-sol')
+        reasoning_effort = _string_setting('openai_pro_reasoning_effort', 'high')
+        return OpenAIReviewProfile(
+            mode='pro',
+            scorer_model_name=model_name,
+            scorer_reasoning_effort=reasoning_effort,
+            writer_model_name=model_name,
+            writer_reasoning_effort=reasoning_effort,
+        )
+    return OpenAIReviewProfile(
+        mode='flash',
+        scorer_model_name=_string_setting('openai_score_model', 'gpt-6-sol'),
+        scorer_reasoning_effort=_string_setting('openai_score_reasoning_effort', 'low'),
+        writer_model_name=_string_setting('openai_review_model', 'gpt-6-sol'),
+        writer_reasoning_effort=_string_setting('openai_review_reasoning_effort', 'low'),
+    )
+
+
 def model_version_for_name(model_name: str) -> str:
     return (model_name or '').strip()
 
@@ -370,6 +408,9 @@ def build_cached_canonical_score(
     scorer_model_version: str,
     score_evidence: dict | None = None,
     final_score: float | None = None,
+    expected_model_name: str | None = None,
+    scorer_reasoning_effort: str | None = None,
+    expected_scorer_reasoning_effort: str | None = None,
 ) -> CanonicalScore:
     locked_scores = _normalize_locked_scores(raw_scores)
     computed_final_score = _compute_final_score(locked_scores)
@@ -391,9 +432,14 @@ def build_cached_canonical_score(
         score_prompt_version=SCORE_PROMPT_VERSION,
         score_version=SCORE_VERSION,
         preprocess_version=SCORER_PREPROCESS_VERSION,
+        scorer_reasoning_effort=str(scorer_reasoning_effort or ''),
         cache_hit=True,
     )
-    _validate_canonical_score_contract(canonical_score)
+    _validate_canonical_score_contract(
+        canonical_score,
+        expected_model_name=expected_model_name,
+        expected_scorer_reasoning_effort=expected_scorer_reasoning_effort,
+    )
     return canonical_score
 
 
@@ -401,9 +447,17 @@ def _validate_canonical_score_contract(
     canonical_score: CanonicalScore,
     *,
     require_high_score_audit: bool = True,
+    expected_model_name: str | None = None,
+    expected_scorer_reasoning_effort: str | None = None,
 ) -> None:
-    if canonical_score.model_name != settings.openai_score_model:
+    expected_model = expected_model_name or settings.openai_score_model
+    if canonical_score.model_name != expected_model:
         raise AIReviewError('Canonical score uses a different scorer model')
+    if (
+        expected_scorer_reasoning_effort is not None
+        and canonical_score.scorer_reasoning_effort != expected_scorer_reasoning_effort
+    ):
+        raise AIReviewError('Canonical score uses a different scorer profile')
     if not str(canonical_score.model_version or '').strip():
         raise AIReviewError('Canonical score model version is required')
     if canonical_score.score_prompt_version != SCORE_PROMPT_VERSION:
@@ -765,6 +819,7 @@ def _build_canonical_score_from_response(
     *,
     scoring_response: AIJSONResponse,
     high_score_audited: bool,
+    profile: OpenAIReviewProfile,
 ) -> CanonicalScore:
     try:
         raw_scores = scoring_response.parsed.get('scores')
@@ -789,16 +844,22 @@ def _build_canonical_score_from_response(
         scores=locked_scores,
         score_evidence=normalized_evidence,
         final_score=_compute_final_score(locked_scores),
-        model_name=settings.openai_score_model,
+        model_name=profile.scorer_model_name,
         model_version=scoring_response.model_name,
         score_prompt_version=SCORE_PROMPT_VERSION,
         score_version=SCORE_VERSION,
         preprocess_version=SCORER_PREPROCESS_VERSION,
+        scorer_reasoning_effort=profile.scorer_reasoning_effort,
         input_tokens=scoring_response.usage.get('input_tokens'),
         output_tokens=scoring_response.usage.get('output_tokens'),
         latency_ms=scoring_response.latency_ms,
     )
-    _validate_canonical_score_contract(canonical_score, require_high_score_audit=high_score_audited)
+    _validate_canonical_score_contract(
+        canonical_score,
+        require_high_score_audit=high_score_audited,
+        expected_model_name=profile.scorer_model_name,
+        expected_scorer_reasoning_effort=profile.scorer_reasoning_effort,
+    )
     return canonical_score
 
 
@@ -808,6 +869,7 @@ def _request_canonical_score_once(
     image_url: str,
     high_score_audited: bool,
     sequence: str,
+    profile: OpenAIReviewProfile,
 ) -> CanonicalScore:
     try:
         scoring_response = _request_openai_multimodal_json(
@@ -815,8 +877,8 @@ def _request_canonical_score_once(
             image_url=image_url,
             schema_name='picspeak_photo_scores',
             schema=_OPENAI_SCORE_SCHEMA,
-            model_name=settings.openai_score_model,
-            reasoning_effort=settings.openai_score_reasoning_effort,
+            model_name=profile.scorer_model_name,
+            reasoning_effort=profile.scorer_reasoning_effort,
             timeout_seconds=settings.openai_score_timeout_seconds,
             call_stage='scorer',
             call_sequence=sequence,
@@ -824,6 +886,7 @@ def _request_canonical_score_once(
         return _build_canonical_score_from_response(
             scoring_response=scoring_response,
             high_score_audited=high_score_audited,
+            profile=profile,
         )
     except AIReviewError as exc:
         raise AIReviewError(str(exc), stage='scoring') from exc
@@ -845,6 +908,7 @@ def _merge_scoring_usage(final_score: CanonicalScore, previous_score: CanonicalS
         score_prompt_version=final_score.score_prompt_version,
         score_version=final_score.score_version,
         preprocess_version=final_score.preprocess_version,
+        scorer_reasoning_effort=final_score.scorer_reasoning_effort,
         cache_hit=final_score.cache_hit,
         input_tokens=input_tokens,
         output_tokens=output_tokens,
@@ -857,11 +921,12 @@ def _run_canonical_scoring(
     image_url: str,
     exif_data: dict | None,
     image_type: str,
+    profile: OpenAIReviewProfile,
 ) -> CanonicalScore:
     if not settings.openai_api_key:
         raise AIReviewError('OPENAI_API_KEY is not configured for the canonical GPT scorer')
-    if not settings.openai_score_model:
-        raise AIReviewError('OPENAI_SCORE_MODEL is not configured')
+    if not profile.scorer_model_name:
+        raise AIReviewError('OpenAI scorer model is not configured')
 
     prompt = _score_prompt(exif_data, image_type=image_type)
     canonical_score = _request_canonical_score_once(
@@ -869,6 +934,7 @@ def _run_canonical_scoring(
         image_url=image_url,
         high_score_audited=False,
         sequence='initial',
+        profile=profile,
     )
     if canonical_score.final_score < 8:
         return canonical_score
@@ -881,9 +947,14 @@ def _run_canonical_scoring(
         image_url=image_url,
         high_score_audited=True,
         sequence='audit',
+        profile=profile,
     )
     merged_score = _merge_scoring_usage(audited_score, canonical_score)
-    _validate_canonical_score_contract(merged_score)
+    _validate_canonical_score_contract(
+        merged_score,
+        expected_model_name=profile.scorer_model_name,
+        expected_scorer_reasoning_effort=profile.scorer_reasoning_effort,
+    )
     return merged_score
 
 
@@ -912,8 +983,9 @@ def _run_openai_review(
 ) -> AIReviewResponse:
     if not settings.openai_api_key:
         raise AIReviewError('OPENAI_API_KEY is not configured for OpenAI photo review')
-    if not settings.openai_review_model:
-        raise AIReviewError('OPENAI_REVIEW_MODEL is not configured')
+    profile = openai_review_profile_for_mode(mode)
+    if not profile.writer_model_name:
+        raise AIReviewError('OpenAI review writer model is not configured')
 
     resolved_score = canonical_score
     if resolved_score is None:
@@ -921,10 +993,15 @@ def _run_openai_review(
             image_url=image_url,
             exif_data=exif_data,
             image_type=image_type,
+            profile=profile,
         )
         if on_canonical_score is not None:
             on_canonical_score(resolved_score)
-    _validate_canonical_score_contract(resolved_score)
+    _validate_canonical_score_contract(
+        resolved_score,
+        expected_model_name=profile.scorer_model_name,
+        expected_scorer_reasoning_effort=profile.scorer_reasoning_effort,
+    )
     locked_scores = resolved_score.scores
     final_score = resolved_score.final_score
     try:
@@ -933,8 +1010,8 @@ def _run_openai_review(
             image_url=image_url,
             schema_name='picspeak_photo_review',
             schema=_OPENAI_WRITING_SCHEMA,
-            model_name=settings.openai_review_model,
-            reasoning_effort=settings.openai_review_reasoning_effort,
+            model_name=profile.writer_model_name,
+            reasoning_effort=profile.writer_reasoning_effort,
             timeout_seconds=settings.openai_review_timeout_seconds,
             call_stage='writer',
         )
@@ -950,8 +1027,10 @@ def _run_openai_review(
         parsed['score_prompt_version'] = SCORE_PROMPT_VERSION
         parsed['scorer_model_name'] = resolved_score.model_name
         parsed['scorer_model_version'] = resolved_score.model_version
-        parsed['writer_model_name'] = settings.openai_review_model
+        parsed['scorer_reasoning_effort'] = resolved_score.scorer_reasoning_effort
+        parsed['writer_model_name'] = profile.writer_model_name
         parsed['writer_model_version'] = model_version_for_name(writing_response.model_name)
+        parsed['writer_reasoning_effort'] = profile.writer_reasoning_effort
         parsed['scorer_preprocess_version'] = resolved_score.preprocess_version
         parsed['score_cache_hit'] = resolved_score.cache_hit
         parsed['scores'] = locked_scores
@@ -969,7 +1048,7 @@ def _run_openai_review(
     input_tokens = (resolved_score.input_tokens or 0) + (writing_response.usage.get('input_tokens') or 0)
     output_tokens = (resolved_score.output_tokens or 0) + (writing_response.usage.get('output_tokens') or 0)
     writer_usage = ReviewModelUsage(
-        model_name=settings.openai_review_model,
+        model_name=profile.writer_model_name,
         input_tokens=writing_response.usage.get('input_tokens'),
         output_tokens=writing_response.usage.get('output_tokens'),
     )
@@ -986,7 +1065,7 @@ def _run_openai_review(
         prompt_version=PROMPT_VERSION,
         scorer_model_name=resolved_score.model_name,
         scorer_model_version=resolved_score.model_version,
-        writer_model_name=settings.openai_review_model,
+        writer_model_name=profile.writer_model_name,
         writer_model_version=model_version_for_name(writing_response.model_name),
         score_prompt_version=resolved_score.score_prompt_version,
         scorer_preprocess_version=resolved_score.preprocess_version,
@@ -1014,7 +1093,7 @@ def run_ai_review(
     canonical_score: CanonicalScore | None = None,
     on_canonical_score: Callable[[CanonicalScore], None] | None = None,
 ) -> AIReviewResponse:
-    if review_model in {'gpt-5.5', 'gpt-5.6-luna', 'gpt-6-luna', 'gpt-6-sol'}:
+    if review_model in {'gpt-5.5', 'gpt-5.6-luna', 'gpt-6-luna', 'gpt-6-sol', 'gpt-6.1-sol'}:
         return _run_openai_review(
             mode=mode,
             image_url=image_url,
@@ -1031,16 +1110,22 @@ def run_ai_review(
         raise AIReviewError('AI_API_KEY is not configured')
 
     writing_model_name = model_name_for_mode(mode)
+    profile = openai_review_profile_for_mode(mode)
     resolved_score = canonical_score
     if resolved_score is None:
         resolved_score = _run_canonical_scoring(
             image_url=image_url,
             exif_data=exif_data,
             image_type=image_type,
+            profile=profile,
         )
         if on_canonical_score is not None:
             on_canonical_score(resolved_score)
-    _validate_canonical_score_contract(resolved_score)
+    _validate_canonical_score_contract(
+        resolved_score,
+        expected_model_name=profile.scorer_model_name,
+        expected_scorer_reasoning_effort=profile.scorer_reasoning_effort,
+    )
     locked_scores = resolved_score.scores
     final_score = resolved_score.final_score
     try:
@@ -1064,6 +1149,7 @@ def run_ai_review(
         parsed['score_prompt_version'] = SCORE_PROMPT_VERSION
         parsed['scorer_model_name'] = resolved_score.model_name
         parsed['scorer_model_version'] = resolved_score.model_version
+        parsed['scorer_reasoning_effort'] = resolved_score.scorer_reasoning_effort
         parsed['writer_model_name'] = writing_model_name
         parsed['writer_model_version'] = model_version_for_name(writing_response.model_name)
         parsed['scorer_preprocess_version'] = resolved_score.preprocess_version
