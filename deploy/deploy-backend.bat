@@ -87,7 +87,7 @@ gcloud run deploy %SERVICE_NAME% ^
   --region %REGION% ^
   --platform managed ^
   --allow-unauthenticated ^
-  --update-env-vars OPENAI_SCORE_MODEL=gpt-6-luna,OPENAI_REVIEW_MODEL=gpt-6-luna,RETAKE_ANALYSIS_MODEL=gpt-6-luna ^
+  --update-env-vars OPENAI_SCORE_MODEL=gpt-6-sol,OPENAI_REVIEW_MODEL=gpt-6-sol,RETAKE_ANALYSIS_MODEL=gpt-6-sol ^
   --port 8080
 
 if errorlevel 1 (

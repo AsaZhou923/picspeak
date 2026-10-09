@@ -61,23 +61,23 @@ def _ai_response(*, score: float = 7.6) -> SimpleNamespace:
     return SimpleNamespace(
         result=result,
         prompt_version='photo-review-v9-gpt6-image-led',
-        model_name='gpt-6-luna',
-        model_version='gpt-6-luna-2026',
-        scorer_model_name='gpt-6-luna',
-        scorer_model_version='gpt-6-luna-2026',
-        writer_model_name='gpt-6-luna',
-        writer_model_version='gpt-6-luna-2026',
+        model_name='gpt-6-sol',
+        model_version='gpt-6-sol-2026',
+        scorer_model_name='gpt-6-sol',
+        scorer_model_version='gpt-6-sol-2026',
+        writer_model_name='gpt-6-sol',
+        writer_model_version='gpt-6-sol-2026',
         score_prompt_version='photo-score-v8-style-relative',
         scorer_preprocess_version='preprocess-v7',
         score_cache_hit=False,
         input_tokens=123,
         output_tokens=45,
         cost_usd=0.01,
-        cost_rate_version='openai:gpt-6-luna:test',
+        cost_rate_version='openai:gpt-6-sol:test',
         writer_input_tokens=23,
         writer_output_tokens=17,
         writer_cost_usd=0.002,
-        writer_cost_rate_version='openai:gpt-6-luna:test',
+        writer_cost_rate_version='openai:gpt-6-sol:test',
         latency_ms=4567,
     )
 
@@ -310,7 +310,7 @@ class ReassessScoreVersionScriptTests(unittest.TestCase):
 
         self.assertEqual(item['status'], 'reassessed')
         self.assertEqual(run_review.call_args.kwargs['locale'], 'ja')
-        self.assertEqual(run_review.call_args.kwargs['review_model'], 'gpt-6-luna')
+        self.assertEqual(run_review.call_args.kwargs['review_model'], 'gpt-6-sol')
         self.assertEqual(run_review.call_args.kwargs['image_url'], 'https://signed.example/private-test-bucket/user_usr/2026/09/photo%20one.jpg')
         self.get_object_read_url.assert_called_once_with('user_usr/2026/09/photo one.jpg', bucket='private-test-bucket')
         self.assertEqual(review.public_id, 'rev_old')

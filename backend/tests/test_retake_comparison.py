@@ -178,6 +178,32 @@ class RetakeComparisonTests(unittest.TestCase):
         self.assertEqual(ai_response.result.score_prompt_version, 'retake-coach-v2-gpt6-image-led')
         self.assertIsNone(ai_response.result.goal_assessment)
 
+    def test_sol_retake_payload_uses_configured_sol_model_and_pricing(self) -> None:
+        body = _response_body()
+        body['model'] = 'gpt-6-sol-2026-10-09'
+        response = PooledHTTPResponse(
+            status=200,
+            data=json.dumps(body).encode('utf-8'),
+            headers={},
+            reason='OK',
+        )
+        with patch('app.services.retake_comparison.settings') as mocked_settings:
+            mocked_settings.openai_api_key = 'test-openai-key'
+            mocked_settings.retake_analysis_model = 'gpt-6-sol'
+            mocked_settings.retake_analysis_reasoning_effort = 'xhigh'
+            mocked_settings.retake_analysis_api_url = 'https://api.openai.com/v1/responses'
+            mocked_settings.retake_analysis_timeout_seconds = 180
+            mocked_settings.review_pricing_overrides = {}
+            with patch('app.services.retake_comparison.pooled_request', return_value=response) as request:
+                ai_response = self._run()
+
+        payload = json.loads(request.call_args.kwargs['body'])
+        self.assertEqual(payload['model'], 'gpt-6-sol')
+        self.assertEqual(payload['reasoning'], {'effort': 'xhigh'})
+        self.assertEqual(ai_response.model_name, 'gpt-6-sol')
+        self.assertEqual(ai_response.model_version, 'gpt-6-sol-2026-10-09')
+        self.assertIn('openai:gpt-6-sol:standard', ai_response.cost_rate_version or '')
+
     def test_goal_context_requires_goal_assessment_and_does_not_infer_from_score_delta(self) -> None:
         response = PooledHTTPResponse(
             status=200,

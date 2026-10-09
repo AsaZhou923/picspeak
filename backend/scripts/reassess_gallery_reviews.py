@@ -370,7 +370,7 @@ def main() -> int:
     parser.add_argument('--execute', action='store_true', help='Update gallery critiques in place without charging user quota.')
     parser.add_argument('--limit', type=_positive_int, default=None, help='Maximum gallery reviews to process.')
     parser.add_argument('--locale', choices=['zh', 'en', 'ja'], default='zh')
-    parser.add_argument('--review-model', default='qwen', choices=['qwen', 'gpt-5.5', 'gpt-5.6-luna', 'gpt-6-luna'])
+    parser.add_argument('--review-model', default='qwen', choices=['qwen', 'gpt-5.5', 'gpt-5.6-luna', 'gpt-6-luna', 'gpt-6-sol'])
     parser.add_argument(
         '--review-id',
         action='append',

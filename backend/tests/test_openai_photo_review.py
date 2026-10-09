@@ -45,6 +45,16 @@ def _cached_score():
         )
 
 
+def _cached_sol_score():
+    with patch('app.services.ai.settings.openai_score_model', 'gpt-6-sol'):
+        return build_cached_canonical_score(
+            LOW_SCORES,
+            scorer_model_name='gpt-6-sol',
+            scorer_model_version='gpt-6-sol',
+            score_evidence=score_evidence_fixture(LOW_SCORES),
+        )
+
+
 class OpenAIPhotoReviewTests(unittest.TestCase):
     def test_gpt_review_uses_responses_image_input_and_locks_scores(self) -> None:
         scoring = _response(
@@ -263,6 +273,44 @@ class OpenAIPhotoReviewTests(unittest.TestCase):
                 image_url='https://example.com/photo.jpg',
                 review_model='unknown',
             )
+
+    def test_gpt6_sol_selector_routes_to_configured_sol_responses_payload(self) -> None:
+        cached_score = _cached_sol_score()
+        writing = _response(
+            {
+                'advantage': '1. Clear subject separation.',
+                'critique': '1. The light is visually flat.',
+                'suggestions': (
+                    '1. Observation: The face and background have similar brightness; '
+                    'Reason: Weak tonal separation reduces depth; '
+                    'Action: Move the subject closer to the side light.'
+                ),
+            },
+            model='gpt-6-sol-2026-10-09',
+            input_tokens=180,
+            output_tokens=70,
+        )
+
+        with patch('app.services.ai.settings.openai_api_key', 'test-key'), patch(
+            'app.services.ai.settings.openai_score_model', 'gpt-6-sol'
+        ), patch('app.services.ai.settings.openai_review_model', 'gpt-6-sol'), patch(
+            'app.services.ai.settings.openai_review_reasoning_effort', 'xhigh'
+        ), patch('app.services.ai.pooled_request', return_value=writing) as request_mock:
+            response = run_ai_review(
+                mode='flash',
+                image_url='data:image/jpeg;base64,abc',
+                locale='en',
+                image_type='portrait',
+                review_model='gpt-6-sol',
+                canonical_score=cached_score,
+            )
+
+        payload = json.loads(request_mock.call_args.kwargs['body'])
+        self.assertEqual(payload['model'], 'gpt-6-sol')
+        self.assertEqual(payload['reasoning'], {'effort': 'xhigh'})
+        self.assertEqual(response.writer_model_name, 'gpt-6-sol')
+        self.assertEqual(response.writer_model_version, 'gpt-6-sol-2026-10-09')
+        self.assertIn('openai:gpt-6-sol:standard', response.writer_cost_rate_version or '')
 
 
 if __name__ == '__main__':

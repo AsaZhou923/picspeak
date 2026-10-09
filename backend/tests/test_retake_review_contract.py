@@ -77,6 +77,16 @@ class RetakeReviewContractTests(unittest.TestCase):
 
         self.assertEqual(payload.review_model, 'gpt-6-luna')
 
+    def test_gpt6_sol_can_be_selected_for_normal_review(self) -> None:
+        payload = ReviewCreateRequest(
+            photo_id='pho_1',
+            mode='flash',
+            analysis_type='single',
+            review_model='gpt-6-sol',
+        )
+
+        self.assertEqual(payload.review_model, 'gpt-6-sol')
+
     def test_legacy_gpt55_single_request_is_normalized_to_luna(self) -> None:
         payload = ReviewCreateRequest(
             photo_id='pho_1',
@@ -99,6 +109,19 @@ class RetakeReviewContractTests(unittest.TestCase):
 
         self.assertEqual(payload.review_model, 'gpt-6-luna')
         self.assertEqual(payload.model_dump(by_alias=True)['review_model'], 'gpt-6-luna')
+
+    def test_explicit_gpt6_sol_retake_selector_stays_sol(self) -> None:
+        payload = ReviewCreateRequest(
+            photo_id='pho_retake',
+            mode='pro',
+            source_review_id='rev_source',
+            analysis_type='retake_compare',
+            review_model='gpt-6-sol',
+            locale='en',
+        )
+
+        self.assertEqual(payload.review_model, 'gpt-6-sol')
+        self.assertEqual(payload.model_dump(by_alias=True)['review_model'], 'gpt-6-sol')
 
     def test_legacy_terra_retake_request_uses_legacy_canonical_payload(self) -> None:
         payload = ReviewCreateRequest(

@@ -1014,7 +1014,7 @@ def run_ai_review(
     canonical_score: CanonicalScore | None = None,
     on_canonical_score: Callable[[CanonicalScore], None] | None = None,
 ) -> AIReviewResponse:
-    if review_model in {'gpt-5.5', 'gpt-5.6-luna', 'gpt-6-luna'}:
+    if review_model in {'gpt-5.5', 'gpt-5.6-luna', 'gpt-6-luna', 'gpt-6-sol'}:
         return _run_openai_review(
             mode=mode,
             image_url=image_url,

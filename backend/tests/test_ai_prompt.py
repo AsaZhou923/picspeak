@@ -377,12 +377,13 @@ class AIPromptTests(unittest.TestCase):
         self.assertIn('alibaba-cn-beijing:qwen3.5-plus', response.cost_rate_version or '')
 
     def test_cached_score_is_shared_by_qwen_writer_without_another_score_call(self) -> None:
-        cached_score = build_cached_canonical_score(
-            LOW_SCORES,
-            scorer_model_name='gpt-6-luna',
-            scorer_model_version='gpt-6-luna',
-            score_evidence=score_evidence_fixture(LOW_SCORES),
-        )
+        with patch('app.services.ai.settings.openai_score_model', 'gpt-6-luna'):
+            cached_score = build_cached_canonical_score(
+                LOW_SCORES,
+                scorer_model_name='gpt-6-luna',
+                scorer_model_version='gpt-6-luna',
+                score_evidence=score_evidence_fixture(LOW_SCORES),
+            )
         writer_response = AIJSONResponse(
             parsed={
                 'advantage': '1. \u4e3b\u4f53\u660e\u786e',
@@ -448,12 +449,13 @@ class AIPromptTests(unittest.TestCase):
         self.assertEqual(raised.exception.stage, 'writing')
 
     def test_invalid_qwen_writer_payload_is_attributed_to_writing_stage(self) -> None:
-        cached_score = build_cached_canonical_score(
-            LOW_SCORES,
-            scorer_model_name='gpt-6-luna',
-            scorer_model_version='gpt-6-luna',
-            score_evidence=score_evidence_fixture(LOW_SCORES),
-        )
+        with patch('app.services.ai.settings.openai_score_model', 'gpt-6-luna'):
+            cached_score = build_cached_canonical_score(
+                LOW_SCORES,
+                scorer_model_name='gpt-6-luna',
+                scorer_model_version='gpt-6-luna',
+                score_evidence=score_evidence_fixture(LOW_SCORES),
+            )
 
         with patch('app.services.ai.settings.ai_api_key', 'test-qwen-key'), patch(
             'app.services.ai.settings.openai_score_model', 'gpt-6-luna'
@@ -520,13 +522,14 @@ class AIPromptTests(unittest.TestCase):
                 _validate_canonical_score_contract(score)
 
     def test_cached_score_rejects_empty_model_version_metadata(self) -> None:
-        with self.assertRaisesRegex(AIReviewError, 'model version'):
-            build_cached_canonical_score(
-                LOW_SCORES,
-                scorer_model_name='gpt-6-luna',
-                scorer_model_version='',
-                score_evidence=score_evidence_fixture(LOW_SCORES),
-            )
+        with patch('app.services.ai.settings.openai_score_model', 'gpt-6-luna'):
+            with self.assertRaisesRegex(AIReviewError, 'model version'):
+                build_cached_canonical_score(
+                    LOW_SCORES,
+                    scorer_model_name='gpt-6-luna',
+                    scorer_model_version='',
+                    score_evidence=score_evidence_fixture(LOW_SCORES),
+                )
 
     def test_high_score_audit_can_raise_keep_or_lower_without_blanket_clamp(self) -> None:
         writer = AIJSONResponse(

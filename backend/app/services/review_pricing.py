@@ -55,6 +55,14 @@ _BUILT_IN_RATES: dict[str, ReviewPricingRate] = {
             _tier(None, '0.20', '0.75'),
         ),
     ),
+    'gpt-6-sol': ReviewPricingRate(
+        model='gpt-6-sol',
+        rate_version='review-pricing-2026-10-09:openai:gpt-6-sol:standard',
+        tiers=(
+            _tier(272_000, '2.00', '10.00'),
+            _tier(None, '4.00', '15.00'),
+        ),
+    ),
     'gpt-5.6-luna': ReviewPricingRate(
         model='gpt-5.6-luna',
         rate_version=f'{REVIEW_PRICING_VERSION}:openai:gpt-5.6-luna:standard',

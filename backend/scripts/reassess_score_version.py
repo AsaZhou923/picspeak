@@ -36,7 +36,7 @@ from app.services.review_task_processor import _normalize_review_result_payload 
 SOURCE_SCORE_VERSION_V5 = 'score-v5-evidence-calibrated'
 SOURCE_SCORE_VERSION_V7 = 'score-v7-canonical-quality'
 SUPPORTED_SOURCE_SCORE_VERSIONS = {SOURCE_SCORE_VERSION_V5, SOURCE_SCORE_VERSION_V7}
-TARGET_REVIEW_MODEL = 'gpt-6-luna'
+TARGET_REVIEW_MODEL = 'gpt-6-sol'
 REASSESSMENT_METADATA_KEY = 'version_reassessment'
 REASSESSMENT_METADATA_VERSION = 1
 _LOCK_NAMESPACE = 'picspeak-gallery-free-reassessment-v1'
@@ -170,7 +170,7 @@ def _validate_target_runtime(review_model: str) -> None:
         raise ValueError(f'Unsupported target review model {review_model!r}; expected {TARGET_REVIEW_MODEL!r}')
     if settings.openai_score_model != TARGET_REVIEW_MODEL or settings.openai_review_model != TARGET_REVIEW_MODEL:
         raise RuntimeError(
-            'Score-version reassessment requires OPENAI_SCORE_MODEL and OPENAI_REVIEW_MODEL to be gpt-6-luna.'
+            'Score-version reassessment requires OPENAI_SCORE_MODEL and OPENAI_REVIEW_MODEL to be gpt-6-sol.'
         )
 
 

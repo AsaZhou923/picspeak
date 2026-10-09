@@ -95,14 +95,18 @@ class ReviewScoreCacheTests(unittest.TestCase):
             self.assertFalse(review_uses_current_score_contract(review))
 
     def test_writer_contract_for_gpt_uses_official_model_alias(self) -> None:
-        with patch('app.services.review_score_cache.settings.openai_review_model', 'gpt-6-luna'):
+        with patch('app.services.review_score_cache.settings.openai_review_model', 'gpt-6-sol'):
             self.assertEqual(
-                writer_contract_for_review_request(mode='flash', review_model='gpt-6-luna'),
-                'gpt-6-luna',
+                writer_contract_for_review_request(mode='flash', review_model='gpt-6-sol'),
+                'gpt-6-sol',
             )
             self.assertEqual(
                 writer_contract_for_review_request(mode='flash', review_model='gpt-5.6-luna'),
-                'gpt-6-luna',
+                'gpt-6-sol',
+            )
+            self.assertEqual(
+                writer_contract_for_review_request(mode='flash', review_model='gpt-6-luna'),
+                'gpt-6-sol',
             )
 
     def test_cached_score_requires_exact_integer_scores(self) -> None:
@@ -276,7 +280,7 @@ class ReviewScoreCacheTests(unittest.TestCase):
     def test_task_checkpoint_rejects_v7_with_the_same_current_model(self) -> None:
         task = SimpleNamespace(request_payload={})
         score = build_cached_canonical_score(
-            dict(LOW_SCORES), scorer_model_name='gpt-6-luna', scorer_model_version='gpt-6-luna',
+            dict(LOW_SCORES), scorer_model_name='gpt-6-sol', scorer_model_version='gpt-6-sol',
             final_score=6.0, score_evidence=score_evidence_fixture(LOW_SCORES),
         )
         checkpoint_task_canonical_score(task, score)
@@ -284,6 +288,67 @@ class ReviewScoreCacheTests(unittest.TestCase):
         checkpoint['score_prompt_version'] = 'photo-score-v7-canonical-quality'
         checkpoint['score_version'] = 'score-v7-canonical-quality'
         self.assertIsNone(load_task_canonical_score_checkpoint(task))
+
+    def test_sol_runtime_rejects_luna_retry_checkpoint(self) -> None:
+        task = SimpleNamespace(request_payload={})
+        with patch('app.services.ai.settings.openai_score_model', 'gpt-6-luna'):
+            score = build_cached_canonical_score(
+                dict(LOW_SCORES), scorer_model_name='gpt-6-luna', scorer_model_version='gpt-6-luna',
+                final_score=6.0, score_evidence=score_evidence_fixture(LOW_SCORES),
+            )
+            checkpoint_task_canonical_score(task, score)
+
+        with patch('app.services.ai.settings.openai_score_model', 'gpt-6-sol'):
+            self.assertIsNone(load_task_canonical_score_checkpoint(task))
+
+    def test_sol_runtime_rejects_luna_review_score_cache_candidate(self) -> None:
+        review = SimpleNamespace(
+            final_score=6.0,
+            scorer_model_name='gpt-6-luna',
+            result_json={
+                'scores': dict(LOW_SCORES),
+                'final_score': 6.0,
+                'score_evidence': score_evidence_fixture(LOW_SCORES),
+                'score_prompt_version': SCORE_PROMPT_VERSION,
+                'score_version': SCORE_VERSION,
+                'scorer_model_version': 'gpt-6-luna',
+                'scorer_preprocess_version': SCORER_PREPROCESS_VERSION,
+            },
+        )
+
+        with patch('app.services.review_score_cache.settings.openai_score_model', 'gpt-6-sol'):
+            self.assertFalse(review_uses_current_score_contract(review))
+
+    def test_sol_runtime_rejects_luna_full_review_cache_candidate(self) -> None:
+        review = SimpleNamespace(
+            final_score=6.0,
+            scorer_model_name='gpt-6-luna',
+            writer_model_name='gpt-6-luna',
+            model_name='gpt-6-luna',
+            result_json={
+                'scores': dict(LOW_SCORES),
+                'final_score': 6.0,
+                'score_evidence': score_evidence_fixture(LOW_SCORES),
+                'prompt_version': PROMPT_VERSION,
+                'score_prompt_version': SCORE_PROMPT_VERSION,
+                'score_version': SCORE_VERSION,
+                'scorer_model_version': 'gpt-6-luna',
+                'scorer_preprocess_version': SCORER_PREPROCESS_VERSION,
+                'writer_model_name': 'gpt-6-luna',
+                'writer_model_version': 'gpt-6-luna',
+            },
+        )
+
+        with patch('app.services.review_score_cache.settings.openai_score_model', 'gpt-6-sol'), patch(
+            'app.services.review_score_cache.settings.openai_review_model', 'gpt-6-sol'
+        ):
+            writer_name = writer_contract_for_review_request(mode='flash', review_model='gpt-6-sol')
+            self.assertFalse(
+                review_uses_current_full_review_contract(
+                    review,
+                    writer_model_name=writer_name,
+                )
+            )
 
 
 if __name__ == '__main__':
