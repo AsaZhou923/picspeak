@@ -26,7 +26,9 @@ test('Sol rollout keeps the pricing notice and latest popup priority only for Ch
   assert.equal(shouldShowProductUpdatePopup(announcement), true);
   assert.equal(announcement.docPath, `docs/changelog/CHANGELOG.md#${announcement.id}`);
   assert.match(announcement.summary, /将于 10 月 10 日 00:00/);
-  assert.match(announcement.summary, /现已全面切换至 GPT-6 Sol/);
+  assert.match(announcement.summary, /Flash 使用 GPT-6 Sol/);
+  assert.match(announcement.summary, /Pro 使用更强的 GPT-6\.1 Sol/);
+  assert.doesNotMatch(announcement.summary, /推理强度|\b(?:low|light|high|xhigh)\b/);
   assert.match(announcement.summary, /GPT-6 Sol/);
   assert.match(announcement.summary, /1\.99 美元\/月恢复至原价 3\.99 美元\/月/);
   assert.match(announcement.summary, /现有 Pro 用户不受本次价格调整影响/);

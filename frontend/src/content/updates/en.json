@@ -3,11 +3,11 @@
     "id": "2026-10-09-gpt6-sol-review-rollout",
     "date": "2026-10-09",
     "showPopup": false,
-    "title": "Photo critique now uses GPT-6 Sol",
-    "summary": "New photo scores, detailed critiques, and original/retake comparisons now use GPT-6 Sol with high reasoning. Saved critiques and scores keep their original model information. Progress statistics compare matching scoring standards and models, while retake results remain separate rounds.",
+    "title": "Quick Flash critique, stronger Pro analysis",
+    "summary": "Flash uses GPT-6 Sol for quick photo critique. Pro uses the stronger GPT-6.1 Sol for deeper analysis and improvement advice. Photo scoring, detailed feedback, and original/retake comparisons follow your chosen mode. Saved critiques keep their original model information, and progress statistics compare matching scoring profiles.",
     "docPath": "docs/changelog/CHANGELOG.md#2026-10-09-gpt6-sol-review-rollout",
     "primaryAction": {
-      "label": "Try GPT-6 Sol critique",
+      "label": "Choose a critique mode",
       "href": "/workspace"
     }
   },
@@ -269,26 +269,24 @@
   {
     "id": "2026-08-20-gpt56-luna-xhigh",
     "date": "2026-08-20",
-    "title": "OpenAI photo reviews move to GPT-5.6 Luna with xhigh reasoning",
-    "summary": "PicSpeak now routes both single-photo OpenAI reviews and original-versus-retake comparisons to GPT-5.6 Luna with xhigh reasoning. The product UI uses the stable GPT-5.6 family label, while request payloads, persisted model provenance, environment defaults, and regression tests identify the actual Luna route.",
+    "title": "Photo critique and retake analysis upgraded",
+    "summary": "This release upgraded single-photo and retake analysis to the GPT-5.6 model used at the time. Saved results retain their actual model information. Today Flash uses GPT-6 Sol for quick critique, while Pro uses the stronger GPT-6.1 Sol for deeper analysis.",
     "docPath": "docs/changelog/CHANGELOG.md#2026-08-20-gpt56-luna-xhigh",
     "sections": [
       {
-        "title": "Runtime routing",
+        "title": "Critique experience",
         "items": [
-          "Single-photo OpenAI reviews and retake comparisons now send model gpt-5.6-luna with reasoning.effort set to xhigh",
-          "Legacy clients that still submit GPT-5.5 for single-photo review or Terra for retake comparison are normalized to Luna",
-          "Usage metadata records the model returned by the OpenAI response instead of copying the client route label"
+          "Single-photo and retake analysis moved to GPT-5.6 in this release",
+          "Existing clients remain compatible and saved critiques stay readable",
+          "Saved scores and critiques retain the model actually used"
         ]
       },
       {
-        "title": "Product labeling",
+        "title": "Current modes",
         "items": [
-          "The navigation badge now reads 5.6 instead of Terra",
-          "The normal OpenAI review card now displays GPT-5.6 and submits the Luna route",
-          "English, Chinese, and Japanese Retake Coach surfaces use the GPT-5.6 family label consistently",
-          "Historical Build Week and release records keep their original Terra wording",
-          "The workspace card now displays Qwen 3.7; this frontend-only label change does not alter the existing DashScope backend route"
+          "Flash: GPT-6 Sol for a quick diagnosis of strengths and issues",
+          "Pro: the stronger GPT-6.1 Sol for deeper analysis and improvement advice",
+          "Changing modes affects new critiques without modifying saved results"
         ]
       }
     ]

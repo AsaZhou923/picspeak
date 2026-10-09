@@ -4,6 +4,8 @@ Status: Active; refreshed 2026-09-26 after the image-led Gallery and accessibili
 Owner: product/frontend
 Applies to: `frontend/src/app`, `frontend/src/components`, `frontend/src/features`
 
+Workspace model/mode contract refreshed 2026-10-09: one critique-mode control selects Flash with GPT-6 Sol or Pro with the stronger GPT-6.1 Sol. Keep the actual model visible inside each mode option, with a concise quick/deep-analysis description and the existing quota/guest explanation. Desktop and mobile share this single choice; do not repeat a separate model picker. Public product copy describes the mode and model benefit, while exact reasoning parameters remain internal configuration. Historical results keep their stored model provenance.
+
 ## 1. Source of truth
 
 This file is the canonical product UI/UX and visual design contract for PicSpeak. When implementation and older screenshots or planning notes disagree, follow this document unless a newer approved product decision explicitly overrides it.

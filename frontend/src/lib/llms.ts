@@ -21,8 +21,8 @@ export function getLlmsText(): string {
 - Public locales: English, Simplified Chinese, Japanese
 
 ## Core features
-- Flash critique for rapid five-dimension scoring
-- Pro critique for deeper written diagnosis and stronger next-step guidance
+- Flash critique with GPT-6 Sol for rapid five-dimension scoring
+- Pro critique with GPT-6.1 Sol for fuller written diagnosis and stronger next-step guidance
 - AI Create for GPT Image 2 visual reference generation
 - Curated prompt library with example outputs
 - Review-linked reference generation for planning retakes

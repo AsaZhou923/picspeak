@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowRight, Clock3, FileText } from 'lucide-react';
+import { ArrowRight, Clock3 } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { getProductUpdates } from '@/lib/updates-data';
 
@@ -20,7 +20,6 @@ function getPageCopy(locale: Locale) {
       latestLabel: '最近の更新',
       listLabel: '最近の更新',
       latestBadge: '最新',
-      docLabel: 'ドキュメント',
       backHome: 'ホームへ戻る',
     };
   }
@@ -33,7 +32,6 @@ function getPageCopy(locale: Locale) {
       latestLabel: 'Latest Update',
       listLabel: 'Recent Updates',
       latestBadge: 'Latest',
-      docLabel: 'Doc path',
       backHome: 'Back home',
     };
   }
@@ -45,7 +43,6 @@ function getPageCopy(locale: Locale) {
     latestLabel: '最近更新',
     listLabel: '近期更新',
     latestBadge: '最新',
-    docLabel: '文档路径',
     backHome: '返回首页',
   };
 }
@@ -114,22 +111,13 @@ export default function UpdatesPageContent({ homeHref }: UpdatesPageContentProps
               </div>
 
               <aside className="ui-panel p-5">
-                <div className="flex items-center gap-2 text-sm text-ink">
-                  <FileText size={14} className="text-gold" />
-                  <span>{copy.docLabel}</span>
-                </div>
-                <p className="mt-3 break-all font-mono text-xs leading-6 text-ink-muted">
-                  {latest.docPath}
-                </p>
-                <div className="mt-6">
-                  <Link
-                    href={homeHref}
-                    className="ui-action-primary px-4 py-2 text-sm"
-                  >
-                    {copy.backHome}
-                    <ArrowRight size={13} />
-                  </Link>
-                </div>
+                <Link
+                  href={homeHref}
+                  className="ui-action-primary px-4 py-2 text-sm"
+                >
+                  {copy.backHome}
+                  <ArrowRight size={13} />
+                </Link>
               </aside>
             </div>
           </div>
@@ -158,10 +146,6 @@ export default function UpdatesPageContent({ homeHref }: UpdatesPageContentProps
                 </div>
                 <h3 className="mt-4 font-display text-2xl text-ink">{entry.title}</h3>
                 <p className="mt-3 text-sm leading-7 text-ink-muted">{entry.summary}</p>
-                <div className="mt-5 rounded-control border border-border-subtle bg-void/30 px-3 py-3">
-                  <p className="text-[10px] uppercase tracking-[0.18em] text-ink-subtle">{copy.docLabel}</p>
-                  <p className="mt-2 break-all font-mono text-xs leading-6 text-ink-muted">{entry.docPath}</p>
-                </div>
               </article>
             ))}
           </div>

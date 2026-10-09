@@ -123,7 +123,7 @@ export interface PhotoCreateResponse {
 // ─── Review ──────────────────────────────────────────────────────────────────
 
 export type ReviewMode = 'flash' | 'pro';
-export type ReviewModel = 'gpt-5.5' | 'gpt-5.6-luna' | 'gpt-6-luna' | 'gpt-6-sol';
+export type ReviewModel = 'gpt-5.5' | 'gpt-5.6-luna' | 'gpt-6-luna' | 'gpt-6-sol' | 'gpt-6.1-sol';
 export type ReviewAnalysisType = 'single' | 'retake_compare';
 export type ImageType = 'default' | 'landscape' | 'portrait' | 'street' | 'still_life' | 'architecture';
 export type ReviewStatus = 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'EXPIRED';
@@ -212,6 +212,7 @@ export interface GoalAssessment {
   prompt_version?: string | null;
   model_name?: string | null;
   model_version?: string | null;
+  scorer_reasoning_effort?: string | null;
   preprocess_version?: string | null;
 }
 
@@ -224,6 +225,7 @@ export interface ReviewResult {
   model_version: string;
   scorer_model_name: string;
   scorer_model_version: string;
+  scorer_reasoning_effort?: string | null;
   writer_model_name: string;
   writer_model_version: string;
   scorer_preprocess_version: string;
@@ -709,6 +711,7 @@ export interface ReviewHistoryItem {
   model_version: string;
   scorer_model_name: string;
   scorer_model_version: string;
+  scorer_reasoning_effort?: string | null;
   writer_model_name: string;
   writer_model_version: string;
   score_version?: string | null;
@@ -790,6 +793,7 @@ export interface ReviewExportData {
   model_version: string;
   scorer_model_name: string;
   scorer_model_version: string;
+  scorer_reasoning_effort?: string | null;
   writer_model_name: string;
   writer_model_version: string;
   score_version?: string | null;

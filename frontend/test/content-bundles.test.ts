@@ -93,6 +93,22 @@ test('all locale update entries point to existing unified changelog anchors in n
   }
 });
 
+test('current and historical update copy describes mode benefits without reasoning parameters', () => {
+  const reasoningParameter = /\bxhigh\b|reasoning\.effort|\b(?:high|low|light) reasoning\b|(?:推理强度|推論強度)\s*(?:high|low|light)/i;
+  for (const locale of LOCALES) {
+    const entries = readJson<UpdateEntry[]>(`src/content/updates/${locale}.json`);
+    for (const entry of entries) {
+      const visibleCopy = [entry.title, entry.summary, ...(entry.sections ?? []).flatMap((section) => [section.title, ...section.items])].join('\n');
+      assert.doesNotMatch(visibleCopy, reasoningParameter, `${locale}: ${entry.id}`);
+    }
+    const latest = entries[0];
+    assert.match(latest.summary, /Flash/);
+    assert.match(latest.summary, /Pro/);
+    assert.match(latest.summary, /GPT-6 Sol/);
+    assert.match(latest.summary, /GPT-6\.1 Sol/);
+  }
+});
+
 test('Blog hardening release describes redirects without stale SSG claims', () => {
   const redirectWording = {
     en: /redirect/i,

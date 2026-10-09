@@ -199,8 +199,9 @@ function scoreCohortKey(item?: ReviewHistoryItem): string | null {
   const scoreVersion = normalizeScoreVersion(item?.score_version);
   const scorerModel = normalizeModelSegment(item?.scorer_model_name);
   const scorerSnapshot = normalizeModelSegment(item?.scorer_model_version);
+  const scorerProfile = normalizeModelSegment(item?.scorer_reasoning_effort) ?? 'unknown-profile';
   if (!scoreVersion || !scorerModel || !scorerSnapshot) return null;
-  return `${scoreVersion}|${scorerModel}|${scorerSnapshot}`;
+  return `${scoreVersion}|${scorerModel}|${scorerSnapshot}|${scorerProfile}`;
 }
 
 function isOrdinaryScoredReview(item: ReviewHistoryItem): boolean {

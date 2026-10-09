@@ -6,7 +6,7 @@ import {
   getUsageDecisionCopy,
 } from '../src/lib/pro-conversion.ts';
 
-test('Pro boundary shifts from model depth to next-round progress value', () => {
+test('Pro boundary combines stronger model access with next-round progress value', () => {
   const copy = getProPlanBoundaryCopy('en');
   const freeText = `${copy.free.body} ${copy.free.features.join(' ')}`;
   const proText = `${copy.pro.body} ${copy.pro.features.join(' ')}`;

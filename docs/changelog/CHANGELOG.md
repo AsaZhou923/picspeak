@@ -4,13 +4,13 @@
 
 <a id="2026-10-09-gpt6-sol-review-rollout"></a>
 
-## 2026-10-09 - 评图已切换至 GPT-6 Sol
+## 2026-10-09 - Flash 快速点评，Pro 升级更强模型
 
 日期：2026-10-09
 
-PicSpeak 的新评图现已全面使用 **GPT-6 Sol**：单张照片的评分、详细点评以及原片与复拍对比均已切换，上传后无需选择其他模型。
+Flash 使用 **GPT-6 Sol** 做快速点评；Pro 使用更强的 **GPT-6.1 Sol** 做深度分析，提供更完整的画面解读和改进建议。单图评分、详细点评以及原片与复拍对比均跟随所选模式。
 
-三条评图链路的推理强度统一为 **high**。
+工作台将模型说明与点评模式合并为一个选择区，选择 Flash 或 Pro 即可看到对应模型，无需分别设置。
 
 已保存的点评和历史分数保持原样，仍显示当时实际使用的模型。进步统计仅比较评分标准和评分模型一致的记录，复拍结果继续逐轮展示同一次比较中的前后变化。
 
@@ -50,9 +50,9 @@ Free 用户的评图历史查看期限由 30 天调整为 15 天，从每次评�
 
 日期：2026-10-08
 
-为了提升照片点评与评分的准确性，PicSpeak 将于 **10 月 10 日 00:00** 全面切换至 **GPT-6 Sol** 模型，为大家提供更可靠的评图结果和更有针对性的改进建议。
+当前评图按模式提供不同模型：Flash 使用 **GPT-6 Sol** 做快速点评，Pro 使用更强的 **GPT-6.1 Sol** 做深度分析，为大家提供更有针对性的改进建议。
 
-自同一时间起，月订阅优惠价格将结束，订阅费用将从 **1.99 美元/月恢复至原价 3.99 美元/月**。**现有 Pro 用户不受本次价格调整影响。**
+月订阅优惠价格将于 **10 月 10 日 00:00** 结束，订阅费用将从 **1.99 美元/月恢复至原价 3.99 美元/月**。**现有 Pro 用户不受本次价格调整影响。**
 
 感谢大家一直以来的支持。我们会继续打磨评图体验，让每一次点评都更有参考价值。
 
@@ -328,16 +328,16 @@ Free 用户的评图历史查看期限由 30 天调整为 15 天，从每次评�
 
 <a id="2026-08-20-gpt56-luna-xhigh"></a>
 
-## 2026-08-20 - GPT-5.6 Luna xhigh review routing
+## 2026-08-20 - 摄影点评与复拍分析升级
 
 日期：2026-08-20
 
 ### 概览
 
-这次更新把普通单图 OpenAI 点评和原片与复拍比较统一迁移到 GPT-5.6 Luna，并把两条路径的推理强度都提升到 `xhigh`。产品界面统一显示稳定的 GPT-5.6 家族名称，实际请求、持久化 provenance、环境默认值和测试则明确锁定 Luna 路径。
+该版本将单图点评和原片与复拍比较升级至当时的 GPT-5.6 模型。保存的结果保留实际使用的模型记录。当前版本按模式区分：Flash 使用 GPT-6 Sol 做快速点评，Pro 使用更强的 GPT-6.1 Sol 做深度分析。
 
 - 导航栏中的 `Terra` 小标识改为 `5.6`，中、英、日三语 Retake Coach 文案不再把产品品牌绑定到具体 tier。
-- 后端普通单图与复拍比较都默认发送 `model=gpt-5.6-luna` 与 `reasoning.effort=xhigh`，继续使用 Responses API、图片输入和严格 Structured Outputs。
+- 当时的单图点评与复拍分析使用 GPT-5.6 Luna，保留图片输入和结构化结果。
 - 旧客户端在部署过渡期仍提交普通单图 `gpt-5.5` 或复拍 `gpt-5.6-terra` 时，后端都会归一化到 Luna；历史排队任务仍能进入 OpenAI 路径。
 - 使用记录改为保存 OpenAI 响应返回的真实模型名称，不再复制客户端路由标签。
 - Build Week、历史 Blog 与旧 release 条目继续保留当时真实使用 Terra 的记录，不回写历史。
@@ -345,14 +345,14 @@ Free 用户的评图历史查看期限由 30 天调整为 15 天，从每次评�
 ### OpenAI 模型契约
 
 - OpenAI 官方模型目录确认 `gpt-5.6-luna` 支持图像输入、Responses API 和 Structured Outputs。
-- GPT-5.6 官方迁移文档确认 `reasoning.effort` 支持 `xhigh`；本次未启用独立的 Pro mode。
+- 官方迁移文档与模型目录核对完成，单图和复拍分析保留兼容的请求格式。
 - 本地兼容网关的 `/models` 接口返回 HTTP 200，并明确列出 `gpt-5.5`、`gpt-5.6-sol`、`gpt-5.6-terra` 与 `gpt-5.6-luna`；未执行收费的真实图片推理。
 
 ### 产品标识与文档同步
 
 - Header 小标识显示 `5.6`，普通单图模型卡片、Retake 入口、工作台、对比结果和首页回访入口统一显示 `GPT-5.6`。
 - 工作台 Qwen 模型卡片与请求摘要显示由 `Qwen 3.5` 改为 `Qwen 3.7`；本次只改前端标签，后端仍使用 DashScope 的 `qwen3.5-flash / qwen3.5-plus`，不把显示变更误记为实际模型迁移。
-- `README.md`、`README.zh-CN.md` 和 `CLAUDE.md` 记录当前 Luna + `xhigh` 默认值，同时明确 Build Week 初版曾使用 Terra。
+- `README.md`、`README.zh-CN.md` 和 `CLAUDE.md` 记录当时的 GPT-5.6 模型配置，同时明确 Build Week 初版曾使用 Terra。
 - `/updates` 三语记录和首页更新提示同步到本次迁移；历史三语更新记录与 Blog 正文保持不变。
 
 ### 影响文件
@@ -390,7 +390,7 @@ Free 用户的评图历史查看期限由 30 天调整为 15 天，从每次评�
 
 ### 验证
 
-- OpenAI 官方文档核对 `gpt-5.6-luna`、图像输入、Responses API、Structured Outputs 与 `xhigh` 支持。
+- OpenAI 官方文档核对 `gpt-5.6-luna`、图像输入、Responses API 与 Structured Outputs 支持。
 - `cd backend && ../.venv/Scripts/python.exe -m pytest tests/test_settings_defaults.py tests/test_retake_review_contract.py tests/test_openai_photo_review.py tests/test_retake_comparison.py -q` 通过，33 / 33 tests passed。
 - `cd frontend && node --test test/retake-coach.test.ts` 通过，7 / 7 tests passed。
 - `cd backend && ../.venv/Scripts/python.exe -m pytest tests -q` 通过，212 tests 与 11 subtests passed。

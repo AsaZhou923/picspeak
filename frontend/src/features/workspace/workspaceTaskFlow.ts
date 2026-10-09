@@ -1,5 +1,5 @@
 import type { Stage } from './hooks/useUploadFlow';
-import type { ImageType, PracticeKind, RetakeDimensionKey, ReviewModel, TaskStatus } from '@/lib/types';
+import type { ImageType, PracticeKind, RetakeDimensionKey, ReviewMode, ReviewModel, TaskStatus } from '@/lib/types';
 
 export type WorkspaceTaskStep = 'image' | 'settings' | 'submit';
 
@@ -7,6 +7,7 @@ export interface WorkspaceTaskFlowCopy {
   steps: Record<WorkspaceTaskStep, string>;
   stepHints: Record<WorkspaceTaskStep, string>;
   reviewModel: string;
+  critiqueMode: string;
   selectedValue: string;
   requestSummary: string;
   quotaImpact: (mode: 'flash' | 'pro') => string;
@@ -143,10 +144,11 @@ export function getWorkspaceTaskFlowCopy(locale: 'zh' | 'en' | 'ja'): WorkspaceT
       steps: { image: 'Image', settings: 'Intent & settings', submit: 'Submit' },
       stepHints: {
         image: 'Choose the frame PicSpeak should critique.',
-        settings: 'Set the photo context, model and critique depth.',
+        settings: 'Set the photo context and critique mode.',
         submit: 'Review the request and start the critique.',
       },
       reviewModel: 'Critique model',
+      critiqueMode: 'Critique mode',
       selectedValue: 'Selected',
       requestSummary: 'Request summary',
       quotaImpact: (mode) => `This request counts against your ${mode === 'pro' ? 'Pro' : 'Flash'} critique quota.`,
@@ -160,10 +162,11 @@ export function getWorkspaceTaskFlowCopy(locale: 'zh' | 'en' | 'ja'): WorkspaceT
       steps: { image: '画像', settings: '目的と設定', submit: '送信' },
       stepHints: {
         image: '講評する写真を選びます。',
-        settings: '写真の種類、モデル、講評の深さを設定します。',
+        settings: '写真タイプと講評モードを設定します。',
         submit: '内容と利用枠を確認して講評を開始します。',
       },
       reviewModel: '講評モデル',
+      critiqueMode: '講評モード',
       selectedValue: '選択中',
       requestSummary: 'リクエスト内容',
       quotaImpact: (mode) => `送信すると ${mode === 'pro' ? 'Pro' : 'Flash'} 講評枠としてカウントされます。`,
@@ -176,10 +179,11 @@ export function getWorkspaceTaskFlowCopy(locale: 'zh' | 'en' | 'ja'): WorkspaceT
     steps: { image: '图片', settings: '意图与设置', submit: '提交' },
     stepHints: {
       image: '选择要让 PicSpeak 点评的照片。',
-      settings: '设置图片语境、评图模型和点评深度。',
+      settings: '设置图片语境和点评模式。',
       submit: '确认请求内容和可用额度后开始点评。',
     },
     reviewModel: '评图模型',
+    critiqueMode: '点评模式',
     selectedValue: '当前选择',
     requestSummary: '请求摘要',
     quotaImpact: (mode) => `提交后将计入 ${mode === 'pro' ? 'Pro' : 'Flash'} 点评额度。`,
@@ -196,7 +200,12 @@ export function resolveWorkspaceTaskStep(stage: Stage, hasReadyPhoto: boolean, h
 
 export function reviewModelLabel(model: ReviewModel): string {
   if (model === 'gpt-5.5') return 'GPT-5.5';
+  if (model === 'gpt-6.1-sol') return 'GPT-6.1 Sol';
   if (model === 'gpt-6-sol') return 'GPT-6 Sol';
   if (model === 'gpt-6-luna') return 'GPT-6 Luna';
   return 'GPT-5.6';
+}
+
+export function reviewModelForMode(mode: ReviewMode): ReviewModel {
+  return mode === 'pro' ? 'gpt-6.1-sol' : 'gpt-6-sol';
 }

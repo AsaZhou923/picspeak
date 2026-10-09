@@ -27,7 +27,7 @@ const LOCALE_META: Record<
     ogLocale: 'zh_CN',
     title: 'AI 摄影点评与照片分析',
     description:
-      '上传照片，AI 即刻从构图、光线、色彩、表达与技术五维度打分并给出改进建议。免费试用，无需注册，秒级出结果。适合摄影爱好者、学生和创作者快速提升拍摄水平。',
+      '上传照片，AI 从构图、光线、色彩、表达与技术五维度打分并给出改进建议。Flash 快速诊断，Pro 使用更强模型做完整复盘。',
     keywords: [
       'AI摄影点评',
       '照片分析',
@@ -61,7 +61,7 @@ const LOCALE_META: Record<
     // Lead with the highest-volume head term before the brand name
     title: 'AI Photo Critique and Photography Feedback',
     description:
-      'Free AI photo critique across composition, lighting, color, impact, and technique. Get practical photography feedback in seconds with no sign-up required.',
+      'Free AI photo critique across composition, lighting, color, impact, and technique. Use Flash for quick diagnosis or Pro for a fuller critique with a stronger model.',
     keywords: [
       'AI photo critique',
       'AI photography feedback',
@@ -94,7 +94,7 @@ const LOCALE_META: Record<
     // Lead with core Japanese search terms
     title: 'AI写真講評・採点と写真フィードバック',
     description:
-      '写真をアップするだけで、AIが構図・光・色彩・インパクト・技術の5項目を即座に採点・批評。登録不要・無料で今すぐ試せる、写真上達のためのAIフィードバックツール。',
+      '写真をアップするだけで、AIが構図・光・色彩・インパクト・技術の5項目を採点・批評。Flash は素早い診断、Pro はより強いモデルの詳しい振り返りに対応。',
     keywords: [
       'AI写真批評',
       '写真フィードバック',

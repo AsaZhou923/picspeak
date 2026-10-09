@@ -69,7 +69,7 @@ function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
           },
           pro: {
             title: '你的 Pro 已开通',
-            body: '你已经是 Pro，可以继续使用深度评图、永久历史和优先处理。',
+            body: '你已经是 Pro，可以继续使用更强模型评图、永久历史和优先处理。',
           },
         },
         gallery: {
@@ -79,7 +79,7 @@ function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
           },
           pro: {
             title: '你的 Pro 已开通',
-            body: '可以继续使用深度评图、永久历史和优先处理。',
+            body: '可以继续使用更强模型评图、永久历史和优先处理。',
           },
         },
         usage: {
@@ -98,8 +98,8 @@ function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
             body: `${reviewTrigger.body} 中文用户使用 Lemon Squeezy 专属 checkout，$1.99 一次性开通 30 天，不会自动续费。`,
           },
           pro: {
-            title: '继续使用 Pro 深度分析',
-            body: '当前订阅已生效，可以继续使用深度评图和永久历史。',
+            title: '继续使用 Pro 更强模型分析',
+            body: '当前订阅已生效，可以继续使用更强模型评图和永久历史。',
           },
         },
       },
@@ -113,8 +113,8 @@ function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
     price: isJa ? '$3.99 / 月' : '$3.99 / month',
     oldPrice: '',
     footnote: isJa
-      ? 'より深い分析、永久履歴、優先処理、毎月の AI image credits が含まれます。'
-      : 'Includes deeper critique, permanent history, priority processing, and monthly AI image credits.',
+      ? 'より強いモデルの講評、永久履歴、優先処理、毎月の AI image credits が含まれます。'
+      : 'Includes stronger-model critique, permanent history, priority processing, and monthly AI image credits.',
     features: proFeatures,
     guestCta: isJa ? 'Pro にアップグレード' : 'Upgrade to Pro',
     freeCta: isJa ? '今すぐ Pro にアップグレード' : 'Upgrade to Pro now',
@@ -128,8 +128,8 @@ function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
         pro: {
           title: isJa ? 'Pro プランは有効です' : 'Your Pro plan is active',
           body: isJa
-            ? '深い分析、永久履歴、優先処理をそのまま利用できます。'
-            : 'Your current subscription keeps deeper critique, permanent history, and priority processing available.',
+            ? 'より強いモデルの講評、永久履歴、優先処理をそのまま利用できます。'
+            : 'Your current subscription keeps stronger-model critique, permanent history, and priority processing available.',
         },
       },
       gallery: {
@@ -142,7 +142,7 @@ function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
         pro: {
           title: isJa ? 'Pro プランは有効です' : 'Your Pro plan is active',
           body: isJa
-            ? '深い分析、永久履歴、優先処理を引き続き利用できます。'
+            ? 'より強いモデルの講評、永久履歴、優先処理を引き続き利用できます。'
             : 'Unlimited-style review flow, permanent history, and priority processing remain available.',
         },
       },
@@ -158,10 +158,10 @@ function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
       review: {
         default: { title: reviewTrigger.title, body: reviewTrigger.body },
         pro: {
-          title: isJa ? 'Pro でさらに深く確認できます' : 'This result can still be explored more deeply with Pro',
+          title: isJa ? 'Pro のより強いモデルで確認できます' : 'This result can still be explored with Pro’s stronger model',
           body: isJa
-            ? '現在の契約は有効なので、深い分析と永久履歴を使い続けられます。'
-            : 'Your current subscription is active, so you can keep using deeper critique and permanent history.',
+            ? '現在の契約は有効なので、より強いモデルの講評と永久履歴を使い続けられます。'
+            : 'Your current subscription is active, so you can keep using stronger-model critique and permanent history.',
         },
       },
     },

@@ -36,9 +36,9 @@ test('retake entry keeps only completed sources and carries the selected review 
   );
 });
 
-test('normal workspace and retake flow both route to GPT-6 Sol while preserving legacy result labels', async () => {
+test('normal workspace and retake flow derive the review model from the selected mode while preserving legacy result labels', async () => {
   const source = await readFile('src/app/workspace/page.tsx', 'utf8');
-  const picker = await readFile('src/features/workspace/components/ReviewModelPicker.tsx', 'utf8');
+  const modePicker = await readFile('src/features/workspace/components/ModePicker.tsx', 'utf8');
   const settings = await readFile('src/features/workspace/components/WorkspaceSettingsPanel.tsx', 'utf8');
   const header = await readFile('src/components/layout/Header.tsx', 'utf8');
   const headerControls = await readFile('src/components/layout/HeaderControls.tsx', 'utf8');
@@ -46,19 +46,21 @@ test('normal workspace and retake flow both route to GPT-6 Sol while preserving 
   const comparisonPanel = await readFile('src/features/reviews/components/RetakeComparisonPanel.tsx', 'utf8');
 
   assert.match(source, /review_model: selectedReviewModel/);
-  assert.match(source, /isRetakeCoachFlow \|\| isPracticePairedFlow \? 'gpt-6-sol' : reviewModel/);
-  assert.match(source, /showReviewModel=\{!isRetakeCoachFlow && !isPracticePairedFlow\}/);
+  assert.match(source, /const selectedReviewModel: ReviewModel = reviewModelForMode\(reviewMode\)/);
+  assert.doesNotMatch(source, /isRetakeCoachFlow \|\| isPracticePairedFlow \? 'gpt-6-sol' : reviewModel/);
+  assert.doesNotMatch(source, /showReviewModel/);
   assert.match(source, /<WorkspaceSettingsPanel/);
-  assert.match(settings, /<ReviewModelPicker/);
-  assert.match(source, /useState<ReviewModel>\('gpt-6-sol'\)/);
-  assert.doesNotMatch(picker, /qwen|Qwen|千问/);
-  assert.match(picker, /GPT-6 Sol/);
-  assert.doesNotMatch(picker, /GPT-5\.5/);
+  assert.match(settings, /<ModePicker/);
+  assert.doesNotMatch(settings, /<ReviewModelPicker/);
+  assert.doesNotMatch(source, /useState<ReviewModel>\('gpt-6-sol'\)/);
+  assert.doesNotMatch(modePicker, /qwen|Qwen|千问/);
+  assert.match(modePicker, /reviewModelForMode/);
+  assert.match(modePicker, /reviewModelLabel/);
   assert.match(header, /href="\/account\/practice"/);
   assert.match(headerControls, /href: '\/retake'/);
   assert.doesNotMatch(header, />Terra<\/span>/);
   assert.doesNotMatch(coachCopy, /Terra/);
-  assert.match(coachCopy, /GPT-6 Sol/);
+  assert.match(coachCopy, /Flash \/ Pro/);
   assert.match(comparisonPanel, /getStoredRetakeModelLabel/);
 });
 
@@ -86,6 +88,17 @@ test('retake result model labels prefer stored result metadata before score-vers
       },
     }),
     'GPT-5.6',
+  );
+  assert.equal(
+    getStoredRetakeModelLabel({
+      result: {
+        model_name: 'gpt-6.1-sol',
+        scorer_model_name: null,
+        writer_model_name: null,
+        score_version: 'retake-paired-v2',
+      },
+    }),
+    'GPT-6.1 Sol',
   );
   assert.equal(
     getStoredRetakeModelLabel({

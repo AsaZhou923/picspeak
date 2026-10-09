@@ -27,6 +27,7 @@ export const AI_MARKDOWN_CONTENT_PAGES: readonly AiMarkdownContentPage[] = [
         heading: 'What PicSpeak does',
         bullets: [
           'Scores uploaded photos across composition, lighting, color, impact, and technique.',
+          'Offers Flash critiques with GPT-6 Sol and Pro critiques with the stronger GPT-6.1 Sol model.',
           'Turns critique output into concrete next-shot guidance for photographers and creators.',
           'Connects critique results with GPT Image 2 visual-reference generation for retake planning.',
         ],

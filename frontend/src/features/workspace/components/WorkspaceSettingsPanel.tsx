@@ -1,24 +1,20 @@
 import type { ReactNode } from 'react';
 import { Check, ChevronDown } from 'lucide-react';
-import type { ImageType, ReviewModel } from '@/lib/types';
+import type { ImageType, ReviewMode } from '@/lib/types';
 import type { Translator } from '@/lib/i18n';
 import { ImageTypePicker } from './ImageTypePicker';
 import { ModePicker } from './ModePicker';
-import { ReviewModelPicker } from './ReviewModelPicker';
-import { getWorkspaceTaskFlowCopy, reviewModelLabel } from '../workspaceTaskFlow';
+import { getWorkspaceTaskFlowCopy, reviewModelForMode, reviewModelLabel } from '../workspaceTaskFlow';
 
 interface WorkspaceSettingsPanelProps {
   imageType: ImageType;
-  reviewMode: 'flash' | 'pro';
-  reviewModel: ReviewModel;
+  reviewMode: ReviewMode;
   isGuest: boolean;
   locale: 'zh' | 'en' | 'ja';
-  showReviewModel?: boolean;
   remainingQuota: number | null;
   totalQuota: number | null;
   onImageTypeChange: (type: ImageType) => void;
-  onReviewModeChange: (mode: 'flash' | 'pro') => void;
-  onReviewModelChange: (model: ReviewModel) => void;
+  onReviewModeChange: (mode: ReviewMode) => void;
   t: Translator;
 }
 
@@ -60,20 +56,18 @@ function DesktopSetting({ label, children }: { label: string; children: ReactNod
 export function WorkspaceSettingsPanel({
   imageType,
   reviewMode,
-  reviewModel,
   isGuest,
   locale,
-  showReviewModel = true,
   remainingQuota,
   totalQuota,
   onImageTypeChange,
   onReviewModeChange,
-  onReviewModelChange,
   t,
 }: WorkspaceSettingsPanelProps) {
   const copy = getWorkspaceTaskFlowCopy(locale);
   const quotaNote = copy.quotaAvailable(remainingQuota, totalQuota);
   const modeLabel = reviewMode === 'pro' ? 'Pro' : 'Flash';
+  const activeModelLabel = reviewModelLabel(reviewModelForMode(reviewMode));
 
   return (
     <>
@@ -82,13 +76,7 @@ export function WorkspaceSettingsPanel({
           <ImageTypePicker value={imageType} onChange={onImageTypeChange} variant="compact" t={t} />
         </MobileSetting>
 
-        {showReviewModel && (
-          <MobileSetting label={copy.reviewModel} value={reviewModelLabel(reviewModel)}>
-            <ReviewModelPicker value={reviewModel} onChange={onReviewModelChange} locale={locale} />
-          </MobileSetting>
-        )}
-
-        <MobileSetting label={t('select_mode')} value={`${modeLabel} · ${quotaNote}`}>
+        <MobileSetting label={copy.critiqueMode} value={`${modeLabel} · ${activeModelLabel}`}>
           <ModePicker value={reviewMode} onChange={onReviewModeChange} isGuest={isGuest} variant="compact" t={t} />
           <p className="mt-3 text-xs leading-5 text-ink-muted">{copy.quotaImpact(reviewMode)} {quotaNote}</p>
         </MobileSetting>
@@ -99,13 +87,7 @@ export function WorkspaceSettingsPanel({
           <ImageTypePicker value={imageType} onChange={onImageTypeChange} t={t} />
         </DesktopSetting>
 
-        {showReviewModel && (
-          <DesktopSetting label={copy.reviewModel}>
-            <ReviewModelPicker value={reviewModel} onChange={onReviewModelChange} locale={locale} />
-          </DesktopSetting>
-        )}
-
-        <DesktopSetting label={t('select_mode')}>
+        <DesktopSetting label={copy.critiqueMode}>
           <ModePicker value={reviewMode} onChange={onReviewModeChange} isGuest={isGuest} t={t} />
           <p className="mt-3 text-xs leading-5 text-ink-muted">{copy.quotaImpact(reviewMode)} {quotaNote}</p>
         </DesktopSetting>

@@ -9,6 +9,7 @@ export interface RetakeModelLabelInput {
 
 function recognizeModelLabel(value: string): string | null {
   const normalized = value.toLowerCase();
+  if (normalized.includes('gpt-6.1-sol')) return 'GPT-6.1 Sol';
   if (normalized.includes('gpt-6-sol')) return 'GPT-6 Sol';
   if (normalized.includes('gpt-6-luna')) return 'GPT-6 Luna';
   if (normalized.includes('gpt-6')) return 'GPT-6';

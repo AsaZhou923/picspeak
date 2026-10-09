@@ -35,6 +35,7 @@ import {
   getWorkspaceTaskFlowCopy,
   makePracticeIdempotencyKey,
   readPendingPracticeState,
+  reviewModelForMode,
   resolveWorkspaceTaskStep,
   shouldReusePracticeReviewIdempotencyKey,
   writePendingPracticeState,
@@ -61,7 +62,7 @@ function retakeTargetCopy(locale: 'zh' | 'en' | 'ja') {
       sourcePrompt: '元の作例',
       sourceContent: '元のコンテンツ',
       dimension: '重点項目',
-      coachTitle: 'GPT-6 Sol Retake Coach',
+      coachTitle: 'Retake Coach',
       originalLabel: '元の写真',
       retakeLabel: '再撮影',
       editedLabel: '編集後の写真',
@@ -96,7 +97,7 @@ function retakeTargetCopy(locale: 'zh' | 'en' | 'ja') {
       sourcePrompt: 'Prompt example',
       sourceContent: 'Content source',
       dimension: 'Focus',
-      coachTitle: 'GPT-6 Sol Retake Coach',
+      coachTitle: 'Retake Coach',
       originalLabel: 'Original',
       retakeLabel: 'Retake',
       editedLabel: 'Edited photo',
@@ -130,7 +131,7 @@ function retakeTargetCopy(locale: 'zh' | 'en' | 'ja') {
     sourcePrompt: '来源案例',
     sourceContent: '内容来源',
     dimension: '重点维度',
-    coachTitle: 'GPT-6 Sol 重拍教练',
+    coachTitle: '重拍教练',
     originalLabel: '原片',
     retakeLabel: '重拍图',
     editedLabel: '修改版照片',
@@ -164,7 +165,6 @@ function WorkspacePageContent() {
   const { t, locale } = useI18n();
 
   const [reviewMode, setReviewMode] = useState<'flash' | 'pro'>('flash');
-  const [reviewModel, setReviewModel] = useState<ReviewModel>('gpt-6-sol');
   const [imageType, setImageType] = useState<ImageType>('default');
   const [showQuotaModal, setShowQuotaModal] = useState(false);
   const [practiceEnabled, setPracticeEnabled] = useState(false);
@@ -238,7 +238,7 @@ function WorkspacePageContent() {
   const activePracticeDimensionLabel = activePracticeDimension ? coachCopy.dimensions[activePracticeDimension] : null;
   const isRetakeCoachFlow = retakeIntent === 'retake_coach' && Boolean(trustedSourceReviewId);
   const isPracticePairedFlow = Boolean((practiceSession || (practiceEnabled && nextShootAction)) && trustedPracticeKind !== 'same_image_recheck');
-  const selectedReviewModel: ReviewModel = isRetakeCoachFlow || isPracticePairedFlow ? 'gpt-6-sol' : reviewModel;
+  const selectedReviewModel: ReviewModel = reviewModelForMode(reviewMode);
   const contentSourceLabel = promptExampleId ?? contentSlug ?? galleryReviewId;
   const practiceGoalDraft = useMemo(() => {
     if (!sourceReviewId || !nextShootAction || practiceSession || practiceSessionId) return null;
@@ -931,15 +931,12 @@ function WorkspacePageContent() {
                   <WorkspaceSettingsPanel
                     imageType={imageType}
                     reviewMode={reviewMode}
-                    reviewModel={selectedReviewModel}
                     isGuest={isGuest}
                     locale={locale}
-                    showReviewModel={!isRetakeCoachFlow && !isPracticePairedFlow}
                     remainingQuota={remainingQuota}
                     totalQuota={totalQuota}
                     onImageTypeChange={setImageType}
                     onReviewModeChange={setReviewMode}
-                    onReviewModelChange={setReviewModel}
                     t={t}
                   />
                 ) : undefined

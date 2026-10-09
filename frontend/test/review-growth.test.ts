@@ -22,6 +22,7 @@ function makeHistoryItem(
   scoreVersion = 'score-v3-canonical-gpt',
   scorerModelName = 'test-scorer',
   scorerModelVersion = '2026-04',
+  scorerReasoningEffort?: string | null,
 ): ReviewHistoryItem {
   return {
     review_id: reviewId,
@@ -38,6 +39,7 @@ function makeHistoryItem(
     model_version: '2026-04',
     scorer_model_name: scorerModelName,
     scorer_model_version: scorerModelVersion,
+    scorer_reasoning_effort: scorerReasoningEffort,
     writer_model_name: 'test-writer',
     writer_model_version: '2026-04',
     score_version: scoreVersion,
@@ -222,6 +224,22 @@ test('v8 growth statistics do not combine Luna, Sol, different snapshots, or mis
   assert.equal(snapshot.averageDelta, 0.8);
 });
 
+test('v8 growth statistics keep known scorer profiles separate without showing effort copy', () => {
+  const snapshot = buildHistoryGrowthSnapshot([
+    makeHistoryItem('rev-sol-low-2', '2026-10-12T10:00:00Z', 7.8, makeScores({ composition: 8 }), CURRENT_SCORE_VERSION, 'gpt-6-sol', '2026-10-10', 'low'),
+    makeHistoryItem('rev-sol-unknown', '2026-10-11T10:00:00Z', 9.4, makeScores({ composition: 9 }), CURRENT_SCORE_VERSION, 'gpt-6-sol', '2026-10-10', null),
+    makeHistoryItem('rev-sol-high', '2026-10-10T10:00:00Z', 5.9, makeScores({ composition: 6 }), CURRENT_SCORE_VERSION, 'gpt-6-sol', '2026-10-10', 'high'),
+    makeHistoryItem('rev-sol-low-1', '2026-10-09T10:00:00Z', 7.2, makeScores({ composition: 7 }), CURRENT_SCORE_VERSION, 'gpt-6-sol', '2026-10-10', 'low'),
+  ], 2);
+
+  assert.deepEqual(snapshot.analyzedItems.map((item) => item.review_id), [
+    'rev-sol-low-2',
+    'rev-sol-low-1',
+  ]);
+  assert.equal(snapshot.excludedVersionCount, 2);
+  assert.equal(snapshot.recentAverage, 7.5);
+});
+
 test('buildHistoryGrowthSnapshot returns no ordinary trend when history only has paired retakes', () => {
   const snapshot = buildHistoryGrowthSnapshot([
     makeHistoryItem('rev-paired-sol', '2026-10-10T10:00:00Z', 9.4, makeScores({ composition: 9 }), 'retake-paired-v2', 'gpt-6-sol', '2026-10-10'),
@@ -360,10 +378,10 @@ test('history growth copy frames single-image history as sampled work performanc
 
   assert.match(source, /按已加载点评查看作品记录/);
   assert.match(source, /不等于已验证能力提升/);
-  assert.match(source, /评图模型或来源不同\/未知/);
+  assert.match(source, /模型配置或来源不同\/未知/);
   assert.match(source, /Read the loaded critique records as a sample/);
   assert.match(source, /not a verified skill-growth claim/);
-  assert.match(source, /scoring model, or provenance/);
+  assert.match(source, /model profile, or provenance/);
   assert.match(source, /検証済みの技能向上/);
-  assert.match(source, /採点モデル、または来歴/);
+  assert.match(source, /モデル設定、または来歴/);
 });

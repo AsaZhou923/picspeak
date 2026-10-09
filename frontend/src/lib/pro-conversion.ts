@@ -138,7 +138,7 @@ const COPY: Record<ProConversionLocale, LocaleCopy> = {
     boundary: {
       label: 'Free / Pro Boundary',
       headline: 'Free diagnoses fast. Pro guides the next shoot.',
-      body: 'Pro is no longer framed as a deeper model tier. It turns each critique into the next shoot, a complete review loop, and progress tracking.',
+      body: 'Pro pairs a stronger critique model with the next shoot, a complete review loop, and progress tracking.',
       free: {
         title: 'Free',
         body: 'Best for quick diagnosis and basic next-step advice before trying another frame.',
@@ -179,7 +179,7 @@ const COPY: Record<ProConversionLocale, LocaleCopy> = {
       standard: {
         badge: 'Next-round progress',
         title: 'If you want this result to become progress, use Pro',
-        body: 'Pro combines deeper advice, complete review, and progress tracking so practice does not stop at a single score.',
+        body: 'Pro combines a stronger model, complete review, and progress tracking so practice does not stop at a single score.',
       },
     },
     usageDecision: {

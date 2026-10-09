@@ -11,6 +11,7 @@ import {
   getWorkspaceTaskFlowCopy,
   makePracticeIdempotencyKey,
   readPendingPracticeState,
+  reviewModelForMode,
   resolveWorkspaceTaskStep,
   reviewModelLabel,
   shouldReusePracticeReviewIdempotencyKey,
@@ -24,6 +25,9 @@ const workspacePageSource = readFileSync(
 );
 
 test('workspace model summaries show the active GPT model and retain the legacy GPT label', () => {
+  assert.equal(reviewModelForMode('flash'), 'gpt-6-sol');
+  assert.equal(reviewModelForMode('pro'), 'gpt-6.1-sol');
+  assert.equal(reviewModelLabel('gpt-6.1-sol'), 'GPT-6.1 Sol');
   assert.equal(reviewModelLabel('gpt-6-sol'), 'GPT-6 Sol');
   assert.equal(reviewModelLabel('gpt-6-luna'), 'GPT-6 Luna');
   assert.equal(reviewModelLabel('gpt-5.6-luna'), 'GPT-5.6');
