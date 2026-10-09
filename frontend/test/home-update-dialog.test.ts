@@ -18,14 +18,15 @@ const homeSource = readFileSync(
 );
 const shellSource = readFileSync(path.join(FRONTEND_DIR, 'src/components/layout/SiteChrome.tsx'), 'utf8');
 
-test('model and pricing announcement keeps the latest popup priority only for Chinese users', () => {
+test('Sol rollout keeps the pricing notice and latest popup priority only for Chinese users', () => {
   const announcement = getLatestProductUpdate('zh');
   assert.ok(announcement);
-  assert.equal(announcement.id, '2026-10-08-gpt6-sol-and-pro-pricing');
-  assert.equal(announcement.date, '2026-10-08');
+  assert.equal(announcement.id, '2026-10-09-gpt6-sol-review-rollout');
+  assert.equal(announcement.date, '2026-10-09');
   assert.equal(shouldShowProductUpdatePopup(announcement), true);
   assert.equal(announcement.docPath, `docs/changelog/CHANGELOG.md#${announcement.id}`);
   assert.match(announcement.summary, /将于 10 月 10 日 00:00/);
+  assert.match(announcement.summary, /现已全面切换至 GPT-6 Sol/);
   assert.match(announcement.summary, /GPT-6 Sol/);
   assert.match(announcement.summary, /1\.99 美元\/月恢复至原价 3\.99 美元\/月/);
   assert.match(announcement.summary, /现有 Pro 用户不受本次价格调整影响/);
@@ -33,13 +34,14 @@ test('model and pricing announcement keeps the latest popup priority only for Ch
   for (const locale of ['en', 'ja'] as const) {
     const latest = getLatestProductUpdate(locale);
     assert.ok(latest);
-    assert.equal(latest.id, '2026-10-08-private-image-access');
-    assert.equal(latest.date, '2026-10-08');
+    assert.equal(latest.id, announcement.id);
+    assert.equal(latest.date, '2026-10-09');
     assert.equal(shouldShowProductUpdatePopup(latest), false);
-    assert.equal(getProductUpdates(locale).some((entry) => entry.id === announcement.id), false);
+    assert.doesNotMatch(latest.summary, /1\.99|3\.99|10 月 10 日/);
+    assert.equal(getProductUpdates(locale).some((entry) => entry.id === '2026-10-08-gpt6-sol-and-pro-pricing'), false);
   }
-  assert.equal(getLatestProductUpdateDate('zh'), '2026-10-08');
-  assert.equal(getLatestProductUpdateDate(), '2026-10-08');
+  assert.equal(getLatestProductUpdateDate('zh'), '2026-10-09');
+  assert.equal(getLatestProductUpdateDate(), '2026-10-09');
 });
 
 test('Free history change is recorded in every locale while preserving the Chinese announcement priority', () => {
@@ -48,8 +50,8 @@ test('Free history change is recorded in every locale while preserving the Chine
     const pending = getProductUpdates(locale).find((entry) => entry.id === '2026-10-08-free-history-fifteen-days');
     assert.ok(latest);
     assert.ok(pending);
-    assert.equal(latest.id, locale === 'zh' ? '2026-10-08-gpt6-sol-and-pro-pricing' : '2026-10-08-private-image-access');
-    assert.equal(latest.date, '2026-10-08');
+    assert.equal(latest.id, '2026-10-09-gpt6-sol-review-rollout');
+    assert.equal(latest.date, '2026-10-09');
     assert.equal(pending.showPopup, false);
     assert.match(pending.summary, /15/);
     assert.equal(shouldShowProductUpdatePopup(pending), false);

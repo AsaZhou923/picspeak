@@ -4,24 +4,24 @@ import type { ReviewModel } from '@/lib/types';
 function modelCopy(locale: 'zh' | 'en' | 'ja') {
   if (locale === 'en') {
     return {
-      gptTitle: 'GPT-6',
+      gptTitle: 'GPT-6 Sol',
       gptBadge: 'Deep vision',
-      gptBody: 'GPT-6 reviews five photo dimensions with visible evidence and next-photo actions. Usually takes longer.',
+      gptBody: 'GPT-6 Sol reviews five photo dimensions with visible evidence and next-photo actions. Usually takes longer.',
       groupLabel: 'Critique model',
     };
   }
   if (locale === 'ja') {
     return {
-      gptTitle: 'GPT-6',
+      gptTitle: 'GPT-6 Sol',
       gptBadge: '深い視覚分析',
-      gptBody: 'GPT-6 が写真の5項目を確認し、見える根拠と次の撮影アクションを返します。通常は時間がかかります。',
+      gptBody: 'GPT-6 Sol が写真の5項目を確認し、見える根拠と次の撮影アクションを返します。通常は時間がかかります。',
       groupLabel: '講評モデル',
     };
   }
   return {
-    gptTitle: 'GPT-6',
+    gptTitle: 'GPT-6 Sol',
     gptBadge: '深度视觉',
-    gptBody: 'GPT-6 会检查照片五个维度，给出画面依据和下一张照片的行动建议，通常需要更长时间。',
+    gptBody: 'GPT-6 Sol 会检查照片五个维度，给出画面依据和下一张照片的行动建议，通常需要更长时间。',
     groupLabel: '评图模型',
   };
 }
@@ -38,7 +38,7 @@ export function ReviewModelPicker({
   const copy = modelCopy(locale);
   const options = [
     {
-      value: 'gpt-6-luna' as const,
+      value: 'gpt-6-sol' as const,
       title: copy.gptTitle,
       badge: copy.gptBadge,
       body: copy.gptBody,

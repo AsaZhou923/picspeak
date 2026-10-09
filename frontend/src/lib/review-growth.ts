@@ -189,6 +189,25 @@ function compareByCreatedAtDesc(left: ReviewHistoryItem, right: ReviewHistoryIte
   return new Date(right.created_at).getTime() - new Date(left.created_at).getTime();
 }
 
+function normalizeModelSegment(value?: string | null): string | null {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized || normalized === 'unknown' || normalized === 'legacy') return null;
+  return normalized;
+}
+
+function scoreCohortKey(item?: ReviewHistoryItem): string | null {
+  const scoreVersion = normalizeScoreVersion(item?.score_version);
+  const scorerModel = normalizeModelSegment(item?.scorer_model_name);
+  const scorerSnapshot = normalizeModelSegment(item?.scorer_model_version);
+  if (!scoreVersion || !scorerModel || !scorerSnapshot) return null;
+  return `${scoreVersion}|${scorerModel}|${scorerSnapshot}`;
+}
+
+function isOrdinaryScoredReview(item: ReviewHistoryItem): boolean {
+  const rawScoreVersion = item.score_version?.trim().toLowerCase();
+  return Boolean(!item.comparison && !rawScoreVersion?.startsWith('retake-paired'));
+}
+
 function lowestAverageDimension(items: ReviewHistoryItem[]): GrowthDimensionKey {
   if (!items.length) return 'composition';
   return DIMENSION_KEYS
@@ -207,9 +226,11 @@ function practiceIntensityForTrend(trend: GrowthTrend): HistoryPracticeIntensity
 
 export function buildHistoryGrowthSnapshot(items: ReviewHistoryItem[], recentWindow = 3): HistoryGrowthSnapshot {
   const sortedItems = [...items].sort(compareByCreatedAtDesc);
-  const scoreVersion = normalizeScoreVersion(sortedItems[0]?.score_version);
-  const analyzedItems = scoreVersion
-    ? sortedItems.filter((item) => normalizeScoreVersion(item.score_version) === scoreVersion)
+  const latestOrdinaryItem = sortedItems.find(isOrdinaryScoredReview);
+  const scoreVersion = normalizeScoreVersion(latestOrdinaryItem?.score_version);
+  const latestCohortKey = scoreCohortKey(latestOrdinaryItem);
+  const analyzedItems = latestCohortKey
+    ? sortedItems.filter((item) => isOrdinaryScoredReview(item) && scoreCohortKey(item) === latestCohortKey)
     : [];
   const excludedVersionCount = sortedItems.length - analyzedItems.length;
   const recentItems = analyzedItems.slice(0, recentWindow);

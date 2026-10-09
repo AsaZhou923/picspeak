@@ -24,7 +24,8 @@ const workspacePageSource = readFileSync(
 );
 
 test('workspace model summaries show the active GPT model and retain the legacy GPT label', () => {
-  assert.equal(reviewModelLabel('gpt-6-luna'), 'GPT-6');
+  assert.equal(reviewModelLabel('gpt-6-sol'), 'GPT-6 Sol');
+  assert.equal(reviewModelLabel('gpt-6-luna'), 'GPT-6 Luna');
   assert.equal(reviewModelLabel('gpt-5.6-luna'), 'GPT-5.6');
   assert.equal(reviewModelLabel('gpt-5.5'), 'GPT-5.5');
 });
@@ -145,7 +146,7 @@ test('practice review idempotency only reuses matching request settings and sess
     sessionId: 'prs_1',
     photoId: 'photo_1',
     mode: 'flash',
-    model: 'gpt-6-luna',
+    model: 'gpt-6-sol',
     imageType: 'portrait',
     locale: 'en',
   });
@@ -153,7 +154,7 @@ test('practice review idempotency only reuses matching request settings and sess
     sessionId: 'prs_1',
     photoId: 'photo_1',
     mode: 'pro',
-    model: 'gpt-6-luna',
+    model: 'gpt-6-sol',
     imageType: 'portrait',
     locale: 'en',
   });
@@ -161,7 +162,7 @@ test('practice review idempotency only reuses matching request settings and sess
     sessionId: 'prs_2',
     photoId: 'photo_1',
     mode: 'flash',
-    model: 'gpt-6-luna',
+    model: 'gpt-6-sol',
     imageType: 'portrait',
     locale: 'en',
   });
@@ -184,7 +185,7 @@ test('practice review idempotency reuses lost responses even after older complet
     sessionId: 'prs_1',
     photoId: 'photo_1',
     mode: 'flash',
-    model: 'gpt-6-luna',
+    model: 'gpt-6-sol',
     imageType: 'portrait',
     locale: 'en',
   });
@@ -211,7 +212,7 @@ test('practice review idempotency rotates known terminal tasks and preserves unk
     sessionId: 'prs_1',
     photoId: 'photo_1',
     mode: 'flash',
-    model: 'gpt-6-luna',
+    model: 'gpt-6-sol',
     imageType: 'portrait',
     locale: 'en',
   });

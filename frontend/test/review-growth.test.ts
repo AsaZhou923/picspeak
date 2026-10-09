@@ -20,6 +20,8 @@ function makeHistoryItem(
   finalScore: number,
   scores: ReviewScores,
   scoreVersion = 'score-v3-canonical-gpt',
+  scorerModelName = 'test-scorer',
+  scorerModelVersion = '2026-04',
 ): ReviewHistoryItem {
   return {
     review_id: reviewId,
@@ -34,8 +36,8 @@ function makeHistoryItem(
     scores,
     model_name: 'test-model',
     model_version: '2026-04',
-    scorer_model_name: 'test-scorer',
-    scorer_model_version: '2026-04',
+    scorer_model_name: scorerModelName,
+    scorer_model_version: scorerModelVersion,
     writer_model_name: 'test-writer',
     writer_model_version: '2026-04',
     score_version: scoreVersion,
@@ -174,7 +176,7 @@ test('buildHistoryGrowthSnapshot keeps v6 and v7 histories separate', () => {
   assert.equal(snapshot.recentAverage, 7.3);
 });
 
-test('v8 history statistics use only the exact latest rubric version', () => {
+test('v8 history statistics use only the exact latest rubric and scorer cohort', () => {
   const snapshot = buildHistoryGrowthSnapshot([
     makeHistoryItem('rev-v8-recent-2', '2026-10-06T10:00:00Z', 7.8, makeScores({ composition: 8, lighting: 8, color: 8, impact: 8, technical: 7 }), CURRENT_SCORE_VERSION),
     makeHistoryItem('rev-v7-high', '2026-10-06T09:00:00Z', 9.8, makeScores({ composition: 10, lighting: 10, color: 10, impact: 10, technical: 9 }), 'score-v7-canonical-quality'),
@@ -196,6 +198,59 @@ test('v8 history statistics use only the exact latest rubric version', () => {
   assert.equal(snapshot.trend, 'up');
   assert.deepEqual(snapshot.practiceTheme, { dimension: 'technical', intensity: 'extend', reviewCount: 4 });
   assert.deepEqual(snapshot.weakDimensions[0], { key: 'technical', lowCount: 3, average: 6 });
+});
+
+test('v8 growth statistics do not combine Luna, Sol, different snapshots, or missing scorer provenance', () => {
+  const snapshot = buildHistoryGrowthSnapshot([
+    makeHistoryItem('rev-sol-3', '2026-10-09T10:00:00Z', 7.8, makeScores({ composition: 8, lighting: 8, color: 8, impact: 8, technical: 7 }), CURRENT_SCORE_VERSION, 'gpt-6-sol', '2026-10-10'),
+    makeHistoryItem('rev-luna-high', '2026-10-08T10:00:00Z', 9.7, makeScores({ composition: 10, lighting: 10, color: 10, impact: 9, technical: 9 }), CURRENT_SCORE_VERSION, 'gpt-6-luna', '2026-10-01'),
+    makeHistoryItem('rev-sol-old-snapshot', '2026-10-07T10:00:00Z', 5.2, makeScores({ composition: 5, lighting: 5, color: 5, impact: 5, technical: 6 }), CURRENT_SCORE_VERSION, 'gpt-6-sol', '2026-10-09'),
+    makeHistoryItem('rev-sol-2', '2026-10-06T10:00:00Z', 7.4, makeScores({ composition: 7, lighting: 8, color: 7, impact: 8, technical: 7 }), CURRENT_SCORE_VERSION, 'gpt-6-sol', '2026-10-10'),
+    makeHistoryItem('rev-missing-scorer', '2026-10-05T10:00:00Z', 9.1, makeScores({ composition: 9, lighting: 9, color: 9, impact: 9, technical: 9 }), CURRENT_SCORE_VERSION, '', ''),
+    makeHistoryItem('rev-sol-1', '2026-10-04T10:00:00Z', 6.8, makeScores({ composition: 7, lighting: 7, color: 7, impact: 7, technical: 6 }), CURRENT_SCORE_VERSION, 'gpt-6-sol', '2026-10-10'),
+  ], 2);
+
+  assert.deepEqual(snapshot.analyzedItems.map((item) => item.review_id), [
+    'rev-sol-3',
+    'rev-sol-2',
+    'rev-sol-1',
+  ]);
+  assert.equal(snapshot.scoreVersion, CURRENT_SCORE_VERSION);
+  assert.equal(snapshot.excludedVersionCount, 3);
+  assert.equal(snapshot.recentAverage, 7.6);
+  assert.equal(snapshot.previousAverage, 6.8);
+  assert.equal(snapshot.averageDelta, 0.8);
+});
+
+test('buildHistoryGrowthSnapshot returns no ordinary trend when history only has paired retakes', () => {
+  const snapshot = buildHistoryGrowthSnapshot([
+    makeHistoryItem('rev-paired-sol', '2026-10-10T10:00:00Z', 9.4, makeScores({ composition: 9 }), 'retake-paired-v2', 'gpt-6-sol', '2026-10-10'),
+    makeHistoryItem('rev-paired-luna', '2026-10-09T10:00:00Z', 8.7, makeScores({ composition: 9 }), 'retake-paired-v2', 'gpt-6-luna', '2026-10-01'),
+  ]);
+
+  assert.equal(snapshot.scoreVersion, null);
+  assert.equal(snapshot.excludedVersionCount, 2);
+  assert.deepEqual(snapshot.analyzedItems, []);
+  assert.deepEqual(snapshot.recentItems, []);
+  assert.equal(snapshot.recentAverage, null);
+  assert.equal(snapshot.previousAverage, null);
+  assert.equal(snapshot.averageDelta, null);
+  assert.equal(snapshot.trend, 'flat');
+  assert.equal(snapshot.practiceTheme.reviewCount, 0);
+});
+
+test('buildHistoryGrowthSnapshot chooses the latest ordinary cohort when a newer paired retake exists', () => {
+  const snapshot = buildHistoryGrowthSnapshot([
+    makeHistoryItem('rev-paired-newest', '2026-10-11T10:00:00Z', 9.6, makeScores({ composition: 10 }), 'retake-paired-v2', 'gpt-6-sol', '2026-10-10'),
+    makeHistoryItem('rev-v8-latest', '2026-10-10T10:00:00Z', 7.8, makeScores({ composition: 8, lighting: 8, color: 8, impact: 8, technical: 7 }), CURRENT_SCORE_VERSION, 'gpt-6-sol', '2026-10-10'),
+    makeHistoryItem('rev-v7-high', '2026-10-09T10:00:00Z', 9.5, makeScores({ composition: 10 }), 'score-v7-canonical-quality', 'gpt-6-luna', '2026-10-01'),
+    makeHistoryItem('rev-v8-older', '2026-10-08T10:00:00Z', 7.0, makeScores({ composition: 7, lighting: 7, color: 7, impact: 7, technical: 7 }), CURRENT_SCORE_VERSION, 'gpt-6-sol', '2026-10-10'),
+  ]);
+
+  assert.equal(snapshot.scoreVersion, CURRENT_SCORE_VERSION);
+  assert.deepEqual(snapshot.analyzedItems.map((item) => item.review_id), ['rev-v8-latest', 'rev-v8-older']);
+  assert.equal(snapshot.excludedVersionCount, 2);
+  assert.equal(snapshot.recentAverage, 7.4);
 });
 
 test('changing the default rubric preserves cached v7 history and excludes v8 records', () => {
@@ -233,6 +288,19 @@ test('buildHistoryGrowthSnapshot does not treat a missing latest score version a
   ]);
 
   assert.equal(snapshot.scoreVersion, null);
+  assert.equal(snapshot.excludedVersionCount, 2);
+  assert.deepEqual(snapshot.analyzedItems, []);
+  assert.equal(snapshot.recentAverage, null);
+  assert.equal(snapshot.practiceTheme.reviewCount, 0);
+});
+
+test('buildHistoryGrowthSnapshot treats known rubrics with missing latest scorer provenance as incomparable', () => {
+  const snapshot = buildHistoryGrowthSnapshot([
+    makeHistoryItem('rev-v8-missing-scorer', '2026-10-09T10:00:00Z', 8.8, makeScores({ composition: 9 }), CURRENT_SCORE_VERSION, '', ''),
+    makeHistoryItem('rev-v8-sol', '2026-10-08T10:00:00Z', 6.2, makeScores({ composition: 6 }), CURRENT_SCORE_VERSION, 'gpt-6-sol', '2026-10-10'),
+  ]);
+
+  assert.equal(snapshot.scoreVersion, CURRENT_SCORE_VERSION);
   assert.equal(snapshot.excludedVersionCount, 2);
   assert.deepEqual(snapshot.analyzedItems, []);
   assert.equal(snapshot.recentAverage, null);
@@ -292,7 +360,10 @@ test('history growth copy frames single-image history as sampled work performanc
 
   assert.match(source, /按已加载点评查看作品记录/);
   assert.match(source, /不等于已验证能力提升/);
+  assert.match(source, /评图模型或来源不同\/未知/);
   assert.match(source, /Read the loaded critique records as a sample/);
   assert.match(source, /not a verified skill-growth claim/);
+  assert.match(source, /scoring model, or provenance/);
   assert.match(source, /検証済みの技能向上/);
+  assert.match(source, /採点モデル、または来歴/);
 });

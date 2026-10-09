@@ -21,8 +21,8 @@ export const zhTranslations = {
   pro_offer_label: '',
   pro_offer_highlight: 'Pro',
   updates_label: '更新记录',
-  updates_hint_home: '10 月 10 日评图模型升级与 Pro 价格调整',
-  updates_hint_latest: '10 月 10 日评图模型升级与 Pro 价格调整',
+  updates_hint_home: '评图已切换至 GPT-6 Sol，Pro 价格将于 10 月 10 日调整',
+  updates_hint_latest: '评图已切换至 GPT-6 Sol，Pro 价格将于 10 月 10 日调整',
   contact_label: '联系',
   contact_headline: '联系我',
 
@@ -64,10 +64,10 @@ export const zhTranslations = {
   generation_examples_source: '来源',
   generation_examples_by: '作者：{author}',
 
-  hero_label: 'PicSpeak · GPT-6 AI 摄影点评',
+  hero_label: 'PicSpeak · GPT-6 Sol AI 摄影点评',
   hero_headline_1: '专业摄影点评',
   hero_headline_2: '几秒完成',
-  hero_desc: '上传照片，即可获得 GPT-6 对构图、光线、色彩、感染力和技术细节的点评。',
+  hero_desc: '上传照片，即可获得 GPT-6 Sol 对构图、光线、色彩、感染力和技术细节的点评。',
   hero_cta_start: '开始评图',
   hero_cta_login: '使用 Google 登录',
   home_gpt_image_badge: '新功能 · GPT Image 2',

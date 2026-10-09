@@ -1,5 +1,17 @@
 [
   {
+    "id": "2026-10-09-gpt6-sol-review-rollout",
+    "date": "2026-10-09",
+    "showPopup": false,
+    "title": "写真講評が GPT-6 Sol に切り替わりました",
+    "summary": "新しい写真の採点、詳しい講評、元写真と再撮影の比較に GPT-6 Sol を使用します。保存済みの講評と点数には当時のモデル情報を残します。進歩の統計は採点基準とモデルが一致する記録で比較し、再撮影の結果は各回ごとに表示します。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-10-09-gpt6-sol-review-rollout",
+    "primaryAction": {
+      "label": "GPT-6 Sol の講評を試す",
+      "href": "/workspace"
+    }
+  },
+  {
     "id": "2026-10-08-private-image-access",
     "date": "2026-10-08",
     "showPopup": false,

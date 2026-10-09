@@ -26,8 +26,8 @@ Upload a photo
   -> save progress and generate the next visual target
 ```
 
-- **Single-photo critique:** the workspace uses GPT-6 Luna with `xhigh` reasoning through the OpenAI Responses API. The Qwen-compatible backend API remains available for existing clients.
-- **Retake Coach:** GPT-6 Luna receives the original and retake together with `xhigh` reasoning; the server calculates every score delta deterministically.
+- **Single-photo critique:** the workspace uses GPT-6 Sol with `xhigh` reasoning through the OpenAI Responses API. The Qwen-compatible backend API remains available for existing clients.
+- **Retake Coach:** GPT-6 Sol receives the original and retake together with `xhigh` reasoning; the server calculates every score delta deterministically.
 - **AI Create:** generate visual references with GPT Image 2, including review-linked composition, lighting, color, and retake directions.
 - **Learning surfaces:** move between critiques, the public gallery, Lens Notes, prompt examples, review history, and same-source retake chains.
 
@@ -97,7 +97,7 @@ For an existing public R2 bucket, deploy and verify these read paths before disa
 
 PicSpeak existed before the submission window. The Build Week contribution extended the existing single-photo product into an auditable retake loop rather than only replacing a model name. The pre-event baseline is [`b74ddfb`](https://github.com/AsaZhou923/picspeak/commit/b74ddfb88ae32e37965ba8b29f40c9ebcbbf77fc); the core paired-comparison implementation landed in [`2a626aa`](https://github.com/AsaZhou923/picspeak/commit/2a626aabab30d5cdb45ca0450fdd1ce7a5387b4c).
 
-The original Build Week implementation used GPT-5.6 Terra. The current runtime default is `gpt-6-luna` with `reasoning.effort: xhigh`; the paired scoring and server-owned delta contract remain unchanged.
+The original Build Week implementation used GPT-5.6 Terra. The current runtime default is `gpt-6-sol` with `reasoning.effort: xhigh`; the paired scoring and server-owned delta contract remain unchanged.
 
 | Before Build Week | Added during Build Week |
 |---|---|
@@ -122,7 +122,7 @@ Three implementation rules keep the result auditable:
 - PostgreSQL 14+
 - S3-compatible object storage
 - An OpenAI-compatible critique API key
-- An OpenAI API key with GPT-6 Luna access
+- An OpenAI API key with GPT-6 Sol access
 
 ### 1. Clone and configure the backend
 
@@ -141,14 +141,14 @@ The workspace uses the model-specific OpenAI settings below. The retained Qwen-c
 ```dotenv
 OPENAI_API_KEY=
 OPENAI_API_BASE_URL=https://api.openai.com/v1
-OPENAI_SCORE_MODEL=gpt-6-luna
-OPENAI_REVIEW_MODEL=gpt-6-luna
+OPENAI_SCORE_MODEL=gpt-6-sol
+OPENAI_REVIEW_MODEL=gpt-6-sol
 OPENAI_REVIEW_REASONING_EFFORT=xhigh
 OPENAI_REVIEW_TIMEOUT_SECONDS=180
 
 # Optional complete endpoint override; otherwise /responses is appended.
 RETAKE_ANALYSIS_API_URL=
-RETAKE_ANALYSIS_MODEL=gpt-6-luna
+RETAKE_ANALYSIS_MODEL=gpt-6-sol
 RETAKE_ANALYSIS_REASONING_EFFORT=xhigh
 RETAKE_ANALYSIS_TIMEOUT_SECONDS=180
 ```
@@ -192,9 +192,10 @@ The frontend and backend can be deployed independently. The backend includes a c
 
 ## Documentation
 
+- [Latest release: GPT-6 Sol photo critique](docs/changelog/CHANGELOG.md#2026-10-09-gpt6-sol-review-rollout)
 - [Controlled photo access](docs/changelog/CHANGELOG.md#2026-10-08-private-image-access)
 - [15-day Free critique history](docs/changelog/CHANGELOG.md#2026-10-08-free-history-fifteen-days)
-- [Latest announcement for Chinese users: upcoming model and Pro pricing update](docs/changelog/CHANGELOG.md#2026-10-08-gpt6-sol-and-pro-pricing)
+- [Previous announcement for Chinese users: model and Pro pricing schedule](docs/changelog/CHANGELOG.md#2026-10-08-gpt6-sol-and-pro-pricing)
 - [Previous critique reliability and gallery improvements](docs/changelog/CHANGELOG.md#2026-10-07-review-reliability-and-gallery)
 - [Previous scoring refinement and gallery reassessment](docs/changelog/CHANGELOG.md#2026-10-06-photo-rubric-and-gallery-reassessment)
 - [Previous v5 gallery critique reassessment](docs/changelog/CHANGELOG.md#2026-10-06-gallery-critique-reassessment)

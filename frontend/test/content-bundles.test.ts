@@ -50,7 +50,7 @@ test('shared update content stays aligned while the pricing announcement is Chin
     );
     assert.deepEqual(
       sharedEntries.map((entry) => entry.showPopup),
-      bundles.en.map((entry) => entry.showPopup),
+      bundles.en.map((entry) => entry.id === '2026-10-09-gpt6-sol-review-rollout' ? locale === 'zh' : entry.showPopup),
     );
 
     for (const entry of bundles[locale]) {

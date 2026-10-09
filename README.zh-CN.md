@@ -26,8 +26,8 @@
   -> 保存进步，并生成下一轮视觉目标
 ```
 
-- **单张照片点评：** 工作台使用 OpenAI Responses API 的 GPT-6 Luna，推理强度为 `xhigh`；后端保留 Qwen 兼容接口，供已有客户端继续调用。
-- **复拍教练：** GPT-6 Luna 以 `xhigh` 推理强度在同一次请求中接收原片和复拍；所有分差均由服务端确定性计算。
+- **单张照片点评：** 工作台使用 OpenAI Responses API 的 GPT-6 Sol，推理强度为 `xhigh`；后端保留 Qwen 兼容接口，供已有客户端继续调用。
+- **复拍教练：** GPT-6 Sol 以 `xhigh` 推理强度在同一次请求中接收原片和复拍；所有分差均由服务端确定性计算。
 - **AI 创作：** 使用 GPT Image 2 生成视觉参考，包括点评关联的构图、光线、色彩与复拍方向。
 - **学习入口：** 在点评、公开长廊、镜头手记、提示词案例、点评历史和同源复拍链之间继续练习。
 
@@ -93,7 +93,7 @@ Next.js 15 / React 18
 
 PicSpeak 在提交窗口前已经存在。Build Week 的贡献是在原有单张照片产品上建立可审计的复拍闭环，而不是只替换模型名称。活动前基线为 [`b74ddfb`](https://github.com/AsaZhou923/picspeak/commit/b74ddfb88ae32e37965ba8b29f40c9ebcbbf77fc)，配对比较核心实现落在 [`2a626aa`](https://github.com/AsaZhou923/picspeak/commit/2a626aabab30d5cdb45ca0450fdd1ce7a5387b4c)。
 
-最初的 Build Week 实现使用 GPT-5.6 Terra；当前运行时默认值已经改为 `gpt-6-luna` 与 `reasoning.effort: xhigh`，配对评分和服务端计算分差的契约保持不变。
+最初的 Build Week 实现使用 GPT-5.6 Terra；当前运行时默认值已经改为 `gpt-6-sol` 与 `reasoning.effort: xhigh`，配对评分和服务端计算分差的契约保持不变。
 
 | Build Week 前 | Build Week 期间新增 |
 |---|---|
@@ -118,7 +118,7 @@ PicSpeak 在提交窗口前已经存在。Build Week 的贡献是在原有单张
 - PostgreSQL 14+
 - S3 兼容对象存储
 - OpenAI 协议兼容的点评 API Key
-- GPT-6 Luna OpenAI API 访问权限
+- GPT-6 Sol OpenAI API 访问权限
 
 ### 1. 克隆并配置后端
 
@@ -137,14 +137,14 @@ pip install -r backend/requirements.txt
 ```dotenv
 OPENAI_API_KEY=
 OPENAI_API_BASE_URL=https://api.openai.com/v1
-OPENAI_SCORE_MODEL=gpt-6-luna
-OPENAI_REVIEW_MODEL=gpt-6-luna
+OPENAI_SCORE_MODEL=gpt-6-sol
+OPENAI_REVIEW_MODEL=gpt-6-sol
 OPENAI_REVIEW_REASONING_EFFORT=xhigh
 OPENAI_REVIEW_TIMEOUT_SECONDS=180
 
 # 可选：完整 endpoint；留空时会在 base URL 后追加 /responses。
 RETAKE_ANALYSIS_API_URL=
-RETAKE_ANALYSIS_MODEL=gpt-6-luna
+RETAKE_ANALYSIS_MODEL=gpt-6-sol
 RETAKE_ANALYSIS_REASONING_EFFORT=xhigh
 RETAKE_ANALYSIS_TIMEOUT_SECONDS=180
 ```
@@ -188,7 +188,8 @@ npm run build
 
 ## 文档
 
-- [最新中文公告：评图模型升级与 Pro 价格调整预告](docs/changelog/CHANGELOG.md#2026-10-08-gpt6-sol-and-pro-pricing)
+- [最新更新：评图已切换至 GPT-6 Sol](docs/changelog/CHANGELOG.md#2026-10-09-gpt6-sol-review-rollout)
+- [此前中文公告：评图模型升级与 Pro 价格调整预告](docs/changelog/CHANGELOG.md#2026-10-08-gpt6-sol-and-pro-pricing)
 - [此前评图与照片浏览稳定性优化](docs/changelog/CHANGELOG.md#2026-10-07-review-reliability-and-gallery)
 - [此前评分标准优化与长廊重评](docs/changelog/CHANGELOG.md#2026-10-06-photo-rubric-and-gallery-reassessment)
 - [此前长廊 v5 评图免费重评](docs/changelog/CHANGELOG.md#2026-10-06-gallery-critique-reassessment)
