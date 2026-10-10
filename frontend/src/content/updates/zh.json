@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-10-critique-reading-guides",
+    "date": "2026-10-10",
+    "showPopup": false,
+    "title": "看懂照片点评，选择下一步调整（准备发布）",
+    "summary": "英文首页、公开长廊和日常练习文章的阅读路径正在准备更新，帮助你结合拍摄意图理解点评，选择一个可尝试的调整。精选案例展示真实公开点评与建议动作，不代表已验证的复拍成果。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-10-10-critique-reading-guides"
+  },
+  {
     "id": "2026-10-10-inbox-score-feedback-prep",
     "date": "2026-10-10",
     "showPopup": false,

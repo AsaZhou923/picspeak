@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-10-critique-reading-guides",
+    "date": "2026-10-10",
+    "showPopup": false,
+    "title": "写真講評を読み、次の調整を選ぶ（公開準備中）",
+    "summary": "英語ホーム、公開 Gallery、日々の練習記事の導線を更新する準備を進めています。撮影意図と照らして講評を読み、試す調整を一つ選ぶための内容です。厳選例は実際の公開講評と行動案であり、撮り直しの成果を検証したものではありません。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-10-10-critique-reading-guides"
+  },
+  {
     "id": "2026-10-10-inbox-score-feedback-prep",
     "date": "2026-10-10",
     "showPopup": false,

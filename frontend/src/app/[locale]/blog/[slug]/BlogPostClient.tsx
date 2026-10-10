@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { ArrowLeft, ArrowRight, Clock3, Eye, Sparkles } from 'lucide-react';
 import { notFound } from 'next/navigation';
 import { getBlogViewCounts, incrementBlogPostView } from '@/lib/api';
-import { getBlogPost, getBlogPosts, getBlogUi } from '@/lib/blog-data';
+import { getBlogPost, getRelatedBlogPosts, getBlogUi } from '@/lib/blog-data';
 import { getBlogReferences } from '@/lib/blog-references';
 import { formatBlogViewCount, shouldTrackBlogView } from '@/lib/blog-view-stats';
 import { getBlogWorkspaceCta, type ContentConversionEntrypoint } from '@/lib/content-conversion';
@@ -50,7 +50,7 @@ function BlogPostContent({ slug }: { slug: string }) {
     notFound();
   }
 
-  const relatedPosts = getBlogPosts(locale).filter((entry) => entry.slug !== post.slug).slice(0, 2);
+  const relatedPosts = getRelatedBlogPosts(locale, post.slug);
   const workspaceCta = getBlogWorkspaceCta(locale, post);
 
   const handleWorkspaceCtaClick = (entrypoint: ContentConversionEntrypoint = workspaceCta.entrypoint) => {
@@ -71,9 +71,7 @@ function BlogPostContent({ slug }: { slug: string }) {
 
   useEffect(() => {
     let cancelled = false;
-    const relatedSlugs = getBlogPosts(locale)
-      .filter((entry) => entry.slug !== post.slug)
-      .slice(0, 2)
+    const relatedSlugs = getRelatedBlogPosts(locale, post.slug)
       .map((entry) => entry.slug);
     const pendingRequests: Promise<Record<string, number>>[] = [getBlogViewCounts([post.slug, ...relatedSlugs])];
 

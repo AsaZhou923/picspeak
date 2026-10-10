@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-10-critique-reading-guides",
+    "date": "2026-10-10",
+    "showPopup": false,
+    "title": "Read a critique and choose the next adjustment (upcoming)",
+    "summary": "The English homepage, public Gallery and daily-practice reading path are being updated to help you judge feedback against your intention and choose one adjustment. Gallery examples show real public critiques with suggested actions, not verified retake results.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-10-10-critique-reading-guides"
+  },
+  {
     "id": "2026-10-10-inbox-score-feedback-prep",
     "date": "2026-10-10",
     "showPopup": false,

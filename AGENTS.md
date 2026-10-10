@@ -255,3 +255,5 @@ Use the smallest verification set that proves the change:
 - Public routing, cache, metadata, schema, or sitemap changes: `npm run test:production-blog` after a successful build
 
 If a command cannot be run locally, report exactly which command was skipped and why.
+
+English homepage critique guidance supports the primary upload flow. Gallery featured examples must recheck current public membership without caching or authentication before showing an image; omit revoked, unavailable, or image-less records. Editorial next-shoot actions are suggestions, never verified retake outcomes. Daily-practice related reading deliberately prioritizes the checklist and paired-retake comparison guide in every locale.

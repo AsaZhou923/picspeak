@@ -121,6 +121,21 @@ export function getStarterBlogPosts(locale: Locale): BlogPost[] {
   });
 }
 
+export function getRelatedBlogPosts(locale: Locale, slug: string): BlogPost[] {
+  if (slug === FEATURED_BLOG_SLUG) {
+    const relatedSlugs = [
+      'turn-photo-feedback-into-shooting-checklist',
+      'compare-photo-retakes-real-improvement',
+    ];
+    return relatedSlugs.flatMap((relatedSlug) => {
+      const post = getBlogPost(locale, relatedSlug);
+      return post ? [post] : [];
+    });
+  }
+
+  return getBlogPosts(locale).filter((post) => post.slug !== slug).slice(0, 2);
+}
+
 export function getBlogPost(locale: Locale, slug: string): BlogPost | undefined {
   return BLOG_POSTS_BY_LOCALE[locale].get(slug);
 }

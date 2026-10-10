@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import HomeContactSection from '@/components/home/HomeContactSection';
 import HomeCritiqueArtifact from '@/components/home/HomeCritiqueArtifact';
+import HomeCritiqueGuide from '@/components/home/HomeCritiqueGuide';
 import HomeGenerationPricingSection from '@/components/home/HomeGenerationPricingSection';
 import HomeImprovementLoop from '@/components/home/HomeImprovementLoop';
 import { usePracticeEnabled } from '@/features/practice/usePracticeEnabled';
@@ -131,6 +132,8 @@ export function HomePageContent() {
           />
         </div>
       </section>
+
+      {locale === 'en' ? <HomeCritiqueGuide /> : null}
 
       <HomeImprovementLoop
         t={t}

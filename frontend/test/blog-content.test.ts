@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import {
   getBlogPostsByFreshness,
   getFeaturedBlogPost,
+  getRelatedBlogPosts,
   getStarterBlogPosts,
 } from '../src/lib/blog-data.ts';
 import { getBlogReferences } from '../src/lib/blog-references.ts';
@@ -122,6 +123,43 @@ test('Blog freshness and editorial curation are independent contracts', () => {
     for (let index = 1; index < freshPosts.length; index += 1) {
       assert.ok(freshPosts[index - 1].updatedAt >= freshPosts[index].updatedAt);
     }
+  }
+});
+
+test('daily practice recommends the localized checklist and retake comparison in order', () => {
+  for (const locale of LOCALES) {
+    const relatedPosts = getRelatedBlogPosts(locale, 'ai-photo-critique-daily-practice');
+    assert.deepEqual(
+      relatedPosts.map((post) => post.slug),
+      [
+        'turn-photo-feedback-into-shooting-checklist',
+        'compare-photo-retakes-real-improvement',
+      ],
+    );
+    const bundle = readBundle(locale);
+    for (const post of relatedPosts) {
+      assert.deepEqual(post, bundle.posts.find((entry) => entry.slug === post.slug));
+    }
+  }
+});
+
+test('other articles keep the first two recommendations without recommending themselves', () => {
+  for (const locale of LOCALES) {
+    const posts = readBundle(locale).posts;
+    for (const post of posts.filter((entry) => entry.slug !== 'ai-photo-critique-daily-practice')) {
+      const relatedPosts = getRelatedBlogPosts(locale, post.slug);
+      assert.deepEqual(relatedPosts, posts.filter((entry) => entry.slug !== post.slug).slice(0, 2));
+      assert.ok(relatedPosts.every((entry) => entry.slug !== post.slug));
+    }
+  }
+});
+
+test('an unknown article slug keeps the existing first-two fallback', () => {
+  for (const locale of LOCALES) {
+    assert.deepEqual(
+      getRelatedBlogPosts(locale, 'unknown-article'),
+      readBundle(locale).posts.slice(0, 2),
+    );
   }
 });
 
