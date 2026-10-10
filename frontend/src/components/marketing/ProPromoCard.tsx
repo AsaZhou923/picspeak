@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import Link from 'next/link';
 import { ArrowRight, Settings2, Sparkles, Ticket } from 'lucide-react';
@@ -50,22 +50,22 @@ function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
   if (locale === 'zh') {
     return {
       badge: 'Pro',
-      discount: '30 天一次性开通',
-      price: '$1.99 / 30 天',
+      discount: '按月订阅',
+      price: '$3.99 / 月',
       oldPrice: '',
       footnote: CN_PRO_CHECKOUT_TIP,
       features: proFeatures,
       guestCta: '升级到 Pro',
       freeCta: '升级到 Pro',
       proCta: '查看账户页',
-      proStatus: '你当前已经是 Pro，可以在账户页查看状态或兑换新的激活码。',
+      proStatus: '你当前已经是 Pro，可以在账户页管理订阅，或兑换已经收到的激活码。',
       activationCta: '输入激活码',
       activationRenewCta: '输入新的激活码',
       scenes: {
         workspace: {
           default: {
             title: workspaceTrigger.title,
-            body: `${workspaceTrigger.body} 中文用户使用 Lemon Squeezy 专属 checkout，$1.99 一次性开通 30 天，不会自动续费。`,
+            body: `${workspaceTrigger.body} Pro 为 $3.99/月，按月自动续费，可随时取消；现有 Pro 用户不受影响。`,
           },
           pro: {
             title: '你的 Pro 已开通',
@@ -75,7 +75,7 @@ function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
         gallery: {
           default: {
             title: usageTrigger.title,
-            body: `${usageTrigger.body} 中文用户使用 Lemon Squeezy 专属 checkout，$1.99 一次性开通 30 天，不会自动续费。`,
+            body: `${usageTrigger.body} Pro 为 $3.99/月，按月自动续费，可随时取消；现有 Pro 用户不受影响。`,
           },
           pro: {
             title: '你的 Pro 已开通',
@@ -85,7 +85,7 @@ function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
         usage: {
           default: {
             title: usageTrigger.title,
-            body: `${usageTrigger.body} 中文用户使用 Lemon Squeezy 专属 checkout，$1.99 一次性开通 30 天，不会自动续费。`,
+            body: `${usageTrigger.body} Pro 为 $3.99/月，按月自动续费，可随时取消；现有 Pro 用户不受影响。`,
           },
           pro: {
             title: '当前账号已是 Pro',
@@ -95,7 +95,7 @@ function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
         review: {
           default: {
             title: reviewTrigger.title,
-            body: `${reviewTrigger.body} 中文用户使用 Lemon Squeezy 专属 checkout，$1.99 一次性开通 30 天，不会自动续费。`,
+            body: `${reviewTrigger.body} Pro 为 $3.99/月，按月自动续费，可随时取消；现有 Pro 用户不受影响。`,
           },
           pro: {
             title: '继续使用 Pro 更强模型分析',

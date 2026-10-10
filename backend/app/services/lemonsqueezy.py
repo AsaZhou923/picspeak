@@ -7,13 +7,8 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from app.core.config import settings
 from app.core.http_client import PooledHTTPRequestError, PooledHTTPStatusError, pooled_request
-from app.core.security import sign_payload
 from app.db.models import User
 
-ONE_TIME_PRO_BILLING_MODE = 'one_time_pro'
-ONE_TIME_PRO_DURATION_DAYS = 30
-ONE_TIME_PRO_GRANT_PURPOSE = 'lemonsqueezy_one_time_pro'
-ONE_TIME_PRO_GRANT_TTL_SECONDS = 30 * 24 * 3600
 LEMONSQUEEZY_LOCALES = {
     'en': 'en',
     'ja': 'ja',
@@ -129,13 +124,6 @@ def _api_request(path: str, *, method: str = 'GET', payload: dict[str, Any] | No
     return decoded
 
 
-def _pro_checkout_url_for_locale(locale: str | None = None) -> str:
-    normalized_locale = _normalize_checkout_locale(locale)
-    if normalized_locale.startswith('zh') and settings.lemonsqueezy_zh_pro_checkout_url.strip():
-        return settings.lemonsqueezy_zh_pro_checkout_url.strip()
-    return settings.lemonsqueezy_pro_checkout_url.strip()
-
-
 def _normalize_checkout_locale(locale: str | None) -> str:
     raw = str(locale or '').strip().lower()
     if raw.startswith('zh'):
@@ -152,7 +140,7 @@ def _lemonsqueezy_checkout_locale(locale: str | None) -> str:
 
 
 def _hosted_checkout_for_user(user: User, *, locale: str | None = None) -> LemonSqueezyCheckout | None:
-    base_url = _pro_checkout_url_for_locale(locale)
+    base_url = settings.lemonsqueezy_pro_checkout_url.strip()
     if not base_url:
         return None
 
@@ -169,26 +157,6 @@ def _hosted_checkout_for_user(user: User, *, locale: str | None = None) -> Lemon
             'locale': _lemonsqueezy_checkout_locale(normalized_locale),
         }
     )
-    if normalized_locale.startswith('zh'):
-        grant_token = sign_payload(
-            {
-                'user_id': user.public_id,
-                'plan': 'pro',
-                'billing_mode': ONE_TIME_PRO_BILLING_MODE,
-                'duration_days': ONE_TIME_PRO_DURATION_DAYS,
-            },
-            ttl_seconds=ONE_TIME_PRO_GRANT_TTL_SECONDS,
-            purpose=ONE_TIME_PRO_GRANT_PURPOSE,
-        )
-        query_params.update(
-            {
-                'checkout[custom][billing_mode]': ONE_TIME_PRO_BILLING_MODE,
-                'checkout[custom][duration_days]': str(ONE_TIME_PRO_DURATION_DAYS),
-                'checkout[custom][grant_token]': grant_token,
-                'checkout[custom][locale]': normalized_locale,
-            }
-        )
-
     checkout_url = urlunsplit(
         (
             parsed.scheme,

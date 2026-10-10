@@ -9,7 +9,7 @@ import { Locale } from './i18n';
 import { trackProductEvent } from './product-analytics';
 
 export const CN_PRO_CHECKOUT_TIP =
-  '中文用户使用 Lemon Squeezy 中文专属 checkout，$1.99 一次性开通 30 天 Pro，不会自动续费。已收到激活码的用户仍可在站内兑换。';
+  '中文 Pro 为 $3.99/月，按月自动续费，可随时取消；现有 Pro 用户不受影响。已收到激活码的用户仍可在站内兑换。';
 
 const ACCOUNT_USAGE_PATH = '/account/usage';
 const CHECKOUT_LOADING_COPY: Record<Locale, string> = {

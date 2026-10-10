@@ -17,7 +17,6 @@ if str(BACKEND_ROOT) not in sys.path:
 
 from app.api.deps import bind_guest_token, get_current_actor
 from app.core.errors import api_error
-from app.core.security import verify_payload
 from app.db.models import UsageLedger, User, UserPlan, UserStatus
 from app.db.session import get_db
 from app.main import app
@@ -423,7 +422,7 @@ class ApiSurfaceRegressionTests(unittest.TestCase):
         self.assertEqual(query['locale'], ['en'])
         db.commit.assert_called_once()
 
-    def test_billing_checkout_uses_one_time_zh_hosted_checkout_for_chinese_locale(self) -> None:
+    def test_billing_checkout_uses_generic_subscription_hosted_checkout_for_chinese_locales(self) -> None:
         db = MagicMock()
         user = User(
             id=28,
@@ -447,36 +446,70 @@ class ApiSurfaceRegressionTests(unittest.TestCase):
 
         with patch(
             'app.services.lemonsqueezy.settings.lemonsqueezy_pro_checkout_url',
-            'https://picspeak.lemonsqueezy.com/checkout/buy/default-pro',
+            'https://picspeak.lemonsqueezy.com/checkout/buy/default-pro?locale=en',
         ), patch(
             'app.services.lemonsqueezy.settings.lemonsqueezy_zh_pro_checkout_url',
             'https://picspeak.lemonsqueezy.com/checkout/buy/b8c7310f-09b3-4be3-bac2-4d14ba6bbcde',
         ):
             with self._client() as client:
                 response = client.post('/api/v1/billing/checkout', json={'plan': 'pro', 'locale': 'zh'})
+                response_zh_cn = client.post('/api/v1/billing/checkout', json={'plan': 'pro', 'locale': 'zh-CN'})
 
-        self.assertEqual(response.status_code, 200)
-        body = response.json()
-        self.assertEqual(body['status'], 'created')
-        parsed = urlsplit(body['checkout_url'])
-        self.assertEqual(
-            f'{parsed.scheme}://{parsed.netloc}{parsed.path}',
-            'https://picspeak.lemonsqueezy.com/checkout/buy/b8c7310f-09b3-4be3-bac2-4d14ba6bbcde',
+        for checkout_response in (response, response_zh_cn):
+            self.assertEqual(checkout_response.status_code, 200)
+            body = checkout_response.json()
+            self.assertEqual(body['status'], 'created')
+            parsed = urlsplit(body['checkout_url'])
+            self.assertEqual(
+                f'{parsed.scheme}://{parsed.netloc}{parsed.path}',
+                'https://picspeak.lemonsqueezy.com/checkout/buy/default-pro',
+            )
+            query = parse_qs(parsed.query)
+            self.assertEqual(query['checkout[email]'], ['zh-checkout@example.com'])
+            self.assertEqual(query['checkout[custom][plan]'], ['pro'])
+            self.assertEqual(query['checkout[custom][locale]'], ['zh'])
+            self.assertEqual(query['locale'], ['zh-CN'])
+            self.assertNotIn('checkout[custom][billing_mode]', query)
+            self.assertNotIn('checkout[custom][duration_days]', query)
+            self.assertNotIn('checkout[custom][grant_token]', query)
+        self.assertEqual(db.commit.call_count, 2)
+
+    def test_hosted_pro_checkout_keeps_generic_subscription_url_for_english_and_japanese(self) -> None:
+        user = User(
+            id=30,
+            public_id='usr_generic_checkout',
+            email='generic-checkout@example.com',
+            username='generic_checkout',
+            plan=UserPlan.free,
+            daily_quota_total=0,
+            daily_quota_used=0,
+            status=UserStatus.active,
         )
-        query = parse_qs(parsed.query)
-        self.assertEqual(query['checkout[email]'], ['zh-checkout@example.com'])
-        self.assertEqual(query['checkout[custom][plan]'], ['pro'])
-        self.assertEqual(query['checkout[custom][billing_mode]'], ['one_time_pro'])
-        self.assertEqual(query['checkout[custom][duration_days]'], ['30'])
-        self.assertEqual(query['checkout[custom][locale]'], ['zh'])
-        self.assertEqual(query['locale'], ['zh-CN'])
-        self.assertIn('checkout[custom][grant_token]', query)
-        grant_payload = verify_payload(query['checkout[custom][grant_token]'][0])
-        self.assertEqual(grant_payload['purpose'], 'lemonsqueezy_one_time_pro')
-        self.assertEqual(grant_payload['user_id'], 'usr_zh_checkout')
-        self.assertEqual(grant_payload['billing_mode'], 'one_time_pro')
-        self.assertEqual(grant_payload['duration_days'], 30)
-        db.commit.assert_called_once()
+
+        with patch(
+            'app.services.lemonsqueezy.settings.lemonsqueezy_pro_checkout_url',
+            'https://picspeak.lemonsqueezy.com/checkout/buy/default-pro?locale=en',
+        ), patch(
+            'app.services.lemonsqueezy.settings.lemonsqueezy_zh_pro_checkout_url',
+            'https://picspeak.lemonsqueezy.com/checkout/buy/b8c7310f-09b3-4be3-bac2-4d14ba6bbcde',
+        ):
+            from app.services.lemonsqueezy import create_checkout_for_user
+
+            checkouts = {
+                'en': create_checkout_for_user(user, locale='en'),
+                'ja': create_checkout_for_user(user, locale='ja'),
+            }
+
+        for locale, checkout in checkouts.items():
+            parsed = urlsplit(checkout.checkout_url)
+            self.assertEqual(
+                f'{parsed.scheme}://{parsed.netloc}{parsed.path}',
+                'https://picspeak.lemonsqueezy.com/checkout/buy/default-pro',
+            )
+            query = parse_qs(parsed.query)
+            self.assertEqual(query['checkout[custom][locale]'], [locale])
+            self.assertEqual(query['locale'], [locale])
+            self.assertNotIn('checkout[custom][grant_token]', query)
 
     def test_api_checkout_payload_sets_provider_locale_for_japanese(self) -> None:
         user = User(
@@ -512,6 +545,54 @@ class ApiSurfaceRegressionTests(unittest.TestCase):
         attributes = payload['data']['attributes']
         self.assertEqual(attributes['checkout_options']['locale'], 'ja')
         self.assertEqual(attributes['checkout_data']['custom']['locale'], 'ja')
+
+    def test_api_checkout_payload_uses_generic_subscription_variant_for_chinese_locale(self) -> None:
+        user = User(
+            id=31,
+            public_id='usr_api_zh_checkout',
+            email='api-zh-checkout@example.com',
+            username='api_zh_checkout',
+            plan=UserPlan.free,
+            daily_quota_total=0,
+            daily_quota_used=0,
+            status=UserStatus.active,
+        )
+        api_response = {
+            'data': {
+                'id': 'chk_zh',
+                'attributes': {'url': 'https://checkout.example.com/zh'},
+            },
+        }
+
+        with patch('app.services.lemonsqueezy.settings.lemonsqueezy_pro_checkout_url', ''), patch(
+            'app.services.lemonsqueezy.settings.lemonsqueezy_zh_pro_checkout_url',
+            'https://picspeak.lemonsqueezy.com/checkout/buy/legacy-zh-one-time',
+        ), patch('app.services.lemonsqueezy._api_request', return_value=api_response) as api_request, patch(
+            'app.services.lemonsqueezy.settings.lemonsqueezy_store_id', '123'
+        ), patch(
+            'app.services.lemonsqueezy.settings.lemonsqueezy_pro_variant_id',
+            '456',
+        ), patch(
+            'app.services.lemonsqueezy.settings.lemonsqueezy_zh_pro_variant_id',
+            '1418094',
+        ):
+            from app.services.lemonsqueezy import create_checkout_for_user
+
+            checkout = create_checkout_for_user(user, locale='zh-CN')
+
+        self.assertEqual(checkout.checkout_id, 'chk_zh')
+        payload = api_request.call_args.kwargs['payload']
+        data = payload['data']
+        attributes = data['attributes']
+        self.assertEqual(data['relationships']['variant']['data']['id'], '456')
+        self.assertEqual(attributes['product_options']['enabled_variants'], [456])
+        self.assertEqual(attributes['checkout_options']['locale'], 'zh-CN')
+        custom = attributes['checkout_data']['custom']
+        self.assertEqual(custom['locale'], 'zh')
+        self.assertEqual(custom['plan'], 'pro')
+        self.assertNotIn('billing_mode', custom)
+        self.assertNotIn('duration_days', custom)
+        self.assertNotIn('grant_token', custom)
 
     def test_image_credit_pack_rmb_is_no_longer_available(self) -> None:
         db = MagicMock()

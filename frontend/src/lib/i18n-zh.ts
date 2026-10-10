@@ -21,8 +21,8 @@ export const zhTranslations = {
   pro_offer_label: '',
   pro_offer_highlight: 'Pro',
   updates_label: '更新记录',
-  updates_hint_home: 'Flash / Pro 评图模型已区分，Pro 价格将于 10 月 10 日调整',
-  updates_hint_latest: 'Flash / Pro 评图模型已区分，Pro 价格将于 10 月 10 日调整',
+  updates_hint_home: 'Flash / Pro 评图模型已区分，Pro 已恢复 3.99 美元/月原价',
+  updates_hint_latest: 'Flash / Pro 评图模型已区分，Pro 已恢复 3.99 美元/月原价',
   contact_label: '联系',
   contact_headline: '联系我',
 
@@ -322,7 +322,7 @@ export const zhTranslations = {
   activation_code_dialog_label: '激活码',
   activation_code_label: '激活',
   activation_code_title: '输入激活码',
-  activation_code_body: '下单后把你收到的激活码填在这里，当前账号会立即开通或顺延 30 天 Pro。',
+  activation_code_body: '如果你已经收到激活码，可以在这里兑换；月订阅支付成功后会自动生效，无需输入激活码。',
   activation_code_signin_hint: '兑换前需要先登录账号，这样会员时长才会绑定到你的账号上。',
   activation_code_signin_cta: '先登录再兑换',
   activation_code_input_label: '激活码',
@@ -791,13 +791,13 @@ export const zhTranslations = {
   faq_a10: '自然光中，日出后和日落前的黄金时刻更柔和，适合人像和风景。侧光能强调质感，逆光能制造轮廓光，阴天散射光适合静物和产品。',
 
 
-  pro_offer_price_label: '$1.99 / 30 天',
-  affiliate_intro_item_4: '中文 Pro 为 $1.99 一次性开通 30 天，不会自动续费，适合需要深度分析、永久历史记录和优先处理的用户。',
-  review_promo_guest_body: '登录后不仅能保存这次结果，还能直接继续看 Pro 的更强模型分析。中文 Pro 为 $1.99 一次性开通 30 天，不会自动续费。',
-  review_promo_guest_low_quota_body: '你今天只剩 {n} 次评图了。先登录解锁 Free，再直接切到 Pro 更强模型分析。中文 Pro 为 $1.99 一次性开通 30 天。',
-  review_promo_low_quota_body: '如果你准备继续比较更多照片，Pro 会比反复计算额度更顺手。中文 Pro 为 $1.99 一次性开通 30 天。',
-  review_promo_low_score_body: '分数偏低时，更需要完整拆解和明确修改方向。中文 Pro 为 $1.99 一次性开通 30 天。',
-  review_promo_standard_body: '更强模型分析加上永久历史记录，更适合连续复盘和稳定提升。中文 Pro 为 $1.99 一次性开通 30 天。',
+  pro_offer_price_label: '$3.99 / 月',
+  affiliate_intro_item_4: '中文 Pro 为 $3.99/月，按月自动续费，可随时取消，适合需要深度分析、永久历史记录和优先处理的用户。',
+  review_promo_guest_body: '登录后不仅能保存这次结果，还能直接继续看 Pro 的更强模型分析。中文 Pro 为 $3.99/月，按月自动续费，可随时取消。',
+  review_promo_guest_low_quota_body: '你今天只剩 {n} 次评图了。先登录解锁 Free，再直接切到 Pro 更强模型分析。中文 Pro 为 $3.99/月，可随时取消。',
+  review_promo_low_quota_body: '如果你准备继续比较更多照片，Pro 会比反复计算额度更顺手。中文 Pro 为 $3.99/月，可随时取消。',
+  review_promo_low_score_body: '分数偏低时，更需要完整拆解和明确修改方向。中文 Pro 为 $3.99/月，可随时取消。',
+  review_promo_standard_body: '更强模型分析加上永久历史记录，更适合连续复盘和稳定提升。中文 Pro 为 $3.99/月，可随时取消。',
 } as const satisfies TranslationDictionary;
 
 export type { TranslationDictionary, TranslationKey };
