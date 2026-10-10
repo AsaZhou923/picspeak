@@ -294,8 +294,8 @@ export const enTranslations = {
     pro_offer_label: '',
     pro_offer_highlight: 'Pro',
     updates_label: 'Updates',
-    updates_hint_home: "Photo critique guides and public examples are being prepared",
-    updates_hint_latest: "Photo critique guides and public examples are being prepared",
+    updates_hint_home: "Read photo critiques through guides and real public examples",
+    updates_hint_latest: "Read photo critiques through guides and real public examples",
     contact_label: 'Contact',
     contact_headline: 'Get in Touch',
 

@@ -83,8 +83,8 @@ export const zhTranslations = {
   pro_offer_label: '',
   pro_offer_highlight: 'Pro',
   updates_label: '更新记录',
-  updates_hint_home: "照片点评阅读指南与公开案例正在准备发布",
-  updates_hint_latest: "照片点评阅读指南与公开案例正在准备发布",
+  updates_hint_home: "通过阅读指南和真实公开案例理解照片点评",
+  updates_hint_latest: "通过阅读指南和真实公开案例理解照片点评",
   contact_label: '联系',
   contact_headline: '联系我',
 

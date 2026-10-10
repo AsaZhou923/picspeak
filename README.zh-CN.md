@@ -191,7 +191,7 @@ npm run build
 
 ## 文档
 
-- [准备发布：点评阅读指南与公开案例](docs/changelog/CHANGELOG.md#2026-10-10-critique-reading-guides)
+- [点评阅读指南与公开案例](docs/changelog/CHANGELOG.md#2026-10-10-critique-reading-guides)
 
 - [评分反馈可用，站内消息准备中](docs/changelog/CHANGELOG.md#2026-10-10-inbox-score-feedback-prep)
 - [最新更新：Flash 快速点评，Pro 升级更强模型](docs/changelog/CHANGELOG.md#2026-10-09-gpt6-sol-review-rollout)

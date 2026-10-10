@@ -195,7 +195,7 @@ The frontend and backend can be deployed independently. The backend includes a c
 
 ## Documentation
 
-- [Upcoming: critique reading guides and public examples](docs/changelog/CHANGELOG.md#2026-10-10-critique-reading-guides)
+- [Critique reading guides and public examples](docs/changelog/CHANGELOG.md#2026-10-10-critique-reading-guides)
 
 - [Score feedback available; in-app messages in preparation](docs/changelog/CHANGELOG.md#2026-10-10-inbox-score-feedback-prep)
 - [Latest release: quick Flash critique and stronger Pro analysis](docs/changelog/CHANGELOG.md#2026-10-09-gpt6-sol-review-rollout)
