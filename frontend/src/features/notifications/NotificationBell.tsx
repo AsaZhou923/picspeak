@@ -8,7 +8,8 @@ import { useNotifications } from './NotificationProvider';
 
 export default function NotificationBell() {
   const { t } = useI18n();
-  const { unreadTotal, error } = useNotifications();
+  const { canReadNotifications, unreadTotal, error } = useNotifications();
+  if (!canReadNotifications) return null;
   const copy = (key: TranslationKey) => t(key);
   const label = unreadTotal && unreadTotal > 0
     ? copy('notifications_bell_label_unread').replace('{count}', String(unreadTotal))

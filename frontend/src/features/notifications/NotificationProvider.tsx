@@ -12,6 +12,7 @@ import {
 } from './notification-state';
 
 interface NotificationContextValue {
+  canReadNotifications: boolean;
   unread: NotificationUnreadCountResponse | null;
   unreadTotal: number | null;
   loading: boolean;
@@ -21,6 +22,7 @@ interface NotificationContextValue {
 }
 
 const NotificationContext = createContext<NotificationContextValue>({
+  canReadNotifications: false,
   unread: null,
   unreadTotal: null,
   loading: false,
@@ -33,6 +35,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const { token, userInfo, isLoading } = useAuth();
   const [unread, setUnread] = useState<NotificationUnreadCountResponse | null>(null);
   const [unreadIdentity, setUnreadIdentity] = useState('');
+  const [readAccessIdentity, setReadAccessIdentity] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
   const generationRef = useRef(0);
@@ -46,6 +49,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const identityRef = useRef(identityKey);
   identityRef.current = identityKey;
   const visibleUnread = !isLoading && unread && identityKey && unreadIdentity === identityKey ? unread : null;
+  const canReadNotifications = Boolean(!isLoading && identityKey && readAccessIdentity === identityKey);
 
   const applyUnreadCount = useCallback((next: NotificationUnreadCountResponse | null) => {
     setUnread(next);
@@ -54,6 +58,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       setError(false);
       failureRef.current = 0;
       retryAfterUntilRef.current = 0;
+      setReadAccessIdentity(identityRef.current);
     }
   }, []);
 
@@ -62,6 +67,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     if (isLoading || !accountEnabled || !token || unauthorizedRef.current) {
       controllerRef.current?.abort();
       setUnread(null);
+      setReadAccessIdentity('');
       setLoading(false);
       setError(false);
       return;
@@ -83,11 +89,13 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       retryAfterUntilRef.current = 0;
       setUnread(next);
       setUnreadIdentity(requestIdentity);
+      setReadAccessIdentity(requestIdentity);
       setError(false);
     } catch (err) {
       if (isAbortError(err) || controller.signal.aborted || generationRef.current !== requestGeneration || identityRef.current !== requestIdentity) return;
       if (err instanceof ApiException && err.status === 401) {
         setUnread(null);
+        setReadAccessIdentity('');
         setError(false);
         failureRef.current = 0;
         unauthorizedRef.current = true;
@@ -98,9 +106,10 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       if (errorStatus === 429) {
         retryAfterUntilRef.current = Date.now() + (errorRetryAfterMs ?? nextNotificationRetryDelayMs(failureRef.current + 1));
       }
-      if (err instanceof ApiException && err.status === 403) {
+      if (err instanceof ApiException && (err.status === 403 || (err.status === 503 && err.code === 'NOTIFICATIONS_DISABLED'))) {
         setUnread(null);
         setUnreadIdentity('');
+        setReadAccessIdentity('');
       }
       failureRef.current += 1;
       setError(true);
@@ -122,6 +131,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     controllerRef.current?.abort();
     inFlightRef.current = false;
     setUnreadIdentity('');
+    setReadAccessIdentity('');
 
     if (isLoading || !accountEnabled) {
       setUnread(null);
@@ -177,13 +187,14 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   }, [error, identityKey, isLoading, refreshUnreadCount]);
 
   const value = useMemo<NotificationContextValue>(() => ({
+    canReadNotifications,
     unread: visibleUnread,
     unreadTotal: getUnreadTotal(visibleUnread),
     loading,
     error,
     refreshUnreadCount,
     applyUnreadCount,
-  }), [applyUnreadCount, error, loading, refreshUnreadCount, visibleUnread]);
+  }), [applyUnreadCount, canReadNotifications, error, loading, refreshUnreadCount, visibleUnread]);
 
   return <NotificationContext.Provider value={value}>{children}</NotificationContext.Provider>;
 }

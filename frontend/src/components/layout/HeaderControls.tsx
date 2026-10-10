@@ -13,6 +13,7 @@ import { useTheme } from '@/lib/theme-context';
 import type { HeaderVisibilityState } from './header-auth-visibility';
 import { getRetakeCoachCopy } from '@/lib/retake-coach-copy';
 import NotificationBell from '@/features/notifications/NotificationBell';
+import { useNotifications } from '@/features/notifications/NotificationProvider';
 
 const AUTH_LABELS: Record<Locale, { signIn: string; signUp: string }> = {
   zh: { signIn: '登录', signUp: '注册' },
@@ -91,6 +92,7 @@ function QuickLinksMenu() {
   const pathname = usePathname();
   const { t, locale } = useI18n();
   const { userInfo } = useAuth();
+  const { canReadNotifications } = useNotifications();
   const retakeCopy = getRetakeCoachCopy(locale);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -114,7 +116,7 @@ function QuickLinksMenu() {
     { href: '/retake', label: retakeCopy.nav, icon: Repeat2 },
     ...(userInfo && userInfo.plan !== 'guest' ? [{ href: '/account/reviews', label: t('nav_history'), icon: Clock }] : []),
     ...(userInfo && userInfo.plan !== 'guest' ? [{ href: '/account/generations', label: t('generation_history_nav'), icon: Wand2 }] : []),
-    ...(userInfo && userInfo.plan !== 'guest' ? [{ href: '/account/notifications', label: t('notifications_title'), icon: Bell }] : []),
+    ...(userInfo && userInfo.plan !== 'guest' && canReadNotifications ? [{ href: '/account/notifications', label: t('notifications_title'), icon: Bell }] : []),
     ...(userInfo && userInfo.plan !== 'guest' ? [{
       href: '/account/profile',
       label: locale === 'zh' ? '公开作品主页' : locale === 'ja' ? '公開作品プロフィール' : 'Public portfolio',
