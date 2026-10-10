@@ -294,8 +294,8 @@ export const enTranslations = {
     pro_offer_label: '',
     pro_offer_highlight: 'Pro',
     updates_label: 'Updates',
-    updates_hint_home: 'In-app messages and score feedback are being prepared',
-    updates_hint_latest: 'In-app messages and score feedback are being prepared',
+    updates_hint_home: "Score feedback is available; in-app messages are in preparation",
+    updates_hint_latest: "Score feedback is available; in-app messages are in preparation",
     contact_label: 'Contact',
     contact_headline: 'Get in Touch',
 

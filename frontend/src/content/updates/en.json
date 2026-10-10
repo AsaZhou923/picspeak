@@ -3,8 +3,8 @@
     "id": "2026-10-10-inbox-score-feedback-prep",
     "date": "2026-10-10",
     "showPopup": false,
-    "title": "In-app messages and score feedback are being prepared",
-    "summary": "An in-app message center and score feedback are being prepared for release. When available, signed-in users can revisit critique and generation updates, choose product announcements and Gallery like notices, and save, change or withdraw their own judgment of a single-photo score. This update is not live yet and requires no action now.",
+    "title": "Give feedback on scores; in-app messages are in preparation",
+    "summary": "Signed-in users can now privately mark a single-photo score as accurate, too high or too low, then change or withdraw their judgment. Feedback does not directly change scores. The in-app message center is not enabled yet and needs no setup now.",
     "docPath": "docs/changelog/CHANGELOG.md#2026-10-10-inbox-score-feedback-prep"
   },
   {

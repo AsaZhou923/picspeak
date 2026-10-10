@@ -191,7 +191,7 @@ npm run build
 
 ## 文档
 
-- [准备上线：站内消息与评分反馈](docs/changelog/CHANGELOG.md#2026-10-10-inbox-score-feedback-prep)
+- [评分反馈可用，站内消息准备中](docs/changelog/CHANGELOG.md#2026-10-10-inbox-score-feedback-prep)
 - [最新更新：Flash 快速点评，Pro 升级更强模型](docs/changelog/CHANGELOG.md#2026-10-09-gpt6-sol-review-rollout)
 - [此前中文公告：评图模型升级与 Pro 价格调整预告](docs/changelog/CHANGELOG.md#2026-10-08-gpt6-sol-and-pro-pricing)
 - [此前评图与照片浏览稳定性优化](docs/changelog/CHANGELOG.md#2026-10-07-review-reliability-and-gallery)

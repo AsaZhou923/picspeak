@@ -919,3 +919,70 @@ $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER review_score_snapshot_immutable BEFORE UPDATE ON review_score_snapshots
 FOR EACH ROW EXECUTE FUNCTION reject_review_score_snapshot_update();
+
+ALTER TABLE announcements ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notification_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notification_preferences ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE review_score_feedback ENABLE ROW LEVEL SECURITY;
+ALTER TABLE review_score_snapshots ENABLE ROW LEVEL SECURITY;
+
+REVOKE ALL PRIVILEGES ON TABLE announcements FROM PUBLIC;
+REVOKE ALL PRIVILEGES ON TABLE notification_events FROM PUBLIC;
+REVOKE ALL PRIVILEGES ON TABLE notification_preferences FROM PUBLIC;
+REVOKE ALL PRIVILEGES ON TABLE notifications FROM PUBLIC;
+REVOKE ALL PRIVILEGES ON TABLE review_score_feedback FROM PUBLIC;
+REVOKE ALL PRIVILEGES ON TABLE review_score_snapshots FROM PUBLIC;
+
+DO $$
+DECLARE
+    role_name text;
+    table_name text;
+BEGIN
+    FOREACH role_name IN ARRAY ARRAY['anon', 'authenticated']
+    LOOP
+        IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = role_name) THEN
+            FOREACH table_name IN ARRAY ARRAY[
+                'announcements',
+                'notification_events',
+                'notification_preferences',
+                'notifications',
+                'review_score_feedback',
+                'review_score_snapshots'
+            ]
+            LOOP
+                EXECUTE format('REVOKE ALL PRIVILEGES ON TABLE public.%I FROM %I', table_name, role_name);
+            END LOOP;
+        END IF;
+    END LOOP;
+END
+$$;
+
+REVOKE ALL PRIVILEGES ON SEQUENCE announcements_id_seq FROM PUBLIC;
+REVOKE ALL PRIVILEGES ON SEQUENCE notification_events_id_seq FROM PUBLIC;
+REVOKE ALL PRIVILEGES ON SEQUENCE notifications_id_seq FROM PUBLIC;
+REVOKE ALL PRIVILEGES ON SEQUENCE review_score_feedback_id_seq FROM PUBLIC;
+REVOKE ALL PRIVILEGES ON SEQUENCE review_score_snapshots_id_seq FROM PUBLIC;
+
+DO $$
+DECLARE
+    role_name text;
+    sequence_name text;
+BEGIN
+    FOREACH role_name IN ARRAY ARRAY['anon', 'authenticated']
+    LOOP
+        IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = role_name) THEN
+            FOREACH sequence_name IN ARRAY ARRAY[
+                'announcements_id_seq',
+                'notification_events_id_seq',
+                'notifications_id_seq',
+                'review_score_feedback_id_seq',
+                'review_score_snapshots_id_seq'
+            ]
+            LOOP
+                EXECUTE format('REVOKE ALL PRIVILEGES ON SEQUENCE public.%I FROM %I', sequence_name, role_name);
+            END LOOP;
+        END IF;
+    END LOOP;
+END
+$$;
