@@ -200,6 +200,7 @@ def _reassess_one(
     review_model: str,
     journal: RunJournal,
 ) -> dict[str, Any]:
+    candidate_digest = _digest_payload(_review_field_snapshot(review))
     image_url = get_object_read_url(photo.object_key, bucket=photo.bucket)
     mode = review.mode.value if hasattr(review.mode, 'value') else str(review.mode)
     profile = openai_review_profile_for_mode(mode)
@@ -221,6 +222,51 @@ def _reassess_one(
         )
 
     now = datetime.now(timezone.utc)
+
+    result_payload = _normalize_review_result_payload(
+        ai_response.result.model_dump(),
+        final_score=ai_response.result.final_score,
+        prompt_version=ai_response.prompt_version,
+        model_name=ai_response.model_name,
+        model_version=ai_response.model_version,
+        exif_info=photo.exif_data or None,
+        scorer_model_name=ai_response.scorer_model_name,
+        scorer_model_version=ai_response.scorer_model_version,
+        scorer_reasoning_effort=getattr(ai_response.result, 'scorer_reasoning_effort', ''),
+        writer_model_name=ai_response.writer_model_name,
+        writer_model_version=ai_response.writer_model_version,
+        writer_reasoning_effort=getattr(ai_response.result, 'writer_reasoning_effort', ''),
+        score_prompt_version=ai_response.score_prompt_version,
+        scorer_preprocess_version=ai_response.scorer_preprocess_version,
+        score_cache_hit=ai_response.score_cache_hit,
+    )
+    _set_free_billing_info(result_payload, ai_response)
+    lock_query = (
+        db.query(Review, Photo)
+        .join(Photo, Photo.id == Review.photo_id)
+        .filter(
+            Review.id == review.id,
+            Review.deleted_at.is_(None),
+            Review.gallery_visible == True,  # noqa: E712
+            Review.gallery_audit_status == GALLERY_AUDIT_APPROVED,
+            Photo.status == PhotoStatus.READY,
+        )
+    )
+    if hasattr(lock_query, "with_for_update"):
+        lock_query = lock_query.with_for_update(of=Review)
+    if hasattr(lock_query, "populate_existing"):
+        lock_query = lock_query.populate_existing()
+    if hasattr(lock_query, "one_or_none"):
+        locked_row = lock_query.one_or_none()
+    else:
+        locked_row = (review, photo)
+    if locked_row is None:
+        db.rollback()
+        return {'status': 'skipped', 'reason': 'source_changed', 'review_id': review.public_id}
+    review, photo = locked_row
+    if _digest_payload(_review_field_snapshot(review)) != candidate_digest:
+        db.rollback()
+        return {'status': 'skipped', 'reason': 'source_changed', 'review_id': review.public_id}
     original_fields = _review_field_snapshot(review)
     original_digest = _digest_payload(original_fields)
     journal.append(
@@ -242,25 +288,6 @@ def _reassess_one(
             },
         }
     )
-
-    result_payload = _normalize_review_result_payload(
-        ai_response.result.model_dump(),
-        final_score=ai_response.result.final_score,
-        prompt_version=ai_response.prompt_version,
-        model_name=ai_response.model_name,
-        model_version=ai_response.model_version,
-        exif_info=photo.exif_data or None,
-        scorer_model_name=ai_response.scorer_model_name,
-        scorer_model_version=ai_response.scorer_model_version,
-        scorer_reasoning_effort=getattr(ai_response.result, 'scorer_reasoning_effort', ''),
-        writer_model_name=ai_response.writer_model_name,
-        writer_model_version=ai_response.writer_model_version,
-        writer_reasoning_effort=getattr(ai_response.result, 'writer_reasoning_effort', ''),
-        score_prompt_version=ai_response.score_prompt_version,
-        scorer_preprocess_version=ai_response.scorer_preprocess_version,
-        score_cache_hit=ai_response.score_cache_hit,
-    )
-    _set_free_billing_info(result_payload, ai_response)
     _attach_reassessment_metadata(result_payload, review=review, run_id=journal.run_id, original_digest=original_digest, created_at=now)
 
     review.schema_version = result_payload['schema_version']

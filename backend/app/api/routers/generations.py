@@ -46,6 +46,7 @@ from app.services.image_generation_task_processor import (
     stage_generation_terminal_event,
 )
 from app.services.generation_credit_reservations import reserve_generation_credits_for_task, release_generation_credit_reservation
+from app.services.notification_events import record_generation_terminal
 from app.services.object_storage import get_object_storage_client
 from app.services.product_analytics import record_product_event
 from app.services.task_dispatcher import TaskDispatchError, enqueue_image_generation_task
@@ -474,6 +475,7 @@ def _mark_generation_dispatch_failed(db: Session, task_public_id: str, error_mes
             event_name='generation_failed',
             metadata=_generation_failure_event_metadata(failed_task, 'TASK_DISPATCH_FAILED'),
         )
+        record_generation_terminal(db, failed_task)
     db.commit()
     if owner is not None:
         deliver_generation_terminal_event(db, task=failed_task, owner=owner)

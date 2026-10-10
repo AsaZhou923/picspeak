@@ -171,6 +171,21 @@ def get_current_actor(
     return actor
 
 
+def get_registered_actor(
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+    authorization: str | None = Header(default=None),
+) -> CurrentActor:
+    """Require an active account bearer token without creating a guest."""
+    response.headers['Cache-Control'] = 'private, no-store'
+    user = _fetch_user_by_token(_extract_bearer_token(authorization), db)
+    if user.plan == UserPlan.guest:
+        raise api_error(status.HTTP_401_UNAUTHORIZED, 'AUTH_LOGIN_REQUIRED', 'Sign in to continue')
+    set_current_user_public_id(request, user.public_id)
+    return CurrentActor(user)
+
+
 def get_optional_actor(
     request: Request,
     db: Session = Depends(get_db),

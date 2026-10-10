@@ -8,23 +8,34 @@ import { formatUserFacingError } from '@/lib/error-utils';
 import { trackProductEvent } from '@/lib/product-analytics';
 
 export function useReviewDetail(reviewId: string) {
-  const { ensureToken } = useAuth();
+  const { ensureToken, userInfo, isLoading: authLoading } = useAuth();
+  const identity = userInfo?.user_id ?? null;
+  const identityRef = useRef(identity);
+  identityRef.current = identity;
   const { t, locale } = useI18n();
   const [review, setReview] = useState<ReviewGetResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [initialPhotoUrl, setInitialPhotoUrl] = useState<string | null>(null);
+  const [loadedIdentity, setLoadedIdentity] = useState<string | null | undefined>(undefined);
+  const [loadedReviewId, setLoadedReviewId] = useState<string | null>(null);
   const trackedReviewIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
     setError('');
+    setReview(null);
+    setInitialPhotoUrl(null);
+    if (authLoading) return () => controller.abort();
     ensureToken()
       .then(async (token) => {
+        if (controller.signal.aborted || identityRef.current !== identity) return;
         const data = await getReview(reviewId, token, controller.signal);
         const localPhotoUrl = await getUploadedPhotoPreviewSrc(data.photo_id);
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted || identityRef.current !== identity) return;
+        setLoadedIdentity(identity);
+        setLoadedReviewId(reviewId);
         setReview(data);
         setInitialPhotoUrl(localPhotoUrl || data.photo_url || null);
         setLoading(false);
@@ -43,14 +54,21 @@ export function useReviewDetail(reviewId: string) {
         }
       })
       .catch((err) => {
-        if (isAbortError(err)) return;
+        if (controller.signal.aborted || identityRef.current !== identity || isAbortError(err)) return;
         setLoading(false);
         setError(formatUserFacingError(t, err, t('review_err_fetch')));
       });
     return () => {
       controller.abort();
     };
-  }, [reviewId, ensureToken, locale, t]);
+  }, [reviewId, ensureToken, locale, t, identity, authLoading]);
 
-  return { review, setReview, loading, error, initialPhotoUrl };
+  const matchesIdentity = !authLoading && loadedIdentity === identity && loadedReviewId === reviewId;
+  return {
+    review: matchesIdentity && !loading ? review : null,
+    setReview,
+    loading: authLoading || loading,
+    error: authLoading ? '' : error,
+    initialPhotoUrl: matchesIdentity && !loading ? initialPhotoUrl : null,
+  };
 }

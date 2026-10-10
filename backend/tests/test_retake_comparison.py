@@ -214,7 +214,15 @@ class RetakeComparisonTests(unittest.TestCase):
         pro_body['model'] = 'gpt-6.1-sol-2026-10-09'
         pro_response = PooledHTTPResponse(status=200, data=json.dumps(pro_body).encode('utf-8'), headers={}, reason='OK')
 
-        with patch('app.services.retake_comparison.settings') as mocked_settings:
+        with patch('app.services.retake_comparison.settings') as mocked_settings, patch.multiple(
+            'app.services.ai.settings',
+            openai_score_model='gpt-6-sol',
+            openai_score_reasoning_effort='low',
+            openai_review_model='gpt-6-sol',
+            openai_review_reasoning_effort='low',
+            openai_pro_model='gpt-6.1-sol',
+            openai_pro_reasoning_effort='high',
+        ):
             mocked_settings.openai_api_key = 'test-openai-key'
             mocked_settings.openai_score_model = 'gpt-6-sol'
             mocked_settings.openai_score_reasoning_effort = 'low'

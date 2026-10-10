@@ -8,6 +8,7 @@ from concurrent.futures import Future, ThreadPoolExecutor, wait
 from app.core.config import settings
 from app.services.guest_cleanup import cleanup_stale_guest_users
 from app.services.image_generation_task_processor import claim_next_pending_image_generation_task, process_image_generation_task
+from app.services.notification_processor import cleanup_expired_notifications, process_pending_notifications
 from app.services.review_task_processor import claim_next_pending_review_task, process_review_task
 
 
@@ -19,7 +20,11 @@ class ReviewWorker:
         self._running = False
         self._threads = []
         self._maintenance_lock = threading.Lock()
+        self._notification_lock = threading.Lock()
+        self._notification_stop_event = threading.Event()
+        self._notification_thread: threading.Thread | None = None
         self._next_guest_cleanup_at = 0.0
+        self._next_notification_sweep_at = 0.0
         self.worker_name = worker_name or settings.review_worker_name
         # Dedicated thread pool for image generation tasks (blocking I/O, up to 180s).
         # Keeps the worker main loop unblocked so review tasks can still be claimed.
@@ -34,6 +39,13 @@ class ReviewWorker:
         if self._running:
             return
         self._running = True
+        self._notification_stop_event.clear()
+        self._notification_thread = threading.Thread(
+            target=self._notification_maintenance_loop,
+            name=f'{self.worker_name}-notifications',
+            daemon=True,
+        )
+        self._notification_thread.start()
 
         worker_count = max(int(settings.review_worker_concurrency), 1)
         self._threads = []
@@ -44,6 +56,10 @@ class ReviewWorker:
 
     def stop(self) -> None:
         self._running = False
+        self._notification_stop_event.set()
+        if self._notification_thread and self._notification_thread.is_alive():
+            self._notification_thread.join(timeout=2)
+        self._notification_thread = None
         for thread in self._threads:
             if thread.is_alive():
                 thread.join(timeout=2)
@@ -99,6 +115,18 @@ class ReviewWorker:
                 time.sleep(idle_sleep_seconds)
             finally:
                 time.sleep(0.05)
+
+
+    def _notification_maintenance_loop(self) -> None:
+        while self._running and not self._notification_stop_event.is_set():
+            try:
+                self._run_notification_sweep_if_due()
+            finally:
+                now = time.monotonic()
+                wait_seconds = 1.0
+                if self._next_notification_sweep_at > now:
+                    wait_seconds = min(max(self._next_notification_sweep_at - now, 0.05), 1.0)
+                self._notification_stop_event.wait(wait_seconds)
 
     def _prune_done_gen_futures(self) -> None:
         """Remove completed generation futures and log any exceptions."""
@@ -168,6 +196,45 @@ class ReviewWorker:
             logger.exception('Failed to run stale guest cleanup')
         finally:
             self._maintenance_lock.release()
+
+    def _run_notification_sweep_if_due(self) -> None:
+        if not getattr(settings, 'notifications_worker_enabled', True):
+            return
+
+        now = time.monotonic()
+        if now < self._next_notification_sweep_at:
+            return
+        if not self._notification_lock.acquire(blocking=False):
+            return
+
+        try:
+            now = time.monotonic()
+            if now < self._next_notification_sweep_at:
+                return
+            interval = int(
+                getattr(settings, 'notification_sweep_interval_seconds', None)
+                or getattr(settings, 'notifications_worker_interval_seconds', 60)
+                or 60
+            )
+            self._next_notification_sweep_at = now + min(max(interval, 1), 60)
+
+            from app.db.session import SessionLocal
+
+            db = SessionLocal()
+            try:
+                result = process_pending_notifications(db, limit=100)
+                expired = cleanup_expired_notifications(db)
+                if expired:
+                    db.commit()
+            finally:
+                db.close()
+
+            if result.get('processed') or expired:
+                logger.info('Notification sweep processed %s event(s), deleted %s expired notification(s)', result.get('processed'), expired)
+        except Exception:
+            logger.exception('Failed to run notification sweep')
+        finally:
+            self._notification_lock.release()
 
 
 worker = ReviewWorker()

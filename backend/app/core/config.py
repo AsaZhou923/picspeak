@@ -107,6 +107,12 @@ class Settings(BaseSettings):
     guest_user_cleanup_interval_seconds: int = 3600
     guest_user_stale_days: int = 7
     guest_user_cleanup_batch_size: int = 200
+    notifications_worker_enabled: bool = True
+    notifications_worker_interval_seconds: int = 60
+    notification_sweep_interval_seconds: int = 60
+    notifications_read_enabled: bool = False
+    notifications_event_capture_enabled: bool = False
+    announcement_publish_enabled: bool = False
     cloud_tasks_enabled: bool = False
     cloud_tasks_project_id: str = ''
     cloud_tasks_location: str = ''

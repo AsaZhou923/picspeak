@@ -16,6 +16,15 @@ import {
   GenerationTemplatesResponse,
   GuestMigrateResponse,
   ImageCreditCodeRedeemResponse,
+  NotificationArchiveResponse,
+  NotificationDetail,
+  NotificationListQuery,
+  NotificationListResponse,
+  NotificationPreferencesPatchRequest,
+  NotificationPreferencesResponse,
+  NotificationReadAllResponse,
+  NotificationReadResponse,
+  NotificationUnreadCountResponse,
   PhotoCreateResponse,
   PhotoReviewsResponse,
   PresignRequest,
@@ -52,6 +61,7 @@ import {
   UsageResponse,
 } from './types';
 import { parseContentDispositionFilename } from './generation-download';
+import type { ScoreFeedback, ScoreFeedbackPutRequest, ScoreFeedbackResponse } from './score-feedback';
 
 function resolveApiBase(): string {
   const configured = process.env.NEXT_PUBLIC_API_URL?.trim();
@@ -236,6 +246,17 @@ async function request<T>(
     let code = 'UNKNOWN_ERROR';
     let message = `HTTP ${res.status}`;
     let requestId: string | undefined;
+    let retryAfterMs: number | undefined;
+    const retryAfter = res.headers.get('Retry-After');
+    if (retryAfter) {
+      const seconds = Number(retryAfter);
+      const dateMs = Date.parse(retryAfter);
+      if (Number.isFinite(seconds) && seconds >= 0) {
+        retryAfterMs = seconds * 1000;
+      } else if (Number.isFinite(dateMs)) {
+        retryAfterMs = Math.max(0, dateMs - Date.now());
+      }
+    }
     try {
       const body = await res.json();
       if (body?.error) {
@@ -248,11 +269,16 @@ async function request<T>(
     } catch {
       // ignore JSON parse errors
     }
-    throw new ApiException(res.status, code, message, requestId);
+    throw new ApiException(res.status, code, message, requestId, retryAfterMs);
   }
 
   if (res.status === 204) return undefined as T;
   return res.json();
+}
+
+// Account-only features must never recover authentication by creating a guest.
+export function requestAccountApi<T>(path: string, options: ApiRequestOptions & { token: string }): Promise<T> {
+  return request<T>(path, { ...options, cache: 'no-store', unauthorizedRecovery: 'disabled' });
 }
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
@@ -718,7 +744,23 @@ export function buildTaskWebSocketUrl(taskId: string): string {
 }
 
 export async function getReview(reviewId: string, token: string, signal?: AbortSignal): Promise<ReviewGetResponse> {
-  return request<ReviewGetResponse>(`/reviews/${reviewId}`, { token, signal });
+  return request<ReviewGetResponse>(`/reviews/${reviewId}`, { token, signal, cache: 'no-store' });
+}
+
+export function getScoreFeedback(reviewId: string, revision: string, token: string, signal?: AbortSignal): Promise<ScoreFeedbackResponse> {
+  return requestAccountApi(`/reviews/${encodeURIComponent(reviewId)}/score-feedback?score_revision=${encodeURIComponent(revision)}`, { token, signal });
+}
+
+export function putScoreFeedback(reviewId: string, data: ScoreFeedbackPutRequest, token: string, signal?: AbortSignal): Promise<ScoreFeedback> {
+  return requestAccountApi(`/reviews/${encodeURIComponent(reviewId)}/score-feedback`, { token, signal, method: 'PUT', body: JSON.stringify(data) });
+}
+
+export function getScoreFeedbackRecord(feedbackId: string, token: string, signal?: AbortSignal): Promise<ScoreFeedback> {
+  return requestAccountApi(`/score-feedback/${encodeURIComponent(feedbackId)}`, { token, signal });
+}
+
+export function deleteScoreFeedback(feedbackId: string, version: number, token: string, signal?: AbortSignal): Promise<ScoreFeedback> {
+  return requestAccountApi(`/score-feedback/${encodeURIComponent(feedbackId)}`, { token, signal, method: 'DELETE', body: JSON.stringify({ expected_feedback_version: version }) });
 }
 
 export async function getPhotoReviews(
@@ -852,6 +894,120 @@ export async function updateReviewMeta(
     method: 'PATCH',
     body: JSON.stringify(payload),
     token,
+  });
+}
+
+// ─── Notifications ──────────────────────────────────────────────────────────
+
+export async function getNotifications(
+  token: string,
+  query: NotificationListQuery = {},
+  signal?: AbortSignal
+): Promise<NotificationListResponse> {
+  const params = new URLSearchParams({
+    category: query.category ?? 'all',
+    limit: String(query.limit ?? 20),
+  });
+  if (query.unread_only) params.set('unread_only', 'true');
+  if (query.archived) params.set('archived', 'true');
+  if (query.locale) params.set('locale', query.locale);
+  if (query.cursor) params.set('cursor', query.cursor);
+  return request<NotificationListResponse>(`/notifications?${params.toString()}`, {
+    token,
+    signal,
+    cache: 'no-store',
+  });
+}
+
+export async function getNotificationUnreadCount(
+  token: string,
+  signal?: AbortSignal
+): Promise<NotificationUnreadCountResponse> {
+  return request<NotificationUnreadCountResponse>('/notifications/unread-count', {
+    token,
+    signal,
+    cache: 'no-store',
+  });
+}
+
+export async function getNotificationDetail(
+  notificationId: string,
+  token: string,
+  signal?: AbortSignal,
+  locale?: 'en' | 'zh' | 'ja'
+): Promise<NotificationDetail> {
+  const query = locale ? `?${new URLSearchParams({ locale })}` : '';
+  return request<NotificationDetail>(`/notifications/${encodeURIComponent(notificationId)}${query}`, {
+    token,
+    signal,
+    cache: 'no-store',
+  });
+}
+
+export async function markNotificationRead(
+  notificationId: string,
+  token: string,
+  signal?: AbortSignal
+): Promise<NotificationReadResponse> {
+  return request<NotificationReadResponse>(`/notifications/${encodeURIComponent(notificationId)}/read`, {
+    method: 'POST',
+    token,
+    signal,
+    cache: 'no-store',
+  });
+}
+
+export async function markNotificationsReadAll(
+  token: string,
+  category?: NotificationListQuery['category'],
+  signal?: AbortSignal
+): Promise<NotificationReadAllResponse> {
+  return request<NotificationReadAllResponse>('/notifications/read-all', {
+    method: 'POST',
+    token,
+    signal,
+    cache: 'no-store',
+    body: JSON.stringify(category && category !== 'all' ? { category } : {}),
+  });
+}
+
+export async function updateNotificationArchive(
+  notificationId: string,
+  archived: boolean,
+  token: string,
+  signal?: AbortSignal
+): Promise<NotificationArchiveResponse> {
+  return request<NotificationArchiveResponse>(`/notifications/${encodeURIComponent(notificationId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ archived }),
+    token,
+    signal,
+    cache: 'no-store',
+  });
+}
+
+export async function getNotificationPreferences(
+  token: string,
+  signal?: AbortSignal
+): Promise<NotificationPreferencesResponse> {
+  return request<NotificationPreferencesResponse>('/notifications/preferences', {
+    token,
+    signal,
+    cache: 'no-store',
+  });
+}
+
+export async function updateNotificationPreferences(
+  token: string,
+  payload: NotificationPreferencesPatchRequest,
+  signal?: AbortSignal
+): Promise<NotificationPreferencesResponse> {
+  return request<NotificationPreferencesResponse>('/notifications/preferences', {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+    token,
+    signal,
+    cache: 'no-store',
   });
 }
 

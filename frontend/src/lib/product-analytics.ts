@@ -38,6 +38,10 @@ export type ProductAnalyticsEventName =
   | 'generation_credit_exhausted'
   | 'generation_upgrade_clicked'
   | 'credit_pack_checkout_started'
+  | 'notification_center_opened'
+  | 'notification_opened'
+  | 'notification_target_clicked'
+  | 'notification_preferences_changed'
   | 'web_vital_reported';
 
 const ANALYTICS_SOURCE_KEY = 'ps_product_source_v1';
@@ -51,6 +55,8 @@ export function normalizeProductAnalyticsSource(value: string | null | undefined
       return 'blog';
     case 'gallery':
       return 'gallery';
+    case 'notifications':
+      return 'notifications';
     case 'prompt_library':
       return 'prompt_library';
     case 'share':

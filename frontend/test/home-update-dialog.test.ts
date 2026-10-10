@@ -18,10 +18,23 @@ const homeSource = readFileSync(
 );
 const shellSource = readFileSync(path.join(FRONTEND_DIR, 'src/components/layout/SiteChrome.tsx'), 'utf8');
 
-test('Sol rollout keeps the pricing notice and latest popup priority only for Chinese users', () => {
-  const announcement = getLatestProductUpdate('zh');
+test('inbox and score feedback prep is the latest visible update without popup', () => {
+  for (const locale of ['zh', 'en', 'ja'] as const) {
+    const latest = getLatestProductUpdate(locale);
+    assert.ok(latest);
+    assert.equal(latest.id, '2026-10-10-inbox-score-feedback-prep');
+    assert.equal(latest.date, '2026-10-10');
+    assert.equal(latest.showPopup, false);
+    assert.equal(shouldShowProductUpdatePopup(latest), false);
+    assert.equal(latest.docPath, `docs/changelog/CHANGELOG.md#${latest.id}`);
+  }
+  assert.equal(getLatestProductUpdateDate('zh'), '2026-10-10');
+  assert.equal(getLatestProductUpdateDate(), '2026-10-10');
+});
+
+test('Sol rollout keeps the pricing notice popup opt-in only for Chinese users', () => {
+  const announcement = getProductUpdates('zh').find((entry) => entry.id === '2026-10-09-gpt6-sol-review-rollout');
   assert.ok(announcement);
-  assert.equal(announcement.id, '2026-10-09-gpt6-sol-review-rollout');
   assert.equal(announcement.date, '2026-10-09');
   assert.equal(shouldShowProductUpdatePopup(announcement), true);
   assert.equal(announcement.docPath, `docs/changelog/CHANGELOG.md#${announcement.id}`);
@@ -35,16 +48,13 @@ test('Sol rollout keeps the pricing notice and latest popup priority only for Ch
   assert.match(announcement.summary, /现有 Pro 用户不受本次价格调整影响/);
 
   for (const locale of ['en', 'ja'] as const) {
-    const latest = getLatestProductUpdate(locale);
-    assert.ok(latest);
-    assert.equal(latest.id, announcement.id);
-    assert.equal(latest.date, '2026-10-09');
-    assert.equal(shouldShowProductUpdatePopup(latest), false);
-    assert.doesNotMatch(latest.summary, /1\.99|3\.99|10 月 10 日/);
+    const rollout: ReturnType<typeof getProductUpdates>[number] | undefined = getProductUpdates(locale).find((entry) => entry.id === announcement.id);
+    assert.ok(rollout);
+    assert.equal(rollout.date, '2026-10-09');
+    assert.equal(shouldShowProductUpdatePopup(rollout), false);
+    assert.doesNotMatch(rollout.summary, /1\.99|3\.99|10 月 10 日/);
     assert.equal(getProductUpdates(locale).some((entry) => entry.id === '2026-10-08-gpt6-sol-and-pro-pricing'), false);
   }
-  assert.equal(getLatestProductUpdateDate('zh'), '2026-10-09');
-  assert.equal(getLatestProductUpdateDate(), '2026-10-09');
 });
 
 test('Free history change is recorded in every locale while preserving the Chinese announcement priority', () => {
@@ -53,12 +63,12 @@ test('Free history change is recorded in every locale while preserving the Chine
     const pending = getProductUpdates(locale).find((entry) => entry.id === '2026-10-08-free-history-fifteen-days');
     assert.ok(latest);
     assert.ok(pending);
-    assert.equal(latest.id, '2026-10-09-gpt6-sol-review-rollout');
-    assert.equal(latest.date, '2026-10-09');
+    assert.equal(latest.id, '2026-10-10-inbox-score-feedback-prep');
+    assert.equal(latest.date, '2026-10-10');
     assert.equal(pending.showPopup, false);
     assert.match(pending.summary, /15/);
     assert.equal(shouldShowProductUpdatePopup(pending), false);
-    assert.equal(shouldShowProductUpdatePopup(latest), locale === 'zh');
+    assert.equal(shouldShowProductUpdatePopup(latest), false);
   }
 });
 
@@ -96,7 +106,7 @@ test('maintenance updates remain in the log while popup eligibility stays separa
     assert.equal(shouldShowProductUpdatePopup(previousSameDay), false);
     assert.equal(updates[0].id, latest.id);
     assert.equal(shouldShowProductUpdatePopup(latestMaintenance), false);
-    assert.equal(shouldShowProductUpdatePopup(latest), locale === 'zh');
+    assert.equal(shouldShowProductUpdatePopup(latest), false);
     const previousAnnouncement = updates.find((entry) => entry.id === '2026-10-06-photo-rubric-and-gallery-reassessment');
     assert.ok(previousAnnouncement);
     assert.equal(shouldShowProductUpdatePopup(previousAnnouncement), true);

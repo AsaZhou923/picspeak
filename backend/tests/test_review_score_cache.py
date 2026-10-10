@@ -323,15 +323,16 @@ class ReviewScoreCacheTests(unittest.TestCase):
 
     def test_task_checkpoint_rejects_v7_with_the_same_current_model(self) -> None:
         task = SimpleNamespace(request_payload={})
-        score = build_cached_canonical_score(
-            dict(LOW_SCORES), scorer_model_name='gpt-6-sol', scorer_model_version='gpt-6-sol',
-            final_score=6.0, score_evidence=score_evidence_fixture(LOW_SCORES),
-        )
-        checkpoint_task_canonical_score(task, score)
-        checkpoint = task.request_payload['_canonical_score_checkpoint']
-        checkpoint['score_prompt_version'] = 'photo-score-v7-canonical-quality'
-        checkpoint['score_version'] = 'score-v7-canonical-quality'
-        self.assertIsNone(load_task_canonical_score_checkpoint(task))
+        with patch('app.services.ai.settings.openai_score_model', 'gpt-6-sol'):
+            score = build_cached_canonical_score(
+                dict(LOW_SCORES), scorer_model_name='gpt-6-sol', scorer_model_version='gpt-6-sol',
+                final_score=6.0, score_evidence=score_evidence_fixture(LOW_SCORES),
+            )
+            checkpoint_task_canonical_score(task, score)
+            checkpoint = task.request_payload['_canonical_score_checkpoint']
+            checkpoint['score_prompt_version'] = 'photo-score-v7-canonical-quality'
+            checkpoint['score_version'] = 'score-v7-canonical-quality'
+            self.assertIsNone(load_task_canonical_score_checkpoint(task))
 
     def test_sol_runtime_rejects_luna_retry_checkpoint(self) -> None:
         task = SimpleNamespace(request_payload={})
@@ -347,23 +348,24 @@ class ReviewScoreCacheTests(unittest.TestCase):
 
     def test_retry_checkpoint_requires_matching_scorer_reasoning_effort(self) -> None:
         task = SimpleNamespace(request_payload={})
-        score = build_cached_canonical_score(
-            dict(LOW_SCORES),
-            scorer_model_name='gpt-6-sol',
-            scorer_model_version='gpt-6-sol',
-            final_score=6.0,
-            score_evidence=score_evidence_fixture(LOW_SCORES),
-            scorer_reasoning_effort='high',
-        )
-        checkpoint_task_canonical_score(task, score)
-
-        self.assertIsNone(
-            load_task_canonical_score_checkpoint(
-                task,
+        with patch('app.services.ai.settings.openai_score_model', 'gpt-6-sol'):
+            score = build_cached_canonical_score(
+                dict(LOW_SCORES),
                 scorer_model_name='gpt-6-sol',
-                scorer_reasoning_effort='low',
+                scorer_model_version='gpt-6-sol',
+                final_score=6.0,
+                score_evidence=score_evidence_fixture(LOW_SCORES),
+                scorer_reasoning_effort='high',
             )
-        )
+            checkpoint_task_canonical_score(task, score)
+
+            self.assertIsNone(
+                load_task_canonical_score_checkpoint(
+                    task,
+                    scorer_model_name='gpt-6-sol',
+                    scorer_reasoning_effort='low',
+                )
+            )
         self.assertIsNotNone(
             load_task_canonical_score_checkpoint(
                 task,

@@ -6,12 +6,14 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from fastapi import HTTPException
+from fastapi import FastAPI, HTTPException
+from fastapi.testclient import TestClient
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
+from app.api.routers import gallery
 from app.api.routers.gallery import like_public_gallery_review
 from app.db.models import UserPlan
 
@@ -27,6 +29,19 @@ class GalleryLikeRouteTests(unittest.TestCase):
         self.assertEqual(ctx.exception.status_code, 403)
         db.query.assert_not_called()
 
+
+    def test_like_public_gallery_review_requires_registered_actor_without_guest_cookie(self) -> None:
+        app = FastAPI()
+        app.include_router(gallery.router)
+        app.dependency_overrides[gallery.get_db] = lambda: MagicMock()
+
+        with patch('app.api.deps.create_guest_user') as create_guest_user:
+            response = TestClient(app).post('/gallery/rev_123/likes')
+
+        self.assertEqual(response.status_code, 401)
+        self.assertNotIn('set-cookie', {key.lower(): value for key, value in response.headers.items()})
+        create_guest_user.assert_not_called()
+
     def test_like_public_gallery_review_returns_updated_count(self) -> None:
         db = MagicMock()
         like_query = MagicMock()
@@ -40,13 +55,14 @@ class GalleryLikeRouteTests(unittest.TestCase):
         with patch('app.api.routers.gallery._find_public_gallery_review', return_value=review), patch(
             'app.api.routers.gallery._gallery_like_count',
             return_value=4,
-        ):
+        ), patch('app.api.routers.gallery.record_gallery_like') as record_like:
             payload = like_public_gallery_review(review_id='rev_123', db=db, actor=actor)
 
         self.assertEqual(payload.review_id, 'rev_123')
         self.assertEqual(payload.like_count, 4)
         self.assertTrue(payload.liked_by_viewer)
         db.add.assert_called_once()
+        record_like.assert_called_once_with(db, review, actor.user.id)
         db.commit.assert_called_once()
 
 

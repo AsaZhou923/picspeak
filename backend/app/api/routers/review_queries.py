@@ -12,7 +12,7 @@ from app.api.deps import CurrentActor, get_current_actor, get_db
 from app.api.routers.gallery import GALLERY_AUDIT_NONE
 from app.api.routers.photos import _build_photo_proxy_url, _find_photo_owned
 from app.core.errors import api_error
-from app.db.models import Photo, Review, ReviewTask, User, UserPlan
+from app.db.models import Photo, PhotoStatus, Review, ReviewTask, User, UserPlan, UserStatus
 from app.schemas import PhotoReviewsResponse, ReviewGetResponse, ReviewHistoryResponse, ReviewListItem
 from app.services.guard import review_history_cutoff
 from .review_support import (
@@ -32,6 +32,7 @@ from .review_support import (
     _review_source_public_id,
 )
 from app.services.practice import owner_practice_context_for_review
+from app.services.review_score_feedback import score_revision
 
 router = APIRouter(tags=['reviews'])
 
@@ -75,9 +76,27 @@ def get_review(
         review_task_public_id = db.query(ReviewTask.public_id).filter(ReviewTask.id == review.task_id).scalar()
     practice_context = owner_practice_context_for_review(db, review) if is_owner else None
     result_payload = dict(review.result_json or {})
-    db.commit()
-    return ReviewGetResponse(
+    result_response = _review_result_payload(
+        result_payload,
+        review.final_score,
+        model_name=review.model_name,
+        model_version=_review_model_version(review),
+        exif_info=photo.exif_data if is_owner and photo and photo.exif_data else {},
+        share_info_override=_review_share_info(request, review, include_token=is_owner),
+        include_goal_assessment=is_owner,
+    )
+    gallery_feedback_allowed = (
+        not is_owner
+        and bool(review.is_public)
+        and bool(review.gallery_visible)
+        and getattr(review, 'gallery_audit_status', None) == 'approved'
+        and getattr(photo, 'status', None) == PhotoStatus.READY
+        and getattr(photo_owner, 'status', None) == UserStatus.active
+    )
+    feedback_revision = score_revision(review) if (is_owner or gallery_feedback_allowed) and not practice_context else None
+    response = ReviewGetResponse(
         review_id=review.public_id,
+        score_revision=feedback_revision,
         task_id=review_task_public_id,
         photo_id=photo.public_id if photo else 'unknown',
         photo_url=photo_url,
@@ -99,18 +118,12 @@ def get_review(
         gallery_rejected_reason=review.gallery_rejected_reason if is_owner else None,
         tags=_normalize_review_tags(review.tags_json if isinstance(review.tags_json, list) else []) if is_owner else [],
         note=review.note if is_owner else None,
-        result=_review_result_payload(
-            review.result_json,
-            review.final_score,
-            model_name=review.model_name,
-            model_version=_review_model_version(review),
-            exif_info=photo.exif_data if is_owner and photo and photo.exif_data else {},
-            share_info_override=_review_share_info(request, review, include_token=is_owner),
-            include_goal_assessment=is_owner,
-        ),
+        result=result_response,
         created_at=review.created_at,
         exif_data=photo.exif_data if is_owner and photo and photo.exif_data else None,
     )
+    db.commit()
+    return response
 
 
 @router.get('/public/reviews/{share_token}', response_model=ReviewGetResponse, name='get_public_review')
@@ -137,10 +150,19 @@ def get_public_review(
         return RedirectResponse(_frontend_share_url(share_token), status_code=status.HTTP_307_TEMPORARY_REDIRECT)
 
     photo_url = _build_photo_proxy_url(request, photo.public_id, photo_owner.public_id)
+    result_response = _review_result_payload(
+        dict(review.result_json or {}),
+        review.final_score,
+        model_name=review.model_name,
+        model_version=_review_model_version(review),
+        exif_info={},
+        share_info_override=_review_share_info(request, review, include_token=False),
+        include_goal_assessment=False,
+    )
 
-    db.commit()
-    return ReviewGetResponse(
+    response = ReviewGetResponse(
         review_id=review.public_id,
+        score_revision=None,
         task_id=None,
         photo_id=photo.public_id if photo else 'unknown',
         photo_url=photo_url,
@@ -156,18 +178,12 @@ def get_public_review(
         gallery_rejected_reason=None,
         tags=[],
         note=None,
-        result=_review_result_payload(
-            review.result_json,
-            review.final_score,
-            model_name=review.model_name,
-            model_version=_review_model_version(review),
-            exif_info={},
-            share_info_override=_review_share_info(request, review, include_token=False),
-            include_goal_assessment=False,
-        ),
+        result=result_response,
         created_at=review.created_at,
         exif_data=None,
     )
+    db.commit()
+    return response
 
 
 @router.get('/me/reviews', response_model=ReviewHistoryResponse)

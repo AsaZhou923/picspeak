@@ -25,6 +25,7 @@ from app.services.ai import (
     run_ai_review,
 )
 from app.services.guard import guest_usage_snapshot, increment_quota, user_usage_snapshot
+from app.services.notification_events import record_review_terminal
 from app.services.practice import attach_practice_review, resolve_task_practice
 from app.services.practice_events import record_practice_analysis_completed
 from app.services.retake_comparison import run_retake_comparison
@@ -266,6 +267,7 @@ def expire_review_tasks(db: Session) -> None:
         task.error_message = 'Task expired before completion'
         db.add(task)
         record_task_event(db, task, event_type='TASK_EXPIRED', message=task.error_message)
+        record_review_terminal(db, task)
     if expired_tasks:
         db.commit()
 
@@ -333,6 +335,7 @@ def _reconcile_completed_tasks(db: Session) -> None:
             message='Task status reconciled from persisted review',
             payload={'review_id': review.public_id},
         )
+        record_review_terminal(db, task, review)
     db.commit()
 
 
@@ -489,6 +492,7 @@ def _complete_task(
         message=error_message,
         payload={'error_code': error_code} if error_code else None,
     )
+    record_review_terminal(db, task)
     db.commit()
 
 
@@ -861,4 +865,5 @@ def _process_task(db: Session, task: ReviewTask, *, claim_token: str | None = No
     task.error_message = None
     db.add(task)
     record_task_event(db, task, event_type='REVIEW_CREATED', message='Review succeeded', payload={'review_id': review.public_id})
+    record_review_terminal(db, task, review)
     db.commit()

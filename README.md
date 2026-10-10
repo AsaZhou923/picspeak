@@ -195,6 +195,7 @@ The frontend and backend can be deployed independently. The backend includes a c
 
 ## Documentation
 
+- [Upcoming: in-app messages and score feedback](docs/changelog/CHANGELOG.md#2026-10-10-inbox-score-feedback-prep)
 - [Latest release: quick Flash critique and stronger Pro analysis](docs/changelog/CHANGELOG.md#2026-10-09-gpt6-sol-review-rollout)
 - [Controlled photo access](docs/changelog/CHANGELOG.md#2026-10-08-private-image-access)
 - [15-day Free critique history](docs/changelog/CHANGELOG.md#2026-10-08-free-history-fifteen-days)

@@ -288,6 +288,8 @@ async def request_audit_middleware(request: Request, call_next):
         response = await call_next(request)
         status_code = response.status_code
         response.headers['X-Request-Id'] = request_id
+        if '/score-feedback' in request.url.path or '/notifications' in request.url.path:
+            response.headers['Cache-Control'] = 'private, no-store'
         return response
     finally:
         # Skip audit for non-business endpoints.

@@ -197,6 +197,16 @@ def _null_cache_lease(*args, **kwargs):
 
 class ReassessScoreVersionScriptTests(unittest.TestCase):
     def setUp(self) -> None:
+        self.settings_patcher = patch.multiple(
+            script.settings,
+            openai_score_model='gpt-6-sol',
+            openai_score_reasoning_effort='low',
+            openai_review_model='gpt-6-sol',
+            openai_review_reasoning_effort='low',
+            openai_pro_model='gpt-6.1-sol',
+            openai_pro_reasoning_effort='high',
+        )
+        self.settings_patcher.start()
         self.read_url_patcher = patch.object(
             script,
             'get_object_read_url',
@@ -206,6 +216,7 @@ class ReassessScoreVersionScriptTests(unittest.TestCase):
 
     def tearDown(self) -> None:
         self.read_url_patcher.stop()
+        self.settings_patcher.stop()
 
     def _candidate(self, review=None, photo=None, task=None):
         return script._candidate_from_row(review or _review(), photo or _photo(), task or _task())

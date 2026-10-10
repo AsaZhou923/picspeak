@@ -101,11 +101,15 @@ test('current and historical update copy describes mode benefits without reasoni
       const visibleCopy = [entry.title, entry.summary, ...(entry.sections ?? []).flatMap((section) => [section.title, ...section.items])].join('\n');
       assert.doesNotMatch(visibleCopy, reasoningParameter, `${locale}: ${entry.id}`);
     }
+    const rollout = entries.find((entry) => entry.id === '2026-10-09-gpt6-sol-review-rollout');
+    assert.ok(rollout);
+    assert.match(rollout.summary, /Flash/);
+    assert.match(rollout.summary, /Pro/);
+    assert.match(rollout.summary, /GPT-6 Sol/);
+    assert.match(rollout.summary, /GPT-6\.1 Sol/);
     const latest = entries[0];
-    assert.match(latest.summary, /Flash/);
-    assert.match(latest.summary, /Pro/);
-    assert.match(latest.summary, /GPT-6 Sol/);
-    assert.match(latest.summary, /GPT-6\.1 Sol/);
+    assert.equal(latest.id, '2026-10-10-inbox-score-feedback-prep');
+    assert.equal(latest.showPopup, false);
   }
 });
 

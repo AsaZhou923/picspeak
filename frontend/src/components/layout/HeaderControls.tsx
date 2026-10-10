@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { Show, SignInButton, SignUpButton, UserButton } from '@clerk/nextjs';
-import { BadgeDollarSign, ChevronDown, ChevronRight, Clock, Heart, Moon, Repeat2, Sun, UserRound, Wand2 } from 'lucide-react';
+import { BadgeDollarSign, Bell, ChevronDown, ChevronRight, Clock, Heart, Moon, Repeat2, Sun, UserRound, Wand2 } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import { KeyboardEvent, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
@@ -12,6 +12,7 @@ import { LOCALE_LABELS, Locale, useI18n } from '@/lib/i18n';
 import { useTheme } from '@/lib/theme-context';
 import type { HeaderVisibilityState } from './header-auth-visibility';
 import { getRetakeCoachCopy } from '@/lib/retake-coach-copy';
+import NotificationBell from '@/features/notifications/NotificationBell';
 
 const AUTH_LABELS: Record<Locale, { signIn: string; signUp: string }> = {
   zh: { signIn: '登录', signUp: '注册' },
@@ -113,6 +114,7 @@ function QuickLinksMenu() {
     { href: '/retake', label: retakeCopy.nav, icon: Repeat2 },
     ...(userInfo && userInfo.plan !== 'guest' ? [{ href: '/account/reviews', label: t('nav_history'), icon: Clock }] : []),
     ...(userInfo && userInfo.plan !== 'guest' ? [{ href: '/account/generations', label: t('generation_history_nav'), icon: Wand2 }] : []),
+    ...(userInfo && userInfo.plan !== 'guest' ? [{ href: '/account/notifications', label: t('notifications_title'), icon: Bell }] : []),
     ...(userInfo && userInfo.plan !== 'guest' ? [{
       href: '/account/profile',
       label: locale === 'zh' ? '公开作品主页' : locale === 'ja' ? '公開作品プロフィール' : 'Public portfolio',
@@ -218,6 +220,7 @@ export function HeaderRightControls({
               {visibleUserInfo!.plan === 'guest' ? t('plan_guest_label') : planLabel(visibleUserInfo!.plan)}
             </span>
           </span>
+          <NotificationBell />
           <QuickLinksMenu />
 
           {isLegacyAuthenticated ? (

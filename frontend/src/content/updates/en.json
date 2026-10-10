@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-10-inbox-score-feedback-prep",
+    "date": "2026-10-10",
+    "showPopup": false,
+    "title": "In-app messages and score feedback are being prepared",
+    "summary": "An in-app message center and score feedback are being prepared for release. When available, signed-in users can revisit critique and generation updates, choose product announcements and Gallery like notices, and save, change or withdraw their own judgment of a single-photo score. This update is not live yet and requires no action now.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-10-10-inbox-score-feedback-prep"
+  },
+  {
     "id": "2026-10-09-gpt6-sol-review-rollout",
     "date": "2026-10-09",
     "showPopup": false,

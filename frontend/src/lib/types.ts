@@ -1,4 +1,5 @@
 // ─── Auth ────────────────────────────────────────────────────────────────────
+export type { ScoreFeedback, ScoreFeedbackVerdict, ScoreFeedbackResponse, ScoreFeedbackPutRequest } from './score-feedback';
 
 export interface AuthToken {
   access_token: string;
@@ -658,6 +659,7 @@ export interface GeneratedImageHistoryResponse {
 
 export interface ReviewGetResponse {
   review_id: string;
+  score_revision?: string | null;
   task_id?: string | null;
   photo_id: string;
   photo_url: string | null;
@@ -848,6 +850,91 @@ export interface GalleryLikeResponse {
   liked_by_viewer: boolean;
 }
 
+// ─── Notifications ──────────────────────────────────────────────────────────
+
+export type NotificationCategory = 'system' | 'announcement' | 'interaction';
+export type NotificationCategoryFilter = 'all' | NotificationCategory;
+export type NotificationTargetState = 'available' | 'unavailable' | 'expired' | 'revoked' | string;
+
+export interface NotificationTarget {
+  type: 'review' | 'task' | 'generation' | 'generation_task' | 'usage' | 'updates' | 'blog' | 'workspace' | 'generate' | string | null;
+  public_id: string | null;
+  href: string | null;
+  state: NotificationTargetState;
+}
+
+export interface NotificationItem {
+  notification_id: string;
+  category: NotificationCategory;
+  type: string;
+  title: string;
+  summary: string;
+  occurred_at: string;
+  delivered_at: string;
+  read_at: string | null;
+  archived_at: string | null;
+  target: NotificationTarget | null;
+}
+
+export interface NotificationDetail extends NotificationItem {
+  body: string;
+  rendered_locale: 'zh' | 'en' | 'ja' | string;
+}
+
+export interface NotificationListQuery {
+  locale?: 'en' | 'zh' | 'ja';
+  category?: NotificationCategoryFilter;
+  unread_only?: boolean;
+  archived?: boolean;
+  cursor?: string | null;
+  limit?: number;
+}
+
+export interface NotificationListResponse {
+  items: NotificationItem[];
+  next_cursor: string | null;
+  unread_count: number;
+  as_of: string;
+}
+
+export interface NotificationUnreadCountResponse {
+  total: number;
+  by_category: Record<NotificationCategory, number>;
+  as_of: string;
+}
+
+export interface NotificationReadResponse {
+  read_at: string;
+  unread_count: number;
+  as_of: string;
+}
+
+export interface NotificationReadAllResponse {
+  changed_count: number;
+  unread_count: number;
+  as_of: string;
+}
+
+export interface NotificationArchiveResponse {
+  notification_id: string;
+  archived_at: string | null;
+  unread_count: number;
+  as_of: string;
+}
+
+export interface NotificationPreferencesResponse {
+  likes_enabled: boolean;
+  announcements_enabled: boolean;
+  likes_enabled_at: string | null;
+  announcements_enabled_at: string | null;
+  updated_at: string | null;
+}
+
+export interface NotificationPreferencesPatchRequest {
+  likes_enabled?: boolean;
+  announcements_enabled?: boolean;
+}
+
 // ─── Blog Views ──────────────────────────────────────────────────────────────
 
 export interface BlogPostViewItem {
@@ -869,6 +956,7 @@ export type ProductAnalyticsSource =
   | 'home_direct'
   | 'blog'
   | 'gallery'
+  | 'notifications'
   | 'prompt_library'
   | 'share'
   | 'checkout'
@@ -920,7 +1008,8 @@ export class ApiException extends Error {
     public status: number,
     public code: string,
     message: string,
-    public requestId?: string
+    public requestId?: string,
+    public retryAfterMs?: number
   ) {
     super(message);
     this.name = 'ApiException';

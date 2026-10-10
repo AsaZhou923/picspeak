@@ -4,6 +4,8 @@ import type { ReviewGetResponse } from '@/lib/types';
 import { useI18n } from '@/lib/i18n';
 import { localeToIntlLocale } from '@/lib/locale';
 import { getScoreVersionLabel } from '@/lib/review-growth';
+import { ScoreFeedbackPanel } from './ScoreFeedbackPanel';
+import type { ScoreFeedback } from '@/lib/score-feedback';
 import {
   DIM_TO_TAGS,
   formatExposureValue,
@@ -24,6 +26,8 @@ interface ReviewScorePanelProps {
   review: ReviewGetResponse;
   activeDim: string | null;
   onDimClick: (dimKey: string) => void;
+  onReviewRefresh?: (review: ReviewGetResponse | null, feedback?: ScoreFeedback | null) => void;
+  sourceSurface?: 'result' | 'gallery';
 }
 
 interface ReviewMetadataPanelProps {
@@ -87,6 +91,8 @@ export function ReviewScorePanel({
   review,
   activeDim,
   onDimClick,
+  onReviewRefresh,
+  sourceSurface = 'result',
 }: ReviewScorePanelProps) {
   const { t, locale } = useI18n();
   const resultImageType = review.result?.image_type ?? 'default';
@@ -183,6 +189,7 @@ export function ReviewScorePanel({
           );
         })}
       </div>
+      {onReviewRefresh && <ScoreFeedbackPanel review={review} sourceSurface={sourceSurface} onReviewRefresh={onReviewRefresh} />}
     </section>
   );
 }

@@ -16,7 +16,23 @@ from app.core.config import settings
 from app.core.errors import api_error
 from app.core.http_client import PooledHTTPRequestError, PooledHTTPStatusError, pooled_request
 from app.core.security import create_access_token
-from app.db.models import IdempotencyKey, Photo, PracticeAttempt, PracticeFeedback, PracticeSession, Review, ReviewTask, User, UserPlan, UserStatus
+from app.db.models import (
+    IdempotencyKey,
+    Notification,
+    NotificationEvent,
+    NotificationPreference,
+    Photo,
+    PracticeAttempt,
+    PracticeFeedback,
+    PracticeSession,
+    Review,
+    ReviewScoreFeedback,
+    ReviewScoreSnapshot,
+    ReviewTask,
+    User,
+    UserPlan,
+    UserStatus,
+)
 from app.schemas import AuthTokenResponse
 from app.services.clerk_auth import ClerkIdentity
 from app.services.clerk_webhooks import ClerkWebhookEvent
@@ -243,15 +259,79 @@ def _sync_clerk_user_from_webhook(db: Session, user_payload: dict[str, Any]) -> 
     return 'upserted', user.public_id
 
 
+def _cleanup_deleted_user_feature_state(db: Session, user: User) -> None:
+    now = datetime.now(timezone.utc)
+
+    owned_review_ids = [
+        review_id
+        for (review_id,) in (
+            db.query(Review.id)
+            .filter(Review.owner_user_id == user.id)
+            .order_by(Review.id)
+            .with_for_update()
+            .all()
+        )
+    ]
+    if owned_review_ids:
+        owned_snapshot_ids = [
+            snapshot_id
+            for (snapshot_id,) in (
+                db.query(ReviewScoreSnapshot.id)
+                .filter(ReviewScoreSnapshot.review_id.in_(owned_review_ids))
+                .order_by(ReviewScoreSnapshot.id)
+                .with_for_update()
+                .all()
+            )
+        ]
+        if owned_snapshot_ids:
+            db.query(ReviewScoreFeedback).filter(
+                ReviewScoreFeedback.snapshot_id.in_(owned_snapshot_ids)
+            ).delete(synchronize_session=False)
+            db.query(ReviewScoreSnapshot).filter(ReviewScoreSnapshot.id.in_(owned_snapshot_ids)).delete(
+                synchronize_session=False
+            )
+
+    db.query(ReviewScoreFeedback).filter(ReviewScoreFeedback.user_id == user.id).delete(synchronize_session=False)
+    db.query(Notification).filter(Notification.recipient_user_id == user.id).delete(synchronize_session=False)
+    db.query(NotificationPreference).filter(NotificationPreference.user_id == user.id).delete(synchronize_session=False)
+    db.query(NotificationEvent).filter(NotificationEvent.recipient_user_id == user.id).update(
+        {
+            NotificationEvent.recipient_user_id: None,
+            NotificationEvent.payload_json: {},
+            NotificationEvent.cursor_json: {},
+            NotificationEvent.optional_preference_eligible: False,
+            NotificationEvent.status: 'expired_delivery',
+            NotificationEvent.processed_at: now,
+            NotificationEvent.available_at: now,
+            NotificationEvent.last_error_code: 'RECIPIENT_DELETED',
+        },
+        synchronize_session=False,
+    )
+
+
 def _handle_clerk_user_deleted(db: Session, user_payload: dict[str, Any]) -> tuple[str, str | None]:
     clerk_user_id = user_payload.get('id')
     if not isinstance(clerk_user_id, str) or not clerk_user_id.strip():
         return 'ignored_missing_user_id', None
 
-    user = db.query(User).filter(User.clerk_user_id == clerk_user_id.strip()).first()
+    user = (
+        db.query(User)
+        .filter(User.clerk_user_id == clerk_user_id.strip())
+        .with_for_update()
+        .populate_existing()
+        .first()
+    )
     if user is None:
         return 'ignored_not_found', None
 
+    (
+        db.query(NotificationEvent.id)
+        .filter(NotificationEvent.recipient_user_id == user.id)
+        .order_by(NotificationEvent.id)
+        .with_for_update()
+        .all()
+    )
+    _cleanup_deleted_user_feature_state(db, user)
     user.status = UserStatus.deleted
     db.add(user)
     db.flush()

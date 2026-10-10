@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator, model_validator
 
 from app.goal_assessment import GoalAssessment
 
@@ -179,6 +179,10 @@ class InternalTaskExecuteRequest(BaseModel):
     task_id: str
 
 
+class InternalNotificationProcessRequest(BaseModel):
+    limit: int = Field(default=100, ge=1, le=100)
+
+
 class ReviewCreateSyncResponse(BaseModel):
     review_id: str
     status: str
@@ -294,6 +298,7 @@ class GeneratedImageHistoryResponse(BaseModel):
 
 class ReviewGetResponse(BaseModel):
     review_id: str
+    score_revision: str | None = None
     task_id: str | None = None
     photo_id: str
     photo_url: str | None = None
@@ -315,6 +320,40 @@ class ReviewGetResponse(BaseModel):
     result: ReviewResult
     created_at: datetime
     exif_data: dict[str, Any] | None = None
+
+
+class ScoreFeedbackPutRequest(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    expected_score_revision: str = Field(pattern=r'^[a-f0-9]{64}$')
+    verdict: Literal['accurate', 'too_high', 'too_low']
+    expected_feedback_version: int | None = Field(default=None, ge=0, strict=True)
+    source_surface: Literal['result', 'gallery'] = 'result'
+
+
+class ScoreFeedbackWithdrawRequest(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    expected_feedback_version: int = Field(ge=1, strict=True)
+
+
+class ScoreFeedbackResponse(BaseModel):
+    feedback_id: str
+    verdict: Literal['accurate', 'too_high', 'too_low']
+    state: Literal['active', 'withdrawn']
+    feedback_version: int
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+    withdrawn_at: datetime | None = None
+
+
+class ReviewScoreFeedbackResponse(BaseModel):
+    review_id: str | None = None
+    score_revision: str | None = None
+    eligible: bool
+    role: Literal['author', 'community'] | None = None
+    reason: str | None = None
+    my_feedback: ScoreFeedbackResponse | None = None
 
 
 class ReviewListItem(BaseModel):
@@ -434,6 +473,93 @@ class GalleryLikeResponse(BaseModel):
     review_id: str
     like_count: int = 0
     liked_by_viewer: bool = False
+
+
+class NotificationTarget(BaseModel):
+    type: str
+    public_id: str | None = None
+    href: str | None = None
+    state: Literal['available', 'unavailable'] = 'available'
+
+
+class NotificationItem(BaseModel):
+    notification_id: str
+    category: Literal['system', 'announcement', 'interaction']
+    type: str
+    title: str
+    summary: str
+    target: NotificationTarget | None = None
+    occurred_at: datetime
+    delivered_at: datetime
+    read_at: datetime | None = None
+    archived_at: datetime | None = None
+
+
+class NotificationListResponse(BaseModel):
+    items: list[NotificationItem]
+    next_cursor: str | None = None
+    unread_count: int = 0
+    as_of: datetime
+
+
+class NotificationUnreadCountResponse(BaseModel):
+    total: int
+    by_category: dict[str, int]
+    as_of: datetime
+
+
+class NotificationDetailResponse(NotificationItem):
+    body: str
+    rendered_locale: Literal['en', 'zh', 'ja']
+
+
+class NotificationReadResponse(BaseModel):
+    read_at: datetime
+    unread_count: int
+    as_of: datetime
+
+
+class NotificationReadAllRequest(BaseModel):
+    category: str | None = Field(default=None, pattern='^(all|system|announcement|interaction)$')
+
+
+class NotificationReadAllResponse(BaseModel):
+    changed_count: int
+    unread_count: int
+    as_of: datetime
+
+
+class NotificationArchiveRequest(BaseModel):
+    archived: StrictBool
+
+
+class NotificationArchiveResponse(BaseModel):
+    notification_id: str
+    archived_at: datetime | None = None
+    read_at: datetime | None = None
+    unread_count: int
+    as_of: datetime
+
+
+class NotificationPreferencesResponse(BaseModel):
+    likes_enabled: bool = False
+    announcements_enabled: bool = False
+    likes_enabled_at: datetime | None = None
+    announcements_enabled_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class NotificationPreferencesUpdateRequest(BaseModel):
+    likes_enabled: StrictBool | None = None
+    announcements_enabled: StrictBool | None = None
+
+    @field_validator('likes_enabled', 'announcements_enabled', mode='before')
+    @classmethod
+    def reject_null(cls, value):
+        if value is None:
+            raise ValueError('Preference values cannot be null')
+        return value
+
 
 
 class BlogPostViewItem(BaseModel):

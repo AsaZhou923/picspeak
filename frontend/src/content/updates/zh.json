@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-10-inbox-score-feedback-prep",
+    "date": "2026-10-10",
+    "showPopup": false,
+    "title": "站内消息与评分反馈准备中",
+    "summary": "站内消息中心和评分反馈正在准备上线。发布后，登录用户可以回看评图与生成进展，选择接收产品公告和 Gallery 点赞通知，并保存、修改或撤回对单图总分的本人判断。本次更新尚未上线，现在无需操作。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-10-10-inbox-score-feedback-prep"
+  },
+  {
     "id": "2026-10-09-gpt6-sol-review-rollout",
     "date": "2026-10-09",
     "showPopup": true,

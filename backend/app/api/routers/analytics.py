@@ -7,7 +7,14 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import CurrentActor, get_db, get_optional_actor
 from app.core.errors import api_error
+from app.db.models import UserPlan
 from app.schemas import ProductAnalyticsTrackRequest, ProductAnalyticsTrackResponse
+from app.services.notification_analytics import (
+    NOTIFICATION_ANALYTICS_EVENTS,
+    NOTIFICATION_ANALYTICS_SOURCE,
+    NotificationAnalyticsValidationError,
+    normalize_notification_analytics_event,
+)
 from app.services.product_analytics import normalize_stage_a_event_name, record_product_event
 from app.services.practice_events import PRACTICE_CLIENT_EVENTS, PRACTICE_SERVER_EVENTS, record_client_practice_event
 
@@ -24,6 +31,27 @@ def _normalized_optional_header(value: str | None, *, max_length: int = 128) -> 
     if not normalized:
         return None
     return normalized[:max_length]
+
+
+def _normalize_client_metadata(payload: ProductAnalyticsTrackRequest, db: Session, actor: CurrentActor | None, event_name: str) -> tuple[str | None, dict[str, Any]]:
+    if event_name not in NOTIFICATION_ANALYTICS_EVENTS:
+        return payload.page_path, dict(payload.metadata or {})
+
+    if actor is None or actor.user.plan == UserPlan.guest:
+        raise api_error(status.HTTP_401_UNAUTHORIZED, 'AUTH_LOGIN_REQUIRED', 'Sign in to continue')
+    if payload.source != NOTIFICATION_ANALYTICS_SOURCE:
+        raise api_error(status.HTTP_400_BAD_REQUEST, 'ANALYTICS_SOURCE_INVALID', 'Invalid analytics source')
+    try:
+        return normalize_notification_analytics_event(
+            db,
+            user_id=actor.user.id,
+            event_name=event_name,
+            page_path=payload.page_path,
+            metadata=payload.metadata,
+        )
+    except NotificationAnalyticsValidationError as exc:
+        status_code = status.HTTP_404_NOT_FOUND if exc.code == 'NOTIFICATION_NOT_FOUND' else status.HTTP_400_BAD_REQUEST
+        raise api_error(status_code, exc.code, exc.message) from exc
 
 
 @router.post('/events', response_model=ProductAnalyticsTrackResponse, status_code=status.HTTP_202_ACCEPTED)
@@ -52,6 +80,7 @@ def track_product_analytics_event(
         record_client_practice_event(db, actor=actor, event_name=event_name, metadata=payload.metadata or {}, locale=payload.locale)
         db.commit()
         return ProductAnalyticsTrackResponse(status='accepted', event_name=event_name)
+    page_path, metadata = _normalize_client_metadata(payload, db, actor, event_name)
     record_product_event(
         db,
         event_name=event_name,
@@ -60,9 +89,9 @@ def track_product_analytics_event(
         device_id=_normalized_optional_header(device_id),
         session_id=_normalized_optional_header(payload.session_id),
         source=payload.source,
-        page_path=payload.page_path or request.url.path,
+        page_path=page_path or request.url.path,
         locale=payload.locale,
-        metadata=payload.metadata,
+        metadata=metadata,
     )
     db.commit()
     return ProductAnalyticsTrackResponse(status='accepted', event_name=event_name)

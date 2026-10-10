@@ -304,6 +304,7 @@ class ImageGenerationTaskProcessorTests(unittest.TestCase):
             unittest.mock.patch('app.services.image_generation_task_processor._reconcile_pending_generation_terminal_events'),
             unittest.mock.patch('app.services.image_generation_task_processor.release_generation_credit_reservation') as release_reservation,
             unittest.mock.patch('app.services.image_generation_task_processor.deliver_generation_terminal_event') as deliver_event,
+            unittest.mock.patch('app.services.image_generation_task_processor.record_generation_terminal') as record_notification,
         ):
             mocked_settings.image_generation_task_stale_timeout_seconds = 600
             mocked_settings.image_generation_timeout_seconds = 180
@@ -316,6 +317,7 @@ class ImageGenerationTaskProcessorTests(unittest.TestCase):
         db.add.assert_called_once_with(task)
         self.assertEqual(db.commit.call_count, 1)
         release_reservation.assert_called_once()
+        record_notification.assert_called_once_with(db, task)
         deliver_event.assert_called_once()
         self.assertEqual(task.request_payload['pending_terminal_event']['event_name'], 'generation_failed')
 

@@ -21,6 +21,12 @@ def utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _coerce_utc(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    return value if value.tzinfo is not None else value.replace(tzinfo=timezone.utc)
+
+
 def normalize_activation_code(value: str) -> str:
     normalized = _ACTIVATION_CODE_RE.sub('', str(value or '').strip().upper())
     if not normalized:
@@ -43,10 +49,11 @@ def activation_code_prefix(value: str) -> str:
 def subscription_grants_pro_access(subscription: BillingSubscription, *, now: datetime | None = None) -> bool:
     current = now or utc_now()
     status_value = (subscription.status or '').strip().lower()
+    ends_at = _coerce_utc(subscription.ends_at)
 
     if status_value in {'active', 'on_trial'}:
-        return subscription.ends_at is None or subscription.ends_at > current
-    if status_value == 'cancelled' and subscription.ends_at and subscription.ends_at > current:
+        return ends_at is None or ends_at > current
+    if status_value == 'cancelled' and ends_at and ends_at > current:
         return True
     return False
 
@@ -92,6 +99,13 @@ def active_subscription_for_user(db: Session, user: User) -> BillingSubscription
         if subscription_grants_pro_access(item, now=current):
             return item
     return None
+
+
+def effective_user_billing_plan(db: Session, user: User) -> UserPlan:
+    """Resolve the current plan without mutating the user row."""
+    if user.plan == UserPlan.guest:
+        return UserPlan.guest
+    return UserPlan.pro if active_subscription_for_user(db, user) is not None else UserPlan.free
 
 
 def activation_subscription_for_user(db: Session, user: User) -> BillingSubscription | None:

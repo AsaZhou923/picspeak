@@ -264,8 +264,10 @@ class ImageGenerationRoutesTests(unittest.TestCase):
             patch('app.api.routers.generations.release_generation_credit_reservation') as release_reservation,
             patch('app.api.routers.generations.stage_generation_terminal_event') as stage_event,
             patch('app.api.routers.generations.deliver_generation_terminal_event') as deliver_event,
+            patch('app.api.routers.generations.record_generation_terminal') as notification_event,
         ):
             _mark_generation_dispatch_failed(db, 'igt_dispatch_failed', 'queue unavailable')
+        notification_event.assert_called_once_with(db, task)
 
         self.assertEqual(task.status, TaskStatus.FAILED)
         self.assertEqual(task.error_code, 'TASK_DISPATCH_FAILED')

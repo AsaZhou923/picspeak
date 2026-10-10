@@ -42,6 +42,7 @@ from app.services.guard import (
 )
 from app.services.task_dispatcher import TaskDispatchError, enqueue_review_task
 from app.services.task_events import record_task_event
+from app.services.notification_events import record_review_terminal
 from app.services.retake_comparison import run_retake_comparison
 from app.services.practice import prepare_practice_attempt_for_task
 from app.services.review_score_cache import (
@@ -338,6 +339,7 @@ def create_review(
                     failed_task.error_message = str(exc)[:500]
                     db.add(failed_task)
                     record_task_event(db, failed_task, event_type='TASK_DISPATCH_FAILED', message=failed_task.error_message)
+                    record_review_terminal(db, failed_task)
                     db.commit()
                 raise api_error(status.HTTP_503_SERVICE_UNAVAILABLE, 'TASK_DISPATCH_FAILED', 'Failed to enqueue async review task') from exc
         return response

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from app.api.routers import analytics, auth, billing, blog, gallery, generations, photos, practice, profiles, realtime, reviews, tasks, uploads, webhooks
+from app.api.routers import analytics, auth, billing, blog, gallery, generations, notifications, photos, practice, profiles, realtime, reviews, score_feedback, tasks, uploads, webhooks
 
 router = APIRouter(prefix='/api/v1', tags=['v1'])
 webhook_router = APIRouter(prefix='/api', tags=['webhooks'])
@@ -12,9 +12,11 @@ router.include_router(auth.webhooks_router)
 router.include_router(uploads.router)
 router.include_router(photos.router)
 router.include_router(reviews.router)
+router.include_router(score_feedback.router)
 router.include_router(tasks.router)
 router.include_router(gallery.router)
 router.include_router(generations.router)
+router.include_router(notifications.router)
 router.include_router(practice.router)
 router.include_router(profiles.router)
 router.include_router(blog.router)

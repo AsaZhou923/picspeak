@@ -7,7 +7,7 @@ from sqlalchemy import Float, and_, cast, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.deps import CurrentActor, get_current_actor, get_db
+from app.api.deps import CurrentActor, get_db, get_registered_actor
 from app.api.routers.photos import _build_photo_proxy_url, _build_thumbnail_bytes, _get_photo_object
 from app.core.errors import api_error
 from app.db.models import Photo, Review, ReviewLike, User, UserPlan
@@ -19,6 +19,7 @@ from app.services.gallery_scoreboard import (
   build_gallery_scoreboard,
   _owner_profile_url,
 )
+from app.services.notification_events import record_gallery_like
 from app.services.object_storage import get_object_storage_client
 from .gallery_support import (
   GALLERY_AUDIT_APPROVED,
@@ -228,7 +229,7 @@ def get_gallery_neighbors(
 def like_public_gallery_review(
   review_id: str,
   db: Session = Depends(get_db),
-  actor: CurrentActor = Depends(get_current_actor),
+  actor: CurrentActor = Depends(get_registered_actor),
 ):
   if actor.plan == UserPlan.guest:
     raise api_error(status.HTTP_403_FORBIDDEN, 'GALLERY_LIKE_LOGIN_REQUIRED', 'Please sign in before liking gallery items')
@@ -241,6 +242,7 @@ def like_public_gallery_review(
   )
   if existing is None:
     db.add(ReviewLike(review_id=review.id, user_id=actor.user.id))
+    record_gallery_like(db, review, actor.user.id)
     try:
       db.commit()
     except IntegrityError:
@@ -256,7 +258,7 @@ def like_public_gallery_review(
 def unlike_public_gallery_review(
   review_id: str,
   db: Session = Depends(get_db),
-  actor: CurrentActor = Depends(get_current_actor),
+  actor: CurrentActor = Depends(get_registered_actor),
 ):
   if actor.plan == UserPlan.guest:
     raise api_error(status.HTTP_403_FORBIDDEN, 'GALLERY_LIKE_LOGIN_REQUIRED', 'Please sign in before liking gallery items')

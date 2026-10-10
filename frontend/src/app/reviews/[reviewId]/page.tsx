@@ -44,6 +44,8 @@ import { trackProductEvent } from '@/lib/product-analytics';
 import GalleryReviewNeighborNav from '@/components/gallery/GalleryReviewNeighborNav';
 import ReviewExportPanel from '@/features/reviews/components/ReviewExportPanel';
 import { ReviewOwnerTools } from '@/features/reviews/components/ReviewOwnerTools';
+import { ScoreFeedbackWithdrawal } from '@/features/reviews/components/ScoreFeedbackPanel';
+import type { ScoreFeedback } from '@/lib/score-feedback';
 
 function getReviewSourceContextCopy(locale: 'zh' | 'en' | 'ja') {
   if (locale === 'ja') {
@@ -154,6 +156,8 @@ export default function ReviewPage() {
   const [highlightedCardId, setHighlightedCardId] = useState<string | null>(null);
   const [exportToolsOpen, setExportToolsOpen] = useState(false);
   const [ownerToolsBusy, setOwnerToolsBusy] = useState(false);
+  const [unavailableFeedback, setUnavailableFeedback] = useState<{ reviewId: string; ownerId: string; feedback: ScoreFeedback } | null>(null);
+  const [scoreChangedReviewId, setScoreChangedReviewId] = useState<string | null>(null);
   const exportToolsRef = useRef<HTMLDetailsElement | null>(null);
 
   const { review, setReview, loading, error, initialPhotoUrl } = useReviewDetail(reviewId);
@@ -227,7 +231,11 @@ export default function ReviewPage() {
     );
   }
 
-  if (!review) return null;
+  if (!review) return <section className="mx-auto max-w-reading px-5 py-12">
+    <h1 className="text-xl font-semibold text-ink">{t('score_feedback_unavailable')}</h1>
+    {unavailableFeedback?.reviewId === reviewId && <ScoreFeedbackWithdrawal feedback={unavailableFeedback.feedback} ownerId={unavailableFeedback.ownerId} />}
+    <button type="button" className="mt-4 min-h-11 text-sm underline" onClick={handleBackNavigation}>{t('back_btn')}</button>
+  </section>;
 
   const activeReview = review;
   const r = activeReview.result;
@@ -567,6 +575,7 @@ export default function ReviewPage() {
           </h2>
 
           <div className="mt-6 space-y-6">
+            {scoreChangedReviewId === reviewId && <p role="status" className="text-sm text-ink-muted">{t('score_feedback_score_changed')}</p>}
             {r.comparison && !isGoalPracticeReview && <RetakeComparisonPanel review={activeReview} locale={locale} />}
 
             <div className="grid items-start gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
@@ -574,6 +583,12 @@ export default function ReviewPage() {
                 review={review}
                 activeDim={activeDim}
                 onDimClick={handleDimClick}
+                onReviewRefresh={(next, feedback) => {
+                  if (next && next.score_revision !== review.score_revision) setScoreChangedReviewId(reviewId);
+                  setReview(next);
+                  if (!next && feedback && userInfo) setUnavailableFeedback({ reviewId, ownerId: userInfo.user_id, feedback });
+                }}
+                sourceSurface={isGalleryBackHref ? 'gallery' : 'result'}
               />
 
               <div className="min-w-0 space-y-6">

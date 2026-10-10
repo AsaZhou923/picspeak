@@ -22,6 +22,7 @@ from app.services.lemonsqueezy import (
     retrieve_subscription,
     webhook_signing_secret,
 )
+from app.services.notification_events import record_credit_confirmed, record_subscription_changed
 from app.services.product_analytics import record_product_event
 
 HANDLED_LEMONSQUEEZY_EVENTS = {
@@ -55,6 +56,42 @@ def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _subscription_state_fingerprint(subscription: BillingSubscription) -> str:
+    return '|'.join(
+        [
+            str(subscription.status or ''),
+            str(subscription.cancelled),
+            str(subscription.renews_at or ''),
+            str(subscription.ends_at or ''),
+        ]
+    )
+
+
+def _notification_subscription_token(subscription: BillingSubscription) -> str:
+    source_id = subscription.provider_subscription_id or subscription.provider_order_id or str(subscription.id or '')
+    return hashlib.sha256(str(source_id).encode()).hexdigest()[:24]
+
+
+def _record_subscription_changed_if_state_changed(
+    db: Session,
+    user: User,
+    subscription: BillingSubscription,
+    *,
+    before_fingerprint: str | None,
+    event_version: str | None,
+) -> None:
+    after_fingerprint = _subscription_state_fingerprint(subscription)
+    if before_fingerprint == after_fingerprint:
+        return
+    record_subscription_changed(
+        db,
+        user,
+        subscription_id=_notification_subscription_token(subscription),
+        status=subscription.status,
+        version=f'{after_fingerprint}|{event_version or ""}',
+    )
+
+
 def _parse_iso_datetime(value: Any) -> datetime | None:
     if not isinstance(value, str):
         return None
@@ -70,6 +107,10 @@ def _parse_iso_datetime(value: Any) -> datetime | None:
     if parsed.tzinfo is None:
         return parsed.replace(tzinfo=timezone.utc)
     return parsed
+
+
+def _event_effective_at(attributes: dict[str, Any]) -> datetime | None:
+    return _parse_iso_datetime(attributes.get('updated_at')) or _parse_iso_datetime(attributes.get('created_at'))
 
 
 def _payload_attributes(data: dict[str, Any]) -> dict[str, Any]:
@@ -357,7 +398,7 @@ def _grant_one_time_pro_access(
     user: User,
     subscription: BillingSubscription,
     event: LemonSqueezyWebhookEvent,
-) -> BillingSubscription:
+) -> tuple[BillingSubscription, str | None, str | None, bool]:
     current = _utc_now()
     current_end = current_period_ends_at(subscription)
     start_at = current_end if current_end is not None and current_end > current else current
@@ -385,6 +426,13 @@ def _grant_one_time_pro_access(
     }
     db.add(subscription)
     _sync_user_plan(db, user)
+    record_subscription_changed(
+        db,
+        user,
+        subscription_id=_notification_subscription_token(subscription),
+        status=subscription.status,
+        version=_subscription_state_fingerprint(subscription),
+    )
     record_product_event(
         db,
         event_name='paid_success',
@@ -443,24 +491,25 @@ def _process_image_credit_pack_order(db: Session, event: LemonSqueezyWebhookEven
     if credits != IMAGE_CREDIT_PACK_CREDITS:
         credits = IMAGE_CREDIT_PACK_CREDITS
 
-    db.add(
-        UsageLedger(
-            user_id=user.id,
-            review_id=None,
-            task_id=None,
-            usage_type='image_generation_credit',
-            amount=-credits,
-            unit='credits',
-            bill_date=_utc_now().date(),
-            metadata_json={
-                'grant_type': 'lemonsqueezy_credit_pack',
-                'pack': IMAGE_CREDIT_PACK_KEY,
-                'order_id': order_id,
-                'credits_granted': credits,
-                'event_name': event.event_name,
-            },
-        )
+    ledger = UsageLedger(
+        user_id=user.id,
+        review_id=None,
+        task_id=None,
+        usage_type='image_generation_credit',
+        amount=-credits,
+        unit='credits',
+        bill_date=_utc_now().date(),
+        metadata_json={
+            'grant_type': 'lemonsqueezy_credit_pack',
+            'pack': IMAGE_CREDIT_PACK_KEY,
+            'order_id': order_id,
+            'credits_granted': credits,
+            'event_name': event.event_name,
+        },
     )
+    db.add(ledger)
+    db.flush()
+    record_credit_confirmed(db, user, grant_id=f'ledger_{ledger.id}', credits=credits)
     record_product_event(
         db,
         event_name='paid_success',
@@ -496,7 +545,8 @@ def _upsert_subscription_from_resource(
     data: dict[str, Any],
     user: User,
     fallback_order_id: str | None = None,
-) -> BillingSubscription:
+    event_hash: str | None = None,
+) -> tuple[BillingSubscription, str | None, str | None, bool]:
     attributes = _payload_attributes(data)
     order_item_attributes = _order_item_attributes(attributes)
     resource_id = str(data.get('id') or '').strip() or None
@@ -510,6 +560,15 @@ def _upsert_subscription_from_resource(
     )
     if subscription is None:
         subscription = BillingSubscription(user_id=user.id, provider='lemonsqueezy')
+    before_fingerprint = _subscription_state_fingerprint(subscription) if subscription.id is not None else None
+    event_effective_at = _event_effective_at(attributes)
+    if (
+        subscription.id is not None
+        and event_effective_at is not None
+        and subscription.last_event_at is not None
+        and event_effective_at <= subscription.last_event_at
+    ):
+        return subscription, before_fingerprint, str(event_effective_at.isoformat()), False
 
     urls = attributes.get('urls')
     url_map = urls if isinstance(urls, dict) else {}
@@ -538,12 +597,15 @@ def _upsert_subscription_from_resource(
         url_map.get('customer_portal_update_subscription') or subscription.customer_portal_update_subscription_url or ''
     ).strip() or None
     subscription.last_event_name = event_name
-    subscription.last_event_at = _utc_now()
+    subscription.last_event_at = event_effective_at or _utc_now()
     subscription.raw_payload = data
     subscription.updated_at = _utc_now()
     db.add(subscription)
     db.flush()
-    return subscription
+    effective_version = str((event_effective_at or subscription.last_event_at or _utc_now()).isoformat())
+    if event_hash:
+        effective_version = f'{effective_version}|{event_hash}'
+    return subscription, before_fingerprint, effective_version, True
 
 
 def _sync_subscription_from_api(db: Session, subscription_id: str, user: User | None) -> tuple[BillingSubscription, User]:
@@ -558,7 +620,7 @@ def _sync_subscription_from_api(db: Session, subscription_id: str, user: User | 
             'LEMONSQUEEZY_USER_NOT_FOUND',
             'Unable to match Lemon Squeezy subscription to a user',
         )
-    subscription = _upsert_subscription_from_resource(
+    subscription, _before_fingerprint, _event_version, _applied = _upsert_subscription_from_resource(
         db,
         event_name='subscription_updated',
         data=data,
@@ -609,12 +671,13 @@ def _process_order_created(db: Session, event: LemonSqueezyWebhookEvent, user: U
         existing_subscription = _lookup_subscription(db, provider_order_id=order_id, user_id=user.id)
         if _one_time_pro_already_granted(existing_subscription):
             return 'one_time_pro_already_granted', user
-    subscription = _upsert_subscription_from_resource(
+    subscription, before_fingerprint, event_version, applied = _upsert_subscription_from_resource(
         db,
         event_name=event.event_name,
         data=event.data,
         user=user,
         fallback_order_id=order_id,
+        event_hash=event.event_hash,
     )
     if _is_one_time_pro_order(event):
         if not _variant_matches_one_time_pro_plan(subscription.variant_id):
@@ -623,21 +686,38 @@ def _process_order_created(db: Session, event: LemonSqueezyWebhookEvent, user: U
         return 'one_time_pro_granted', user
     if not _variant_matches_pro_plan(subscription.variant_id):
         return 'ignored_non_pro_variant', user
+    if applied:
+        _record_subscription_changed_if_state_changed(
+            db,
+            user,
+            subscription,
+            before_fingerprint=before_fingerprint,
+            event_version=event_version,
+        )
     return 'order_recorded', user
 
 
 def _process_subscription_event(db: Session, event: LemonSqueezyWebhookEvent, user: User | None) -> tuple[str, User | None]:
     if user is None:
         return 'ignored_user_not_found', None
-    subscription = _upsert_subscription_from_resource(
+    subscription, before_fingerprint, event_version, applied = _upsert_subscription_from_resource(
         db,
         event_name=event.event_name,
         data=event.data,
         user=user,
+        event_hash=event.event_hash,
     )
     if not _variant_matches_pro_plan(subscription.variant_id):
         return 'ignored_non_pro_variant', user
     _sync_user_plan(db, user)
+    if applied:
+        _record_subscription_changed_if_state_changed(
+            db,
+            user,
+            subscription,
+            before_fingerprint=before_fingerprint,
+            event_version=event_version,
+        )
     return 'subscription_synced', user
 
 
@@ -670,6 +750,7 @@ def _process_subscription_payment_success(db: Session, event: LemonSqueezyWebhoo
     if not _variant_matches_pro_plan(subscription.variant_id):
         return 'ignored_non_pro_variant', resolved_user
 
+    before_fingerprint = _subscription_state_fingerprint(subscription)
     invoice_id = str(event.data.get('id') or '').strip() or None
     subscription.last_invoice_id = invoice_id
     subscription.last_payment_status = 'success'
@@ -679,6 +760,13 @@ def _process_subscription_payment_success(db: Session, event: LemonSqueezyWebhoo
     subscription.updated_at = _utc_now()
     db.add(subscription)
     _sync_user_plan(db, resolved_user)
+    _record_subscription_changed_if_state_changed(
+        db,
+        resolved_user,
+        subscription,
+        before_fingerprint=before_fingerprint,
+        event_version=event.event_hash or str((subscription.last_payment_at or _utc_now()).isoformat()),
+    )
     record_product_event(
         db,
         event_name='paid_success',

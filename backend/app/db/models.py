@@ -246,6 +246,63 @@ class Review(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 
 
+class ReviewScoreSnapshot(Base):
+    __tablename__ = 'review_score_snapshots'
+    __table_args__ = (
+        UniqueConstraint('review_id', 'revision_hash', name='uq_review_score_snapshots_revision'),
+        CheckConstraint("analysis_type = 'single'", name='chk_review_score_snapshots_analysis_type'),
+        CheckConstraint('final_score >= 0 AND final_score <= 10', name='chk_review_score_snapshots_score'),
+        Index('idx_review_score_snapshots_review_created', 'review_id', 'created_at'),
+        Index('idx_review_score_snapshots_version_mode', 'score_version', 'mode', 'created_at'),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    public_id: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
+    review_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('reviews.id', ondelete='CASCADE'), nullable=False)
+    revision_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    snapshot_schema_version: Mapped[str] = mapped_column(Text, nullable=False)
+    analysis_type: Mapped[str] = mapped_column(Text, nullable=False)
+    mode: Mapped[str] = mapped_column(Text, nullable=False)
+    image_type: Mapped[str] = mapped_column(Text, nullable=False)
+    final_score: Mapped[Decimal] = mapped_column(Numeric(10, 6), nullable=False)
+    scores_json: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    score_version: Mapped[str | None] = mapped_column(Text)
+    score_prompt_version: Mapped[str | None] = mapped_column(Text)
+    scorer_model_name: Mapped[str | None] = mapped_column(Text)
+    scorer_model_version: Mapped[str | None] = mapped_column(Text)
+    scorer_reasoning_effort: Mapped[str | None] = mapped_column(Text)
+    scorer_preprocess_version: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class ReviewScoreFeedback(Base):
+    __tablename__ = 'review_score_feedback'
+    __table_args__ = (
+        UniqueConstraint('snapshot_id', 'user_id', name='uq_review_score_feedback_snapshot_user'),
+        CheckConstraint("verdict IN ('accurate', 'too_high', 'too_low')", name='chk_review_score_feedback_verdict'),
+        CheckConstraint("role_at_submission IN ('author', 'community')", name='chk_review_score_feedback_role'),
+        CheckConstraint("source_surface IN ('result', 'gallery')", name='chk_review_score_feedback_surface'),
+        CheckConstraint("state IN ('active', 'withdrawn')", name='chk_review_score_feedback_state'),
+        CheckConstraint('feedback_version >= 1', name='chk_review_score_feedback_version'),
+        CheckConstraint("(state = 'active' AND withdrawn_at IS NULL) OR (state = 'withdrawn' AND withdrawn_at IS NOT NULL)", name='chk_review_score_feedback_withdrawn'),
+        Index('idx_review_score_feedback_snapshot_role_state', 'snapshot_id', 'role_at_submission', 'state'),
+        Index('idx_review_score_feedback_user_created', 'user_id', 'created_at'),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    public_id: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
+    snapshot_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('review_score_snapshots.id', ondelete='CASCADE'), nullable=False)
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    role_at_submission: Mapped[str] = mapped_column(Text, nullable=False)
+    source_surface: Mapped[str] = mapped_column(Text, nullable=False)
+    verdict: Mapped[str] = mapped_column(Text, nullable=False)
+    state: Mapped[str] = mapped_column(Text, nullable=False, default='active', server_default='active')
+    feedback_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default='1')
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+    withdrawn_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class PracticeSession(Base):
     __tablename__ = 'practice_sessions'
     __table_args__ = (
@@ -359,6 +416,120 @@ class ReviewLike(Base):
     review_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('reviews.id'), nullable=False)
     user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('users.id'), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class Announcement(Base):
+    __tablename__ = 'announcements'
+    __table_args__ = (
+        UniqueConstraint('idempotency_key', name='uq_announcements_idempotency_key'),
+        Index(
+            'uq_announcements_active_update',
+            'update_id',
+            unique=True,
+            postgresql_where=text("update_id IS NOT NULL AND status = 'published'"),
+        ),
+        Index('idx_announcements_status_published', 'status', 'published_at'),
+        CheckConstraint("status IN ('draft', 'published', 'cancelled')", name='chk_announcements_status'),
+        CheckConstraint("audience_type IN ('all_existing_users', 'specific_users')", name='chk_announcements_audience_type'),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    public_id: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
+    content_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default='1')
+    title_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    summary_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    body_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    cta_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    audience_type: Mapped[str] = mapped_column(Text, nullable=False)
+    audience_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    status: Mapped[str] = mapped_column(Text, nullable=False, default='draft', server_default='draft')
+    idempotency_key: Mapped[str | None] = mapped_column(Text)
+    content_fingerprint: Mapped[str] = mapped_column(Text, nullable=False)
+    update_id: Mapped[str | None] = mapped_column(Text)
+    created_by: Mapped[str | None] = mapped_column(Text)
+    operation_log_json: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class NotificationPreference(Base):
+    __tablename__ = 'notification_preferences'
+    __table_args__ = (
+        UniqueConstraint('user_id', name='uq_notification_preferences_user'),
+    )
+
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('users.id', ondelete='CASCADE'), primary_key=True)
+    likes_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default='false')
+    announcements_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default='false')
+    likes_enabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    announcements_enabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+
+
+class NotificationEvent(Base):
+    __tablename__ = 'notification_events'
+    __table_args__ = (
+        UniqueConstraint('dedupe_key', name='uq_notification_events_dedupe_key'),
+        Index('idx_notification_events_status_available', 'status', 'available_at', 'id'),
+        Index('idx_notification_events_recipient_occurred', 'recipient_user_id', 'occurred_at'),
+        CheckConstraint(
+            "status IN ('pending', 'processing', 'delivered', 'suppressed_preferences', 'suppressed_limit', 'suppressed_inactive', 'suppressed_self', 'expired_delivery', 'failed')",
+            name='chk_notification_events_status',
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    public_id: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
+    event_type: Mapped[str] = mapped_column(Text, nullable=False)
+    dedupe_key: Mapped[str] = mapped_column(Text, nullable=False)
+    schema_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default='1')
+    payload_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    recipient_user_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey('users.id', ondelete='CASCADE'))
+    optional_preference_eligible: Mapped[bool | None] = mapped_column(Boolean)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    status: Mapped[str] = mapped_column(Text, nullable=False, default='pending', server_default='pending')
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default='0')
+    available_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_error_code: Mapped[str | None] = mapped_column(Text)
+    cursor_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+
+
+class Notification(Base):
+    __tablename__ = 'notifications'
+    __table_args__ = (
+        UniqueConstraint('recipient_user_id', 'dedupe_key', name='uq_notifications_recipient_dedupe'),
+        Index('idx_notifications_recipient_delivered', 'recipient_user_id', 'delivered_at', 'id'),
+        Index(
+            'idx_notifications_recipient_unread',
+            'recipient_user_id',
+            'delivered_at',
+            postgresql_where=text('read_at IS NULL AND archived_at IS NULL AND revoked_at IS NULL'),
+        ),
+        Index('idx_notifications_announcement', 'announcement_id'),
+        CheckConstraint("category IN ('system', 'announcement', 'interaction')", name='chk_notifications_category'),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    public_id: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
+    recipient_user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    category: Mapped[str] = mapped_column(Text, nullable=False)
+    notification_type: Mapped[str] = mapped_column(Text, nullable=False)
+    dedupe_key: Mapped[str] = mapped_column(Text, nullable=False)
+    template_key: Mapped[str] = mapped_column(Text, nullable=False)
+    template_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default='1')
+    template_params_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    target_type: Mapped[str | None] = mapped_column(Text)
+    target_public_id: Mapped[str | None] = mapped_column(Text)
+    announcement_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey('announcements.id'))
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    delivered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class BlogPostView(Base):

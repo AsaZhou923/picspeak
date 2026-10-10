@@ -246,7 +246,10 @@ class ReviewTaskProcessorTests(unittest.TestCase):
             'app.services.review_task_processor.increment_quota'
         ), patch('app.services.review_task_processor.user_usage_snapshot', return_value={}), patch(
             'app.services.review_task_processor.canonical_score_cache_lease', return_value=nullcontext(None)
-        ) as cache_lease, patch('app.services.review_task_processor.run_ai_review', return_value=response) as single:
+        ) as cache_lease, patch('app.services.review_task_processor.run_ai_review', return_value=response) as single, patch(
+            'app.services.review_task_processor.settings.openai_score_model',
+            'gpt-6-sol',
+        ), patch('app.services.review_task_processor.settings.openai_score_reasoning_effort', 'low'):
             _process_task(db, task)
 
         self.assertEqual(single.call_args.args[0], 'flash')

@@ -10,6 +10,7 @@ import type { TranslationDictionary } from '@/lib/i18n-en';
 import { ThemeProvider } from '@/lib/theme-context';
 import { AppErrorBoundary } from '@/components/providers/AppErrorBoundary';
 import ProductAnalyticsProvider from '@/components/providers/ProductAnalyticsProvider';
+import { NotificationProvider } from '@/features/notifications/NotificationProvider';
 
 function LocalizedClerkProvider({ children }: { children: ReactNode }) {
   const { locale } = useI18n();
@@ -22,9 +23,11 @@ function RouteScopedProviders({ children }: { children: ReactNode }) {
     <LocalizedClerkProvider>
       <ThemeProvider>
         <AuthProvider>
-          <Suspense fallback={null}>
-            <ProductAnalyticsProvider>{children}</ProductAnalyticsProvider>
-          </Suspense>
+          <NotificationProvider>
+            <Suspense fallback={null}>
+              <ProductAnalyticsProvider>{children}</ProductAnalyticsProvider>
+            </Suspense>
+          </NotificationProvider>
         </AuthProvider>
       </ThemeProvider>
     </LocalizedClerkProvider>

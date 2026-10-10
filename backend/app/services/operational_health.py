@@ -155,6 +155,7 @@ def build_operational_health_snapshot(
     now: datetime | None = None,
     pending_timeout_minutes: int = 20,
     running_timeout_minutes: int = 15,
+    notification_health: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     now_utc = _as_utc_datetime(now or datetime.now(timezone.utc))
     period_tasks = [
@@ -311,11 +312,23 @@ def build_operational_health_snapshot(
         warnings.append('public_gallery_summary_missing')
     if review_cost_missing:
         warnings.append('review_cost_missing')
+    notifications = notification_health or {
+        'status': 'unavailable',
+        'pending_count': 0,
+        'failed_count': 0,
+        'last_successful_processed_at': None,
+        'stale_pending_over_5m': False,
+        'failed_events_present': False,
+    }
+    if notifications.get('stale_pending_over_5m'):
+        warnings.append('notification_sweep_stale')
+    if notifications.get('failed_events_present'):
+        warnings.append('notification_events_failed')
 
     status = 'healthy'
     if warnings:
         status = 'attention'
-    if stale_running or any(row['by_status']['DEAD_LETTER'] for row in task_rows.values()):
+    if stale_running or any(row['by_status']['DEAD_LETTER'] for row in task_rows.values()) or notifications.get('failed_events_present'):
         status = 'critical'
 
     return {
@@ -363,6 +376,7 @@ def build_operational_health_snapshot(
             'thumbnail_missing': len(thumbnail_missing),
             'summary_missing': len(summary_missing),
         },
+        'notifications': notifications,
     }
 
 
@@ -379,6 +393,7 @@ def render_operational_health_markdown(snapshot: dict[str, Any]) -> str:
         f"- 生成时间：{snapshot.get('generated_at', '')}",
         f"- 总体状态：{snapshot.get('status', 'unknown')}",
         f"- 告警：{warnings}",
+        f"- 站内信处理：{(snapshot.get('notifications') or {}).get('status', 'unknown')}",
         '',
         '## 任务健康',
         '',
@@ -403,6 +418,20 @@ def render_operational_health_markdown(snapshot: dict[str, Any]) -> str:
                 avg_processing_seconds=row.get('avg_processing_seconds', 0),
             )
         )
+
+    notifications = snapshot.get('notifications') or {}
+    lines.extend(
+        [
+            '',
+            '## 站内信处理',
+            '',
+            f"- 状态：{notifications.get('status', 'unknown')}",
+            f"- 待处理事件：{notifications.get('pending_count', 0)}",
+            f"- 失败事件：{notifications.get('failed_count', 0)}",
+            f"- 最早待处理时间：{notifications.get('pending_oldest_available_at') or '无'}",
+            f"- 最近成功处理时间：{notifications.get('last_successful_processed_at') or '无'}",
+        ]
+    )
 
     lines.extend(
         [
@@ -541,6 +570,7 @@ def load_operational_health_snapshot_from_db(
         TaskStatus,
         UsageLedger,
     )
+    from app.services.notification_processor import notification_health_snapshot
 
     window_start = datetime.combine(start_date, datetime.min.time(), tzinfo=timezone.utc)
     window_end = datetime.combine(end_date + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc)
@@ -741,4 +771,5 @@ def load_operational_health_snapshot_from_db(
         start_date=start_date,
         end_date=end_date,
         now=now,
+        notification_health=notification_health_snapshot(db),
     )

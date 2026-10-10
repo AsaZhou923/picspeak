@@ -51,6 +51,7 @@ from app.services.lemonsqueezy import (
     create_image_credit_pack_checkout_for_user,
     retrieve_subscription,
 )
+from app.services.notification_events import record_credit_confirmed, record_subscription_changed
 from app.services.product_analytics import record_product_event
 
 router = APIRouter(tags=['billing'])
@@ -358,6 +359,21 @@ def redeem_activation_code(
     enforce_activation_code_rate_limit(db, actor.user)
 
     _, subscription = redeem_activation_code_for_user(db, user=actor.user, raw_code=payload.code)
+    record_subscription_changed(
+        db,
+        actor.user,
+        subscription_id=subscription.provider_subscription_id or subscription.provider_order_id or str(subscription.id),
+        status=subscription.status,
+        version='|'.join(
+            [
+                str(subscription.status or ''),
+                str(subscription.cancelled),
+                str(subscription.renews_at or ''),
+                str(subscription.ends_at or ''),
+                str(subscription.last_event_name or ''),
+            ]
+        ),
+    )
     db.commit()
     db.refresh(actor.user)
     db.refresh(subscription)
@@ -390,8 +406,7 @@ def redeem_image_credit_code(
     if _has_redeemed_image_credit_code(db, actor.user, code):
         raise api_error(status.HTTP_409_CONFLICT, 'IMAGE_CREDIT_CODE_ALREADY_REDEEMED', 'This credit code has already been redeemed')
 
-    db.add(
-        UsageLedger(
+    ledger = UsageLedger(
             user_id=actor.user.id,
             review_id=None,
             task_id=None,
@@ -405,7 +420,9 @@ def redeem_image_credit_code(
                 'credits_granted': IMAGE_CREDIT_PROMO_CREDITS,
             },
         )
-    )
+    db.add(ledger)
+    db.flush()
+    record_credit_confirmed(db, actor.user, grant_id=f'ledger_{ledger.id}', credits=IMAGE_CREDIT_PROMO_CREDITS)
     db.commit()
     snapshot = _generation_credit_usage_snapshot(db, actor.user, actor.plan)
     return ImageCreditCodeRedeemResponse(

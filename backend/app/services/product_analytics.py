@@ -193,6 +193,26 @@ STAGE_A_EVENT_CATALOG: dict[str, dict[str, Any]] = {
         'stage': 'A',
         'description': 'A generation credit pack checkout was started.',
     },
+    'notification_center_opened': {
+        'label': '打开消息中心',
+        'stage': 'A',
+        'description': 'A registered user opened the notification center.',
+    },
+    'notification_opened': {
+        'label': '打开站内信',
+        'stage': 'A',
+        'description': 'A registered user opened one visible notification detail.',
+    },
+    'notification_target_clicked': {
+        'label': '点击站内信目标',
+        'stage': 'A',
+        'description': 'A registered user clicked the current target from a visible notification.',
+    },
+    'notification_preferences_changed': {
+        'label': '修改通知偏好',
+        'stage': 'A',
+        'description': 'A registered user changed an optional notification preference.',
+    },
     'web_vital_reported': {
         'label': 'Core Web Vital',
         'stage': 'OPS',
@@ -208,6 +228,7 @@ KNOWN_SOURCES = {
     'prompt_library',
     'share',
     'checkout',
+    'notifications',
     'system_performance',
     'unknown',
 }

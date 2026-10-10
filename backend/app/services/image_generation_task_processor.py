@@ -44,6 +44,7 @@ from app.services.image_generation_pricing import (
     normalize_generation_quality,
     normalize_generation_size,
 )
+from app.services.notification_events import record_generation_terminal
 from app.services.object_storage import get_object_read_url, get_object_storage_client
 from app.services.product_analytics import record_product_event
 
@@ -193,6 +194,7 @@ def expire_image_generation_tasks(db: Session) -> None:
             if owner is not None:
                 metadata = _generation_failure_event_metadata(task, 'TASK_STALLED')
                 stage_generation_terminal_event(task, event_name='generation_failed', metadata=metadata)
+                record_generation_terminal(db, task)
                 terminal_events.append(
                     (task, owner, 'generation_failed', metadata)
                 )
@@ -253,6 +255,7 @@ def _reconcile_completed_generation_tasks(db: Session) -> None:
                 'reconciled': True,
             }
             stage_generation_terminal_event(task, event_name='generation_succeeded', metadata=metadata)
+            record_generation_terminal(db, task, image)
             terminal_events.append(
                 (
                     task,
@@ -547,6 +550,7 @@ def _process_generation_task(db: Session, task: ImageGenerationTask) -> None:
             event_name='generation_succeeded',
             metadata=success_metadata,
         )
+        record_generation_terminal(db, task, generated)
         db.add(task)
         db.commit()
         _record_terminal_generation_events_after_state_commit(
@@ -1166,6 +1170,7 @@ def _handle_generation_failure(
                 event_name='generation_failed',
                 metadata=terminal_metadata,
             )
+            record_generation_terminal(db, task)
             terminal_event = (
                 task,
                 owner,
@@ -1201,6 +1206,7 @@ def _handle_generation_failure(
                         event_name='generation_failed',
                         metadata=terminal_metadata,
                     )
+                    record_generation_terminal(db, failed_task)
                 db.commit()
                 if owner is not None:
                     _record_terminal_generation_events_after_state_commit(

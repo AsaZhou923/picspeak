@@ -732,3 +732,190 @@ create index idx_billing_webhook_events_provider_created
 
 create index idx_billing_webhook_events_event_name_created
     on billing_webhook_events (event_name asc, created_at desc);
+
+
+-- 2026-10-10: inbox and private score feedback
+
+CREATE TABLE announcements (
+	id BIGSERIAL NOT NULL,
+	public_id TEXT NOT NULL,
+	content_version INTEGER DEFAULT '1' NOT NULL,
+	title_json JSONB NOT NULL,
+	summary_json JSONB NOT NULL,
+	body_json JSONB NOT NULL,
+	cta_json JSONB NOT NULL,
+	audience_type TEXT NOT NULL,
+	audience_json JSONB NOT NULL,
+	status TEXT DEFAULT 'draft' NOT NULL,
+	idempotency_key TEXT,
+	content_fingerprint TEXT NOT NULL,
+	update_id TEXT,
+	created_by TEXT,
+	operation_log_json JSONB NOT NULL,
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	published_at TIMESTAMP WITH TIME ZONE,
+	cancelled_at TIMESTAMP WITH TIME ZONE,
+	expires_at TIMESTAMP WITH TIME ZONE,
+	PRIMARY KEY (id),
+	CONSTRAINT uq_announcements_idempotency_key UNIQUE (idempotency_key),
+	CONSTRAINT chk_announcements_status CHECK (status IN ('draft', 'published', 'cancelled')),
+	CONSTRAINT chk_announcements_audience_type CHECK (audience_type IN ('all_existing_users', 'specific_users')),
+	UNIQUE (public_id)
+);
+
+ALTER TABLE announcements OWNER TO pic;
+
+CREATE INDEX idx_announcements_status_published ON announcements (status, published_at);
+
+CREATE UNIQUE INDEX uq_announcements_active_update ON announcements (update_id) WHERE update_id IS NOT NULL AND status = 'published';
+
+CREATE TABLE notification_preferences (
+	user_id BIGINT NOT NULL,
+	likes_enabled BOOLEAN DEFAULT 'false' NOT NULL,
+	announcements_enabled BOOLEAN DEFAULT 'false' NOT NULL,
+	likes_enabled_at TIMESTAMP WITH TIME ZONE,
+	announcements_enabled_at TIMESTAMP WITH TIME ZONE,
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	PRIMARY KEY (user_id),
+	CONSTRAINT uq_notification_preferences_user UNIQUE (user_id),
+	FOREIGN KEY(user_id) REFERENCES users (id) ON DELETE CASCADE
+);
+
+ALTER TABLE notification_preferences OWNER TO pic;
+
+CREATE TABLE notification_events (
+	id BIGSERIAL NOT NULL,
+	public_id TEXT NOT NULL,
+	event_type TEXT NOT NULL,
+	dedupe_key TEXT NOT NULL,
+	schema_version INTEGER DEFAULT '1' NOT NULL,
+	payload_json JSONB NOT NULL,
+	recipient_user_id BIGINT,
+	optional_preference_eligible BOOLEAN,
+	occurred_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	status TEXT DEFAULT 'pending' NOT NULL,
+	attempts INTEGER DEFAULT '0' NOT NULL,
+	available_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	processed_at TIMESTAMP WITH TIME ZONE,
+	last_error_code TEXT,
+	cursor_json JSONB NOT NULL,
+	PRIMARY KEY (id),
+	CONSTRAINT uq_notification_events_dedupe_key UNIQUE (dedupe_key),
+	CONSTRAINT chk_notification_events_status CHECK (status IN ('pending', 'processing', 'delivered', 'suppressed_preferences', 'suppressed_limit', 'suppressed_inactive', 'suppressed_self', 'expired_delivery', 'failed')),
+	UNIQUE (public_id),
+	FOREIGN KEY(recipient_user_id) REFERENCES users (id) ON DELETE CASCADE
+);
+
+ALTER TABLE notification_events OWNER TO pic;
+
+CREATE INDEX idx_notification_events_recipient_occurred ON notification_events (recipient_user_id, occurred_at);
+
+CREATE INDEX idx_notification_events_status_available ON notification_events (status, available_at, id);
+
+CREATE TABLE notifications (
+	id BIGSERIAL NOT NULL,
+	public_id TEXT NOT NULL,
+	recipient_user_id BIGINT NOT NULL,
+	category TEXT NOT NULL,
+	notification_type TEXT NOT NULL,
+	dedupe_key TEXT NOT NULL,
+	template_key TEXT NOT NULL,
+	template_version INTEGER DEFAULT '1' NOT NULL,
+	template_params_json JSONB NOT NULL,
+	target_type TEXT,
+	target_public_id TEXT,
+	announcement_id BIGINT,
+	occurred_at TIMESTAMP WITH TIME ZONE NOT NULL,
+	delivered_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	read_at TIMESTAMP WITH TIME ZONE,
+	archived_at TIMESTAMP WITH TIME ZONE,
+	revoked_at TIMESTAMP WITH TIME ZONE,
+	expires_at TIMESTAMP WITH TIME ZONE,
+	PRIMARY KEY (id),
+	CONSTRAINT uq_notifications_recipient_dedupe UNIQUE (recipient_user_id, dedupe_key),
+	CONSTRAINT chk_notifications_category CHECK (category IN ('system', 'announcement', 'interaction')),
+	UNIQUE (public_id),
+	FOREIGN KEY(recipient_user_id) REFERENCES users (id) ON DELETE CASCADE,
+	FOREIGN KEY(announcement_id) REFERENCES announcements (id)
+);
+
+ALTER TABLE notifications OWNER TO pic;
+
+CREATE INDEX idx_notifications_announcement ON notifications (announcement_id);
+
+CREATE INDEX idx_notifications_recipient_delivered ON notifications (recipient_user_id, delivered_at, id);
+
+CREATE INDEX idx_notifications_recipient_unread ON notifications (recipient_user_id, delivered_at) WHERE read_at IS NULL AND archived_at IS NULL AND revoked_at IS NULL;
+
+CREATE TABLE review_score_snapshots (
+	id BIGSERIAL NOT NULL,
+	public_id TEXT NOT NULL,
+	review_id BIGINT NOT NULL,
+	revision_hash TEXT NOT NULL,
+	snapshot_schema_version TEXT NOT NULL,
+	analysis_type TEXT NOT NULL,
+	mode TEXT NOT NULL,
+	image_type TEXT NOT NULL,
+	final_score NUMERIC(10, 6) NOT NULL,
+	scores_json JSONB NOT NULL,
+	score_version TEXT,
+	score_prompt_version TEXT,
+	scorer_model_name TEXT,
+	scorer_model_version TEXT,
+	scorer_reasoning_effort TEXT,
+	scorer_preprocess_version TEXT,
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	PRIMARY KEY (id),
+	CONSTRAINT uq_review_score_snapshots_revision UNIQUE (review_id, revision_hash),
+	CONSTRAINT chk_review_score_snapshots_analysis_type CHECK (analysis_type = 'single'),
+	CONSTRAINT chk_review_score_snapshots_score CHECK (final_score >= 0 AND final_score <= 10),
+	UNIQUE (public_id),
+	FOREIGN KEY(review_id) REFERENCES reviews (id) ON DELETE CASCADE
+);
+
+ALTER TABLE review_score_snapshots OWNER TO pic;
+
+CREATE INDEX idx_review_score_snapshots_review_created ON review_score_snapshots (review_id, created_at);
+
+CREATE INDEX idx_review_score_snapshots_version_mode ON review_score_snapshots (score_version, mode, created_at);
+
+CREATE TABLE review_score_feedback (
+	id BIGSERIAL NOT NULL,
+	public_id TEXT NOT NULL,
+	snapshot_id BIGINT NOT NULL,
+	user_id BIGINT NOT NULL,
+	role_at_submission TEXT NOT NULL,
+	source_surface TEXT NOT NULL,
+	verdict TEXT NOT NULL,
+	state TEXT DEFAULT 'active' NOT NULL,
+	feedback_version INTEGER DEFAULT '1' NOT NULL,
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	withdrawn_at TIMESTAMP WITH TIME ZONE,
+	PRIMARY KEY (id),
+	CONSTRAINT uq_review_score_feedback_snapshot_user UNIQUE (snapshot_id, user_id),
+	CONSTRAINT chk_review_score_feedback_verdict CHECK (verdict IN ('accurate', 'too_high', 'too_low')),
+	CONSTRAINT chk_review_score_feedback_role CHECK (role_at_submission IN ('author', 'community')),
+	CONSTRAINT chk_review_score_feedback_surface CHECK (source_surface IN ('result', 'gallery')),
+	CONSTRAINT chk_review_score_feedback_state CHECK (state IN ('active', 'withdrawn')),
+	CONSTRAINT chk_review_score_feedback_version CHECK (feedback_version >= 1),
+	CONSTRAINT chk_review_score_feedback_withdrawn CHECK ((state = 'active' AND withdrawn_at IS NULL) OR (state = 'withdrawn' AND withdrawn_at IS NOT NULL)),
+	UNIQUE (public_id),
+	FOREIGN KEY(snapshot_id) REFERENCES review_score_snapshots (id) ON DELETE CASCADE,
+	FOREIGN KEY(user_id) REFERENCES users (id) ON DELETE CASCADE
+);
+
+ALTER TABLE review_score_feedback OWNER TO pic;
+
+CREATE INDEX idx_review_score_feedback_snapshot_role_state ON review_score_feedback (snapshot_id, role_at_submission, state);
+
+CREATE INDEX idx_review_score_feedback_user_created ON review_score_feedback (user_id, created_at);
+
+CREATE OR REPLACE FUNCTION reject_review_score_snapshot_update() RETURNS trigger AS $$
+BEGIN
+    RAISE EXCEPTION 'Review score snapshots are immutable';
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER review_score_snapshot_immutable BEFORE UPDATE ON review_score_snapshots
+FOR EACH ROW EXECUTE FUNCTION reject_review_score_snapshot_update();

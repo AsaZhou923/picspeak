@@ -88,3 +88,14 @@ test('frontend error formatter maps stable backend codes to localized text inste
   assert.equal(localizedErrorMessage(t, 'UNAUTHORIZED'), zhTranslations.err_unauthorized_body);
   assert.equal(localizedErrorMessage(t, 'UNMAPPED_CODE', 'fallback'), 'fallback');
 });
+
+test('score feedback labels are complete and preserve the direction of the AI score judgment', () => {
+  for (const dictionary of [enTranslations, zhTranslations, jaTranslations]) {
+    for (const key of ['score_feedback_accurate', 'score_feedback_too_high', 'score_feedback_too_low', 'score_feedback_score_changed', 'score_feedback_version_changed', 'score_feedback_private'] as const) {
+      assert.ok(dictionary[key].trim(), key);
+    }
+    assert.notEqual(dictionary.score_feedback_too_high, dictionary.score_feedback_too_low);
+  }
+  assert.match(zhTranslations.score_feedback_hint, /AI 给分过高/);
+  assert.match(zhTranslations.score_feedback_private, /不会直接调整/);
+});
