@@ -1,5 +1,17 @@
 [
   {
+    "id": "2026-10-10-inbox-live",
+    "date": "2026-10-10",
+    "showPopup": false,
+    "title": "消息中心已开放",
+    "summary": "登录后，从顶栏铃铛或“更多 → 消息中心”查看任务和账号系统消息，筛选未读、标记已读或归档。系统消息保持开启；长廊点赞和产品公告默认关闭，可在通知设置中自行开启。单图评分反馈继续可用，只显示自己的选择，可修改或撤回，不会直接改分。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-10-10-inbox-live",
+    "primaryAction": {
+      "label": "打开消息中心",
+      "href": "/account/notifications"
+    }
+  },
+  {
     "id": "2026-10-10-critique-reading-guides",
     "date": "2026-10-10",
     "showPopup": false,

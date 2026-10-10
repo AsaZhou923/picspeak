@@ -38,6 +38,7 @@ function FeedbackSession({ review, sourceSurface, onReviewRefresh, token, authLo
   const [retry, setRetry] = useState(0);
   const lifetime = useRef<AbortController | null>(null);
   const mutationBusy = useRef(false);
+  const mutationKind = useRef<'save' | 'withdraw'>('save');
   const revision = review.score_revision!;
 
   useEffect(() => {
@@ -59,7 +60,7 @@ function FeedbackSession({ review, sourceSurface, onReviewRefresh, token, authLo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, review.review_id, revision, retry, t]);
 
-  async function handleFailure(failure: unknown, signal: AbortSignal) {
+  async function handleFailure(failure: unknown, signal: AbortSignal, operation: 'save' | 'withdraw' = 'save') {
     if (signal.aborted || !token) return;
     if (failure instanceof ApiException) {
       if (failure.status === 401) {
@@ -87,12 +88,13 @@ function FeedbackSession({ review, sourceSurface, onReviewRefresh, token, authLo
       }
       if (failure.status === 429) { setError(t('score_feedback_rate_limit')); return; }
     }
-    setError(t('score_feedback_failed'));
+    setError(t(operation === 'withdraw' ? 'score_feedback_withdraw_failed' : 'score_feedback_failed'));
   }
 
   async function save(verdict: ScoreFeedbackVerdict) {
     const controller = lifetime.current;
     if (!token || !eligible || unauthorized || mutationBusy.current || !controller || controller.signal.aborted) return;
+    mutationKind.current = 'save';
     mutationBusy.current = true; setBusy(true); setDraft(verdict); setError(''); setNotice('');
     try {
       const saved = await putScoreFeedback(review.review_id, { expected_score_revision: revision, verdict, expected_feedback_version: feedback?.feedback_version ?? null, source_surface: sourceSurface }, token, controller.signal);
@@ -108,6 +110,7 @@ function FeedbackSession({ review, sourceSurface, onReviewRefresh, token, authLo
   async function withdraw() {
     const controller = lifetime.current;
     if (!token || !feedback || unauthorized || mutationBusy.current || !controller || controller.signal.aborted) return;
+    mutationKind.current = 'withdraw';
     mutationBusy.current = true; setBusy(true); setError(''); setNotice('');
     try {
       await withdrawScoreFeedback(feedback,
@@ -115,7 +118,7 @@ function FeedbackSession({ review, sourceSurface, onReviewRefresh, token, authLo
         (id) => getScoreFeedbackRecord(id, token, controller.signal));
       if (!controller.signal.aborted) { setFeedback(null); setDraft(null); setEditing(false); setNotice(t('score_feedback_withdrawn')); setRetry((value) => value + 1); }
     } catch (failure) {
-      if (!controller.signal.aborted && !isAbortError(failure)) await handleFailure(failure, controller.signal);
+      if (!controller.signal.aborted && !isAbortError(failure)) await handleFailure(failure, controller.signal, 'withdraw');
     } finally {
       mutationBusy.current = false;
       if (!controller.signal.aborted) setBusy(false);
@@ -146,7 +149,7 @@ function FeedbackSession({ review, sourceSurface, onReviewRefresh, token, authLo
           {verdicts.map((verdict) => <button key={verdict} type="button" aria-pressed={draft === verdict} disabled={busy || !eligible} onClick={() => void save(verdict)} className={`min-h-11 rounded-control border px-2 py-2 text-xs disabled:opacity-50 ${draft === verdict ? 'border-ink bg-raised font-semibold text-ink' : 'border-border-subtle text-ink-muted hover:bg-raised'}`}>{t(`score_feedback_${verdict}`)}</button>)}
         </div>
       )}
-      {busy && <p role="status" className="mt-2 text-xs text-ink-muted">{t(mutationBusy.current ? 'score_feedback_saving' : 'score_feedback_loading')}</p>}
+      {busy && <p role="status" className="mt-2 text-xs text-ink-muted">{t(mutationBusy.current ? mutationKind.current === 'withdraw' ? 'score_feedback_withdrawing' : 'score_feedback_saving' : 'score_feedback_loading')}</p>}
       {notice && <p role="status" className="mt-2 text-xs text-ink-muted">{notice}</p>}
       {error && <div className="mt-2 text-xs text-ink-muted"><p role="alert">{error}</p>{!loginRequired && <button type="button" disabled={busy} className="min-h-11 underline" onClick={() => { setError(''); if (eligible && draft) void save(draft); else setRetry((value) => value + 1); }}>{t('score_feedback_retry')}</button>}</div>}
       <p className="mt-2 text-xs leading-5 text-ink-subtle">{t('score_feedback_private')}</p>
@@ -183,8 +186,8 @@ function WithdrawalSession({ feedback, token }: { feedback: ScoreFeedback; token
   return <div className="mt-4 text-sm text-ink-muted">
     {status === 'done' ? <p role="status">{t('score_feedback_withdrawn')}</p> : <>
       <button type="button" className="min-h-11 underline disabled:opacity-50" disabled={status === 'busy' || status === 'unauthorized'} onClick={() => void withdraw()}>{t('score_feedback_withdraw')}</button>
-      {status === 'busy' && <p role="status">{t('score_feedback_saving')}</p>}
-      {status === 'failed' && <p role="alert">{t('score_feedback_failed')}</p>}
+      {status === 'busy' && <p role="status">{t('score_feedback_withdrawing')}</p>}
+      {status === 'failed' && <p role="alert">{t('score_feedback_withdraw_failed')}</p>}
       {status === 'unauthorized' && <p role="alert">{t('score_feedback_login')}</p>}
     </>}
   </div>;

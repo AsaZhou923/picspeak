@@ -195,10 +195,11 @@ The frontend and backend can be deployed independently. The backend includes a c
 
 ## Documentation
 
+- [Latest update: the message center is available](docs/changelog/CHANGELOG.md#2026-10-10-inbox-live)
 - [Critique reading guides and public examples](docs/changelog/CHANGELOG.md#2026-10-10-critique-reading-guides)
 
-- [Score feedback available; in-app messages in preparation](docs/changelog/CHANGELOG.md#2026-10-10-inbox-score-feedback-prep)
-- [Latest release: quick Flash critique and stronger Pro analysis](docs/changelog/CHANGELOG.md#2026-10-09-gpt6-sol-review-rollout)
+- [Earlier score-feedback rollout and inbox preparation](docs/changelog/CHANGELOG.md#2026-10-10-inbox-score-feedback-prep)
+- [Quick Flash critique and stronger Pro analysis](docs/changelog/CHANGELOG.md#2026-10-09-gpt6-sol-review-rollout)
 - [Controlled photo access](docs/changelog/CHANGELOG.md#2026-10-08-private-image-access)
 - [15-day Free critique history](docs/changelog/CHANGELOG.md#2026-10-08-free-history-fifteen-days)
 - [Previous announcement for Chinese users: model and Pro pricing schedule](docs/changelog/CHANGELOG.md#2026-10-08-gpt6-sol-and-pro-pricing)

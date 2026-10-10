@@ -191,10 +191,11 @@ npm run build
 
 ## 文档
 
+- [最新更新：消息中心已开放](docs/changelog/CHANGELOG.md#2026-10-10-inbox-live)
 - [点评阅读指南与公开案例](docs/changelog/CHANGELOG.md#2026-10-10-critique-reading-guides)
 
-- [评分反馈可用，站内消息准备中](docs/changelog/CHANGELOG.md#2026-10-10-inbox-score-feedback-prep)
-- [最新更新：Flash 快速点评，Pro 升级更强模型](docs/changelog/CHANGELOG.md#2026-10-09-gpt6-sol-review-rollout)
+- [此前评分反馈开放与站内消息准备记录](docs/changelog/CHANGELOG.md#2026-10-10-inbox-score-feedback-prep)
+- [Flash 快速点评，Pro 升级更强模型](docs/changelog/CHANGELOG.md#2026-10-09-gpt6-sol-review-rollout)
 - [此前中文公告：评图模型升级与 Pro 价格调整预告](docs/changelog/CHANGELOG.md#2026-10-08-gpt6-sol-and-pro-pricing)
 - [此前评图与照片浏览稳定性优化](docs/changelog/CHANGELOG.md#2026-10-07-review-reliability-and-gallery)
 - [此前评分标准优化与长廊重评](docs/changelog/CHANGELOG.md#2026-10-06-photo-rubric-and-gallery-reassessment)

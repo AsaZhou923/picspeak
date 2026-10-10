@@ -1,5 +1,17 @@
 [
   {
+    "id": "2026-10-10-inbox-live",
+    "date": "2026-10-10",
+    "showPopup": false,
+    "title": "メッセージセンターを公開しました",
+    "summary": "ログイン後、ヘッダーのベルまたは「その他 → メッセージセンター」からタスクやアカウントの通知を確認し、未読の絞り込み、既読への変更、アーカイブができます。システム通知は常に有効です。ギャラリーのいいねと製品のお知らせは初期設定ではオフで、通知設定から有効にできます。単一写真のスコアへの回答は本人だけに表示され、変更や取り消しができ、点数を直接変更しません。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-10-10-inbox-live",
+    "primaryAction": {
+      "label": "メッセージセンターを開く",
+      "href": "/account/notifications"
+    }
+  },
+  {
     "id": "2026-10-10-critique-reading-guides",
     "date": "2026-10-10",
     "showPopup": false,

@@ -1,5 +1,17 @@
 [
   {
+    "id": "2026-10-10-inbox-live",
+    "date": "2026-10-10",
+    "showPopup": false,
+    "title": "The message center is available",
+    "summary": "Sign in and open the header bell or More → Message center to see task and account messages, filter unread items, mark them read, or archive them. System messages stay on; Gallery likes and product announcements are off by default and can be enabled in notification settings. Single-photo score feedback remains private, can be changed or withdrawn, and does not directly change scores.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-10-10-inbox-live",
+    "primaryAction": {
+      "label": "Open message center",
+      "href": "/account/notifications"
+    }
+  },
+  {
     "id": "2026-10-10-critique-reading-guides",
     "date": "2026-10-10",
     "showPopup": false,

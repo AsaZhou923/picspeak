@@ -41,6 +41,8 @@ start-dev-proxy.bat
 .claude/
 deploy/*
 !deploy/deploy-backend.bat
+!deploy/configure-notifications.py
+!deploy/notifications.md
 
 # GEO audit reports (generated locally)
 GEO-*.md

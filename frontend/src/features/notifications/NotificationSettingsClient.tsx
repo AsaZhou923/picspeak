@@ -188,6 +188,7 @@ function PreferenceRow({
       <button
         type="button"
         role="switch"
+        aria-label={title}
         aria-checked={enabled}
         onClick={() => onChange(!enabled)}
         disabled={saving}

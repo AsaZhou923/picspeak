@@ -20,9 +20,9 @@ SYSTEM_COPY: dict[str, dict[str, tuple[str, str, str]]] = {
         'ja': ('レビューが完了しました', '写真講評の準備ができました。', '結果を開いてスコアと次の撮影アクションを確認できます。'),
     },
     'review.failed': {
-        'en': ('Review did not finish', 'The critique task reached a final failure state.', 'Open the task to see the current recovery path.'),
-        'zh': ('点评未能完成', '点评任务进入最终失败状态。', '打开任务查看当前恢复路径。'),
-        'ja': ('レビューが完了しませんでした', '講評タスクが最終失敗状態になりました。', 'タスクを開いて現在の復旧方法を確認してください。'),
+        'en': ('Review did not finish', 'This photo critique could not be completed.', 'Open the task page to see the reason and next steps.'),
+        'zh': ('点评未能完成', '这次照片点评未能完成。', '打开任务页面查看原因和后续操作。'),
+        'ja': ('レビューが完了しませんでした', '今回の写真講評を完了できませんでした。', 'タスクページを開いて理由と次の操作を確認してください。'),
     },
     'generation.completed': {
         'en': ('Image generated', 'Your reference image is ready.', 'Open the generated image to download or reuse the prompt.'),
@@ -30,9 +30,9 @@ SYSTEM_COPY: dict[str, dict[str, tuple[str, str, str]]] = {
         'ja': ('画像が生成されました', '参照画像の準備ができました。', '生成結果を開いてダウンロードまたはプロンプトを再利用できます。'),
     },
     'generation.failed': {
-        'en': ('Image generation did not finish', 'The generation task reached a final failure state.', 'Open the task to see its current status.'),
-        'zh': ('图片生成未成功', '生成任务进入最终失败状态。', '打开任务查看当前状态。'),
-        'ja': ('画像生成が完了しませんでした', '生成タスクが最終失敗状態になりました。', 'タスクを開いて現在の状態を確認してください。'),
+        'en': ('Image generation did not finish', 'This image could not be generated.', 'Open the task page to see the reason and next steps.'),
+        'zh': ('图片生成未成功', '这次图片生成未能完成。', '打开任务页面查看原因和后续操作。'),
+        'ja': ('画像生成が完了しませんでした', '今回の画像を生成できませんでした。', 'タスクページを開いて理由と次の操作を確認してください。'),
     },
     'credits.confirmed': {
         'en': ('Credits confirmed', 'New image credits were added to your account.', 'Open usage to check the confirmed balance.'),
@@ -46,8 +46,8 @@ SYSTEM_COPY: dict[str, dict[str, tuple[str, str, str]]] = {
     },
     'gallery.review_liked': {
         'en': ('Your work received a like', 'Someone liked one of your Gallery works.', 'Open the result to review the work.'),
-        'zh': ('你的作品收到点赞', '有人点赞了你的 Gallery 作品。', '打开结果查看这条作品。'),
-        'ja': ('作品にいいねが付きました', 'Gallery の作品にいいねが付きました。', '結果を開いて作品を確認できます。'),
+        'zh': ('你的作品收到点赞', '有人点赞了你的长廊作品。', '打开结果查看这幅作品。'),
+        'ja': ('作品にいいねが付きました', 'あなたのギャラリー作品にいいねが付きました。', '結果を開いて作品を確認できます。'),
     },
 }
 
