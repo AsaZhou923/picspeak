@@ -85,8 +85,8 @@ export const zhTranslations = {
   pro_offer_label: '',
   pro_offer_highlight: 'Pro',
   updates_label: '更新记录',
-  updates_hint_home: "消息中心已开放，登录后查看任务和账号通知",
-  updates_hint_latest: "消息中心已开放，登录后查看任务和账号通知",
+  updates_hint_home: "长廊已移除精选点评卡片，直接浏览公开作品",
+  updates_hint_latest: "长廊已移除精选点评卡片，直接浏览公开作品",
   contact_label: '联系',
   contact_headline: '联系我',
 

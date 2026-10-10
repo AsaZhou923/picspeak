@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-10-gallery-browsing",
+    "date": "2026-10-10",
+    "showPopup": false,
+    "title": "ギャラリーをすっきり閲覧",
+    "summary": "ギャラリーの固定の厳選講評カードを削除しました。公開作品を閲覧し、気になる写真の講評全文を直接開けます。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-10-10-gallery-browsing"
+  },
+  {
     "id": "2026-10-10-inbox-live",
     "date": "2026-10-10",
     "showPopup": false,

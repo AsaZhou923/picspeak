@@ -108,7 +108,7 @@ test('current and historical update copy describes mode benefits without reasoni
     assert.match(rollout.summary, /GPT-6 Sol/);
     assert.match(rollout.summary, /GPT-6\.1 Sol/);
     const latest = entries[0];
-    assert.equal(latest.id, '2026-10-10-inbox-live');
+    assert.equal(latest.id, '2026-10-10-gallery-browsing');
     assert.equal(latest.showPopup, false);
   }
 });

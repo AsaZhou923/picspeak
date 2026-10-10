@@ -195,7 +195,8 @@ The frontend and backend can be deployed independently. The backend includes a c
 
 ## Documentation
 
-- [Latest update: the message center is available](docs/changelog/CHANGELOG.md#2026-10-10-inbox-live)
+- [Latest update: Gallery browsing is more direct](docs/changelog/CHANGELOG.md#2026-10-10-gallery-browsing)
+- [The message center is available](docs/changelog/CHANGELOG.md#2026-10-10-inbox-live)
 - [Critique reading guides and public examples](docs/changelog/CHANGELOG.md#2026-10-10-critique-reading-guides)
 
 - [Earlier score-feedback rollout and inbox preparation](docs/changelog/CHANGELOG.md#2026-10-10-inbox-score-feedback-prep)

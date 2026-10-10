@@ -1,6 +1,4 @@
 import GallerySeoHero from '@/components/gallery/GallerySeoHero';
-import GalleryFeaturedCritiques from '@/components/gallery/GalleryFeaturedCritiques';
-import { Suspense } from 'react';
 import GalleryClientPage from './GalleryClientPage';
 import { buildGalleryCollectionJsonLd } from '@/lib/gallery-schema';
 import { serializeJsonLd } from '@/lib/json-ld';
@@ -28,9 +26,6 @@ export default function GalleryPage() {
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(galleryBreadcrumbJsonLd) }}
       />
       <GallerySeoHero />
-      <Suspense fallback={null}>
-        <GalleryFeaturedCritiques />
-      </Suspense>
       <GalleryClientPage />
     </>
   );

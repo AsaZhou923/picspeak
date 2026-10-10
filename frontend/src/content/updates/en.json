@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-10-gallery-browsing",
+    "date": "2026-10-10",
+    "showPopup": false,
+    "title": "Gallery browsing is more direct",
+    "summary": "The Gallery no longer displays fixed featured critique cards. Browse public photos and open their full critiques directly.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-10-10-gallery-browsing"
+  },
+  {
     "id": "2026-10-10-inbox-live",
     "date": "2026-10-10",
     "showPopup": false,

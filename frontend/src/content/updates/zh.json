@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-10-gallery-browsing",
+    "date": "2026-10-10",
+    "showPopup": false,
+    "title": "长廊浏览更直接",
+    "summary": "长廊已移除固定的精选点评卡片。直接浏览公开作品，并打开感兴趣的完整点评。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-10-10-gallery-browsing"
+  },
+  {
     "id": "2026-10-10-inbox-live",
     "date": "2026-10-10",
     "showPopup": false,

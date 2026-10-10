@@ -256,4 +256,4 @@ Use the smallest verification set that proves the change:
 
 If a command cannot be run locally, report exactly which command was skipped and why.
 
-English homepage critique guidance supports the primary upload flow. Gallery featured examples must recheck current public membership without caching or authentication before showing an image; omit revoked, unavailable, or image-less records. Editorial next-shoot actions are suggestions, never verified retake outcomes. Daily-practice related reading deliberately prioritizes the checklist and paired-retake comparison guide in every locale.
+English homepage critique guidance supports the primary upload flow. Gallery uses the live public collection without fixed editorial critique cards. Editorial next-shoot actions are suggestions, never verified retake outcomes. Daily-practice related reading deliberately prioritizes the checklist and paired-retake comparison guide in every locale.

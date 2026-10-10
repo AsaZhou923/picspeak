@@ -296,8 +296,8 @@ export const enTranslations = {
     pro_offer_label: '',
     pro_offer_highlight: 'Pro',
     updates_label: 'Updates',
-    updates_hint_home: "The message center is open for task and account updates",
-    updates_hint_latest: "The message center is open for task and account updates",
+    updates_hint_home: "Browse public photos directly in the Gallery",
+    updates_hint_latest: "Browse public photos directly in the Gallery",
     contact_label: 'Contact',
     contact_headline: 'Get in Touch',
 

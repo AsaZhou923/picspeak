@@ -18,11 +18,11 @@ const homeSource = readFileSync(
 );
 const shellSource = readFileSync(path.join(FRONTEND_DIR, 'src/components/layout/SiteChrome.tsx'), 'utf8');
 
-test('message center launch is the latest visible update without popup', () => {
+test('Gallery browsing update is the latest visible update without popup', () => {
   for (const locale of ['zh', 'en', 'ja'] as const) {
     const latest = getLatestProductUpdate(locale);
     assert.ok(latest);
-    assert.equal(latest.id, '2026-10-10-inbox-live');
+    assert.equal(latest.id, '2026-10-10-gallery-browsing');
     assert.equal(latest.date, '2026-10-10');
     assert.equal(latest.showPopup, false);
     assert.equal(shouldShowProductUpdatePopup(latest), false);
@@ -63,7 +63,7 @@ test('Free history change is recorded in every locale while preserving the Chine
     const pending = getProductUpdates(locale).find((entry) => entry.id === '2026-10-08-free-history-fifteen-days');
     assert.ok(latest);
     assert.ok(pending);
-    assert.equal(latest.id, '2026-10-10-inbox-live');
+    assert.equal(latest.id, '2026-10-10-gallery-browsing');
     assert.equal(latest.date, '2026-10-10');
     assert.equal(pending.showPopup, false);
     assert.match(pending.summary, /15/);

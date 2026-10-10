@@ -191,7 +191,8 @@ npm run build
 
 ## 文档
 
-- [最新更新：消息中心已开放](docs/changelog/CHANGELOG.md#2026-10-10-inbox-live)
+- [最新更新：长廊浏览更直接](docs/changelog/CHANGELOG.md#2026-10-10-gallery-browsing)
+- [消息中心已开放](docs/changelog/CHANGELOG.md#2026-10-10-inbox-live)
 - [点评阅读指南与公开案例](docs/changelog/CHANGELOG.md#2026-10-10-critique-reading-guides)
 
 - [此前评分反馈开放与站内消息准备记录](docs/changelog/CHANGELOG.md#2026-10-10-inbox-score-feedback-prep)
