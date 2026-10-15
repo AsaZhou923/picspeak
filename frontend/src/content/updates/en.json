@@ -3,8 +3,8 @@
     "id": "2026-10-15-purchased-image-credits",
     "date": "2026-10-15",
     "showPopup": false,
-    "title": "Upcoming: purchased image credits carry over",
-    "summary": "This fix is in preparation. After release, newly purchased image credits will carry over between months, while monthly plan credits still refresh monthly and are used first. Your account will show each balance and the available total. A pack contains 300 credits, not 300 images; costs vary by quality, and buying credits does not unlock High quality on Free. This change applies to purchases made after the update; earlier balances remain unchanged.",
+    "title": "Purchased image credits carry over",
+    "summary": "Newly purchased image credits now carry over between months, while monthly plan credits still refresh monthly and are used first. Your account shows each balance and the available total. A pack contains 300 credits, not 300 images; costs vary by quality, and buying credits does not unlock High quality on Free. This change applies to purchases made after the update; earlier balances remain unchanged.",
     "docPath": "docs/changelog/CHANGELOG.md#2026-10-15-purchased-image-credits"
   },
   {

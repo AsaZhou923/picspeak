@@ -18,11 +18,12 @@ const homeSource = readFileSync(
 );
 const shellSource = readFileSync(path.join(FRONTEND_DIR, 'src/components/layout/SiteChrome.tsx'), 'utf8');
 
-test('Purchased credits preparation is the latest visible update without popup', () => {
+test('Purchased credits release is the latest visible update without popup', () => {
   for (const locale of ['zh', 'en', 'ja'] as const) {
     const latest = getLatestProductUpdate(locale);
     assert.ok(latest);
     assert.equal(latest.id, '2026-10-15-purchased-image-credits');
+    assert.doesNotMatch(latest.title + latest.summary, /准备中|in preparation|Upcoming:|準備中/);
     assert.equal(latest.date, '2026-10-15');
     assert.equal(latest.showPopup, false);
     assert.equal(shouldShowProductUpdatePopup(latest), false);
@@ -64,6 +65,7 @@ test('Free history change is recorded in every locale while preserving the Chine
     assert.ok(latest);
     assert.ok(pending);
     assert.equal(latest.id, '2026-10-15-purchased-image-credits');
+    assert.doesNotMatch(latest.title + latest.summary, /准备中|in preparation|Upcoming:|準備中/);
     assert.equal(latest.date, '2026-10-15');
     assert.equal(pending.showPopup, false);
     assert.match(pending.summary, /15/);
