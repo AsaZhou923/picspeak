@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 import sys
 import unittest
@@ -29,7 +29,11 @@ from app.services.generation_credit_reservations import (  # noqa: E402
 class GenerationCreditReservationTests(unittest.TestCase):
     def test_available_generation_credits_subtracts_consumed_and_active_holds(self) -> None:
         db = MagicMock()
-        db.query.return_value.filter.return_value.scalar.side_effect = [-30, 42, 11]
+        today = datetime.now(timezone.utc).date()
+        db.execute.return_value.all.return_value = [
+            ('ledger', -30, today, {}, None), ('ledger', 42, today, {}, None),
+            ('held', 11, today, None, {}),
+        ]
         user = SimpleNamespace(id=7, plan=UserPlan.pro)
 
         with patch(
@@ -39,6 +43,7 @@ class GenerationCreditReservationTests(unittest.TestCase):
             available = available_generation_credits(db, user)
 
         self.assertEqual(available, 176)
+        db.execute.assert_called_once()
 
     def test_reserve_generation_credits_locks_user_and_rejects_overcommit(self) -> None:
         existing_reservation_query = MagicMock()
@@ -52,6 +57,8 @@ class GenerationCreditReservationTests(unittest.TestCase):
         held_query.filter.return_value.scalar.return_value = 8
         db = MagicMock()
         db.query.side_effect = [user_lock_query, existing_reservation_query, grant_query, consumed_query, held_query]
+        today = datetime.now(timezone.utc).date()
+        db.execute.return_value.all.return_value = [('ledger', 9, today, {}, None), ('held', 8, today, None, {})]
         user = SimpleNamespace(id=7, plan=UserPlan.free)
         task = SimpleNamespace(id=10)
 
@@ -77,6 +84,10 @@ class GenerationCreditReservationTests(unittest.TestCase):
         held_query.filter.return_value.scalar.return_value = 3
         db = MagicMock()
         db.query.side_effect = [user_lock_query, existing_reservation_query, grant_query, consumed_query, held_query]
+        db.execute.return_value.all.return_value = [
+            ('ledger', -30, date(2026, 5, 1), {}, None),
+            ('ledger', 2, date(2026, 5, 1), {}, None), ('held', 3, date(2026, 5, 1), None, {}),
+        ]
         user = SimpleNamespace(id=7, plan=UserPlan.free)
         task = SimpleNamespace(id=10)
         now = datetime(2026, 5, 31, 23, 0, tzinfo=timezone.utc)
@@ -108,6 +119,7 @@ class GenerationCreditReservationTests(unittest.TestCase):
         query.filter.return_value.with_for_update.return_value.first.return_value = reservation
         db = MagicMock()
         db.query.return_value = query
+        query.filter.return_value.scalar.return_value = {}
         task = SimpleNamespace(id=10, public_id='igt_10')
 
         consumed = consume_generation_credit_reservation(
@@ -171,6 +183,10 @@ class GenerationCreditReservationTests(unittest.TestCase):
         period = monthly_generation_credit_period(now=datetime(2026, 12, 31, 23, 59, tzinfo=timezone.utc))
 
         self.assertEqual(period, (date(2026, 12, 1), date(2027, 1, 1)))
+
+    def test_monthly_generation_credit_period_uses_utc_boundary(self) -> None:
+        period = monthly_generation_credit_period(now=datetime(2026, 6, 1, 8, tzinfo=timezone(timedelta(hours=9))))
+        self.assertEqual(period, (date(2026, 5, 1), date(2026, 6, 1)))
 
 
 if __name__ == '__main__':

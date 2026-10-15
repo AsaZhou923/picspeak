@@ -14,7 +14,7 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-from app.db.models import GeneratedImage, TaskStatus  # noqa: E402
+from app.db.models import GeneratedImage, TaskStatus, UserPlan  # noqa: E402
 from app.services.generation_credit_reservations import GenerationCreditReservationError  # noqa: E402
 from app.services.image_generation import ImageGenerationResult  # noqa: E402
 from app.services.image_generation_task_processor import (  # noqa: E402
@@ -748,7 +748,11 @@ class ImageGenerationTaskProcessorTests(unittest.TestCase):
         consumed_query.filter.return_value.scalar.return_value = 26
         grant_query.filter.return_value.scalar.return_value = -30
         db.query.side_effect = [consumed_query, grant_query]
-        user = SimpleNamespace(id=20)
+        user = SimpleNamespace(id=20, plan=UserPlan.free)
+        today = datetime.now(timezone.utc).date()
+        db.execute.return_value.all.return_value = [
+            ('ledger', 26, today, {}, None), ('ledger', -30, today, {}, None),
+        ]
 
         consumed = count_monthly_generation_credit_consumed(db, user)
         granted = count_monthly_generation_credit_grants(db, user)

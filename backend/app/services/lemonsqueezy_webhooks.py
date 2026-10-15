@@ -480,6 +480,11 @@ def _process_image_credit_pack_order(db: Session, event: LemonSqueezyWebhookEven
         return 'ignored_non_credit_pack_variant', user
 
     order_id = _image_credit_pack_order_id(event)
+    if not order_id:
+        return 'ignored_credit_pack_missing_order_id', user
+    # Serialize both new reservations and grants at the same user boundary.
+    # Event hashes alone do not deduplicate distinct deliveries of one order.
+    db.query(User).filter(User.id == user.id).with_for_update().one()
     if _has_granted_image_credit_pack(db, user, order_id):
         return 'credit_pack_already_granted', user
 
@@ -501,6 +506,7 @@ def _process_image_credit_pack_order(db: Session, event: LemonSqueezyWebhookEven
         bill_date=_utc_now().date(),
         metadata_json={
             'grant_type': 'lemonsqueezy_credit_pack',
+            'balance_version': 'persistent-v1',
             'pack': IMAGE_CREDIT_PACK_KEY,
             'order_id': order_id,
             'credits_granted': credits,

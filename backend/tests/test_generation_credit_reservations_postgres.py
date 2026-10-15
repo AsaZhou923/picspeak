@@ -24,8 +24,13 @@ from app.db.models import (  # noqa: E402
     User,
     UserPlan,
     UserStatus,
+    UsageLedger,
 )
-from app.services.generation_credit_reservations import reserve_generation_credits_for_task  # noqa: E402
+from app.services.generation_credit_reservations import (  # noqa: E402
+    reserve_generation_credits_for_task, consume_generation_credit_reservation,
+    release_generation_credit_reservation, generation_credit_balance_snapshot,
+    GenerationCreditReservationError,
+)
 from app.services.image_generation_task_processor import (  # noqa: E402
     _claim_generation_task,
     deliver_generation_request_event,
@@ -453,6 +458,169 @@ class GenerationCreditReservationPostgresTests(unittest.TestCase):
                 .all()
             )
             self.assertEqual(len(events), 1)
+
+
+@unittest.skipUnless(TEST_DATABASE_URL, 'requires disposable PostgreSQL via PICSPEAK_TEST_DATABASE_URL')
+class PersistentGenerationCreditPostgresTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.engine = create_engine(TEST_DATABASE_URL, pool_pre_ping=True)
+        self.Session = sessionmaker(bind=self.engine, expire_on_commit=False)
+        self.db = self.Session()
+        self.addCleanup(self.engine.dispose)
+        self.addCleanup(self.db.close)
+        self.limit = patch('app.services.generation_credit_reservations.monthly_generation_credit_limit_for_plan', return_value=3)
+        self.limit.start()
+        self.addCleanup(self.limit.stop)
+        self.user = self.new_user()
+        self.may = datetime(2026, 5, 31, 23, 59, tzinfo=timezone.utc)
+        self.june = datetime(2026, 6, 1, tzinfo=timezone.utc)
+
+    def new_user(self):
+        suffix = uuid4().hex
+        user = User(public_id=f'usr_persistent_{suffix}', email=f'{suffix}@example.test', username=suffix,
+                    plan=UserPlan.free, status=UserStatus.active, daily_quota_total=0, daily_quota_used=0)
+        self.db.add(user)
+        self.db.flush()
+        return user
+
+    def grant(self, credits=300, *, persistent=True):
+        ledger = UsageLedger(user_id=self.user.id, usage_type='image_generation_credit', amount=-credits,
+                             unit='credits', bill_date=self.may.date(), metadata_json={
+                                 'grant_type': 'lemonsqueezy_credit_pack',
+                                 **({'balance_version': 'persistent-v1'} if persistent else {}),
+                             })
+        self.db.add(ledger)
+        self.db.flush()
+        return ledger
+
+    def task(self, *, credits, now):
+        suffix = uuid4().hex
+        task = ImageGenerationTask(public_id=f'igt_persistent_{suffix}', owner_user_id=self.user.id,
+                                   status=TaskStatus.PENDING, generation_mode='general', intent='photo_inspiration',
+                                   prompt='persistent credits', prompt_hash=suffix, request_payload={})
+        self.db.add(task)
+        reservation = reserve_generation_credits_for_task(self.db, user=self.user, task=task, credits=credits, now=now)
+        return task, reservation
+
+    def balance(self, now):
+        return generation_credit_balance_snapshot(self.db, self.user, now=now)
+
+    def test_month_end_purchase_hold_success_and_duplicate_consumption(self):
+        self.grant()
+        task, reservation = self.task(credits=10, now=self.may)
+        self.assertEqual(task.request_payload['credit_allocation'], {'version': 1, 'monthly': 3, 'purchased': 7})
+        before = self.balance(self.june)
+        self.assertEqual((before['monthly_remaining'], before['purchased_remaining']), (3, 293))
+        consume_generation_credit_reservation(self.db, task=task, usage_metadata={
+            'credit_allocation': {'version': 1, 'monthly': 10, 'purchased': 0},
+        })
+        consume_generation_credit_reservation(self.db, task=task, usage_metadata={})
+        after = self.balance(self.june)
+        self.assertEqual(after['purchased_used'], 7)
+        self.assertEqual(after['purchased_held'], 0)
+        self.assertEqual(after['available_total'], before['available_total'])
+        self.assertEqual(self.db.query(UsageLedger).filter(UsageLedger.id == reservation.consumed_usage_ledger_id).one()
+                         .metadata_json['credit_allocation']['purchased'], 7)
+
+    def test_month_end_failure_releases_purchased_hold(self):
+        self.grant()
+        task, _ = self.task(credits=10, now=self.may)
+        self.assertEqual(self.balance(self.june)['purchased_held'], 7)
+        release_generation_credit_reservation(self.db, task=task, reason='provider_failed')
+        release_generation_credit_reservation(self.db, task=task, reason='retry')
+        self.assertEqual(self.balance(self.june)['purchased_remaining'], 300)
+
+    def test_purchase_consumption_never_revives_and_isolated_from_other_users(self):
+        self.grant(credits=7)
+        task, _ = self.task(credits=10, now=self.may)
+        consume_generation_credit_reservation(self.db, task=task, usage_metadata={})
+        self.assertEqual(self.balance(self.june)['available_total'], 3)
+        other = self.new_user()
+        self.assertEqual(generation_credit_balance_snapshot(self.db, other, now=self.june)['purchased_total'], 0)
+        self.assertEqual(self.balance(datetime(2026, 7, 1, tzinfo=timezone.utc))['purchased_remaining'], 0)
+
+    def test_legacy_grant_remains_monthly_and_is_not_restored(self):
+        self.grant(persistent=False)
+        self.assertEqual(self.balance(self.may)['monthly_remaining'], 303)
+        self.assertEqual(self.balance(self.june)['available_total'], 3)
+
+    def test_downgrade_cannot_deduct_from_purchased_pool(self):
+        self.grant()
+        with patch('app.services.generation_credit_reservations.monthly_generation_credit_limit_for_plan', return_value=20):
+            task, _ = self.task(credits=20, now=self.may)
+            consume_generation_credit_reservation(self.db, task=task, usage_metadata={})
+        self.user.plan = UserPlan.free
+        balance = self.balance(self.may)
+        self.assertEqual(balance['monthly_remaining'], 0)
+        self.assertEqual(balance['available_total'], 300)
+
+    def test_rolling_deployment_legacy_worker_ledger_uses_reservation_allocation(self):
+        self.grant()
+        task, reservation = self.task(credits=10, now=self.may)
+        ledger = UsageLedger(user_id=self.user.id, usage_type='image_generation_credit', amount=10,
+                             unit='credits', bill_date=self.may.date(), metadata_json={})
+        self.db.add(ledger)
+        self.db.flush()
+        reservation.status = 'consumed'
+        reservation.consumed_usage_ledger_id = ledger.id
+        self.db.flush()
+        balance = self.balance(self.june)
+        self.assertEqual(balance['purchased_used'], 7)
+        self.assertEqual(balance['purchased_remaining'], 293)
+
+    def test_malformed_allocation_fails_closed(self):
+        self.grant()
+        task, _ = self.task(credits=10, now=self.may)
+        for allocation in ({'version': 1, 'monthly': -1, 'purchased': 11},
+                           {'version': 1, 'monthly': 3, 'purchased': 6},
+                           {'version': 1, 'monthly': True, 'purchased': 9}, None):
+            task.request_payload = {'credit_allocation': allocation}
+            self.db.flush()
+            with self.assertRaises(GenerationCreditReservationError):
+                self.balance(self.june)
+            with self.assertRaises(GenerationCreditReservationError):
+                consume_generation_credit_reservation(self.db, task=task, usage_metadata={})
+
+    def test_distinct_webhook_deliveries_for_same_order_grant_once(self):
+        from app.services.lemonsqueezy_webhooks import LemonSqueezyWebhookEvent, _process_image_credit_pack_order
+
+        self.db.commit()
+        user_id = self.user.id
+        order_id = f'order_{uuid4().hex}'
+        barrier = threading.Barrier(2)
+        outcomes, errors = [], []
+
+        def deliver(index):
+            try:
+                with self.Session() as db:
+                    user = db.query(User).filter(User.id == user_id).one()
+                    event = LemonSqueezyWebhookEvent(
+                        event_name='order_created', payload={}, meta={'custom_data': {'credits': '300'}},
+                        data={'attributes': {'first_order_item': {'variant_id': 'test_persistent_variant'}}},
+                        event_hash=f'{order_id}_{index}', test_mode=False, resource_type='orders', resource_id=order_id,
+                    )
+                    barrier.wait(timeout=10)
+                    result, _ = _process_image_credit_pack_order(db, event, user)
+                    db.commit()
+                    outcomes.append(result)
+            except Exception as error:
+                errors.append(error)
+
+        with patch('app.services.lemonsqueezy_webhooks.settings.lemonsqueezy_image_credit_pack_variant_id', 'test_persistent_variant'), \
+             patch('app.services.lemonsqueezy_webhooks.record_credit_confirmed'), \
+             patch('app.services.lemonsqueezy_webhooks.record_product_event'):
+            threads = [threading.Thread(target=deliver, args=(index,)) for index in range(2)]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join(timeout=15)
+        self.assertFalse(any(thread.is_alive() for thread in threads))
+        self.assertEqual(errors, [])
+        self.assertCountEqual(outcomes, ['credit_pack_granted', 'credit_pack_already_granted'])
+        self.assertEqual(self.db.query(UsageLedger).filter(
+            UsageLedger.user_id == user_id,
+            UsageLedger.metadata_json.contains({'grant_type': 'lemonsqueezy_credit_pack', 'order_id': order_id}),
+        ).count(), 1)
 
 
 if __name__ == '__main__':

@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-15-purchased-image-credits",
+    "date": "2026-10-15",
+    "showPopup": false,
+    "title": "准备中：新购买的生图 credits 跨月保留",
+    "summary": "这项修复正在准备中。发布后新购买的生图 credits 将跨月保留，套餐月赠送仍按月刷新并优先使用；账户将分别显示两类余额和总可用额度。额度包为 300 credits，并非 300 张图片，按生成品质消耗，购买不会解锁 Free 的 High 品质。本次调整适用于更新后购买的额度，既有历史余额保持原样。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-10-15-purchased-image-credits"
+  },
+  {
     "id": "2026-10-10-gallery-browsing",
     "date": "2026-10-10",
     "showPopup": false,

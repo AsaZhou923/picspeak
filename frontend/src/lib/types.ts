@@ -32,6 +32,11 @@ export interface UsageResponse {
     monthly_used: number | null;
     monthly_held: number | null;
     monthly_remaining: number | null;
+    purchased_total?: number;
+    purchased_used?: number;
+    purchased_held?: number;
+    purchased_remaining?: number;
+    available_total?: number;
   };
   features: {
     review_modes: Array<'flash' | 'pro'>;

@@ -27,6 +27,8 @@ export default function UsageGenerationCreditsPanel({
   renderUsageBar,
 }: UsageGenerationCreditsPanelProps) {
   const monthlyHeld = generationCredits.monthly_held ?? 0;
+  const purchasedHeld = generationCredits.purchased_held ?? 0;
+  const hasPurchasedBalance = generationCredits.available_total !== undefined;
 
   return (
     <div className="overflow-hidden rounded-lg border border-gold/25 bg-[linear-gradient(135deg,rgba(200,162,104,0.16),transparent_44%),rgb(var(--color-raised)/0.78)] p-6">
@@ -42,16 +44,33 @@ export default function UsageGenerationCreditsPanel({
         </div>
         <div className="min-w-[150px] text-left sm:text-right">
           <p className="font-display text-4xl text-gold">
-            {generationCredits.monthly_remaining ?? 0}
+            {generationCredits.available_total ?? generationCredits.monthly_remaining ?? 0}
           </p>
           <p className="mt-1 text-xs text-ink-muted">
-            {t('usage_generation_credits_monthly_remaining').replace(
-              '{total}',
-              String(generationCredits.monthly_total ?? 0),
-            )}
+            {hasPurchasedBalance
+              ? t('usage_generation_credits_available')
+              : t('usage_generation_credits_monthly_remaining').replace(
+                  '{total}',
+                  String(generationCredits.monthly_total ?? 0),
+                )}
           </p>
         </div>
       </div>
+
+      {hasPurchasedBalance && (
+        <dl className="mt-5 grid gap-3 text-sm sm:grid-cols-2">
+          <div className="rounded-md border border-border-subtle bg-void/25 px-3 py-2">
+            <dt className="text-xs text-ink-muted">{t('usage_generation_credits_monthly_balance')}</dt>
+            <dd className="mt-1 text-ink">
+              {generationCredits.monthly_remaining ?? 0} / {generationCredits.monthly_total ?? 0}
+            </dd>
+          </div>
+          <div className="rounded-md border border-border-subtle bg-void/25 px-3 py-2">
+            <dt className="text-xs text-ink-muted">{t('usage_generation_credits_purchased_balance')}</dt>
+            <dd className="mt-1 text-ink">{generationCredits.purchased_remaining ?? 0}</dd>
+          </div>
+        </dl>
+      )}
 
       {generationCredits.monthly_total !== null &&
         generationCredits.monthly_total > 0 &&
@@ -74,6 +93,12 @@ export default function UsageGenerationCreditsPanel({
             )}
           </>
         )}
+
+      {purchasedHeld > 0 && (
+        <p className="mt-3 text-xs text-ink-muted">
+          {t('usage_generation_credits_purchased_held').replace('{held}', String(purchasedHeld))}
+        </p>
+      )}
 
       <p className="mt-4 rounded-md border border-border-subtle bg-void/25 px-3 py-2 text-xs leading-5 text-ink-muted">
         {plan === 'guest'

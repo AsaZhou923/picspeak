@@ -155,15 +155,9 @@ class BillingPortalSelectionTests(unittest.TestCase):
             status=UserStatus.active,
         )
 
-        with patch.object(routes, 'monthly_generation_credit_limit_for_plan', return_value=199), patch.object(
-            routes,
-            'count_monthly_generation_credit_grants',
-            return_value=0,
-        ), patch.object(routes, 'count_monthly_generation_credit_consumed', return_value=42), patch.object(
-            routes,
-            'count_monthly_generation_credit_holds',
-            return_value=11,
-        ):
+        with patch.object(routes, 'generation_credit_balance_snapshot', return_value={
+            'monthly_total': 199, 'monthly_used': 42, 'monthly_held': 11, 'monthly_remaining': 146,
+        }):
             snapshot = _generation_credit_usage_snapshot(Mock(), user, UserPlan.pro)
 
         self.assertEqual(snapshot['monthly_total'], 199)
@@ -183,15 +177,9 @@ class BillingPortalSelectionTests(unittest.TestCase):
             status=UserStatus.active,
         )
 
-        with patch.object(routes, 'monthly_generation_credit_limit_for_plan', return_value=3), patch.object(
-            routes,
-            'count_monthly_generation_credit_grants',
-            return_value=30,
-        ), patch.object(routes, 'count_monthly_generation_credit_consumed', return_value=0), patch.object(
-            routes,
-            'count_monthly_generation_credit_holds',
-            return_value=8,
-        ):
+        with patch.object(routes, 'generation_credit_balance_snapshot', return_value={
+            'monthly_total': 33, 'monthly_used': 0, 'monthly_held': 8, 'monthly_remaining': 25,
+        }):
             snapshot = _generation_credit_usage_snapshot(Mock(), user, UserPlan.free)
 
         self.assertEqual(snapshot['monthly_total'], 33)

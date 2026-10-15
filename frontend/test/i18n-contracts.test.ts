@@ -10,6 +10,17 @@ import { localizedErrorMessage } from '../src/lib/error-utils.ts';
 
 const t = (key: keyof typeof enTranslations) => zhTranslations[key] ?? enTranslations[key] ?? key;
 
+test('image credit copy separates monthly and purchased balances and explains quality restrictions', () => {
+  for (const dictionary of [enTranslations, zhTranslations, jaTranslations]) {
+    assert.notEqual(dictionary.usage_generation_credits_monthly_balance, dictionary.usage_generation_credits_purchased_balance);
+    assert.match(dictionary.usage_credit_pack_body, /300/);
+    assert.match(dictionary.usage_credit_pack_body, /Free/);
+    assert.match(dictionary.usage_credit_pack_body, /High|高画質/);
+  }
+  assert.match(zhTranslations.usage_credit_pack_body, /300 credits/);
+  assert.doesNotMatch(zhTranslations.usage_credit_pack_body, /300 张 AI 生图额度/);
+});
+
 test('translation dictionaries are explicit and do not inherit English with object spread', async () => {
   const [zhSource, jaSource] = await Promise.all([
     readFile(new URL('../src/lib/i18n-zh.ts', import.meta.url), 'utf8'),

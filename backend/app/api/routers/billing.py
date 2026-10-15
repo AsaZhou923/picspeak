@@ -38,11 +38,8 @@ from app.services.guard import (
     plan_review_modes,
     user_usage_snapshot,
 )
-from app.services.image_generation_task_processor import (
-    count_monthly_generation_credit_consumed,
-    count_monthly_generation_credit_grants,
-    count_monthly_generation_credit_holds,
-    monthly_generation_credit_limit_for_plan,
+from app.services.generation_credit_reservations import (
+    generation_credit_balance_snapshot,
 )
 from app.services.lemonsqueezy import (
     LemonSqueezyAPIError,
@@ -173,19 +170,14 @@ def _generation_credit_usage_snapshot(db: Session, user: User, plan: UserPlan) -
             'monthly_used': 0,
             'monthly_held': 0,
             'monthly_remaining': 0,
+            'purchased_total': 0,
+            'purchased_used': 0,
+            'purchased_held': 0,
+            'purchased_remaining': 0,
+            'available_total': 0,
         }
 
-    base_monthly_total = monthly_generation_credit_limit_for_plan(plan)
-    monthly_granted = count_monthly_generation_credit_grants(db, user)
-    monthly_total = base_monthly_total + monthly_granted
-    monthly_used = count_monthly_generation_credit_consumed(db, user)
-    monthly_held = count_monthly_generation_credit_holds(db, user)
-    return {
-        'monthly_total': monthly_total,
-        'monthly_used': max(monthly_used, 0),
-        'monthly_held': max(monthly_held, 0),
-        'monthly_remaining': max(monthly_total - monthly_used - monthly_held, 0),
-    }
+    return generation_credit_balance_snapshot(db, user, plan=plan)
 
 
 def _normalize_image_credit_code(raw_code: str) -> str:

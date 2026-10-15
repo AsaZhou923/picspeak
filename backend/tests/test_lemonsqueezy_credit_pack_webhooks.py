@@ -120,9 +120,22 @@ class LemonSqueezyCreditPackWebhookTests(unittest.TestCase):
         self.assertEqual(ledger.amount, -300)
         self.assertEqual(ledger.unit, 'credits')
         self.assertEqual(ledger.metadata_json['grant_type'], 'lemonsqueezy_credit_pack')
+        self.assertEqual(ledger.metadata_json['balance_version'], 'persistent-v1')
         self.assertEqual(ledger.metadata_json['pack'], 'image_credits_300')
         self.assertEqual(ledger.metadata_json['order_id'], 'ord_300')
         record_product_event.assert_called_once()
+
+    def test_credit_pack_without_order_id_fails_closed(self) -> None:
+        event = _credit_pack_event()
+        event.resource_id = None
+        event.data['id'] = ''
+        user = User(id=51, public_id='usr_credit_pack_paid', plan=UserPlan.free)
+        db = MagicMock()
+        db.query.return_value.filter.return_value.first.return_value = user
+        with patch('app.services.lemonsqueezy_webhooks.settings.lemonsqueezy_image_credit_pack_variant_id', '1574509'):
+            outcome, _ = process_lemonsqueezy_webhook_event(db, event)
+        self.assertEqual(outcome, 'ignored_credit_pack_missing_order_id')
+        db.add.assert_not_called()
 
     def test_order_created_skips_duplicate_credit_pack_grant(self) -> None:
         db = MagicMock()

@@ -665,6 +665,11 @@ class UsageGenerationCredits(BaseModel):
     monthly_used: int | None = None
     monthly_held: int | None = None
     monthly_remaining: int | None = None
+    purchased_total: int | None = None
+    purchased_used: int | None = None
+    purchased_held: int | None = None
+    purchased_remaining: int | None = None
+    available_total: int | None = None
 
 
 class UsageResponse(BaseModel):
