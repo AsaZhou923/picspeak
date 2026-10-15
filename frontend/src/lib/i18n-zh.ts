@@ -85,8 +85,8 @@ export const zhTranslations = {
   pro_offer_label: '',
   pro_offer_highlight: 'Pro',
   updates_label: '更新记录',
-  updates_hint_home: "新购买的生图 credits 跨月保留",
-  updates_hint_latest: "新购买的生图 credits 跨月保留",
+  updates_hint_home: "修复了一些问题，提升使用稳定性。",
+  updates_hint_latest: "修复了一些问题，提升使用稳定性。",
   contact_label: '联系',
   contact_headline: '联系我',
 

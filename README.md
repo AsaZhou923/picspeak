@@ -195,7 +195,7 @@ The frontend and backend can be deployed independently. The backend includes a c
 
 ## Documentation
 
-- [Purchased image credits carry over](docs/changelog/CHANGELOG.md#2026-10-15-purchased-image-credits)
+- [Bug fixes](docs/changelog/CHANGELOG.md#2026-10-15-purchased-image-credits)
 - [Gallery browsing is more direct](docs/changelog/CHANGELOG.md#2026-10-10-gallery-browsing)
 - [The message center is available](docs/changelog/CHANGELOG.md#2026-10-10-inbox-live)
 - [Critique reading guides and public examples](docs/changelog/CHANGELOG.md#2026-10-10-critique-reading-guides)
