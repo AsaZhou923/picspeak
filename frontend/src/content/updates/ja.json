@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-18-critique-and-draft-fixes",
+    "date": "2026-10-18",
+    "showPopup": false,
+    "title": "講評と下書きの修正",
+    "summary": "講評の再試行による重複消費を防ぎ、言語を切り替えても画像生成の下書きを保持します。ログイン・登録画面はサイトの言語に合わせ、撮り直しチェックリストの各項目を分けて表示します。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-10-18-critique-and-draft-fixes"
+  },
+  {
     "id": "2026-10-15-purchased-image-credits",
     "date": "2026-10-15",
     "showPopup": false,

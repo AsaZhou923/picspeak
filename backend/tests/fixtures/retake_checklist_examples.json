@@ -1,0 +1,23 @@
+[
+  {
+    "locale": "en",
+    "observation": "The subject touches the right edge",
+    "reason": "The frame leaves too little space around the subject",
+    "action": "Move one step to the right",
+    "success_check": "Leave visible space beside the subject"
+  },
+  {
+    "locale": "zh",
+    "observation": "主体贴近右侧边缘",
+    "reason": "主体周围缺少留白",
+    "action": "向右移动一步",
+    "success_check": "主体右侧保留清晰可见的空间"
+  },
+  {
+    "locale": "ja",
+    "observation": "主題が右端に接している",
+    "reason": "主題の周囲に余白が足りない",
+    "action": "右に一歩移動する",
+    "success_check": "主題の右側に余白を残す"
+  }
+]

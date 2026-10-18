@@ -3,6 +3,15 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { buildHistoryGrowthSnapshot, buildNextShootChecklist, CURRENT_SCORE_VERSION, getScoreVersionLabel } from '../src/lib/review-growth.ts';
 import type { ReviewHistoryItem, ReviewScores } from '../src/lib/types.ts';
+import { buildPracticeStartRequest } from '../src/features/practice/start.ts';
+
+const retakeChecklistExamples: {
+  locale: 'en' | 'zh' | 'ja';
+  observation: string;
+  reason: string;
+  action: string;
+  success_check: string;
+}[] = JSON.parse(await readFile(new URL('../../backend/tests/fixtures/retake_checklist_examples.json', import.meta.url), 'utf8'));
 
 function makeScores(values: Partial<ReviewScores>): ReviewScores {
   return {
@@ -76,6 +85,70 @@ test('buildNextShootChecklist extracts short actionable titles from structured s
   assert.equal(checklist[1].dimension, 'lighting');
   assert.equal(checklist[2].dimension, 'impact');
   assert.equal(checklist.length, 3);
+});
+
+for (const example of retakeChecklistExamples) {
+  for (const separator of [' ', '; ', '；', '\n']) {
+    test(`paired checklist isolates fields and saves only the action (${example.locale}, ${JSON.stringify(separator)})`, () => {
+      // English labels with localized values are the actual paired backend format.
+      const point = `1. ${[
+        `Observation: ${example.observation}`,
+        `Reason: ${example.reason}`,
+        `Action: ${example.action}`,
+        `Success check: ${example.success_check}`,
+      ].join(separator)}`;
+      const [item] = buildNextShootChecklist(point);
+      assert.equal(item.observation, example.observation);
+      assert.equal(item.reason, example.reason);
+      assert.equal(item.detail, example.action);
+      assert.equal(item.title, example.action);
+
+      // This is the detail used by the checklist handoff and PracticeStartPanel.
+      const target = new URLSearchParams({ next_shoot_action: item.detail || item.title });
+      assert.equal(target.get('next_shoot_action'), example.action);
+      const payload = buildPracticeStartRequest({
+        sourceReviewId: 'review-paired',
+        goal: item.detail || item.title,
+        dimension: item.dimension,
+        kind: 'capture_retake',
+        locale: example.locale,
+      });
+      assert.equal(payload.goal_snapshot.goal, example.action);
+      assert.equal(payload.success_criteria[0].label, example.action);
+    });
+  }
+}
+
+test('localized legacy checklist labels stop at the next field, including success checks', () => {
+  const labels = {
+    zh: ['观察', '原因', '可执行动作', '成功检查'],
+    ja: ['観察', '理由', '行動', '成功条件'],
+  };
+  for (const example of retakeChecklistExamples.filter((item) => item.locale !== 'en')) {
+    const [observation, reason, action, check] = labels[example.locale as 'zh' | 'ja'];
+    for (const separator of [' ', '; ', '\n']) {
+      const [item] = buildNextShootChecklist(`1. ${[
+        `${observation}：${example.observation}`,
+        `${reason}：${example.reason}`,
+        `${action}：${example.action}`,
+        `${check}：${example.success_check}`,
+      ].join(separator)}`);
+      assert.equal(item.observation, example.observation);
+      assert.equal(item.reason, example.reason);
+      assert.equal(item.detail, example.action);
+    }
+  }
+});
+
+test('checklist fields preserve punctuation inside a value and keep numbered actions separate', () => {
+  const checklist = buildNextShootChecklist([
+    '1. Observation: Edge detail is soft; Reason: Motion blur; Action: Raise shutter speed; keep ISO unchanged; Success check: Sharp edge detail',
+    '2. Observation: Highlights are clipped Reason: Excess exposure Action: Lower exposure compensation Success check: Preserve sky detail',
+  ].join('\n'));
+  assert.equal(checklist.length, 2);
+  assert.equal(checklist[0].detail, 'Raise shutter speed; keep ISO unchanged');
+  assert.equal(checklist[1].detail, 'Lower exposure compensation');
+  assert.equal(checklist[1].observation, 'Highlights are clipped');
 });
 
 test('buildNextShootChecklist falls back to weakest scored dimension when text is generic', () => {

@@ -11,7 +11,7 @@ from unittest.mock import patch
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, text, event
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
@@ -71,11 +71,16 @@ class GalleryScoreboardPostgresTests(unittest.TestCase):
     def setUp(self) -> None:
         self.engine = create_engine(TEST_DATABASE_URL, pool_pre_ping=True)
         self.connection = self.engine.connect()
-        self._clean_scoreboard_fixtures()
-        self.Session = sessionmaker(bind=self.connection, autoflush=False, autocommit=False)
+        self.transaction = self.connection.begin()
+        self.Session = sessionmaker(
+            bind=self.connection, autoflush=False, autocommit=False,
+            join_transaction_mode='create_savepoint',
+        )
 
     def tearDown(self) -> None:
         app.dependency_overrides.clear()
+        # Fixture and route commits release savepoints, never this outer transaction.
+        self.transaction.rollback()
         self.connection.close()
         self.engine.dispose()
 
@@ -89,15 +94,6 @@ class GalleryScoreboardPostgresTests(unittest.TestCase):
 
         app.dependency_overrides[get_db] = override_db
         return TestClient(app)
-
-    def _clean_scoreboard_fixtures(self) -> None:
-        self.connection.execute(text(
-            "DELETE FROM review_likes WHERE review_id IN (SELECT id FROM reviews WHERE public_id LIKE 'rev_score_%')"
-        ))
-        self.connection.execute(text("DELETE FROM reviews WHERE public_id LIKE 'rev_score_%'"))
-        self.connection.execute(text("DELETE FROM photos WHERE public_id LIKE 'pho_score_%'"))
-        self.connection.execute(text("DELETE FROM users WHERE public_id LIKE 'usr_score_%'"))
-        self.connection.commit()
 
     def _user(self, db, suffix: str, index: int) -> User:
         user = User(

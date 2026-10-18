@@ -50,7 +50,7 @@ from app.services.review_score_cache import (
     review_uses_current_full_review_contract,
     writer_contract_for_review_request,
 )
-from app.services.review_quota_reservations import synchronous_review_quota, consume_review_quota
+from app.services.review_quota_reservations import synchronous_review_quota, consume_review_quota, release_review_quota
 from app.services.object_storage import get_object_read_url
 from .review_support import (
     _attach_billing_info,
@@ -454,19 +454,33 @@ def create_review(
         _attach_billing_info(result_payload, db=db, user=actor.user, charged=True, guest_scope_key=guest_scope_key)
         review.result_json = result_payload
         db.add(review)
-        db.commit()
-        db.refresh(review)
-
         response_sync = {'review_id': review.public_id, 'status': review.status.value, 'result': result_payload}
-        if idempotency_key:
-            save_idempotency_record(
-                db,
-                user_id=actor.user.id,
-                endpoint='/reviews',
-                key=idempotency_key,
-                request_hash=request_hash,
-                http_status=200,
-                response_json=response_sync,
-            )
+        try:
+            if idempotency_key:
+                save_idempotency_record(
+                    db,
+                    user_id=actor.user.id,
+                    endpoint='/reviews',
+                    key=idempotency_key,
+                    request_hash=request_hash,
+                    http_status=200,
+                    response_json=response_sync,
+                )
+            # Persist the result, charge, and replay record atomically. A failed
+            # replay write must never leave a charged review behind.
             db.commit()
+        except IntegrityError:
+            db.rollback()
+            if not idempotency_key:
+                raise
+            record = get_idempotency_record(db, actor.user.id, '/reviews', idempotency_key)
+            if record is None or record.response_json is None:
+                raise
+            # A concurrent request won this key; discard this request's result
+            # and durable quota hold before returning the winning response.
+            release_review_quota(db, quota_reservation)
+            db.commit()
+            if not _matches_request_hash(record.request_hash, request_hash, payload):
+                raise api_error(status.HTTP_409_CONFLICT, 'IDEMPOTENCY_CONFLICT', 'Idempotency key was used with different review content')
+            return _replay_review_response(db, actor, record.response_json)
         return response_sync

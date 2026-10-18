@@ -50,7 +50,7 @@ export default function GeneratePage() {
   const { token, ensureToken, userInfo, isLoading: authLoading } = useAuth();
   const { t, locale } = useI18n();
   const promptRef = useRef<HTMLTextAreaElement>(null);
-  const skipNextTemplatePromptSyncRef = useRef(false);
+  const preservePromptDraftRef = useRef(false);
   const initialUrlPromptAppliedRef = useRef(false);
   const [templateKey, setTemplateKey] = useState('photo_inspiration');
   const [prompt, setPrompt] = useState<string>(() => t(TEMPLATE_COPY_KEYS.photo_inspiration.prompt));
@@ -103,7 +103,7 @@ export default function GeneratePage() {
         initialUrlPromptAppliedRef.current = true;
         const nextTemplate = getTemplateByKey(promptExample.suggestedTemplateKey);
         const nextPrompt = getPromptExamplePromptPresentation(promptExample, locale).text;
-        skipNextTemplatePromptSyncRef.current = true;
+        preservePromptDraftRef.current = true;
         setTemplateKey(nextTemplate.key);
         setPrompt(nextPrompt);
         setStyle(promptExample.suggestedStyle);
@@ -136,11 +136,9 @@ export default function GeneratePage() {
   }, [locale, token]);
 
   useEffect(() => {
-    if (skipNextTemplatePromptSyncRef.current) {
-      skipNextTemplatePromptSyncRef.current = false;
-      return;
+    if (!preservePromptDraftRef.current) {
+      setPrompt(t(selectedTemplateCopy.prompt));
     }
-    setPrompt(t(selectedTemplateCopy.prompt));
   }, [locale, selectedTemplateCopy.prompt, t]);
 
   useEffect(() => {
@@ -183,6 +181,7 @@ export default function GeneratePage() {
   const handleTemplateSelect = useCallback(
     (key: string) => {
       const nextTemplate = getTemplateByKey(key);
+      preservePromptDraftRef.current = false;
       setTemplateKey(nextTemplate.key);
       setPrompt(t(templateCopyKey(nextTemplate.key).prompt));
       setAppliedPromptExample(null);
@@ -199,9 +198,7 @@ export default function GeneratePage() {
   const handlePromptExampleApply = useCallback(
     (example: GenerationPromptExample) => {
       const nextTemplate = getTemplateByKey(example.suggestedTemplateKey);
-      if (nextTemplate.key !== templateKey) {
-        skipNextTemplatePromptSyncRef.current = true;
-      }
+      preservePromptDraftRef.current = true;
       const nextPrompt = getPromptExamplePromptPresentation(example, locale).text;
       setTemplateKey(nextTemplate.key);
       setPrompt(nextPrompt);
@@ -232,7 +229,7 @@ export default function GeneratePage() {
         promptRef.current?.focus();
       });
     },
-    [locale, templateKey, token]
+    [locale, token]
   );
 
   const handleGenerate = useCallback(async () => {
@@ -356,7 +353,10 @@ export default function GeneratePage() {
             negativePrompt={negativePrompt}
             showNegative={showNegative}
             onTemplateSelect={handleTemplateSelect}
-            onPromptChange={setPrompt}
+            onPromptChange={(value) => {
+              preservePromptDraftRef.current = true;
+              setPrompt(value);
+            }}
             onPromptFocus={() =>
               trackProductEvent('generation_prompt_opened', {
                 token: token ?? undefined,

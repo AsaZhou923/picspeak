@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-18-critique-and-draft-fixes",
+    "date": "2026-10-18",
+    "showPopup": false,
+    "title": "Critique and draft fixes",
+    "summary": "Critique retries no longer charge twice, language changes preserve image prompt drafts, sign-in and sign-up follow the site language, and retake checklist fields stay separate.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-10-18-critique-and-draft-fixes"
+  },
+  {
     "id": "2026-10-15-purchased-image-credits",
     "date": "2026-10-15",
     "showPopup": false,
