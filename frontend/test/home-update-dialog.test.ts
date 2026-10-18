@@ -18,12 +18,12 @@ const homeSource = readFileSync(
 );
 const shellSource = readFileSync(path.join(FRONTEND_DIR, 'src/components/layout/SiteChrome.tsx'), 'utf8');
 
-test('critique and draft fixes are recorded as upcoming without a popup', () => {
+test('critique and draft fixes use release copy without a popup', () => {
   for (const locale of ['zh', 'en', 'ja'] as const) {
     const latest = getLatestProductUpdate(locale);
     assert.ok(latest);
     assert.equal(latest.id, '2026-10-18-critique-and-draft-fixes');
-    assert.match(latest.title + latest.summary, /准备中|upcoming|Upcoming:|準備中/);
+    assert.doesNotMatch(latest.title + latest.summary, /准备中|upcoming|Upcoming:|準備中/);
     assert.equal(latest.date, '2026-10-18');
     assert.equal(latest.showPopup, false);
     assert.equal(shouldShowProductUpdatePopup(latest), false);

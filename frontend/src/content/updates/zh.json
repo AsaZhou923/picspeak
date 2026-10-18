@@ -3,8 +3,8 @@
     "id": "2026-10-18-critique-and-draft-fixes",
     "date": "2026-10-18",
     "showPopup": false,
-    "title": "点评重试与草稿修复（准备中）",
-    "summary": "准备中：点评重试将避免重复扣额，切换语言时保留生图草稿，登录和注册界面跟随站点语言，复拍清单各项内容独立显示。",
+    "title": "点评重试与草稿修复",
+    "summary": "点评重试不再重复扣额，切换语言时保留生图草稿，登录和注册界面跟随站点语言，复拍清单各项内容独立显示。",
     "docPath": "docs/changelog/CHANGELOG.md#2026-10-18-critique-and-draft-fixes"
   },
   {

@@ -3,8 +3,8 @@
     "id": "2026-10-18-critique-and-draft-fixes",
     "date": "2026-10-18",
     "showPopup": false,
-    "title": "Critique and draft fixes (upcoming)",
-    "summary": "Upcoming: critique retries will avoid duplicate charges, language changes will preserve image prompt drafts, sign-in and sign-up will follow the site language, and retake checklist fields will stay separate.",
+    "title": "Critique and draft fixes",
+    "summary": "Critique retries no longer charge twice, language changes preserve image prompt drafts, sign-in and sign-up follow the site language, and retake checklist fields stay separate.",
     "docPath": "docs/changelog/CHANGELOG.md#2026-10-18-critique-and-draft-fixes"
   },
   {

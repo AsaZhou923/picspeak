@@ -191,7 +191,7 @@ npm run build
 
 ## 文档
 
-- [最新更新：点评重试与草稿修复（准备中）](docs/changelog/CHANGELOG.md#2026-10-18-critique-and-draft-fixes)
+- [最新更新：点评重试与草稿修复](docs/changelog/CHANGELOG.md#2026-10-18-critique-and-draft-fixes)
 - [长廊浏览更直接](docs/changelog/CHANGELOG.md#2026-10-10-gallery-browsing)
 - [消息中心已开放](docs/changelog/CHANGELOG.md#2026-10-10-inbox-live)
 - [点评阅读指南与公开案例](docs/changelog/CHANGELOG.md#2026-10-10-critique-reading-guides)
