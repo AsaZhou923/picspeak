@@ -18,19 +18,29 @@ const homeSource = readFileSync(
 );
 const shellSource = readFileSync(path.join(FRONTEND_DIR, 'src/components/layout/SiteChrome.tsx'), 'utf8');
 
-test('Purchased credits release is the latest visible update without popup', () => {
+test('critique and draft fixes are recorded as upcoming without a popup', () => {
   for (const locale of ['zh', 'en', 'ja'] as const) {
     const latest = getLatestProductUpdate(locale);
     assert.ok(latest);
-    assert.equal(latest.id, '2026-10-15-purchased-image-credits');
-    assert.doesNotMatch(latest.title + latest.summary, /准备中|in preparation|Upcoming:|準備中/);
-    assert.equal(latest.date, '2026-10-15');
+    assert.equal(latest.id, '2026-10-18-critique-and-draft-fixes');
+    assert.match(latest.title + latest.summary, /准备中|upcoming|Upcoming:|準備中/);
+    assert.equal(latest.date, '2026-10-18');
     assert.equal(latest.showPopup, false);
     assert.equal(shouldShowProductUpdatePopup(latest), false);
     assert.equal(latest.docPath, `docs/changelog/CHANGELOG.md#${latest.id}`);
   }
-  assert.equal(getLatestProductUpdateDate('zh'), '2026-10-15');
-  assert.equal(getLatestProductUpdateDate(), '2026-10-15');
+  assert.equal(getLatestProductUpdateDate('zh'), '2026-10-18');
+  assert.equal(getLatestProductUpdateDate(), '2026-10-18');
+});
+
+test('purchased credits release retains its published status in every locale', () => {
+  for (const locale of ['zh', 'en', 'ja'] as const) {
+    const released = getProductUpdates(locale).find((entry) => entry.id === '2026-10-15-purchased-image-credits');
+    assert.ok(released);
+    assert.doesNotMatch(released.title + released.summary, /准备中|in preparation|Upcoming:|準備中/);
+    assert.equal(released.date, '2026-10-15');
+    assert.equal(shouldShowProductUpdatePopup(released), false);
+  }
 });
 
 test('Sol rollout keeps the pricing notice popup opt-in only for Chinese users', () => {
@@ -64,9 +74,6 @@ test('Free history change is recorded in every locale while preserving the Chine
     const pending = getProductUpdates(locale).find((entry) => entry.id === '2026-10-08-free-history-fifteen-days');
     assert.ok(latest);
     assert.ok(pending);
-    assert.equal(latest.id, '2026-10-15-purchased-image-credits');
-    assert.doesNotMatch(latest.title + latest.summary, /准备中|in preparation|Upcoming:|準備中/);
-    assert.equal(latest.date, '2026-10-15');
     assert.equal(pending.showPopup, false);
     assert.match(pending.summary, /15/);
     assert.equal(shouldShowProductUpdatePopup(pending), false);

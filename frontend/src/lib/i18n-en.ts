@@ -296,8 +296,8 @@ export const enTranslations = {
     pro_offer_label: '',
     pro_offer_highlight: 'Pro',
     updates_label: 'Updates',
-    updates_hint_home: "Fixed several bugs to improve stability.",
-    updates_hint_latest: "Fixed several bugs to improve stability.",
+    updates_hint_home: "Critique and draft fixes (upcoming)",
+    updates_hint_latest: "Critique and draft fixes (upcoming)",
     contact_label: 'Contact',
     contact_headline: 'Get in Touch',
 

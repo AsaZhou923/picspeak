@@ -1,13 +1,20 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 import unittest
 from unittest.mock import patch
 
 from app.core.http_client import PooledHTTPResponse, PooledHTTPStatusError
 from app.goal_assessment import GOAL_ASSESSMENT_VERSION, GoalAssessmentContext
 from app.services.ai import AIReviewError
-from app.services.retake_comparison import DIMENSION_KEYS, RETAKE_RESPONSE_SCHEMA, run_retake_comparison
+from app.services.retake_comparison import (
+    DIMENSION_KEYS,
+    RETAKE_RESPONSE_SCHEMA,
+    _ModelComparison,
+    _numbered_actions,
+    run_retake_comparison,
+)
 
 
 def _dimension(before: int, after: int, evidence: str, gap: str) -> dict:
@@ -105,6 +112,21 @@ def _response_body(
 
 
 class RetakeComparisonTests(unittest.TestCase):
+    def test_checklist_format_matches_multilingual_frontend_fixtures(self) -> None:
+        examples = json.loads((Path(__file__).parent / 'fixtures' / 'retake_checklist_examples.json').read_text(encoding='utf-8'))
+        for example in examples:
+            with self.subTest(locale=example['locale']):
+                comparison = json.loads(_response_body()['output'][0]['content'][0]['text'])
+                comparison['dimensions']['technical']['evidence'] = [example['observation']]
+                comparison['dimensions']['technical']['remaining_gap'] = example['reason']
+                comparison['next_actions'][0]['action'] = example['action']
+                comparison['next_actions'][0]['success_check'] = example['success_check']
+                self.assertEqual(
+                    _numbered_actions(_ModelComparison.model_validate(comparison)),
+                    f"1. Observation: {example['observation']}; Reason: {example['reason']}; "
+                    f"Action: {example['action']}; Success check: {example['success_check']}",
+                )
+
     def _run(self, *, goal_context: GoalAssessmentContext | None = None, mode: str = ''):
         return run_retake_comparison(
             original_image_url='https://images.example/original.jpg',

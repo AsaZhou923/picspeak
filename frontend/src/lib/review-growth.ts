@@ -115,10 +115,27 @@ function splitChecklistTitle(action: string): string {
   return normalized;
 }
 
+const CHECKLIST_LABELS = {
+  action: ['Action', '可执行动作', '可執行動作', '行动', '行動', '建议', '提案'],
+  reason: ['Reason', '原因', '理由'],
+  observation: ['Observation', '观察', '觀察', '観察'],
+  successCheck: ['Success check', '成功检查', '成功檢查', '成功标准', '成功標準', '成功条件', '成功條件', '確認基準'],
+};
+
+function escapeLabel(label: string): string {
+  return label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+const CHECKLIST_FIELD_BOUNDARY = Object.values(CHECKLIST_LABELS).flat().map(escapeLabel).join('|');
+
 function extractLabeledSegment(point: string, labels: string[]): string {
   for (const label of labels) {
-    const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const match = point.match(new RegExp(`${escaped}\\s*[：:]\\s*([^\\n；;]+)`, 'i'));
+    // Historical paired reviews separate fields with spaces, while other writers
+    // use newlines or semicolons. Only another labeled field ends the value.
+    const match = point.match(new RegExp(
+      `(?:^|[\\s;；])${escapeLabel(label)}\\s*[：:]\\s*([\\s\\S]*?)(?=(?:[\\s;；])(?:${CHECKLIST_FIELD_BOUNDARY})\\s*[：:]|$)`,
+      'i',
+    ));
     if (match?.[1]) {
       return cleanSegment(match[1]);
     }
@@ -170,9 +187,9 @@ export function buildNextShootChecklist(value: string, limit = 3, scores?: Revie
   return points
     .slice(0, limit)
     .map((point) => {
-      const action = extractLabeledSegment(point, ['Action', '可执行动作', '可執行動作', '行动', '行動', '建议', '提案']);
-      const reason = extractLabeledSegment(point, ['Reason', '原因', '理由']);
-      const observation = extractLabeledSegment(point, ['Observation', '观察', '觀察', '観察']);
+      const action = extractLabeledSegment(point, CHECKLIST_LABELS.action);
+      const reason = extractLabeledSegment(point, CHECKLIST_LABELS.reason);
+      const observation = extractLabeledSegment(point, CHECKLIST_LABELS.observation);
       const detail = action || cleanSegment(point);
       return {
         title: splitChecklistTitle(detail),

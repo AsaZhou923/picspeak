@@ -108,7 +108,7 @@ test('current and historical update copy describes mode benefits without reasoni
     assert.match(rollout.summary, /GPT-6 Sol/);
     assert.match(rollout.summary, /GPT-6\.1 Sol/);
     const latest = entries[0];
-    assert.equal(latest.id, '2026-10-15-purchased-image-credits');
+    assert.equal(latest.id, '2026-10-18-critique-and-draft-fixes');
     assert.equal(latest.showPopup, false);
   }
 });

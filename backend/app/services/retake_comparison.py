@@ -283,8 +283,8 @@ def _numbered_actions(comparison: _ModelComparison) -> str:
         evidence = dimensions[action.dimension]['evidence'][0]
         reason = dimensions[action.dimension]['remaining_gap'] or action.success_check
         points.append(
-            f'{index}. Observation: {evidence} Reason: {reason} '
-            f'Action: {action.action} Success check: {action.success_check}'
+            f'{index}. Observation: {evidence}; Reason: {reason}; '
+            f'Action: {action.action}; Success check: {action.success_check}'
         )
     return '\n'.join(points)
 
