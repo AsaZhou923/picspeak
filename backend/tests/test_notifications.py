@@ -223,7 +223,7 @@ class NotificationSQLiteTests(unittest.TestCase):
         occurred_at: datetime | None = None,
         cursor: dict | None = None,
     ) -> NotificationEvent:
-        occurred = occurred_at or datetime(2026, 10, 10, 3, 0, tzinfo=timezone.utc)
+        occurred = occurred_at or notification_events.database_now(self.db)
         event = NotificationEvent(
             id=self._next_id('notification_events'),
             public_id=f'nev_notify_{suffix}',
@@ -402,6 +402,19 @@ class NotificationSQLiteTests(unittest.TestCase):
         status = self.deliver(event)
 
         self.assertEqual(status, 'suppressed_preferences')
+        self.assertEqual(self.db.query(Notification).count(), 0)
+
+    def test_deliver_expired_like_event_expires_before_checking_preferences(self) -> None:
+        owner = self.user('like_expired')
+        event = self.event(
+            'like_expired',
+            recipient=owner,
+            occurred_at=notification_events.database_now(self.db) - timedelta(days=8),
+        )
+
+        status = self.deliver(event)
+
+        self.assertEqual(status, 'expired_delivery')
         self.assertEqual(self.db.query(Notification).count(), 0)
 
     def test_deliver_like_event_requires_opt_in_before_event_time(self) -> None:

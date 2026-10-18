@@ -263,10 +263,15 @@ class PublicGalleryRoutePostgresTests(unittest.TestCase):
     def setUp(self) -> None:
         self.engine = create_engine(TEST_DATABASE_URL, pool_pre_ping=True)
         self.connection = self.engine.connect()
-        self.Session = sessionmaker(bind=self.connection, autoflush=False, autocommit=False)
+        self.transaction = self.connection.begin()
+        self.Session = sessionmaker(
+            bind=self.connection, autoflush=False, autocommit=False,
+            join_transaction_mode='create_savepoint',
+        )
 
     def tearDown(self) -> None:
         app.dependency_overrides.clear()
+        self.transaction.rollback()
         self.connection.close()
         self.engine.dispose()
 
@@ -347,7 +352,8 @@ class PublicGalleryRoutePostgresTests(unittest.TestCase):
             db.close()
 
     def test_latest_pagination_uses_exact_timestamp_and_id_boundary(self) -> None:
-        newest_at = datetime(2035, 1, 1, 12, 0, 0, 120, tzinfo=timezone.utc) + timedelta(days=int(uuid4().hex[:6], 16) % 3000)
+        # Overlap the scoreboard boundary so leaked fixtures fail deterministically.
+        newest_at = datetime(2035, 4, 24, 12, 0, 0, 120, tzinfo=timezone.utc)
         inserted_ids = self._insert_gallery_reviews(count=61, newest_at=newest_at, spacing=timedelta(microseconds=2))
         created_from = (newest_at - timedelta(seconds=1)).isoformat()
         created_to = (newest_at + timedelta(seconds=1)).isoformat()
@@ -375,12 +381,15 @@ class PublicGalleryRoutePostgresTests(unittest.TestCase):
         first_ids = [item['review_id'] for item in first_body['items']]
         second_ids = [item['review_id'] for item in second.json()['items']]
 
-        self.assertEqual(len(first_ids), 60)
+        self.assertEqual(first_ids, inserted_ids[:60])
+        self.assertEqual(first_body['total_count'], 61)
+        self.assertEqual(second.json()['total_count'], 61)
         self.assertEqual(second_ids, [inserted_ids[60]])
+        self.assertIsNone(second.json()['next_cursor'])
         self.assertEqual(len(first_ids + second_ids), len(set(first_ids + second_ids)))
 
     def test_default_pagination_reuses_rank_clock_from_cursor(self) -> None:
-        newest_at = datetime(2035, 1, 2, 12, 0, tzinfo=timezone.utc) + timedelta(days=int(uuid4().hex[:6], 16) % 3000)
+        newest_at = datetime(2035, 4, 25, 12, 0, tzinfo=timezone.utc)
         inserted_ids = self._insert_gallery_reviews(count=25, newest_at=newest_at, spacing=timedelta(seconds=1))
         created_from = (newest_at - timedelta(minutes=1)).isoformat()
         created_to = (newest_at + timedelta(minutes=1)).isoformat()
@@ -408,7 +417,8 @@ class PublicGalleryRoutePostgresTests(unittest.TestCase):
         first_ids = [item['review_id'] for item in first_body['items']]
         second_ids = [item['review_id'] for item in second.json()['items']]
 
-        self.assertEqual(len(first_ids), 24)
+        self.assertEqual(first_ids, inserted_ids[:24])
+        self.assertEqual(first_body['total_count'], 25)
         self.assertEqual(second_ids, [inserted_ids[24]])
         self.assertEqual(len(first_ids + second_ids), len(set(first_ids + second_ids)))
         self.assertEqual(first_body['next_cursor'].count('|'), 3)
