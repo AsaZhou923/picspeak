@@ -5,7 +5,8 @@ from datetime import datetime, timezone
 from urllib.parse import urlsplit, urlunsplit
 
 from fastapi import APIRouter, Depends, Request, status
-from sqlalchemy.orm import Session
+from sqlalchemy import func
+from sqlalchemy.orm import Query, Session
 
 from app.api.deps import CurrentActor, get_current_actor, get_db, get_registered_actor
 from app.core.config import settings
@@ -143,6 +144,16 @@ def _active_subscription_for_user(db: Session, user: User) -> BillingSubscriptio
     return resolve_active_subscription_for_user(db, user)
 
 
+def _portal_subscription_query(db: Session, user: User) -> Query[BillingSubscription]:
+    # One-time Pro purchases share this table/provider but have only an order
+    # ID. They must not replace checkout or shadow a real subscription's portal.
+    return db.query(BillingSubscription).filter(
+        BillingSubscription.user_id == user.id,
+        BillingSubscription.provider == 'lemonsqueezy',
+        func.trim(BillingSubscription.provider_subscription_id, ' \t\r\n') != '',
+    )
+
+
 def _best_subscription_for_portal(subscriptions: list[BillingSubscription]) -> BillingSubscription | None:
     active_with_portal: BillingSubscription | None = None
     active_without_portal: BillingSubscription | None = None
@@ -219,13 +230,7 @@ def get_usage(request: Request, db: Session = Depends(get_db), actor: CurrentAct
     # Billing recovery remains available after paid access has ended. Do not use
     # the active subscription summary or the current plan as portal eligibility.
     billing_portal_available = actor.plan != UserPlan.guest and (
-        db.query(BillingSubscription.id)
-        .filter(
-            BillingSubscription.user_id == actor.user.id,
-            BillingSubscription.provider == 'lemonsqueezy',
-        )
-        .first()
-        is not None
+        _portal_subscription_query(db, actor.user).first() is not None
     )
     db.commit()
     return UsageResponse(
@@ -448,11 +453,7 @@ def get_billing_portal(
     # Owning a provider subscription grants management access even when payment
     # failure or expiry has downgraded the account to Free.
     subscriptions = (
-        db.query(BillingSubscription)
-        .filter(
-            BillingSubscription.user_id == actor.user.id,
-            BillingSubscription.provider == 'lemonsqueezy',
-        )
+        _portal_subscription_query(db, actor.user)
         .order_by(BillingSubscription.updated_at.desc(), BillingSubscription.id.desc())
         .all()
     )

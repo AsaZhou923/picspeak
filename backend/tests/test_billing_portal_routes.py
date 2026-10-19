@@ -239,6 +239,75 @@ class BillingPortalRouteTests(unittest.TestCase):
         self.assertEqual(response.json()['detail']['code'], 'BILLING_PORTAL_UNAVAILABLE')
         self.assertNotIn('active', response.json()['detail']['message'])
 
+    def test_expired_one_time_orders_keep_free_checkout_without_portal_eligibility(self) -> None:
+        for missing_id in (None, '', ' \t\r\n '):
+            with self.subTest(subscription_id=missing_id):
+                user = self.user(UserPlan.pro)
+                order = self.subscription(
+                    user, ends_at=datetime.now(timezone.utc) - timedelta(days=1),
+                    portal_url='https://picspeak.lemonsqueezy.com/billing?token=order-only',
+                )
+                with self.Session() as db:
+                    row = db.get(BillingSubscription, order.id)
+                    row.provider_subscription_id = missing_id
+                    row.provider_order_id = f'one_time_order_{order.id}'
+                    row.cancelled = True
+                    row.raw_payload = {'billing_access': {'billing_mode': 'one_time_pro', 'renews': False}}
+                    db.commit()
+                usage = self.get('/me/usage', user)
+                self.assertEqual(usage.status_code, 200, usage.text)
+                self.assertEqual(usage.json()['plan'], 'free')
+                self.assertIsNone(usage.json()['subscription'])
+                self.assertFalse(usage.json()['billing_portal_available'])
+                with patch.object(billing.settings, 'lemonsqueezy_pro_checkout_url', 'https://picspeak.lemonsqueezy.com/buy/pro'):
+                    portal = self.get('/billing/portal', user)
+                self.assertEqual(portal.status_code, 404, portal.text)
+                self.assertEqual(portal.json()['detail']['code'], 'BILLING_SUBSCRIPTION_NOT_FOUND')
+                self.retrieve.assert_not_called()
+
+    def test_order_only_history_cannot_shadow_real_subscription_recovery(self) -> None:
+        for subscription_status in ('past_due', 'unpaid', 'expired', 'cancelled'):
+            with self.subTest(status=subscription_status):
+                user = self.user()
+                recurring = self.subscription(user, status=subscription_status, portal_url=None)
+                order = self.subscription(
+                    user, status='active', portal_url='https://picspeak.lemonsqueezy.com/billing?token=order-only',
+                    ends_at=datetime.now(timezone.utc) + timedelta(days=1),
+                )
+                with self.Session() as db:
+                    row = db.get(BillingSubscription, order.id)
+                    row.provider_subscription_id = None
+                    row.provider_order_id = f'one_time_order_{order.id}'
+                    row.cancelled = True
+                    row.raw_payload = {'billing_access': {'billing_mode': 'one_time_pro', 'renews': False}}
+                    db.commit()
+                usage = self.get('/me/usage', user)
+                self.assertEqual(usage.status_code, 200, usage.text)
+                self.assertEqual(usage.json()['plan'], 'pro')
+                self.assertTrue(usage.json()['billing_portal_available'])
+                fresh_url = f'https://picspeak.lemonsqueezy.com/billing?subscription={recurring.provider_subscription_id}'
+                self.retrieve.return_value = {'attributes': {'urls': {'customer_portal': fresh_url}}}
+                self.retrieve.reset_mock()
+                response = self.get('/billing/portal', user)
+                self.assertEqual(response.status_code, 200, response.text)
+                self.assertEqual(response.json()['portal_url'], fresh_url)
+                self.retrieve.assert_called_once_with(recurring.provider_subscription_id)
+
+    def test_own_order_and_another_users_subscription_do_not_grant_portal_access(self) -> None:
+        user = self.user()
+        order = self.subscription(user, status='expired')
+        with self.Session() as db:
+            row = db.get(BillingSubscription, order.id)
+            row.provider_subscription_id = None
+            row.provider_order_id = 'owned_one_time_order'
+            db.commit()
+        self.subscription(self.user(UserPlan.pro))
+        usage = self.get('/me/usage', user)
+        self.assertFalse(usage.json()['billing_portal_available'])
+        response = self.get('/billing/portal', user)
+        self.assertEqual(response.status_code, 404)
+        self.retrieve.assert_not_called()
+
     def test_guest_usage_never_advertises_billing_portal(self) -> None:
         user = self.user(UserPlan.guest)
         self.subscription(user, status='expired')
