@@ -110,6 +110,7 @@ const _usage: UsageResponse = {
     priority_queue: false,
   },
   subscription: null,
+  billing_portal_available: false,
   rate_limit: {
     limit_per_min: 60,
     remaining: 59,

@@ -100,6 +100,17 @@ test('frontend error formatter maps stable backend codes to localized text inste
   assert.equal(localizedErrorMessage(t, 'UNMAPPED_CODE', 'fallback'), 'fallback');
 });
 
+test('idempotency conflicts use request-neutral copy for generation and practice', () => {
+  for (const dictionary of [enTranslations, zhTranslations, jaTranslations]) {
+    const translate = (key: keyof typeof enTranslations) => dictionary[key];
+    for (const code of ['IDEMPOTENCY_CONFLICT', 'PRACTICE_SESSION_DUPLICATE', 'PRACTICE_ATTEMPT_DUPLICATE_TASK']) {
+      assert.equal(localizedErrorMessage(translate, code), dictionary.err_idempotency_conflict_body);
+    }
+    assert.doesNotMatch(dictionary.err_idempotency_conflict_body, /practice|练习|練習/i);
+    assert.match(dictionary.err_idempotency_conflict_body, /new request|新请求|新しいリクエスト/);
+  }
+});
+
 test('score feedback labels are complete and preserve the direction of the AI score judgment', () => {
   for (const dictionary of [enTranslations, zhTranslations, jaTranslations]) {
     for (const key of ['score_feedback_accurate', 'score_feedback_too_high', 'score_feedback_too_low', 'score_feedback_score_changed', 'score_feedback_version_changed', 'score_feedback_private', 'score_feedback_withdrawing', 'score_feedback_withdraw_failed'] as const) {

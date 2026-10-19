@@ -678,6 +678,7 @@ class UsageResponse(BaseModel):
     generation_credits: UsageGenerationCredits
     features: UsageFeatures
     subscription: UsageSubscription | None = None
+    billing_portal_available: bool = False
     rate_limit: dict[str, Any]
 
 

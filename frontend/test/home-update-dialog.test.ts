@@ -18,19 +18,30 @@ const homeSource = readFileSync(
 );
 const shellSource = readFileSync(path.join(FRONTEND_DIR, 'src/components/layout/SiteChrome.tsx'), 'utf8');
 
-test('critique and draft fixes use release copy without a popup', () => {
+test('subscription recovery and generation retry fixes are upcoming without a popup', () => {
   for (const locale of ['zh', 'en', 'ja'] as const) {
     const latest = getLatestProductUpdate(locale);
     assert.ok(latest);
-    assert.equal(latest.id, '2026-10-18-critique-and-draft-fixes');
-    assert.doesNotMatch(latest.title + latest.summary, /准备中|upcoming|Upcoming:|準備中/);
-    assert.equal(latest.date, '2026-10-18');
+    assert.equal(latest.id, '2026-10-19-billing-recovery-and-generation-retries');
+    assert.match(latest.title, /准备中|Upcoming:|準備中/);
+    assert.match(latest.summary, /准备中|In preparation:|準備中/);
+    assert.equal(latest.date, '2026-10-19');
     assert.equal(latest.showPopup, false);
     assert.equal(shouldShowProductUpdatePopup(latest), false);
     assert.equal(latest.docPath, `docs/changelog/CHANGELOG.md#${latest.id}`);
   }
-  assert.equal(getLatestProductUpdateDate('zh'), '2026-10-18');
-  assert.equal(getLatestProductUpdateDate(), '2026-10-18');
+  assert.equal(getLatestProductUpdateDate('zh'), '2026-10-19');
+  assert.equal(getLatestProductUpdateDate(), '2026-10-19');
+});
+
+test('critique and draft fixes retain their published status in every locale', () => {
+  for (const locale of ['zh', 'en', 'ja'] as const) {
+    const released = getProductUpdates(locale).find((entry) => entry.id === '2026-10-18-critique-and-draft-fixes');
+    assert.ok(released);
+    assert.doesNotMatch(released.title + released.summary, /准备中|upcoming|Upcoming:|準備中/);
+    assert.equal(released.date, '2026-10-18');
+    assert.equal(shouldShowProductUpdatePopup(released), false);
+  }
 });
 
 test('purchased credits release retains its published status in every locale', () => {
