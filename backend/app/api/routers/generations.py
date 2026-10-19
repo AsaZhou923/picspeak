@@ -68,6 +68,21 @@ def _decode_generation_cursor(cursor: str) -> tuple[datetime, int]:
     return created_at, int(raw_id)
 
 
+def _matches_generation_request_hash(
+    stored_hash: str, request_hash: str, payload: GenerationCreateRequest, idempotency_key: str,
+) -> bool:
+    if stored_hash == request_hash:
+        return True
+    # Previously persisted hashes included the transport key. Accept the old
+    # body/header representations without weakening the request-content check.
+    legacy_payload = payload.model_dump(by_alias=True)
+    for legacy_key in (idempotency_key, None, ''):
+        legacy_payload['idempotency_key'] = legacy_key
+        if stored_hash == hash_request(json.dumps(legacy_payload, ensure_ascii=False, sort_keys=True)):
+            return True
+    return False
+
+
 @router.get('/generations/templates', response_model=GenerationTemplatesResponse)
 def get_generation_template_catalog():
     return {'items': get_generation_templates(), 'credits_table': get_credits_table()}
@@ -112,9 +127,14 @@ def create_generation(
         source_photo_internal_id = source_photo.id
 
     idempotency_key = payload.idempotency_key or request.headers.get('Idempotency-Key')
-    payload_dump = json.dumps(payload.model_dump(by_alias=True), ensure_ascii=False, sort_keys=True)
+    payload_dump = json.dumps(
+        payload.model_dump(by_alias=True, exclude={'idempotency_key'}), ensure_ascii=False, sort_keys=True,
+    )
+    request_hash = hash_request(payload_dump)
     if idempotency_key:
         record = get_idempotency_record(db, actor.user.id, '/generations', idempotency_key)
+        if record is not None and not _matches_generation_request_hash(record.request_hash, request_hash, payload, idempotency_key):
+            raise api_error(status.HTTP_409_CONFLICT, 'IDEMPOTENCY_CONFLICT', 'Idempotency key was used with different generation content')
         if record is not None and record.response_json is not None:
             return record.response_json
 
@@ -190,7 +210,7 @@ def create_generation(
             user_id=actor.user.id,
             endpoint='/generations',
             key=idempotency_key,
-            request_hash=hash_request(payload_dump),
+            request_hash=request_hash,
             http_status=200,
             response_json=response,
         )

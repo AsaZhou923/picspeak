@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-19-billing-recovery-and-generation-retries",
+    "date": "2026-10-19",
+    "showPopup": false,
+    "title": "準備中：サブスク復旧と画像生成の再試行を修正",
+    "summary": "準備中：支払いの問題が起きても既存のサブスクを管理できるようにし、支払い通知の到着順によって復旧した Pro の利用が妨げられる問題を修正します。画像生成の再試行で内容が変わった場合は、古いタスクを返さず、再送信を案内します。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-10-19-billing-recovery-and-generation-retries"
+  },
+  {
     "id": "2026-10-18-critique-and-draft-fixes",
     "date": "2026-10-18",
     "showPopup": false,

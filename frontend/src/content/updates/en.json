@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-19-billing-recovery-and-generation-retries",
+    "date": "2026-10-19",
+    "showPopup": false,
+    "title": "Upcoming: subscription recovery and image retry fixes",
+    "summary": "In preparation: keep subscription management available after payment issues, prevent out-of-order payment updates from blocking restored Pro access, and show an error when a retried image request has changed instead of returning an older task.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-10-19-billing-recovery-and-generation-retries"
+  },
+  {
     "id": "2026-10-18-critique-and-draft-fixes",
     "date": "2026-10-18",
     "showPopup": false,

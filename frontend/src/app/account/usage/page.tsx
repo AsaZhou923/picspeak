@@ -8,6 +8,7 @@ import ActivationCodeModal from '@/components/billing/ActivationCodeModal';
 import BillingContactModal from '@/components/account/BillingContactModal';
 import UsageGenerationCreditsPanel from '@/components/account/UsageGenerationCreditsPanel';
 import UsageQuotaPanel from '@/components/account/UsageQuotaPanel';
+import UsageBillingActions from '@/components/account/UsageBillingActions';
 import { createBillingCheckout, getBillingPortal, getUsage } from '@/lib/api';
 import ClerkSignInTrigger from '@/components/auth/ClerkSignInTrigger';
 import ProPromoCard from '@/components/marketing/ProPromoCard';
@@ -329,44 +330,17 @@ export default function UsagePage() {
                     {t('usage_login_now')}
                     <ArrowRight size={11} />
                   </ClerkSignInTrigger>
-                ) : usage.plan === 'free' ? (
-                  <div className="flex flex-col items-end gap-2">
-                    <button
-                      type="button"
-                      onClick={handleCheckout}
-                      disabled={checkoutLoading}
-                      className="ui-action-secondary px-3 py-1.5 text-xs text-gold disabled:opacity-60"
-                    >
-                      {checkoutLoading
-                        ? t('usage_checkout_loading')
-                        : t('usage_checkout_pro')}
-                      <ArrowRight size={11} />
-                    </button>
-                  </div>
-                ) : usage.plan === 'pro' ? (
-                  isZhLocale && isActivationCodeSubscription ? (
-                    <div className="flex flex-col items-end gap-2">
-                      <button
-                        type="button"
-                        onClick={handleCheckout}
-                        className="ui-action-secondary px-3 py-1.5 text-xs text-gold"
-                      >
-                        {t('usage_checkout_pro')}
-                        <ArrowRight size={11} />
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={handleManageSubscription}
-                      disabled={portalLoading}
-                      className="ui-action-secondary px-3 py-1.5 text-xs text-gold disabled:opacity-60"
-                    >
-                      {portalLoading ? t('usage_manage_loading') : t('usage_manage_subscription')}
-                      <ArrowRight size={11} />
-                    </button>
-                  )
-                ) : null}
+                ) : (
+                  <UsageBillingActions
+                    t={t}
+                    usage={usage}
+                    locale={locale}
+                    checkoutLoading={checkoutLoading}
+                    portalLoading={portalLoading}
+                    onCheckout={handleCheckout}
+                    onManageSubscription={handleManageSubscription}
+                  />
+                )}
               </div>
             </div>
 

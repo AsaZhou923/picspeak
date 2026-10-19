@@ -6,6 +6,7 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from uuid import uuid4
+from unittest.mock import patch
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
@@ -264,6 +265,84 @@ class LemonSqueezyNotificationPostgresTests(unittest.TestCase):
         events = self.db.query(NotificationEvent).order_by(NotificationEvent.id).all()
         self.assertEqual(len(events), 3)
         self.assertEqual([event.payload_json['status'] for event in events], ['active', 'cancelled', 'active'])
+
+    def _assert_payment_recovery(self, *, payment_first: bool) -> None:
+        user = self.user()
+        user.plan = UserPlan.free
+        provider_time = datetime(2026, 10, 10, 12, 1, tzinfo=timezone.utc)
+        subscription = self.existing_subscription(
+            user, status='past_due', last_event_at=provider_time - timedelta(minutes=1),
+        )
+        invoice = LemonSqueezyWebhookEvent(
+            event_name='subscription_payment_success', payload={}, meta={},
+            data={
+                'type': 'subscription-invoices', 'id': 'invoice_recovery',
+                'attributes': {
+                    'subscription_id': subscription.provider_subscription_id,
+                    'updated_at': provider_time.isoformat(),
+                },
+            },
+            event_hash='invoice_recovery', test_mode=False,
+            resource_type='subscription-invoices', resource_id='invoice_recovery',
+        )
+        update = _subscription_event(
+            event_name='subscription_updated', subscription_id=subscription.provider_subscription_id,
+            status='active', cancelled=False, updated_at=provider_time,
+        )
+        events = [invoice, update] if payment_first else [update, invoice]
+        with patch('app.services.lemonsqueezy_webhooks._utc_now', return_value=provider_time + timedelta(seconds=5)), patch(
+            'app.services.lemonsqueezy_webhooks.retrieve_subscription',
+            side_effect=AssertionError('No provider API calls allowed'),
+        ):
+            for event in events:
+                process_lemonsqueezy_webhook_event(self.db, event)
+                self.db.commit()
+                self.db.expire_all()
+            # Real stale state events and duplicate deliveries must stay harmless.
+            process_lemonsqueezy_webhook_event(self.db, _subscription_event(
+                event_name='subscription_updated', subscription_id=subscription.provider_subscription_id,
+                status='past_due', cancelled=False, updated_at=provider_time - timedelta(seconds=1),
+            ))
+            process_lemonsqueezy_webhook_event(self.db, update)
+            self.db.commit()
+            self.db.expire_all()
+        self.assertEqual(subscription.status, 'active')
+        self.assertEqual(user.plan, UserPlan.pro)
+        self.assertEqual(subscription.last_event_name, 'subscription_updated')
+        self.assertEqual(subscription.last_event_at, provider_time)
+        self.assertEqual(subscription.last_payment_at, provider_time)
+        self.assertEqual(subscription.last_invoice_id, 'invoice_recovery')
+        self.assertEqual(self.db.query(NotificationEvent).count(), 1)
+
+    def test_payment_first_then_equal_time_state_restores_persisted_access(self) -> None:
+        self._assert_payment_recovery(payment_first=True)
+
+    def test_state_first_then_equal_time_payment_preserves_persisted_access(self) -> None:
+        self._assert_payment_recovery(payment_first=False)
+
+    def test_legacy_invoice_watermark_after_portal_refresh_recovers_persisted_access(self) -> None:
+        user = self.user()
+        user.plan = UserPlan.free
+        provider_time = datetime(2026, 10, 10, 12, 1, tzinfo=timezone.utc)
+        subscription = self.existing_subscription(
+            user, status='past_due', last_event_at=provider_time + timedelta(seconds=5),
+        )
+        update = _subscription_event(
+            event_name='subscription_updated', subscription_id=subscription.provider_subscription_id,
+            status='active', cancelled=False, updated_at=provider_time,
+        )
+        subscription.last_event_name = 'subscription_payment_success'
+        subscription.raw_payload = update.data
+        self.db.commit()
+        self.db.expire_all()
+        process_lemonsqueezy_webhook_event(self.db, update)
+        self.db.commit()
+        self.db.expire_all()
+        self.assertEqual(subscription.status, 'active')
+        self.assertEqual(user.plan, UserPlan.pro)
+        self.assertEqual(subscription.last_event_name, 'subscription_updated')
+        self.assertEqual(subscription.last_event_at, provider_time)
+        self.assertEqual(self.db.query(NotificationEvent).count(), 1)
 
     def test_old_changed_subscription_payload_does_not_revert_state_or_notify(self) -> None:
         user = self.user()

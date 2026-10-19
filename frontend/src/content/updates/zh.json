@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-19-billing-recovery-and-generation-retries",
+    "date": "2026-10-19",
+    "showPopup": false,
+    "title": "订阅恢复与生图重试修复（准备中）",
+    "summary": "准备中：付款出现问题后仍可管理已有订阅，避免付款消息顺序阻挡恢复后的 Pro 权益；生图重试内容发生变化时明确提示重新提交，不再返回旧任务。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-10-19-billing-recovery-and-generation-retries"
+  },
+  {
     "id": "2026-10-18-critique-and-draft-fixes",
     "date": "2026-10-18",
     "showPopup": false,

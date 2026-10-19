@@ -51,6 +51,7 @@ export interface UsageResponse {
     ends_at: string | null;
     current_period_ends_at: string | null;
   } | null;
+  billing_portal_available: boolean;
   rate_limit: {
     limit_per_min: number;
     remaining: number;

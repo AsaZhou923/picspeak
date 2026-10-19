@@ -568,13 +568,18 @@ def _upsert_subscription_from_resource(
         subscription = BillingSubscription(user_id=user.id, provider='lemonsqueezy')
     before_fingerprint = _subscription_state_fingerprint(subscription) if subscription.id is not None else None
     event_effective_at = _event_effective_at(attributes)
-    if (
-        subscription.id is not None
-        and event_effective_at is not None
-        and subscription.last_event_at is not None
-        and event_effective_at <= subscription.last_event_at
-    ):
-        return subscription, before_fingerprint, str(event_effective_at.isoformat()), False
+    # Older payment handlers wrote the local invoice receipt time into the
+    # subscription-state watermark. Recover its provider timestamp when possible.
+    # Portal refreshes can also replace raw_payload without applying its state,
+    # so an equal-time subscription snapshot must still be accepted in this case.
+    legacy_payment_watermark = subscription.last_event_name == 'subscription_payment_success'
+    state_watermark = subscription.last_event_at
+    if legacy_payment_watermark:
+        state_watermark = _event_effective_at(_payload_attributes(subscription.raw_payload or {}))
+    if subscription.id is not None and event_effective_at is not None and state_watermark is not None:
+        stale = event_effective_at < state_watermark if legacy_payment_watermark else event_effective_at <= state_watermark
+        if stale:
+            return subscription, before_fingerprint, str(event_effective_at.isoformat()), False
 
     urls = attributes.get('urls')
     url_map = urls if isinstance(urls, dict) else {}
@@ -758,11 +763,16 @@ def _process_subscription_payment_success(db: Session, event: LemonSqueezyWebhoo
 
     before_fingerprint = _subscription_state_fingerprint(subscription)
     invoice_id = str(event.data.get('id') or '').strip() or None
-    subscription.last_invoice_id = invoice_id
-    subscription.last_payment_status = 'success'
-    subscription.last_payment_at = _parse_iso_datetime(attributes.get('updated_at')) or _utc_now()
-    subscription.last_event_name = event.event_name
-    subscription.last_event_at = _utc_now()
+    payment_effective_at = _event_effective_at(attributes)
+    # An invoice is not a subscription-state snapshot. Keep its timestamps and
+    # identity separate so delayed/equal-time subscription updates can restore
+    # access, and older invoices cannot replace newer payment metadata.
+    if subscription.last_payment_at is None or (
+        payment_effective_at is not None and payment_effective_at > subscription.last_payment_at
+    ):
+        subscription.last_invoice_id = invoice_id
+        subscription.last_payment_status = 'success'
+        subscription.last_payment_at = payment_effective_at
     subscription.updated_at = _utc_now()
     db.add(subscription)
     _sync_user_plan(db, resolved_user)

@@ -5,9 +5,10 @@ from datetime import datetime, timezone
 from urllib.parse import urlsplit, urlunsplit
 
 from fastapi import APIRouter, Depends, Request, status
-from sqlalchemy.orm import Session
+from sqlalchemy import func
+from sqlalchemy.orm import Query, Session
 
-from app.api.deps import CurrentActor, get_current_actor, get_db
+from app.api.deps import CurrentActor, get_current_actor, get_db, get_registered_actor
 from app.core.config import settings
 from app.core.errors import api_error
 from app.db.models import BillingSubscription, UsageLedger, User, UserPlan
@@ -143,6 +144,16 @@ def _active_subscription_for_user(db: Session, user: User) -> BillingSubscriptio
     return resolve_active_subscription_for_user(db, user)
 
 
+def _portal_subscription_query(db: Session, user: User) -> Query[BillingSubscription]:
+    # One-time Pro purchases share this table/provider but have only an order
+    # ID. They must not replace checkout or shadow a real subscription's portal.
+    return db.query(BillingSubscription).filter(
+        BillingSubscription.user_id == user.id,
+        BillingSubscription.provider == 'lemonsqueezy',
+        func.trim(BillingSubscription.provider_subscription_id, ' \t\r\n') != '',
+    )
+
+
 def _best_subscription_for_portal(subscriptions: list[BillingSubscription]) -> BillingSubscription | None:
     active_with_portal: BillingSubscription | None = None
     active_without_portal: BillingSubscription | None = None
@@ -216,6 +227,11 @@ def get_usage(request: Request, db: Session = Depends(get_db), actor: CurrentAct
                 'ends_at': active_subscription.ends_at,
                 'current_period_ends_at': _current_period_ends_at(active_subscription),
             }
+    # Billing recovery remains available after paid access has ended. Do not use
+    # the active subscription summary or the current plan as portal eligibility.
+    billing_portal_available = actor.plan != UserPlan.guest and (
+        _portal_subscription_query(db, actor.user).first() is not None
+    )
     db.commit()
     return UsageResponse(
         plan=actor.plan.value,
@@ -227,6 +243,7 @@ def get_usage(request: Request, db: Session = Depends(get_db), actor: CurrentAct
             'priority_queue': has_priority_queue(actor.plan),
         },
         subscription=subscription,
+        billing_portal_available=billing_portal_available,
         rate_limit={},
     )
 
@@ -431,17 +448,12 @@ def redeem_image_credit_code(
 @router.get('/billing/portal', response_model=BillingPortalResponse)
 def get_billing_portal(
     db: Session = Depends(get_db),
-    actor: CurrentActor = Depends(get_current_actor),
+    actor: CurrentActor = Depends(get_registered_actor),
 ):
-    if actor.plan != UserPlan.pro:
-        raise api_error(status.HTTP_403_FORBIDDEN, 'BILLING_PORTAL_PRO_REQUIRED', 'Only Pro users can manage a subscription')
-
+    # Owning a provider subscription grants management access even when payment
+    # failure or expiry has downgraded the account to Free.
     subscriptions = (
-        db.query(BillingSubscription)
-        .filter(
-            BillingSubscription.user_id == actor.user.id,
-            BillingSubscription.provider == 'lemonsqueezy',
-        )
+        _portal_subscription_query(db, actor.user)
         .order_by(BillingSubscription.updated_at.desc(), BillingSubscription.id.desc())
         .all()
     )
@@ -461,7 +473,7 @@ def get_billing_portal(
         raise api_error(
             status.HTTP_409_CONFLICT,
             'BILLING_PORTAL_UNAVAILABLE',
-            'Your subscription is active, but the billing portal link is not ready yet',
+            'The billing portal link for your subscription is not ready yet',
         )
 
     db.commit()
