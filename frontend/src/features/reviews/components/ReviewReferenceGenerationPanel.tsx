@@ -64,7 +64,7 @@ export function ReviewReferenceGenerationPanel({
   sourceAspect,
 }: ReviewReferenceGenerationPanelProps) {
   const router = useRouter();
-  const { ensureToken, userInfo, token: currentToken } = useAuth();
+  const { ensureToken, captureAuthOwner, userInfo } = useAuth();
   const owner = userInfo?.user_id ?? '';
   const scope = `${owner}:${reviewId}:${photoId}`;
   const scopeRef = useRef({ scope, revision: 0 });
@@ -150,12 +150,14 @@ export function ReviewReferenceGenerationPanel({
     busyRef.current = true;
     let handedOff = false;
     const revision = scopeRef.current.revision;
-    const isCurrent = () => mountedRef.current && scopeRef.current.revision === revision;
+    const isOwnerCurrent = captureAuthOwner(owner);
+    const isScopeCurrent = () => mountedRef.current && scopeRef.current.revision === revision;
+    const isCurrent = () => isScopeCurrent() && isOwnerCurrent();
     setBusy(true);
     setError('');
     try {
       const token = await ensureToken();
-      if (!isCurrent() || token !== currentToken) return;
+      if (!isCurrent()) return;
       const analyticsSource = readProductAttributionSource();
       const pendingRequest = await prepareGenerationRequest(owner,
         {
@@ -215,7 +217,7 @@ export function ReviewReferenceGenerationPanel({
       }
       setError(formatUserFacingError(t, err, t('generation_error_fallback')));
     } finally {
-      if (!handedOff && isCurrent()) {
+      if (!handedOff && isScopeCurrent()) {
         busyRef.current = false;
         if (mountedRef.current) setBusy(false);
       }

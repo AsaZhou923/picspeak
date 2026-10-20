@@ -24,7 +24,7 @@ function profileHref(publicProfileId: string): string {
 }
 
 export default function AccountProfilePage() {
-  const { ensureToken, userInfo } = useAuth();
+  const { ensureToken, captureAuthOwner, userInfo } = useAuth();
   const { locale, t } = useI18n();
   const copy = useMemo(() => getProfileCopy(locale), [locale]);
   const [hydrated, setHydrated] = useState(false);
@@ -99,16 +99,16 @@ export default function AccountProfilePage() {
   async function toggleProfile(enabled: boolean) {
     if (!canPublish || loading || savingRef.current || !settings) return;
     const revision = identityRef.current.revision;
-    const expectedToken = userInfo?.access_token;
-    const isCurrent = () => activeRef.current && identityRef.current.revision === revision;
+    const isOwnerCurrent = captureAuthOwner(userInfo?.user_id ?? null);
+    const isScopeCurrent = () => activeRef.current && identityRef.current.revision === revision;
+    const isCurrent = () => isScopeCurrent() && isOwnerCurrent();
     savingRef.current = true;
     setSaving(true);
     setError('');
     try {
       const token = await ensureToken();
-      // Auth updates may not have rendered yet when ensureToken resolves. Never
-      // apply the previous identity's publish decision with a different token.
-      if (!isCurrent() || token !== expectedToken) return;
+      // A renewed bearer is valid for this owner; a confirmed owner change is not.
+      if (!isCurrent()) return;
       const payload = await updateMyProfileSettings(token, enabled);
       if (!isCurrent()) return;
       // The confirmed write is newer than any overlapping read for this owner.
@@ -124,7 +124,7 @@ export default function AccountProfilePage() {
       }
       setError(formatUserFacingError(messagesRef.current.t, err, messagesRef.current.copy.unavailable));
     } finally {
-      if (isCurrent()) {
+      if (isScopeCurrent()) {
         savingRef.current = false;
         setSaving(false);
       }

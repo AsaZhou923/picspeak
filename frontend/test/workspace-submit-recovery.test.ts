@@ -1,24 +1,26 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { componentHarness, deferred, settle } from './helpers/component-harness.ts';
+import { createAuthOwnerState } from './helpers/auth-owner-state.ts';
 import * as reviewRequest from '../src/features/workspace/review-request.ts';
 import * as workspaceTaskFlow from '../src/features/workspace/workspaceTaskFlow.ts';
 
-function harness(create: (payload: any, token: string) => Promise<any>, initialOwner?: string) {
+function harness(create: (payload: any, token: string) => Promise<any>, initialOwner?: string, createPractice?: (payload: any, token: string) => Promise<any>) {
   let locale = 'en';
-  let owner = initialOwner ?? `workspace-${crypto.randomUUID()}`;
+  const authState = createAuthOwnerState(initialOwner ?? `workspace-${crypto.randomUUID()}`);
   let stage = 'ready';
   let errMessage = '';
   let remainingQuota = 20;
   let photo: any = { photo_id: 'photo-a', status: 'READY' };
   let preview: string | null = 'local-preview';
   const pushed: string[] = [];
-  const auth = () => ({ token: owner, userInfo: { user_id: owner, plan: 'pro' }, ensureToken: async () => owner });
+  const replaced: string[] = [];
+  const auth = authState.read;
   const modules: Record<string, any> = {
     'next/image': { default: 'Image' }, 'next/link': { default: 'Link' }, 'lucide-react': {},
-    'next/navigation': { useRouter: () => ({ push: (path: string) => pushed.push(path), replace() {} }) },
+    'next/navigation': { useRouter: () => ({ push: (path: string) => pushed.push(path), replace: (path: string) => replaced.push(path) }) },
     '@/lib/auth-context': { useAuth: auth }, '@/lib/i18n': { useI18n: () => ({ locale, t: (key: string) => `${locale}:${key}` }) },
-    '@/lib/api': { createReview: create, getPracticeConfig: async () => ({ practice_enabled: false }), isAbortError: () => false },
+    '@/lib/api': { createReview: create, createPracticeSession: createPractice, getReview: async () => ({ photo_url: '/source' }), getPracticeConfig: async () => ({ practice_enabled: Boolean(createPractice) }), isAbortError: () => false },
     '@/lib/types': { ApiException: class extends Error {} },
     '@/lib/error-utils': { formatUserFacingError: () => 'localized-error' },
     '@/lib/product-analytics': { trackProductEvent() {} },
@@ -26,7 +28,7 @@ function harness(create: (payload: any, token: string) => Promise<any>, initialO
     '@/lib/retake-coach-copy': { getRetakeCoachCopy: () => ({ dimensions: {} }) },
     '@/features/workspace/hooks/useWorkspaceUsage': { useWorkspaceUsage: () => ({ usage: {}, fetchUsage() {}, currentPlan: 'pro', isGuest: false, remainingQuota, totalQuota: 20 }) },
     '@/features/workspace/hooks/useUploadFlow': { useUploadFlow: () => ({ photo, preview, stage, errMessage, setStage(value: string) { stage = value; }, setErrMessage(value: string) { errMessage = value; }, handleFileSelected() {}, handleReset() { stage = 'idle'; errMessage = ''; preview = null; photo = null; } }) },
-    '@/features/workspace/hooks/useReplayContext': { useReplayContext: () => ({ clearReplay() {} }) },
+    '@/features/workspace/hooks/useReplayContext': { useReplayContext: () => ({ clearReplay() {}, ...(createPractice ? { sourceReviewId: 'review-source', nextShootAction: 'Keep the background clear', nextShootDimension: 'composition' } : {}) }) },
     '@/features/workspace/review-request': reviewRequest,
     '@/features/workspace/workspaceTaskFlow': workspaceTaskFlow,
     '@/features/reviews/hooks/usePracticeExposure': { usePracticeExposure: () => null },
@@ -38,8 +40,11 @@ function harness(create: (payload: any, token: string) => Promise<any>, initialO
   const app = componentHarness(new URL('../src/app/workspace/page.tsx', import.meta.url), modules);
   const render = () => app.render();
   const submit = () => app.nodes((node) => node.type === 'WorkspaceSubmitPanel')[0].props.onSubmit();
-  return { ...app, render, submit, pushed, get owner() { return owner; }, get stage() { return stage; },
-    changeOwner(value: string) { owner = value; render(); }, changeLocale(value: string) { locale = value; render(); },
+  return { ...app, render, submit, pushed, replaced, get owner() { return authState.owner; }, get stage() { return stage; },
+    changeOwner(value: string, rerender = true) { authState.changeOwner(value); if (rerender) render(); },
+    refreshToken() { authState.refreshToken(); },
+    holdToken(value: Promise<string> | null) { authState.holdToken(value); }, changeLocale(value: string) { locale = value; render(); },
+    acceptPractice() { return app.nodes((node) => node.type === 'button' && node.props.children === 'Save this goal')[0].props.onClick(); },
     setQuota(value: number) { remainingQuota = value; render(); },
     changeMode(value: string) { app.nodes((node) => node.type === 'WorkspaceSettingsPanel')[0].props.onReviewModeChange(value); render(); },
   };
@@ -151,4 +156,95 @@ test('workspace exhausted quota cannot reuse an uncertain Flash intent for a new
   await app.submit(); app.render(); await app.submit(); app.render();
   assert.equal(calls.length, 1);
   assert.equal(app.nodes((node) => node.type === 'QuotaModal').length, 1);
+});
+
+test('workspace submits a retained photo with the same-owner renewed token', async () => {
+  const tokens: string[] = [];
+  const app = harness(async (_payload, token) => { tokens.push(token); return { task_id: 'renewed-review' }; });
+  app.render(); await settle(); app.render();
+  app.refreshToken();
+  await app.submit();
+  assert.deepEqual(tokens, [`${app.owner}-refreshed`]);
+  assert.deepEqual(app.pushed, ['/tasks/renewed-review?mode=flash']);
+  app.unmount();
+});
+
+for (const timing of ['during-auth', 'late-response'] as const) {
+  test(`workspace rejects a confirmed owner switch ${timing} before React rerenders`, async () => {
+    const authentication = deferred<string>();
+    const result = deferred<any>(); const called = deferred<void>();
+    let writes = 0;
+    const app = harness(async () => { writes++; called.resolve(); return result.promise; });
+    app.render(); await settle(); app.render();
+    if (timing === 'during-auth') app.holdToken(authentication.promise);
+    const submission = app.submit();
+    if (timing === 'late-response') await called.promise;
+    app.changeOwner('new-owner', false);
+    authentication.resolve('new-owner-token'); result.resolve({ task_id: 'stale-review' });
+    await submission;
+    assert.equal(writes, timing === 'late-response' ? 1 : 0);
+    assert.deepEqual(app.pushed, []);
+    app.unmount();
+  });
+}
+
+const practiceSession = { session_id: 'saved-goal', practice_kind: 'capture_retake', source_access: 'available', source_review_id: 'review-source', source_photo_id: 'photo-source', goal_snapshot: { goal: 'Keep the background clear', dimension: 'composition' }, success_criteria: [], attempts: [], locale: 'en' };
+
+test('workspace goal save accepts same-owner renewed token and guards repeated clicks', async () => {
+  const writes: string[] = []; const called = deferred<void>(); const saved = deferred<any>();
+  const app = harness(async () => ({}), undefined, async (_payload, token) => { writes.push(token); called.resolve(); return saved.promise; });
+  app.render(); await settle(); app.render(); app.refreshToken();
+  app.acceptPractice(); app.acceptPractice(); await called.promise;
+  assert.deepEqual(writes, [`${app.owner}-refreshed`]);
+  saved.resolve(practiceSession); await settle(); app.render();
+  assert.deepEqual(app.replaced, ['/workspace?practice_session_id=saved-goal']);
+  app.unmount();
+});
+
+for (const timing of ['during-auth', 'late-response'] as const) {
+  test(`workspace goal save rejects a confirmed owner switch ${timing} before React rerenders`, async () => {
+    const authentication = deferred<string>(); const saved = deferred<any>(); const called = deferred<void>();
+    let writes = 0;
+    const app = harness(async () => ({}), undefined, async () => { writes++; called.resolve(); return saved.promise; });
+    app.render(); await settle(); app.render();
+    if (timing === 'during-auth') app.holdToken(authentication.promise);
+    app.acceptPractice();
+    if (timing === 'late-response') await called.promise;
+    app.changeOwner('new-owner', false);
+    authentication.resolve('new-owner-token'); saved.resolve({ ...practiceSession, session_id: 'old-account-session' });
+    await settle();
+    assert.equal(writes, timing === 'late-response' ? 1 : 0);
+    assert.deepEqual(app.replaced, []);
+    app.render();
+    assert.doesNotMatch(app.text(), /old-account-session/);
+    app.unmount();
+  });
+}
+
+test('workspace review unlocks after a discarded A-to-B-to-A result without clearing a newer action', async () => {
+  const result = deferred<any>(); const called = deferred<void>();
+  let writes = 0;
+  const app = harness(async () => { writes++; called.resolve(); return result.promise; });
+  app.render(); await settle(); app.render();
+  const first = app.submit(); await called.promise;
+  const owner = app.owner; app.changeOwner('other-owner', false); app.changeOwner(owner, false);
+  result.resolve({ task_id: 'recovered-review' }); await first; app.render();
+  assert.deepEqual(app.pushed, []); assert.equal(app.stage, 'ready');
+  await app.submit();
+  assert.equal(writes, 2);
+  assert.deepEqual(app.pushed, ['/tasks/recovered-review?mode=flash']);
+  app.unmount();
+});
+
+test('workspace goal save unlocks after a discarded A-to-B-to-A result', async () => {
+  const result = deferred<any>(); const called = deferred<void>(); let writes = 0;
+  const app = harness(async () => ({}), undefined, async () => { writes++; called.resolve(); return result.promise; });
+  app.render(); await settle(); app.render(); app.acceptPractice(); await called.promise;
+  const owner = app.owner; app.changeOwner('other-owner', false); app.changeOwner(owner, false);
+  result.resolve(practiceSession); await settle(); app.render();
+  assert.deepEqual(app.replaced, []);
+  app.acceptPractice(); await settle();
+  assert.equal(writes, 2);
+  assert.deepEqual(app.replaced, ['/workspace?practice_session_id=saved-goal']);
+  app.unmount();
 });

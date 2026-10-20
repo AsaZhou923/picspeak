@@ -47,8 +47,24 @@ type AppliedPromptExample = {
 };
 
 export default function GeneratePage() {
+  const { userInfo } = useAuth();
+  const owner = userInfo?.user_id ?? null;
+  const registered = Boolean(userInfo && userInfo.plan !== 'guest');
+  const draftScopeRef = useRef({ owner, registered, revision: 0 });
+  if (draftScopeRef.current.owner !== owner) {
+    // Private drafts belong to an established account. Renewing its bearer or
+    // completing the initial guest sign-in must not discard the user's work.
+    const revision = draftScopeRef.current.revision + (draftScopeRef.current.registered ? 1 : 0);
+    draftScopeRef.current = { owner, registered, revision };
+  } else {
+    draftScopeRef.current.registered = registered;
+  }
+  return <GeneratePageContent key={draftScopeRef.current.revision} />;
+}
+
+function GeneratePageContent() {
   const router = useRouter();
-  const { token, ensureToken, userInfo, isLoading: authLoading } = useAuth();
+  const { token, ensureToken, captureAuthOwner, userInfo, isLoading: authLoading } = useAuth();
   const { t, locale } = useI18n();
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const submittingRef = useRef(false);
@@ -261,12 +277,14 @@ export default function GeneratePage() {
     const owner = identity;
     let handedOff = false;
     const revision = identityRef.current.revision;
-    const isCurrent = () => mountedRef.current && identityRef.current.revision === revision;
+    const isOwnerCurrent = captureAuthOwner(owner);
+    const isScopeCurrent = () => mountedRef.current && identityRef.current.revision === revision;
+    const isCurrent = () => isScopeCurrent() && isOwnerCurrent();
     setSubmitting(true);
     setError('');
     try {
       const activeToken = await ensureToken();
-      if (!isCurrent() || activeToken !== token) return;
+      if (!isCurrent()) return;
       const analyticsSource = readProductAttributionSource();
       const pendingRequest = await prepareGenerationRequest(owner,
         {
@@ -313,12 +331,12 @@ export default function GeneratePage() {
       }
       setError(formatUserFacingError(t, err, t('generation_error_fallback')));
     } finally {
-      if (!handedOff && isCurrent()) {
+      if (!handedOff && isScopeCurrent()) {
         submittingRef.current = false;
         if (mountedRef.current) setSubmitting(false);
       }
     }
-  }, [identity, promptReady, appliedPromptExample, credits, creditsReady, ensureToken, isFreeQualityBlocked, isGuest, locale, negativePrompt, prompt, quality, router, selectedTemplate, size, sourceMetadata, style, t, token]);
+  }, [captureAuthOwner, identity, promptReady, appliedPromptExample, credits, creditsReady, ensureToken, isFreeQualityBlocked, isGuest, locale, negativePrompt, prompt, quality, router, selectedTemplate, size, sourceMetadata, style, t, token]);
 
   const handleCreditPackCheckout = useCallback(
     async (currency: 'usd', entrypoint: 'sidebar' | 'credit_exhausted') => {

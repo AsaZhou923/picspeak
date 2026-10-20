@@ -100,7 +100,7 @@ test('usage lists exactly the available modes for Guest, Free and Pro in every l
 type Harness = {
   cursor: number;
   states: any[];
-  userInfo: { plan: string; access_token: string } | null;
+  userInfo: { user_id: string; plan: string; access_token: string } | null;
   dictionary: Record<keyof typeof enTranslations, string>;
   locale: string;
   updates: boolean[];
@@ -123,7 +123,7 @@ const profileModule = moduleUrl(await readFile('src/app/account/profile/page.tsx
   'next/link': moduleUrl('import {createElement} from "react"; export default function Link({children, ...props}) { return createElement("a", props, children); }'),
   'lucide-react': moduleUrl('export const AlertCircle = () => null; export const Copy = AlertCircle, Eye = AlertCircle, EyeOff = AlertCircle, RefreshCw = AlertCircle, UserRound = AlertCircle;'),
   '@/components/auth/ClerkSignInTrigger': moduleUrl('import {createElement} from "react"; export default function ClerkSignInTrigger({children, className, fallbackRedirectUrl}) { return createElement("button", {className, "data-sign-in": fallbackRedirectUrl}, children); }'),
-  '@/lib/auth-context': moduleUrl('export function useAuth() { return {userInfo: globalThis.__profileRecoveryHarness.userInfo, ensureToken: async () => globalThis.__profileRecoveryHarness.userInfo?.access_token}; }'),
+  '@/lib/auth-context': moduleUrl('export function useAuth() { return {userInfo: globalThis.__profileRecoveryHarness.userInfo, captureAuthOwner: owner => () => owner === globalThis.__profileRecoveryHarness.userInfo?.user_id, ensureToken: async () => globalThis.__profileRecoveryHarness.userInfo?.access_token}; }'),
   '@/lib/i18n': moduleUrl('export function useI18n() { const h = globalThis.__profileRecoveryHarness; return {locale: h.locale, t: key => h.dictionary[key]}; }'),
   '@/lib/error-utils': moduleUrl(await readFile('src/lib/error-utils.ts', 'utf8')),
   '@/features/profile/profile-copy': moduleUrl(await readFile('src/features/profile/profile-copy.ts', 'utf8')),
@@ -143,7 +143,7 @@ function createProfileHarness(locale: keyof typeof dictionaries, plan: string | 
     cursor: 0,
     // Seed the mounted page after hydration and profile settings have loaded.
     states: [true, { public_profile_enabled: false, public_profile_id: null, username: 'Test photographer', avatar_url: null, gallery_review_count: 0 }, false, false, false, '', false],
-    userInfo: plan ? { plan, access_token: `${plan}-token` } : null,
+    userInfo: plan ? { user_id: `owner-${plan}`, plan, access_token: `${plan}-token` } : null,
     dictionary: dictionaries[locale], locale, updates: [], failure: null,
   };
   globals.__profileRecoveryHarness = h;
