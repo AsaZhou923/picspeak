@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { AlertCircle, ChevronRight, RefreshCw } from 'lucide-react';
@@ -56,39 +56,61 @@ function GenerationCard({ item }: { item: GeneratedImageItem }) {
 }
 
 export default function GenerationHistoryPage() {
-  const { ensureToken, userInfo } = useAuth();
+  const { userInfo, isLoading } = useAuth();
+  const scope = `${isLoading ? 'loading' : 'ready'}:${userInfo?.user_id ?? 'anonymous'}`;
+  return <GenerationHistory key={scope} />;
+}
+
+function GenerationHistory() {
+  const { ensureToken, token: currentToken } = useAuth();
   const { t } = useI18n();
   const [items, setItems] = useState<GeneratedImageItem[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<unknown>(null);
+  const [moreError, setMoreError] = useState<unknown>(null);
+  const requestRef = useRef(0);
+  const pendingRef = useRef(false);
 
-  const fetchPage = useCallback(
-    async (nextCursor?: string) => {
-      try {
-        const token = await ensureToken();
-        const data = await getMyGenerations(token, { cursor: nextCursor, limit: 20 });
-        setItems((prev) => (nextCursor ? [...prev, ...data.items] : data.items));
-        setCursor(data.next_cursor);
-        setError('');
-      } catch (err) {
-        setError(formatUserFacingError(t, err, t('generation_history_error_fallback')));
+  const fetchPage = useCallback(async (nextCursor?: string) => {
+    if (pendingRef.current) return;
+    pendingRef.current = true;
+    const requestId = ++requestRef.current;
+    if (nextCursor) { setLoadingMore(true); setMoreError(null); }
+    else { setLoading(true); setError(null); setMoreError(null); }
+    try {
+      const token = await ensureToken();
+      if (requestRef.current !== requestId || (currentToken && token !== currentToken)) return;
+      const data = await getMyGenerations(token, { cursor: nextCursor, limit: 20 });
+      if (requestRef.current !== requestId) return;
+      setItems((prev) => nextCursor
+        ? [...prev, ...data.items.filter((item) => !prev.some((existing) => existing.generation_id === item.generation_id))]
+        : data.items);
+      setCursor(data.next_cursor);
+    } catch (err) {
+      if (requestRef.current !== requestId) return;
+      if (nextCursor) setMoreError(err);
+      else setError(err);
+    } finally {
+      if (requestRef.current === requestId) {
+        pendingRef.current = false;
+        setLoading(false);
+        setLoadingMore(false);
       }
-    },
-    [ensureToken, t]
-  );
+    }
+  }, [currentToken, ensureToken]);
 
   useEffect(() => {
-    setLoading(true);
-    fetchPage().finally(() => setLoading(false));
-  }, [fetchPage, userInfo?.access_token]);
+    void fetchPage();
+    return () => {
+      requestRef.current += 1;
+      pendingRef.current = false;
+    };
+  }, [fetchPage]);
 
-  const handleLoadMore = async () => {
-    if (!cursor || loadingMore) return;
-    setLoadingMore(true);
-    await fetchPage(cursor);
-    setLoadingMore(false);
+  const handleLoadMore = () => {
+    if (cursor) void fetchPage(cursor);
   };
 
   return (
@@ -110,10 +132,12 @@ export default function GenerationHistoryPage() {
               <div key={index} className="ui-panel h-36 animate-pulse" />
             ))}
           </div>
-        ) : error ? (
-          <div className="flex items-center gap-2 rounded-lg border border-rust/20 bg-rust/5 px-4 py-3 text-sm text-rust">
-            <AlertCircle size={14} />
-            {error}
+        ) : error != null ? (
+          <div role="alert" className="space-y-3 rounded-lg border border-rust/20 bg-rust/5 px-4 py-3 text-sm text-rust">
+            <p className="flex items-center gap-2"><AlertCircle size={14} />{formatUserFacingError(t, error, t('generation_history_error_fallback'))}</p>
+            <button type="button" onClick={() => void fetchPage()} className="ui-action-secondary px-4 text-sm">
+              {t('app_error_retry')}
+            </button>
           </div>
         ) : items.length === 0 ? (
           <div className="ui-panel border-dashed px-6 py-20 text-center">
@@ -131,6 +155,7 @@ export default function GenerationHistoryPage() {
             </div>
             {cursor && (
               <div className="mt-8 text-center">
+                {!!moreError && <p role="alert" className="mb-3 rounded-control border border-rust/20 bg-rust/5 px-4 py-3 text-sm text-rust">{formatUserFacingError(t, moreError, t('generation_history_error_fallback'))}</p>}
                 <button
                   type="button"
                   onClick={handleLoadMore}
@@ -138,7 +163,7 @@ export default function GenerationHistoryPage() {
                   className="ui-action-secondary px-5 py-2 text-sm disabled:opacity-50"
                 >
                   {loadingMore && <RefreshCw size={13} className="animate-spin" />}
-                  {t('generation_load_more')}
+                  {t(moreError ? 'app_error_retry' : 'generation_load_more')}
                 </button>
               </div>
             )}

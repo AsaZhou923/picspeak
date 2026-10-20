@@ -86,6 +86,11 @@ export function ImageZoomOverlay({ zoomMounted, zoomOpen, photoUrl, onClose, t }
   if (!zoomMounted || !photoUrl) return null;
   return (
     <div
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label={t('review_photo_zoom_alt')}
+      tabIndex={-1}
       className={`fixed inset-0 z-50 flex items-center justify-center bg-void/90 backdrop-blur-sm transition-opacity duration-200 ${zoomOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
       onClick={onClose}
       aria-hidden={!zoomOpen ? 'true' : 'false'}
@@ -136,7 +141,6 @@ export function ImageZoomOverlay({ zoomMounted, zoomOpen, photoUrl, onClose, t }
         </button>
       </div>
       <div
-        ref={dialogRef}
         className={`relative max-h-[90vh] max-w-[90vw] touch-none overflow-hidden ${clampedScale > 1 ? 'cursor-grab' : 'cursor-zoom-in'} ${dragging ? 'cursor-grabbing' : ''}`}
         onClick={(e) => e.stopPropagation()}
         onDoubleClick={() => updateScale(clampedScale > 1 ? 1 : 2)}
@@ -145,10 +149,6 @@ export function ImageZoomOverlay({ zoomMounted, zoomOpen, photoUrl, onClose, t }
         onPointerUp={clearPointer}
         onPointerCancel={clearPointer}
         onWheel={handleWheel}
-        role="dialog"
-        aria-modal="true"
-        aria-label={t('review_photo_zoom_alt')}
-        tabIndex={-1}
       >
         <img
           src={photoUrl}

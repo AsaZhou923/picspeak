@@ -20,7 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.api.deps import CurrentActor, get_current_actor, get_db
 from app.api.routers import generations
 from app.db.models import (
-    GenerationCreditReservation, IdempotencyKey, ImageGenerationTask,
+    GeneratedImage, GenerationCreditReservation, IdempotencyKey, ImageGenerationTask,
     Photo, Review, ReviewTask, UsageLedger, User, UserPlan, UserStatus,
 )
 from app.schemas import GenerationCreateRequest
@@ -38,7 +38,7 @@ class GenerationCreateIdempotencyTests(unittest.TestCase):
         metadata = sa.MetaData()
         for model in (
             User, Photo, ReviewTask, Review, UsageLedger, ImageGenerationTask,
-            GenerationCreditReservation, IdempotencyKey,
+            GenerationCreditReservation, IdempotencyKey, GeneratedImage,
         ):
             table = model.__table__.to_metadata(metadata)
             for column in table.columns:
@@ -230,6 +230,27 @@ class GenerationCreateIdempotencyTests(unittest.TestCase):
         self.assertNotEqual(first.json()['task_id'], second.json()['task_id'])
         self.assertEqual(self.post(prompt='sunny beach landscape').json(), second.json())
         self.assert_state(2)
+
+    def test_expired_generation_replay_cache_does_not_create_or_charge_another_task(self):
+        from datetime import datetime, timedelta, timezone
+        first = self.post()
+        with self.Session() as db:
+            db.query(IdempotencyKey).one().expire_at = datetime.now(timezone.utc) - timedelta(days=1)
+            db.commit()
+        self.assertEqual(self.post().json(), first.json())
+        self.assert_state(1)
+
+    def test_downgrade_allows_recovery_of_accepted_task_without_new_premium_work(self):
+        first = self.post(quality='medium')
+        self.assertEqual(first.status_code, 200, first.text)
+        with self.Session() as db:
+            db.get(User, 1).plan = UserPlan.free
+            db.commit()
+        self.assertEqual(self.post(quality='medium').json(), first.json())
+        self.assertEqual(self.post('new-key', quality='medium').status_code, 403)
+        with self.Session() as db:
+            self.assertEqual(db.query(ImageGenerationTask).count(), 1)
+            self.assertEqual(db.query(GenerationCreditReservation).count(), 1)
 
 
 if __name__ == '__main__':

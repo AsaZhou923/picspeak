@@ -37,6 +37,7 @@ import {
   type GenerationPromptExample,
 } from '@/content/generation/prompt-examples';
 import GeneratePageHeader from '@/features/generations/components/GeneratePageHeader';
+import { prepareGenerationRequest, completeGenerationRequest } from '@/features/generations/generation-request';
 
 type AppliedPromptExample = {
   id: string;
@@ -50,6 +51,17 @@ export default function GeneratePage() {
   const { token, ensureToken, userInfo, isLoading: authLoading } = useAuth();
   const { t, locale } = useI18n();
   const promptRef = useRef<HTMLTextAreaElement>(null);
+  const submittingRef = useRef(false);
+  const identity = userInfo?.user_id ?? '';
+  const identityRef = useRef({ identity, revision: 0 });
+  if (identityRef.current.identity !== identity) {
+    identityRef.current = { identity, revision: identityRef.current.revision + 1 };
+  }
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
   const preservePromptDraftRef = useRef(false);
   const initialUrlPromptAppliedRef = useRef(false);
   const [templateKey, setTemplateKey] = useState('photo_inspiration');
@@ -61,7 +73,14 @@ export default function GeneratePage() {
   const [showNegative, setShowNegative] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [history, setHistory] = useState<GeneratedImageItem[]>([]);
+  useEffect(() => {
+    submittingRef.current = false;
+    setSubmitting(false);
+    setError('');
+  }, [identity]);
+  const [historyState, setHistoryState] = useState<{ owner: string; items: GeneratedImageItem[] }>({ owner: '', items: [] });
+  const history = historyState.owner === identity ? historyState.items : [];
+  const setHistory = useCallback((items: GeneratedImageItem[]) => setHistoryState({ owner: identity, items }), [identity]);
   const [hasHydrated, setHasHydrated] = useState(false);
   const [sourceMetadata, setSourceMetadata] = useState<Record<string, string>>({});
   const [appliedPromptExample, setAppliedPromptExample] = useState<AppliedPromptExample | null>(null);
@@ -164,6 +183,7 @@ export default function GeneratePage() {
   }, [locale, token]);
 
   useEffect(() => {
+    setHistory([]);
     if (!token || plan === 'guest') return;
     let cancelled = false;
     getMyGenerations(token, { limit: 4 })
@@ -176,7 +196,7 @@ export default function GeneratePage() {
     return () => {
       cancelled = true;
     };
-  }, [plan, token]);
+  }, [identity, plan, setHistory, token]);
 
   const handleTemplateSelect = useCallback(
     (key: string) => {
@@ -233,16 +253,22 @@ export default function GeneratePage() {
   );
 
   const handleGenerate = useCallback(async () => {
-    if (isGuest || isFreeQualityBlocked || submitting || !creditsReady) return;
+    if (isGuest || isFreeQualityBlocked || submittingRef.current || !creditsReady || !promptReady || !identity) return;
     if (quality === 'high' && !window.confirm(interpolateGenerationCopy(t('generation_high_confirm'), { credits }))) {
       return;
     }
+    submittingRef.current = true;
+    const owner = identity;
+    let handedOff = false;
+    const revision = identityRef.current.revision;
+    const isCurrent = () => mountedRef.current && identityRef.current.revision === revision;
     setSubmitting(true);
     setError('');
     try {
       const activeToken = await ensureToken();
+      if (!isCurrent() || activeToken !== token) return;
       const analyticsSource = readProductAttributionSource();
-      const result = await createGeneration(
+      const pendingRequest = await prepareGenerationRequest(owner,
         {
           generation_mode: 'general',
           intent: selectedTemplate.intent,
@@ -257,14 +283,18 @@ export default function GeneratePage() {
           negative_prompt: negativePrompt.trim() || null,
           output_format: 'webp',
           async: true,
-          idempotency_key: `${selectedTemplate.key}-${quality}-${size}-${Date.now()}`,
           analytics_source: analyticsSource,
           locale,
-        },
-        activeToken
+        }
       );
+      if (!isCurrent()) return;
+      const result = await createGeneration(pendingRequest.payload, activeToken);
+      if (!isCurrent()) return;
       router.push(`/generation-tasks/${result.task_id}`);
+      handedOff = true;
+      completeGenerationRequest(pendingRequest);
     } catch (err) {
+      if (!isCurrent()) return;
       if (err instanceof ApiException && err.code === 'IMAGE_GENERATION_CREDITS_EXHAUSTED') {
         void trackProductEvent('generation_credit_exhausted', {
           token: token ?? undefined,
@@ -283,9 +313,12 @@ export default function GeneratePage() {
       }
       setError(formatUserFacingError(t, err, t('generation_error_fallback')));
     } finally {
-      setSubmitting(false);
+      if (!handedOff && isCurrent()) {
+        submittingRef.current = false;
+        if (mountedRef.current) setSubmitting(false);
+      }
     }
-  }, [appliedPromptExample, credits, creditsReady, ensureToken, isFreeQualityBlocked, isGuest, locale, negativePrompt, prompt, quality, router, selectedTemplate, size, sourceMetadata, style, submitting, t, token]);
+  }, [identity, promptReady, appliedPromptExample, credits, creditsReady, ensureToken, isFreeQualityBlocked, isGuest, locale, negativePrompt, prompt, quality, router, selectedTemplate, size, sourceMetadata, style, t, token]);
 
   const handleCreditPackCheckout = useCallback(
     async (currency: 'usd', entrypoint: 'sidebar' | 'credit_exhausted') => {

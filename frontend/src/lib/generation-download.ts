@@ -1,3 +1,11 @@
+export function generationDownloadFilename(disposition: string, contentType: string | null, generationId: string): string {
+  const provided = parseContentDispositionFilename(disposition);
+  if (provided) return provided;
+  const mediaType = contentType?.split(';', 1)[0].trim().toLowerCase();
+  const extension = ({ 'image/webp': 'webp', 'image/jpeg': 'jpg', 'image/png': 'png', 'image/avif': 'avif' } as Record<string, string>)[mediaType ?? ''] ?? 'bin';
+  return `${sanitizeDownloadFilename(generationId) ?? 'generation'}.${extension}`;
+}
+
 export function parseContentDispositionFilename(disposition: string): string | null {
   const parts = splitContentDisposition(disposition);
   const encodedFilename = getDispositionParameter(parts, 'filename*');

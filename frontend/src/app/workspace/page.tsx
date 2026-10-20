@@ -1,13 +1,13 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AlertCircle, CheckCircle } from 'lucide-react';
 import Image from 'next/image';
 import { createPracticeSession, createReview, getPracticeConfig, getPracticeSession, getReview, isAbortError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
-import { ApiException, ImageType, PracticeKind, PracticeSessionResponse, ReviewCreateAsyncResponse, ReviewCreateSyncResponse, ReviewModel } from '@/lib/types';
+import { ApiException, ImageType, PracticeKind, PracticeSessionResponse, ReviewCreateAsyncResponse, ReviewCreateRequest, ReviewCreateSyncResponse, ReviewModel } from '@/lib/types';
 import ImageUploader from '@/components/upload/ImageUploader';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import ProPromoCard from '@/components/marketing/ProPromoCard';
@@ -19,6 +19,7 @@ import { getRetakeCoachCopy } from '@/lib/retake-coach-copy';
 import { useWorkspaceUsage } from '@/features/workspace/hooks/useWorkspaceUsage';
 import { useUploadFlow } from '@/features/workspace/hooks/useUploadFlow';
 import { useReplayContext } from '@/features/workspace/hooks/useReplayContext';
+import { completeReviewRequest, prepareReviewRequest } from '@/features/workspace/review-request';
 import { QuotaModal } from '@/features/workspace/components/QuotaModal';
 import { QuotaBanner } from '@/features/workspace/components/QuotaBanner';
 import { RetakeWorkspaceIntro } from '@/features/workspace/components/RetakeWorkspaceIntro';
@@ -161,7 +162,19 @@ function retakeTargetCopy(locale: 'zh' | 'en' | 'ja') {
 
 function WorkspacePageContent() {
   const router = useRouter();
-  const { token, ensureToken } = useAuth();
+  const { token, ensureToken, userInfo } = useAuth();
+  const submittingRef = useRef(false);
+  const identity = userInfo?.user_id ?? token;
+  const identityRef = useRef({ identity, revision: 0 });
+  if (identityRef.current.identity !== identity) {
+    identityRef.current = { identity, revision: identityRef.current.revision + 1 };
+    submittingRef.current = false;
+  }
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
   const { t, locale } = useI18n();
 
   const [reviewMode, setReviewMode] = useState<'flash' | 'pro'>('flash');
@@ -191,6 +204,15 @@ function WorkspacePageContent() {
     handleFileSelected: _handleFileSelected,
     handleReset,
   } = useUploadFlow({ fetchUsage });
+
+  const previousIdentityRef = useRef(identity);
+  useEffect(() => {
+    const previousIdentity = previousIdentityRef.current;
+    previousIdentityRef.current = identity;
+    // Initial guest creation is part of uploading; only an established owner's
+    // replacement/logout abandons the previous private photo and submit state.
+    if (previousIdentity !== null && previousIdentity !== identity) handleReset();
+  }, [identity, handleReset]);
 
   const {
     sourceReviewId,
@@ -410,6 +432,7 @@ function WorkspacePageContent() {
   }, [ensurePracticeSession, ensureToken, practiceAccepting, practiceGoalDraft, router, t, targetCopy.disabled]);
 
   const handleReview = useCallback(async () => {
+    if (submittingRef.current) return;
     const draftPhotoId = photo?.photo_id;
     if (!draftPhotoId && !canSubmitSameImageRecheck) return;
     void trackProductEvent('start_review_clicked', {
@@ -431,14 +454,15 @@ function WorkspacePageContent() {
         prompt_example_id: promptExampleId,
       },
     });
-    if (usage && remainingQuota !== null && remainingQuota <= 0) {
-      setShowQuotaModal(true);
-      return;
-    }
+    submittingRef.current = true;
+    let handedOff = false;
+    const revision = identityRef.current.revision;
+    const isCurrent = () => mountedRef.current && identityRef.current.revision === revision;
     setStage('reviewing');
     setErrMessage('');
     try {
       const tok = await ensureToken();
+      if (!isCurrent()) return;
       const session = practiceSession;
       const requestSourceReviewId = session ? session.source_review_id : sourceReviewId;
       if (unresolvedPracticeSession) {
@@ -493,7 +517,31 @@ function WorkspacePageContent() {
                 'practice_review',
                 `${practiceSemanticKey}:${session.session_id}:${activePhotoId}:${reviewMode}:${selectedReviewModel}:${imageType}:${session.attempts.length + 1}:${Date.now()}`
               )
-            : `${activePhotoId}-${reviewMode}-${selectedReviewModel}-${Date.now()}`;
+            : undefined;
+      const requestPayload: ReviewCreateRequest = {
+        photo_id: activePhotoId,
+        mode: reviewMode,
+        review_model: selectedReviewModel,
+        async: true,
+        idempotency_key: idempotencyKey,
+        locale: trustedLocale,
+        image_type: imageType,
+        ...(requestSourceReviewId ? { source_review_id: requestSourceReviewId } : {}),
+        ...(session ? { practice_session_id: session.session_id, practice_kind: session.practice_kind } : {}),
+        analysis_type: session?.practice_kind === 'same_image_recheck'
+          ? 'single'
+          : resolveReviewAnalysisType(requestSourceReviewId, Boolean(photo)),
+      };
+      const pendingRequest = session ? null : await prepareReviewRequest(userInfo?.user_id ?? tok, requestPayload);
+      if (!isCurrent()) return;
+      if (usage && remainingQuota !== null && remainingQuota <= 0 && !(pendingRequest?.isRetry || canReusePendingKey)) {
+        // A matching uncertain request may already own the last quota slot.
+        // Keep new intents blocked; the server remains authoritative on replay.
+        if (pendingRequest) completeReviewRequest(pendingRequest);
+        setStage('ready');
+        setShowQuotaModal(true);
+        return;
+      }
       if (practiceSemanticKey && session) {
         writePendingPracticeState({
           semanticKey: practiceSemanticKey,
@@ -504,23 +552,8 @@ function WorkspacePageContent() {
           photoId: activePhotoId,
         });
       }
-      const result = await createReview(
-        {
-          photo_id: activePhotoId,
-          mode: reviewMode,
-          review_model: selectedReviewModel,
-          async: true,
-          idempotency_key: idempotencyKey,
-          locale: trustedLocale,
-          image_type: imageType,
-          ...(requestSourceReviewId ? { source_review_id: requestSourceReviewId } : {}),
-          ...(session ? { practice_session_id: session.session_id, practice_kind: session.practice_kind } : {}),
-          analysis_type: session?.practice_kind === 'same_image_recheck'
-            ? 'single'
-            : resolveReviewAnalysisType(requestSourceReviewId, Boolean(photo)),
-        },
-        tok
-      );
+      const result = await createReview(pendingRequest?.payload ?? requestPayload, tok);
+      if (!isCurrent()) return;
       if ('task_id' in result) {
         const asyncResult = result as ReviewCreateAsyncResponse;
         if (practiceSemanticKey && session) {
@@ -561,6 +594,7 @@ function WorkspacePageContent() {
         const taskParams = new URLSearchParams({ mode: reviewMode });
         if (session) taskParams.set('practice_session_id', session.session_id);
         router.push(`/tasks/${asyncResult.task_id}?${taskParams.toString()}`);
+        handedOff = true;
       } else {
         const syncResult = result as ReviewCreateSyncResponse;
         if (practiceSemanticKey) clearPendingPracticeState(practiceSemanticKey);
@@ -589,8 +623,11 @@ function WorkspacePageContent() {
           },
         });
         router.push(`/reviews/${syncResult.review_id}`);
+        handedOff = true;
       }
+      if (pendingRequest) completeReviewRequest(pendingRequest);
     } catch (err) {
+      if (!isCurrent()) return;
       setStage('ready');
       if (err instanceof ApiException) {
         if (err.status === 429) {
@@ -603,8 +640,10 @@ function WorkspacePageContent() {
       } else {
         setErrMessage(formatUserFacingError(t, err, t('err_upload')));
       }
+    } finally {
+      if (!handedOff && isCurrent()) submittingRef.current = false;
     }
-  }, [photo, practiceSession, unresolvedPracticeSession, canSubmitSameImageRecheck, reviewMode, selectedReviewModel, locale, trustedLocale, imageType, trustedSourceReviewId, sourceReviewId, retakeIntent, nextShootAction, nextShootDimension, sourceGenerationId, contentEntrypoint, contentSlug, galleryReviewId, promptExampleId, ensureToken, router, t, token, usage, remainingQuota, practiceEnabled, savedPracticeSourceUnavailable, setStage, setErrMessage, targetCopy.disabled]);
+  }, [photo, userInfo?.user_id, practiceSession, unresolvedPracticeSession, canSubmitSameImageRecheck, reviewMode, selectedReviewModel, locale, trustedLocale, imageType, trustedSourceReviewId, sourceReviewId, retakeIntent, nextShootAction, nextShootDimension, sourceGenerationId, contentEntrypoint, contentSlug, galleryReviewId, promptExampleId, ensureToken, router, t, token, usage, remainingQuota, practiceEnabled, savedPracticeSourceUnavailable, setStage, setErrMessage, targetCopy.disabled]);
 
   const flowCopy = getWorkspaceTaskFlowCopy(locale);
   const hasReadyPhoto = Boolean(photo && (stage === 'ready' || stage === 'reviewing'));

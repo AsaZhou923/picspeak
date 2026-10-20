@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, ImagePlus, Loader2, Sparkles } from 'lucide-react';
 import ClerkSignInTrigger from '@/components/auth/ClerkSignInTrigger';
@@ -16,6 +16,8 @@ import {
   estimateGenerationCredits,
   formatGenerationOutputSpec,
 } from '@/features/generations/generation-config';
+
+import { prepareGenerationRequest, completeGenerationRequest } from '@/features/generations/generation-request';
 
 type ReferenceIntent = 'retake_reference' | 'composition_sketch' | 'lighting_reference' | 'color_mood_reference';
 
@@ -62,12 +64,31 @@ export function ReviewReferenceGenerationPanel({
   sourceAspect,
 }: ReviewReferenceGenerationPanelProps) {
   const router = useRouter();
-  const { ensureToken } = useAuth();
+  const { ensureToken, userInfo, token: currentToken } = useAuth();
+  const owner = userInfo?.user_id ?? '';
+  const scope = `${owner}:${reviewId}:${photoId}`;
+  const scopeRef = useRef({ scope, revision: 0 });
+  if (scopeRef.current.scope !== scope) {
+    scopeRef.current = { scope, revision: scopeRef.current.revision + 1 };
+  }
+  const busyRef = useRef(false);
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
   const { t } = useI18n();
   const [intent, setIntent] = useState<ReferenceIntent>('retake_reference');
   const [customPrompt, setCustomPrompt] = useState('');
+  const promptEditedRef = useRef(false);
+  const promptSourceRef = useRef(`${reviewId}:${photoId}`);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  useEffect(() => {
+    busyRef.current = false;
+    setBusy(false);
+    setError('');
+  }, [scope]);
   const [creditsTable, setCreditsTable] = useState<GenerationCreditsTable | null>(null);
   const creditPackCheckout = useCreditPackCheckout({
     ensureToken,
@@ -98,8 +119,13 @@ export function ReviewReferenceGenerationPanel({
     : promptToSubmit.length < 3 ? t('generation_submit_disabled_prompt_too_short') : '';
 
   useEffect(() => {
-    setCustomPrompt(defaultPrompt);
-  }, [defaultPrompt]);
+    const source = `${reviewId}:${photoId}`;
+    if (promptSourceRef.current !== source) {
+      promptSourceRef.current = source;
+      promptEditedRef.current = false;
+    }
+    if (!promptEditedRef.current) setCustomPrompt(defaultPrompt);
+  }, [defaultPrompt, photoId, reviewId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -116,17 +142,22 @@ export function ReviewReferenceGenerationPanel({
   }, []);
 
   async function handleGenerate() {
-    if (plan === 'guest' || !creditsReady) return;
+    if (plan === 'guest' || !creditsReady || busyRef.current || !owner) return;
     if (promptToSubmit.length < 3) {
       setError(t('review_reference_prompt_too_short'));
       return;
     }
+    busyRef.current = true;
+    let handedOff = false;
+    const revision = scopeRef.current.revision;
+    const isCurrent = () => mountedRef.current && scopeRef.current.revision === revision;
     setBusy(true);
     setError('');
     try {
       const token = await ensureToken();
+      if (!isCurrent() || token !== currentToken) return;
       const analyticsSource = readProductAttributionSource();
-      const result = await createGeneration(
+      const pendingRequest = await prepareGenerationRequest(owner,
         {
           generation_mode: 'review_linked',
           intent,
@@ -141,12 +172,13 @@ export function ReviewReferenceGenerationPanel({
           negative_prompt: 'no text, no watermark, no fake before/after label',
           output_format: 'webp',
           async: true,
-          idempotency_key: `${reviewId}-${intent}-${Date.now()}`,
           analytics_source: analyticsSource,
           locale,
-        },
-        token
+        }
       );
+      if (!isCurrent()) return;
+      const result = await createGeneration(pendingRequest.payload, token);
+      if (!isCurrent()) return;
       void trackProductEvent('generation_intent_selected', {
         token,
         pagePath: `/reviews/${reviewId}`,
@@ -161,7 +193,10 @@ export function ReviewReferenceGenerationPanel({
         },
       });
       router.push(`/generation-tasks/${result.task_id}`);
+      handedOff = true;
+      completeGenerationRequest(pendingRequest);
     } catch (err) {
+      if (!isCurrent()) return;
       if (err instanceof ApiException && err.code === 'IMAGE_GENERATION_CREDITS_EXHAUSTED') {
         void trackProductEvent('generation_credit_exhausted', {
           pagePath: `/reviews/${reviewId}`,
@@ -180,7 +215,10 @@ export function ReviewReferenceGenerationPanel({
       }
       setError(formatUserFacingError(t, err, t('generation_error_fallback')));
     } finally {
-      setBusy(false);
+      if (!handedOff && isCurrent()) {
+        busyRef.current = false;
+        if (mountedRef.current) setBusy(false);
+      }
     }
   }
 
@@ -221,7 +259,10 @@ export function ReviewReferenceGenerationPanel({
             <span className="mb-2 block text-sm font-medium text-ink">{t('review_reference_prompt_label')}</span>
             <textarea
               value={customPrompt}
-              onChange={(event) => setCustomPrompt(event.target.value)}
+              onChange={(event) => {
+                promptEditedRef.current = true;
+                setCustomPrompt(event.target.value);
+              }}
               rows={5}
               maxLength={1200}
               className="w-full resize-none rounded-lg border border-border bg-void/60 px-3 py-3 text-sm leading-6 text-ink outline-none transition-colors placeholder:text-ink-subtle focus:border-gold/40"
@@ -241,6 +282,7 @@ export function ReviewReferenceGenerationPanel({
                   type="button"
                   aria-pressed={selected}
                   onClick={() => {
+                    promptEditedRef.current = false;
                     setIntent(item.value);
                     setCustomPrompt(buildReviewLinkedUserPrompt(suggestions, t(item.labelKey), t('review_reference_prompt_seed')));
                     void trackProductEvent('generation_intent_selected', {

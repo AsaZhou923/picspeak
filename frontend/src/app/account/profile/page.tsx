@@ -4,11 +4,13 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { AlertCircle, Copy, Eye, EyeOff, RefreshCw, UserRound } from 'lucide-react';
+import ClerkSignInTrigger from '@/components/auth/ClerkSignInTrigger';
 import { useAuth } from '@/lib/auth-context';
 import { useI18n } from '@/lib/i18n';
 import { formatUserFacingError } from '@/lib/error-utils';
 import {
   getMyProfileSettings,
+  ProfileApiError,
   ProfileSettingsResponse,
   updateMyProfileSettings,
 } from '@/features/profile/api';
@@ -30,48 +32,98 @@ export default function AccountProfilePage() {
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState('');
+  const [loginRequired, setLoginRequired] = useState(false);
+  const requiresSignIn = userInfo?.plan === 'guest' || loginRequired;
+  const canPublish = Boolean(userInfo && !requiresSignIn);
+  const messagesRef = useRef({ t, copy });
+  messagesRef.current = { t, copy };
   const requestRef = useRef(0);
+  const activeRef = useRef(true);
+  const savingRef = useRef(false);
+  const identity = userInfo?.user_id ?? '';
+  const identityRef = useRef({ identity, revision: 0 });
+  if (identityRef.current.identity !== identity) {
+    identityRef.current = { identity, revision: identityRef.current.revision + 1 };
+    savingRef.current = false;
+  }
+
+  useEffect(() => {
+    activeRef.current = true;
+    return () => { activeRef.current = false; };
+  }, []);
+
+  useEffect(() => {
+    setSaving(false);
+    setCopied(false);
+  }, [identity]);
 
   useEffect(() => {
     const requestId = requestRef.current + 1;
     requestRef.current = requestId;
     const controller = new AbortController();
     setLoading(true);
+    setSettings(null);
+    setError('');
+    setLoginRequired(false);
 
     ensureToken()
       .then((token) => getMyProfileSettings(token, controller.signal))
       .then((payload) => {
-        if (requestRef.current !== requestId) return;
+        if (requestRef.current !== requestId || controller.signal.aborted) return;
         setSettings(payload);
         setError('');
         setLoading(false);
       })
       .catch((err) => {
         if (requestRef.current !== requestId || controller.signal.aborted) return;
-        setError(formatUserFacingError(t, err, copy.unavailable));
+        if (err instanceof ProfileApiError && (err.code === 'PUBLIC_PROFILE_LOGIN_REQUIRED' || err.status === 401)) {
+          setLoginRequired(true);
+        }
+        setError(formatUserFacingError(messagesRef.current.t, err, messagesRef.current.copy.unavailable));
         setLoading(false);
       });
 
     return () => {
       controller.abort();
     };
-  }, [copy.unavailable, ensureToken, t, userInfo?.access_token]);
+  }, [ensureToken, userInfo?.access_token]);
 
   const publicUrl = settings?.public_profile_enabled && settings.public_profile_id
     ? profileHref(settings.public_profile_id)
     : '';
 
   async function toggleProfile(enabled: boolean) {
+    if (!canPublish || loading || savingRef.current || !settings) return;
+    const revision = identityRef.current.revision;
+    const expectedToken = userInfo?.access_token;
+    const isCurrent = () => activeRef.current && identityRef.current.revision === revision;
+    savingRef.current = true;
     setSaving(true);
     setError('');
     try {
       const token = await ensureToken();
+      // Auth updates may not have rendered yet when ensureToken resolves. Never
+      // apply the previous identity's publish decision with a different token.
+      if (!isCurrent() || token !== expectedToken) return;
       const payload = await updateMyProfileSettings(token, enabled);
+      if (!isCurrent()) return;
+      // The confirmed write is newer than any overlapping read for this owner.
+      requestRef.current += 1;
       setSettings(payload);
+      setError('');
+      setLoginRequired(false);
+      setLoading(false);
     } catch (err) {
-      setError(formatUserFacingError(t, err, copy.unavailable));
+      if (!isCurrent()) return;
+      if (err instanceof ProfileApiError && (err.code === 'PUBLIC_PROFILE_LOGIN_REQUIRED' || err.status === 401)) {
+        setLoginRequired(true);
+      }
+      setError(formatUserFacingError(messagesRef.current.t, err, messagesRef.current.copy.unavailable));
     } finally {
-      setSaving(false);
+      if (isCurrent()) {
+        savingRef.current = false;
+        setSaving(false);
+      }
     }
   }
 
@@ -157,15 +209,27 @@ export default function AccountProfilePage() {
               )}
 
               <div className="grid gap-3">
-                <button
-                  type="button"
-                  disabled={loading || saving}
-                  onClick={() => void toggleProfile(!settings?.public_profile_enabled)}
-                  className="ui-action-primary justify-center px-4 py-3 disabled:opacity-60"
-                >
-                  {saving ? <RefreshCw size={15} className="animate-spin" /> : settings?.public_profile_enabled ? <EyeOff size={15} /> : <Eye size={15} />}
-                  {settings?.public_profile_enabled ? copy.disable : copy.enable}
-                </button>
+                {requiresSignIn ? (
+                  <>
+                    <p className="text-sm leading-7 text-ink-muted">{copy.signinHint}</p>
+                    <ClerkSignInTrigger
+                      className="ui-action-primary justify-center px-4 py-3"
+                      fallbackRedirectUrl="/account/profile"
+                    >
+                      {copy.signIn}
+                    </ClerkSignInTrigger>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={!canPublish || !settings || loading || saving}
+                    onClick={() => void toggleProfile(!settings?.public_profile_enabled)}
+                    className="ui-action-primary justify-center px-4 py-3 disabled:opacity-60"
+                  >
+                    {saving ? <RefreshCw size={15} className="animate-spin" /> : settings?.public_profile_enabled ? <EyeOff size={15} /> : <Eye size={15} />}
+                    {settings?.public_profile_enabled ? copy.disable : copy.enable}
+                  </button>
+                )}
                 <button
                   type="button"
                   disabled={!publicUrl}

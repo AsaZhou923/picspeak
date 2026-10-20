@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import {
@@ -13,7 +13,7 @@ import {
   Sparkles,
   Target,
 } from 'lucide-react';
-import { getMyReviews } from '@/lib/api';
+import { getMyReviews, isAbortError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { formatUserFacingError } from '@/lib/error-utils';
 import { useI18n } from '@/lib/i18n';
@@ -105,29 +105,41 @@ function SourceSkeleton() {
 }
 
 export default function RetakeCoachPage() {
+  const { userInfo, isLoading } = useAuth();
+  const identity = `${isLoading ? 'loading' : 'ready'}:${userInfo?.user_id ?? 'signed-out'}`;
+  return <RetakeCoachSession key={identity} />;
+}
+
+function RetakeCoachSession() {
   const { ensureToken, userInfo } = useAuth();
   const { t, locale } = useI18n();
   const copy = getRetakeCoachCopy(locale);
   const [items, setItems] = useState<ReviewHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const loadControllerRef = useRef<AbortController | null>(null);
 
   const loadSources = useCallback(async () => {
+    loadControllerRef.current?.abort();
+    const controller = new AbortController();
+    loadControllerRef.current = controller;
     setLoading(true);
     setError('');
     try {
       const token = await ensureToken();
-      const data = await getMyReviews(token, { limit: 24 });
-      setItems(data.items);
+      if (controller.signal.aborted) return;
+      const data = await getMyReviews(token, { limit: 24 }, controller.signal);
+      if (!controller.signal.aborted) setItems(data.items);
     } catch (err) {
-      setError(formatUserFacingError(t, err, copy.error));
+      if (!controller.signal.aborted && !isAbortError(err)) setError(formatUserFacingError(t, err, copy.error));
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) setLoading(false);
     }
   }, [copy.error, ensureToken, t]);
 
   useEffect(() => {
     void loadSources();
+    return () => loadControllerRef.current?.abort();
   }, [loadSources, userInfo?.access_token]);
 
   const sources = useMemo(() => getEligibleRetakeSources(items), [items]);

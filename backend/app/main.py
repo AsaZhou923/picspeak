@@ -60,7 +60,7 @@ app.add_middleware(
         'Cache-Control',
         'Pragma',
     ],
-    expose_headers=['X-Request-Id', 'X-Guest-Access-Token'],
+    expose_headers=['X-Request-Id', 'X-Guest-Access-Token', 'Content-Disposition'],
 )
 app.include_router(router)
 app.include_router(webhook_router)

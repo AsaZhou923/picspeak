@@ -60,7 +60,7 @@ import {
   TaskStatusResponse,
   UsageResponse,
 } from './types';
-import { parseContentDispositionFilename } from './generation-download';
+import { generationDownloadFilename } from './generation-download';
 import type { ScoreFeedback, ScoreFeedbackPutRequest, ScoreFeedbackResponse } from './score-feedback';
 
 function resolveApiBase(): string {
@@ -702,12 +702,14 @@ export async function getMyGenerations(
 export async function reuseGeneration(
   generationId: string,
   token: string,
-  analyticsSource?: string
+  analyticsSource?: string,
+  idempotencyKey?: string
 ): Promise<GenerationCreateResponse> {
   const suffix = analyticsSource ? `?analytics_source=${encodeURIComponent(analyticsSource)}` : '';
   return request<GenerationCreateResponse>(`/generations/${generationId}/reuse${suffix}`, {
     method: 'POST',
     token,
+    headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
     unauthorizedRecovery: 'guest',
   });
 }
@@ -733,7 +735,7 @@ export async function downloadGeneration(
     throw new ApiException(res.status, 'GENERATION_DOWNLOAD_FAILED', `HTTP ${res.status}`);
   }
   const disposition = res.headers.get('Content-Disposition') ?? '';
-  const filename = parseContentDispositionFilename(disposition) ?? `${generationId}.png`;
+  const filename = generationDownloadFilename(disposition, res.headers.get('Content-Type'), generationId);
   return { blob: await res.blob(), filename };
 }
 

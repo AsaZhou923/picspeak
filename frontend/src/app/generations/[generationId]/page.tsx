@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -12,12 +12,28 @@ import { useI18n } from '@/lib/i18n';
 import { formatUserFacingError } from '@/lib/error-utils';
 import { readProductAttributionSource, trackProductEvent } from '@/lib/product-analytics';
 import { formatGenerationOutputSpec } from '@/features/generations/generation-config';
+import { prepareGenerationRequest, completeGenerationRequest } from '@/features/generations/generation-request';
 
 export default function GenerationDetailPage() {
   const params = useParams();
-  const router = useRouter();
+  const { userInfo, isLoading } = useAuth();
   const generationId = params.generationId as string;
-  const { ensureToken } = useAuth();
+  // A keyed privacy boundary hides the former identity's data in the same render,
+  // before effects run. Token refreshes for the same owner do not change identity.
+  const scope = `${isLoading ? 'loading' : 'ready'}:${userInfo?.user_id ?? 'anonymous'}:${generationId}`;
+  return <GenerationDetail key={scope} generationId={generationId} />;
+}
+
+function GenerationDetail({ generationId }: { generationId: string }) {
+  const router = useRouter();
+  const { ensureToken, token: currentToken, userInfo } = useAuth();
+  const activeRef = useRef(true);
+  const reuseRef = useRef(false);
+  const downloadRef = useRef(false);
+  useEffect(() => {
+    activeRef.current = true;
+    return () => { activeRef.current = false; };
+  }, []);
   const { t, locale } = useI18n();
   const [generation, setGeneration] = useState<GeneratedImageDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -30,6 +46,11 @@ export default function GenerationDetailPage() {
   useEffect(() => {
     let cancelled = false;
     const controller = new AbortController();
+    setLoading(true);
+    setGeneration(null);
+    setError('');
+    setImageFailed(false);
+    setCopied(false);
     ensureToken()
       .then((token) => getGeneration(generationId, token, controller.signal))
       .then((data) => {
@@ -44,7 +65,10 @@ export default function GenerationDetailPage() {
         }
       })
       .catch((err) => {
-        if (!cancelled) setError(formatUserFacingError(t, err, t('generation_detail_fetch_error')));
+        if (!cancelled) {
+          setGeneration(null);
+          setError(formatUserFacingError(t, err, t('generation_detail_fetch_error')));
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -56,11 +80,14 @@ export default function GenerationDetailPage() {
   }, [ensureToken, generationId, locale, t]);
 
   const handleReuse = useCallback(async () => {
-    if (!generation) return;
+    if (!generation || reuseRef.current) return;
+    reuseRef.current = true;
+    let handedOff = false;
     setBusy(true);
     setError('');
     try {
       const token = await ensureToken();
+      if (!activeRef.current || token !== currentToken) return;
       void trackProductEvent('generation_reuse_clicked', {
         token,
         pagePath: `/generations/${generationId}`,
@@ -75,29 +102,54 @@ export default function GenerationDetailPage() {
           entrypoint: 'generation_detail_reuse',
         },
       });
-      const result = await reuseGeneration(generationId, token, readProductAttributionSource());
-      router.push(`/generation-tasks/${result.task_id}`);
+      const pendingRequest = await prepareGenerationRequest(`reuse:${userInfo?.user_id}:${generationId}:${generation.model_snapshot ?? generation.model_name}`, {
+        generation_mode: generation.generation_mode,
+        async: true,
+        intent: generation.intent,
+        prompt: generation.prompt,
+        quality: generation.quality,
+        size: generation.size,
+        output_format: generation.output_format,
+        source_photo_id: generation.source_photo_id,
+        source_review_id: generation.source_review_id,
+        template_key: generation.template_key,
+        analytics_source: readProductAttributionSource(),
+      });
+      if (!activeRef.current) return;
+      const result = await reuseGeneration(generationId, token, pendingRequest.payload.analytics_source, pendingRequest.payload.idempotency_key);
+      if (activeRef.current) {
+        router.push(`/generation-tasks/${result.task_id}`);
+        handedOff = true;
+        completeGenerationRequest(pendingRequest);
+      }
     } catch (err) {
-      setError(formatUserFacingError(t, err, t('generation_detail_reuse_error')));
+      if (activeRef.current) setError(formatUserFacingError(t, err, t('generation_detail_reuse_error')));
     } finally {
-      setBusy(false);
+      if (!handedOff) {
+        reuseRef.current = false;
+        if (activeRef.current) setBusy(false);
+      }
     }
-  }, [ensureToken, generation, generationId, locale, router, t]);
+  }, [currentToken, ensureToken, generation, generationId, locale, router, t, userInfo?.user_id]);
 
   const handleCopy = useCallback(async () => {
     if (!generation) return;
     await navigator.clipboard.writeText(generation.prompt);
+    if (!activeRef.current) return;
     setCopied(true);
-    window.setTimeout(() => setCopied(false), 1400);
+    window.setTimeout(() => { if (activeRef.current) setCopied(false); }, 1400);
   }, [generation]);
 
   const handleDownload = useCallback(async () => {
-    if (!generation) return;
+    if (!generation || downloadRef.current) return;
+    downloadRef.current = true;
     setDownloadBusy(true);
     setError('');
     try {
       const token = await ensureToken();
+      if (!activeRef.current || token !== currentToken) return;
       const { blob, filename } = await downloadGeneration(generation.generation_id, token);
+      if (!activeRef.current) return;
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
@@ -113,12 +165,12 @@ export default function GenerationDetailPage() {
         metadata: { generation_id: generation.generation_id, generation_mode: generation.generation_mode },
       });
     } catch (err) {
-      setError(formatUserFacingError(t, err, t('generation_detail_download_error')));
-      window.open(generation.image_url, '_blank', 'noopener,noreferrer');
+      if (activeRef.current) setError(formatUserFacingError(t, err, t('generation_detail_download_error')));
     } finally {
-      setDownloadBusy(false);
+      downloadRef.current = false;
+      if (activeRef.current) setDownloadBusy(false);
     }
-  }, [ensureToken, generation, generationId, locale, t]);
+  }, [currentToken, ensureToken, generation, generationId, locale, t]);
 
   const handleUseForRetake = useCallback(() => {
     if (!generation) return;
