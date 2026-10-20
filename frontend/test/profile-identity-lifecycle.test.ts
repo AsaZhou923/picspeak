@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { componentHarness, deferred, settle } from './helpers/component-harness.ts';
 
+import { createAuthOwnerState } from './helpers/auth-owner-state.ts';
+
 const t = (key: string) => key;
 const copy = new Proxy({}, { get: (_target, key) => String(key) });
 const settings = (owner: string, enabled = false) => ({
@@ -12,13 +14,11 @@ const settings = (owner: string, enabled = false) => ({
 function profileHarness() {
   let locale = 'en';
   let translation = t;
-  let owner = 'owner-a';
-  let token = `${owner}-token`;
-  let tokenResult: Promise<string> | null = null;
+  const authState = createAuthOwnerState('owner-a', 'free');
   const writes: Array<{ token: string; enabled: boolean }> = [];
   let update = async (nextToken: string, enabled: boolean) => settings(nextToken, enabled);
-  const ensureToken = () => tokenResult ?? Promise.resolve(token);
-  const auth = () => ({ userInfo: { user_id: owner, plan: 'free', access_token: token }, ensureToken });
+  const savedSettings = new Map<string, ReturnType<typeof settings>>();
+  const auth = authState.read;
   const app = componentHarness(new URL('../src/app/account/profile/page.tsx', import.meta.url), {
     'next/image': { default: 'Image' }, 'next/link': { default: 'Link' }, 'lucide-react': {},
     '@/components/auth/ClerkSignInTrigger': { default: 'SignIn' },
@@ -27,19 +27,21 @@ function profileHarness() {
     '@/lib/error-utils': { formatUserFacingError: () => 'localized-error' },
     '@/features/profile/api': {
       ProfileApiError: class extends Error {},
-      getMyProfileSettings: async (nextToken: string) => settings(nextToken),
+      getMyProfileSettings: async (nextToken: string) => savedSettings.get(nextToken) ?? settings(nextToken),
       updateMyProfileSettings: async (nextToken: string, enabled: boolean) => {
         writes.push({ token: nextToken, enabled });
-        return update(nextToken, enabled);
+        const payload = await update(nextToken, enabled);
+        savedSettings.set(nextToken, payload);
+        return payload;
       },
     },
   });
   return {
     ...app, writes,
     changeLocale() { locale = 'ja'; translation = (key: string) => `ja:${key}`; app.render(); },
-    refreshToken() { token = `${owner}-refreshed`; app.render(); },
-    holdToken(value: Promise<string> | null) { tokenResult = value; },
-    changeOwner(next: string) { owner = next; token = `${owner}-token`; app.render(); },
+    refreshToken(rerender = true) { authState.refreshToken(); if (rerender) app.render(); },
+    holdToken(value: Promise<string> | null) { authState.holdToken(value); },
+    changeOwner(next: string, rerender = true) { authState.changeOwner(next); if (rerender) app.render(); },
     deferWrite(value: Promise<ReturnType<typeof settings>>) { update = () => value; },
     toggle() { return app.nodes((node) => node.type === 'button' && node.props.className.includes('ui-action-primary'))[0]; },
   };
@@ -62,8 +64,9 @@ test('deferred authentication cannot publish a different account after switching
   app.unmount();
 });
 
-test('a returned new token is rejected even before its auth update renders', async () => {
+test('a confirmed new owner is rejected even before its auth update renders', async () => {
   const app = profileHarness(); await ready(app);
+  app.changeOwner('owner-b', false);
   app.holdToken(Promise.resolve('owner-b-token'));
   app.toggle().props.onClick(); await settle(); app.render();
   assert.deepEqual(app.writes, []);
@@ -105,3 +108,27 @@ for (const refresh of ['locale', 'token'] as const) {
     app.unmount();
   });
 }
+
+test('profile publication accepts a renewed same-owner bearer before the auth rerender', async () => {
+  const app = profileHarness(); await ready(app);
+  app.refreshToken(false);
+  app.toggle().props.onClick(); await settle(); app.render();
+  assert.deepEqual(app.writes, [{ token: 'owner-a-refreshed', enabled: true }]);
+  await settle(); app.render();
+  assert.match(app.text(), /public-owner-a-refreshed/);
+  assert.equal(app.toggle().props.disabled, false);
+  app.unmount();
+});
+
+test('profile publication discards a late result after a synchronous A-to-B-to-A session change', async () => {
+  const app = profileHarness(); await ready(app);
+  const result = deferred<ReturnType<typeof settings>>(); app.deferWrite(result.promise);
+  app.toggle().props.onClick(); await settle();
+  app.changeOwner('owner-b', false); app.changeOwner('owner-a', false);
+  result.resolve(settings('stale-owner', true)); await settle(); app.render();
+  assert.doesNotMatch(app.text(), /public-stale-owner/);
+  assert.equal(app.toggle().props.disabled, false);
+  app.toggle().props.onClick(); await settle();
+  assert.equal(app.writes.length, 2, 'discarding a stale outcome must unlock the current owner');
+  app.unmount();
+});

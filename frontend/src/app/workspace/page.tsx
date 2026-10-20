@@ -162,13 +162,15 @@ function retakeTargetCopy(locale: 'zh' | 'en' | 'ja') {
 
 function WorkspacePageContent() {
   const router = useRouter();
-  const { token, ensureToken, userInfo } = useAuth();
+  const { token, ensureToken, captureAuthOwner, userInfo } = useAuth();
   const submittingRef = useRef(false);
+  const practiceAcceptingRef = useRef(false);
   const identity = userInfo?.user_id ?? token;
   const identityRef = useRef({ identity, revision: 0 });
   if (identityRef.current.identity !== identity) {
     identityRef.current = { identity, revision: identityRef.current.revision + 1 };
     submittingRef.current = false;
+    practiceAcceptingRef.current = false;
   }
   const mountedRef = useRef(true);
   useEffect(() => {
@@ -211,7 +213,12 @@ function WorkspacePageContent() {
     previousIdentityRef.current = identity;
     // Initial guest creation is part of uploading; only an established owner's
     // replacement/logout abandons the previous private photo and submit state.
-    if (previousIdentity !== null && previousIdentity !== identity) handleReset();
+    if (previousIdentity !== null && previousIdentity !== identity) {
+      handleReset();
+      setPracticeSession(null);
+      setPracticeAccepting(false);
+      setPracticeError('');
+    }
   }, [identity, handleReset]);
 
   const {
@@ -375,7 +382,8 @@ function WorkspacePageContent() {
     return () => controller.abort();
   }, [ensureToken, practiceSession, practiceSession?.source_review_id, practiceSession?.source_access]);
 
-  const ensurePracticeSession = useCallback(async (tok: string): Promise<PracticeSessionResponse | null> => {
+  const ensurePracticeSession = useCallback(async (tok: string, isCurrent: () => boolean): Promise<PracticeSessionResponse | null> => {
+    if (!isCurrent()) return null;
     if (practiceSession) return practiceSession;
     if (!practiceGoalDraft) return null;
     if (!practiceEnabled) {
@@ -407,6 +415,7 @@ function WorkspacePageContent() {
       },
       tok
     );
+    if (!isCurrent()) return null;
     setPracticeSession(session);
     setPracticeKind(session.practice_kind);
     writePendingPracticeState({ semanticKey, sessionId: session.session_id, sessionIdempotencyKey });
@@ -414,22 +423,31 @@ function WorkspacePageContent() {
   }, [practiceEnabled, practiceGoalDraft, practiceSession, targetCopy.disabled]);
 
   const handleAcceptPracticeGoal = useCallback(async () => {
-    if (!practiceGoalDraft || practiceAccepting) return;
+    if (!practiceGoalDraft || practiceAcceptingRef.current) return;
+    practiceAcceptingRef.current = true;
+    const revision = identityRef.current.revision;
+    const isOwnerCurrent = captureAuthOwner(userInfo?.user_id ?? null);
+    const isScopeCurrent = () => mountedRef.current && identityRef.current.revision === revision;
+    const isCurrent = () => isScopeCurrent() && isOwnerCurrent();
     setPracticeAccepting(true);
     setPracticeError('');
     try {
       const tok = await ensureToken();
-      const session = await ensurePracticeSession(tok);
-      if (session) {
+      if (!isCurrent()) return;
+      const session = await ensurePracticeSession(tok, isCurrent);
+      if (session && isCurrent()) {
         const params = new URLSearchParams({ practice_session_id: session.session_id });
         router.replace(`/workspace?${params.toString()}`);
       }
     } catch (err) {
-      setPracticeError(formatUserFacingError(t, err, targetCopy.disabled));
+      if (isCurrent()) setPracticeError(formatUserFacingError(t, err, targetCopy.disabled));
     } finally {
-      setPracticeAccepting(false);
+      if (isScopeCurrent()) {
+        practiceAcceptingRef.current = false;
+        setPracticeAccepting(false);
+      }
     }
-  }, [ensurePracticeSession, ensureToken, practiceAccepting, practiceGoalDraft, router, t, targetCopy.disabled]);
+  }, [captureAuthOwner, ensurePracticeSession, ensureToken, practiceGoalDraft, router, t, targetCopy.disabled, userInfo?.user_id]);
 
   const handleReview = useCallback(async () => {
     if (submittingRef.current) return;
@@ -457,7 +475,9 @@ function WorkspacePageContent() {
     submittingRef.current = true;
     let handedOff = false;
     const revision = identityRef.current.revision;
-    const isCurrent = () => mountedRef.current && identityRef.current.revision === revision;
+    const isOwnerCurrent = captureAuthOwner(userInfo?.user_id ?? null);
+    const isScopeCurrent = () => mountedRef.current && identityRef.current.revision === revision;
+    const isCurrent = () => isScopeCurrent() && isOwnerCurrent();
     setStage('reviewing');
     setErrMessage('');
     try {
@@ -641,9 +661,12 @@ function WorkspacePageContent() {
         setErrMessage(formatUserFacingError(t, err, t('err_upload')));
       }
     } finally {
-      if (!handedOff && isCurrent()) submittingRef.current = false;
+      if (!handedOff && isScopeCurrent()) {
+        submittingRef.current = false;
+        if (!isOwnerCurrent()) setStage('ready');
+      }
     }
-  }, [photo, userInfo?.user_id, practiceSession, unresolvedPracticeSession, canSubmitSameImageRecheck, reviewMode, selectedReviewModel, locale, trustedLocale, imageType, trustedSourceReviewId, sourceReviewId, retakeIntent, nextShootAction, nextShootDimension, sourceGenerationId, contentEntrypoint, contentSlug, galleryReviewId, promptExampleId, ensureToken, router, t, token, usage, remainingQuota, practiceEnabled, savedPracticeSourceUnavailable, setStage, setErrMessage, targetCopy.disabled]);
+  }, [captureAuthOwner, photo, userInfo?.user_id, practiceSession, unresolvedPracticeSession, canSubmitSameImageRecheck, reviewMode, selectedReviewModel, locale, trustedLocale, imageType, trustedSourceReviewId, sourceReviewId, retakeIntent, nextShootAction, nextShootDimension, sourceGenerationId, contentEntrypoint, contentSlug, galleryReviewId, promptExampleId, ensureToken, router, t, token, usage, remainingQuota, practiceEnabled, savedPracticeSourceUnavailable, setStage, setErrMessage, targetCopy.disabled]);
 
   const flowCopy = getWorkspaceTaskFlowCopy(locale);
   const hasReadyPhoto = Boolean(photo && (stage === 'ready' || stage === 'reviewing'));

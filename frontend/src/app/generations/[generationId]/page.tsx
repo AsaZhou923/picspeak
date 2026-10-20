@@ -26,7 +26,7 @@ export default function GenerationDetailPage() {
 
 function GenerationDetail({ generationId }: { generationId: string }) {
   const router = useRouter();
-  const { ensureToken, token: currentToken, userInfo } = useAuth();
+  const { ensureToken, captureAuthOwner, userInfo } = useAuth();
   const activeRef = useRef(true);
   const reuseRef = useRef(false);
   const downloadRef = useRef(false);
@@ -83,11 +83,13 @@ function GenerationDetail({ generationId }: { generationId: string }) {
     if (!generation || reuseRef.current) return;
     reuseRef.current = true;
     let handedOff = false;
+    const isOwnerCurrent = captureAuthOwner(userInfo?.user_id ?? null);
+    const isCurrent = () => activeRef.current && isOwnerCurrent();
     setBusy(true);
     setError('');
     try {
       const token = await ensureToken();
-      if (!activeRef.current || token !== currentToken) return;
+      if (!isCurrent()) return;
       void trackProductEvent('generation_reuse_clicked', {
         token,
         pagePath: `/generations/${generationId}`,
@@ -115,22 +117,22 @@ function GenerationDetail({ generationId }: { generationId: string }) {
         template_key: generation.template_key,
         analytics_source: readProductAttributionSource(),
       });
-      if (!activeRef.current) return;
+      if (!isCurrent()) return;
       const result = await reuseGeneration(generationId, token, pendingRequest.payload.analytics_source, pendingRequest.payload.idempotency_key);
-      if (activeRef.current) {
+      if (isCurrent()) {
         router.push(`/generation-tasks/${result.task_id}`);
         handedOff = true;
         completeGenerationRequest(pendingRequest);
       }
     } catch (err) {
-      if (activeRef.current) setError(formatUserFacingError(t, err, t('generation_detail_reuse_error')));
+      if (isCurrent()) setError(formatUserFacingError(t, err, t('generation_detail_reuse_error')));
     } finally {
       if (!handedOff) {
         reuseRef.current = false;
         if (activeRef.current) setBusy(false);
       }
     }
-  }, [currentToken, ensureToken, generation, generationId, locale, router, t, userInfo?.user_id]);
+  }, [captureAuthOwner, ensureToken, generation, generationId, locale, router, t, userInfo?.user_id]);
 
   const handleCopy = useCallback(async () => {
     if (!generation) return;
@@ -143,13 +145,15 @@ function GenerationDetail({ generationId }: { generationId: string }) {
   const handleDownload = useCallback(async () => {
     if (!generation || downloadRef.current) return;
     downloadRef.current = true;
+    const isOwnerCurrent = captureAuthOwner(userInfo?.user_id ?? null);
+    const isCurrent = () => activeRef.current && isOwnerCurrent();
     setDownloadBusy(true);
     setError('');
     try {
       const token = await ensureToken();
-      if (!activeRef.current || token !== currentToken) return;
+      if (!isCurrent()) return;
       const { blob, filename } = await downloadGeneration(generation.generation_id, token);
-      if (!activeRef.current) return;
+      if (!isCurrent()) return;
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
@@ -165,12 +169,12 @@ function GenerationDetail({ generationId }: { generationId: string }) {
         metadata: { generation_id: generation.generation_id, generation_mode: generation.generation_mode },
       });
     } catch (err) {
-      if (activeRef.current) setError(formatUserFacingError(t, err, t('generation_detail_download_error')));
+      if (isCurrent()) setError(formatUserFacingError(t, err, t('generation_detail_download_error')));
     } finally {
       downloadRef.current = false;
       if (activeRef.current) setDownloadBusy(false);
     }
-  }, [currentToken, ensureToken, generation, generationId, locale, t]);
+  }, [captureAuthOwner, ensureToken, generation, generationId, locale, t, userInfo?.user_id]);
 
   const handleUseForRetake = useCallback(() => {
     if (!generation) return;

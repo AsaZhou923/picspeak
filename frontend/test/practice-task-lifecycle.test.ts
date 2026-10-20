@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import ts from 'typescript';
+import { createAuthOwnerState } from './helpers/auth-owner-state.ts';
+import { deferred } from './helpers/component-harness.ts';
 import { buildPracticeStartRequest } from '../src/features/practice/start.ts';
 
 // Execute the real components and their effect cleanup/dependency behavior without
@@ -21,6 +23,7 @@ function harness(file: string, extra: Record<string, unknown> = {}, componentNam
   let locale = 'en';
   let taskId = 'task-a';
   let userId = 'user-a';
+  const authOwner = createAuthOwnerState(userId);
   let translate = (key: string) => `${locale}:${key}`;
   const depsChanged = (before: unknown[] | undefined, after: unknown[]) => !before || before.length !== after.length || after.some((x, i) => !Object.is(x, before[i]));
   const react = {
@@ -52,7 +55,9 @@ function harness(file: string, extra: Record<string, unknown> = {}, componentNam
       });
     },
   };
-  let ensureToken = async () => 'test-token';
+  let tokenValue = 'test-token';
+  let pendingToken: Promise<string> | null = null;
+  let ensureToken = () => pendingToken ?? Promise.resolve(tokenValue);
   const router = { push: (url: string) => pushes.push(url), back() {} };
   const api: Record<string, any> = {
     buildTaskWebSocketUrl: (id: string) => `ws://test/${id}`,
@@ -69,7 +74,7 @@ function harness(file: string, extra: Record<string, unknown> = {}, componentNam
     'next/link': { default: 'a' },
     'next/navigation': { useRouter: () => router, useParams: () => ({ taskId }), useSearchParams: () => new URLSearchParams() },
     'lucide-react': {},
-    '@/lib/auth-context': { useAuth: () => ({ ensureToken, token: 'test-token', userInfo: { user_id: userId, plan: 'pro' } }) },
+    '@/lib/auth-context': { useAuth: () => ({ ensureToken, captureAuthOwner: authOwner.read().captureAuthOwner, token: 'test-token', userInfo: { user_id: userId, plan: 'pro' } }) },
     '@/lib/i18n': { useI18n: () => ({ locale, t: translate }) },
     '@/lib/api': api,
     '@/lib/types': { ApiException },
@@ -107,7 +112,9 @@ function harness(file: string, extra: Record<string, unknown> = {}, componentNam
     setProps(next: Record<string, any>) { props = next; render(); },
     setLocale(next: string) { locale = next; translate = (key: string) => `${next}:${key}`; render(); },
     setTaskId(next: string) { taskId = next; render(); },
-    setIdentity(next: string) { userId = next; render(); },
+    setIdentity(next: string, rerender = true) { userId = next; authOwner.changeOwner(next); if (rerender) render(); },
+    renewToken() { tokenValue = 'renewed-token'; },
+    holdToken(value: Promise<string> | null) { pendingToken = value; },
     refreshTokenGetter() { ensureToken = async () => 'refreshed-token'; render(); },
     async flush() { for (let i = 0; i < 4; i++) { await new Promise((resolve) => setImmediate(resolve)); render(); } },
     advance(ms: number) { now += ms; for (const [id, timer] of [...timers]) if (timer.at <= now) { timers.delete(id); timer.run(); } render(); },
@@ -381,3 +388,64 @@ test('scene saves cannot duplicate writes or refresh an unmounted account subtre
   app.unmount(); resolve(); await new Promise((done) => setImmediate(done));
   assert.equal(app.calls.filter((call) => call === 'sessions').length, 1);
 });
+
+for (const action of ['accept', 'scene'] as const) {
+  const actionButton = (app: ReturnType<typeof practiceAccountHarness>) => app.find((node) => node.type === 'button' && (action === 'accept'
+    ? node.props.children === 'Accept recommendation'
+    : JSON.stringify(node.props.children).includes('"sceneGroupSave"')));
+
+  test(`practice ${action} accepts a renewed same-owner token`, async () => {
+    const tokens: string[] = [];
+    const app = practiceAccountHarness();
+    app.api.createPracticeSession = async (_payload: unknown, token: string) => { tokens.push(token); return { session_id: 'fresh-session' }; };
+    app.api.updatePracticeSceneGroup = async (_id: string, _payload: unknown, token: string) => { tokens.push(token); };
+    app.render(); await app.flush(); app.renewToken();
+    await actionButton(app).props.onClick(); await app.flush();
+    assert.deepEqual(tokens, ['renewed-token']);
+    if (action === 'accept') assert.deepEqual(app.pushes, ['/workspace?practice_session_id=fresh-session']);
+    else assert.equal(app.calls.filter((call) => call === 'sessions').length, 2);
+    app.unmount();
+  });
+
+  for (const timing of ['during-auth', 'late-response'] as const) {
+    test(`practice ${action} aborts a confirmed owner switch ${timing} before React rerenders`, async () => {
+      const token = deferred<string>(); const response = deferred<any>(); const called = deferred<void>();
+      let writes = 0;
+      const app = practiceAccountHarness();
+      const write = async () => { writes++; called.resolve(); return response.promise; };
+      app.api.createPracticeSession = write; app.api.updatePracticeSceneGroup = write;
+      app.render(); await app.flush();
+      if (timing === 'during-auth') app.holdToken(token.promise);
+      const pending = actionButton(app).props.onClick();
+      if (timing === 'late-response') await called.promise;
+      app.setIdentity('user-b', false);
+      token.resolve('user-b-token'); response.resolve({ session_id: 'old-session' });
+      await pending; await new Promise((resolve) => setImmediate(resolve));
+      assert.equal(writes, timing === 'late-response' ? 1 : 0);
+      assert.deepEqual(app.pushes, []);
+      assert.equal(app.calls.filter((call) => call === 'sessions').length, 1);
+      app.unmount();
+    });
+  }
+}
+
+for (const action of ['accept', 'scene'] as const) {
+  test(`practice ${action} unlocks after a discarded A-to-B-to-A result`, async () => {
+    const response = deferred<any>(); const called = deferred<void>(); let writes = 0;
+    const app = practiceAccountHarness();
+    const write = async () => { writes++; called.resolve(); return response.promise; };
+    app.api.createPracticeSession = write; app.api.updatePracticeSceneGroup = write;
+    app.render(); await app.flush();
+    const button = () => app.find((node) => node.type === 'button' && (action === 'accept'
+      ? node.props.children === 'Accept recommendation'
+      : JSON.stringify(node.props.children).includes('"sceneGroupSave"')));
+    const pending = button().props.onClick(); await called.promise;
+    app.setIdentity('user-b', false); app.setIdentity('user-a', false);
+    response.resolve({ session_id: 'retry-session' }); await pending; await new Promise((resolve) => setImmediate(resolve)); app.render();
+    assert.deepEqual(app.pushes, []);
+    assert.equal(button().props.disabled, false);
+    await button().props.onClick(); await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(writes, 2);
+    app.unmount();
+  });
+}

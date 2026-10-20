@@ -4,7 +4,7 @@
     "date": "2026-10-20",
     "showPopup": false,
     "title": "Upcoming: gallery and recovery fixes",
-    "summary": "In preparation: keep gallery results and drafts when correcting filters or switching language; match repeat critiques to language, category and accessible history; recover interrupted critique and image requests without duplicate quota use; preserve pagination and ignore stale results after filter or account changes; hide private content after identity changes; improve downloads, mobile error pages and account recovery controls.",
+    "summary": "In preparation: keep gallery results and drafts when correcting filters or switching language; match repeat critiques to language, category and accessible history; recover interrupted critique and image requests without duplicate quota use; preserve pagination and ignore stale results after filter or account changes; hide private content after identity changes; improve downloads, mobile error pages and account recovery controls. Same-account session renewal keeps uploads and drafts and continues the requested action; signing out or changing accounts still clears private state.",
     "docPath": "docs/changelog/CHANGELOG.md#2026-10-20-gallery-and-review-cache-fixes"
   },
   {

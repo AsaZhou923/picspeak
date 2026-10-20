@@ -59,7 +59,7 @@ function harness(search = '') {
     'next/navigation': { useRouter: () => ({ push() {} }) },
     'lucide-react': { AlertCircle: 'AlertCircle', ImageIcon: 'ImageIcon' },
     '@clerk/nextjs': { SignInButton: 'SignInButton' },
-    '@/lib/auth-context': { useAuth: () => ({ token: 'token', ensureToken: async () => 'token', userInfo: { plan: 'pro', user_id: 'generation-draft-user' }, isLoading: false }) },
+    '@/lib/auth-context': { useAuth: () => ({ token: 'token', ensureToken: async () => 'token', captureAuthOwner: () => () => true, userInfo: { plan: 'pro', user_id: 'generation-draft-user' }, isLoading: false }) },
     '@/lib/i18n': { useI18n: () => ({ locale, t }) },
     '@/lib/api': {
       getGenerationTemplates: async () => ({ credits_table: { medium: { '1024x1536': 2, '1024x1024': 2 } } }),
@@ -93,7 +93,9 @@ function harness(search = '') {
   }
   modules['@/features/generations/components/PromptExampleGallery'] = { PromptExampleGallery: 'PromptExampleGallery' };
   const exports: { default?: () => Node } = {};
-  vm.runInNewContext(compiled, {
+  // These draft/locale cases exercise the form; keyed account lifetimes are
+  // covered by generation-submit-recovery's component harness.
+  vm.runInNewContext(compiled + '\nexports.default = GeneratePageContent;', {
     exports, require: (name: string) => { assert.ok(name in modules, name); return modules[name]; },
     URLSearchParams,
     window: { location: { search }, requestAnimationFrame: (callback: () => void) => callback() },

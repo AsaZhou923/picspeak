@@ -78,7 +78,7 @@ export default function PracticeAccountPage() {
 
 function PracticeAccountContent() {
   const router = useRouter();
-  const { ensureToken, userInfo, token: currentToken } = useAuth();
+  const { ensureToken, captureAuthOwner, userInfo } = useAuth();
   const practiceEnabled = usePracticeEnabled();
   const { t, locale } = useI18n();
   const copy = useMemo(() => getPracticeGuidanceCopy(locale), [locale]);
@@ -166,13 +166,15 @@ function PracticeAccountContent() {
     const semanticKey = acceptSemanticKey(recommendation);
     if (!payload || !semanticKey || !recommendation.accept_available || actionRef.current) return;
     actionRef.current = true;
+    const isOwnerCurrent = captureAuthOwner(userInfo?.user_id ?? null);
+    const isCurrent = () => mountedRef.current && isOwnerCurrent();
     let navigating = false;
 
     setActionError('');
     setAcceptingRecommendationId(recommendation.recommendation_id);
     try {
       const token = await ensureToken();
-      if (!mountedRef.current || token !== currentToken) return;
+      if (!isCurrent()) return;
       if (!token) {
         setActionError(copy.signInRequired);
         return;
@@ -183,19 +185,19 @@ function PracticeAccountContent() {
         : makePracticeIdempotencyKey('practice_session', semanticKey);
       writePendingPracticeState({ semanticKey, sessionIdempotencyKey });
       const session = await createPracticeSession({ ...payload, idempotency_key: sessionIdempotencyKey }, token);
-      if (!mountedRef.current) return;
+      if (!isCurrent()) return;
       clearPendingPracticeState(semanticKey);
       router.push(`/workspace?practice_session_id=${encodeURIComponent(session.session_id)}`);
       navigating = true;
     } catch (err) {
-      if (mountedRef.current) setActionError(formatUserFacingError(t, err, copy.acceptError));
+      if (isCurrent()) setActionError(formatUserFacingError(t, err, copy.acceptError));
     } finally {
       if (mountedRef.current && !navigating) {
         actionRef.current = false;
         setAcceptingRecommendationId(null);
       }
     }
-  }, [copy.acceptError, copy.signInRequired, currentToken, ensureToken, router, t]);
+  }, [copy.acceptError, copy.signInRequired, captureAuthOwner, ensureToken, router, t, userInfo?.user_id]);
 
   const handleSaveSceneGroup = useCallback(async (sessionId: string) => {
     const label = (sceneDrafts[sessionId] ?? '').trim();
@@ -205,29 +207,31 @@ function PracticeAccountContent() {
     }
     if (actionRef.current) return;
     actionRef.current = true;
+    const isOwnerCurrent = captureAuthOwner(userInfo?.user_id ?? null);
+    const isCurrent = () => mountedRef.current && isOwnerCurrent();
     setActionError('');
     setSavedSceneSessionId(null);
     setSavingSceneSessionId(sessionId);
     try {
       const token = await ensureToken();
-      if (!mountedRef.current || token !== currentToken) return;
+      if (!isCurrent()) return;
       if (!token) {
         setActionError(copy.signInRequired);
         return;
       }
       await updatePracticeSceneGroup(sessionId, { label }, token);
-      if (!mountedRef.current) return;
+      if (!isCurrent()) return;
       setSavedSceneSessionId(sessionId);
       await loadRef.current();
     } catch (err) {
-      if (mountedRef.current) setActionError(formatUserFacingError(t, err, copy.sceneGroupError));
+      if (isCurrent()) setActionError(formatUserFacingError(t, err, copy.sceneGroupError));
     } finally {
       if (mountedRef.current) {
         actionRef.current = false;
         setSavingSceneSessionId(null);
       }
     }
-  }, [copy.sceneGroupError, copy.sceneGroupRequired, copy.signInRequired, currentToken, ensureToken, sceneDrafts, t]);
+  }, [copy.sceneGroupError, copy.sceneGroupRequired, copy.signInRequired, captureAuthOwner, ensureToken, sceneDrafts, t, userInfo?.user_id]);
 
   const coverage = profile?.coverage;
   const levelMessage = profile ? guidanceLevelMessage(profile.level, profile.level_reason, locale) : copy.recordsOnly;

@@ -62,7 +62,7 @@ export default function GenerationHistoryPage() {
 }
 
 function GenerationHistory() {
-  const { ensureToken, token: currentToken } = useAuth();
+  const { ensureToken, captureAuthOwner, userInfo } = useAuth();
   const { t } = useI18n();
   const [items, setItems] = useState<GeneratedImageItem[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -77,19 +77,21 @@ function GenerationHistory() {
     if (pendingRef.current) return;
     pendingRef.current = true;
     const requestId = ++requestRef.current;
+    const isOwnerCurrent = captureAuthOwner(userInfo?.user_id ?? null);
+    const isCurrent = () => requestRef.current === requestId && isOwnerCurrent();
     if (nextCursor) { setLoadingMore(true); setMoreError(null); }
     else { setLoading(true); setError(null); setMoreError(null); }
     try {
       const token = await ensureToken();
-      if (requestRef.current !== requestId || (currentToken && token !== currentToken)) return;
+      if (!isCurrent()) return;
       const data = await getMyGenerations(token, { cursor: nextCursor, limit: 20 });
-      if (requestRef.current !== requestId) return;
+      if (!isCurrent()) return;
       setItems((prev) => nextCursor
         ? [...prev, ...data.items.filter((item) => !prev.some((existing) => existing.generation_id === item.generation_id))]
         : data.items);
       setCursor(data.next_cursor);
     } catch (err) {
-      if (requestRef.current !== requestId) return;
+      if (!isCurrent()) return;
       if (nextCursor) setMoreError(err);
       else setError(err);
     } finally {
@@ -99,7 +101,7 @@ function GenerationHistory() {
         setLoadingMore(false);
       }
     }
-  }, [currentToken, ensureToken]);
+  }, [captureAuthOwner, ensureToken, userInfo?.user_id]);
 
   useEffect(() => {
     void fetchPage();

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as generationRequest from '../src/features/generations/generation-request.ts';
 import { componentHarness, deferred, settle } from './helpers/component-harness.ts';
 
-const authFor = (id: string) => ({ userInfo: { user_id: id, plan: id === 'guest' ? 'guest' : 'pro' }, isLoading: false, token: `${id}-token`, ensureToken: async () => `${id}-token` });
+import { createAuthOwnerState } from './helpers/auth-owner-state.ts';
 const t = (key: string) => key;
 const baseModules = {
   'next/image': { default: 'Image' }, 'next/link': { default: 'Link' },
@@ -16,11 +16,16 @@ const baseModules = {
 const item = (id: string) => ({ generation_id: id, prompt: `private-${id}`, image_url: `https://example.test/${id}.webp`, created_at: '2026-10-20T00:00:00Z', metadata: {} });
 
 function historyHarness(api: (token: string, query: { cursor?: string }) => Promise<any>) {
-  let auth = authFor('owner');
+  const authState = createAuthOwnerState('owner');
+  let auth = authState.read();
   const app = componentHarness(new URL('../src/app/account/generations/page.tsx', import.meta.url), {
     ...baseModules, '@/lib/api': { getMyGenerations: api }, '@/lib/auth-context': { useAuth: () => auth },
   });
-  return { ...app, changeOwner: (id: string) => { auth = authFor(id); app.render(); } };
+  return { ...app,
+    changeOwner(id: string, rerender = true) { authState.changeOwner(id); auth = authState.read(); if (rerender) app.render(); },
+    refreshToken() { authState.refreshToken(); },
+    holdToken(value: Promise<string> | null) { authState.holdToken(value); },
+  };
 }
 const cards = (app: ReturnType<typeof historyHarness>) => app.nodes((node) => node.type === 'Link' && node.props.href?.startsWith('/generations/'));
 const button = (app: { nodes: ReturnType<typeof componentHarness>['nodes'] }, label: string) => app.nodes((node) => node.type === 'button' && JSON.stringify(node.props.children).includes(label))[0];
@@ -78,7 +83,8 @@ test('identity switch removes history immediately and ignores an old-owner late 
 });
 
 function detailHarness(api: Record<string, any>) {
-  let auth = authFor('owner');
+  const authState = createAuthOwnerState('owner');
+  let auth = authState.read();
   let locale = 'en';
   let translation = t;
   const pushed: string[] = [];
@@ -94,7 +100,7 @@ function detailHarness(api: Record<string, any>) {
     URL: { createObjectURL: () => { downloads++; return 'blob:test'; }, revokeObjectURL() {} },
     document: { createElement: () => ({ click() {}, remove() {} }), body: { appendChild() {} } },
   });
-  return { ...app, pushed, failNextNavigation() { failNavigation = true; }, get downloads() { return downloads; }, changeOwner: (id: string) => { auth = authFor(id); app.render(); }, changeLocale: () => { locale = 'ja'; translation = (key: string) => key; app.render(); } };
+  return { ...app, pushed, failNextNavigation() { failNavigation = true; }, get downloads() { return downloads; }, changeOwner: (id: string, rerender = true) => { authState.changeOwner(id); auth = authState.read(); if (rerender) app.render(); }, refreshToken() { authState.refreshToken(); }, holdToken(value: Promise<string> | null) { authState.holdToken(value); }, changeLocale: () => { locale = 'ja'; translation = (key: string) => key; app.render(); } };
 }
 
 test('private detail disappears on guest/owner change and rejects late responses', async () => {
@@ -217,3 +223,72 @@ test('reuse: failed navigation retains the accepted request key and unlocks retr
   assert.deepEqual(app.pushed, ['/generation-tasks/accepted-reuse-task']);
   app.unmount();
 });
+
+test('generation history pagination accepts same-owner token renewal without losing existing cards', async () => {
+  const tokens: string[] = [];
+  const app = historyHarness(async (token, query) => {
+    tokens.push(token);
+    return query.cursor ? { items: [item('second')], next_cursor: null } : { items: [item('first')], next_cursor: 'next' };
+  });
+  app.render(); await settle(); app.render();
+  app.refreshToken();
+  button(app, 'generation_load_more').props.onClick(); await settle(); app.render();
+  assert.deepEqual(tokens, ['owner-token', 'owner-refreshed']);
+  assert.equal(cards(app).length, 2);
+  app.unmount();
+});
+
+for (const action of ['download', 'reuse'] as const) {
+  test(`${action} accepts same-owner bearer renewal before the auth rerender`, async () => {
+    const tokens: string[] = [];
+    const app = detailHarness({
+      getGeneration: async () => ({ ...item('refresh-result'), generation_mode: 'general' }),
+      downloadGeneration: async (_id: string, token: string) => { tokens.push(token); return { blob: new Blob(['private']), filename: 'private.webp' }; },
+      reuseGeneration: async (_id: string, token: string) => { tokens.push(token); return { task_id: 'renewed-reuse' }; },
+    });
+    app.render(); await settle(); app.render(); app.refreshToken();
+    await button(app, `generation_detail_${action}`).props.onClick();
+    assert.deepEqual(tokens, ['owner-refreshed']);
+    assert.equal(app.downloads, action === 'download' ? 1 : 0);
+    assert.deepEqual(app.pushed, action === 'reuse' ? ['/generation-tasks/renewed-reuse'] : []);
+    app.unmount();
+  });
+
+  for (const timing of ['during-auth', 'late-response'] as const) {
+    test(`${action} rejects a confirmed owner switch ${timing} before React rerenders`, async () => {
+      const authentication = deferred<string>(); const result = deferred<any>(); const called = deferred<void>();
+      let requests = 0;
+      const start = async () => { requests++; called.resolve(); return result.promise; };
+      const app = detailHarness({ getGeneration: async () => ({ ...item('old-result'), generation_mode: 'general' }), downloadGeneration: start, reuseGeneration: start });
+      app.render(); await settle(); app.render();
+      if (timing === 'during-auth') app.holdToken(authentication.promise);
+      const pending = button(app, `generation_detail_${action}`).props.onClick();
+      if (timing === 'late-response') await called.promise;
+      app.changeOwner('other-owner', false);
+      authentication.resolve('other-owner-token');
+      result.resolve(action === 'download' ? { blob: new Blob(['private']), filename: 'private.webp' } : { task_id: 'stale-task' });
+      await pending;
+      assert.equal(requests, timing === 'late-response' ? 1 : 0);
+      assert.equal(app.downloads, 0); assert.deepEqual(app.pushed, []);
+      app.unmount();
+    });
+  }
+}
+
+for (const action of ['download', 'reuse'] as const) {
+  test(`${action} unlocks after a discarded A-to-B-to-A result`, async () => {
+    const result = deferred<any>(); const called = deferred<void>(); let requests = 0;
+    const start = async () => { requests++; called.resolve(); return result.promise; };
+    const app = detailHarness({ getGeneration: async () => ({ ...item('retry-result'), generation_mode: 'general' }), downloadGeneration: start, reuseGeneration: start });
+    app.render(); await settle(); app.render();
+    const pending = button(app, `generation_detail_${action}`).props.onClick(); await called.promise;
+    app.changeOwner('other-owner', false); app.changeOwner('owner', false);
+    result.resolve(action === 'download' ? { blob: new Blob(['private']), filename: 'private.webp' } : { task_id: 'retry-task' });
+    await pending; app.render();
+    assert.equal(app.downloads, 0); assert.deepEqual(app.pushed, []);
+    assert.equal(button(app, `generation_detail_${action}`).props.disabled, false);
+    await button(app, `generation_detail_${action}`).props.onClick();
+    assert.equal(requests, 2);
+    app.unmount();
+  });
+}
