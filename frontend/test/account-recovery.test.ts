@@ -133,7 +133,7 @@ const profileModule = moduleUrl(await readFile('src/app/account/profile/page.tsx
     export async function updateMyProfileSettings(token, enabled) {
       const h = globalThis.__profileRecoveryHarness; h.updates.push(enabled);
       if (h.failure) throw h.failure;
-      return {...h.states[0], public_profile_enabled: enabled, public_profile_id: enabled ? 'public-id' : null};
+      return {...h.states[1], public_profile_enabled: enabled, public_profile_id: enabled ? 'public-id' : null};
     }
   `),
 });
@@ -141,7 +141,8 @@ const { default: AccountProfilePage } = await import(profileModule);
 function createProfileHarness(locale: keyof typeof dictionaries, plan: string | null) {
   const h: Harness = {
     cursor: 0,
-    states: [{ public_profile_enabled: false, public_profile_id: null, username: 'Test photographer', avatar_url: null, gallery_review_count: 0 }, false, false, false, '', false],
+    // Seed the mounted page after hydration and profile settings have loaded.
+    states: [true, { public_profile_enabled: false, public_profile_id: null, username: 'Test photographer', avatar_url: null, gallery_review_count: 0 }, false, false, false, '', false],
     userInfo: plan ? { plan, access_token: `${plan}-token` } : null,
     dictionary: dictionaries[locale], locale, updates: [], failure: null,
   };
@@ -180,17 +181,18 @@ test('guest profile uses a sign-in action and registered profiles retain publish
         assert.equal(toggle.props.disabled, false);
         toggle.props.onClick(); await settleClick();
         assert.deepEqual(h.updates, [true]);
-        assert.equal(h.states[0].public_profile_enabled, true);
+        assert.equal(h.states[1].public_profile_enabled, true);
       }
     }
   }
 });
 
-test('profile publishing waits for confirmed identity and loaded settings', async () => {
-  for (const setup of ['identity', 'settings', 'loading']) {
+test('profile publishing waits for hydration, confirmed identity and loaded settings', async () => {
+  for (const setup of ['hydration', 'identity', 'settings', 'loading']) {
     const h = createProfileHarness('en', setup === 'identity' ? null : 'free');
-    if (setup === 'settings') h.states[0] = null;
-    if (setup === 'loading') h.states[1] = true;
+    if (setup === 'hydration') h.states[0] = false;
+    if (setup === 'settings') h.states[1] = null;
+    if (setup === 'loading') h.states[2] = true;
     const toggle = findElement(profileTree(h), (node) => node.type === 'button' && node.props.className.includes('ui-action-primary'));
     assert.equal(toggle.props.disabled, true);
     toggle.props.onClick(); await settleClick();

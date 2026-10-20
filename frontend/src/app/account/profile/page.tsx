@@ -27,14 +27,17 @@ export default function AccountProfilePage() {
   const { ensureToken, userInfo } = useAuth();
   const { locale, t } = useI18n();
   const copy = useMemo(() => getProfileCopy(locale), [locale]);
+  const [hydrated, setHydrated] = useState(false);
   const [settings, setSettings] = useState<ProfileSettingsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState('');
   const [loginRequired, setLoginRequired] = useState(false);
-  const requiresSignIn = userInfo?.plan === 'guest' || loginRequired;
-  const canPublish = Boolean(userInfo && !requiresSignIn);
+  // The parent auth provider may restore a session before this account
+  // Suspense boundary hydrates. Keep its first control identical to SSR.
+  const requiresSignIn = hydrated && (userInfo?.plan === 'guest' || loginRequired);
+  const canPublish = Boolean(hydrated && userInfo && !requiresSignIn);
   const messagesRef = useRef({ t, copy });
   messagesRef.current = { t, copy };
   const requestRef = useRef(0);
@@ -48,6 +51,7 @@ export default function AccountProfilePage() {
   }
 
   useEffect(() => {
+    setHydrated(true);
     activeRef.current = true;
     return () => { activeRef.current = false; };
   }, []);
