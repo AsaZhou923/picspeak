@@ -13,9 +13,13 @@ export function useReviewDetail(reviewId: string) {
   const identityRef = useRef(identity);
   identityRef.current = identity;
   const { t, locale } = useI18n();
+  // Locale and token callback changes do not change this review's identity.
+  // Reloading on either would unmount owner tools and discard in-progress drafts.
+  const requestContextRef = useRef({ ensureToken, locale });
+  requestContextRef.current = { ensureToken, locale };
   const [review, setReview] = useState<ReviewGetResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<{ reason: unknown; identity: string | null; reviewId: string } | null>(null);
   const [initialPhotoUrl, setInitialPhotoUrl] = useState<string | null>(null);
   const [loadedIdentity, setLoadedIdentity] = useState<string | null | undefined>(undefined);
   const [loadedReviewId, setLoadedReviewId] = useState<string | null>(null);
@@ -24,11 +28,11 @@ export function useReviewDetail(reviewId: string) {
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
-    setError('');
+    setError(null);
     setReview(null);
     setInitialPhotoUrl(null);
     if (authLoading) return () => controller.abort();
-    ensureToken()
+    requestContextRef.current.ensureToken()
       .then(async (token) => {
         if (controller.signal.aborted || identityRef.current !== identity) return;
         const data = await getReview(reviewId, token, controller.signal);
@@ -44,7 +48,7 @@ export function useReviewDetail(reviewId: string) {
           void trackProductEvent('review_result_viewed', {
             token,
             pagePath: `/reviews/${data.review_id}`,
-            locale,
+            locale: requestContextRef.current.locale,
             metadata: {
               review_id: data.review_id,
               task_id: data.task_id ?? undefined,
@@ -56,19 +60,20 @@ export function useReviewDetail(reviewId: string) {
       .catch((err) => {
         if (controller.signal.aborted || identityRef.current !== identity || isAbortError(err)) return;
         setLoading(false);
-        setError(formatUserFacingError(t, err, t('review_err_fetch')));
+        setError({ reason: err, identity, reviewId });
       });
     return () => {
       controller.abort();
     };
-  }, [reviewId, ensureToken, locale, t, identity, authLoading]);
+  }, [reviewId, identity, authLoading]);
 
   const matchesIdentity = !authLoading && loadedIdentity === identity && loadedReviewId === reviewId;
   return {
     review: matchesIdentity && !loading ? review : null,
     setReview,
     loading: authLoading || loading,
-    error: authLoading ? '' : error,
+    error: !authLoading && error?.identity === identity && error.reviewId === reviewId
+      ? formatUserFacingError(t, error.reason, t('review_err_fetch')) : '',
     initialPhotoUrl: matchesIdentity && !loading ? initialPhotoUrl : null,
   };
 }
