@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-20-gallery-and-review-cache-fixes",
+    "date": "2026-10-20",
+    "showPopup": false,
+    "title": "準備中：ギャラリーと操作復帰の修正",
+    "summary": "準備中：フィルターの修正や言語の切り替えでも作品と下書きを保持。再評価は言語・写真分類・閲覧可能な履歴を照合し、中断した評価と画像生成の再試行による重複消費を防ぎます。ページ読み込み失敗時は一覧を保持し、条件やアカウント変更後の古い結果を無視。本人確認の変更後は非公開内容を隠し、ダウンロード・モバイルのエラーページ・アカウント復旧導線も改善します。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-10-20-gallery-and-review-cache-fixes"
+  },
+  {
     "id": "2026-10-19-billing-recovery-and-generation-retries",
     "date": "2026-10-19",
     "showPopup": false,

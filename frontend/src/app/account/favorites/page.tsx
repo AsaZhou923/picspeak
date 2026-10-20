@@ -1,9 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { AlertCircle, ChevronRight, Heart, RefreshCw } from 'lucide-react';
-import { getMyReviews, updateReviewMeta } from '@/lib/api';
+import { getMyReviews, isAbortError, updateReviewMeta } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { ImageType, ReviewHistoryItem } from '@/lib/types';
 import { ModeBadge, StatusBadge } from '@/components/ui/Badge';
@@ -93,6 +93,12 @@ function SkeletonList() {
 }
 
 export default function FavoritesPage() {
+  const { userInfo, isLoading } = useAuth();
+  const identity = `${isLoading ? 'loading' : 'ready'}:${userInfo?.user_id ?? 'signed-out'}`;
+  return <FavoritesSession key={identity} />;
+}
+
+function FavoritesSession() {
   const { ensureToken, userInfo } = useAuth();
   const { locale, t } = useI18n();
   const copy = useMemo(() => getFavoritesCopy(locale), [locale]);
@@ -105,15 +111,20 @@ export default function FavoritesPage() {
   const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState('');
   const [feedback, setFeedback] = useState('');
+  const loadControllerRef = useRef<AbortController | null>(null);
+  const paginationBusyRef = useRef(false);
+  const favoriteBusyRef = useRef<string | null>(null);
 
   const fetchFavoriteChunk = useCallback(
-    async (startCursor?: string | null) => {
+    async (startCursor?: string | null, signal?: AbortSignal) => {
       const token = await ensureToken();
+      if (signal?.aborted) return null;
       const response = await getMyReviews(token, {
         cursor: startCursor ?? undefined,
         limit: 20,
         favorite_only: true,
-      });
+      }, signal);
+      if (signal?.aborted) return null;
 
       return {
         items: response.items,
@@ -124,55 +135,82 @@ export default function FavoritesPage() {
   );
 
   const loadInitial = useCallback(async () => {
+    loadControllerRef.current?.abort();
+    const controller = new AbortController();
+    loadControllerRef.current = controller;
+    paginationBusyRef.current = false;
+    favoriteBusyRef.current = null;
+    setLoadingMore(false);
+    setActionBusyId(null);
+    setLoading(true);
+    setError('');
+    setFeedback('');
     try {
-      setError('');
-      setFeedback('');
-      const data = await fetchFavoriteChunk();
+      const data = await fetchFavoriteChunk(undefined, controller.signal);
+      if (!data || controller.signal.aborted) return;
       setItems(data.items);
       setCursor(data.nextCursor);
       setHasMore(data.nextCursor !== null);
     } catch (err) {
-      setError(formatUserFacingError(t, err, t('reviews_err_fetch')));
+      if (!controller.signal.aborted && !isAbortError(err)) {
+        setError(formatUserFacingError(t, err, t('reviews_err_fetch')));
+      }
+    } finally {
+      if (!controller.signal.aborted) setLoading(false);
     }
   }, [fetchFavoriteChunk, t]);
 
   useEffect(() => {
-    setLoading(true);
-    loadInitial().finally(() => setLoading(false));
+    void loadInitial();
+    return () => loadControllerRef.current?.abort();
   }, [loadInitial, userInfo?.access_token]);
 
   const handleLoadMore = async () => {
-    if (!cursor || loadingMore) return;
+    if (!cursor || paginationBusyRef.current) return;
+    paginationBusyRef.current = true;
+    const signal = loadControllerRef.current?.signal;
     setLoadingMore(true);
     try {
-      const data = await fetchFavoriteChunk(cursor);
+      const data = await fetchFavoriteChunk(cursor, signal);
+      if (!data || signal?.aborted) return;
       setItems((prev) => [...prev, ...data.items]);
       setCursor(data.nextCursor);
       setHasMore(data.nextCursor !== null);
     } catch (err) {
-      setError(formatUserFacingError(t, err, t('reviews_err_fetch')));
+      if (!signal?.aborted && !isAbortError(err)) setError(formatUserFacingError(t, err, t('reviews_err_fetch')));
     } finally {
-      setLoadingMore(false);
+      if (!signal?.aborted) {
+        paginationBusyRef.current = false;
+        setLoadingMore(false);
+      }
     }
   };
 
   const handleUnfavorite = async (reviewId: string) => {
-    if (actionBusyId) return;
+    if (favoriteBusyRef.current) return;
+    favoriteBusyRef.current = reviewId;
 
+    const signal = loadControllerRef.current?.signal;
     setActionBusyId(reviewId);
     setFeedback(copy.unfavoritePending);
     setError('');
 
     try {
       const token = await ensureToken();
+      if (signal?.aborted) return;
       await updateReviewMeta(reviewId, { favorite: false }, token);
+      if (signal?.aborted) return;
       setItems((prev) => prev.filter((item) => item.review_id !== reviewId));
       setFeedback(copy.unfavoriteDone);
     } catch (err) {
+      if (signal?.aborted || isAbortError(err)) return;
       setFeedback('');
       setError(formatUserFacingError(t, err, t('reviews_err_fetch')));
     } finally {
-      setActionBusyId(null);
+      if (!signal?.aborted) {
+        favoriteBusyRef.current = null;
+        setActionBusyId(null);
+      }
     }
   };
 

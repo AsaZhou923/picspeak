@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { ArrowRight, Settings2, Sparkles, Ticket } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import ClerkSignInTrigger from '@/components/auth/ClerkSignInTrigger';
 import ActivationCodeModal from '@/components/billing/ActivationCodeModal';
 import { useAuth } from '@/lib/auth-context';
@@ -179,10 +179,14 @@ export default function ProPromoCard({
 }: ProPromoCardProps) {
   const { ensureToken } = useAuth();
   const { locale, t } = useI18n();
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => setHydrated(true), []);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [activationOpen, setActivationOpen] = useState(false);
   const copy = getPromoCopy(locale);
-  const sceneCopy = copy.scenes[scene][plan === 'pro' ? 'pro' : 'default'];
+  // A parent auth effect can resolve before this Suspense subtree hydrates.
+  // Keep its first render deterministic, then expose the account-specific CTA.
+  const sceneCopy = copy.scenes[scene][hydrated && plan === 'pro' ? 'pro' : 'default'];
   const resolvedTitle = title ?? sceneCopy.title;
   const resolvedBody = body ?? sceneCopy.body;
 
@@ -241,7 +245,9 @@ export default function ProPromoCard({
           </div>
           <p className="mt-2 text-xs leading-6 text-ink-subtle">{copy.footnote}</p>
 
-          {plan === 'pro' ? (
+          {!hydrated ? (
+            <div aria-hidden="true" className="mt-5 h-12 animate-pulse rounded-full bg-gold/10" />
+          ) : plan === 'pro' ? (
             <>
               <p className="mt-5 rounded-2xl border border-gold/20 bg-gold/10 px-4 py-3 text-sm text-gold/90">
                 {copy.proStatus}

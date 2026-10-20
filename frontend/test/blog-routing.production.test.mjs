@@ -368,6 +368,25 @@ test('invalid locale-shaped paths are real 404s and discovery assets stay canoni
   assert.match(sitemapXml, /<loc>https:\/\/www\.picspeak\.art\/editorial-policy<\/loc>/);
 });
 
+test('localized 404 pages retain the mobile viewport and locale-specific home recovery', async () => {
+  for (const { locale, documentLang } of LOCALE_CASES) {
+    for (const pathName of [
+      '/definitely-not-a-real-route',
+      `/${locale}/blog/definitely-not-a-real-post`,
+      '/generate/prompts/definitely-not-a-real-prompt',
+    ]) {
+      const response = await fetch(`${baseUrl}${pathName}`, {
+        headers: { cookie: `picspeak-locale=${locale}` },
+      });
+      assert.equal(response.status, 404, `${locale}: ${pathName}`);
+      const html = await response.text();
+      assert.match(html, /<meta name="viewport" content="width=device-width, initial-scale=1"\s*\/?>/i);
+      assert.match(html, new RegExp(`<html[^>]+lang="${documentLang}"`));
+      assert.match(html, new RegExp(`href="/${locale}"`));
+    }
+  }
+});
+
 test('search-result titles stay unique, concise, and free of duplicated brand suffixes', async () => {
   const paths = [
     '/en',

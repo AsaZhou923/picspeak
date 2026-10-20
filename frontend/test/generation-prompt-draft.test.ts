@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import ts from 'typescript';
+import * as generationRequest from '../src/features/generations/generation-request.ts';
 
 const compiled = ts.transpileModule(
   fs.readFileSync(new URL('../src/app/generate/GeneratePageClient.tsx', import.meta.url), 'utf8'),
@@ -58,13 +59,14 @@ function harness(search = '') {
     'next/navigation': { useRouter: () => ({ push() {} }) },
     'lucide-react': { AlertCircle: 'AlertCircle', ImageIcon: 'ImageIcon' },
     '@clerk/nextjs': { SignInButton: 'SignInButton' },
-    '@/lib/auth-context': { useAuth: () => ({ token: 'token', ensureToken: async () => 'token', userInfo: { plan: 'pro' }, isLoading: false }) },
+    '@/lib/auth-context': { useAuth: () => ({ token: 'token', ensureToken: async () => 'token', userInfo: { plan: 'pro', user_id: 'generation-draft-user' }, isLoading: false }) },
     '@/lib/i18n': { useI18n: () => ({ locale, t }) },
     '@/lib/api': {
       getGenerationTemplates: async () => ({ credits_table: { medium: { '1024x1536': 2, '1024x1024': 2 } } }),
       getMyGenerations: async () => ({ items: [] }),
       createGeneration: async (payload: Record<string, unknown>) => { submitted = payload; return { task_id: 'task' }; },
     },
+    '@/features/generations/generation-request': generationRequest,
     '@/lib/types': { ApiException: class extends Error {} },
     '@/lib/error-utils': { formatUserFacingError: () => 'error' },
     '@/lib/product-analytics': { trackProductEvent() {}, readProductAttributionSource: () => undefined },
@@ -157,9 +159,12 @@ for (const source of ['gallery', 'url']) {
     assert.equal(app.submitted?.prompt_example_category, example.category);
     app.render().form.onPromptChange('edited example');
     assert.equal(app.render('zh').form.prompt, 'edited example');
-    app.render().form.onTemplateSelect('portrait_avatar');
-    await app.render().submit();
-    assert.equal(app.submitted?.prompt, 'zh:portrait_avatar.prompt');
-    assert.equal(app.submitted?.prompt_example_id, null);
+    const returned = harness();
+    returned.render('zh').gallery.onApply(example);
+    returned.render().form.onTemplateSelect('portrait_avatar');
+    await new Promise((resolve) => setImmediate(resolve));
+    await returned.render().submit();
+    assert.equal(returned.submitted?.prompt, 'zh:portrait_avatar.prompt');
+    assert.equal(returned.submitted?.prompt_example_id, null);
   });
 }

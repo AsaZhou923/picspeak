@@ -1,4 +1,4 @@
-import { displayDateToIso, isoDateToDisplay } from '@/lib/date-filters';
+import { displayDateToIso, isoDateToDisplay } from './date-filters.ts';
 import type { PublicGalleryQuery } from '@/lib/types';
 import type { FilterDraft } from '@/components/gallery/GalleryFilters';
 
@@ -12,6 +12,29 @@ export const EMPTY_GALLERY_FILTERS: FilterDraft = {
   imageType: '',
   sort: 'default',
 };
+
+type GalleryScoreError = 'filter_score_invalid' | 'filter_score_range_invalid';
+
+export interface GalleryScoreValidation {
+  minScore: GalleryScoreError | null;
+  maxScore: GalleryScoreError | null;
+  hasError: boolean;
+}
+
+/** Validate both editable fields and URL values before they can reach the API. */
+export function validateGalleryScores(filters: Pick<FilterDraft, 'minScore' | 'maxScore'>): GalleryScoreValidation {
+  const isValidScore = (value: string) => value === '' || (
+    /^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i.test(value.trim()) &&
+    Number.isFinite(Number(value)) && Number(value) >= 0 && Number(value) <= 10
+  );
+  let minScore: GalleryScoreError | null = isValidScore(filters.minScore) ? null : 'filter_score_invalid';
+  let maxScore: GalleryScoreError | null = isValidScore(filters.maxScore) ? null : 'filter_score_invalid';
+  if (!minScore && !maxScore && filters.minScore !== '' && filters.maxScore !== '' && Number(filters.minScore) > Number(filters.maxScore)) {
+    minScore = 'filter_score_range_invalid';
+    maxScore = 'filter_score_range_invalid';
+  }
+  return { minScore, maxScore, hasError: Boolean(minScore || maxScore) };
+}
 
 export function galleryFiltersFromSearchParams(searchParams: URLSearchParams): FilterDraft {
   return {

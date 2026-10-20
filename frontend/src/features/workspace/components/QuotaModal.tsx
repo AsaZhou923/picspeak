@@ -1,6 +1,8 @@
+import Link from 'next/link';
 import { AlertCircle, ArrowRight, X } from 'lucide-react';
 import ClerkSignInTrigger from '@/components/auth/ClerkSignInTrigger';
 import { type Translator } from '@/lib/i18n';
+import { useModalFocusTrap } from '@/lib/hooks/useModalFocusTrap';
 
 interface QuotaModalProps {
   plan: string;
@@ -9,6 +11,9 @@ interface QuotaModalProps {
 }
 
 export function QuotaModal({ plan, onClose, t }: QuotaModalProps) {
+  const dialogRef = useModalFocusTrap<HTMLDivElement>({ open: true, onClose });
+  const bodyKey = plan === 'guest' ? 'quota_modal_body' : plan === 'pro' ? 'quota_modal_pro_body' : 'quota_modal_free_body';
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center px-6"
@@ -16,6 +21,8 @@ export function QuotaModal({ plan, onClose, t }: QuotaModalProps) {
       onClick={onClose}
     >
       <div
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-labelledby="workspace-quota-title"
@@ -37,7 +44,7 @@ export function QuotaModal({ plan, onClose, t }: QuotaModalProps) {
         </div>
         <div>
           <h2 id="workspace-quota-title" className="mb-2 font-display text-2xl">{t('quota_modal_title')}</h2>
-          <p id="workspace-quota-description" className="text-sm leading-relaxed text-ink-muted">{t('quota_modal_body')}</p>
+          <p id="workspace-quota-description" className="text-sm leading-relaxed text-ink-muted">{t(bodyKey)}</p>
         </div>
         <div className="flex flex-col gap-2 pt-1">
           {plan === 'guest' ? (
@@ -49,7 +56,10 @@ export function QuotaModal({ plan, onClose, t }: QuotaModalProps) {
               <ArrowRight size={13} />
             </ClerkSignInTrigger>
           ) : (
-            <p className="text-xs text-ink-muted text-center">{t('quota_modal_upgrade')}</p>
+            <Link href="/account/usage" className="ui-action-primary min-h-11 px-5 py-2.5 text-sm">
+              {t(plan === 'pro' ? 'quota_modal_view_usage' : 'quota_modal_view_plans')}
+              <ArrowRight size={13} />
+            </Link>
           )}
           <button
             type="button"

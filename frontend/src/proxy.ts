@@ -46,7 +46,7 @@ function escapeHtml(value: string): string {
 function unknownRouteResponse(locale: SupportedLocale): NextResponse {
   const copy = NOT_FOUND_COPY[locale];
   return new NextResponse(
-    `<!doctype html><html lang="${htmlLang(locale)}"><head><meta charset="utf-8"><meta name="robots" content="noindex"><title>${escapeHtml(copy.title)}</title></head><body><main><h1>${escapeHtml(copy.heading)}</h1><p>${escapeHtml(copy.body)}</p><a href="/${locale}">${escapeHtml(copy.cta)}</a></main></body></html>`,
+    `<!doctype html><html lang="${htmlLang(locale)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>${escapeHtml(copy.title)}</title></head><body><main><h1>${escapeHtml(copy.heading)}</h1><p>${escapeHtml(copy.body)}</p><a href="/${locale}">${escapeHtml(copy.cta)}</a></main></body></html>`,
     {
       status: 404,
       headers: {

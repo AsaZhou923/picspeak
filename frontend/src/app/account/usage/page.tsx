@@ -18,6 +18,7 @@ import { BillingCheckoutResponse, BillingPortalResponse, UsageResponse } from '@
 import { SkeletonBlock } from '@/components/ui/LoadingSpinner';
 import { useI18n } from '@/lib/i18n';
 import { formatUserFacingError } from '@/lib/error-utils';
+import { formatReviewModes } from '@/lib/usage-review-modes';
 import {
   closeExternalCheckoutWindow,
   navigateExternalCheckoutWindow,
@@ -264,7 +265,7 @@ export default function UsagePage() {
         ? t('usage_history_none')
         : `${usage?.features.history_retention_days} ${t('usage_history_days')}`;
   const reviewModesText =
-    usage?.features.review_modes.includes('pro') ? t('plan_free_feature') : t('plan_guest_feature');
+    formatReviewModes(usage?.features.review_modes ?? [], t);
   const subscriptionEndText = formatSubscriptionDate(usage?.subscription?.current_period_ends_at, locale) ?? fixedSubscriptionCopy[locale].pending;
   const isZhLocale = locale === 'zh';
   const isActivationCodeSubscription = usage?.subscription?.provider === 'activation_code';

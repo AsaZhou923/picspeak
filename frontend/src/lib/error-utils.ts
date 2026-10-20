@@ -35,6 +35,7 @@ const ERROR_CODE_KEYS: Record<string, TranslationKey> = {
   TASK_DISPATCH_UNAUTHORIZED: 'err_unauthorized_body',
   TASK_STREAM_ERROR: 'task_fetch_error',
   BILLING_SIGNIN_REQUIRED: 'err_unauthorized_body',
+  PUBLIC_PROFILE_LOGIN_REQUIRED: 'err_public_profile_login_required_body',
   CREDIT_PACK_CURRENCY_UNSUPPORTED: 'usage_checkout_unavailable',
   GENERATION_LOGIN_REQUIRED: 'err_generation_login_required_body',
   GENERATION_QUALITY_FORBIDDEN: 'err_generation_quality_forbidden_body',
@@ -118,8 +119,8 @@ export function formatUserFacingError(
   error: unknown,
   fallbackMessage: string
 ): string {
-  if (isApiExceptionLike(error)) {
-    return formatSupportMessage(t, localizedErrorMessage(t, error, fallbackMessage), error.requestId);
+  if (isApiErrorLike(error)) {
+    return formatSupportMessage(t, localizedErrorMessage(t, error, fallbackMessage), error.requestId ?? error.request_id);
   }
   return formatSupportMessage(t, fallbackMessage);
 }
@@ -133,11 +134,11 @@ export function formatTaskError(
   return formatSupportMessage(t, localizedErrorMessage(t, error, fallbackMessage), requestId);
 }
 
-function isApiExceptionLike(error: unknown): error is ErrorLike & { requestId?: string } {
+function isApiErrorLike(error: unknown): error is ErrorLike & { requestId?: string } {
   return (
     typeof error === 'object' &&
     error !== null &&
-    'code' in error &&
-    (error as { name?: unknown }).name === 'ApiException'
+    typeof (error as ErrorLike).code === 'string' &&
+    ['ApiException', 'ProfileApiError'].includes(String((error as { name?: unknown }).name))
   );
 }

@@ -38,6 +38,7 @@ from app.services.guard import (
     guest_rate_limit_scope_key,
     hash_request,
     increment_quota,
+    review_history_cutoff,
     save_idempotency_record,
 )
 from app.services.task_dispatcher import TaskDispatchError, enqueue_review_task
@@ -157,7 +158,18 @@ def create_review(
             Review.mode == mode_enum,
             Review.status == ReviewStatus.SUCCEEDED,
             Review.deleted_at.is_(None),
+            Review.image_type == payload.image_type,
+            # Only provenance persisted by our creation paths can establish the
+            # prose language. Historical results without it are not full hits.
+            Review.result_json['review_locale'].as_string() == payload.locale,
         )
+        cutoff = review_history_cutoff(actor.plan)
+        if cutoff is not None:
+            # Match get_review, not history listing: old public reviews remain
+            # readable, while an expired private result must never be returned.
+            existing_query = existing_query.filter(
+                or_(Review.is_public.is_(True), Review.created_at >= cutoff)
+            )
         if payload.review_model in _OPENAI_REVIEW_MODELS:
             existing_query = existing_query.filter(Review.model_name.ilike('%gpt-%'))
         else:
@@ -404,6 +416,10 @@ def create_review(
             score_cache_hit=ai_response.score_cache_hit,
             exif_info=photo.exif_data if photo.exif_data else None,
         )
+        # These values describe the trusted request sent to the writer, not
+        # model-generated metadata. Keep locale absent on historical results.
+        result_payload['review_locale'] = payload.locale
+        result_payload['image_type'] = payload.image_type
         if ai_response.cost_rate_version:
             result_payload.setdefault('billing_info', {})['cost_rate_version'] = ai_response.cost_rate_version
         review = Review(

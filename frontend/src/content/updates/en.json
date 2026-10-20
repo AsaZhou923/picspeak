@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-20-gallery-and-review-cache-fixes",
+    "date": "2026-10-20",
+    "showPopup": false,
+    "title": "Upcoming: gallery and recovery fixes",
+    "summary": "In preparation: keep gallery results and drafts when correcting filters or switching language; match repeat critiques to language, category and accessible history; recover interrupted critique and image requests without duplicate quota use; preserve pagination and ignore stale results after filter or account changes; hide private content after identity changes; improve downloads, mobile error pages and account recovery controls.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-10-20-gallery-and-review-cache-fixes"
+  },
+  {
     "id": "2026-10-19-billing-recovery-and-generation-retries",
     "date": "2026-10-19",
     "showPopup": false,

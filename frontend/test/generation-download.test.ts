@@ -22,3 +22,13 @@ test('generation download filename parser strips path separators and control cha
     '..-unsafe-image.png'
   );
 });
+
+test('generation fallback derives WebP/JPEG/PNG extension from CORS-visible content type', async () => {
+  const { generationDownloadFilename } = await import('../src/lib/generation-download.ts');
+  assert.equal(generationDownloadFilename('', 'image/webp', 'gen_webp'), 'gen_webp.webp');
+  assert.equal(generationDownloadFilename('', 'IMAGE/JPEG; charset=binary', 'gen_jpeg'), 'gen_jpeg.jpg');
+  assert.equal(generationDownloadFilename('', 'image/png', 'gen_png'), 'gen_png.png');
+  assert.equal(generationDownloadFilename('', null, 'gen_unknown'), 'gen_unknown.bin');
+  assert.equal(generationDownloadFilename('attachment; filename="custom.webp"', 'image/webp', 'gen'), 'custom.webp');
+  assert.equal(generationDownloadFilename('', 'image/webp', '../unsafe/gen'), '..-unsafe-gen.webp');
+});

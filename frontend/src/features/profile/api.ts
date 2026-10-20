@@ -36,16 +36,19 @@ export interface PublicProfileResponse {
 export class ProfileApiError extends Error {
   status: number;
   code: string;
+  requestId?: string;
 
   constructor(
     status: number,
     code: string,
-    message: string
+    message: string,
+    requestId?: string
   ) {
     super(message);
     this.name = 'ProfileApiError';
     this.status = status;
     this.code = code;
+    this.requestId = requestId;
   }
 }
 
@@ -101,14 +104,16 @@ async function profileRequest<T>(path: string, options: RequestInit & { token?: 
   if (!response.ok) {
     let code = `HTTP_${response.status}`;
     let message = `Request failed with status ${response.status}`;
+    let requestId = response.headers.get('X-Request-Id') ?? undefined;
     try {
       const payload = await response.json();
       code = payload?.error?.code || code;
       message = payload?.error?.message || message;
+      requestId = payload?.error?.request_id || requestId;
     } catch {
       // Keep the HTTP fallback.
     }
-    throw new ProfileApiError(response.status, code, message);
+    throw new ProfileApiError(response.status, code, message, requestId);
   }
   return response.json() as Promise<T>;
 }

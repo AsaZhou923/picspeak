@@ -166,6 +166,12 @@ function formatPracticeGenre(locale: string, genre: string | null): string | nul
 }
 
 export default function ReviewHistoryPage() {
+  const { userInfo, isLoading } = useAuth();
+  const identity = `${isLoading ? 'loading' : 'ready'}:${userInfo?.user_id ?? 'signed-out'}`;
+  return <ReviewHistorySession key={identity} />;
+}
+
+function ReviewHistorySession() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -250,6 +256,8 @@ export default function ReviewHistoryPage() {
   const legacyRequestRef = useRef(0);
   const legacyAbortRef = useRef<AbortController | null>(null);
   const selectedReviewIdRef = useRef<string | null>(null);
+  const reviewListAbortRef = useRef<AbortController | null>(null);
+  const reviewPageBusyRef = useRef(false);
 
   const createdFromInvalid = isInvalidCompletedDate(draftFilters.createdFrom);
   const createdToInvalid = isInvalidCompletedDate(draftFilters.createdTo);
@@ -331,6 +339,7 @@ export default function ReviewHistoryPage() {
     async (nextCursor?: string, activeFilters: FilterDraft = appliedFilters, signal?: AbortSignal) => {
       try {
         const token = await ensureToken();
+        if (signal?.aborted) return;
         const data = await getOrganizedMyReviews(token, {
           ...toQuery(activeFilters),
           cursor: nextCursor,
@@ -347,7 +356,7 @@ export default function ReviewHistoryPage() {
         setHasMore(data.next_cursor !== null);
         setError('');
       } catch (err) {
-        if (isAbortError(err)) return;
+        if (isAbortError(err) || signal?.aborted) return;
         setError(formatUserFacingError(t, err, t('reviews_err_fetch')));
       }
     },
@@ -430,7 +439,16 @@ export default function ReviewHistoryPage() {
 
   useEffect(() => {
     if (view !== 'reviews') return;
+    reviewListAbortRef.current?.abort();
     const controller = new AbortController();
+    reviewListAbortRef.current = controller;
+    reviewPageBusyRef.current = false;
+    setLoadingMore(false);
+    setOrganizationBusy(false);
+    setVisibilityBusy(false);
+    setOrganizationStatus('');
+    setVisibilityStatus('');
+    setGalleryConfirmReviewId(null);
     setItems([]);
     setCursor(null);
     setHasMore(false);
@@ -552,10 +570,18 @@ export default function ReviewHistoryPage() {
   }, [ensureToken, selectedSessionId, t, view]);
 
   const handleLoadMore = async () => {
-    if (!cursor || loadingMore) return;
+    const signal = reviewListAbortRef.current?.signal;
+    if (!cursor || reviewPageBusyRef.current || !signal || signal.aborted) return;
+    reviewPageBusyRef.current = true;
     setLoadingMore(true);
-    await fetchPage(cursor);
-    setLoadingMore(false);
+    try {
+      await fetchPage(cursor, appliedFilters, signal);
+    } finally {
+      if (!signal.aborted) {
+        reviewPageBusyRef.current = false;
+        setLoadingMore(false);
+      }
+    }
   };
 
   const handleViewChange = (nextView: HistoryView) => {
@@ -587,29 +613,38 @@ export default function ReviewHistoryPage() {
   };
 
   const refreshSelectedVisibility = async () => {
+    const signal = reviewListAbortRef.current?.signal;
+    if (!signal || signal.aborted) return;
     if (!selectedReview || visibilityBusy || organizationBusy) return;
     const reviewId = selectedReview.review_id;
     setVisibilityBusy(true);
     setVisibilityStatus('');
     try {
       const token = await ensureToken();
+      if (signal.aborted) return;
       const visibility = await getReviewVisibility(reviewId, token);
+      if (signal.aborted) return;
       patchReviewVisibility(reviewId, visibility);
     } catch (err) {
+      if (signal.aborted || isAbortError(err)) return;
       setError(formatUserFacingError(t, err, t('reviews_err_fetch')));
     } finally {
-      setVisibilityBusy(false);
+      if (!signal.aborted) setVisibilityBusy(false);
     }
   };
 
   const handleSaveOrganization = async (payload: { tags: string[]; note: string }) => {
+    const signal = reviewListAbortRef.current?.signal;
+    if (!signal || signal.aborted) return;
     if (!selectedReview || visibilityBusy || organizationBusy) return;
     const reviewId = selectedReview.review_id;
     setOrganizationBusy(true);
     setOrganizationStatus('');
     try {
       const token = await ensureToken();
+      if (signal.aborted) return;
       const meta = await updateOrganizedReviewMeta(reviewId, payload, token);
+      if (signal.aborted) return;
       patchSelectedReview(reviewId, {
         tags: meta.tags,
         note: meta.note,
@@ -620,53 +655,69 @@ export default function ReviewHistoryPage() {
       });
       setOrganizationStatus('saved');
     } catch (err) {
+      if (signal.aborted || isAbortError(err)) return;
       setError(formatUserFacingError(t, err, t('reviews_err_fetch')));
     } finally {
-      setOrganizationBusy(false);
+      if (!signal.aborted) setOrganizationBusy(false);
     }
   };
 
   const handleCreateShare = async () => {
+    const signal = reviewListAbortRef.current?.signal;
+    if (!signal || signal.aborted) return;
     if (!selectedReview || visibilityBusy || organizationBusy) return;
     const reviewId = selectedReview.review_id;
     setVisibilityBusy(true);
     setVisibilityStatus('');
     try {
       const token = await ensureToken();
+      if (signal.aborted) return;
       await createOrganizedReviewShare(reviewId, token);
+      if (signal.aborted) return;
       const visibility = await getReviewVisibility(reviewId, token);
+      if (signal.aborted) return;
       patchReviewVisibility(reviewId, visibility);
     } catch (err) {
+      if (signal.aborted || isAbortError(err)) return;
       setError(formatUserFacingError(t, err, t('reviews_err_fetch')));
     } finally {
-      setVisibilityBusy(false);
+      if (!signal.aborted) setVisibilityBusy(false);
     }
   };
 
   const handleRevokeShare = async () => {
+    const signal = reviewListAbortRef.current?.signal;
+    if (!signal || signal.aborted) return;
     if (!selectedReview || visibilityBusy || organizationBusy) return;
     const reviewId = selectedReview.review_id;
     setVisibilityBusy(true);
     setVisibilityStatus('');
     try {
       const token = await ensureToken();
+      if (signal.aborted) return;
       const visibility = await revokeReviewShare(reviewId, token);
+      if (signal.aborted) return;
       patchReviewVisibility(reviewId, visibility);
     } catch (err) {
+      if (signal.aborted || isAbortError(err)) return;
       setError(formatUserFacingError(t, err, t('reviews_err_fetch')));
     } finally {
-      setVisibilityBusy(false);
+      if (!signal.aborted) setVisibilityBusy(false);
     }
   };
 
   const handleRemoveGallery = async () => {
+    const signal = reviewListAbortRef.current?.signal;
+    if (!signal || signal.aborted) return;
     if (!selectedReview || visibilityBusy || organizationBusy) return;
     const reviewId = selectedReview.review_id;
     setVisibilityBusy(true);
     setVisibilityStatus(galleryActionCopy.pendingRemove);
     try {
       const token = await ensureToken();
+      if (signal.aborted) return;
       const meta = await updateOrganizedReviewMeta(reviewId, { gallery_visible: false }, token);
+      if (signal.aborted) return;
       patchSelectedReview(reviewId, {
         favorite: meta.favorite,
         gallery_visible: meta.gallery_visible,
@@ -674,24 +725,30 @@ export default function ReviewHistoryPage() {
         gallery_added_at: meta.gallery_added_at,
       });
       const visibility = await getReviewVisibility(reviewId, token);
+      if (signal.aborted) return;
       patchReviewVisibility(reviewId, visibility);
       setVisibilityStatus(galleryActionCopy.doneRemove);
     } catch (err) {
+      if (signal.aborted || isAbortError(err)) return;
       setVisibilityStatus('');
       setError(formatUserFacingError(t, err, t('reviews_err_fetch')));
     } finally {
-      setVisibilityBusy(false);
+      if (!signal.aborted) setVisibilityBusy(false);
     }
   };
 
   const handleAddGallery = async (reviewId: string) => {
+    const signal = reviewListAbortRef.current?.signal;
+    if (!signal || signal.aborted) return;
     if (visibilityBusy || organizationBusy) return;
     setGalleryConfirmReviewId(null);
     setVisibilityBusy(true);
     setVisibilityStatus(galleryActionCopy.pendingAdd);
     try {
       const token = await ensureToken();
+      if (signal.aborted) return;
       const meta = await updateOrganizedReviewMeta(reviewId, { gallery_visible: true }, token);
+      if (signal.aborted) return;
       patchSelectedReview(reviewId, {
         favorite: meta.favorite,
         gallery_visible: meta.gallery_visible,
@@ -708,28 +765,35 @@ export default function ReviewHistoryPage() {
         setVisibilityStatus(galleryActionCopy.donePending);
       }
       const visibility = await getReviewVisibility(reviewId, token);
+      if (signal.aborted) return;
       patchReviewVisibility(reviewId, visibility);
     } catch (err) {
+      if (signal.aborted || isAbortError(err)) return;
       setVisibilityStatus('');
       setError(formatUserFacingError(t, err, t('reviews_err_fetch')));
     } finally {
-      setVisibilityBusy(false);
+      if (!signal.aborted) setVisibilityBusy(false);
     }
   };
 
   const handleStopAllPublic = async () => {
+    const signal = reviewListAbortRef.current?.signal;
+    if (!signal || signal.aborted) return;
     if (!selectedReview || visibilityBusy || organizationBusy) return;
     const reviewId = selectedReview.review_id;
     setVisibilityBusy(true);
     setVisibilityStatus('');
     try {
       const token = await ensureToken();
+      if (signal.aborted) return;
       const visibility = await disableReviewPublicVisibility(reviewId, token);
+      if (signal.aborted) return;
       patchReviewVisibility(reviewId, visibility);
     } catch (err) {
+      if (signal.aborted || isAbortError(err)) return;
       setError(formatUserFacingError(t, err, t('reviews_err_fetch')));
     } finally {
-      setVisibilityBusy(false);
+      if (!signal.aborted) setVisibilityBusy(false);
     }
   };
 

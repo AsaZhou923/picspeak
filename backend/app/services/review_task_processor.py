@@ -785,6 +785,10 @@ def _process_task(db: Session, task: ReviewTask, *, claim_token: str | None = No
         scorer_preprocess_version=ai_response.scorer_preprocess_version,
         score_cache_hit=ai_response.score_cache_hit,
     )
+    # Persist the effective writer inputs (including the saved practice locale),
+    # never an untrusted locale/image type echoed by the model.
+    result_payload['review_locale'] = payload_locale
+    result_payload['image_type'] = payload_image_type
     if ai_response.cost_rate_version:
         result_payload.setdefault('billing_info', {})['cost_rate_version'] = ai_response.cost_rate_version
     if goal_context is None:

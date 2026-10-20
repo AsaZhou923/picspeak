@@ -24,6 +24,8 @@ export default function PracticeStartPanel({ templates }: { templates: PracticeG
   const { locale, t } = useI18n();
   const router = useRouter();
   const copy = COPY[locale];
+  const messagesRef = useRef({ t, copy });
+  messagesRef.current = { t, copy };
   const [items, setItems] = useState<ReviewHistoryItem[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState('');
@@ -38,9 +40,21 @@ export default function PracticeStartPanel({ templates }: { templates: PracticeG
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const savingRef = useRef(false);
+  const mountedRef = useRef(true);
+  const draftSourceIdRef = useRef('');
+  const photosRequestRef = useRef<AbortController | null>(null);
   const [reload, setReload] = useState(0);
 
-  const loadPhotos = useCallback(async (nextCursor?: string, signal?: AbortSignal) => {
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+
+  const loadPhotos = useCallback(async (nextCursor?: string) => {
+    photosRequestRef.current?.abort();
+    const controller = new AbortController();
+    photosRequestRef.current = controller;
+    const { signal } = controller;
     setLoading(true);
     setError('');
     try {
@@ -53,16 +67,15 @@ export default function PracticeStartPanel({ templates }: { templates: PracticeG
       setCursor(response.next_cursor ?? null);
       setSelectedId((current) => current || available[0]?.review_id || '');
     } catch (err) {
-      if (!signal?.aborted) setError(formatUserFacingError(t, err, copy.error));
+      if (!signal?.aborted) setError(formatUserFacingError(messagesRef.current.t, err, messagesRef.current.copy.error));
     } finally {
       if (!signal?.aborted) setLoading(false);
     }
-  }, [copy.error, ensureToken, t]);
+  }, [ensureToken]);
 
   useEffect(() => {
-    const controller = new AbortController();
-    void loadPhotos(undefined, controller.signal);
-    return () => controller.abort();
+    void loadPhotos();
+    return () => photosRequestRef.current?.abort();
   }, [loadPhotos]);
 
   useEffect(() => {
@@ -71,27 +84,34 @@ export default function PracticeStartPanel({ templates }: { templates: PracticeG
     setLoadingSource(true);
     setSource(null);
     setError('');
-    ensureToken().then((token) => getReview(selectedId, token, controller.signal)).then((review) => {
-      if (controller.signal.aborted) return;
+    ensureToken().then((token) => {
+      if (controller.signal.aborted) return null;
+      return getReview(selectedId, token, controller.signal);
+    }).then((review) => {
+      if (controller.signal.aborted || !review || review.review_id !== selectedId) return;
       setSource(review);
+      // Revalidating the same original must not replace an edited/template draft.
+      if (draftSourceIdRef.current === selectedId) return;
+      draftSourceIdRef.current = selectedId;
       const suggestion = buildNextShootChecklist(review.result.suggestions, 1, review.result.scores)[0];
       setGoal(suggestion?.detail || suggestion?.title || '');
       setDimension(suggestion?.dimension ?? 'composition');
       setCriteria([]);
       setTemplateId('');
     }).catch((err) => {
-      if (!controller.signal.aborted) setError(formatUserFacingError(t, err, copy.error));
+      if (!controller.signal.aborted) setError(formatUserFacingError(messagesRef.current.t, err, messagesRef.current.copy.error));
     }).finally(() => {
       if (!controller.signal.aborted) setLoadingSource(false);
     });
     return () => controller.abort();
-  }, [copy.error, ensureToken, reload, selectedId, t]);
+  }, [ensureToken, reload, selectedId]);
 
   async function start() {
     if (!source || source.review_id !== selectedId || savingRef.current || goal.trim().length < 3) return;
     savingRef.current = true;
     setSaving(true);
     setError('');
+    let navigating = false;
     try {
       const payload = buildPracticeStartRequest({ sourceReviewId: selectedId, goal, dimension, kind, locale, criteria });
       const semanticKey = buildPracticeSemanticKey({ sourceReviewId: selectedId, goal: payload.goal_snapshot.goal, dimension, practiceKind: kind, locale, successCriteria: payload.success_criteria.map((item) => item.label) });
@@ -99,14 +119,21 @@ export default function PracticeStartPanel({ templates }: { templates: PracticeG
       const sessionIdempotencyKey = pending?.semanticKey === semanticKey ? pending.sessionIdempotencyKey : makePracticeIdempotencyKey('practice_session', semanticKey);
       writePendingPracticeState({ semanticKey, sessionIdempotencyKey });
       const token = await ensureToken();
+      if (!mountedRef.current) return;
       const session = await createPracticeSession({ ...payload, idempotency_key: sessionIdempotencyKey }, token);
+      if (!mountedRef.current) return;
       clearPendingPracticeState(semanticKey);
       router.push(`/workspace?practice_session_id=${encodeURIComponent(session.session_id)}`);
+      navigating = true;
     } catch (err) {
+      if (!mountedRef.current) return;
       setError(formatUserFacingError(t, err, locale === 'zh' ? '未能保存练习，请重试。' : locale === 'ja' ? '練習を保存できませんでした。' : 'Could not save practice. Please retry.'));
     } finally {
-      savingRef.current = false;
-      setSaving(false);
+      // Keep the successful submit locked until navigation unmounts the panel.
+      if (!navigating) {
+        savingRef.current = false;
+        if (mountedRef.current) setSaving(false);
+      }
     }
   }
 
@@ -136,7 +163,7 @@ export default function PracticeStartPanel({ templates }: { templates: PracticeG
           if (template) { setGoal(template.goal_example); setDimension(template.dimension as RetakeDimensionKey); setCriteria(template.success_criteria); }
           else if (source) { const suggestion = buildNextShootChecklist(source.result.suggestions, 1, source.result.scores)[0]; setGoal(suggestion?.detail || suggestion?.title || ''); setDimension(suggestion?.dimension ?? 'composition'); setCriteria([]); }
         }} className="mt-1 min-h-10 w-full rounded-control border border-border bg-surface px-3 text-sm text-ink"><option value="">{copy.suggested}</option>{templates.map((template) => <option key={template.template_id} value={template.template_id}>{template.title}</option>)}</select></label>}
-        <label className="flex items-center gap-3 text-xs text-ink-muted">{copy.dimension}<select value={dimension} disabled={saving} onChange={(event) => setDimension(event.target.value as RetakeDimensionKey)} className="min-h-10 rounded-control border border-border bg-surface px-3 text-sm text-ink">{(['composition','lighting','color','impact','technical'] as const).map((value) => <option key={value} value={value}>{guidanceDimensionLabel(value, locale)}</option>)}</select></label>
+        <label className="flex items-center gap-3 text-xs text-ink-muted">{copy.dimension}<select value={dimension} disabled={loadingSource || saving} onChange={(event) => setDimension(event.target.value as RetakeDimensionKey)} className="min-h-10 rounded-control border border-border bg-surface px-3 text-sm text-ink">{(['composition','lighting','color','impact','technical'] as const).map((value) => <option key={value} value={value}>{guidanceDimensionLabel(value, locale)}</option>)}</select></label>
         <fieldset><legend className="text-sm font-semibold text-ink">{copy.kind}</legend><div className="mt-2 flex flex-wrap gap-3">{(['capture_retake','edit_revision'] as const).map((value) => <label key={value} className="flex min-h-10 items-center gap-2 text-sm text-ink"><input type="radio" name="practice-start-kind" value={value} checked={kind === value} disabled={saving} onChange={() => setKind(value)} />{value === 'capture_retake' ? copy.capture : copy.edit}</label>)}</div><p className="mt-1 text-xs leading-5 text-ink-muted">{kind === 'capture_retake' ? copy.captureHelp : copy.editHelp}</p></fieldset>
         <button type="button" disabled={saving || loadingSource || !source || source.review_id !== selectedId || goal.trim().length < 3} onClick={() => void start()} className="ui-action-primary min-h-11 px-4 py-2 text-sm disabled:opacity-50">{saving ? copy.saving : copy.save}</button>
       </div>

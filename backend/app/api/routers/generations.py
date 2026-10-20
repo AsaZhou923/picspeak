@@ -13,7 +13,7 @@ from app.api.deps import CurrentActor, get_current_actor, get_db
 from app.api.routers.photos import _build_storage_photo_url
 from app.core.config import settings
 from app.core.errors import api_error
-from app.db.models import GeneratedImage, ImageGenerationTask, Photo, PhotoStatus, Review, TaskStatus, User, UserPlan
+from app.db.models import GeneratedImage, IdempotencyKey, ImageGenerationTask, Photo, PhotoStatus, Review, TaskStatus, User, UserPlan
 from app.schemas import (
     GeneratedImageDetailResponse,
     GeneratedImageHistoryResponse,
@@ -23,7 +23,7 @@ from app.schemas import (
     GenerationTaskStatusResponse,
     GenerationTemplatesResponse,
 )
-from app.services.guard import get_idempotency_record, hash_request, save_idempotency_record
+from app.services.guard import hash_request, save_idempotency_record
 from app.services.image_generation_pricing import (
     estimate_image_generation_credits,
     get_credits_table,
@@ -83,6 +83,26 @@ def _matches_generation_request_hash(
     return False
 
 
+def _generation_replay_record(db: Session, owner_user_id: int, endpoint: str, key: str) -> IdempotencyKey | None:
+    # Paid task keys remain unique after the general replay-cache TTL. A late
+    # browser retry must recover the original task, never silently bill again.
+    return db.query(IdempotencyKey).filter(
+        IdempotencyKey.user_id == owner_user_id,
+        IdempotencyKey.endpoint == endpoint,
+        IdempotencyKey.idempotency_key == key,
+    ).first()
+
+
+def _reject_retained_generation_key(db: Session, owner_user_id: int, key: str, record: IdempotencyKey | None) -> None:
+    # Task uniqueness spans create + reuse. Handle expired/cleaned/incomplete
+    # replay records and cross-endpoint keys as a conflict rather than a DB 500.
+    if record is not None or db.query(ImageGenerationTask).filter(
+        ImageGenerationTask.owner_user_id == owner_user_id,
+        ImageGenerationTask.idempotency_key == key,
+    ).first() is not None:
+        raise api_error(status.HTTP_409_CONFLICT, 'IDEMPOTENCY_CONFLICT', 'Idempotency key already belongs to another generation request')
+
+
 @router.get('/generations/templates', response_model=GenerationTemplatesResponse)
 def get_generation_template_catalog():
     return {'items': get_generation_templates(), 'credits_table': get_credits_table()}
@@ -100,9 +120,6 @@ def create_generation(
 
     quality = normalize_generation_quality(payload.quality)
     size = normalize_generation_size(payload.size)
-    if actor.plan == UserPlan.free and quality != 'low':
-        raise api_error(status.HTTP_403_FORBIDDEN, 'GENERATION_QUALITY_FORBIDDEN', 'Free users can only generate low quality images')
-
     source_photo_internal_id: int | None = None
     source_review_internal_id: int | None = None
     source_review: Review | None = None
@@ -132,11 +149,16 @@ def create_generation(
     )
     request_hash = hash_request(payload_dump)
     if idempotency_key:
-        record = get_idempotency_record(db, actor.user.id, '/generations', idempotency_key)
+        db.query(User).filter(User.id == actor.user.id).with_for_update().one()
+        record = _generation_replay_record(db, actor.user.id, '/generations', idempotency_key)
         if record is not None and not _matches_generation_request_hash(record.request_hash, request_hash, payload, idempotency_key):
             raise api_error(status.HTTP_409_CONFLICT, 'IDEMPOTENCY_CONFLICT', 'Idempotency key was used with different generation content')
         if record is not None and record.response_json is not None:
             return record.response_json
+        _reject_retained_generation_key(db, actor.user.id, idempotency_key, record)
+
+    if actor.plan == UserPlan.free and quality != 'low':
+        raise api_error(status.HTTP_403_FORBIDDEN, 'GENERATION_QUALITY_FORBIDDEN', 'Free users can only generate low quality images')
 
     try:
         if payload.generation_mode == 'review_linked' and source_review is not None:
@@ -396,6 +418,11 @@ def reuse_generation(
 ):
     if actor.plan == UserPlan.guest:
         raise api_error(status.HTTP_403_FORBIDDEN, 'GENERATION_LOGIN_REQUIRED', 'Sign in before generating images')
+    idempotency_key = request.headers.get('Idempotency-Key')
+    if idempotency_key:
+        # Serialize replay admission with credit reservations for this owner. A
+        # concurrent retry must see the first committed key before creating a task.
+        db.query(User).filter(User.id == actor.user.id).with_for_update().one()
     image = _find_generation_owned(db, generation_id, actor.user.id)
     payload = dict(image.metadata_json or {})
     request_payload = {
@@ -415,6 +442,24 @@ def reuse_generation(
         'analytics_source': request.query_params.get('analytics_source'),
         'locale': payload.get('locale') if payload.get('locale') in {'zh', 'en', 'ja'} else 'en',
     }
+    request_hash = hash_request(json.dumps({
+        'generation_id': generation_id,
+        'prompt': image.prompt,
+        'source_photo_id': image.source_photo_id,
+        'source_review_id': image.source_review_id,
+        'payload': request_payload,
+    }, ensure_ascii=False, sort_keys=True))
+    if idempotency_key:
+        record = _generation_replay_record(db, actor.user.id, '/generations/reuse', idempotency_key)
+        if record is not None and record.request_hash != request_hash:
+            raise api_error(status.HTTP_409_CONFLICT, 'IDEMPOTENCY_CONFLICT', 'Idempotency key was used with different generation content')
+        if record is not None and record.response_json is not None:
+            return record.response_json
+        _reject_retained_generation_key(db, actor.user.id, idempotency_key, record)
+
+    if actor.plan == UserPlan.free and image.quality != 'low':
+        raise api_error(status.HTTP_403_FORBIDDEN, 'GENERATION_QUALITY_FORBIDDEN', 'Free users can only generate low quality images')
+
     credits_reserved = estimate_image_generation_credits(
         quality=image.quality,
         size=image.size,
@@ -429,9 +474,21 @@ def reuse_generation(
         intent=image.intent,
         source_photo_id=image.source_photo_id,
         source_review_id=image.source_review_id,
+        idempotency_key=idempotency_key,
     )
     db.add(task)
     _reserve_generation_credits_or_raise(db, user=actor.user, task=task, credits=credits_reserved)
+    response = {
+        'task_id': task.public_id,
+        'status': task.status.value,
+        'estimated_seconds': 45,
+        'credits_reserved': credits_reserved,
+    }
+    if idempotency_key:
+        save_idempotency_record(
+            db, user_id=actor.user.id, endpoint='/generations/reuse', key=idempotency_key,
+            request_hash=request_hash, http_status=200, response_json=response,
+        )
     request_event_metadata = {
         'generation_mode': image.generation_mode,
         'intent': image.intent,
@@ -466,12 +523,7 @@ def reuse_generation(
                 'GENERATION_TASK_DISPATCH_FAILED',
                 'Failed to enqueue async image generation task',
             ) from exc
-    return {
-        'task_id': task.public_id,
-        'status': task.status.value,
-        'estimated_seconds': 45,
-        'credits_reserved': credits_reserved,
-    }
+    return response
 
 
 def _mark_generation_dispatch_failed(db: Session, task_public_id: str, error_message: str) -> None:

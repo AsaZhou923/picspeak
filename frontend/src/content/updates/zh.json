@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-20-gallery-and-review-cache-fixes",
+    "date": "2026-10-20",
+    "showPopup": false,
+    "title": "准备中：长廊与操作恢复修复",
+    "summary": "准备中：修正长廊筛选时保留作品与草稿；再次点评匹配语言、照片分类和可访问的历史；点评与生图中断后重试不重复扣额；分页失败保留列表，切换筛选或账号后忽略旧结果；身份失效后隐藏私有内容，并改善下载、手机错误页和账号恢复入口。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-10-20-gallery-and-review-cache-fixes"
+  },
+  {
     "id": "2026-10-19-billing-recovery-and-generation-retries",
     "date": "2026-10-19",
     "showPopup": false,

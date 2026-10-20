@@ -18,9 +18,25 @@ const homeSource = readFileSync(
 );
 const shellSource = readFileSync(path.join(FRONTEND_DIR, 'src/components/layout/SiteChrome.tsx'), 'utf8');
 
-test('subscription recovery and generation retry fixes are upcoming without a popup', () => {
+test('gallery filter and critique cache fixes are upcoming without a popup', () => {
   for (const locale of ['zh', 'en', 'ja'] as const) {
     const latest = getLatestProductUpdate(locale);
+    assert.ok(latest);
+    assert.equal(latest.id, '2026-10-20-gallery-and-review-cache-fixes');
+    assert.match(latest.title, /准备中|Upcoming:|準備中/);
+    assert.match(latest.summary, /准备中|In preparation:|準備中/);
+    assert.equal(latest.date, '2026-10-20');
+    assert.equal(latest.showPopup, false);
+    assert.equal(shouldShowProductUpdatePopup(latest), false);
+    assert.equal(latest.docPath, `docs/changelog/CHANGELOG.md#${latest.id}`);
+  }
+  assert.equal(getLatestProductUpdateDate('zh'), '2026-10-20');
+  assert.equal(getLatestProductUpdateDate(), '2026-10-20');
+});
+
+test('subscription recovery and generation retry fixes are upcoming without a popup', () => {
+  for (const locale of ['zh', 'en', 'ja'] as const) {
+    const latest = getProductUpdates(locale).find((entry) => entry.id === '2026-10-19-billing-recovery-and-generation-retries');
     assert.ok(latest);
     assert.equal(latest.id, '2026-10-19-billing-recovery-and-generation-retries');
     assert.match(latest.title, /准备中|Upcoming:|準備中/);
@@ -30,8 +46,6 @@ test('subscription recovery and generation retry fixes are upcoming without a po
     assert.equal(shouldShowProductUpdatePopup(latest), false);
     assert.equal(latest.docPath, `docs/changelog/CHANGELOG.md#${latest.id}`);
   }
-  assert.equal(getLatestProductUpdateDate('zh'), '2026-10-19');
-  assert.equal(getLatestProductUpdateDate(), '2026-10-19');
 });
 
 test('critique and draft fixes retain their published status in every locale', () => {

@@ -71,8 +71,14 @@ function acceptSemanticKey(recommendation: PracticeRecommendation): string | nul
 }
 
 export default function PracticeAccountPage() {
+  const { userInfo } = useAuth();
+  // Preserve drafts across locale refreshes, but never across account changes.
+  return <PracticeAccountContent key={userInfo?.user_id ?? 'signed-out'} />;
+}
+
+function PracticeAccountContent() {
   const router = useRouter();
-  const { ensureToken, userInfo } = useAuth();
+  const { ensureToken, userInfo, token: currentToken } = useAuth();
   const practiceEnabled = usePracticeEnabled();
   const { t, locale } = useI18n();
   const copy = useMemo(() => getPracticeGuidanceCopy(locale), [locale]);
@@ -83,12 +89,19 @@ export default function PracticeAccountPage() {
       ? { recent: '自分の練習', start: '新しい練習', continue: '練習を続ける', result: '結果を見る', pending: '進捗を見る', details: '履歴を見る', attempts: '回の試行', insights: '練習の観察とシーン整理', empty: '保存された練習はまだありません。講評済みの元写真を選び、目標を保存するとここに表示されます。' }
       : { recent: 'My practice', start: 'Start a new practice', continue: 'Continue practice', result: 'View result', pending: 'View progress', details: 'View record', attempts: 'attempts', insights: 'Practice observations and scenes', empty: 'No saved practice yet. Choose a reviewed original and save a goal to see it here.' };
   const requestIdRef = useRef(0);
+  const mountedRef = useRef(true);
+  const actionRef = useRef(false);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
   const [profile, setProfile] = useState<PracticeGuidanceProfileResponse | null>(null);
   const [recommendations, setRecommendations] = useState<PracticeRecommendationsResponse | null>(null);
   const [practiceSessions, setPracticeSessions] = useState<PracticeSessionListItem[]>([]);
   const [recommendationIndex, setRecommendationIndex] = useState(0);
   const [sceneDrafts, setSceneDrafts] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [startOpen, setStartOpen] = useState(false);
   const [error, setError] = useState('');
   const [actionError, setActionError] = useState('');
@@ -99,7 +112,7 @@ export default function PracticeAccountPage() {
   const load = useCallback(async (signal?: AbortSignal) => {
     const requestId = requestIdRef.current + 1;
     requestIdRef.current = requestId;
-    const isCurrent = () => requestIdRef.current === requestId && !signal?.aborted;
+    const isCurrent = () => mountedRef.current && requestIdRef.current === requestId && !signal?.aborted;
     setLoading(true);
     setError('');
     try {
@@ -122,6 +135,7 @@ export default function PracticeAccountPage() {
       setRecommendations(nextRecommendations.status === 'fulfilled' ? nextRecommendations.value : null);
       if (nextPracticeSessions.status === 'rejected') throw nextPracticeSessions.reason;
       setPracticeSessions(nextPracticeSessions.value);
+      setHasLoaded(true);
       setSceneDrafts((current) => {
         const next: Record<string, string> = {};
         for (const session of nextPracticeSessions.value) {
@@ -138,6 +152,9 @@ export default function PracticeAccountPage() {
     }
   }, [ensureToken, loadError, locale, t]);
 
+  const loadRef = useRef(load);
+  loadRef.current = load;
+
   useEffect(() => {
     const controller = new AbortController();
     void load(controller.signal);
@@ -147,12 +164,15 @@ export default function PracticeAccountPage() {
   const handleAcceptRecommendation = useCallback(async (recommendation: PracticeRecommendation) => {
     const payload = recommendation.accept_payload;
     const semanticKey = acceptSemanticKey(recommendation);
-    if (!payload || !semanticKey || !recommendation.accept_available || acceptingRecommendationId) return;
+    if (!payload || !semanticKey || !recommendation.accept_available || actionRef.current) return;
+    actionRef.current = true;
+    let navigating = false;
 
     setActionError('');
     setAcceptingRecommendationId(recommendation.recommendation_id);
     try {
       const token = await ensureToken();
+      if (!mountedRef.current || token !== currentToken) return;
       if (!token) {
         setActionError(copy.signInRequired);
         return;
@@ -163,14 +183,19 @@ export default function PracticeAccountPage() {
         : makePracticeIdempotencyKey('practice_session', semanticKey);
       writePendingPracticeState({ semanticKey, sessionIdempotencyKey });
       const session = await createPracticeSession({ ...payload, idempotency_key: sessionIdempotencyKey }, token);
+      if (!mountedRef.current) return;
       clearPendingPracticeState(semanticKey);
       router.push(`/workspace?practice_session_id=${encodeURIComponent(session.session_id)}`);
+      navigating = true;
     } catch (err) {
-      setActionError(formatUserFacingError(t, err, copy.acceptError));
+      if (mountedRef.current) setActionError(formatUserFacingError(t, err, copy.acceptError));
     } finally {
-      setAcceptingRecommendationId(null);
+      if (mountedRef.current && !navigating) {
+        actionRef.current = false;
+        setAcceptingRecommendationId(null);
+      }
     }
-  }, [acceptingRecommendationId, copy.acceptError, copy.signInRequired, ensureToken, router, t]);
+  }, [copy.acceptError, copy.signInRequired, currentToken, ensureToken, router, t]);
 
   const handleSaveSceneGroup = useCallback(async (sessionId: string) => {
     const label = (sceneDrafts[sessionId] ?? '').trim();
@@ -178,24 +203,31 @@ export default function PracticeAccountPage() {
       setActionError(copy.sceneGroupRequired);
       return;
     }
+    if (actionRef.current) return;
+    actionRef.current = true;
     setActionError('');
     setSavedSceneSessionId(null);
     setSavingSceneSessionId(sessionId);
     try {
       const token = await ensureToken();
+      if (!mountedRef.current || token !== currentToken) return;
       if (!token) {
         setActionError(copy.signInRequired);
         return;
       }
       await updatePracticeSceneGroup(sessionId, { label }, token);
+      if (!mountedRef.current) return;
       setSavedSceneSessionId(sessionId);
-      await load();
+      await loadRef.current();
     } catch (err) {
-      setActionError(formatUserFacingError(t, err, copy.sceneGroupError));
+      if (mountedRef.current) setActionError(formatUserFacingError(t, err, copy.sceneGroupError));
     } finally {
-      setSavingSceneSessionId(null);
+      if (mountedRef.current) {
+        actionRef.current = false;
+        setSavingSceneSessionId(null);
+      }
     }
-  }, [copy.sceneGroupError, copy.sceneGroupRequired, copy.signInRequired, ensureToken, load, sceneDrafts, t]);
+  }, [copy.sceneGroupError, copy.sceneGroupRequired, copy.signInRequired, currentToken, ensureToken, sceneDrafts, t]);
 
   const coverage = profile?.coverage;
   const levelMessage = profile ? guidanceLevelMessage(profile.level, profile.level_reason, locale) : copy.recordsOnly;
@@ -262,7 +294,8 @@ export default function PracticeAccountPage() {
         </section>
       )}
 
-      {!loading && !error && practiceEnabled === true && (
+      {/* Keep unsaved goals mounted while localized guidance refreshes. */}
+      {hasLoaded && practiceEnabled === true && (
         practiceSessions.length === 0
           ? <PracticeStartPanel templates={profile?.templates ?? []} />
           : <details className="rounded-card border border-border-subtle" onToggle={(event) => setStartOpen(event.currentTarget.open)}>

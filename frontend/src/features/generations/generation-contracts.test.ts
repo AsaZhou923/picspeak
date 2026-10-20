@@ -209,7 +209,8 @@ test('generation analytics, idempotency and destinations remain server-owned', (
   assert.doesNotMatch(generatePageSource, /trackProductEvent\('generation_requested'/);
   assert.doesNotMatch(generationTaskSource, /trackProductEvent\('generation_succeeded'/);
   assert.doesNotMatch(generationTaskSource, /trackProductEvent\('generation_failed'/);
-  assert.match(generatePageSource, /idempotency_key:/);
+  assert.match(generatePageSource, /prepareGenerationRequest\(owner,/);
+  assert.match(generatePageSource, /createGeneration\(pendingRequest\.payload, activeToken\)/);
   assert.match(generatePageSource, /router\.push\(`\/generation-tasks\/\$\{result\.task_id\}`\)/);
   assert.match(generationTaskSource, /router\.replace\(destination\)/);
   assert.match(generationTaskSource, /source_review_id: nextTask\.source_review_id/);

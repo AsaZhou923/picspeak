@@ -208,7 +208,7 @@ class ImageGenerationRoutesTests(unittest.TestCase):
                 )
                 reuse_generation(
                     'gen_reuse',
-                    SimpleNamespace(query_params={'analytics_source': 'history'}),
+                    SimpleNamespace(query_params={'analytics_source': 'history'}, headers={}),
                     db=db,
                     actor=actor,
                 )

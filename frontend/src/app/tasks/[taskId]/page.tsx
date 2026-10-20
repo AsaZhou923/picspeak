@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { AlertCircle, RotateCcw, ArrowLeft, ShieldCheck, Cpu, CheckCircle2, Clock, Aperture } from 'lucide-react';
 import { buildTaskWebSocketUrl, getTask, isAbortError } from '@/lib/api';
@@ -34,8 +35,14 @@ export default function TaskPage() {
   const taskId = params.taskId as string;
   const searchParams = useSearchParams();
   const urlMode = searchParams.get('mode');
-  const { ensureToken } = useAuth();
+  const { ensureToken, userInfo } = useAuth();
+  const identity = userInfo?.user_id ?? '';
+  const tokenGetterRef = useRef(ensureToken);
+  tokenGetterRef.current = ensureToken;
+  const taskOwnerRef = useRef(identity);
   const { t } = useI18n();
+  const translationRef = useRef(t);
+  translationRef.current = t;
 
   const STEPS = [
     { id: 'queue', label: t('task_step_queue_label'), detail: t('task_step_queue_detail'), icon: Clock, minProgress: 0, maxProgress: 19 },
@@ -55,13 +62,12 @@ export default function TaskPage() {
   const pageStartedAtRef = useRef(Date.now());
   const transientErrorCountRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const wsConnectedRef = useRef(false);
   const finalRef = useRef(false);
   const errorTerminalRef = useRef(false);
   const taskRef = useRef<TaskStatusResponse | null>(null);
-  const redirectReviewIdRef = useRef<string | null>(null);
+  const lifecycleRef = useRef(0);
   const pollRequestControllerRef = useRef<AbortController | null>(null);
 
   const setTransientError = (message: string) => {
@@ -76,7 +82,7 @@ export default function TaskPage() {
   const handleTaskUpdate = (nextTask: TaskStatusResponse) => {
     // Ignore stale updates once a terminal state has been reached (e.g. a concurrent HTTP
     // poll returning an old RUNNING snapshot after the WebSocket already delivered SUCCEEDED).
-    if (finalRef.current) return;
+    if (finalRef.current || nextTask.task_id !== taskId) return;
 
     taskRef.current = nextTask;
     transientErrorCountRef.current = 0;
@@ -84,16 +90,7 @@ export default function TaskPage() {
     setError('');
 
     if (nextTask.status === 'SUCCEEDED') {
-      if (nextTask.review_id) {
-        finalRef.current = true;
-        if (redirectReviewIdRef.current !== nextTask.review_id) {
-          redirectReviewIdRef.current = nextTask.review_id;
-          if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
-          redirectTimerRef.current = setTimeout(() => {
-            router.push(`/reviews/${nextTask.review_id}`);
-          }, 800);
-        }
-      }
+      if (nextTask.review_id) finalRef.current = true;
       return;
     }
 
@@ -122,16 +119,18 @@ export default function TaskPage() {
     return false;
   };
 
-  const poll = async () => {
-    if (finalRef.current || errorTerminalRef.current) return;
+  const poll = async (lifecycle = lifecycleRef.current) => {
+    if (lifecycle !== lifecycleRef.current || finalRef.current || errorTerminalRef.current) return;
     const controller = new AbortController();
     pollRequestControllerRef.current?.abort();
     pollRequestControllerRef.current = controller;
+    const isCurrent = () => !controller.signal.aborted && lifecycle === lifecycleRef.current;
 
     try {
-      const token = await ensureToken();
-      if (controller.signal.aborted) return;
+      const token = await tokenGetterRef.current();
+      if (!isCurrent()) return;
       const data = await getTask(taskId, token, controller.signal);
+      if (!isCurrent() || finalRef.current) return;
       pollCount.current += 1;
       setError('');
       handleTaskUpdate(data);
@@ -139,11 +138,11 @@ export default function TaskPage() {
       if (finalRef.current) return;
 
       if (pollCount.current >= 60 && !shouldContinueWaiting(data)) {
-        setError(t('task_timeout_error'));
+        setError(translationRef.current('task_timeout_error'));
         return;
       }
     } catch (err) {
-      if (isAbortError(err)) {
+      if (!isCurrent() || finalRef.current || isAbortError(err)) {
         return;
       }
       if (err instanceof ApiException) {
@@ -153,36 +152,57 @@ export default function TaskPage() {
             if (!withinGraceWindow || hasTaskSnapshot) {
               errorTerminalRef.current = true;
               if (wsRef.current) wsRef.current.close();
-              setError(formatUserFacingError(t, err, t('task_fetch_error')));
+              setError(formatUserFacingError(translationRef.current, err, translationRef.current('task_fetch_error')));
               return;
             }
           }
-        setTransientError(formatUserFacingError(t, err, t('task_fetch_error')));
+        setTransientError(formatUserFacingError(translationRef.current, err, translationRef.current('task_fetch_error')));
       } else {
-        setTransientError(formatUserFacingError(t, err, t('task_fetch_error')));
+        setTransientError(formatUserFacingError(translationRef.current, err, translationRef.current('task_fetch_error')));
       }
     } finally {
       if (pollRequestControllerRef.current === controller) {
         pollRequestControllerRef.current = null;
       }
-      if (!finalRef.current && !errorTerminalRef.current && !wsConnectedRef.current) {
-        timerRef.current = setTimeout(poll, POLL_INTERVAL);
+      if (isCurrent() && !finalRef.current && !errorTerminalRef.current && !wsConnectedRef.current) {
+        timerRef.current = setTimeout(() => void poll(lifecycle), POLL_INTERVAL);
       }
     }
   };
 
+  // Completion navigation owns its own lifecycle. Localized copy and socket
+  // reconnects must not cancel a completed task's only route to its result.
+  const completedReviewId = taskOwnerRef.current === identity && task?.task_id === taskId && task.status === 'SUCCEEDED' ? task.review_id : null;
+  useEffect(() => {
+    if (!completedReviewId) return;
+    const timer = setTimeout(() => router.push(`/reviews/${completedReviewId}`), 800);
+    return () => clearTimeout(timer);
+  }, [completedReviewId, router, taskId]);
+
   useEffect(() => {
     let cancelled = false;
+    const lifecycle = ++lifecycleRef.current;
+    taskOwnerRef.current = identity;
+    pollCount.current = 0;
+    pageStartedAtRef.current = Date.now();
+    transientErrorCountRef.current = 0;
+    finalRef.current = false;
+    errorTerminalRef.current = false;
+    wsConnectedRef.current = false;
+    taskRef.current = null;
+    setTask(null);
+    setError('');
 
     const connect = async () => {
       try {
-        const token = await ensureToken();
+        const token = await tokenGetterRef.current();
         if (cancelled) return;
 
         const ws = new WebSocket(buildTaskWebSocketUrl(taskId), ['picspeak-auth', token]);
         wsRef.current = ws;
 
         ws.onopen = () => {
+          if (cancelled) return;
           wsConnectedRef.current = true;
           transientErrorCountRef.current = 0;
           setError('');
@@ -193,6 +213,7 @@ export default function TaskPage() {
         };
 
         ws.onmessage = (event) => {
+          if (cancelled || finalRef.current) return;
           const message = JSON.parse(event.data) as TaskStreamMessage | { error?: { message?: string } };
           if ('task' in message) {
             setError('');
@@ -205,19 +226,21 @@ export default function TaskPage() {
               const hasTaskSnapshot = taskRef.current !== null;
               if (!withinGraceWindow || hasTaskSnapshot) {
                 errorTerminalRef.current = true;
-                setError(formatUserFacingError(t, new ApiException(404, 'TASK_NOT_FOUND', message.error.message), t('task_fetch_error')));
+                setError(formatUserFacingError(translationRef.current, new ApiException(404, 'TASK_NOT_FOUND', message.error.message), translationRef.current('task_fetch_error')));
                 return;
               }
             }
-            setTransientError(formatUserFacingError(t, new ApiException(500, 'TASK_STREAM_ERROR', message.error.message), t('task_fetch_error')));
+            setTransientError(formatUserFacingError(translationRef.current, new ApiException(500, 'TASK_STREAM_ERROR', message.error.message), translationRef.current('task_fetch_error')));
           }
         };
 
         ws.onerror = () => {
+          if (cancelled) return;
           wsConnectedRef.current = false;
         };
 
         ws.onclose = () => {
+          if (cancelled) return;
           const isFinal = finalRef.current;
           wsConnectedRef.current = false;
           if (!cancelled && !isFinal && !errorTerminalRef.current) {
@@ -227,29 +250,28 @@ export default function TaskPage() {
               clearTimeout(timerRef.current);
               timerRef.current = null;
             }
-            poll();
+            void poll(lifecycle);
           }
         };
       } catch (err) {
         if (!cancelled) {
           logClientError('Failed to connect task websocket', err, { taskId });
-          poll();
+          void poll(lifecycle);
         }
       }
     };
 
-    poll();
-    connect();
+    void poll(lifecycle);
+    void connect();
 
     return () => {
       cancelled = true;
       if (timerRef.current) clearTimeout(timerRef.current);
-      if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
       pollRequestControllerRef.current?.abort();
       if (wsRef.current) wsRef.current.close();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [taskId, ensureToken, t]);
+  }, [taskId, identity]);
 
   const stageInfo = task
     ? task.status === 'FAILED'
@@ -402,6 +424,12 @@ export default function TaskPage() {
           <p role="alert" className="rounded-control border border-rust/25 bg-rust/10 px-4 py-2.5 text-sm text-rust">
             {taskErrorMessage}
           </p>
+        )}
+
+        {completedReviewId && (
+          <Link href={`/reviews/${completedReviewId}`} className="ui-action-primary min-h-11 px-6 text-sm">
+            {t('practice_detail_review')}
+          </Link>
         )}
 
         {(isFinal || error) && (
