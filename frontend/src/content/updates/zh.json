@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-20-gallery-and-review-cache-fixes",
+    "date": "2026-10-20",
+    "showPopup": false,
+    "title": "准备中：长廊筛选与点评修复",
+    "summary": "准备中：长廊评分区间有误时会就地提示并保留已加载作品；再次点评会匹配所选语言与照片分类，避免跳转到 Free 已过期、无法打开的私有点评。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-10-20-gallery-and-review-cache-fixes"
+  },
+  {
     "id": "2026-10-19-billing-recovery-and-generation-retries",
     "date": "2026-10-19",
     "showPopup": false,

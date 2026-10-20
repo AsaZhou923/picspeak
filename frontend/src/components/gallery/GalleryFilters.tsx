@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ImageType } from '@/lib/types';
 import { type TranslationKey, useI18n } from '@/lib/i18n';
 import { displayDateToIso, isoDateToDisplay, normalizeDateDisplay } from '@/lib/date-filters';
+import type { GalleryScoreValidation } from '@/lib/gallery-query';
 
 export type FilterDraft = {
   createdFrom: string;
@@ -24,6 +25,7 @@ interface GalleryFiltersProps {
   hasInvalidDate: boolean;
   createdFromInvalid: boolean;
   createdToInvalid: boolean;
+  scoreValidation: GalleryScoreValidation;
 }
 
 function DateFilterField({
@@ -110,8 +112,10 @@ export default function GalleryFilters({
   hasInvalidDate,
   createdFromInvalid,
   createdToInvalid,
+  scoreValidation,
 }: GalleryFiltersProps) {
   const { t } = useI18n();
+  const hasInvalidFilters = hasInvalidDate || scoreValidation.hasError;
 
   const sortOptions = [
     { id: 'default', label: t('gallery_sort_default'), icon: Zap },
@@ -126,14 +130,14 @@ export default function GalleryFilters({
     draftFilters.maxScore ||
     draftFilters.imageType
   );
-  const [advancedOpen, setAdvancedOpen] = useState(hasAdvancedFilters || hasInvalidDate);
+  const [advancedOpen, setAdvancedOpen] = useState(hasAdvancedFilters || hasInvalidFilters);
 
   useEffect(() => {
-    if (hasAdvancedFilters || hasInvalidDate) setAdvancedOpen(true);
-  }, [hasAdvancedFilters, hasInvalidDate]);
+    if (hasAdvancedFilters || hasInvalidFilters) setAdvancedOpen(true);
+  }, [hasAdvancedFilters, hasInvalidFilters]);
 
   return (
-    <section className="mt-5 rounded-card border border-border-subtle bg-surface/70 p-3 shadow-level-1">
+    <section id="gallery-filters" className="mt-5 rounded-card border border-border-subtle bg-surface/70 p-3 shadow-level-1">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-sm text-ink">
           <SlidersHorizontal size={15} className="text-gold" />
@@ -149,8 +153,9 @@ export default function GalleryFilters({
                 key={opt.id}
                 type="button"
                 onClick={() => onSortChange(opt.id)}
+                disabled={hasInvalidFilters}
                 aria-pressed={active}
-                className={`flex min-h-11 items-center gap-1.5 rounded-control px-3 py-1.5 text-xs font-medium transition-all active:scale-95 ${
+                className={`flex min-h-11 items-center gap-1.5 rounded-control px-3 py-1.5 text-xs font-medium transition-all disabled:cursor-not-allowed disabled:opacity-50 active:scale-95 ${
                   active
                     ? 'bg-action text-action-ink shadow-level-1'
                     : 'text-ink-muted hover:bg-gold/10 hover:text-gold'
@@ -205,11 +210,16 @@ export default function GalleryFilters({
               max="10"
               step="0.1"
               value={draftFilters.minScore}
+              aria-invalid={Boolean(scoreValidation.minScore)}
+              aria-describedby={scoreValidation.minScore ? 'gallery-min-score-error' : undefined}
               onChange={(event) =>
                 setDraftFilters((prev) => ({ ...prev, minScore: event.target.value }))
               }
-              className="min-h-11 w-full min-w-0 rounded-control border border-border bg-void/60 px-3 py-2.5 text-sm text-ink outline-none transition-colors focus:border-gold/40"
+              className={`min-h-11 w-full min-w-0 rounded-control border bg-void/60 px-3 py-2.5 text-sm text-ink outline-none transition-colors ${scoreValidation.minScore ? 'border-rust/60 focus:border-rust' : 'border-border focus:border-gold/40'}`}
             />
+            <p id="gallery-min-score-error" aria-live="polite" className="min-h-5 text-[11px] leading-5 text-rust">
+              {scoreValidation.minScore ? t(scoreValidation.minScore) : null}
+            </p>
           </label>
 
           <label className="min-w-0 space-y-2 text-xs text-ink-muted">
@@ -220,11 +230,16 @@ export default function GalleryFilters({
               max="10"
               step="0.1"
               value={draftFilters.maxScore}
+              aria-invalid={Boolean(scoreValidation.maxScore)}
+              aria-describedby={scoreValidation.maxScore ? 'gallery-max-score-error' : undefined}
               onChange={(event) =>
                 setDraftFilters((prev) => ({ ...prev, maxScore: event.target.value }))
               }
-              className="min-h-11 w-full min-w-0 rounded-control border border-border bg-void/60 px-3 py-2.5 text-sm text-ink outline-none transition-colors focus:border-gold/40"
+              className={`min-h-11 w-full min-w-0 rounded-control border bg-void/60 px-3 py-2.5 text-sm text-ink outline-none transition-colors ${scoreValidation.maxScore ? 'border-rust/60 focus:border-rust' : 'border-border focus:border-gold/40'}`}
             />
+            <p id="gallery-max-score-error" aria-live="polite" className="min-h-5 text-[11px] leading-5 text-rust">
+              {scoreValidation.maxScore ? t(scoreValidation.maxScore) : null}
+            </p>
           </label>
 
           <label className="min-w-0 space-y-2 text-xs text-ink-muted">
@@ -253,7 +268,7 @@ export default function GalleryFilters({
           <button
             type="button"
             onClick={onApply}
-            disabled={hasInvalidDate}
+            disabled={hasInvalidFilters}
             className="ui-action-primary px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50 active:scale-95"
           >
             {t('filter_apply')}

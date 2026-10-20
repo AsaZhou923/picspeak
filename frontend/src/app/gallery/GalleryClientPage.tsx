@@ -35,6 +35,7 @@ import {
   galleryFiltersFromSearchParams,
   GALLERY_PAGE_SIZE,
   toGalleryQuery,
+  validateGalleryScores,
 } from '@/lib/gallery-query';
 
 // Extracted sub-components
@@ -59,8 +60,11 @@ function GalleryPageContent() {
   const pendingRestoreRef = useRef<GalleryRestoreState | null>(null);
   const pagesRef = useRef<GalleryUxItem[][]>([]);
   const nextCursorRef = useRef<string | null>(null);
+  const loadGenerationRef = useRef(0);
+  const lastLoadedGalleryRef = useRef<(Pick<GalleryRestoreState, 'pages' | 'totalCount' | 'nextCursor' | 'pageIndex'> & { filterSignature: string }) | null>(null);
   
   const [pages, setPages] = useState<GalleryUxItem[][]>([]);
+  const [loadedFilterSignature, setLoadedFilterSignature] = useState<string | null>(null);
   const [totalCount, setTotalCount] = useState(0);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [pageIndex, setPageIndex] = useState(0);
@@ -94,26 +98,32 @@ function GalleryPageContent() {
   const shouldRestore = searchParams.get('restore') === '1';
   const filterSignature = filterSearch.toString();
   const appliedFilters = useMemo(() => galleryFiltersFromSearchParams(filterSearch), [filterSearch]);
+  const hasInvalidAppliedScore = validateGalleryScores(appliedFilters).hasError;
   const restoreKey = useMemo(() => buildGalleryRestoreKey(filterSignature), [filterSignature]);
+  // Invalid URL edits must not change links or restore state for the retained works.
+  const resultFilterSignature = hasInvalidAppliedScore ? loadedFilterSignature ?? '' : filterSignature;
+  const resultFilters = useMemo(() => galleryFiltersFromSearchParams(new URLSearchParams(resultFilterSignature)), [resultFilterSignature]);
   const rankReferenceAtRef = useRef(new Date().toISOString());
   const galleryContextQuery = useMemo(() => {
-    const params = new URLSearchParams(filterSignature);
-    if ((appliedFilters.sort || 'default') === 'default') {
+    const params = new URLSearchParams(resultFilterSignature);
+    if ((resultFilters.sort || 'default') === 'default') {
       params.set('rank_reference_at', rankReferenceAtRef.current);
     }
     return params.toString();
-  }, [appliedFilters.sort, filterSignature]);
+  }, [resultFilters.sort, resultFilterSignature]);
   
   const backHref = useMemo(() => {
-    const params = buildGallerySearchParams(appliedFilters, { restore: true });
+    const params = buildGallerySearchParams(resultFilters, { restore: true });
     const query = params.toString();
     return query ? `/gallery?${query}` : '/gallery';
-  }, [appliedFilters]);
+  }, [resultFilters]);
 
   const [draftFilters, setDraftFilters] = useState<FilterDraft>(appliedFilters);
   const createdFromInvalid = isInvalidCompletedDate(draftFilters.createdFrom);
   const createdToInvalid = isInvalidCompletedDate(draftFilters.createdTo);
   const hasInvalidDate = createdFromInvalid || createdToInvalid;
+  const scoreValidation = validateGalleryScores(draftFilters);
+  const hasInvalidFilters = hasInvalidDate || scoreValidation.hasError;
 
   useEffect(() => {
     setDraftFilters(appliedFilters);
@@ -133,10 +143,15 @@ function GalleryPageContent() {
     nextCursorRef.current = nextCursor;
   }, [nextCursor, pages]);
 
+  useEffect(() => {
+    if (loading || pages.length === 0 || loadedFilterSignature === null) return;
+    lastLoadedGalleryRef.current = { pages, totalCount, nextCursor, pageIndex, filterSignature: loadedFilterSignature };
+  }, [loadedFilterSignature, loading, nextCursor, pageIndex, pages, totalCount]);
+
   const persistGalleryState = useCallback((reviewId: string | null = null) => {
-    if (pages.length === 0) return;
+    if (pages.length === 0 || loadedFilterSignature === null) return;
     const normalizedPageIndex = Math.min(Math.max(0, pageIndex), pages.length - 1);
-    saveGalleryRestoreState(restoreKey, {
+    saveGalleryRestoreState(buildGalleryRestoreKey(loadedFilterSignature), {
       pages,
       totalCount,
       nextCursor,
@@ -144,7 +159,7 @@ function GalleryPageContent() {
       scrollY: window.scrollY,
       reviewId,
     });
-  }, [nextCursor, pageIndex, pages, restoreKey, totalCount]);
+  }, [loadedFilterSignature, nextCursor, pageIndex, pages, totalCount]);
 
   const loadPage = useCallback(async (cursor?: string | null) => {
     const response = await getPublicGallery({ ...toGalleryQuery(appliedFilters), cursor: cursor ?? undefined }, viewerToken);
@@ -157,9 +172,28 @@ function GalleryPageContent() {
 
   useEffect(() => {
     let cancelled = false;
+    loadGenerationRef.current += 1;
+    setPaging(false);
     setError('');
     setActionError('');
     pendingRestoreRef.current = null;
+
+    // A malformed link is a correctable filter problem, not a failed request.
+    // Keep any previously loaded works, and never restore/cache under this URL.
+    if (hasInvalidAppliedScore) {
+      // Back/Forward may interrupt a valid request after it cleared the grid.
+      // Retain the last settled result without changing valid-request failures.
+      const previous = lastLoadedGalleryRef.current;
+      if (previous) {
+        setPages(previous.pages);
+        setTotalCount(previous.totalCount);
+        setNextCursor(previous.nextCursor);
+        setPageIndex(previous.pageIndex);
+        setLoadedFilterSignature(previous.filterSignature);
+      }
+      setLoading(false);
+      return () => { cancelled = true; };
+    }
 
     const restoredState = shouldRestore ? readGalleryRestoreState(restoreKey) : null;
     if (restoredState) {
@@ -168,6 +202,7 @@ function GalleryPageContent() {
       setTotalCount(restoredState.totalCount);
       setNextCursor(restoredState.nextCursor);
       setPageIndex(restoredState.pageIndex);
+      setLoadedFilterSignature(filterSignature);
       setLoading(false);
       return () => { cancelled = true; };
     }
@@ -184,6 +219,7 @@ function GalleryPageContent() {
         setPages([data.items]);
         setTotalCount(data.totalCount);
         setNextCursor(data.nextCursor);
+        setLoadedFilterSignature(filterSignature);
       })
       .catch((err) => {
         if (cancelled) return;
@@ -194,7 +230,7 @@ function GalleryPageContent() {
       });
 
     return () => { cancelled = true; };
-  }, [loadPage, restoreKey, shouldRestore, t, retryKey]);
+  }, [filterSignature, hasInvalidAppliedScore, loadPage, restoreKey, shouldRestore, t, retryKey]);
 
   useEffect(() => {
     const restoreState = pendingRestoreRef.current;
@@ -242,6 +278,7 @@ function GalleryPageContent() {
   }, [loading, pages.length, persistGalleryState]);
 
   const pushFilterState = useCallback((filters: FilterDraft) => {
+    if (validateGalleryScores(filters).hasError || isInvalidCompletedDate(filters.createdFrom) || isInvalidCompletedDate(filters.createdTo)) return;
     const params = buildGallerySearchParams(filters);
     const query = params.toString();
     router.push(query ? `/gallery?${query}` : '/gallery');
@@ -258,7 +295,8 @@ function GalleryPageContent() {
   const totalPages = Math.max(1, Math.ceil(Math.max(totalCount, 1) / GALLERY_PAGE_SIZE));
 
   const goToPage = useCallback(async (targetIndex: number) => {
-    if (paging) return;
+    if (paging || hasInvalidAppliedScore) return;
+    const generation = loadGenerationRef.current;
     const normalizedTarget = Math.min(Math.max(targetIndex, 0), totalPages - 1);
     if (normalizedTarget === pageIndex) return;
 
@@ -281,6 +319,7 @@ function GalleryPageContent() {
       let loadedTotalCount = totalCount;
       while (loadedPages.length <= normalizedTarget && cursor) {
         const data = await loadPage(cursor);
+        if (generation !== loadGenerationRef.current) return;
         loadedPages = [...loadedPages, data.items];
         loadedTotalCount = data.totalCount;
         cursor = data.nextCursor;
@@ -290,14 +329,15 @@ function GalleryPageContent() {
       setNextCursor(cursor);
       setPageIndex(Math.min(normalizedTarget, loadedPages.length - 1));
     } catch (err) {
+      if (generation !== loadGenerationRef.current) return;
       setError(formatUserFacingError(t, err, t('gallery_err_fetch')));
     } finally {
-      setPaging(false);
+      if (generation === loadGenerationRef.current) setPaging(false);
     }
-  }, [loadPage, pageIndex, paging, t, totalCount, totalPages]);
+  }, [hasInvalidAppliedScore, loadPage, pageIndex, paging, t, totalCount, totalPages]);
 
   const handlePrevPage = () => {
-    if (pageIndex === 0 || paging) return;
+    if (pageIndex === 0 || paging || hasInvalidAppliedScore) return;
     setPageIndex((current) => current - 1);
   };
 
@@ -306,7 +346,7 @@ function GalleryPageContent() {
   };
 
   const handleApplyFilters = () => {
-    if (hasInvalidDate) return;
+    if (hasInvalidFilters) return;
     pushFilterState(draftFilters);
   };
 
@@ -316,6 +356,7 @@ function GalleryPageContent() {
   };
 
   const handleSortChange = (newSort: string) => {
+    if (hasInvalidFilters) return;
     const newFilters = { ...draftFilters, sort: newSort };
     setDraftFilters(newFilters);
     pushFilterState(newFilters);
@@ -413,6 +454,12 @@ function GalleryPageContent() {
       )}
 
       <div className="mx-auto max-w-editorial px-6 pb-12 pt-4 animate-fade-in">
+        {hasInvalidAppliedScore && (
+          <section role="alert" className="mt-4 rounded-card border border-rust/30 bg-rust/5 px-6 py-5 text-sm leading-7 text-rust">
+            <p>{t('gallery_filter_score_error')}</p>
+            <a href="#gallery-filters" className="mt-2 inline-flex min-h-11 items-center underline">{t('filter_label')}</a>
+          </section>
+        )}
         {((error && items.length > 0) || actionError) && (
           <div className="mt-6 flex items-center gap-2 rounded-control border border-rust/20 bg-rust/5 px-4 py-3 text-sm text-rust animate-fade-in">
             <AlertCircle size={14} />
@@ -434,7 +481,7 @@ function GalleryPageContent() {
               {t('app_error_retry')}
             </button>
           </section>
-        ) : items.length === 0 ? (
+        ) : hasInvalidAppliedScore && items.length === 0 ? null : items.length === 0 ? (
           <section className="ui-panel mt-4 px-6 py-10 text-center">
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-gold/20 bg-gold/10 text-gold">
               <Star size={20} />
@@ -484,6 +531,7 @@ function GalleryPageContent() {
               visibleStart={visibleStart}
               visibleEnd={visibleEnd}
               paging={paging}
+              disabled={hasInvalidAppliedScore}
               goToPage={goToPage}
               handlePrevPage={handlePrevPage}
               handleNextPage={handleNextPage}
@@ -506,6 +554,7 @@ function GalleryPageContent() {
           hasInvalidDate={hasInvalidDate}
           createdFromInvalid={createdFromInvalid}
           createdToInvalid={createdToInvalid}
+          scoreValidation={scoreValidation}
         />
 
         <section className="mt-8 flex flex-col gap-4 border-y border-border-subtle py-5 md:flex-row md:items-start md:justify-between">
@@ -521,7 +570,7 @@ function GalleryPageContent() {
 
         <GalleryScoreboard
           locale={locale}
-          imageType={appliedFilters.imageType}
+          imageType={resultFilters.imageType}
           token={viewerToken}
           onOpenReview={persistGalleryState}
           buildReviewHref={buildReviewHref}

@@ -11,6 +11,7 @@ interface GalleryPaginationProps {
   visibleStart: number;
   visibleEnd: number;
   paging: boolean;
+  disabled?: boolean;
   goToPage: (index: number) => void | Promise<void>;
   handlePrevPage: () => void;
   handleNextPage: () => void | Promise<void>;
@@ -53,6 +54,7 @@ const GalleryPagination = memo(function GalleryPagination({
   visibleStart,
   visibleEnd,
   paging,
+  disabled = false,
   goToPage,
   handlePrevPage,
   handleNextPage,
@@ -88,7 +90,7 @@ const GalleryPagination = memo(function GalleryPagination({
           <button
             type="button"
             onClick={() => void goToPage(0)}
-            disabled={pageIndex === 0 || paging}
+            disabled={pageIndex === 0 || paging || disabled}
             className="ui-action-secondary px-4 py-2 text-sm disabled:opacity-40"
           >
             <ChevronLeft size={14} />
@@ -97,7 +99,7 @@ const GalleryPagination = memo(function GalleryPagination({
           <button
             type="button"
             onClick={handlePrevPage}
-            disabled={!hasPrevPage || paging}
+            disabled={!hasPrevPage || paging || disabled}
             className="ui-action-secondary px-4 py-2 text-sm disabled:opacity-40"
           >
             <ChevronLeft size={14} />
@@ -106,7 +108,7 @@ const GalleryPagination = memo(function GalleryPagination({
           <button
             type="button"
             onClick={() => void handleNextPage()}
-            disabled={!hasNextPage || paging}
+            disabled={!hasNextPage || paging || disabled}
             className="ui-action-primary px-4 py-2 text-sm disabled:opacity-40"
           >
             {paging ? t('reviews_loading_more') : t('pagination_next')}
@@ -115,7 +117,7 @@ const GalleryPagination = memo(function GalleryPagination({
           <button
             type="button"
             onClick={() => void goToPage(totalPages - 1)}
-            disabled={pageIndex === totalPages - 1 || paging}
+            disabled={pageIndex === totalPages - 1 || paging || disabled}
             className="ui-action-secondary px-4 py-2 text-sm disabled:opacity-40"
           >
             {t('pagination_last')}
@@ -136,7 +138,7 @@ const GalleryPagination = memo(function GalleryPagination({
                 key={slot}
                 type="button"
                 onClick={() => void goToPage(slot)}
-                disabled={paging}
+                disabled={paging || disabled}
                 aria-current={slot === pageIndex ? 'page' : undefined}
                 className={`inline-flex h-11 min-w-11 items-center justify-center rounded-control border px-3 text-sm transition-colors disabled:opacity-40 ${
                   slot === pageIndex

@@ -102,6 +102,7 @@ class ReviewTaskProcessorTests(unittest.TestCase):
         def attach(_db, _task, review):
             self.assertEqual(_task, task)
             self.assertEqual(review.source_review_id, context.source_review.id)
+            self.assertEqual(review.result_json['review_locale'], context.session.locale)
             self.assertEqual(review.result_json['goal_assessment']['status'], 'not_achieved')
             self.assertTrue(review.result_json['billing_info']['quota_charged'])
             attached.append(review)

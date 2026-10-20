@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-20-gallery-and-review-cache-fixes",
+    "date": "2026-10-20",
+    "showPopup": false,
+    "title": "準備中：ギャラリー絞り込みと講評の修正",
+    "summary": "準備中：ギャラリーのスコア範囲に誤りがある場合は、読み込み済みの作品を残して入力欄で案内します。同じ写真を再講評する際は選択した言語と写真カテゴリを反映し、Free の閲覧期限を過ぎた非公開講評に移動しないようにします。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-10-20-gallery-and-review-cache-fixes"
+  },
+  {
     "id": "2026-10-19-billing-recovery-and-generation-retries",
     "date": "2026-10-19",
     "showPopup": false,
