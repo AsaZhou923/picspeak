@@ -7,6 +7,7 @@ import React, {
   useEffect,
   useRef,
   useState,
+  useSyncExternalStore,
 } from 'react';
 import { useAuth as useClerkAuth } from '@clerk/nextjs';
 import { authClerkExchange, authGuest, clearUsageCache, registerUnauthorizedHandler } from './api';
@@ -31,6 +32,9 @@ interface AuthState {
 }
 
 const AuthContext = createContext<AuthState | null>(null);
+const subscribeToHydration = () => () => {};
+const getClientHydrationSnapshot = () => true;
+const getServerHydrationSnapshot = () => false;
 
 function decodeJwtPayload(token: string): Record<string, unknown> | null {
   try {
@@ -480,8 +484,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 export function useAuth(): AuthState {
   const ctx = useContext(AuthContext);
+  // A parent may restore auth before a suspended consumer hydrates. Match that
+  // consumer's server snapshot, without delaying later client-only navigation.
+  const hydrated = useSyncExternalStore(subscribeToHydration, getClientHydrationSnapshot, getServerHydrationSnapshot);
   if (!ctx) throw new Error('useAuth must be used within AuthProvider');
-  return ctx;
+  return hydrated ? ctx : { ...ctx, token: null, userInfo: null, isLoading: true };
 }
 
 export function planLabel(plan: string): string {
