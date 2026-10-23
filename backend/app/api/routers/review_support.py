@@ -636,9 +636,14 @@ def _attach_billing_info(
     user: User,
     charged: bool,
     guest_scope_key: str | None = None,
+    guest_network_scope_key: str | None = None,
 ) -> None:
     if user.plan == UserPlan.guest:
-        usage = guest_usage_snapshot(db, guest_scope_key) if guest_scope_key else None
+        usage = (
+            guest_usage_snapshot(db, guest_scope_key, network_scope_key=guest_network_scope_key)
+            if guest_scope_key
+            else None
+        )
     else:
         usage = user_usage_snapshot(db, user)
 

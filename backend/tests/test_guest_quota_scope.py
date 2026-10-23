@@ -5,6 +5,7 @@ from unittest.mock import Mock, patch
 
 from starlette.requests import Request
 
+from app.api.routers.review_support import _attach_billing_info
 from app.db.models import User, UserPlan, UserStatus
 from app.services.guard import (
     enforce_guest_creation_rate_limit,
@@ -251,6 +252,26 @@ class GuestNetworkLimitTests(unittest.TestCase):
         self.assertEqual(with_network['daily_used'], 1)
         self.assertEqual(with_network['daily_remaining'], 1)
         self.assertEqual(with_network['monthly_remaining'], 1)
+
+    def test_review_billing_info_reports_network_remaining(self) -> None:
+        guest = _user(plan=UserPlan.guest, public_id='gst_abc123')
+        snapshot = {'daily_remaining': 0, 'monthly_remaining': 4, 'pro_monthly_remaining': None}
+        payload: dict = {}
+
+        with patch('app.api.routers.review_support.guest_usage_snapshot', return_value=snapshot) as usage:
+            _attach_billing_info(
+                payload,
+                db=Mock(),
+                user=guest,
+                charged=True,
+                guest_scope_key='guest:device',
+                guest_network_scope_key='guest:network',
+            )
+
+        usage.assert_called_once()
+        self.assertEqual(usage.call_args.args[1], 'guest:device')
+        self.assertEqual(usage.call_args.kwargs['network_scope_key'], 'guest:network')
+        self.assertEqual(payload['billing_info']['remaining_quota']['daily_remaining'], 0)
 
 
 if __name__ == '__main__':
