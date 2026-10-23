@@ -15,6 +15,8 @@ from app.services.notification_analytics import (
     NotificationAnalyticsValidationError,
     normalize_notification_analytics_event,
 )
+from app.core.config import settings
+from app.services.guard import enforce_minute_rate_limit, request_rate_limit_scope_key
 from app.services.product_analytics import normalize_stage_a_event_name, record_product_event
 from app.services.practice_events import PRACTICE_CLIENT_EVENTS, PRACTICE_SERVER_EVENTS, record_client_practice_event
 
@@ -62,6 +64,15 @@ def track_product_analytics_event(
     actor: CurrentActor | None = Depends(get_optional_actor),
     device_id: str | None = Header(default=None, alias='X-Device-Id'),
 ):
+    rate_scope_key = request_rate_limit_scope_key(request, None if actor is None else actor.user)
+    if rate_scope_key:
+        enforce_minute_rate_limit(
+            db,
+            scope='analytics_event_minute',
+            scope_key=rate_scope_key,
+            endpoint='analytics_events',
+            limit=settings.analytics_event_rate_limit_per_minute,
+        )
     try:
         event_name = normalize_stage_a_event_name(payload.event_name)
     except ValueError as exc:

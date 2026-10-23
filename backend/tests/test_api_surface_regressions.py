@@ -304,7 +304,8 @@ class ApiSurfaceRegressionTests(unittest.TestCase):
         self.assertEqual(ledger.amount, -30)
         self.assertEqual(ledger.unit, 'credits')
         self.assertEqual(ledger.metadata_json['grant_code'], 'PICSPEAKART')
-        db.commit.assert_called_once()
+        # One commit records the rate-limited attempt, the other the redemption.
+        self.assertEqual(db.commit.call_count, 2)
 
     def test_image_credit_code_redeem_rejects_unknown_code(self) -> None:
         db = MagicMock()

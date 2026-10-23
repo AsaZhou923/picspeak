@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from typing import Any, Literal
 
@@ -576,6 +577,19 @@ class BlogPostViewIncrementResponse(BaseModel):
     view_count: int = 0
 
 
+ANALYTICS_METADATA_MAX_KEYS = 50
+ANALYTICS_METADATA_MAX_DEPTH = 4
+ANALYTICS_METADATA_MAX_BYTES = 8 * 1024
+
+
+def _json_depth(value: Any) -> int:
+    if isinstance(value, dict):
+        return 1 + max((_json_depth(item) for item in value.values()), default=0)
+    if isinstance(value, list):
+        return 1 + max((_json_depth(item) for item in value), default=0)
+    return 0
+
+
 class ProductAnalyticsTrackRequest(BaseModel):
     event_name: str = Field(min_length=1, max_length=64)
     source: str | None = Field(default=None, max_length=64)
@@ -583,6 +597,19 @@ class ProductAnalyticsTrackRequest(BaseModel):
     locale: str | None = Field(default=None, max_length=16)
     session_id: str | None = Field(default=None, max_length=128)
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator('metadata')
+    @classmethod
+    def _bounded_metadata(cls, value: dict[str, Any]) -> dict[str, Any]:
+        # Events are anonymous writes; keep each stored payload small.
+        if len(value) > ANALYTICS_METADATA_MAX_KEYS:
+            raise ValueError('metadata has too many keys')
+        if _json_depth(value) > ANALYTICS_METADATA_MAX_DEPTH:
+            raise ValueError('metadata is nested too deeply')
+        encoded = json.dumps(value, ensure_ascii=False, separators=(',', ':'), default=str).encode('utf-8')
+        if len(encoded) > ANALYTICS_METADATA_MAX_BYTES:
+            raise ValueError('metadata is too large')
+        return value
 
 
 class ProductAnalyticsTrackResponse(BaseModel):

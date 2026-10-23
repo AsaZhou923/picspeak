@@ -7,7 +7,6 @@ import sys
 import time
 import warnings
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 from typing import Any
 from io import BytesIO
 
@@ -26,11 +25,12 @@ from app.api.routers.photos import (
     _find_photo_owned,
 )
 from app.core.config import settings
-from app.core.errors import api_error
+from app.core.errors import ApiHTTPException, api_error
 from app.core.network import client_ip_from_request
 from app.core.security import sign_payload, verify_payload
 from app.db.models import Photo, PhotoStatus
 from app.schemas import PhotoCreateRequest, PhotoCreateResponse, PresignRequest, PresignResponse
+from app.services.guard import enforce_minute_rate_limit, request_rate_limit_scope_key
 from app.services.object_storage import get_object_storage_client
 
 router = APIRouter(tags=['uploads'])
@@ -52,6 +52,44 @@ UPLOAD_METRIC_KEYS = (
     'final_size_bytes',
 )
 UPLOAD_CONFIRM_TOKEN_PURPOSE = 'upload_confirm'
+UPLOAD_OBJECT_EXTENSIONS = {'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp'}
+# Verification failures that prove the stored bytes can never be confirmed.
+# Missing objects, transient storage errors and concurrent changes keep the object.
+REJECTED_UPLOAD_ERROR_CODES = {
+    'FILE_TOO_LARGE',
+    'UPLOAD_CONTENT_MISMATCH',
+    'UPLOAD_CHECKSUM_MISMATCH',
+    'UPLOAD_IMAGE_INVALID',
+}
+
+
+def _discard_unreferenced_upload(db: Session, token: dict) -> None:
+    """Best-effort delete of an uploaded object that no photo references."""
+    bucket = token.get('bucket')
+    object_key = token.get('object_key')
+    if not bucket or not object_key:
+        return
+    referenced = (
+        db.query(Photo.id)
+        .filter(Photo.bucket == bucket, Photo.object_key == object_key)
+        .first()
+    )
+    if referenced is not None:
+        return
+    try:
+        get_object_storage_client().delete_object(Bucket=bucket, Key=object_key)
+    except Exception:  # noqa: BLE001 - cleanup must not change the request outcome
+        logger.warning('Failed to delete rejected upload object %s', object_key, exc_info=True)
+
+
+def _verify_uploaded_object_or_discard(db: Session, token: dict) -> tuple[str, int, int]:
+    try:
+        return _verify_uploaded_object(token)
+    except ApiHTTPException as exc:
+        detail = exc.detail if isinstance(exc.detail, dict) else {}
+        if exc.status_code == status.HTTP_400_BAD_REQUEST and detail.get('code') in REJECTED_UPLOAD_ERROR_CODES:
+            _discard_unreferenced_upload(db, token)
+        raise
 
 
 def _verify_uploaded_object(token: dict) -> tuple[str, int, int]:
@@ -178,8 +216,19 @@ def create_upload_presign(
     if payload.size_bytes > settings.max_upload_bytes:
         raise api_error(status.HTTP_400_BAD_REQUEST, 'FILE_TOO_LARGE', 'File too large')
 
+    rate_scope_key = request_rate_limit_scope_key(request, actor.user)
+    if rate_scope_key:
+        enforce_minute_rate_limit(
+            db,
+            scope='upload_presign_minute',
+            scope_key=rate_scope_key,
+            endpoint='uploads_presign',
+            limit=settings.upload_presign_rate_limit_per_minute,
+        )
+
     now = datetime.now(timezone.utc)
-    ext = Path(payload.filename).suffix or '.jpg'
+    # The extension follows the validated content type, never the client filename.
+    ext = UPLOAD_OBJECT_EXTENSIONS[payload.content_type]
     object_key = f'user_{actor.user.public_id}/{now:%Y/%m}/{new_public_id("obj")}{ext}'
 
     token_payload = {
@@ -247,7 +296,7 @@ def confirm_photo_upload(
     if token.get('uid') != actor.user.public_id:
         raise api_error(status.HTTP_403_FORBIDDEN, 'UPLOAD_OWNER_MISMATCH', 'Upload owner mismatch')
 
-    checksum_sha256, client_width, client_height = _verify_uploaded_object(token)
+    checksum_sha256, client_width, client_height = _verify_uploaded_object_or_discard(db, token)
     if checksum_sha256:
         existing_photo = (
             db.query(Photo)
@@ -260,6 +309,9 @@ def confirm_photo_upload(
             .first()
         )
         if existing_photo is not None:
+            if existing_photo.object_key != token['object_key']:
+                # The duplicate upload is never referenced; keep only the original.
+                _discard_unreferenced_upload(db, token)
             db.commit()
             confirm_processing_ms = _duration_ms(started_at)
             _emit_structured_log(

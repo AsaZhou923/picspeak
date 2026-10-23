@@ -33,7 +33,12 @@ from app.schemas import (
 )
 from app.services.clerk_auth import verify_clerk_session_token
 from app.services.clerk_webhooks import verify_clerk_webhook
-from app.services.guard import enforce_guest_creation_rate_limit, guest_network_scope_key, guest_rate_limit_scope_key
+from app.services.guard import (
+    enforce_guest_creation_rate_limit,
+    enforce_minute_rate_limit,
+    guest_network_scope_key,
+    guest_rate_limit_scope_key,
+)
 from .auth_support import (
     GOOGLE_OAUTH_STATE_COOKIE,
     _bind_google_oauth_state,
@@ -130,6 +135,18 @@ def auth_clerk_exchange(
     authorization: str | None = Header(default=None),
 ):
     session_token = _extract_bearer_token(authorization)
+    network_scope_key = guest_network_scope_key(request)
+    if network_scope_key:
+        enforce_minute_rate_limit(
+            db,
+            scope='auth_exchange_minute',
+            scope_key=network_scope_key,
+            endpoint='clerk_exchange',
+            limit=settings.auth_exchange_rate_limit_per_minute,
+        )
+        # Commit now: a rejected token rolls back the request, and failed
+        # attempts must still count toward the limit.
+        db.commit()
     identity = verify_clerk_session_token(session_token)
     user = _sync_clerk_user(db, identity)
     set_current_user_public_id(request, user.public_id)

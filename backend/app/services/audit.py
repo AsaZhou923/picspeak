@@ -25,6 +25,7 @@ SENSITIVE_JSON_FIELDS = {
     'client_secret',
     'secret',
     'authorization',
+    'grant_token',
 }
 
 SENSITIVE_QUERY_FIELDS = {

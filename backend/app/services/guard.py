@@ -552,6 +552,30 @@ def save_idempotency_record(
     db.add(record)
 
 
+def enforce_minute_rate_limit(db: Session, *, scope: str, scope_key: str, endpoint: str, limit: int) -> dict:
+    """Per-minute limit for an endpoint keyed by user or client network. 0 disables."""
+    if limit <= 0:
+        return {}
+    now = utc_now()
+    return _enforce_scope_rate_limit(
+        db,
+        scope=scope,
+        scope_key=scope_key,
+        endpoint=endpoint,
+        per_minute_limit=limit,
+        window_start=minute_window_start(now),
+        window_seconds=60,
+    )
+
+
+def request_rate_limit_scope_key(request: Request, user: User | None = None) -> str | None:
+    """Registered users are limited per account; guests and anonymous callers per network."""
+    public_id = (getattr(user, 'public_id', None) or '').strip()
+    if user is not None and getattr(user, 'plan', None) != UserPlan.guest and public_id:
+        return f'user:{public_id}'
+    return guest_network_scope_key(request)
+
+
 # ---------------------------------------------------------------------------
 # Activation-code specific rate limiting
 # ---------------------------------------------------------------------------
@@ -560,7 +584,7 @@ def save_idempotency_record(
 ACTIVATION_CODE_RATE_LIMIT_PER_HOUR = 10
 
 
-def enforce_activation_code_rate_limit(db: Session, user: User) -> None:
+def enforce_activation_code_rate_limit(db: Session, user: User, *, scope: str = 'activation_code_redeem') -> None:
     """Raise 429 if the user has exceeded the activation-code redemption rate limit.
 
     Limit: ``ACTIVATION_CODE_RATE_LIMIT_PER_HOUR`` attempts per rolling hour per user.
@@ -570,9 +594,9 @@ def enforce_activation_code_rate_limit(db: Session, user: User) -> None:
     window_start = now.replace(minute=0, second=0, microsecond=0)
     _enforce_scope_rate_limit(
         db,
-        scope='activation_code_redeem',
+        scope=scope,
         scope_key=f'user:{user.public_id}',
-        endpoint='activation_code_redeem',
+        endpoint=scope,
         per_minute_limit=ACTIVATION_CODE_RATE_LIMIT_PER_HOUR,
         window_start=window_start,
         window_seconds=3600,

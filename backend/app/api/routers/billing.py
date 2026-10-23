@@ -370,7 +370,9 @@ def redeem_activation_code(
         raise api_error(status.HTTP_403_FORBIDDEN, 'BILLING_SIGNIN_REQUIRED', 'Please sign in before redeeming an activation code')
 
     # Enforce per-user rate limit before attempting redemption to prevent brute-force.
+    # Commit the attempt first; an invalid code rolls back the rest of the request.
     enforce_activation_code_rate_limit(db, actor.user)
+    db.commit()
 
     _, subscription = redeem_activation_code_for_user(db, user=actor.user, raw_code=payload.code)
     record_subscription_changed(
@@ -413,6 +415,9 @@ def redeem_image_credit_code(
     if actor.plan == UserPlan.guest:
         raise api_error(status.HTTP_403_FORBIDDEN, 'BILLING_SIGNIN_REQUIRED', 'Please sign in before redeeming a credit code')
 
+    # Shared promo codes are short; count every attempt, including rejected ones.
+    enforce_activation_code_rate_limit(db, actor.user, scope='image_credit_code_redeem')
+    db.commit()
     code = _normalize_image_credit_code(payload.code)
     if code != IMAGE_CREDIT_PROMO_CODE:
         raise api_error(status.HTTP_404_NOT_FOUND, 'IMAGE_CREDIT_CODE_INVALID', 'This credit code is not valid')

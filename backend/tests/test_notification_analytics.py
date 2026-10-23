@@ -19,7 +19,7 @@ from app.api.deps import get_db
 from app.api.routers.analytics import router as analytics_router
 from app.core.security import create_access_token
 from app.db.base import Base
-from app.db.models import Notification, ProductAnalyticsEvent, User, UserPlan, UserStatus
+from app.db.models import Notification, ProductAnalyticsEvent, RateLimitCounter, User, UserPlan, UserStatus
 
 try:
     from tests.test_notifications import NOTIFICATION_TABLES
@@ -27,7 +27,7 @@ except ImportError:
     from test_notifications import NOTIFICATION_TABLES
 
 
-ANALYTICS_TABLES = [*NOTIFICATION_TABLES, ProductAnalyticsEvent.__table__]
+ANALYTICS_TABLES = [*NOTIFICATION_TABLES, ProductAnalyticsEvent.__table__, RateLimitCounter.__table__]
 TEST_DATABASE_URL = os.getenv('PICSPEAK_TEST_DATABASE_URL', '').strip()
 
 

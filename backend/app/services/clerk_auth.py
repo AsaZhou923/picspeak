@@ -19,7 +19,10 @@ from app.core.http_client import PooledHTTPRequestError, PooledHTTPStatusError, 
 
 logger = logging.getLogger(__name__)
 _JWKS_CACHE_TTL_SECONDS = 300
-_jwks_cache: dict[str, Any] = {'expires_at': 0.0, 'keys': []}
+# An unknown key id forces a refresh to pick up key rotation. Tokens with made-up
+# key ids must not turn every request into an upstream JWKS fetch.
+_JWKS_FORCED_REFRESH_COOLDOWN_SECONDS = 30
+_jwks_cache: dict[str, Any] = {'expires_at': 0.0, 'keys': [], 'forced_at': 0.0}
 _jwks_cache_lock = threading.Lock()
 _CLERK_BACKEND_USER_AGENT = 'PicSpeak Clerk Backend Adapter'
 
@@ -152,6 +155,10 @@ def _fetch_jwks(*, force_refresh: bool = False) -> list[dict[str, Any]]:
         now = time.time()
         if not force_refresh and _jwks_cache['expires_at'] > now and _jwks_cache['keys']:
             return list(_jwks_cache['keys'])
+        if force_refresh:
+            if _jwks_cache['keys'] and now - _jwks_cache.get('forced_at', 0.0) < _JWKS_FORCED_REFRESH_COOLDOWN_SECONDS:
+                return list(_jwks_cache['keys'])
+            _jwks_cache['forced_at'] = now
         return _refresh_jwks(now)
 
 

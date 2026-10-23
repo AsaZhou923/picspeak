@@ -39,6 +39,11 @@ class Settings(BaseSettings):
     object_secret_access_key: str = ''
     object_region: str = 'auto'
     max_upload_bytes: int = 20 * 1024 * 1024
+    # API bodies are small JSON; photos go straight to object storage. 0 disables.
+    max_request_body_bytes: int = 1024 * 1024
+    upload_presign_rate_limit_per_minute: int = 30
+    analytics_event_rate_limit_per_minute: int = 120
+    auth_exchange_rate_limit_per_minute: int = 60
 
     rate_limit_per_minute: int = 10
     ip_rate_limit_per_minute: int = 30

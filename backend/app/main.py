@@ -15,6 +15,7 @@ from app.api.router import router, webhook_router
 from app.core.config import settings
 from app.core.errors import normalize_http_error
 from app.core.network import client_ip_from_request
+from app.core.request_limits import RequestBodyLimitMiddleware
 from app.db.session import SessionLocal
 from app.services.audit import log_api_request
 from app.services.worker import worker
@@ -43,6 +44,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title='PicSpeak Backend', version='1.0.0', lifespan=lifespan)
+app.add_middleware(RequestBodyLimitMiddleware, max_body_bytes=settings.max_request_body_bytes)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.backend_cors_origins,
@@ -167,6 +169,11 @@ _AUDIT_SKIP_PATHS = {
 _AUDIT_SKIP_PREFIXES = ('/api/v1/photos/',)
 _AUDIT_BODY_CAPTURE_LIMIT_BYTES = 4 * 1024
 _AUDIT_BINARY_CONTENT_TYPES = ('application/octet-stream', 'multipart/form-data')
+# Audited without request bodies: their bodies are redeemable codes.
+_AUDIT_BODY_SKIP_PATHS = {
+    '/api/v1/billing/activation-code/redeem',
+    '/api/v1/billing/image-credit-code/redeem',
+}
 
 
 def _should_skip_audit(path: str) -> bool:
@@ -174,6 +181,8 @@ def _should_skip_audit(path: str) -> bool:
 
 
 def _should_capture_audit_body(request: Request) -> bool:
+    if request.url.path in _AUDIT_BODY_SKIP_PATHS:
+        return False
     content_type = request.headers.get('content-type', '').split(';', 1)[0].strip().lower()
     if content_type in _AUDIT_BINARY_CONTENT_TYPES:
         return False
