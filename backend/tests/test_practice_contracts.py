@@ -198,6 +198,9 @@ class PracticeContractTests(unittest.TestCase):
         ), patch(
             'app.api.routers.review_create.guest_quota_scope_key',
             return_value='guest-quota',
+        ), patch(
+            'app.api.routers.review_create.guest_network_scope_key',
+            return_value='guest-network',
         ):
             with self.assertRaises(HTTPException) as raised:
                 create_review(payload, SimpleNamespace(headers={}), db, actor)
@@ -235,6 +238,9 @@ class PracticeContractTests(unittest.TestCase):
         ), patch(
             'app.api.routers.review_create.guest_quota_scope_key',
             return_value='guest-quota',
+        ), patch(
+            'app.api.routers.review_create.guest_network_scope_key',
+            return_value='guest-network',
         ):
             response = create_review(payload, SimpleNamespace(headers={}), db, actor)
 

@@ -33,7 +33,7 @@ from app.schemas import (
 )
 from app.services.clerk_auth import verify_clerk_session_token
 from app.services.clerk_webhooks import verify_clerk_webhook
-from app.services.guard import enforce_guest_creation_rate_limit, guest_rate_limit_scope_key
+from app.services.guard import enforce_guest_creation_rate_limit, guest_network_scope_key, guest_rate_limit_scope_key
 from .auth_support import (
     GOOGLE_OAUTH_STATE_COOKIE,
     _bind_google_oauth_state,
@@ -94,7 +94,7 @@ def auth_guest(
             user = None
 
     if user is None:
-        enforce_guest_creation_rate_limit(db, guest_rate_limit_scope_key(request))
+        enforce_guest_creation_rate_limit(db, guest_rate_limit_scope_key(request), guest_network_scope_key(request))
         user = create_guest_user(db)
 
     db.commit()

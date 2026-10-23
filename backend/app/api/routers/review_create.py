@@ -34,6 +34,7 @@ from app.services.guard import (
     enforce_guest_review_limits,
     enforce_user_quota,
     get_idempotency_record,
+    guest_network_scope_key,
     guest_quota_scope_key,
     guest_rate_limit_scope_key,
     hash_request,
@@ -228,6 +229,7 @@ def create_review(
             actor,
             request_scope_key=guest_rate_limit_scope_key(request, actor.user),
             quota_scope_key=guest_quota_scope_key(request, actor.user),
+            network_scope_key=guest_network_scope_key(request),
         )
     else:
         enforce_user_quota(db, actor.user, mode=mode_enum)
