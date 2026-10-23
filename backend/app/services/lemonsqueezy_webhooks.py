@@ -717,6 +717,9 @@ def _process_order_created(db: Session, event: LemonSqueezyWebhookEvent, user: U
     if _is_one_time_pro_order(event):
         if _verified_one_time_pro_payload(event, user) is None:
             return 'ignored_one_time_pro_grant_invalid', user
+        # Serialize with order_refunded so a concurrent refund sees this grant
+        # or this grant sees the committed refund.
+        db.query(User).filter(User.id == user.id).with_for_update().one()
         existing_subscription = _lookup_subscription(db, provider_order_id=order_id, user_id=user.id)
         if _one_time_pro_already_granted(existing_subscription):
             return 'one_time_pro_already_granted', user
@@ -757,8 +760,11 @@ def _revoke_image_credit_pack(
     grant = _credit_pack_ledger_entry(db, user, order_id, grant_type=CREDIT_PACK_GRANT_TYPE)
     credits_granted = abs(int(grant.amount)) if grant is not None else 0
     # Credits already spent cannot be withdrawn; revoke what is still unused.
-    purchased_remaining = generation_credit_balance_snapshot(db, user)['purchased_remaining']
-    credits_revoked = max(min(credits_granted, purchased_remaining), 0)
+    # Held reservations count as unused: releasing one later must not bring
+    # refunded credits back.
+    balance = generation_credit_balance_snapshot(db, user)
+    unspent = balance['purchased_total'] - balance['purchased_used']
+    credits_revoked = max(min(credits_granted, unspent), 0)
     db.add(
         UsageLedger(
             user_id=user.id,
@@ -820,6 +826,9 @@ def _process_order_refunded(db: Session, event: LemonSqueezyWebhookEvent, user: 
     order_id = _order_resource_id(event)
     if not order_id:
         return 'ignored_refund_missing_order_id', user
+    # Same user boundary as the grant paths, so an overlapping order_created
+    # either commits its grant first or observes this refund.
+    db.query(User).filter(User.id == user.id).with_for_update().one()
     full_refund = _order_fully_refunded(_payload_attributes(event.data))
     if _is_image_credit_pack_order(event) or _has_granted_image_credit_pack(db, user, order_id):
         if not full_refund:

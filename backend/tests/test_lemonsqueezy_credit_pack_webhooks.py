@@ -215,6 +215,7 @@ class LemonSqueezyCreditPackWebhookTests(unittest.TestCase):
         no_refund_events_query.filter.return_value.all.return_value = []
         db.query.side_effect = [
             user_query,
+            user_query,
             missing_subscription_query,
             no_refund_events_query,
             missing_subscription_query,
@@ -294,7 +295,13 @@ class LemonSqueezyCreditPackWebhookTests(unittest.TestCase):
         missing_subscription_query.first.return_value = None
         no_refund_events_query = MagicMock()
         no_refund_events_query.filter.return_value.all.return_value = []
-        db.query.side_effect = [user_query, missing_subscription_query, no_refund_events_query, missing_subscription_query]
+        db.query.side_effect = [
+            user_query,
+            user_query,
+            missing_subscription_query,
+            no_refund_events_query,
+            missing_subscription_query,
+        ]
 
         with patch('app.services.lemonsqueezy_webhooks.settings.lemonsqueezy_zh_pro_variant_id', '1418094'), patch(
             'app.services.lemonsqueezy_webhooks.record_product_event'

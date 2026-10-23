@@ -141,6 +141,39 @@ class StripImageMetadataTests(unittest.TestCase):
             self.assertEqual(stripped[20] & 0x0C, 0)
         self.assertEqual(_decoded(stripped)[0].tobytes(), _decoded(original)[0].tobytes())
 
+    def test_animated_images_with_orientation_keep_every_frame(self) -> None:
+        colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255)]
+        frames = [Image.new('RGB', (40, 20), color) for color in colors]
+        for format_name, content_type in (('WEBP', 'image/webp'), ('PNG', 'image/png')):
+            with self.subTest(format=format_name):
+                output = BytesIO()
+                frames[0].save(
+                    output,
+                    format=format_name,
+                    save_all=True,
+                    append_images=frames[1:],
+                    duration=[120, 80, 200],
+                    loop=0,
+                    exif=_exif(orientation=6).tobytes(),
+                    **({'lossless': True} if format_name == 'WEBP' else {}),
+                )
+
+                stripped = strip_image_metadata(output.getvalue(), content_type)
+
+                with Image.open(BytesIO(stripped)) as image:
+                    self.assertEqual(image.n_frames, 3)
+                    self.assertEqual(image.size, (20, 40))
+                    self.assertEqual(dict(image.getexif().get_ifd(GPS_IFD)), {})
+                    self.assertNotIn(ORIENTATION, image.getexif())
+                    seen = []
+                    for index in range(3):
+                        image.seek(index)
+                        seen.append(image.convert('RGB').getpixel((10, 20)))
+                        self.assertEqual(image.info.get('duration'), [120, 80, 200][index])
+                    # WebP animations are re-encoded lossily, so allow small channel drift.
+                    for actual, expected in zip(seen, colors):
+                        self.assertTrue(all(abs(a - b) <= 3 for a, b in zip(actual, expected)), (actual, expected))
+
     def test_metadata_free_images_are_unchanged_in_content(self) -> None:
         output = BytesIO()
         _source_image().save(output, format='PNG')

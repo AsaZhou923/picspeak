@@ -11,9 +11,18 @@ from __future__ import annotations
 import struct
 from io import BytesIO
 
-from PIL import Image, ImageOps, UnidentifiedImageError
+from PIL import Image, ImageOps, ImageSequence, UnidentifiedImageError
 
 EXIF_ORIENTATION_TAG = 0x0112
+_ORIENTATION_TRANSPOSE = {
+    2: Image.Transpose.FLIP_LEFT_RIGHT,
+    3: Image.Transpose.ROTATE_180,
+    4: Image.Transpose.FLIP_TOP_BOTTOM,
+    5: Image.Transpose.TRANSPOSE,
+    6: Image.Transpose.ROTATE_270,
+    7: Image.Transpose.TRANSVERSE,
+    8: Image.Transpose.ROTATE_90,
+}
 _EXIF_HEADER = b'Exif\x00\x00'
 _JPEG_STANDALONE_MARKERS = {0x01, *range(0xD0, 0xD8)}
 _JPEG_APP1 = 0xE1
@@ -179,11 +188,43 @@ def _strip_webp(data: bytes) -> bytes:
     return b'RIFF' + len(body).to_bytes(4, 'little') + bytes(body)
 
 
+def _reencode_animation_without_metadata(source: Image.Image, image_format: str, save_options: dict) -> bytes:
+    """Re-encode every frame of an animated PNG or WebP upright, keeping timing and looping."""
+    orientation = source.getexif().get(EXIF_ORIENTATION_TAG)
+    transpose = _ORIENTATION_TRANSPOSE.get(orientation) if isinstance(orientation, int) else None
+    frames: list[Image.Image] = []
+    durations: list[int] = []
+    for frame in ImageSequence.Iterator(source):
+        # Converting loads the frame, which is when its duration becomes available.
+        upright = frame.convert('RGBA')
+        durations.append(int(frame.info.get('duration') or 100))
+        if transpose is not None:
+            upright = upright.transpose(transpose)
+        upright.info = {}
+        frames.append(upright)
+    output = BytesIO()
+    options = {
+        **save_options,
+        'save_all': True,
+        'append_images': frames[1:],
+        'duration': durations,
+        'loop': int(source.info.get('loop', 0) or 0),
+    }
+    if image_format == 'WEBP':
+        options['quality'] = 95
+    frames[0].save(output, format=image_format, **options)
+    return output.getvalue()
+
+
 def _reencode_without_metadata(data: bytes) -> bytes:
     try:
         with Image.open(BytesIO(data)) as source:
             image_format = source.format
             icc_profile = source.info.get('icc_profile')
+            if image_format in {'PNG', 'WEBP'} and getattr(source, 'is_animated', False):
+                return _reencode_animation_without_metadata(
+                    source, image_format, {'icc_profile': icc_profile} if icc_profile else {},
+                )
             image = ImageOps.exif_transpose(source)
             # exif_transpose keeps the remaining EXIF (including GPS) in info.
             image.info = {}

@@ -85,16 +85,26 @@ def _db(user: User, *, ledger=(), subscriptions=(), webhook_events=()) -> MagicM
             getattr(result, method).return_value = result
         if model is User:
             result.first.return_value = user
-            result.one.return_value = user
+
+            def lock_user():
+                db.events.append('user_locked')
+                return user
+
+            result.one.side_effect = lock_user
         elif model is UsageLedger:
             result.all.return_value = list(ledger)
         elif model is BillingSubscription:
-            result.first.return_value = subscriptions[0] if subscriptions else None
+            def lookup_subscription():
+                db.events.append('subscription_read')
+                return subscriptions[0] if subscriptions else None
+
+            result.first.side_effect = lookup_subscription
             result.all.return_value = list(subscriptions)
         elif model is BillingWebhookEvent:
             result.all.return_value = list(webhook_events)
         return result
 
+    db.events = []
     db.query.side_effect = query
     return db
 
@@ -104,17 +114,23 @@ def _added(db: MagicMock, model) -> list:
 
 
 class CreditPackRefundTests(unittest.TestCase):
-    def _process(self, db: MagicMock, event: LemonSqueezyWebhookEvent, *, purchased_remaining: int = 300):
-        with patch(
-            'app.services.lemonsqueezy_webhooks.generation_credit_balance_snapshot',
-            return_value={'purchased_remaining': purchased_remaining},
-        ):
+    def _process(
+        self, db: MagicMock, event: LemonSqueezyWebhookEvent, *,
+        purchased_total: int = 300, purchased_used: int = 0, purchased_held: int = 0,
+    ):
+        balance = {
+            'purchased_total': purchased_total,
+            'purchased_used': purchased_used,
+            'purchased_held': purchased_held,
+            'purchased_remaining': max(purchased_total - purchased_used - purchased_held, 0),
+        }
+        with patch('app.services.lemonsqueezy_webhooks.generation_credit_balance_snapshot', return_value=balance):
             return process_lemonsqueezy_webhook_event(db, event)
 
     def test_full_refund_revokes_only_unspent_credits(self) -> None:
         db = _db(_user(), ledger=[_credit_grant()])
 
-        outcome, user_public_id = self._process(db, _order_event('order_refunded'), purchased_remaining=120)
+        outcome, user_public_id = self._process(db, _order_event('order_refunded'), purchased_used=180)
 
         self.assertEqual((outcome, user_public_id), ('credit_pack_refunded', USER_PUBLIC_ID))
         [revocation] = _added(db, UsageLedger)
@@ -128,9 +144,19 @@ class CreditPackRefundTests(unittest.TestCase):
     def test_full_refund_never_revokes_more_than_the_pack(self) -> None:
         db = _db(_user(), ledger=[_credit_grant()])
 
-        self._process(db, _order_event('order_refunded'), purchased_remaining=900)
+        self._process(db, _order_event('order_refunded'), purchased_total=900)
 
         self.assertEqual(_added(db, UsageLedger)[0].amount, 300)
+
+    def test_full_refund_also_revokes_credits_held_by_running_generations(self) -> None:
+        db = _db(_user(), ledger=[_credit_grant()])
+
+        self._process(db, _order_event('order_refunded'), purchased_used=180, purchased_held=100)
+
+        # Releasing the 100-credit hold later must not make refunded credits spendable.
+        [revocation] = _added(db, UsageLedger)
+        self.assertEqual(revocation.amount, 120)
+        self.assertEqual(revocation.metadata_json['credits_already_spent'], 180)
 
     def test_repeated_refund_is_applied_once(self) -> None:
         previous = UsageLedger(
@@ -182,6 +208,8 @@ class OneTimeProRefundTests(unittest.TestCase):
         self.assertIn('refunded_at', subscription.raw_payload['billing_access'])
         self.assertEqual(user.plan, UserPlan.free)
         notify.assert_called_once()
+        # The user lock serializes this refund with a concurrent order_created.
+        self.assertEqual(db.events[:2], ['user_locked', 'subscription_read'])
 
     def test_repeated_one_time_pro_refund_is_a_no_op(self) -> None:
         subscription = _one_time_subscription()
