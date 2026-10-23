@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.errors import api_error
-from app.core.network import client_ip_from_request, device_key_from_request
+from app.core.network import client_network_from_request, device_key_from_request
 from app.db.models import IdempotencyKey, RateLimitCounter, ReviewMode, ReviewQuotaReservation, UsageLedger, User, UserPlan
 
 if TYPE_CHECKING:
@@ -191,7 +191,13 @@ def count_monthly_review_usage(
     return int(used or 0)
 
 
-def guest_usage_snapshot(db: Session, scope_key: str, *, now: datetime | None = None) -> dict[str, int | None]:
+def guest_usage_snapshot(
+    db: Session,
+    scope_key: str,
+    *,
+    network_scope_key: str | None = None,
+    now: datetime | None = None,
+) -> dict[str, int | None]:
     current = now or utc_now()
     daily_used = _counter_hit_count(
         db,
@@ -211,13 +217,38 @@ def guest_usage_snapshot(db: Session, scope_key: str, *, now: datetime | None = 
     )
     daily_total = settings.guest_review_limit_per_day
     monthly_total = settings.guest_review_limit_per_month
+    daily_remaining = max(daily_total - daily_used, 0)
+    monthly_remaining = max(monthly_total - monthly_used, 0)
+    if network_scope_key:
+        # A shared network cap can run out before this device's own allowance.
+        network_limits = (
+            ('guest_review_network_daily', settings.guest_review_network_limit_per_day,
+             day_window_start(current), 24 * 3600),
+            ('guest_review_network_monthly', settings.guest_review_network_limit_per_month,
+             month_window_start(current), month_window_seconds(current)),
+        )
+        for scope, limit, window_start, window_seconds in network_limits:
+            if limit <= 0:
+                continue
+            network_used = _counter_hit_count(
+                db,
+                scope=scope,
+                scope_key=network_scope_key,
+                endpoint='review_create',
+                window_start=window_start,
+                window_seconds=window_seconds,
+            )
+            network_remaining = max(limit - network_used, 0)
+            daily_remaining = min(daily_remaining, network_remaining)
+            if scope == 'guest_review_network_monthly':
+                monthly_remaining = min(monthly_remaining, network_remaining)
     return {
         'daily_total': daily_total,
         'daily_used': daily_used,
-        'daily_remaining': max(daily_total - daily_used, 0),
+        'daily_remaining': daily_remaining,
         'monthly_total': monthly_total,
         'monthly_used': monthly_used,
-        'monthly_remaining': max(monthly_total - monthly_used, 0),
+        'monthly_remaining': monthly_remaining,
         'pro_monthly_total': None,
         'pro_monthly_used': None,
         'pro_monthly_remaining': None,
@@ -328,23 +359,38 @@ def guest_quota_scope_key(request: Request, user: User | None = None) -> str:
     return _guest_scope_key(request, user=user, prefer_guest_user=True)
 
 
+def guest_network_scope_key(request: Request) -> str | None:
+    """Network-only key for caps that client-supplied identifiers cannot reset."""
+    network = client_network_from_request(request)
+    return _hashed_guest_scope_key(f'net:{network}') if network else None
+
+
 def _guest_scope_key(request: Request, user: User | None = None, *, prefer_guest_user: bool) -> str:
     device_key = device_key_from_request(request)
+    guest_public_id = (
+        user.public_id.strip()
+        if user is not None and user.plan == UserPlan.guest and user.public_id.strip()
+        else None
+    )
+
+    # The network is a required dimension whenever it is known. Device ids and
+    # guest ids only subdivide a network so households behind one address do
+    # not share a single bucket; they never replace it.
+    network = client_network_from_request(request)
+    if network:
+        if device_key and device_key.startswith('device:'):
+            return _hashed_guest_scope_key(f'{device_key}|net:{network}')
+        if prefer_guest_user and guest_public_id:
+            return _hashed_guest_scope_key(f'guest_user:{guest_public_id}|net:{network}')
+        if device_key:
+            return _hashed_guest_scope_key(f'{device_key}|net:{network}')
+        return _hashed_guest_scope_key(f'net:{network}')
+
     if device_key and device_key.startswith('device:'):
         return _hashed_guest_scope_key(device_key)
 
-    if prefer_guest_user and user is not None and user.plan == UserPlan.guest and user.public_id.strip():
-        return f'guest_user:{user.public_id.strip()}'
-
-    client_ip = client_ip_from_request(request)
-    if device_key and client_ip:
-        return _hashed_guest_scope_key(f'{device_key}|ip:{client_ip}')
-
-    if client_ip:
-        return _hashed_guest_scope_key(f'ip:{client_ip}')
-
-    if not prefer_guest_user and user is not None and user.plan == UserPlan.guest and user.public_id.strip():
-        return f'guest_user:{user.public_id.strip()}'
+    if guest_public_id:
+        return f'guest_user:{guest_public_id}'
 
     if device_key:
         return _hashed_guest_scope_key(device_key)
@@ -358,6 +404,7 @@ def enforce_guest_review_limits(
     *,
     request_scope_key: str,
     quota_scope_key: str,
+    network_scope_key: str | None = None,
 ) -> dict:
     if actor.plan != UserPlan.guest:
         return {}
@@ -390,11 +437,33 @@ def enforce_guest_review_limits(
         window_start=month_window_start(now),
         window_seconds=month_window_seconds(now),
     )
-    return {
+    limits = {
         'guest_review_minute': minute_rate,
         'guest_review_daily': day_rate,
         'guest_review_monthly': month_rate,
     }
+    if network_scope_key:
+        if settings.guest_review_network_limit_per_day > 0:
+            limits['guest_review_network_daily'] = _enforce_scope_rate_limit(
+                db,
+                scope='guest_review_network_daily',
+                scope_key=network_scope_key,
+                endpoint='review_create',
+                per_minute_limit=settings.guest_review_network_limit_per_day,
+                window_start=day_window_start(now),
+                window_seconds=24 * 3600,
+            )
+        if settings.guest_review_network_limit_per_month > 0:
+            limits['guest_review_network_monthly'] = _enforce_scope_rate_limit(
+                db,
+                scope='guest_review_network_monthly',
+                scope_key=network_scope_key,
+                endpoint='review_create',
+                per_minute_limit=settings.guest_review_network_limit_per_month,
+                window_start=month_window_start(now),
+                window_seconds=month_window_seconds(now),
+            )
+    return limits
 
 
 def enforce_guest_api_rate_limit(db: Session, actor: 'CurrentActor', endpoint: str, scope_key: str) -> dict:
@@ -416,7 +485,7 @@ def enforce_guest_api_rate_limit(db: Session, actor: 'CurrentActor', endpoint: s
     }
 
 
-def enforce_guest_creation_rate_limit(db: Session, scope_key: str) -> dict:
+def enforce_guest_creation_rate_limit(db: Session, scope_key: str, network_scope_key: str | None = None) -> dict:
     now = utc_now()
     minute_rate = _enforce_scope_rate_limit(
         db,
@@ -427,9 +496,20 @@ def enforce_guest_creation_rate_limit(db: Session, scope_key: str) -> dict:
         window_start=minute_window_start(now),
         window_seconds=60,
     )
-    return {
+    limits = {
         'guest_creation_minute': minute_rate,
     }
+    if network_scope_key and settings.guest_creation_network_rate_limit_per_minute > 0:
+        limits['guest_creation_network_minute'] = _enforce_scope_rate_limit(
+            db,
+            scope='guest_creation_network_minute',
+            scope_key=network_scope_key,
+            endpoint='guest_create',
+            per_minute_limit=settings.guest_creation_network_rate_limit_per_minute,
+            window_start=minute_window_start(now),
+            window_seconds=60,
+        )
+    return limits
 
 
 def hash_request(payload: str) -> str:

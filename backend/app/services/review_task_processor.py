@@ -842,8 +842,13 @@ def _process_task(db: Session, task: ReviewTask, *, claim_token: str | None = No
     consume_review_quota(db, quota_reservation)
     increment_quota(db, owner, **({'bill_date': quota_reservation.bill_date} if quota_reservation is not None else {}))
     db.flush()
-    guest_scope_key = (task.request_payload or {}).get('_guest_scope_key') if owner.plan == UserPlan.guest else None
-    usage = guest_usage_snapshot(db, guest_scope_key) if guest_scope_key else user_usage_snapshot(db, owner)
+    task_payload = task.request_payload or {}
+    guest_scope_key = task_payload.get('_guest_scope_key') if owner.plan == UserPlan.guest else None
+    usage = (
+        guest_usage_snapshot(db, guest_scope_key, network_scope_key=task_payload.get('_guest_network_scope_key'))
+        if guest_scope_key
+        else user_usage_snapshot(db, owner)
+    )
     # Keep the persisted JSON value intact so SQLAlchemy detects this update.
     result_payload = deepcopy(result_payload)
     result_payload['billing_info'] = {

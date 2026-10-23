@@ -36,14 +36,14 @@ def _request(headers: dict[str, str] | None = None) -> Request:
 
 
 class LowRiskRegressionTests(unittest.TestCase):
-    def test_forwarded_for_rejects_invalid_ip_before_fallback(self) -> None:
-        request = _request({'x-forwarded-for': 'not-an-ip, 203.0.113.10'})
+    def test_forwarded_for_rejects_invalid_trusted_entry_before_fallback(self) -> None:
+        request = _request({'x-forwarded-for': '203.0.113.10, not-an-ip'})
 
         with patch('app.core.network.settings.trust_x_forwarded_for', True):
             self.assertEqual(client_ip_from_request(request), '10.0.0.5')
 
-    def test_forwarded_for_accepts_valid_first_ip(self) -> None:
-        request = _request({'x-forwarded-for': '203.0.113.10, 10.0.0.5'})
+    def test_forwarded_for_ignores_client_supplied_leftmost_ip(self) -> None:
+        request = _request({'x-forwarded-for': '198.51.100.7, 203.0.113.10'})
 
         with patch('app.core.network.settings.trust_x_forwarded_for', True):
             self.assertEqual(client_ip_from_request(request), '203.0.113.10')

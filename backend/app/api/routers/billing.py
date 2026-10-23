@@ -32,6 +32,7 @@ from app.services.billing_access import (
 )
 from app.services.guard import (
     enforce_activation_code_rate_limit,
+    guest_network_scope_key,
     guest_quota_scope_key,
     guest_usage_snapshot,
     has_priority_queue,
@@ -211,7 +212,11 @@ def _has_redeemed_image_credit_code(db: Session, user: User, code: str) -> bool:
 @router.get('/me/usage', response_model=UsageResponse)
 def get_usage(request: Request, db: Session = Depends(get_db), actor: CurrentActor = Depends(get_current_actor)):
     quota = (
-        guest_usage_snapshot(db, guest_quota_scope_key(request, actor.user))
+        guest_usage_snapshot(
+            db,
+            guest_quota_scope_key(request, actor.user),
+            network_scope_key=guest_network_scope_key(request),
+        )
         if actor.plan == UserPlan.guest
         else user_usage_snapshot(db, actor.user)
     )

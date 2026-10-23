@@ -34,6 +34,7 @@ from app.services.guard import (
     enforce_guest_review_limits,
     enforce_user_quota,
     get_idempotency_record,
+    guest_network_scope_key,
     guest_quota_scope_key,
     guest_rate_limit_scope_key,
     hash_request,
@@ -222,17 +223,18 @@ def create_review(
                 db.commit()
             return response_sync
 
+    guest_scope_key = guest_quota_scope_key(request, actor.user) if actor.plan == UserPlan.guest else None
+    guest_network_key = guest_network_scope_key(request) if actor.plan == UserPlan.guest else None
     if actor.plan == UserPlan.guest:
         enforce_guest_review_limits(
             db,
             actor,
             request_scope_key=guest_rate_limit_scope_key(request, actor.user),
-            quota_scope_key=guest_quota_scope_key(request, actor.user),
+            quota_scope_key=guest_scope_key,
+            network_scope_key=guest_network_key,
         )
     else:
         enforce_user_quota(db, actor.user, mode=mode_enum)
-
-    guest_scope_key = guest_quota_scope_key(request, actor.user) if actor.plan == UserPlan.guest else None
 
     if payload.async_mode:
         task_payload = payload.model_dump(by_alias=True)
@@ -241,6 +243,8 @@ def create_review(
             task_payload['source_review_internal_id'] = source_review.id
         if guest_scope_key:
             task_payload['_guest_scope_key'] = guest_scope_key
+        if guest_network_key:
+            task_payload['_guest_network_scope_key'] = guest_network_key
         task = ReviewTask(
             public_id=new_public_id('tsk'),
             photo_id=photo.id,
@@ -467,7 +471,14 @@ def create_review(
         increment_quota(db, actor.user, **({'bill_date': quota_reservation.bill_date} if quota_reservation is not None else {}))
         db.flush()
         result_payload = deepcopy(result_payload)
-        _attach_billing_info(result_payload, db=db, user=actor.user, charged=True, guest_scope_key=guest_scope_key)
+        _attach_billing_info(
+            result_payload,
+            db=db,
+            user=actor.user,
+            charged=True,
+            guest_scope_key=guest_scope_key,
+            guest_network_scope_key=guest_network_key,
+        )
         review.result_json = result_payload
         db.add(review)
         response_sync = {'review_id': review.public_id, 'status': review.status.value, 'result': result_payload}

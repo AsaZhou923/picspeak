@@ -18,6 +18,7 @@ from app.services.guard import (
     daily_quota_for_plan,
     enforce_guest_api_rate_limit,
     enforce_guest_creation_rate_limit,
+    guest_network_scope_key,
     guest_rate_limit_scope_key,
 )
 
@@ -161,7 +162,7 @@ def get_current_actor(
         _touch_user_login(user, db)
         return actor
 
-    enforce_guest_creation_rate_limit(db, guest_rate_limit_scope_key(request))
+    enforce_guest_creation_rate_limit(db, guest_rate_limit_scope_key(request), guest_network_scope_key(request))
     user = create_guest_user(db)
     set_current_user_public_id(request, user.public_id)
     token = issue_guest_token(user)

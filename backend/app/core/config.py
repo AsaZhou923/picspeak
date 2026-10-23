@@ -47,6 +47,11 @@ class Settings(BaseSettings):
     guest_review_rate_limit_per_minute: int = 4
     guest_review_limit_per_day: int = 3
     guest_review_limit_per_month: int = 30
+    # Network-wide guest caps ignore client-supplied device ids, so rotating
+    # X-Device-Id or dropping cookies cannot mint fresh guest quota. 0 disables.
+    guest_review_network_limit_per_day: int = 12
+    guest_review_network_limit_per_month: int = 120
+    guest_creation_network_rate_limit_per_minute: int = 60
     free_review_limit_per_day: int = 5
     free_review_limit_per_month: int = 60
     free_pro_review_limit_per_month: int = 10
@@ -56,6 +61,9 @@ class Settings(BaseSettings):
     oauth_jwt_issuer: str = ''
     oauth_jwt_audience: str = ''
     trust_x_forwarded_for: bool = False
+    # Number of trusted proxies that append to X-Forwarded-For. Cloud Run
+    # direct ingress appends one entry; an external load balancer adds one more.
+    trusted_proxy_hops: int = 1
     google_oauth_client_id: str = ''
     google_oauth_client_secret: str = ''
     google_oauth_redirect_uri: str = ''
