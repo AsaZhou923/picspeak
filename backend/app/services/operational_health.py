@@ -90,6 +90,12 @@ def _money(value: Decimal | float | int | None) -> float:
         return 0.0
 
 
+def _is_credit_refund_entry(entry: Any) -> bool:
+    # Refund revocations are positive ledger rows but are not generation spend.
+    metadata = getattr(entry, 'metadata_json', None) or {}
+    return metadata.get('grant_type') == 'lemonsqueezy_credit_pack_refund'
+
+
 def _status_value(value: str) -> str:
     normalized = str(value or '').strip().upper()
     return normalized if normalized in TASK_STATUSES else 'UNKNOWN'
@@ -240,6 +246,12 @@ def build_operational_health_snapshot(
         _money(entry.amount)
         for entry in period_ledger
         if entry.usage_type == 'image_generation_credit' and _money(entry.amount) > 0
+        and not _is_credit_refund_entry(entry)
+    )
+    ledger_credits_refunded = sum(
+        _money(entry.amount)
+        for entry in period_ledger
+        if entry.usage_type == 'image_generation_credit' and _is_credit_refund_entry(entry)
     )
     ledger_credits_granted = sum(
         abs(_money(entry.amount))
@@ -354,6 +366,7 @@ def build_operational_health_snapshot(
             'generated_image_credits_charged': round(generated_credits, 2),
             'ledger_credits_consumed': round(ledger_credits_consumed, 2),
             'ledger_credits_granted': round(ledger_credits_granted, 2),
+            'ledger_credits_refunded': round(ledger_credits_refunded, 2),
             'review_quota_used': round(review_quota_used, 2),
         },
         'generation_credit_reservations': {
@@ -476,6 +489,7 @@ def render_operational_health_markdown(snapshot: dict[str, Any]) -> str:
             f"| generated image credits charged | {costs.get('generated_image_credits_charged', 0)} |",
             f"| ledger credits consumed | {costs.get('ledger_credits_consumed', 0)} |",
             f"| ledger credits granted | {costs.get('ledger_credits_granted', 0)} |",
+            f"| ledger credits refunded | {costs.get('ledger_credits_refunded', 0)} |",
             f"| review quota used | {costs.get('review_quota_used', 0)} |",
         ]
     )

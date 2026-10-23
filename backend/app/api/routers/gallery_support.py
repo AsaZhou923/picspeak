@@ -23,6 +23,7 @@ from app.db.models import Photo, Review, ReviewLike, ReviewStatus, User
 from app.schemas import PublicGalleryItem
 from app.services.gallery_summary import extract_review_gallery_summary
 from app.services.object_storage import get_object_storage_client
+from app.services.public_identity import public_display_name
 
 GALLERY_AUDIT_NONE = 'none'
 GALLERY_AUDIT_APPROVED = 'approved'
@@ -271,7 +272,7 @@ def _public_gallery_item(
     final_score=float(review.final_score),
     score_version=str((review.result_json or {}).get('score_version') or 'legacy'),
     summary=_review_gallery_summary(review),
-    owner_username=owner.username,
+    owner_username=public_display_name(owner),
     owner_avatar_url=owner.avatar_url,
     like_count=max(0, int(like_count)),
     liked_by_viewer=bool(liked_by_viewer),

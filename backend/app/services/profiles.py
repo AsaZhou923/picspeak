@@ -20,6 +20,7 @@ from app.profile_schemas import (
     PublicProfileGalleryItem,
     PublicProfileResponse,
 )
+from app.services.public_identity import public_display_name
 
 PUBLIC_PROFILE_ID_PREFIX = 'upp'
 PUBLIC_PROFILE_ID_RANDOM_BYTES = 18
@@ -83,7 +84,7 @@ def _profile_settings_response(db: Session, user: User) -> ProfileSettingsRespon
     return ProfileSettingsResponse(
         public_profile_enabled=bool(user.public_profile_enabled),
         public_profile_id=user.public_profile_id if user.public_profile_enabled else None,
-        username=user.username,
+        username=public_display_name(user),
         avatar_url=user.avatar_url,
         gallery_review_count=_gallery_review_count(db, user),
     )
@@ -211,7 +212,7 @@ def get_public_profile(
 
     return PublicProfileResponse(
         public_profile_id=user.public_profile_id or public_profile_id,
-        username=user.username,
+        username=public_display_name(user),
         avatar_url=user.avatar_url,
         gallery_review_count=total_count,
         total_like_count=total_like_count,
