@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import json
-import re
 from datetime import datetime, timezone
+from secrets import token_hex
 from typing import Any
 from urllib import error as urllib_error
 from urllib import parse
@@ -36,10 +36,14 @@ from app.db.models import (
 from app.schemas import AuthTokenResponse
 from app.services.clerk_auth import ClerkIdentity
 from app.services.clerk_webhooks import ClerkWebhookEvent
+from app.services.public_identity import (
+    LEGACY_GOOGLE_USERNAME_PREFIX,
+    normalize_username_seed,
+    username_derived_from_email,
+)
 
 GOOGLE_OAUTH_STATE_COOKIE = 'ps_google_oauth_state'
 GOOGLE_OAUTH_STATE_TTL_SECONDS = 600
-USERNAME_SANITIZE_RE = re.compile(r'[^a-z0-9_]+')
 MAX_USERNAME_ATTEMPTS = 100
 
 
@@ -66,19 +70,18 @@ def _normalize_email(email: str) -> str:
 
 
 def _username_seed(identity: ClerkIdentity) -> str:
+    # Usernames appear on public Gallery pages, so never derive one from the email.
     candidates = [
         identity.username,
         ' '.join(part for part in [identity.first_name, identity.last_name] if part),
-        identity.email.split('@', 1)[0] if '@' in identity.email else identity.email,
         f'user_{identity.user_id[-8:]}',
     ]
     for raw in candidates:
         if not raw:
             continue
-        normalized = USERNAME_SANITIZE_RE.sub('_', raw.strip().lower()).strip('_')
-        normalized = re.sub(r'_+', '_', normalized)
+        normalized = normalize_username_seed(raw)
         if normalized:
-            return normalized[:40]
+            return normalized
     return f'user_{identity.user_id[-8:]}'
 
 
@@ -205,6 +208,7 @@ def _sync_clerk_user(db: Session, identity: ClerkIdentity) -> User:
 
     user = by_clerk_id or by_email
     now = datetime.now(timezone.utc)
+    email_derived_username = user is not None and username_derived_from_email(user.username, user.email)
 
     if user is None:
         user = User(
@@ -237,7 +241,7 @@ def _sync_clerk_user(db: Session, identity: ClerkIdentity) -> User:
     user.clerk_user_id = identity.user_id
     user.avatar_url = identity.avatar_url
     user.email = identity.email
-    if not user.username or user.username.startswith('google_') or user.username.startswith('gst_'):
+    if not user.username or email_derived_username or user.username.startswith('gst_'):
         user.username = _build_unique_username(db, identity, current_user_id=user.id)
     if user.plan == UserPlan.guest:
         user.plan = UserPlan.free
@@ -566,7 +570,7 @@ def _login_from_google_claims(claims: dict, db: Session) -> AuthTokenResponse:
         user = User(
             public_id=new_public_id('usr'),
             email=email,
-            username=f"google_{re.sub(r'[^a-z0-9_]+', '_', email.split('@', 1)[0].lower()).strip('_') or 'user'}",
+            username=f'{LEGACY_GOOGLE_USERNAME_PREFIX}{token_hex(6)}',
             password_hash=None,
             plan=UserPlan.free,
             daily_quota_total=quota_for_plan(UserPlan.free),

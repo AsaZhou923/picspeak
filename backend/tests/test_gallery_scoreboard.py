@@ -22,6 +22,7 @@ from app.db.models import Photo, PhotoStatus, Review, ReviewLike, ReviewMode, Re
 from app.db.session import get_db
 from app.main import app
 from app.services.gallery_scoreboard import build_gallery_scoreboard
+from app.services.public_identity import public_display_name
 
 TEST_DATABASE_URL = os.getenv('PICSPEAK_TEST_DATABASE_URL', '').strip()
 
@@ -243,7 +244,7 @@ class GalleryScoreboardPostgresTests(unittest.TestCase):
             self.assertNotIn(rejected.public_id, ids)
             self.assertNotIn(share_only.public_id, ids)
             self.assertLess(ids.index(reviews[0].public_id), ids.index(newer_duplicate.public_id))
-            owner0_count = sum(1 for item in payload.items if item.owner_username == owners[0].username)
+            owner0_count = sum(1 for item in payload.items if item.owner_username == public_display_name(owners[0]))
             self.assertEqual(owner0_count, 1)
             self.assertNotIn(reviews[6].public_id, ids)
 

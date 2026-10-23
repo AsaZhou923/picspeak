@@ -211,7 +211,16 @@ class LemonSqueezyCreditPackWebhookTests(unittest.TestCase):
         active_subscription_query.all.side_effect = lambda: [
             item for item in [call.args[0] for call in db.add.call_args_list] if isinstance(item, BillingSubscription)
         ]
-        db.query.side_effect = [user_query, missing_subscription_query, missing_subscription_query, active_subscription_query]
+        no_refund_events_query = MagicMock()
+        no_refund_events_query.filter.return_value.all.return_value = []
+        db.query.side_effect = [
+            user_query,
+            user_query,
+            missing_subscription_query,
+            no_refund_events_query,
+            missing_subscription_query,
+            active_subscription_query,
+        ]
 
         with patch('app.services.lemonsqueezy_webhooks.settings.lemonsqueezy_zh_pro_variant_id', '1418094'), patch(
             'app.services.lemonsqueezy_webhooks.settings.lemonsqueezy_pro_variant_id',
@@ -284,7 +293,15 @@ class LemonSqueezyCreditPackWebhookTests(unittest.TestCase):
         missing_subscription_query.filter.return_value = missing_subscription_query
         missing_subscription_query.order_by.return_value = missing_subscription_query
         missing_subscription_query.first.return_value = None
-        db.query.side_effect = [user_query, missing_subscription_query, missing_subscription_query]
+        no_refund_events_query = MagicMock()
+        no_refund_events_query.filter.return_value.all.return_value = []
+        db.query.side_effect = [
+            user_query,
+            user_query,
+            missing_subscription_query,
+            no_refund_events_query,
+            missing_subscription_query,
+        ]
 
         with patch('app.services.lemonsqueezy_webhooks.settings.lemonsqueezy_zh_pro_variant_id', '1418094'), patch(
             'app.services.lemonsqueezy_webhooks.record_product_event'

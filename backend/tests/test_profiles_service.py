@@ -60,6 +60,7 @@ class ProfileServiceTests(unittest.TestCase):
             public_profile_id='upp_existing',
             public_profile_enabled=False,
             username='owner',
+            email='profile-owner@example.com',
             avatar_url=None,
         )
 

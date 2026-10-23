@@ -16,6 +16,7 @@ from app.core.errors import ApiHTTPException, api_error
 from app.core.security import verify_payload
 from app.db.models import BillingSubscription, BillingWebhookEvent, UsageLedger, User, UserPlan
 from app.services.billing_access import current_period_ends_at, subscription_grants_pro_access, sync_user_billing_plan
+from app.services.generation_credit_reservations import PURCHASED_BALANCE_VERSION, generation_credit_balance_snapshot
 from app.services.lemonsqueezy import (
     LemonSqueezyAPIError,
     LemonSqueezyConfigurationError,
@@ -31,6 +32,7 @@ HANDLED_LEMONSQUEEZY_EVENTS = {
     'subscription_updated',
     'subscription_cancelled',
     'subscription_payment_success',
+    'order_refunded',
 }
 
 IMAGE_CREDIT_PACK_KEY = 'image_credits_300'
@@ -38,6 +40,9 @@ IMAGE_CREDIT_PACK_CREDITS = 300
 ONE_TIME_PRO_BILLING_MODE = 'one_time_pro'
 ONE_TIME_PRO_DURATION_DAYS = 30
 ONE_TIME_PRO_GRANT_PURPOSE = 'lemonsqueezy_one_time_pro'
+CREDIT_PACK_GRANT_TYPE = 'lemonsqueezy_credit_pack'
+CREDIT_PACK_REFUND_GRANT_TYPE = 'lemonsqueezy_credit_pack_refund'
+ONE_TIME_PRO_REFUNDED_STATUS = 'refunded'
 
 
 @dataclass(slots=True)
@@ -451,10 +456,10 @@ def _grant_one_time_pro_access(
     return subscription
 
 
-def _has_granted_image_credit_pack(db: Session, user: User, order_id: str | None) -> bool:
+def _credit_pack_ledger_entry(db: Session, user: User, order_id: str | None, *, grant_type: str) -> UsageLedger | None:
     if not order_id:
-        return False
-    grants = (
+        return None
+    entries = (
         db.query(UsageLedger)
         .filter(
             UsageLedger.user_id == user.id,
@@ -462,9 +467,40 @@ def _has_granted_image_credit_pack(db: Session, user: User, order_id: str | None
         )
         .all()
     )
-    for grant in grants:
-        metadata = getattr(grant, 'metadata_json', None) or {}
-        if metadata.get('grant_type') == 'lemonsqueezy_credit_pack' and str(metadata.get('order_id') or '') == order_id:
+    for entry in entries:
+        metadata = getattr(entry, 'metadata_json', None) or {}
+        if metadata.get('grant_type') == grant_type and str(metadata.get('order_id') or '') == order_id:
+            return entry
+    return None
+
+
+def _has_granted_image_credit_pack(db: Session, user: User, order_id: str | None) -> bool:
+    return _credit_pack_ledger_entry(db, user, order_id, grant_type=CREDIT_PACK_GRANT_TYPE) is not None
+
+
+def _order_fully_refunded(attributes: dict[str, Any]) -> bool:
+    # Lemon Squeezy marks partial refunds as 'partial_refund'; only a full
+    # refund withdraws the purchase. Partial refunds stay a manual decision.
+    return str(attributes.get('status') or '').strip().lower() == 'refunded'
+
+
+def _order_refund_already_received(db: Session, order_id: str | None) -> bool:
+    """Whether a full refund for this order arrived before its grant was processed."""
+    if not order_id:
+        return False
+    refunds = (
+        db.query(BillingWebhookEvent)
+        .filter(
+            BillingWebhookEvent.provider == 'lemonsqueezy',
+            BillingWebhookEvent.event_name == 'order_refunded',
+            BillingWebhookEvent.resource_id == order_id,
+        )
+        .all()
+    )
+    for refund in refunds:
+        payload = refund.payload_json if isinstance(refund.payload_json, dict) else {}
+        data = payload.get('data') if isinstance(payload.get('data'), dict) else {}
+        if _order_fully_refunded(_payload_attributes(data)):
             return True
     return False
 
@@ -487,6 +523,8 @@ def _process_image_credit_pack_order(db: Session, event: LemonSqueezyWebhookEven
     db.query(User).filter(User.id == user.id).with_for_update().one()
     if _has_granted_image_credit_pack(db, user, order_id):
         return 'credit_pack_already_granted', user
+    if _order_refund_already_received(db, order_id):
+        return 'ignored_credit_pack_already_refunded', user
 
     custom = _custom_data(event.meta)
     try:
@@ -505,7 +543,7 @@ def _process_image_credit_pack_order(db: Session, event: LemonSqueezyWebhookEven
         unit='credits',
         bill_date=_utc_now().date(),
         metadata_json={
-            'grant_type': 'lemonsqueezy_credit_pack',
+            'grant_type': CREDIT_PACK_GRANT_TYPE,
             'balance_version': 'persistent-v1',
             'pack': IMAGE_CREDIT_PACK_KEY,
             'order_id': order_id,
@@ -679,9 +717,14 @@ def _process_order_created(db: Session, event: LemonSqueezyWebhookEvent, user: U
     if _is_one_time_pro_order(event):
         if _verified_one_time_pro_payload(event, user) is None:
             return 'ignored_one_time_pro_grant_invalid', user
+        # Serialize with order_refunded so a concurrent refund sees this grant
+        # or this grant sees the committed refund.
+        db.query(User).filter(User.id == user.id).with_for_update().one()
         existing_subscription = _lookup_subscription(db, provider_order_id=order_id, user_id=user.id)
         if _one_time_pro_already_granted(existing_subscription):
             return 'one_time_pro_already_granted', user
+        if _order_refund_already_received(db, order_id):
+            return 'ignored_one_time_pro_already_refunded', user
     subscription, before_fingerprint, event_version, applied = _upsert_subscription_from_resource(
         db,
         event_name=event.event_name,
@@ -706,6 +749,99 @@ def _process_order_created(db: Session, event: LemonSqueezyWebhookEvent, user: U
             event_version=event_version,
         )
     return 'order_recorded', user
+
+
+def _revoke_image_credit_pack(
+    db: Session, event: LemonSqueezyWebhookEvent, user: User, order_id: str,
+) -> tuple[str, User | None]:
+    db.query(User).filter(User.id == user.id).with_for_update().one()
+    if _credit_pack_ledger_entry(db, user, order_id, grant_type=CREDIT_PACK_REFUND_GRANT_TYPE) is not None:
+        return 'credit_pack_refund_already_applied', user
+    grant = _credit_pack_ledger_entry(db, user, order_id, grant_type=CREDIT_PACK_GRANT_TYPE)
+    credits_granted = abs(int(grant.amount)) if grant is not None else 0
+    # Credits already spent cannot be withdrawn; revoke what is still unused.
+    # Held reservations count as unused: releasing one later must not bring
+    # refunded credits back.
+    balance = generation_credit_balance_snapshot(db, user)
+    unspent = balance['purchased_total'] - balance['purchased_used']
+    credits_revoked = max(min(credits_granted, unspent), 0)
+    db.add(
+        UsageLedger(
+            user_id=user.id,
+            review_id=None,
+            task_id=None,
+            usage_type='image_generation_credit',
+            amount=credits_revoked,
+            unit='credits',
+            bill_date=_utc_now().date(),
+            metadata_json={
+                'grant_type': CREDIT_PACK_REFUND_GRANT_TYPE,
+                'balance_version': PURCHASED_BALANCE_VERSION,
+                'credit_allocation': {'version': 1, 'monthly': 0, 'purchased': credits_revoked},
+                'order_id': order_id,
+                'credits_granted': credits_granted,
+                'credits_revoked': credits_revoked,
+                'credits_already_spent': credits_granted - credits_revoked,
+                'event_name': event.event_name,
+            },
+        )
+    )
+    db.flush()
+    return 'credit_pack_refunded', user
+
+
+def _revoke_one_time_pro_access(
+    db: Session, event: LemonSqueezyWebhookEvent, user: User, subscription: BillingSubscription,
+) -> tuple[str, User | None]:
+    if (subscription.status or '').strip().lower() == ONE_TIME_PRO_REFUNDED_STATUS:
+        return 'one_time_pro_refund_already_applied', user
+    before_fingerprint = _subscription_state_fingerprint(subscription)
+    current = _utc_now()
+    payload = subscription.raw_payload if isinstance(subscription.raw_payload, dict) else {}
+    access = payload.get('billing_access') if isinstance(payload.get('billing_access'), dict) else {}
+    subscription.status = ONE_TIME_PRO_REFUNDED_STATUS
+    subscription.cancelled = True
+    subscription.renews_at = None
+    subscription.ends_at = current
+    subscription.last_event_name = event.event_name
+    subscription.last_event_at = current
+    subscription.updated_at = current
+    # Keep billing_access so a replayed order_created cannot grant the order again.
+    subscription.raw_payload = {**payload, 'billing_access': {**access, 'refunded_at': current.isoformat()}}
+    db.add(subscription)
+    _sync_user_plan(db, user)
+    _record_subscription_changed_if_state_changed(
+        db,
+        user,
+        subscription,
+        before_fingerprint=before_fingerprint,
+        event_version=event.event_hash,
+    )
+    return 'one_time_pro_refunded', user
+
+
+def _process_order_refunded(db: Session, event: LemonSqueezyWebhookEvent, user: User | None) -> tuple[str, User | None]:
+    if user is None:
+        return 'ignored_user_not_found', None
+    order_id = _order_resource_id(event)
+    if not order_id:
+        return 'ignored_refund_missing_order_id', user
+    # Same user boundary as the grant paths, so an overlapping order_created
+    # either commits its grant first or observes this refund.
+    db.query(User).filter(User.id == user.id).with_for_update().one()
+    full_refund = _order_fully_refunded(_payload_attributes(event.data))
+    if _is_image_credit_pack_order(event) or _has_granted_image_credit_pack(db, user, order_id):
+        if not full_refund:
+            return 'credit_pack_partial_refund_recorded', user
+        return _revoke_image_credit_pack(db, event, user, order_id)
+    subscription = _lookup_subscription(db, provider_order_id=order_id, user_id=user.id)
+    if subscription is not None and _one_time_pro_already_granted(subscription):
+        if not full_refund:
+            return 'one_time_pro_partial_refund_recorded', user
+        return _revoke_one_time_pro_access(db, event, user, subscription)
+    # Subscription access follows subscription state events; a refunded renewal
+    # does not end the subscription unless Lemon Squeezy cancels it.
+    return 'refund_recorded', user
 
 
 def _process_subscription_event(db: Session, event: LemonSqueezyWebhookEvent, user: User | None) -> tuple[str, User | None]:
@@ -807,6 +943,8 @@ def process_lemonsqueezy_webhook_event(db: Session, event: LemonSqueezyWebhookEv
     user = _match_user_for_event(db, event)
     if event.event_name == 'order_created':
         outcome, resolved_user = _process_order_created(db, event, user)
+    elif event.event_name == 'order_refunded':
+        outcome, resolved_user = _process_order_refunded(db, event, user)
     elif event.event_name in {'subscription_created', 'subscription_updated', 'subscription_cancelled'}:
         outcome, resolved_user = _process_subscription_event(db, event, user)
     else:

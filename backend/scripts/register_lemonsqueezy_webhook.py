@@ -23,6 +23,7 @@ DEFAULT_EVENTS = [
     'subscription_updated',
     'subscription_cancelled',
     'subscription_payment_success',
+    'order_refunded',
 ]
 
 

@@ -8,7 +8,6 @@ from typing import Any
 from urllib.parse import quote, urlsplit, urlunsplit
 
 from fastapi import APIRouter, Depends, Header, Query, Request, Response, status
-from fastapi.responses import StreamingResponse
 from PIL import Image, ImageOps, UnidentifiedImageError
 from sqlalchemy.orm import Session
 
@@ -16,6 +15,7 @@ from app.api.deps import get_db
 from app.core.errors import api_error
 from app.core.security import sign_payload, sign_payload_with_exp, verify_payload
 from app.db.models import Photo, PhotoStatus, Review, ReviewStatus, User
+from app.services.image_metadata import ImageMetadataError, strip_image_metadata
 from app.services.object_storage import get_object_read_url, get_object_storage_client
 
 router = APIRouter(prefix='/photos', tags=['photos'])
@@ -150,6 +150,14 @@ def _get_storage_object_bytes(bucket: str, object_key: str) -> tuple[dict[str, A
         body.close()
 
 
+def _strip_photo_metadata(photo: Photo, source_bytes: bytes) -> bytes:
+    # Original uploads can carry GPS and device metadata; never serve them as-is.
+    try:
+        return strip_image_metadata(source_bytes, photo.content_type)
+    except ImageMetadataError as exc:
+        raise api_error(status.HTTP_502_BAD_GATEWAY, 'PHOTO_FETCH_FAILED', 'Failed to prepare photo') from exc
+
+
 def _build_thumbnail_bytes(source_bytes: bytes, size: int) -> tuple[bytes, str]:
     try:
         with Image.open(BytesIO(source_bytes)) as image:
@@ -224,6 +232,7 @@ def get_public_gallery_thumbnail(
     _, source_bytes = _get_photo_object(photo)
     thumbnail_bytes, media_type = _build_thumbnail_bytes(source_bytes, PHOTO_THUMBNAIL_MAX_SIZE)
     if media_type == 'application/octet-stream':
+        thumbnail_bytes = _strip_photo_metadata(photo, thumbnail_bytes)
         media_type = photo.content_type
 
     headers['Content-Length'] = str(len(thumbnail_bytes))
@@ -237,26 +246,14 @@ def get_photo_image(
     db: Session = Depends(get_db),
 ):
     photo = _find_photo_from_token(db, photo_id, photo_token)
-
-    try:
-        storage = get_object_storage_client()
-        result = storage.get_object(Bucket=photo.bucket, Key=photo.object_key)
-    except Exception as exc:
-        raise api_error(status.HTTP_502_BAD_GATEWAY, 'PHOTO_FETCH_FAILED', f'Failed to fetch photo: {exc}') from exc
-
-    body = result['Body']
-
-    def iter_body():
-        try:
-            yield from body.iter_chunks(chunk_size=64 * 1024)
-        finally:
-            body.close()
-
-    return StreamingResponse(
-        iter_body(),
+    _, source_bytes = _get_photo_object(photo)
+    content = _strip_photo_metadata(photo, source_bytes)
+    return Response(
+        content=content,
         media_type=photo.content_type,
         headers={
             'Cache-Control': 'private, no-store',
+            'Content-Length': str(len(content)),
             'X-Content-Type-Options': 'nosniff',
         },
     )
@@ -284,6 +281,7 @@ def get_photo_thumbnail(
     _, source_bytes = _get_photo_object(photo)
     thumbnail_bytes, media_type = _build_thumbnail_bytes(source_bytes, size)
     if media_type == 'application/octet-stream':
+        thumbnail_bytes = _strip_photo_metadata(photo, thumbnail_bytes)
         media_type = photo.content_type
 
     headers['Content-Length'] = str(len(thumbnail_bytes))

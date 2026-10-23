@@ -100,7 +100,7 @@ class GalleryThumbnailFlowTests(unittest.TestCase):
             bucket='gallery-bucket',
             client_meta={'gallery_thumbnail_key': 'gallery-thumbnails/pho_123/512.webp'},
         )
-        owner = SimpleNamespace(public_id='usr_123', username='tester', avatar_url=None)
+        owner = SimpleNamespace(public_id='usr_123', username='tester', email='tester@example.com', avatar_url=None)
 
         with patch('app.api.routers.gallery_support._build_photo_proxy_url', return_value='https://api.example.com/original.jpg') as build_proxy, patch(
             'app.api.routers.gallery_support._build_public_gallery_thumbnail_url',

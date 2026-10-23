@@ -15,6 +15,7 @@ from app.gallery_scoreboard_schemas import (
     GalleryScoreboardResponse,
 )
 from app.schemas import PublicGalleryItem
+from app.services.public_identity import public_display_name
 from app.api.routers.gallery_support import (
     _apply_review_history_filters_gallery,
     _as_utc_datetime,
@@ -199,7 +200,7 @@ def _neighbor_item(request: Request, row: tuple[Review, Photo, User, float], lik
         gallery_added_at=review.gallery_added_at or review.created_at,
         final_score=float(review.final_score),
         like_count=max(0, int(like_count)),
-        owner_username=owner.username,
+        owner_username=public_display_name(owner),
         photo_thumbnail_url=_build_public_gallery_thumbnail_url(request, review.public_id),
     )
 
