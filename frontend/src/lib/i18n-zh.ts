@@ -85,8 +85,8 @@ export const zhTranslations = {
   pro_offer_label: '',
   pro_offer_highlight: 'Pro',
   updates_label: '更新记录',
-  updates_hint_home: "准备中：评分适用性与公开点评保存",
-  updates_hint_latest: "准备中：评分适用性与公开点评保存",
+  updates_hint_home: "评分适用性与公开点评保存",
+  updates_hint_latest: "评分适用性与公开点评保存",
   contact_label: '联系',
   contact_headline: '联系我',
 

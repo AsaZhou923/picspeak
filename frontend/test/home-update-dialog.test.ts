@@ -18,13 +18,13 @@ const homeSource = readFileSync(
 );
 const shellSource = readFileSync(path.join(FRONTEND_DIR, 'src/components/layout/SiteChrome.tsx'), 'utf8');
 
-test('photo applicability and public retention are upcoming without a popup', () => {
+test('photo applicability and public retention are released without a popup', () => {
   for (const locale of ['zh', 'en', 'ja'] as const) {
     const latest = getLatestProductUpdate(locale);
     assert.ok(latest);
     assert.equal(latest.id, '2026-10-24-photo-applicability-and-public-retention');
-    assert.match(latest.title, /准备中|Upcoming:|準備中/);
-    assert.match(latest.summary, /准备中|Upcoming:|準備中/);
+    assert.doesNotMatch(latest.title, /准备中|Upcoming:|準備中/);
+    assert.doesNotMatch(latest.summary, /准备中|Upcoming:|準備中/);
     assert.match(latest.summary, /不适用摄影评分|non-photographic|評価対象外/);
     assert.match(latest.summary, /公开|public|公開/);
     assert.equal(latest.date, '2026-10-24');
