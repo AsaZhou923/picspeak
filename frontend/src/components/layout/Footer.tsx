@@ -98,7 +98,7 @@ export default function Footer() {
     <footer className="border-t border-border-subtle py-8 mt-auto overflow-hidden">
       <div
         aria-label={t('footer_external_listings')}
-        className="mb-8 w-full overflow-x-auto border-b border-border-subtle/30 pb-6 opacity-80"
+        className="mb-8 w-full overflow-x-auto border-b border-border-subtle/30 pb-6"
       >
         <div className="mx-auto flex max-w-6xl items-center gap-6 px-6">{badgeLinks}</div>
       </div>

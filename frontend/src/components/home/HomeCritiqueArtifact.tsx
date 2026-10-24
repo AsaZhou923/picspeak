@@ -32,6 +32,8 @@ export default function HomeCritiqueArtifact({ t }: HomeCritiqueArtifactProps) {
             alt={t('demo_image_alt')}
             fill
             priority
+            fetchPriority="high"
+            quality={60}
             className="object-cover transition-transform duration-300 group-hover:scale-[1.02]"
             sizes="(min-width: 1280px) 280px, (min-width: 640px) 42vw, calc(100vw - 40px)"
           />

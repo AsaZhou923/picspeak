@@ -82,8 +82,8 @@ test('AI markdown and llms.txt publish trust metadata consistently', () => {
 
   assert.ok(policyMirror);
   assert.equal(llmsText, generatedLlmsText);
-  assert.match(llmsText, /Editorial and corrections policy: https:\/\/www\.picspeak\.art\/editorial-policy/);
-  assert.match(llmsText, /Author profile: https:\/\/www\.picspeak\.art\/author\/asa-zhou/);
+  assert.match(llmsText, /\[Editorial and corrections policy\]\(https:\/\/www\.picspeak\.art\/editorial-policy\)/);
+  assert.match(llmsText, /\[Author profile\]\(https:\/\/www\.picspeak\.art\/author\/asa-zhou\)/);
   assert.match(llmsText, /Last reviewed: 2026-08-09/);
   assert.match(llmsText, /do not infer extra license rights/);
   for (const locale of ['en', 'zh', 'ja']) {
