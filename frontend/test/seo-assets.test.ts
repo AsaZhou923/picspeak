@@ -51,6 +51,8 @@ test('llms.txt stays published as a plain-text discovery asset', () => {
   assert.match(llmsText, /## Markdown content mirrors/);
   assert.match(llmsText, /Founder and editor:/);
   assert.equal(llmsText, generatedLlmsText);
+  assert.match(llmsText, /^- \[PicSpeak\]\(https:\/\/www\.picspeak\.art\)$/m);
+  assert.doesNotMatch(llmsText, /^- [^[\n]*: https?:\/\//m, 'llms.txt URLs should use Markdown link syntax');
 
   for (const page of AI_MARKDOWN_CONTENT_PAGES) {
     assert.match(llmsText, new RegExp(`${siteConfig.url}${page.markdownPath.replaceAll('/', '\\/')}`));
