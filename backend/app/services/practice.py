@@ -40,6 +40,7 @@ from app.services.practice_access import (
     load_reviews_by_id,
     load_tasks_by_id,
     owner_history_cutoff,
+    review_access_status,
     source_access_summary,
 )
 from app.services.practice_events import record_practice_event
@@ -104,12 +105,7 @@ def _review_practice_payload(payload: ReviewCreateRequest) -> dict[str, Any]:
 
 
 def _review_access_status(review: Review | None, actor: CurrentActor) -> str:
-    if review is None or review.deleted_at is not None:
-        return 'deleted'
-    cutoff = review_history_cutoff(actor.plan)
-    if cutoff is not None and review.created_at < cutoff:
-        return 'expired'
-    return 'available'
+    return review_access_status(review, review_history_cutoff(actor.plan))
 
 
 def _find_source_review_for_session(db: Session, actor: CurrentActor, source_review_id: str) -> tuple[Review, Photo]:

@@ -17,6 +17,7 @@ from app.services.ai import (
     AIReviewError,
     CanonicalScore,
     _OPENAI_SCORE_SCHEMA,
+    _build_canonical_score_from_response,
     PROMPT_VERSION,
     SCORE_PROMPT_VERSION,
     SCORE_VERSION,
@@ -30,6 +31,7 @@ from app.services.ai import (
     _writing_prompt,
     _validate_suggestions_structure,
     model_name_for_mode,
+    openai_review_profile_for_mode,
     run_ai_review,
 )
 from scoring_fixtures import (
@@ -43,7 +45,7 @@ from scoring_fixtures import (
 class AIPromptTests(unittest.TestCase):
     def test_prompt_versions_identify_canonical_gpt_scoring(self) -> None:
         self.assertEqual(PROMPT_VERSION, 'photo-review-v9-gpt6-image-led')
-        self.assertEqual(SCORE_PROMPT_VERSION, 'photo-score-v8-style-relative')
+        self.assertEqual(SCORE_PROMPT_VERSION, 'photo-score-v9-applicability')
         self.assertEqual(SCORE_VERSION, 'score-v8-style-relative')
 
     def test_chinese_prompt_contains_stricter_scoring_rules(self) -> None:
@@ -119,6 +121,78 @@ class AIPromptTests(unittest.TestCase):
         self.assertNotIn('high score candidate', prompt)
         self.assertNotIn('"scores":{"composition":9,"lighting":8,"color":8,"impact":9,"technical":6}', prompt)
         self.assertNotIn(first_pass_evidence['dimensions']['composition']['strength'], prompt)
+
+    def test_applicability_schema_and_prompt_do_not_force_scores_for_artwork(self) -> None:
+        self.assertIn('applicability', _OPENAI_SCORE_SCHEMA['required'])
+        for key in ('scores', 'score_evidence'):
+            self.assertIn('null', _OPENAI_SCORE_SCHEMA['properties'][key]['type'])
+        prompt = _score_prompt()
+        self.assertIn('illustrations, drawings, icons, text posters', prompt)
+        self.assertIn('Monochrome, minimalism, abstract photography, silhouettes, grain, blur', prompt)
+        self.assertIn('missing EXIF', prompt)
+        self.assertIn('Do not infer AI generation', prompt)
+        self.assertIn('return scores:null and score_evidence:null', prompt)
+
+    def test_non_photographic_input_stops_both_writers_before_checkpoint(self) -> None:
+        response = AIJSONResponse(
+            parsed={
+                'applicability': {'status': 'not_applicable', 'reason': 'Flat geometric drawing with text.'},
+                'scores': None,
+                'score_evidence': None,
+            },
+            model_name='gpt-6-sol', usage={'input_tokens': 100, 'output_tokens': 20}, latency_ms=1,
+        )
+        for writer in ('gpt-6-sol', 'qwen'):
+            with self.subTest(writer=writer), patch('app.services.ai.settings.openai_api_key', 'test-key'), patch(
+                'app.services.ai.settings.ai_api_key', 'test-key'
+            ), patch('app.services.ai._request_openai_multimodal_json', return_value=response) as openai, patch(
+                'app.services.ai._request_multimodal_json'
+            ) as qwen:
+                checkpoint = MagicMock()
+                with self.assertRaises(AIReviewError) as raised:
+                    run_ai_review(
+                        'flash', image_url='https://example.test/drawing.png', review_model=writer,
+                        on_canonical_score=checkpoint,
+                    )
+                self.assertEqual(raised.exception.stage, 'applicability')
+                self.assertNotIn('Flat geometric drawing', str(raised.exception))
+                self.assertEqual(openai.call_count, 1)
+                qwen.assert_not_called()
+                checkpoint.assert_not_called()
+
+    def test_applicable_and_uncertain_inputs_keep_the_numeric_rubric(self) -> None:
+        for status in ('applicable', 'uncertain'):
+            with self.subTest(status=status):
+                payload = model_score_payload(LOW_SCORES)
+                payload['applicability'] = {'status': status, 'reason': 'A restrained abstract photographic subject.'}
+                score = _build_canonical_score_from_response(
+                    scoring_response=AIJSONResponse(parsed=payload, model_name='test-snapshot', usage={}, latency_ms=1),
+                    high_score_audited=False,
+                    profile=openai_review_profile_for_mode('flash'),
+                )
+                self.assertEqual(score.scores, LOW_SCORES)
+                self.assertEqual(score.final_score, 6.0)
+                self.assertEqual(score.score_version, 'score-v8-style-relative')
+                self.assertEqual(score.score_evidence['applicability_status'], status)
+                cached = build_cached_canonical_score(
+                    score.scores, scorer_model_name=score.model_name,
+                    scorer_model_version=score.model_version, score_evidence=score.score_evidence,
+                    scorer_reasoning_effort=score.scorer_reasoning_effort,
+                )
+                self.assertEqual(cached.score_evidence['applicability_status'], status)
+
+    def test_missing_or_malformed_applicability_is_a_scoring_error(self) -> None:
+        for value in (None, {}, {'status': [], 'reason': 'Malformed'}, {'status': 'uncertain', 'reason': ''}):
+            with self.subTest(value=value):
+                payload = model_score_payload()
+                payload['applicability'] = value
+                with self.assertRaises(AIReviewError) as raised:
+                    _build_canonical_score_from_response(
+                        scoring_response=AIJSONResponse(parsed=payload, model_name='test', usage={}, latency_ms=1),
+                        high_score_audited=False,
+                        profile=openai_review_profile_for_mode('flash'),
+                    )
+                self.assertEqual(raised.exception.stage, 'scoring')
 
     def test_writing_prompts_avoid_flash_lighting_confusion_across_locales(self) -> None:
         scores = {'composition': 6, 'lighting': 6, 'color': 6, 'impact': 6, 'technical': 6}

@@ -113,6 +113,7 @@ class PracticeJournalLatestAttempt(BaseModel):
     review_id: str | None = None
     review_access: str = 'none'
     assessment_status: str = 'unknown'
+    error_code: str | None = None
     created_at: datetime | None = None
 
 
@@ -155,6 +156,7 @@ class PracticeJournalSummaryResponse(BaseModel):
     unknown_count: int
     indeterminate_count: int
     failed_count: int
+    not_applicable_count: int = 0
 
 
 class PracticeFeedbackRequest(BaseModel):

@@ -5,14 +5,14 @@ from datetime import date, datetime, timedelta, timezone
 from typing import TYPE_CHECKING
 
 from fastapi import Request
-from sqlalchemy import case, func
+from sqlalchemy import case, func, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.errors import api_error
 from app.core.network import client_network_from_request, device_key_from_request
-from app.db.models import IdempotencyKey, RateLimitCounter, ReviewMode, ReviewQuotaReservation, UsageLedger, User, UserPlan
+from app.db.models import IdempotencyKey, RateLimitCounter, ReviewMode, ReviewQuotaReservation, ReviewTask, UsageLedger, User, UserPlan
 
 if TYPE_CHECKING:
     from app.api.deps import CurrentActor
@@ -463,7 +463,59 @@ def enforce_guest_review_limits(
                 window_start=month_window_start(now),
                 window_seconds=month_window_seconds(now),
             )
+    limits['_quota_reservations'] = [
+        {
+            'scope': scope,
+            'scope_key': scope_key,
+            'window_start': window_start.isoformat(),
+            'window_seconds': window_seconds,
+        }
+        for scope, scope_key, window_start, window_seconds in (
+            ('guest_review_daily', quota_scope_key, day_window_start(now), 24 * 3600),
+            ('guest_review_monthly', quota_scope_key, month_window_start(now), month_window_seconds(now)),
+        )
+        if scope in limits
+    ]
     return limits
+
+
+def release_guest_review_reservations(db: Session, reservations: list[dict]) -> None:
+    """Release personal critique quota; network admission budgets remain spent."""
+    allowed_scopes = {'guest_review_daily', 'guest_review_monthly'}
+    for reservation in reservations:
+        if reservation.get('scope') not in allowed_scopes:
+            continue
+        db.execute(
+            update(RateLimitCounter)
+            .where(
+                RateLimitCounter.scope == reservation['scope'],
+                RateLimitCounter.scope_key == reservation['scope_key'],
+                RateLimitCounter.endpoint == 'review_create',
+                RateLimitCounter.window_start == datetime.fromisoformat(reservation['window_start']),
+                RateLimitCounter.window_seconds == reservation['window_seconds'],
+                RateLimitCounter.hit_count > 0,
+            )
+            .values(hit_count=RateLimitCounter.hit_count - 1)
+            .execution_options(synchronize_session=False)
+        )
+
+
+def release_task_guest_review_quota(db: Session, task: ReviewTask) -> None:
+    """The row lock and payload marker make task quota releases transactional."""
+    with db.no_autoflush:
+        payload = db.query(ReviewTask.request_payload).filter(ReviewTask.id == task.id).with_for_update().scalar()
+        if not isinstance(payload, dict) or payload.get('_guest_quota_released'):
+            return
+        reservations = payload.get('_guest_quota_reservations')
+        if not isinstance(reservations, list) or not reservations:
+            return
+        release_guest_review_reservations(db, reservations)
+        updated_payload = {**(task.request_payload or payload), '_guest_quota_released': True}
+        db.execute(
+            update(ReviewTask).where(ReviewTask.id == task.id).values(request_payload=updated_payload)
+            .execution_options(synchronize_session=False)
+        )
+        task.request_payload = updated_payload
 
 
 def enforce_guest_api_rate_limit(db: Session, actor: 'CurrentActor', endpoint: str, scope_key: str) -> dict:

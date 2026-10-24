@@ -10,7 +10,7 @@ import type {
   TaskStatus,
 } from '@/lib/types';
 
-export type PracticeAttemptDisplayState = 'not_started' | 'pending' | 'failed' | 'success';
+export type PracticeAttemptDisplayState = 'not_started' | 'pending' | 'not_applicable' | 'failed' | 'success';
 export type PracticeJournalItem = PracticeSessionListItem | PracticeSessionResponse;
 
 export interface PracticeJournalCopy {
@@ -26,6 +26,7 @@ export function attemptDisplayState(attempt: PracticeAttemptSummary): PracticeAt
   if (attempt.review_id && status === 'SUCCEEDED') {
     return 'success';
   }
+  if (attempt.error?.code === 'REVIEW_NOT_APPLICABLE') return 'not_applicable';
   if (status === 'FAILED' || status === 'EXPIRED' || status === 'DEAD_LETTER' || attempt.error) {
     return 'failed';
   }
@@ -99,6 +100,7 @@ export function practiceJournalAttemptState(
   if (!attempt && sessionAttemptCount(item) === 0) return 'not_started';
   if (!attempt) return 'pending';
   if ('task_status' in attempt) return attemptDisplayState(attempt);
+  if ('error_code' in attempt && attempt.error_code === 'REVIEW_NOT_APPLICABLE') return 'not_applicable';
   const assessment = latestPracticeAssessment(item);
   if (assessment === 'failed') return 'failed';
   if (assessment === 'achieved' || assessment === 'partial' || assessment === 'not_achieved' || assessment === 'indeterminate') return 'success';

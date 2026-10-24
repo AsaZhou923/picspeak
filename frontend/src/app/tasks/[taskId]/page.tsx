@@ -273,8 +273,11 @@ export default function TaskPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskId, identity]);
 
+  const isNotApplicable = task?.status === 'FAILED' && task.error?.code === 'REVIEW_NOT_APPLICABLE';
   const stageInfo = task
-    ? task.status === 'FAILED'
+    ? isNotApplicable
+      ? { label: t('task_not_applicable_label'), detail: t('task_not_applicable_detail') }
+      : task.status === 'FAILED'
       ? { label: t('task_failed_label'), detail: t('task_failed_detail') }
       : task.status === 'EXPIRED'
       ? { label: t('task_expired_label'), detail: t('task_expired_detail') }
@@ -306,7 +309,11 @@ export default function TaskPage() {
 
         {isFinal ? (
           <div className="space-y-4">
-            <AlertCircle size={48} className="text-rust mx-auto" aria-hidden="true" />
+            {isNotApplicable ? (
+              <Aperture size={48} className="text-ink-muted mx-auto" aria-hidden="true" />
+            ) : (
+              <AlertCircle size={48} className="text-rust mx-auto" aria-hidden="true" />
+            )}
             <div>
               <h1 className="font-display text-3xl mb-2">{stageInfo?.label}</h1>
               <p className="text-sm text-ink-muted">{stageInfo?.detail}</p>
@@ -420,7 +427,12 @@ export default function TaskPage() {
             {error}
           </p>
         )}
-        {task?.error && (
+        {isNotApplicable && (
+          <p role="status" className="rounded-control border border-border bg-raised px-4 py-2.5 text-sm text-ink-muted">
+            {t('task_not_applicable_no_charge')}
+          </p>
+        )}
+        {task?.error && !isNotApplicable && (
           <p role="alert" className="rounded-control border border-rust/25 bg-rust/10 px-4 py-2.5 text-sm text-rust">
             {taskErrorMessage}
           </p>
@@ -440,7 +452,7 @@ export default function TaskPage() {
               className="ui-action-primary min-h-11 px-6 text-sm"
             >
               <RotateCcw size={14} aria-hidden="true" />
-              {t('task_retry')}
+              {t(isNotApplicable ? 'task_upload_photograph' : 'task_retry')}
             </button>
             <button
               type="button"

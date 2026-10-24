@@ -30,6 +30,7 @@ from app.services.review_pricing import ReviewModelUsage, estimate_review_usage_
 
 DIMENSION_KEYS = ('composition', 'lighting', 'color', 'impact', 'technical')
 MAX_SCORE_EVIDENCE_TEXT_LENGTH = 1000
+PHOTO_NOT_APPLICABLE_MESSAGE = 'This image is not suitable for photography scoring. Upload a photograph instead.'
 
 
 class AIReviewError(RuntimeError):
@@ -187,12 +188,37 @@ _SCORE_DIMENSION_EVIDENCE_SCHEMA = {
     'required': ['strength', 'limitation', 'high_score_justification'],
 }
 
+_PHOTO_APPLICABILITY_SCHEMA = {
+    'type': 'object',
+    'additionalProperties': False,
+    'properties': {
+        'status': {'type': 'string', 'enum': ['applicable', 'not_applicable', 'uncertain']},
+        'reason': {'type': 'string'},
+    },
+    'required': ['status', 'reason'],
+}
+
+
+def _validate_photo_applicability(raw: object) -> None:
+    if not isinstance(raw, dict) or set(raw) != {'status', 'reason'}:
+        raise AIReviewError('Photo applicability must include status and reason', stage='scoring')
+    if not isinstance(raw['status'], str) or raw['status'] not in {'applicable', 'not_applicable', 'uncertain'}:
+        raise AIReviewError('Photo applicability status is invalid', stage='scoring')
+    reason = raw['reason']
+    if not isinstance(reason, str) or not reason.strip() or len(reason) > MAX_SCORE_EVIDENCE_TEXT_LENGTH:
+        raise AIReviewError('Photo applicability reason is invalid', stage='scoring')
+    if raw['status'] == 'not_applicable':
+        # Model-authored reasons stay internal. Public clients receive a stable code.
+        raise AIReviewError(PHOTO_NOT_APPLICABLE_MESSAGE, stage='applicability')
+
+
 _OPENAI_SCORE_SCHEMA = {
     'type': 'object',
     'additionalProperties': False,
     'properties': {
+        'applicability': _PHOTO_APPLICABILITY_SCHEMA,
         'scores': {
-            'type': 'object',
+            'type': ['object', 'null'],
             'additionalProperties': False,
             'properties': {
                 key: {'type': 'integer', 'minimum': 0, 'maximum': 10}
@@ -201,7 +227,7 @@ _OPENAI_SCORE_SCHEMA = {
             'required': list(DIMENSION_KEYS),
         },
         'score_evidence': {
-            'type': 'object',
+            'type': ['object', 'null'],
             'additionalProperties': False,
             'properties': {
                 'dimensions': {
@@ -218,7 +244,7 @@ _OPENAI_SCORE_SCHEMA = {
             'required': ['dimensions', 'overall_justification'],
         },
     },
-    'required': ['scores', 'score_evidence'],
+    'required': ['applicability', 'scores', 'score_evidence'],
 }
 
 _OPENAI_WRITING_SCHEMA = {
@@ -394,11 +420,17 @@ def _normalize_score_evidence(
         if require_final_high_score_audit and not high_score_audited:
             raise AIReviewError('score_evidence high score audit is required for final scores >= 8')
 
-    return {
+    normalized = {
         'dimensions': normalized_dimensions,
         'overall_justification': overall_justification,
         'high_score_audited': high_score_audited,
     }
+    if 'applicability_status' in raw_evidence:
+        status = raw_evidence['applicability_status']
+        if not isinstance(status, str) or status not in {'applicable', 'uncertain'}:
+            raise AIReviewError('Score evidence applicability status is invalid')
+        normalized['applicability_status'] = status
+    return normalized
 
 
 def build_cached_canonical_score(
@@ -822,6 +854,7 @@ def _build_canonical_score_from_response(
     profile: OpenAIReviewProfile,
 ) -> CanonicalScore:
     try:
+        _validate_photo_applicability(scoring_response.parsed.get('applicability'))
         raw_scores = scoring_response.parsed.get('scores')
         if not isinstance(raw_scores, dict):
             raise AIReviewError('Canonical scorer response missing scores object', stage='scoring')
@@ -833,6 +866,7 @@ def _build_canonical_score_from_response(
             allow_server_audit_field=False,
             require_final_high_score_audit=high_score_audited,
         )
+        normalized_evidence['applicability_status'] = scoring_response.parsed['applicability']['status']
     except AIReviewError as exc:
         if exc.stage:
             raise
@@ -889,7 +923,7 @@ def _request_canonical_score_once(
             profile=profile,
         )
     except AIReviewError as exc:
-        raise AIReviewError(str(exc), stage='scoring') from exc
+        raise AIReviewError(str(exc), stage=exc.stage or 'scoring') from exc
 
 
 def _merge_scoring_usage(final_score: CanonicalScore, previous_score: CanonicalScore) -> CanonicalScore:

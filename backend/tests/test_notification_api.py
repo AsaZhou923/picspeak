@@ -338,6 +338,45 @@ class NotificationApiSQLiteTests(unittest.TestCase):
         self.assertIsNone(page.items[0].target.href)
         self.assertNotIn(revoked.public_id, {item.notification_id for item in page.items})
 
+    def test_old_review_notification_target_follows_effective_public_channels(self) -> None:
+        from app.services.notification_access import render_notification
+
+        review = self.review(self.owner, 'retained_target')
+        review.created_at = self.now - timedelta(days=90)
+        notification = self.notification(
+            self.owner, 'retained_review_target',
+            params={'review_id': review.public_id}, target_public_id=review.public_id,
+        )
+        for channel in ('share', 'gallery'):
+            with self.subTest(channel=channel):
+                review.is_public = False
+                review.share_token = 'retained-share' if channel == 'share' else None
+                review.gallery_visible = channel == 'gallery'
+                review.gallery_audit_status = 'approved' if channel == 'gallery' else 'none'
+                self.db.flush()
+                retained = render_notification(self.db, notification, locale='en', detail=True)['target']
+                self.assertEqual(retained['state'], 'available')
+                self.assertEqual(retained['href'], '/reviews/' + review.public_id)
+
+                review.is_public = True
+                review.share_token = None
+                review.gallery_visible = False
+                review.gallery_audit_status = 'none'
+                self.db.flush()
+                withdrawn = render_notification(self.db, notification, locale='en', detail=True)['target']
+                self.assertEqual(withdrawn['state'], 'unavailable')
+                self.assertIsNone(withdrawn['href'])
+
+        for audit in ('pending', 'rejected'):
+            with self.subTest(audit=audit):
+                review.is_public = True
+                review.gallery_visible = True
+                review.gallery_audit_status = audit
+                self.db.flush()
+                target = render_notification(self.db, notification, locale='en', detail=True)['target']
+                self.assertEqual(target['state'], 'unavailable')
+                self.assertIsNone(target['href'])
+
 
 if __name__ == '__main__':
     unittest.main()

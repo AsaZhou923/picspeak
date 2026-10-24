@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.db.models import Announcement, GeneratedImage, ImageGenerationTask, Notification, Review, ReviewTask, TaskStatus, User
 from app.services.billing_access import effective_user_billing_plan
 from app.services.guard import review_history_cutoff
+from app.services.review_visibility import review_is_public
 
 SUPPORTED_LOCALES = {'en', 'zh', 'ja'}
 LOCALE_FALLBACK = 'en'
@@ -117,7 +118,7 @@ def _event_type(notification: Notification) -> str:
 
 def _review_accessible_for_notification(db: Session, review: Review, owner: User) -> bool:
     cutoff = review_history_cutoff(effective_user_billing_plan(db, owner))
-    if cutoff is None or review.is_public:
+    if cutoff is None or review_is_public(review):
         return True
     created_at = coerce_utc(review.created_at)
     return created_at is None or created_at >= cutoff

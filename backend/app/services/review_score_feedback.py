@@ -19,6 +19,9 @@ from app.services.billing_access import effective_user_billing_plan
 from app.services.guard import (
     _enforce_scope_rate_limit, day_window_start, minute_window_start, review_history_cutoff,
 )
+from app.services.review_visibility import (
+    review_has_gallery_public_channel, review_has_share_public_channel, review_is_public,
+)
 
 SNAPSHOT_SCHEMA_VERSION = 'review-score-snapshot-v1'
 SCORE_KEYS = ('composition', 'lighting', 'color', 'impact', 'technical')
@@ -123,9 +126,7 @@ def _eligible_review(db: Session, actor: CurrentActor, review_id: str, expected_
     review, photo, owner = row
     is_owner = review.owner_user_id == actor.user.id
     gallery = (
-        bool(review.is_public)
-        and bool(review.gallery_visible)
-        and review.gallery_audit_status == 'approved'
+        review_has_gallery_public_channel(review)
         and review.status == ReviewStatus.SUCCEEDED
         and photo.status == PhotoStatus.READY
         and owner.status == UserStatus.active
@@ -134,9 +135,9 @@ def _eligible_review(db: Session, actor: CurrentActor, review_id: str, expected_
     created_at = review.created_at
     if created_at.tzinfo is None:
         created_at = created_at.replace(tzinfo=timezone.utc)
-    if not is_owner and not gallery and review.is_public and review.share_token:
+    if not is_owner and not gallery and review_has_share_public_channel(review):
         raise api_error(404, 'SCORE_FEEDBACK_NOT_ALLOWED', 'Gallery publication is required')
-    if (not is_owner and not gallery) or (is_owner and not review.is_public and cutoff and created_at < cutoff):
+    if (not is_owner and not gallery) or (is_owner and not review_is_public(review) and cutoff and created_at < cutoff):
         raise api_error(404, 'REVIEW_NOT_FOUND', 'Review not found')
     if photo is None or photo.status != PhotoStatus.READY:
         raise api_error(404, 'REVIEW_NOT_FOUND', 'Review not found')

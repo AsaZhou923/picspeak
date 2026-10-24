@@ -91,15 +91,17 @@ def _latest_attempt_summary(
         owner_user_id=actor.user.id,
         cutoff=owner_history_cutoff(actor.plan),
     )
+    assessment_status = 'unknown' if task and task.error_code == 'REVIEW_NOT_APPLICABLE' else access.assessment_status
     return (
-        access.assessment_status,
+        assessment_status,
         latest.created_at,
         PracticeJournalLatestAttempt(
             attempt_id=latest.public_id,
             task_id=access.task_public_id,
             review_id=access.review_public_id,
             review_access=access.review_access,
-            assessment_status=access.assessment_status,
+            assessment_status=assessment_status,
+            error_code=task.error_code if task else None,
             created_at=latest.created_at,
         ),
     )
@@ -252,6 +254,7 @@ def get_practice_journal_summary(db: Session, actor: CurrentActor) -> PracticeJo
     status_counts = {'achieved': 0, 'partial': 0, 'not_achieved': 0, 'indeterminate': 0}
     unknown_count = 0
     failed_count = 0
+    not_applicable_count = 0
     timeframe_values: list[datetime] = [session.created_at for session in sessions if session.created_at is not None]
     attempt_count = 0
 
@@ -268,6 +271,10 @@ def get_practice_journal_summary(db: Session, actor: CurrentActor) -> PracticeJo
         photos_by_id = load_photos_by_id(db, [attempt.photo_id for attempt in attempts], actor.user.id)
         for attempt in attempts:
             timeframe_values.append(attempt.created_at)
+            task = tasks_by_id.get(attempt.task_id)
+            if task and task.error_code == 'REVIEW_NOT_APPLICABLE':
+                not_applicable_count += 1
+                continue
             access = attempt_access_summary(
                 attempt,
                 source_access=source_access_by_session_id[attempt.session_id],
@@ -298,4 +305,5 @@ def get_practice_journal_summary(db: Session, actor: CurrentActor) -> PracticeJo
         unknown_count=unknown_count,
         indeterminate_count=status_counts['indeterminate'],
         failed_count=failed_count,
+        not_applicable_count=not_applicable_count,
     )

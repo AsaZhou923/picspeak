@@ -18,20 +18,31 @@ const homeSource = readFileSync(
 );
 const shellSource = readFileSync(path.join(FRONTEND_DIR, 'src/components/layout/SiteChrome.tsx'), 'utf8');
 
-test('gallery filter and critique cache fixes are upcoming without a popup', () => {
+test('photo applicability and public retention are upcoming without a popup', () => {
   for (const locale of ['zh', 'en', 'ja'] as const) {
     const latest = getLatestProductUpdate(locale);
     assert.ok(latest);
-    assert.equal(latest.id, '2026-10-20-gallery-and-review-cache-fixes');
+    assert.equal(latest.id, '2026-10-24-photo-applicability-and-public-retention');
     assert.match(latest.title, /准备中|Upcoming:|準備中/);
-    assert.match(latest.summary, /准备中|In preparation:|準備中/);
-    assert.equal(latest.date, '2026-10-20');
+    assert.match(latest.summary, /准备中|Upcoming:|準備中/);
+    assert.match(latest.summary, /不适用摄影评分|non-photographic|評価対象外/);
+    assert.match(latest.summary, /公开|public|公開/);
+    assert.equal(latest.date, '2026-10-24');
     assert.equal(latest.showPopup, false);
     assert.equal(shouldShowProductUpdatePopup(latest), false);
     assert.equal(latest.docPath, `docs/changelog/CHANGELOG.md#${latest.id}`);
   }
-  assert.equal(getLatestProductUpdateDate('zh'), '2026-10-20');
-  assert.equal(getLatestProductUpdateDate(), '2026-10-20');
+  assert.equal(getLatestProductUpdateDate('zh'), '2026-10-24');
+  assert.equal(getLatestProductUpdateDate(), '2026-10-24');
+});
+
+test('gallery filter and critique cache fixes retain their upcoming status without a popup', () => {
+  for (const locale of ['zh', 'en', 'ja'] as const) {
+    const previous = getProductUpdates(locale).find((entry) => entry.id === '2026-10-20-gallery-and-review-cache-fixes');
+    assert.ok(previous);
+    assert.match(previous.title, /准备中|Upcoming:|準備中/);
+    assert.equal(previous.showPopup, false);
+  }
 });
 
 test('subscription recovery and generation retry fixes are upcoming without a popup', () => {

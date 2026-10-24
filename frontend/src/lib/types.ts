@@ -364,6 +364,7 @@ export interface PracticeJournalLatestAttempt {
   review_id: string | null;
   review_access: 'available' | 'hidden' | 'deleted' | 'expired' | 'photo_unavailable' | 'none' | string;
   assessment_status: GoalAssessmentStatus | 'unknown' | 'failed';
+  error_code?: string | null;
   created_at: string | null;
 }
 
@@ -404,6 +405,7 @@ export interface PracticeSummaryResponse {
   unknown_count: number;
   indeterminate_count: number;
   failed_count: number;
+  not_applicable_count?: number;
 }
 
 export interface PracticeContext {

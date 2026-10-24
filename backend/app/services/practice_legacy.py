@@ -15,6 +15,7 @@ from app.core.errors import api_error
 from app.db.models import Photo, PhotoStatus, PracticeAttempt, Review
 from app.schemas import RetakeComparisonResult
 from app.services.guard import review_history_cutoff
+from app.services.review_visibility import retained_review_filter
 from app.services.retake_comparison import DIMENSION_KEYS
 
 
@@ -100,7 +101,7 @@ def list_legacy_retake_comparisons(
     )
     cutoff = review_history_cutoff(actor.plan)
     if cutoff is not None:
-        query = query.filter(Review.created_at >= cutoff)
+        query = query.filter(retained_review_filter(cutoff))
     scan_cursor: tuple[datetime, int] | None = None
     if cursor:
         scan_cursor = _decode_cursor(cursor)

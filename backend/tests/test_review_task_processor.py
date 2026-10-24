@@ -121,6 +121,34 @@ class ReviewTaskProcessorTests(unittest.TestCase):
         self.assertEqual(len(attached), 1)
         self.assertEqual(sum(isinstance(call.args[0], UsageLedger) for call in db.add.call_args_list), 1)
 
+    def test_non_photographic_tasks_release_quota_without_review_charge_or_retry(self) -> None:
+        for same_image in (True, False):
+            for plan in (UserPlan.free, UserPlan.guest):
+                with self.subTest(single=same_image, plan=plan):
+                    db, task, context, _response = self._practice_worker_fixture(same_image=same_image)
+                    db.query(User).filter().first().plan = plan
+                    provider = 'run_ai_review' if same_image else 'run_retake_comparison'
+                    with patch('app.services.review_task_processor.resolve_task_practice', return_value=context), patch(
+                        f'app.services.review_task_processor.{provider}',
+                        side_effect=AIReviewError('Internal model reason must stay private', stage='applicability'),
+                    ), patch('app.services.review_task_processor.canonical_score_cache_lease', return_value=nullcontext(None)), patch(
+                        'app.services.review_task_processor.release_task_review_quota'
+                    ) as release, patch('app.services.review_task_processor.consume_review_quota') as consume, patch(
+                        'app.services.review_task_processor.increment_quota'
+                    ) as charge, patch('app.services.review_task_processor._schedule_retry') as retry, patch(
+                        'app.services.review_task_processor.record_review_terminal'
+                    ), patch('app.services.review_task_processor.persist_observed_provider_call_costs') as costs:
+                        _process_task(db, task)
+                    self.assertEqual(task.status, TaskStatus.FAILED)
+                    self.assertEqual(task.error_code, 'REVIEW_NOT_APPLICABLE')
+                    self.assertNotIn('Internal model reason', task.error_message)
+                    release.assert_called_once_with(db, task.id)
+                    consume.assert_not_called()
+                    charge.assert_not_called()
+                    retry.assert_not_called()
+                    self.assertFalse(costs.call_args.kwargs['failed'])
+                    self.assertFalse(any(isinstance(call.args[0], (Review, UsageLedger)) for call in db.add.call_args_list))
+
     def test_profile_metadata_survives_worker_normalizer_history_and_cache_contract(self) -> None:
         raw = {
             'schema_version': '2.0',

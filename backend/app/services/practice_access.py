@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.db.models import Photo, PhotoStatus, PracticeAttempt, PracticeSession, Review, ReviewStatus, ReviewTask, TaskStatus, UserPlan
 from app.services.guard import review_history_cutoff
+from app.services.review_visibility import review_is_public
 
 ACCESS_AVAILABLE = 'available'
 ACCESS_DELETED = 'deleted'
@@ -44,7 +45,7 @@ def owner_history_cutoff(plan: UserPlan) -> datetime | None:
 def review_access_status(review: Review | None, cutoff: datetime | None) -> str:
     if review is None or review.deleted_at is not None:
         return ACCESS_DELETED
-    if cutoff is not None and review.created_at < cutoff:
+    if cutoff is not None and review.created_at < cutoff and not review_is_public(review):
         return ACCESS_EXPIRED
     return ACCESS_AVAILABLE
 

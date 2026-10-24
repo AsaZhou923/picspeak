@@ -115,6 +115,7 @@ class FullCacheHarness:
                 schema_version='2.0', result_json=raw, final_score=6.0,
                 model_name=raw['model_name'], scorer_model_name=raw['scorer_model_name'],
                 writer_model_name=raw['writer_model_name'], is_public=public,
+                share_token='share_' + uuid4().hex if public else None,
                 # Public detail access is independent of gallery approval/history.
                 gallery_visible=False, gallery_audit_status='none',
                 created_at=created_at or self.now,

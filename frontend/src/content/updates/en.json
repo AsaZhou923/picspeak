@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-24-photo-applicability-and-public-retention",
+    "date": "2026-10-24",
+    "showPopup": false,
+    "title": "Upcoming: photo eligibility and public critique retention",
+    "summary": "Upcoming: clearly non-photographic images will receive an explanation and a new-upload option, without a photography score or a successful-critique quota charge. Critiques with an active share link or an approved, visible gallery listing will retain their images and remain in Free history. Closing all public channels restores the original private-history period; you can still delete your content.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-10-24-photo-applicability-and-public-retention"
+  },
+  {
     "id": "2026-10-20-gallery-and-review-cache-fixes",
     "date": "2026-10-20",
     "showPopup": false,

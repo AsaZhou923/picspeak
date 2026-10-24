@@ -4,7 +4,7 @@ import hashlib
 import ipaddress
 import time
 from io import BytesIO
-from typing import Any
+from typing import Any, Literal
 from urllib.parse import quote, urlsplit, urlunsplit
 
 from fastapi import APIRouter, Depends, Header, Query, Request, Response, status
@@ -14,9 +14,14 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db
 from app.core.errors import api_error
 from app.core.security import sign_payload, sign_payload_with_exp, verify_payload
-from app.db.models import Photo, PhotoStatus, Review, ReviewStatus, User
+from app.db.models import Photo, PhotoStatus, Review, ReviewStatus, User, UserStatus
 from app.services.image_metadata import ImageMetadataError, strip_image_metadata
 from app.services.object_storage import get_object_read_url, get_object_storage_client
+from app.services.review_visibility import (
+    review_has_gallery_public_channel,
+    review_has_share_public_channel,
+    review_is_public,
+)
 
 router = APIRouter(prefix='/photos', tags=['photos'])
 
@@ -78,8 +83,15 @@ def _build_photo_proxy_url(
     owner_public_id: str,
     *,
     size: int | None = None,
+    public_review: Review | None = None,
+    public_channel: Literal['public', 'share', 'gallery'] = 'public',
 ) -> str:
     payload = {'photo_id': photo_public_id, 'uid': owner_public_id}
+    if public_review is not None:
+        payload['review_id'] = public_review.public_id
+        payload['channel'] = public_channel
+        if public_channel == 'share':
+            payload['share_fingerprint'] = hashlib.sha256((public_review.share_token or '').encode('utf-8')).hexdigest()
     route_name = 'get_photo_image'
     query_parts = []
 
@@ -119,6 +131,36 @@ def _find_photo_from_token(db: Session, photo_id: str, photo_token: str, size: i
     )
     if photo is None:
         raise api_error(status.HTTP_404_NOT_FOUND, 'PHOTO_NOT_FOUND', 'Photo not found')
+    if 'review_id' in token_payload:
+        review = (
+            db.query(Review)
+            .join(User, User.id == Review.owner_user_id)
+            .filter(
+                Review.public_id == token_payload['review_id'],
+                Review.photo_id == photo.id,
+                Review.owner_user_id == photo.owner_user_id,
+                Review.status == ReviewStatus.SUCCEEDED,
+                Review.deleted_at.is_(None),
+                User.status == UserStatus.active,
+            )
+            .first()
+        )
+        channel = token_payload.get('channel')
+        permitted = review is not None and photo.status == PhotoStatus.READY
+        if permitted and channel == 'share':
+            permitted = (
+                review_has_share_public_channel(review)
+                and token_payload.get('share_fingerprint')
+                == hashlib.sha256(review.share_token.encode('utf-8')).hexdigest()
+            )
+        elif permitted and channel == 'gallery':
+            permitted = review_has_gallery_public_channel(review)
+        elif permitted and channel == 'public':
+            permitted = review_is_public(review)
+        else:
+            permitted = False
+        if not permitted:
+            raise api_error(status.HTTP_404_NOT_FOUND, 'PHOTO_NOT_FOUND', 'Photo not found')
     return photo
 
 
@@ -184,6 +226,7 @@ def _find_public_gallery_photo(db: Session, review_public_id: str) -> tuple[Phot
     row = (
         db.query(Photo, Review)
         .join(Review, Review.photo_id == Photo.id)
+        .join(User, User.id == Photo.owner_user_id)
         .filter(
             Review.public_id == review_public_id,
             Review.status == ReviewStatus.SUCCEEDED,
@@ -191,6 +234,7 @@ def _find_public_gallery_photo(db: Session, review_public_id: str) -> tuple[Phot
             Review.gallery_visible == True,  # noqa: E712
             Review.gallery_audit_status == 'approved',
             Photo.status == PhotoStatus.READY,
+            User.status == UserStatus.active,
         )
         .first()
     )

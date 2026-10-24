@@ -47,6 +47,10 @@ GOAL = 'Separate the portrait subject from the background pole.'
 
 def comparison_response() -> PooledHTTPResponse:
     result = {
+        'applicability': {
+            'original': {'status': 'applicable', 'reason': 'The original shows a photographic scene.'},
+            'retake': {'status': 'applicable', 'reason': 'The retake shows a photographic scene.'},
+        },
         'is_comparable': True, 'comparison_confidence': 'high', 'comparison_caveat': '',
         'summary': 'Lighting is brighter, but the background overlap remains.',
         'dimensions': {
@@ -86,6 +90,9 @@ class PracticeWorkerPostgresTests(unittest.TestCase):
             patcher.start()
         self.engine = create_engine(TEST_DATABASE_URL)
         self.sessions = sessionmaker(bind=self.engine, expire_on_commit=False)
+        cost_session_patcher = patch('app.services.review_call_costs.SessionLocal', self.sessions)
+        cost_session_patcher.start()
+        self._signed_url_patchers.append(cost_session_patcher)
         self.db = self.sessions()
         suffix = uuid4().hex
         user = User(public_id=f'usr_practice_worker_{suffix}', email=f'{suffix}@example.test', username=suffix,
@@ -215,6 +222,12 @@ class PracticeWorkerPostgresTests(unittest.TestCase):
         self.assertEqual(feedback.review_id, review.id)
         self.assertEqual(review.result_json['goal_assessment'], original_assessment)
         review.created_at = datetime.now(timezone.utc) - timedelta(days=365)
+        self.db.commit()
+        retained_attempt = serialize_practice_session(self.db, session).attempts[0]
+        self.assertEqual(retained_attempt.review_access, 'available')
+        self.assertEqual(retained_attempt.review_id, review.public_id)
+        review.share_token = None
+        review.is_public = False
         self.db.commit()
         hidden_attempt = serialize_practice_session(self.db, session).attempts[0]
         self.assertEqual(hidden_attempt.review_access, 'expired')

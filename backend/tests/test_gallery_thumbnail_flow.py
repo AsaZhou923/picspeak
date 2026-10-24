@@ -114,7 +114,9 @@ class GalleryThumbnailFlowTests(unittest.TestCase):
             'https://api.example.com/api/v1/photos/gallery/rev_123/thumbnail',
         )
         build_gallery_thumbnail.assert_called_once_with(request, 'rev_123')
-        build_proxy.assert_called_once_with(request, 'pho_123', 'usr_123')
+        build_proxy.assert_called_once_with(
+            request, 'pho_123', 'usr_123', public_review=review, public_channel='gallery',
+        )
 
     def test_public_gallery_thumbnail_serves_cached_object_for_approved_review(self) -> None:
         now = datetime(2026, 3, 28, 10, 0, tzinfo=timezone.utc)

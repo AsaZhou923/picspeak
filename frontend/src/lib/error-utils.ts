@@ -26,6 +26,7 @@ const ERROR_CODE_KEYS: Record<string, TranslationKey> = {
   UPLOAD_IMAGE_INVALID: 'err_upload_failed_body',
   UPLOAD_VERIFICATION_FAILED: 'err_upload_failed_body',
   REVIEW_REJECTED: 'err_review_rejected_body',
+  REVIEW_NOT_APPLICABLE: 'task_not_applicable_detail',
   TASK_NOT_FOUND: 'err_not_found_body',
   TASK_FAILED: 'err_task_failed_body',
   TASK_EXPIRED: 'task_expired_detail',

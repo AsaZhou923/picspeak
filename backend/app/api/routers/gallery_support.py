@@ -265,7 +265,9 @@ def _public_gallery_item(
   return PublicGalleryItem(
     review_id=review.public_id,
     photo_id=photo.public_id,
-    photo_url=_build_photo_proxy_url(request, photo.public_id, owner.public_id),
+    photo_url=_build_photo_proxy_url(
+      request, photo.public_id, owner.public_id, public_review=review, public_channel='gallery',
+    ),
     photo_thumbnail_url=_build_public_gallery_thumbnail_url(request, review.public_id),
     mode=review.mode.value,
     image_type=_review_image_type_gallery(review),

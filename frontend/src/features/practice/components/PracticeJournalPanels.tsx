@@ -141,6 +141,11 @@ export function PracticeSummaryPanel({
         <span className={`rounded-full border px-3 py-1 text-xs ${toneForAssessment('failed')}`}>
           {labels.assessment.failed} · {summary.failed_count}
         </span>
+        {(summary.not_applicable_count ?? 0) > 0 && (
+          <span className={`rounded-full border px-3 py-1 text-xs ${toneForAssessment('unknown')}`}>
+            {labels.attemptState.not_applicable} · {summary.not_applicable_count}
+          </span>
+        )}
       </div>
     </section>
   );
@@ -344,7 +349,7 @@ export function PracticeSessionDetail({
                   <p className="mt-2 text-xs text-ink-subtle">
                     {copy.task}: {labels.attemptState[attemptDisplayState(attempt)]} · {labels.sourceAccess[sourceAccessCopyKey(attempt.review_access)] ?? labels.sourceAccess.available}
                   </p>
-                  {attempt.error?.message && (
+                  {state !== 'not_applicable' && attempt.error?.message && (
                     <p className="mt-2 text-xs leading-5 text-rust">
                       {copy.error}: {attempt.error.message}
                     </p>

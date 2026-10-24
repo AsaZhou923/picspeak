@@ -58,6 +58,7 @@ def score_evidence_fixture(scores: dict[str, int] | None = None, *, audited: boo
 def model_score_payload(scores: dict[str, int] | None = None) -> dict:
     resolved_scores = scores or LOW_SCORES
     return {
+        'applicability': {'status': 'applicable', 'reason': 'The input shows photographic scene information.'},
         'scores': deepcopy(resolved_scores),
         'score_evidence': score_evidence_fixture(resolved_scores),
     }

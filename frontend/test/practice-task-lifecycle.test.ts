@@ -140,6 +140,45 @@ const textarea = (app: ReturnType<typeof harness>) => app.find((node) => node.ty
 const selector = (app: ReturnType<typeof harness>) => app.find((node) => node.props?.id === 'practice-original');
 const templateSelect = (app: ReturnType<typeof harness>) => app.find((node) => node.type === 'select' && Array.isArray(node.props?.children) && node.props.children[0]?.props?.value === '');
 
+for (const transport of ['poll', 'socket'] as const) test(`non-photographic input from ${transport} is a neutral terminal outcome with a new-photo action`, async () => {
+  const rejected = {
+    ...task('task-a', 'FAILED'),
+    error: { code: 'REVIEW_NOT_APPLICABLE', message: 'UNSAFE_BACKEND_DETAIL', retryable: false, quota_charged: false, failure_stage: 'applicability' },
+  };
+  const app = harness(taskFile);
+  if (transport === 'poll') app.api.getTask = async () => { app.calls.push('task:task-a'); return rejected; };
+  app.render(); await app.flush();
+  if (transport === 'socket') {
+    app.sockets.at(-1).onmessage({ data: JSON.stringify({ task: rejected }) });
+    app.render();
+  }
+  const callsAtCompletion = app.calls.length;
+  const rendered = JSON.stringify(app.render());
+  assert.equal(app.find((node) => node.type === 'h1').props.children, 'en:task_not_applicable_label');
+  assert.match(rendered, /task_not_applicable_detail/);
+  assert.match(rendered, /task_not_applicable_no_charge/);
+  assert.doesNotMatch(rendered, /UNSAFE_BACKEND_DETAIL|task_failed_label|task_retry|text-rust|"role":"alert"/);
+  app.advance(5000); await app.flush();
+  assert.equal(app.calls.length, callsAtCompletion, 'a not-applicable result must not keep polling');
+  assert.deepEqual(app.pushes, [], 'no score detail should be opened');
+  app.setLocale('ja');
+  assert.equal(app.find((node) => node.type === 'h1').props.children, 'ja:task_not_applicable_label');
+  app.find((node) => node.type === 'button' && JSON.stringify(node.props.children).includes('task_upload_photograph')).props.onClick();
+  assert.deepEqual(app.pushes, ['/workspace']);
+  app.unmount();
+});
+
+test('service failures keep the ordinary failure state and retry action', async () => {
+  const app = harness(taskFile);
+  app.api.getTask = async () => ({ ...task('task-a', 'FAILED'), error: { code: 'AI_CALL_FAILED', message: 'UNSAFE_BACKEND_DETAIL' } });
+  app.render(); await app.flush();
+  const rendered = JSON.stringify(app.render());
+  assert.equal(app.find((node) => node.type === 'h1').props.children, 'en:task_failed_label');
+  assert.match(rendered, /task_retry/);
+  assert.doesNotMatch(rendered, /task_upload_photograph|task_not_applicable_no_charge|UNSAFE_BACKEND_DETAIL/);
+  app.unmount();
+});
+
 for (const timing of ['before', 'after'] as const) test(`completed review still redirects when locale changes ${timing} success`, async () => {
   const app = harness(taskFile); app.render(); await app.flush();
   if (timing === 'before') app.setLocale('ja');

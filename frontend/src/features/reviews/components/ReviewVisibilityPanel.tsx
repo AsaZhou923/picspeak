@@ -17,6 +17,7 @@ const COPY = {
     stopAll: '关闭所有公开访问', refresh: '刷新状态', loading: '正在更新…',
     unknown: '状态暂不可用', retry: '重新加载状态',
     externalCache: '关闭后，他人无法再通过对应入口访问；已下载的副本或外部缓存不会被删除。',
+    retention: '分享链接有效，或作品已审核通过并在长廊公开期间，该条点评与照片永久保存，不受 Free 私有历史 15 天期限限制。关闭所有公开访问后恢复原有期限，仍可主动删除。',
     copyLink: '复制链接', openShare: '查看分享页', copyOk: '分享链接已复制',
     copyManual: '未能自动复制，请选中下方链接手动复制。',
   },
@@ -29,6 +30,7 @@ const COPY = {
     stopAll: 'Disable all public access', refresh: 'Refresh status', loading: 'Updating…',
     unknown: 'Status unavailable', retry: 'Reload status',
     externalCache: 'Disabling access does not delete downloaded copies or external caches.',
+    retention: 'This photo and critique are kept permanently while a share link is active or the work is approved and visible in the gallery, beyond the Free 15-day private-history limit. Disabling all public access restores the original limit. You can still delete your work.',
     copyLink: 'Copy link', openShare: 'View shared page', copyOk: 'Share link copied',
     copyManual: 'Could not copy automatically. Select the link below to copy it manually.',
   },
@@ -41,6 +43,7 @@ const COPY = {
     stopAll: 'すべての公開を停止', refresh: '状態を更新', loading: '更新中…',
     unknown: '状態を取得できません', retry: '状態を再読み込み',
     externalCache: 'アクセスを停止しても、保存済みのコピーや外部キャッシュは削除されません。',
+    retention: '共有リンクが有効な間、または審査に通りギャラリーで公開されている間は、その写真と講評をFreeの非公開履歴15日制限にかかわらず永久保存します。すべての公開を停止すると元の期限に戻ります。ご自身で削除することもできます。',
     copyLink: 'リンクをコピー', openShare: '共有ページを見る', copyOk: '共有リンクをコピーしました',
     copyManual: '自動コピーできませんでした。下のリンクを選択してコピーしてください。',
   },
@@ -108,6 +111,7 @@ export function ReviewVisibilityPanel({
           {busy ? copy.loading : error || !visibility ? copy.retry : copy.refresh}
         </button>
       </div>
+      <p className="mb-4 rounded-control border border-border-subtle bg-void/25 px-3 py-2 text-xs leading-6 text-ink-muted">{copy.retention}</p>
       {error && <p role="alert" className="mb-3 rounded-control border border-rust/20 bg-rust/5 px-3 py-2 text-sm text-rust">{error}</p>}
 
       <div className="grid gap-4 md:grid-cols-2">

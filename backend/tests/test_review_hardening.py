@@ -168,6 +168,7 @@ class ReviewHardeningTests(unittest.TestCase):
             'app.services.ai._request_openai_multimodal_json',
             return_value=AIJSONResponse(
                 parsed={
+                    'applicability': {'status': 'applicable', 'reason': 'Photographic scene.'},
                     'scores': {'composition': 6, 'lighting': 5, 'color': 5, 'story': 4, 'technical': 7},
                     'score_evidence': score_evidence_fixture(
                         {'composition': 6, 'lighting': 5, 'color': 5, 'impact': 4, 'technical': 7}

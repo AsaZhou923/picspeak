@@ -314,7 +314,9 @@ class ScoreFeedbackApiTests(unittest.TestCase):
         self.assertIsNone(denied.json()['score_revision'])
         self.assertEqual(self.put(user=2).status_code, 404)
         self.mutate(gallery_visible=True, gallery_audit_status='approved', is_public=False)
-        self.assertEqual(self.put(user=2).status_code, 404)
+        approved = self.client.get(self.path, params={'score_revision': self.revision}, headers=self.headers(2))
+        self.assertEqual(approved.status_code, 200)
+        self.assertTrue(approved.json()['eligible'])
         self.mutate(is_public=True)
         author = self.put('too_low').json()
         community = self.put('too_high', user=2).json()
@@ -328,6 +330,40 @@ class ScoreFeedbackApiTests(unittest.TestCase):
             self.assertEqual(db.query(ReviewScoreSnapshot).count(), 1)
         self.mutate(gallery_visible=False)
         self.assertEqual(self.put('accurate', 1, user=2).status_code, 404)
+
+    def test_old_public_author_feedback_follows_effective_channels_not_cached_flag(self):
+        for channel in ('share', 'gallery'):
+            with self.subTest(channel=channel):
+                self.mutate(
+                    created_at=datetime.now(timezone.utc) - timedelta(days=90),
+                    is_public=False,
+                    share_token='retained-share' if channel == 'share' else None,
+                    gallery_visible=channel == 'gallery',
+                    gallery_audit_status='approved' if channel == 'gallery' else 'none',
+                )
+                retained = self.client.get(self.path, params={'score_revision': self.revision}, headers=self.headers())
+                self.assertEqual(retained.status_code, 200)
+                self.assertTrue(retained.json()['eligible'])
+                self.assertEqual(retained.json()['role'], 'author')
+                self.mutate(is_public=True, share_token=None, gallery_visible=False, gallery_audit_status='none')
+                withdrawn = self.client.get(self.path, params={'score_revision': self.revision}, headers=self.headers())
+                self.assertEqual(withdrawn.status_code, 404)
+                self.assertEqual(self.put().status_code, 404)
+        with self.Session() as db:
+            self.assertEqual(db.query(ReviewScoreFeedback).count(), 0)
+            self.assertEqual(db.get(User, 1).daily_quota_used, 0)
+
+    def test_share_only_and_unapproved_gallery_never_enable_community_feedback_with_stale_flags(self):
+        self.mutate(is_public=False, share_token='shared-with-stale-flag')
+        shared = self.client.get(self.path, params={'score_revision': self.revision}, headers=self.headers(2))
+        self.assertEqual(shared.status_code, 200)
+        self.assertFalse(shared.json()['eligible'])
+        self.assertEqual(shared.json()['reason'], 'SCORE_FEEDBACK_NOT_ALLOWED')
+        self.assertEqual(self.put(user=2).status_code, 404)
+        for audit in ('pending', 'rejected', 'approved'):
+            with self.subTest(audit=audit):
+                self.mutate(is_public=True, share_token=None, gallery_visible=audit != 'approved', gallery_audit_status=audit)
+                self.assertEqual(self.put(user=2).status_code, 404)
 
     def test_score_changed_conflicts_and_new_snapshot_keeps_old_feedback(self):
         old = self.put('too_low').json()

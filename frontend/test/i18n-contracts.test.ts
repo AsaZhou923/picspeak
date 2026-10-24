@@ -97,7 +97,20 @@ test('frontend error formatter maps stable backend codes to localized text inste
   assert.equal(localizedErrorMessage(t, 'IMAGE_GENERATION_CREDITS_EXHAUSTED'), zhTranslations.err_generation_credits_exhausted_body);
   assert.equal(localizedErrorMessage(t, 'OPENAI_IMAGE_GENERATION_FAILED'), zhTranslations.err_generation_task_failed_body);
   assert.equal(localizedErrorMessage(t, 'UNAUTHORIZED'), zhTranslations.err_unauthorized_body);
+  assert.equal(localizedErrorMessage(t, 'REVIEW_NOT_APPLICABLE'), zhTranslations.task_not_applicable_detail);
   assert.equal(localizedErrorMessage(t, 'UNMAPPED_CODE', 'fallback'), 'fallback');
+});
+
+test('photography applicability messages use a dedicated outcome and new-photo action in every locale', () => {
+  for (const dictionary of [enTranslations, zhTranslations, jaTranslations]) {
+    for (const key of ['task_not_applicable_label', 'task_not_applicable_detail', 'task_not_applicable_no_charge', 'task_upload_photograph', 'practice_attempt_not_applicable'] as const) {
+      assert.ok(dictionary[key].trim(), key);
+    }
+    const translate = (key: keyof typeof enTranslations) => dictionary[key];
+    assert.equal(localizedErrorMessage(translate, 'REVIEW_NOT_APPLICABLE'), dictionary.task_not_applicable_detail);
+    assert.notEqual(dictionary.task_not_applicable_label, dictionary.task_failed_label);
+    assert.notEqual(dictionary.task_upload_photograph, dictionary.task_retry);
+  }
 });
 
 test('idempotency conflicts use request-neutral copy for generation and practice', () => {

@@ -119,6 +119,7 @@ class RetakeActionItem(BaseModel):
 
 
 class RetakeComparisonResult(BaseModel):
+    applicability: dict[str, Literal['applicable', 'uncertain']] | None = None
     original_review_id: str
     original_photo_id: str
     retake_photo_id: str

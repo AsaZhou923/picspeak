@@ -195,6 +195,7 @@ The frontend and backend can be deployed independently. The backend includes a c
 
 ## Documentation
 
+- [Upcoming: photo eligibility and public critique retention](docs/changelog/CHANGELOG.md#2026-10-24-photo-applicability-and-public-retention)
 - [Upcoming: gallery and recovery fixes](docs/changelog/CHANGELOG.md#2026-10-20-gallery-and-review-cache-fixes)
 - [Upcoming: subscription recovery and image retry fixes](docs/changelog/CHANGELOG.md#2026-10-19-billing-recovery-and-generation-retries)
 - [Critique and draft fixes](docs/changelog/CHANGELOG.md#2026-10-18-critique-and-draft-fixes)

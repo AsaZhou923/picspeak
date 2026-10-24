@@ -910,9 +910,13 @@ def _fixture_review_population(fixture: dict[str, Any]) -> list[dict[str, Any]]:
 
 def _attempt_from_fixture(fixture: dict[str, Any], session: dict[str, Any], attempt: dict[str, Any], user_id: str) -> _AttemptRecord:
     status = attempt.get('goal_status')
-    failed = bool(attempt.get('failed') or attempt.get('task_status') in TERMINAL_FAILURE_STATUSES)
+    not_applicable = attempt.get('task_error_code') == 'REVIEW_NOT_APPLICABLE'
+    failed = not not_applicable and bool(attempt.get('failed') or attempt.get('task_status') in TERMINAL_FAILURE_STATUSES)
     access_snapshot_verified = attempt.get('access_snapshot_verified') is True
     exclusion_reasons = list(attempt.get('learning_exclusion_reasons') or ())
+    if not_applicable:
+        status = None
+        exclusion_reasons.append('not_applicable')
     if not access_snapshot_verified:
         exclusion_reasons.append('missing_access_snapshot')
     feedback = _latest_feedback_for_attempt(attempt, session, fixture)
@@ -1541,7 +1545,8 @@ def _attempt_payload_from_db(
 ) -> dict[str, Any]:
     task_status = _enum_value(getattr(task, 'status', None))
     review_status = _enum_value(getattr(review, 'status', None))
-    failed = task_status in TERMINAL_FAILURE_STATUSES or review_status == 'FAILED'
+    not_applicable = getattr(task, 'error_code', None) == 'REVIEW_NOT_APPLICABLE'
+    failed = not not_applicable and (task_status in TERMINAL_FAILURE_STATUSES or review_status == 'FAILED')
     valid_goal = _validated_goal_status_from_db(attempt, session, task, review, source_review, attempt_photo, source_photo, cutoff, owner_exists)
     event_time = viewed_events.get(attempt.id)
     cost_rows = costs_by_task.get(attempt.task_id)
@@ -1554,12 +1559,13 @@ def _attempt_payload_from_db(
         'analysis_type': (getattr(task, 'request_payload', None) or {}).get('analysis_type') if task else None,
         'task_attempt_count': getattr(task, 'attempt_count', None),
         'task_status': task_status,
+        'task_error_code': getattr(task, 'error_code', None),
         'analysis_completed_at': review.created_at.isoformat() if review and review.created_at else None,
         'result_viewed_at': event_time.isoformat() if event_time else None,
         'goal_status': valid_goal['status'],
         'cost_usd': None,
         'cost_rows': cost_rows,
-        'outcome': 'failed' if failed else 'unknown',
+        'outcome': 'not_applicable' if not_applicable else ('failed' if failed else 'unknown'),
         'failed': failed,
         'attempt_kind': attempt.attempt_kind or session.practice_kind,
         'comparison_is_comparable': valid_goal['comparable'],

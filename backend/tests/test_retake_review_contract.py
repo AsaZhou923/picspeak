@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -14,7 +15,7 @@ if str(BACKEND_ROOT) not in sys.path:
 
 from app.api.routers.review_support import _public_comparison_payload, _resolve_source_review, _review_result_payload
 from app.api.routers.review_create import _review_request_hash_payload
-from app.db.models import ReviewStatus
+from app.db.models import ReviewStatus, UserPlan
 from app.schemas import GenerationCreateRequest, ReviewCreateRequest
 from app.services.review_task_processor import _normalize_review_result_payload
 
@@ -33,7 +34,7 @@ def _request(*, source_review_id: str | None, analysis_type: str = 'retake_compa
 class RetakeReviewContractTests(unittest.TestCase):
     def setUp(self) -> None:
         self.db = MagicMock()
-        self.actor = SimpleNamespace(user=SimpleNamespace(id=7))
+        self.actor = SimpleNamespace(user=SimpleNamespace(id=7), plan=UserPlan.free)
         self.retake_photo = SimpleNamespace(id=22, checksum_sha256=None)
 
     def test_analysis_type_defaults_to_single_for_existing_clients(self) -> None:
@@ -181,7 +182,10 @@ class RetakeReviewContractTests(unittest.TestCase):
         self.assertEqual(raised.exception.detail['code'], 'RETAKE_SOURCE_REQUIRED')
 
     def test_retake_rejects_source_review_that_is_not_succeeded(self) -> None:
-        source = SimpleNamespace(id=11, photo_id=21, status=ReviewStatus.FAILED)
+        source = SimpleNamespace(
+            id=11, photo_id=21, status=ReviewStatus.FAILED,
+            created_at=datetime.now(timezone.utc), deleted_at=None,
+        )
         with patch('app.api.routers.review_support._find_review_owned', return_value=source) as find_owned:
             with self.assertRaises(HTTPException) as raised:
                 _resolve_source_review(self.db, self.actor, _request(source_review_id='rev_source'), self.retake_photo)
@@ -190,7 +194,10 @@ class RetakeReviewContractTests(unittest.TestCase):
         self.assertEqual(raised.exception.detail['code'], 'RETAKE_SOURCE_NOT_READY')
 
     def test_retake_rejects_the_same_photo(self) -> None:
-        source = SimpleNamespace(id=11, photo_id=22, status=ReviewStatus.SUCCEEDED)
+        source = SimpleNamespace(
+            id=11, photo_id=22, status=ReviewStatus.SUCCEEDED,
+            created_at=datetime.now(timezone.utc), deleted_at=None,
+        )
         with patch('app.api.routers.review_support._find_review_owned', return_value=source):
             with self.assertRaises(HTTPException) as raised:
                 _resolve_source_review(self.db, self.actor, _request(source_review_id='rev_source'), self.retake_photo)
@@ -198,7 +205,10 @@ class RetakeReviewContractTests(unittest.TestCase):
         self.assertEqual(raised.exception.detail['code'], 'RETAKE_PHOTO_DUPLICATE')
 
     def test_retake_accepts_an_owned_succeeded_source_with_a_different_photo(self) -> None:
-        source = SimpleNamespace(id=11, photo_id=21, status=ReviewStatus.SUCCEEDED)
+        source = SimpleNamespace(
+            id=11, photo_id=21, status=ReviewStatus.SUCCEEDED,
+            created_at=datetime.now(timezone.utc), deleted_at=None,
+        )
         with patch('app.api.routers.review_support._find_review_owned', return_value=source) as find_owned:
             resolved = _resolve_source_review(
                 self.db,
@@ -211,7 +221,10 @@ class RetakeReviewContractTests(unittest.TestCase):
         find_owned.assert_called_once_with(self.db, 'rev_source', 7)
 
     def test_single_photo_reanalysis_keeps_legacy_same_photo_rule(self) -> None:
-        source = SimpleNamespace(id=11, photo_id=21, status=ReviewStatus.SUCCEEDED)
+        source = SimpleNamespace(
+            id=11, photo_id=21, status=ReviewStatus.SUCCEEDED,
+            created_at=datetime.now(timezone.utc), deleted_at=None,
+        )
         with patch('app.api.routers.review_support._find_review_owned', return_value=source):
             with self.assertRaises(HTTPException) as raised:
                 _resolve_source_review(

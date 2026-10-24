@@ -21,6 +21,8 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 from app.services.practice_metrics import (  # noqa: E402
+    _attempt_from_fixture,
+    _has_countable_goal_assessment,
     build_practice_snapshot,
     load_practice_snapshot_from_db,
     render_practice_analytics_markdown,
@@ -35,6 +37,21 @@ TEST_DATABASE_URL = os.getenv('PICSPEAK_TEST_DATABASE_URL', '').strip()
 
 
 class PracticeMetricsTests(unittest.TestCase):
+    def test_non_photographic_rejection_is_not_failed_or_a_countable_goal(self) -> None:
+        record = _attempt_from_fixture(
+            {}, {'session_id': 'prs_test', 'practice_kind': 'capture_retake'},
+            {
+                'attempt_id': 'pra_drawing', 'task_status': 'FAILED',
+                'task_error_code': 'REVIEW_NOT_APPLICABLE', 'goal_status': 'achieved',
+                'failed': True, 'access_snapshot_verified': True,
+            },
+            'usr_test',
+        )
+        self.assertFalse(record.failed)
+        self.assertIsNone(record.goal_status)
+        self.assertIn('not_applicable', record.learning_exclusion_reasons)
+        self.assertFalse(_has_countable_goal_assessment(record, datetime.now(timezone.utc)))
+
     @classmethod
     def setUpClass(cls) -> None:
         cls.payload = json.loads(FIXTURE_PATH.read_text(encoding='utf-8'))

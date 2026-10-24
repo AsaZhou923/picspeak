@@ -24,7 +24,7 @@ from app.services.ai import (
     openai_review_profile_for_mode,
     run_ai_review,
 )
-from app.services.guard import guest_usage_snapshot, increment_quota, user_usage_snapshot
+from app.services.guard import guest_usage_snapshot, increment_quota, release_task_guest_review_quota, user_usage_snapshot
 from app.services.notification_events import record_review_terminal
 from app.services.practice import attach_practice_review, resolve_task_practice
 from app.services.practice_events import record_practice_analysis_completed
@@ -67,6 +67,10 @@ def _ensure_review_claim(db: Session, task: ReviewTask, claim_token: str | None)
 
 
 _PUBLIC_TASK_ERROR_MESSAGES: dict[str, tuple[str, str]] = {
+    'REVIEW_NOT_APPLICABLE': (
+        'This image is not suitable for photography scoring. Upload a photograph instead.',
+        'This image is not suitable for photography scoring. Upload a photograph instead.',
+    ),
     'AI_CALL_FAILED': (
         'AI review is temporarily unavailable; retry scheduled',
         'AI review could not be completed',
@@ -482,6 +486,8 @@ def _complete_task(
     task.error_message = error_message
     if status != TaskStatus.SUCCEEDED:
         release_task_review_quota(db, task.id)
+    if error_code == 'REVIEW_NOT_APPLICABLE':
+        release_task_guest_review_quota(db, task)
     if dead_letter:
         task.dead_lettered_at = now
     db.add(task)
@@ -742,6 +748,7 @@ def _process_task(db: Session, task: ReviewTask, *, claim_token: str | None = No
         _ensure_review_claim(db, task, claim_token)
     except AIReviewError as exc:
         error_code = {
+            'applicability': 'REVIEW_NOT_APPLICABLE',
             'scoring': 'AI_SCORING_FAILED',
             'writing': 'AI_WRITING_FAILED',
         }.get(exc.stage, 'AI_CALL_FAILED')
@@ -750,11 +757,14 @@ def _process_task(db: Session, task: ReviewTask, *, claim_token: str | None = No
             owner_user_id=cost_owner_user_id,
             attempt_count=cost_attempt_count,
             calls=provider_calls,
-            failed=True,
+            failed=exc.stage != 'applicability',
         )
         _ensure_review_claim(db, task, claim_token)
         logger.warning('AI review failed for task %s at %s stage: %s', task.public_id, exc.stage or 'unknown', exc)
-        _handle_failure(db, task, error_code=error_code, error_message=str(exc), retryable=True)
+        _handle_failure(
+            db, task, error_code=error_code, error_message=str(exc),
+            retryable=exc.stage != 'applicability',
+        )
         return
     except Exception:
         persist_observed_provider_call_costs(

@@ -19,15 +19,18 @@ from app.services.ai import (
     AIReviewError,
     AIReviewResponse,
     OpenAIReviewProfile,
+    _PHOTO_APPLICABILITY_SCHEMA,
+    _validate_photo_applicability,
     notify_ai_provider_call,
     openai_review_profile_for_mode,
 )
+from app.services.ai_prompts import _photo_applicability_guide
 from app.services.audit import mask_capability_url_text
 from app.services.review_pricing import ReviewModelUsage, estimate_review_usage_cost
 
 
-RETAKE_PROMPT_VERSION = 'retake-coach-v2-gpt6-image-led'
-RETAKE_GOAL_PROMPT_VERSION = 'retake-coach-goal-v2-gpt6-image-led'
+RETAKE_PROMPT_VERSION = 'retake-coach-v3-applicability'
+RETAKE_GOAL_PROMPT_VERSION = 'retake-coach-goal-v3-applicability'
 RETAKE_SCORE_VERSION = 'retake-paired-v2'
 RETAKE_PREPROCESS_VERSION = 'openai-paired-input-image-high-v1'
 DIMENSION_KEYS = ('composition', 'lighting', 'color', 'impact', 'technical')
@@ -73,6 +76,7 @@ class _ModelAction(_StrictModel):
 
 
 class _ModelComparison(_StrictModel):
+    applicability: dict
     is_comparable: bool
     comparison_confidence: Literal['low', 'medium', 'high']
     comparison_caveat: str
@@ -107,6 +111,15 @@ RETAKE_RESPONSE_SCHEMA = {
     'type': 'object',
     'additionalProperties': False,
     'properties': {
+        'applicability': {
+            'type': 'object',
+            'additionalProperties': False,
+            'properties': {
+                'original': _PHOTO_APPLICABILITY_SCHEMA,
+                'retake': _PHOTO_APPLICABILITY_SCHEMA,
+            },
+            'required': ['original', 'retake'],
+        },
         'is_comparable': {'type': 'boolean'},
         'comparison_confidence': {'type': 'string', 'enum': ['low', 'medium', 'high']},
         'comparison_caveat': {'type': 'string'},
@@ -137,6 +150,7 @@ RETAKE_RESPONSE_SCHEMA = {
         'visual_reference_prompt': {'type': 'string'},
     },
     'required': [
+        'applicability',
         'is_comparable',
         'comparison_confidence',
         'comparison_caveat',
@@ -147,6 +161,14 @@ RETAKE_RESPONSE_SCHEMA = {
         'visual_reference_prompt',
     ],
 }
+
+# An unsuitable pair has no comparison or numeric scores. The response still
+# includes every schema key, using null for the fields that do not apply.
+for _name, _field in RETAKE_RESPONSE_SCHEMA['properties'].items():
+    if _name != 'applicability':
+        _field['type'] = [_field['type'], 'null']
+        if 'enum' in _field:
+            _field['enum'] = [*_field['enum'], None]
 
 
 def _goal_assessment_schema(goal_context: GoalAssessmentContext) -> dict:
@@ -191,7 +213,10 @@ def _response_schema(*, goal_context: GoalAssessmentContext | None = None) -> di
     schema = json.loads(json.dumps(RETAKE_RESPONSE_SCHEMA))
     if goal_context is None:
         return schema
-    schema['properties']['goal_assessment'] = _goal_assessment_schema(goal_context)
+    schema['properties']['goal_assessment'] = {
+        **_goal_assessment_schema(goal_context),
+        'type': ['object', 'null'],
+    }
     schema['required'] = [*schema['required'], 'goal_assessment']
     return schema
 
@@ -231,6 +256,10 @@ def _build_prompt(*, locale: str, image_type: str, goal_context: GoalAssessmentC
     base = (
         'You are PicSpeak Retake Coach, a rigorous photography teacher. Compare Image A (the original) '
         'with Image B (the photographer\'s retake) as a single paired evaluation. '
+        f'{_photo_applicability_guide()}'
+        'Apply that decision separately to Image A as applicability.original and Image B as applicability.retake. '
+        'If either image is not_applicable, return the two applicability decisions and null for every other field, '
+        'including dimensions and goal_assessment when requested. Do not produce a photographic comparison. '
         f'The declared photography genre is {image_type}. Write every natural-language field in {_language_name(locale)}. '
         'Evaluate composition, lighting, color, impact, and technical quality from 0 to 10. '
         'Score both images within this request so the comparison does not mix scoring systems. '
@@ -330,6 +359,7 @@ def _build_result(
         key=lambda key: dimensions[key]['delta'],
     )
     comparison_payload = {
+        'applicability': {image: decision['status'] for image, decision in comparison.applicability.items()},
         'original_review_id': original_review_id,
         'original_photo_id': original_photo_id,
         'retake_photo_id': retake_photo_id,
@@ -511,6 +541,11 @@ def run_retake_comparison(
     )
     try:
         parsed = json.loads(_extract_output_text(body))
+        applicability = parsed.get('applicability') if isinstance(parsed, dict) else None
+        if not isinstance(applicability, dict) or set(applicability) != {'original', 'retake'}:
+            raise AIReviewError('Paired photo applicability must include original and retake', stage='scoring')
+        for image_applicability in applicability.values():
+            _validate_photo_applicability(image_applicability)
         comparison = _ModelComparison.model_validate(parsed)
     except json.JSONDecodeError as exc:
         raise AIReviewError('OpenAI retake comparison structured output was not valid JSON') from exc

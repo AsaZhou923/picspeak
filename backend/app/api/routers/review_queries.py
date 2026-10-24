@@ -12,9 +12,10 @@ from app.api.deps import CurrentActor, get_current_actor, get_db
 from app.api.routers.gallery import GALLERY_AUDIT_NONE
 from app.api.routers.photos import _build_photo_proxy_url, _find_photo_owned
 from app.core.errors import api_error
-from app.db.models import Photo, PhotoStatus, Review, ReviewTask, User, UserPlan, UserStatus
+from app.db.models import Photo, PhotoStatus, Review, ReviewStatus, ReviewTask, User, UserPlan, UserStatus
 from app.schemas import PhotoReviewsResponse, ReviewGetResponse, ReviewHistoryResponse, ReviewListItem
 from app.services.guard import review_history_cutoff
+from app.services.review_visibility import public_review_filter, review_is_public
 from .review_support import (
     _apply_review_history_filters,
     _apply_review_history_organization_filters,
@@ -58,7 +59,13 @@ def get_review(
         .filter(
             Review.public_id == review_id,
             Review.deleted_at.is_(None),
-            (Review.owner_user_id == actor.user.id) | (Review.is_public == True),  # noqa: E712
+            or_(
+                Review.owner_user_id == actor.user.id,
+                and_(
+                    public_review_filter(), Review.status == ReviewStatus.SUCCEEDED,
+                    Photo.status == PhotoStatus.READY, User.status == UserStatus.active,
+                ),
+            ),
         )
         .first()
     )
@@ -67,10 +74,13 @@ def get_review(
     review, photo, photo_owner = row
     is_owner = review.owner_user_id == actor.user.id
     cutoff = review_history_cutoff(actor.plan)
-    if cutoff is not None and is_owner and not review.is_public and review.created_at < cutoff:
+    if cutoff is not None and is_owner and not review_is_public(review) and review.created_at < cutoff:
         raise api_error(status.HTTP_404_NOT_FOUND, 'REVIEW_NOT_FOUND', 'Review not found')
 
-    photo_url = _build_photo_proxy_url(request, photo.public_id, photo_owner.public_id)
+    photo_url = _build_photo_proxy_url(
+        request, photo.public_id, photo_owner.public_id,
+        **({'public_review': review} if not is_owner else {}),
+    )
     review_task_public_id = None
     if is_owner and review.task_id:
         review_task_public_id = db.query(ReviewTask.public_id).filter(ReviewTask.id == review.task_id).scalar()
@@ -87,7 +97,7 @@ def get_review(
     )
     gallery_feedback_allowed = (
         not is_owner
-        and bool(review.is_public)
+        and review_is_public(review)
         and bool(review.gallery_visible)
         and getattr(review, 'gallery_audit_status', None) == 'approved'
         and getattr(photo, 'status', None) == PhotoStatus.READY
@@ -139,6 +149,10 @@ def get_public_review(
         .filter(
             Review.share_token == share_token,
             Review.deleted_at.is_(None),
+            public_review_filter(),
+            Review.status == ReviewStatus.SUCCEEDED,
+            Photo.status == PhotoStatus.READY,
+            User.status == UserStatus.active,
         )
         .first()
     )
@@ -149,7 +163,10 @@ def get_public_review(
     if _prefers_html_response(request):
         return RedirectResponse(_frontend_share_url(share_token), status_code=status.HTTP_307_TEMPORARY_REDIRECT)
 
-    photo_url = _build_photo_proxy_url(request, photo.public_id, photo_owner.public_id)
+    photo_url = _build_photo_proxy_url(
+        request, photo.public_id, photo_owner.public_id,
+        public_review=review, public_channel='share',
+    )
     result_response = _review_result_payload(
         dict(review.result_json or {}),
         review.final_score,

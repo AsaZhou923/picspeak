@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-24-photo-applicability-and-public-retention",
+    "date": "2026-10-24",
+    "showPopup": false,
+    "title": "准备中：评分适用性与公开点评保存",
+    "summary": "准备中：明确的非摄影图片将提示不适用摄影评分，可重新上传，不生成分数或计入成功评图额度。保持有效分享或通过长廊审核并公开的点评及关联图片将长期保留，Free 用户也可在历史中持续查看；关闭全部公开渠道后恢复原来的私有历史期限，仍可主动删除。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-10-24-photo-applicability-and-public-retention"
+  },
+  {
     "id": "2026-10-20-gallery-and-review-cache-fixes",
     "date": "2026-10-20",
     "showPopup": false,

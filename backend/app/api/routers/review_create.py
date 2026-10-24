@@ -29,7 +29,7 @@ from app.db.models import (
     UserPlan,
 )
 from app.schemas import ReviewCreateAsyncResponse, ReviewCreateRequest, ReviewCreateSyncResponse
-from app.services.ai import AIReviewError, openai_review_profile_for_mode, run_ai_review
+from app.services.ai import AIReviewError, PHOTO_NOT_APPLICABLE_MESSAGE, openai_review_profile_for_mode, run_ai_review
 from app.services.guard import (
     enforce_guest_review_limits,
     enforce_user_quota,
@@ -39,6 +39,7 @@ from app.services.guard import (
     guest_rate_limit_scope_key,
     hash_request,
     increment_quota,
+    release_guest_review_reservations,
     review_history_cutoff,
     save_idempotency_record,
 )
@@ -47,6 +48,7 @@ from app.services.task_events import record_task_event
 from app.services.notification_events import record_review_terminal
 from app.services.retake_comparison import run_retake_comparison
 from app.services.practice import prepare_practice_attempt_for_task
+from app.services.review_visibility import retained_review_filter
 from app.services.review_score_cache import (
     canonical_score_cache_lease,
     review_uses_current_full_review_contract,
@@ -166,11 +168,7 @@ def create_review(
         )
         cutoff = review_history_cutoff(actor.plan)
         if cutoff is not None:
-            # Match get_review, not history listing: old public reviews remain
-            # readable, while an expired private result must never be returned.
-            existing_query = existing_query.filter(
-                or_(Review.is_public.is_(True), Review.created_at >= cutoff)
-            )
+            existing_query = existing_query.filter(retained_review_filter(cutoff))
         if payload.review_model in _OPENAI_REVIEW_MODELS:
             existing_query = existing_query.filter(Review.model_name.ilike('%gpt-%'))
         else:
@@ -225,14 +223,16 @@ def create_review(
 
     guest_scope_key = guest_quota_scope_key(request, actor.user) if actor.plan == UserPlan.guest else None
     guest_network_key = guest_network_scope_key(request) if actor.plan == UserPlan.guest else None
+    guest_reservations = []
     if actor.plan == UserPlan.guest:
-        enforce_guest_review_limits(
+        guest_limits = enforce_guest_review_limits(
             db,
             actor,
             request_scope_key=guest_rate_limit_scope_key(request, actor.user),
             quota_scope_key=guest_scope_key,
             network_scope_key=guest_network_key,
         )
+        guest_reservations = guest_limits.get('_quota_reservations', [])
     else:
         enforce_user_quota(db, actor.user, mode=mode_enum)
 
@@ -245,6 +245,8 @@ def create_review(
             task_payload['_guest_scope_key'] = guest_scope_key
         if guest_network_key:
             task_payload['_guest_network_scope_key'] = guest_network_key
+        if guest_reservations:
+            task_payload['_guest_quota_reservations'] = guest_reservations
         task = ReviewTask(
             public_id=new_public_id('tsk'),
             photo_id=photo.id,
@@ -403,6 +405,11 @@ def create_review(
                     )
         except AIReviewError as exc:
             logger.warning('AI review failed for photo %s: %s', photo.public_id, exc)
+            if exc.stage == 'applicability':
+                if guest_reservations:
+                    release_guest_review_reservations(db, guest_reservations)
+                    db.commit()
+                raise api_error(status.HTTP_422_UNPROCESSABLE_ENTITY, 'REVIEW_NOT_APPLICABLE', PHOTO_NOT_APPLICABLE_MESSAGE) from exc
             raise api_error(status.HTTP_502_BAD_GATEWAY, 'AI_REVIEW_FAILED', 'AI review could not be completed') from exc
 
         result_payload = _review_result_payload(

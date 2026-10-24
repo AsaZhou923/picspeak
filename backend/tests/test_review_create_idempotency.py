@@ -23,7 +23,7 @@ from app.db.models import (
     ReviewTask, UsageLedger, User, UserPlan, UserStatus,
 )
 from app.schemas import ReviewResult
-from app.services.ai import AIReviewResponse
+from app.services.ai import AIReviewError, AIReviewResponse
 
 
 class SynchronousReviewIdempotencyTests(unittest.TestCase):
@@ -110,6 +110,34 @@ class SynchronousReviewIdempotencyTests(unittest.TestCase):
         self.assert_state(0)
         self.assertEqual(self.post().status_code, 200)
         self.assert_state(1)
+
+    def test_inapplicable_sync_input_returns_stable_422_and_releases_registered_quota(self):
+        self.ai.side_effect = AIReviewError('Private model explanation', stage='applicability')
+        for _attempt in range(2):
+            response = self.post()
+            self.assertEqual(response.status_code, 422, response.text)
+            self.assertEqual(response.json()['detail']['code'], 'REVIEW_NOT_APPLICABLE')
+            self.assertNotIn('Private model explanation', response.text)
+            self.assert_state(0)
+
+    def test_inapplicable_sync_guest_input_releases_its_admission_reservation(self):
+        with self.Session() as db:
+            db.get(User, 1).plan = UserPlan.guest
+            db.commit()
+        reservations = [{
+            'scope': 'guest_review_daily', 'scope_key': 'server-owned-scope',
+            'window_start': datetime.now(timezone.utc).isoformat(), 'window_seconds': 86400,
+        }]
+        self.ai.side_effect = AIReviewError('Private model explanation', stage='applicability')
+        with patch.object(review_create, 'enforce_guest_review_limits', return_value={
+            '_quota_reservations': reservations,
+        }), patch.object(review_create, 'release_guest_review_reservations') as release:
+            response = self.post(_guest_quota_reservations=[{'scope_key': 'client-forged'}])
+        self.assertEqual(response.status_code, 422, response.text)
+        self.assertEqual(response.json()['detail']['code'], 'REVIEW_NOT_APPLICABLE')
+        release.assert_called_once()
+        self.assertEqual(release.call_args.args[1], reservations)
+        self.assert_state(0)
 
     def test_failed_final_commit_rolls_back_result_and_charge(self):
         def fail_result_commit(db):

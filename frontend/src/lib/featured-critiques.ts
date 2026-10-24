@@ -2,7 +2,7 @@ import type { SupportedLocale } from './locale.ts';
 
 type FeaturedCritiqueCopy = { title: string; alt: string; problem: string; advice: string; action: string };
 
-// Public Gallery records rechecked on 2026-10-10; provenance is retained in the external PicSpeak documentation vault.
+// Approved public Gallery records checked on 2026-10-06; provenance is retained in the external PicSpeak documentation vault.
 export const FEATURED_CRITIQUES: Array<{
   reviewId: string;
   publishedDate: string;

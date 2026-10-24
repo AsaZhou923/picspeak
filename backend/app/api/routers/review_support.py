@@ -13,7 +13,7 @@ from sqlalchemy import exists, func, or_, select
 from sqlalchemy.orm import Session, object_session
 
 from app.api.deps import CurrentActor
-from app.api.routers.gallery import GALLERY_AUDIT_APPROVED, GALLERY_AUDIT_NONE, GALLERY_AUDIT_VALUES
+from app.api.routers.gallery import GALLERY_AUDIT_NONE, GALLERY_AUDIT_VALUES
 from app.api.routers.photos import (
     PHOTO_THUMBNAIL_SIZE,
     _build_photo_proxy_url,
@@ -32,6 +32,12 @@ from app.schemas import (
 from app.services.guard import guest_usage_snapshot, review_history_cutoff, user_usage_snapshot
 from app.services.practice import owner_practice_context_for_review
 from app.services.practice_access import ACCESS_AVAILABLE, review_access_status
+from app.services.review_visibility import (
+    retained_review_filter,
+    review_has_gallery_public_channel,
+    review_has_share_public_channel,
+    review_is_public,
+)
 
 REVIEW_TAG_LIMIT = 8
 REVIEW_TAG_MAX_LENGTH = 32
@@ -171,19 +177,15 @@ def _review_meta_payload(review: Review) -> ReviewMetaResponse:
 
 
 def _review_has_gallery_public_channel(review: Review) -> bool:
-    return (
-        bool(review.gallery_visible)
-        and _review_gallery_audit_status(review) == GALLERY_AUDIT_APPROVED
-        and getattr(review, 'deleted_at', None) is None
-    )
+    return review_has_gallery_public_channel(review)
 
 
 def _review_has_share_public_channel(review: Review) -> bool:
-    return bool(review.share_token) and getattr(review, 'deleted_at', None) is None
+    return review_has_share_public_channel(review)
 
 
 def _review_public_enabled(review: Review) -> bool:
-    return _review_has_gallery_public_channel(review) or _review_has_share_public_channel(review)
+    return review_is_public(review)
 
 
 def _frontend_share_url(share_token: str) -> str:
@@ -416,6 +418,8 @@ def _resolve_source_review(db: Session, actor: CurrentActor, payload: ReviewCrea
         return None
 
     source_review = _find_review_owned(db, payload.source_review_id, actor.user.id)
+    if review_access_status(source_review, review_history_cutoff(actor.plan)) != ACCESS_AVAILABLE:
+        raise api_error(status.HTTP_404_NOT_FOUND, 'REVIEW_NOT_FOUND', 'Review not found')
     if source_review.status != ReviewStatus.SUCCEEDED:
         raise api_error(
             status.HTTP_400_BAD_REQUEST,
@@ -445,7 +449,7 @@ def _resolve_source_review(db: Session, actor: CurrentActor, payload: ReviewCrea
 def _apply_review_history_visibility(query, plan: UserPlan):
     cutoff = review_history_cutoff(plan)
     if cutoff is not None:
-        query = query.filter(Review.created_at >= cutoff)
+        query = query.filter(retained_review_filter(cutoff))
     return query
 
 
@@ -564,7 +568,7 @@ def _review_history_item(
         gallery_added_at=review.gallery_added_at,
         tags=_normalize_review_tags(review.tags_json if isinstance(review.tags_json, list) else []),
         note=review.note,
-        is_shared=bool(review.is_public and review.share_token),
+        is_shared=_review_has_share_public_channel(review),
         created_at=review.created_at,
     )
 

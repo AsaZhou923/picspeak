@@ -72,6 +72,10 @@ def _response_body(
     caveat: str | None = None,
 ) -> dict:
     comparison = {
+        'applicability': {
+            'original': {'status': 'applicable', 'reason': 'The original shows a photographic scene.'},
+            'retake': {'status': 'applicable', 'reason': 'The retake shows a photographic scene.'},
+        },
         'is_comparable': comparable,
         'comparison_confidence': confidence or ('high' if comparable else 'low'),
         'comparison_caveat': caveat if caveat is not None else ('' if comparable else 'The retake shows a different subject and scene.'),
@@ -112,6 +116,47 @@ def _response_body(
 
 
 class RetakeComparisonTests(unittest.TestCase):
+    def test_either_non_photographic_image_rejects_the_pair_without_numeric_result(self) -> None:
+        for rejected_image in ('original', 'retake'):
+            with self.subTest(image=rejected_image):
+                payload = {
+                    name: None for name in RETAKE_RESPONSE_SCHEMA['properties']
+                }
+                payload['applicability'] = {
+                    image: {
+                        'status': 'not_applicable' if image == rejected_image else 'applicable',
+                        'reason': 'Visible drawing.' if image == rejected_image else 'Visible photograph.',
+                    }
+                    for image in ('original', 'retake')
+                }
+                response = PooledHTTPResponse(
+                    status=200, data=json.dumps(_response_body(output_text=json.dumps(payload))).encode('utf-8'),
+                    headers={}, reason='OK',
+                )
+                with patch('app.services.retake_comparison.settings.openai_api_key', 'test-key'), patch(
+                    'app.services.retake_comparison.pooled_request', return_value=response
+                ) as request, patch('app.services.retake_comparison._build_result') as build:
+                    with self.assertRaises(AIReviewError) as raised:
+                        self._run(mode='flash')
+                self.assertEqual(raised.exception.stage, 'applicability')
+                self.assertEqual(request.call_count, 1)
+                build.assert_not_called()
+
+    def test_uncertain_photographic_pair_is_not_rejected(self) -> None:
+        body = _response_body()
+        content = body['output'][0]['content'][0]
+        payload = json.loads(content['text'])
+        payload['applicability']['retake']['status'] = 'uncertain'
+        content['text'] = json.dumps(payload)
+        response = PooledHTTPResponse(status=200, data=json.dumps(body).encode('utf-8'), headers={}, reason='OK')
+        with patch('app.services.retake_comparison.settings.openai_api_key', 'test-key'), patch(
+            'app.services.retake_comparison.pooled_request', return_value=response
+        ):
+            result = self._run(mode='flash').result
+        self.assertEqual(result.final_score, 6.6)
+        self.assertEqual(result.score_version, 'retake-paired-v2')
+        self.assertEqual(result.comparison.applicability, {'original': 'applicable', 'retake': 'uncertain'})
+
     def test_checklist_format_matches_multilingual_frontend_fixtures(self) -> None:
         examples = json.loads((Path(__file__).parent / 'fixtures' / 'retake_checklist_examples.json').read_text(encoding='utf-8'))
         for example in examples:
@@ -197,9 +242,9 @@ class RetakeComparisonTests(unittest.TestCase):
         self.assertEqual(ai_response.output_tokens, 210)
         self.assertEqual(ai_response.cost_usd, 0.000137)
         self.assertIn('openai:gpt-6-luna:standard', ai_response.cost_rate_version or '')
-        self.assertEqual(ai_response.result.prompt_version, 'retake-coach-v2-gpt6-image-led')
+        self.assertEqual(ai_response.result.prompt_version, 'retake-coach-v3-applicability')
         self.assertEqual(ai_response.result.score_version, 'retake-paired-v2')
-        self.assertEqual(ai_response.result.score_prompt_version, 'retake-coach-v2-gpt6-image-led')
+        self.assertEqual(ai_response.result.score_prompt_version, 'retake-coach-v3-applicability')
         self.assertIsNone(ai_response.result.goal_assessment)
 
     def test_sol_retake_payload_uses_configured_sol_model_and_pricing(self) -> None:
@@ -302,10 +347,10 @@ class RetakeComparisonTests(unittest.TestCase):
         self.assertIsNotNone(ai_response.result.goal_assessment)
         assert ai_response.result.goal_assessment is not None
         self.assertEqual(ai_response.result.goal_assessment.status, 'not_achieved')
-        self.assertEqual(ai_response.prompt_version, 'retake-coach-goal-v2-gpt6-image-led')
-        self.assertEqual(ai_response.score_prompt_version, 'retake-coach-goal-v2-gpt6-image-led')
-        self.assertEqual(ai_response.result.prompt_version, 'retake-coach-goal-v2-gpt6-image-led')
-        self.assertEqual(ai_response.result.score_prompt_version, 'retake-coach-goal-v2-gpt6-image-led')
+        self.assertEqual(ai_response.prompt_version, 'retake-coach-goal-v3-applicability')
+        self.assertEqual(ai_response.score_prompt_version, 'retake-coach-goal-v3-applicability')
+        self.assertEqual(ai_response.result.prompt_version, 'retake-coach-goal-v3-applicability')
+        self.assertEqual(ai_response.result.score_prompt_version, 'retake-coach-goal-v3-applicability')
 
     def test_accepts_each_goal_status_with_valid_evidence_contract(self) -> None:
         for status in ('achieved', 'partial', 'not_achieved', 'indeterminate'):

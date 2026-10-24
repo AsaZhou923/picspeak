@@ -309,6 +309,7 @@ function ReviewHistorySession() {
     attemptState: {
       not_started: t('practice_attempt_not_started'),
       pending: t('practice_attempt_pending'),
+      not_applicable: t('practice_attempt_not_applicable'),
       failed: t('practice_attempt_failed'),
       success: t('practice_attempt_success'),
     },

@@ -138,6 +138,15 @@ test('practice attempt display keeps pending, failed, and successful states sepa
   assert.equal(attemptDisplayState(attempt({ task_status: 'SUCCEEDED', review_id: null })), 'pending');
 });
 
+test('non-photographic attempts stay separate from service failures in detail and journal summaries', () => {
+  const rejected = attempt({ task_status: 'FAILED', error: { code: 'REVIEW_NOT_APPLICABLE', message: 'nonphoto', retryable: false, timeout: false, failure_stage: 'applicability', quota_charged: false } });
+  assert.equal(attemptDisplayState(rejected), 'not_applicable');
+  assert.equal(practiceJournalAttemptState(session({ latest_assessment_status: 'unknown', latest_attempt: {
+    attempt_id: 'pra_nonphoto', task_id: 'task_nonphoto', review_id: null, review_access: 'none', assessment_status: 'unknown',
+    error_code: 'REVIEW_NOT_APPLICABLE', created_at: '2026-10-24T00:00:00Z',
+  } })), 'not_applicable');
+});
+
 test('practice journal does not treat indeterminate or unavailable source as resumable completion', () => {
   assert.equal(latestPracticeAssessment(session({ latest_assessment_status: 'indeterminate' })), 'indeterminate');
   assert.equal(latestPracticeAssessment(session({ latest_assessment_status: 'unknown' })), 'unknown');

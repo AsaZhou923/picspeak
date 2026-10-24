@@ -27,6 +27,7 @@ from app.db.models import (
     PhotoStatus,
     PracticeAttempt,
     PracticeSession,
+    RateLimitCounter,
     Review,
     ReviewMode,
     ReviewStatus,
@@ -39,6 +40,7 @@ from app.db.models import (
 from app.services.practice import owner_practice_context_for_review, serialize_practice_session
 from app.services.practice_queries import get_practice_journal_summary, list_practice_journal_sessions
 from app.services.practice_queries import _decode_cursor, _encode_cursor
+from app.services.guard import enforce_guest_review_limits, release_task_guest_review_quota
 
 
 TEST_DATABASE_URL = os.getenv('PICSPEAK_TEST_DATABASE_URL', '').strip()
@@ -292,6 +294,124 @@ class PracticeJournalPostgresTests(unittest.TestCase):
         self.assertEqual(summary.sample_count, 1)
         self.assertEqual(summary.status_counts['achieved'], 1)
         self.assertEqual(summary.failed_count, 1)
+
+    def test_non_photographic_attempt_has_no_assessment_and_is_not_a_system_failure(self):
+        base = self._recent_base()
+        source_photo = self._photo(self.user, 'not-applicable-source')
+        source = self._review(self.user, source_photo, 'not-applicable-source', created_at=base)
+        session = self._session(self.user, source, source_photo, 'not-applicable', created_at=base)
+        photo = self._photo(self.user, 'drawing')
+        attempt = self._attempt(
+            session, photo, 'drawing', task_status=TaskStatus.FAILED, created_at=base + timedelta(minutes=1),
+        )
+        task = self.db.get(ReviewTask, attempt.task_id)
+        task.error_code = 'REVIEW_NOT_APPLICABLE'
+        task.error_message = 'This image is not suitable for photography scoring.'
+        self.db.commit()
+
+        listed = list_practice_journal_sessions(self.db, self.actor, limit=10)
+        summary = get_practice_journal_summary(self.db, self.actor)
+        latest = listed.items[0].latest_attempt
+        self.assertEqual(listed.items[0].latest_assessment_status, 'unknown')
+        self.assertEqual(latest.assessment_status, 'unknown')
+        self.assertEqual(latest.error_code, 'REVIEW_NOT_APPLICABLE')
+        self.assertIsNone(latest.review_id)
+        self.assertEqual(summary.failed_count, 0)
+        self.assertEqual(summary.not_applicable_count, 1)
+        self.assertEqual(summary.sample_count, 0)
+        self.assertEqual(summary.unknown_count, 0)
+
+    def test_guest_rejection_releases_only_original_quota_windows_once(self):
+        self.user.plan = UserPlan.guest
+        self.actor = CurrentActor(self.user)
+        source_photo = self._photo(self.user, 'guest-source')
+        source = self._review(self.user, source_photo, 'guest-source')
+        session = self._session(self.user, source, source_photo, 'guest')
+        photo = self._photo(self.user, 'guest-drawing')
+        attempt = self._attempt(session, photo, 'guest-drawing', task_status=TaskStatus.FAILED)
+        task = self.db.get(ReviewTask, attempt.task_id)
+        admitted_at = datetime(2026, 9, 30, 23, 59, 59, tzinfo=timezone.utc)
+        quota_key, network_key, minute_key = (f'{name}:{self.suffix}' for name in ('quota', 'network', 'minute'))
+        with patch('app.services.guard.utc_now', return_value=admitted_at), patch(
+            'app.services.guard.settings.guest_review_network_limit_per_day', 10
+        ), patch('app.services.guard.settings.guest_review_network_limit_per_month', 20):
+            limits = enforce_guest_review_limits(
+                self.db, self.actor, request_scope_key=minute_key,
+                quota_scope_key=quota_key, network_scope_key=network_key,
+            )
+        task.request_payload = {'_guest_quota_reservations': limits['_quota_reservations']}
+        self.db.flush()
+        current_counter = RateLimitCounter(
+            scope='guest_review_daily', scope_key=quota_key, endpoint='review_create',
+            window_start=datetime(2026, 10, 1, tzinfo=timezone.utc), window_seconds=86400, hit_count=2,
+        )
+        self.db.add(current_counter)
+        self.db.flush()
+
+        release_task_guest_review_quota(self.db, task)
+        release_task_guest_review_quota(self.db, task)
+        self.db.flush()
+        rows = self.db.query(RateLimitCounter).filter(
+            RateLimitCounter.scope_key.in_([quota_key, network_key, minute_key]),
+        ).populate_existing().all()
+        self.assertEqual(len(rows), 6)
+        for row in rows:
+            if row.id == current_counter.id:
+                self.assertEqual(row.hit_count, 2)
+            elif row.scope in {'guest_review_minute', 'guest_review_network_daily', 'guest_review_network_monthly'}:
+                self.assertEqual(row.hit_count, 1)
+            else:
+                self.assertEqual(row.hit_count, 0)
+        self.assertTrue(task.request_payload['_guest_quota_released'])
+
+    def test_rotating_guest_devices_cannot_refund_the_network_admission_budget(self):
+        self.user.plan = UserPlan.guest
+        self.actor = CurrentActor(self.user)
+        source_photo = self._photo(self.user, 'network-source')
+        source = self._review(self.user, source_photo, 'network-source')
+        session = self._session(self.user, source, source_photo, 'network')
+        now = datetime(2026, 10, 1, 12, tzinfo=timezone.utc)
+        for budget, daily_limit, monthly_limit in (('daily', 2, 10), ('monthly', 10, 2)):
+            with self.subTest(budget=budget), patch('app.services.guard.utc_now', return_value=now), patch(
+                'app.services.guard.settings.guest_review_network_limit_per_day', daily_limit,
+            ), patch('app.services.guard.settings.guest_review_network_limit_per_month', monthly_limit):
+                network_key = f'network:{budget}:{self.suffix}'
+                for index in range(2):
+                    label = f'{budget}-device-{index}'
+                    personal_key = f'{label}:{self.suffix}'
+                    limits = enforce_guest_review_limits(
+                        self.db, self.actor, request_scope_key=f'minute:{personal_key}',
+                        quota_scope_key=personal_key, network_scope_key=network_key,
+                    )
+                    photo = self._photo(self.user, label)
+                    attempt = self._attempt(
+                        session, photo, label, task_status=TaskStatus.FAILED,
+                        sequence=index + (1 if budget == 'daily' else 3),
+                    )
+                    task = self.db.get(ReviewTask, attempt.task_id)
+                    task.error_code = 'REVIEW_NOT_APPLICABLE'
+                    task.request_payload = {'_guest_quota_reservations': limits['_quota_reservations']}
+                    self.db.flush()
+                    release_task_guest_review_quota(self.db, task)
+                    release_task_guest_review_quota(self.db, task)
+                    personal = self.db.query(RateLimitCounter).filter(
+                        RateLimitCounter.scope_key == personal_key,
+                    ).populate_existing().all()
+                    self.assertEqual(len(personal), 2)
+                    self.assertTrue(all(counter.hit_count == 0 for counter in personal))
+
+                with self.assertRaises(HTTPException) as raised:
+                    with self.db.begin_nested():
+                        enforce_guest_review_limits(
+                            self.db, self.actor, request_scope_key=f'new-minute:{budget}:{self.suffix}',
+                            quota_scope_key=f'new-device:{budget}:{self.suffix}', network_scope_key=network_key,
+                        )
+                self.assertEqual(raised.exception.status_code, 429)
+                counters = self.db.query(RateLimitCounter).filter(
+                    RateLimitCounter.scope_key == network_key,
+                ).populate_existing().all()
+                self.assertEqual(len(counters), 2)
+                self.assertTrue(all(counter.hit_count == 2 for counter in counters))
 
     def test_deleted_source_and_deleted_attempt_review_do_not_leak_ids_or_count_as_sample(self):
         now = self._recent_base(hours=8)
