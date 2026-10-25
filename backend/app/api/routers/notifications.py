@@ -27,6 +27,7 @@ from app.schemas import (
     NotificationReadResponse,
     NotificationUnreadCountResponse,
 )
+from app.services.audit import cleanup_expired_request_logs
 from app.services.notification_access import render_notification
 from app.services.notification_events import database_now, read_preferences, update_preferences
 from app.services.notification_processor import (
@@ -379,4 +380,6 @@ def process_notifications(
     processed = process_pending_notifications(db, limit=payload.limit if payload else 100)
     expired_deleted = cleanup_expired_notifications(db, limit=100)
     db.commit()
-    return {**processed, 'expired_deleted': expired_deleted}
+    # This per-minute scheduler call is the production maintenance heartbeat.
+    request_logs_deleted = cleanup_expired_request_logs(db)
+    return {**processed, 'expired_deleted': expired_deleted, 'request_logs_deleted': request_logs_deleted}
