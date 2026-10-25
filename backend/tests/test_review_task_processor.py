@@ -57,6 +57,7 @@ class ReviewTaskProcessorTests(unittest.TestCase):
             bucket='retake-bucket',
             object_key='after.jpg',
             exif_data={},
+            status=PhotoStatus.READY,
         )
         source = SimpleNamespace(id=12, public_id='rev_before', status=ReviewStatus.SUCCEEDED)
         owner = SimpleNamespace(id=22, plan=UserPlan.free)
@@ -347,7 +348,7 @@ class ReviewTaskProcessorTests(unittest.TestCase):
 
     def test_cache_lock_contention_is_reported_as_retryable_scoring_failure(self) -> None:
         db = MagicMock()
-        photo = SimpleNamespace(id=11, bucket='review-bucket', object_key='photo.jpg', exif_data={})
+        photo = SimpleNamespace(id=11, bucket='review-bucket', object_key='photo.jpg', exif_data={}, status=PhotoStatus.READY)
         owner = SimpleNamespace(id=22, plan=UserPlan.guest)
         task = SimpleNamespace(
             id=33, public_id='tsk_busy_score', photo_id=photo.id, owner_user_id=owner.id,
@@ -457,7 +458,7 @@ class ReviewTaskProcessorTests(unittest.TestCase):
 
     def test_writer_retry_reuses_checkpointed_score(self) -> None:
         db = MagicMock()
-        photo = SimpleNamespace(id=11, bucket='review-bucket', object_key='photo.jpg', exif_data={})
+        photo = SimpleNamespace(id=11, bucket='review-bucket', object_key='photo.jpg', exif_data={}, status=PhotoStatus.READY)
         owner = SimpleNamespace(id=22, plan=UserPlan.guest)
         task = SimpleNamespace(
             id=33,

@@ -680,6 +680,7 @@ export const zhTranslations = {
   err_task_failed_action: '重新发起点评',
   err_not_found_title: '资源不存在',
   err_not_found_body: '你访问的内容不存在或已被删除。',
+  err_photo_original_expired_body: '这张照片的原图已超过保存期限并被清理，点评和分数仍然保留。如需再次分析，请重新上传照片。',
   err_unauthorized_body: '登录状态已失效，请重新登录后再试。',
   err_forbidden_body: '当前账号暂时不能执行这个操作。',
   err_validation_body: '请求内容不完整或格式不正确，请检查后再试。',

@@ -119,7 +119,7 @@ export interface PresignResponse {
 
 // ─── Photo ───────────────────────────────────────────────────────────────────
 
-export type PhotoStatus = 'UPLOADING' | 'READY' | 'REJECTED';
+export type PhotoStatus = 'UPLOADING' | 'READY' | 'REJECTED' | 'PURGING' | 'PURGED';
 
 export interface PhotoCreateResponse {
   photo_id: string;

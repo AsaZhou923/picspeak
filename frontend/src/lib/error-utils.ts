@@ -58,6 +58,7 @@ const ERROR_CODE_KEYS: Record<string, TranslationKey> = {
   IMAGE_GENERATION_PERSISTENCE_FAILED: 'err_generation_task_failed_body',
   USER_NOT_FOUND: 'err_not_found_body',
   PHOTO_NOT_FOUND: 'err_not_found_body',
+  PHOTO_ORIGINAL_EXPIRED: 'err_photo_original_expired_body',
   SOURCE_REVIEW_REQUIRED: 'err_validation_body',
   SOURCE_REVIEW_NOT_FOUND: 'err_not_found_body',
   SOURCE_PHOTO_NOT_FOUND: 'err_not_found_body',

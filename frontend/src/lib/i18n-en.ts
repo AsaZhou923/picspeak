@@ -721,6 +721,7 @@ export const enTranslations = {
     err_task_failed_action: 'Retry Critique',
     err_not_found_title: 'Not Found',
     err_not_found_body: 'The content you requested does not exist or has been deleted.',
+    err_photo_original_expired_body: 'The original file for this photo was removed after its storage period ended. The critique and scores remain available; upload the photo again to analyze it.',
     err_unauthorized_body: 'Your sign-in session has expired. Please sign in again.',
     err_forbidden_body: 'Your current account cannot perform this action.',
     err_validation_body: 'The request is incomplete or invalid. Please check it and try again.',

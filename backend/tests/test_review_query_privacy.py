@@ -14,7 +14,7 @@ if str(BACKEND_ROOT) not in sys.path:
 from app.api.routers.review_queries import get_public_review, get_review  # noqa: E402
 from app.api.routers.review_support import _review_result_payload  # noqa: E402
 from app.core.errors import ApiHTTPException  # noqa: E402
-from app.db.models import UserPlan  # noqa: E402
+from app.db.models import PhotoStatus, UserPlan  # noqa: E402
 from app.services.guard import history_retention_days_for_plan, review_history_cutoff  # noqa: E402
 
 
@@ -30,7 +30,7 @@ class ReviewQueryPrivacyTests(unittest.TestCase):
             model_name='gpt-5.6-luna',
             created_at=datetime(2026, 8, 28, tzinfo=timezone.utc),
         )
-        photo = SimpleNamespace(public_id='pho_public', exif_data={})
+        photo = SimpleNamespace(public_id='pho_public', exif_data={}, status=PhotoStatus.READY)
         owner = SimpleNamespace(public_id='usr_owner')
         db = MagicMock()
         db.query.return_value.join.return_value.join.return_value.filter.return_value.first.return_value = (
@@ -78,7 +78,7 @@ class ReviewQueryPrivacyTests(unittest.TestCase):
             share_token='share-token',
             created_at=datetime(2026, 8, 28, tzinfo=timezone.utc),
         )
-        photo = SimpleNamespace(public_id='pho_public', exif_data={'Camera': 'Private Body'})
+        photo = SimpleNamespace(public_id='pho_public', exif_data={'Camera': 'Private Body'}, status=PhotoStatus.READY)
         owner = SimpleNamespace(public_id='usr_owner')
         db = MagicMock()
         db.query.return_value.join.return_value.join.return_value.filter.return_value.first.return_value = (
@@ -109,7 +109,7 @@ class ReviewQueryPrivacyTests(unittest.TestCase):
             model_name='gpt-5.6-luna',
             created_at=datetime(2026, 8, 28, tzinfo=timezone.utc),
         )
-        photo = SimpleNamespace(public_id='pho_public', exif_data={'GPSLatitude': 35.0})
+        photo = SimpleNamespace(public_id='pho_public', exif_data={'GPSLatitude': 35.0}, status=PhotoStatus.READY)
         owner = SimpleNamespace(public_id='usr_owner')
         db = MagicMock()
         db.query.return_value.join.return_value.join.return_value.filter.return_value.first.return_value = (
@@ -180,7 +180,7 @@ class ReviewQueryPrivacyTests(unittest.TestCase):
             note='private note',
             created_at=datetime(2026, 8, 28, tzinfo=timezone.utc),
         )
-        photo = SimpleNamespace(public_id='pho_public', exif_data={'GPSLongitude': 139.0})
+        photo = SimpleNamespace(public_id='pho_public', exif_data={'GPSLongitude': 139.0}, status=PhotoStatus.READY)
         owner = SimpleNamespace(public_id='usr_owner')
         actor = SimpleNamespace(user=SimpleNamespace(id=20), plan=UserPlan.free)
         db = MagicMock()
@@ -241,7 +241,7 @@ class ReviewQueryPrivacyTests(unittest.TestCase):
             created_at=now - timedelta(days=15),
         )
         photo_exif = {'Make': 'Leica'}
-        photo = SimpleNamespace(public_id='pho_owner', exif_data=photo_exif)
+        photo = SimpleNamespace(public_id='pho_owner', exif_data=photo_exif, status=PhotoStatus.READY)
         owner = SimpleNamespace(public_id='usr_owner')
         actor = SimpleNamespace(user=SimpleNamespace(id=10), plan=UserPlan.free)
         db = MagicMock()

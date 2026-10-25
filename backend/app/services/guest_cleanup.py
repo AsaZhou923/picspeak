@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.db.models import ApiRequestLog, IdempotencyKey, Photo, Review, ReviewTask, ReviewTaskEvent, TaskStatus, UsageLedger, User, UserPlan, UserStatus
+from app.services.object_retention import guest_photos_pending_purge
 
 
 def cleanup_stale_guest_users(db: Session, *, dry_run: bool = False) -> int:
@@ -33,6 +34,10 @@ def cleanup_stale_guest_users(db: Session, *, dry_run: bool = False) -> int:
         .limit(batch_size)
         .all()
     )
+    # Deleting photo rows before their stored originals are purged would leave
+    # unreferenced objects behind; scripts/purge_expired_objects.py removes them first.
+    pending = guest_photos_pending_purge(db, [row.id for row in stale_users])
+    stale_users = [row for row in stale_users if row.id not in pending]
     if not stale_users:
         return 0
     if dry_run:

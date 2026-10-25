@@ -9,7 +9,7 @@ from app.api.deps import CurrentActor, get_current_actor, get_db
 from app.api.routers.gallery import GALLERY_AUDIT_APPROVED, GALLERY_AUDIT_NONE, GALLERY_AUDIT_REJECTED, _ensure_gallery_thumbnail
 from app.api.routers.photos import PHOTO_THUMBNAIL_SIZE, _build_photo_proxy_url
 from app.core.errors import api_error
-from app.db.models import Photo, UserPlan
+from app.db.models import Photo, PhotoStatus, UserPlan
 from app.schemas import ReviewExportResponse, ReviewMetaResponse, ReviewMetaUpdateRequest, ReviewShareResponse, ReviewVisibilityResponse
 from app.services.guard import review_history_cutoff
 from app.services.content_audit import ContentAuditError, run_content_audit
@@ -163,10 +163,11 @@ def export_review(
     review = _find_review_owned(db, review_id, actor.user.id)
     photo = db.query(Photo).filter(Photo.id == review.photo_id).first()
     photo_public_id = photo.public_id if photo else 'unknown'
-    photo_url = _build_photo_proxy_url(request, photo.public_id, actor.user.public_id) if photo else None
+    original_available = photo is not None and photo.status == PhotoStatus.READY
+    photo_url = _build_photo_proxy_url(request, photo.public_id, actor.user.public_id) if original_available else None
     photo_thumbnail_url = (
         _build_photo_proxy_url(request, photo.public_id, actor.user.public_id, size=PHOTO_THUMBNAIL_SIZE)
-        if photo else None
+        if original_available else None
     )
     payload = _build_review_export_payload(
         review=review,
