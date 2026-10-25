@@ -36,22 +36,21 @@ test('photo applicability and public retention are released without a popup', ()
   assert.equal(getLatestProductUpdateDate(), '2026-10-24');
 });
 
-test('gallery filter and critique cache fixes retain their upcoming status without a popup', () => {
+test('gallery filter and critique cache fixes are published without a popup', () => {
   for (const locale of ['zh', 'en', 'ja'] as const) {
-    const previous = getProductUpdates(locale).find((entry) => entry.id === '2026-10-20-gallery-and-review-cache-fixes');
-    assert.ok(previous);
-    assert.match(previous.title, /准备中|Upcoming:|準備中/);
-    assert.equal(previous.showPopup, false);
+    const released = getProductUpdates(locale).find((entry) => entry.id === '2026-10-20-gallery-and-review-cache-fixes');
+    assert.ok(released);
+    assert.doesNotMatch(released.title + released.summary, /准备中|in preparation|Upcoming:|準備中/i);
+    assert.equal(released.showPopup, false);
   }
 });
 
-test('subscription recovery and generation retry fixes are upcoming without a popup', () => {
+test('subscription recovery and generation retry fixes are published without a popup', () => {
   for (const locale of ['zh', 'en', 'ja'] as const) {
     const latest = getProductUpdates(locale).find((entry) => entry.id === '2026-10-19-billing-recovery-and-generation-retries');
     assert.ok(latest);
     assert.equal(latest.id, '2026-10-19-billing-recovery-and-generation-retries');
-    assert.match(latest.title, /准备中|Upcoming:|準備中/);
-    assert.match(latest.summary, /准备中|In preparation:|準備中/);
+    assert.doesNotMatch(latest.title + latest.summary, /准备中|in preparation|Upcoming:|準備中/i);
     assert.equal(latest.date, '2026-10-19');
     assert.equal(latest.showPopup, false);
     assert.equal(shouldShowProductUpdatePopup(latest), false);

@@ -191,8 +191,8 @@ npm run build
 
 ## 文档
 
-- [准备中：长廊与操作恢复修复](docs/changelog/CHANGELOG.md#2026-10-20-gallery-and-review-cache-fixes)
-- [准备中：订阅恢复与生图重试修复](docs/changelog/CHANGELOG.md#2026-10-19-billing-recovery-and-generation-retries)
+- [长廊与操作恢复修复](docs/changelog/CHANGELOG.md#2026-10-20-gallery-and-review-cache-fixes)
+- [订阅恢复与生图重试修复](docs/changelog/CHANGELOG.md#2026-10-19-billing-recovery-and-generation-retries)
 - [最新更新：点评重试与草稿修复](docs/changelog/CHANGELOG.md#2026-10-18-critique-and-draft-fixes)
 - [长廊浏览更直接](docs/changelog/CHANGELOG.md#2026-10-10-gallery-browsing)
 - [消息中心已开放](docs/changelog/CHANGELOG.md#2026-10-10-inbox-live)
