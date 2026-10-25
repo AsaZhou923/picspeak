@@ -13,6 +13,7 @@ from app.db.models import Photo, PhotoStatus, UserPlan
 from app.schemas import ReviewExportResponse, ReviewMetaResponse, ReviewMetaUpdateRequest, ReviewShareResponse, ReviewVisibilityResponse
 from app.services.guard import review_history_cutoff
 from app.services.content_audit import ContentAuditError, run_content_audit
+from app.services.object_retention import admit_photo_use
 from app.services.object_storage import get_object_read_url
 from .review_support import (
     _build_review_export_payload,
@@ -38,6 +39,9 @@ def enable_review_share(
     actor: CurrentActor = Depends(get_current_actor),
 ):
     review = _find_review_owned(db, review_id, actor.user.id)
+    # Serialise with retention purges: a purge either sees this public channel or
+    # finishes first. Sharing a critique whose original is gone stays allowed.
+    admit_photo_use(db, review.photo_id, require_ready=False)
     if not review.share_token:
         review.share_token = _generate_review_share_token(db)
     _sync_review_public_flag(review)
@@ -121,6 +125,8 @@ def update_review_meta(
         if payload.gallery_visible:
             if photo is None:
                 raise api_error(status.HTTP_404_NOT_FOUND, 'PHOTO_NOT_FOUND', 'Photo not found')
+            # The audit and thumbnail need the original; hold it against retention purges.
+            photo = admit_photo_use(db, photo.id)
             try:
                 audit_result = run_content_audit(get_object_read_url(photo.object_key, bucket=photo.bucket))
             except ContentAuditError as exc:

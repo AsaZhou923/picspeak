@@ -281,6 +281,8 @@ class GalleryThumbnailFlowTests(unittest.TestCase):
         payload = SimpleNamespace(favorite=None, gallery_visible=True, tags=None, note=None)
 
         with patch('app.api.routers.review_actions._find_review_owned', return_value=review), patch(
+            'app.api.routers.review_actions.admit_photo_use', return_value=photo,
+        ), patch(
             'app.api.routers.review_actions.get_object_read_url',
             return_value='https://storage.example.com/signed-source',
         ) as signed_source, patch(

@@ -24,6 +24,7 @@ from app.schemas import (
     GenerationTemplatesResponse,
 )
 from app.services.guard import hash_request, save_idempotency_record
+from app.services.object_retention import admit_photo_use
 from app.services.image_generation_pricing import (
     estimate_image_generation_credits,
     get_credits_table,
@@ -207,6 +208,9 @@ def create_generation(
         'analytics_source': payload.analytics_source,
         'locale': payload.locale,
     }
+    if source_photo_internal_id is not None:
+        # Held until the task commits so a retention purge cannot remove the reference photo.
+        admit_photo_use(db, source_photo_internal_id)
     task = make_generation_task(
         owner_user_id=actor.user.id,
         prompt=final_prompt,

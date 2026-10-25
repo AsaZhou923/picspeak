@@ -190,6 +190,8 @@ class PracticeContractTests(unittest.TestCase):
         stale_record = SimpleNamespace(request_hash='different-hash', response_json=None)
 
         with patch('app.api.routers.review_create._find_photo_owned', return_value=SimpleNamespace(id=1, status=PhotoStatus.READY)), patch(
+            'app.api.routers.review_create.admit_photo_use',
+        ), patch(
             'app.api.routers.review_create.get_idempotency_record',
             side_effect=[None, stale_record],
         ), patch('app.api.routers.review_create.enforce_guest_review_limits'), patch(
@@ -230,6 +232,8 @@ class PracticeContractTests(unittest.TestCase):
 
         db.query.side_effect = query
         with patch('app.api.routers.review_create._find_photo_owned', return_value=SimpleNamespace(id=1, status=PhotoStatus.READY)), patch(
+            'app.api.routers.review_create.admit_photo_use',
+        ), patch(
             'app.api.routers.review_create.get_idempotency_record',
             side_effect=[None, None],
         ), patch('app.api.routers.review_create.enforce_guest_review_limits'), patch(

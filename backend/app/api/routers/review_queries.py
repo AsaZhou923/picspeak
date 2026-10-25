@@ -167,7 +167,7 @@ def get_public_review(
     photo_url = _build_photo_proxy_url(
         request, photo.public_id, photo_owner.public_id,
         public_review=review, public_channel='share',
-    )
+    ) if photo.status == PhotoStatus.READY else None
     result_response = _review_result_payload(
         dict(review.result_json or {}),
         review.final_score,

@@ -17,12 +17,13 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
 from typing import Any, Iterable, Iterator
 
 from sqlalchemy.orm import Session
 
+from app.core.errors import api_error
 from app.db.models import (
     BillingSubscription,
     GeneratedImage,
@@ -281,64 +282,101 @@ class PurgeOutcome:
     bytes_removed: int = 0
 
 
+def admit_photo_use(db: Session, photo_id: int, *, require_ready: bool = True) -> Photo | None:
+    """Lock a photo row in share mode until the caller's transaction ends.
+
+    Purges take FOR UPDATE while deciding and committing PURGING. A task, share
+    link or gallery listing registered under this lock is therefore either seen by
+    the purge decision or sees the photo already leaving READY.
+    """
+    photo = db.query(Photo).filter(Photo.id == photo_id).with_for_update(read=True).populate_existing().first()
+    if require_ready and (photo is None or photo.status != PhotoStatus.READY):
+        if photo is not None and photo.status in (PhotoStatus.PURGING, PhotoStatus.PURGED):
+            raise api_error(410, 'PHOTO_ORIGINAL_EXPIRED', 'The stored original was removed under the retention policy')
+        raise api_error(400, 'PHOTO_NOT_READY', 'Photo is not ready')
+    return photo
+
+
+def _finish_purge(db: Session, storage: Any, photo: Photo, *, now: datetime, reason: str, removed: int, existed: bool) -> PurgeOutcome:
+    # The original is gone from here on, so the photo must never return to READY.
+    photo.status = PhotoStatus.PURGED
+    photo.original_purge_reason = reason
+    photo.original_purged_at = now
+    db.add(photo)
+    db.commit()
+    # Thumbnails are derived copies; one that fails to delete is left to the orphan_thumbnail scan.
+    try:
+        for item in _list_keys(storage, photo.bucket, f'{GALLERY_THUMBNAIL_PREFIX}{photo.public_id}/'):
+            storage.delete_object(Bucket=photo.bucket, Key=item['Key'])
+            removed += int(item.get('Size') or 0)
+    except Exception:  # noqa: BLE001
+        logger.warning('Failed to delete gallery thumbnails for photo %s', photo.public_id, exc_info=True)
+    return PurgeOutcome('purged' if existed else 'already_missing', reason, removed)
+
+
 def purge_photo_original(
     db: Session, storage: Any, photo_id: int, *, now: datetime, grace_until: datetime | None = None,
 ) -> PurgeOutcome:
-    """Remove one photo's original and gallery thumbnails after re-checking the policy."""
+    """Remove one photo's original and gallery thumbnails after re-checking the policy.
+
+    Only READY photos pass through PURGING, so a stalled PURGING photo was READY
+    before and returns to READY if anything protects it now. Unconfirmed and
+    rejected uploads cannot be admitted for work or made public and are removed directly.
+    """
     photo = db.query(Photo).filter(Photo.id == photo_id).with_for_update().populate_existing().first()
     if photo is None:
         db.rollback()
         return PurgeOutcome('skipped', 'photo_missing')
+    if photo.status not in (*PURGEABLE_PHOTO_STATUSES, PhotoStatus.PURGING):
+        db.rollback()
+        return PurgeOutcome('skipped', 'not_purgeable_status')
+
+    try:
+        size = _head_size(storage, photo.bucket, photo.object_key)
+    except Exception:  # noqa: BLE001
+        logger.warning('Failed to inspect original for photo %s', photo.public_id, exc_info=True)
+        db.rollback()
+        return PurgeOutcome('failed', 'storage_unavailable')
+
     resuming = photo.status == PhotoStatus.PURGING
+    if resuming and size is None:
+        # A previous run deleted the original and stopped before recording it.
+        return _finish_purge(db, storage, photo, now=now, reason=photo.original_purge_reason or 'resumed', removed=0, existed=False)
+
+    facts = collect_photo_facts(db, [photo], now=now)[photo.id]
     if resuming:
-        reason = photo.original_purge_reason or 'resumed'
-        previous_status = PhotoStatus.READY
-    else:
-        decision = decide_photo(collect_photo_facts(db, [photo], now=now)[photo.id], now=now, grace_until=grace_until)
-        if not decision.purge:
+        facts = replace(facts, status=PhotoStatus.READY)
+    decision = decide_photo(facts, now=now, grace_until=grace_until)
+    if not decision.purge:
+        if resuming:
+            photo.status = PhotoStatus.READY
+            photo.original_purge_reason = None
+            db.add(photo)
+            db.commit()
+        else:
             db.rollback()
-            return PurgeOutcome('skipped', decision.reason)
-        reason = decision.reason
-        previous_status = photo.status
+        return PurgeOutcome('skipped', decision.reason)
+
+    if photo.status == PhotoStatus.READY:
         photo.status = PhotoStatus.PURGING
-        photo.original_purge_reason = reason
+        photo.original_purge_reason = decision.reason
         db.add(photo)
         db.commit()
 
-        # Creation paths require READY. A task that slipped in before PURGING was
-        # committed is visible now, so the photo goes back instead of losing its source.
-        if photo.id in _live_task_photo_ids(db, [photo.id]):
-            photo.status = previous_status
-            photo.original_purge_reason = None
-            db.add(photo)
-            db.commit()
-            return PurgeOutcome('skipped', 'live_task')
-
-    removed = 0
-    try:
-        size = _head_size(storage, photo.bucket, photo.object_key)
-        if size is not None:
+    if size is not None:
+        try:
             storage.delete_object(Bucket=photo.bucket, Key=photo.object_key)
-            removed += size
-        for item in _list_keys(storage, photo.bucket, f'{GALLERY_THUMBNAIL_PREFIX}{photo.public_id}/'):
-            storage.delete_object(Bucket=photo.bucket, Key=item['Key'])
-            removed += int(item.get('Size') or 0)
-    except Exception:  # noqa: BLE001 - keep the photo usable and retry on the next run
-        logger.warning('Failed to purge original for photo %s', photo.public_id, exc_info=True)
-        db.rollback()
-        if not resuming:
-            photo = db.query(Photo).filter(Photo.id == photo_id).first()
-            photo.status = previous_status
-            photo.original_purge_reason = None
-            db.add(photo)
-            db.commit()
-        return PurgeOutcome('failed', reason)
-
-    photo.status = PhotoStatus.PURGED
-    photo.original_purged_at = now
-    db.add(photo)
-    db.commit()
-    return PurgeOutcome('purged' if size is not None else 'already_missing', reason, removed)
+        except Exception:  # noqa: BLE001 - the original still exists, so the photo stays usable
+            logger.warning('Failed to delete original for photo %s', photo.public_id, exc_info=True)
+            db.rollback()
+            if photo.status == PhotoStatus.PURGING:
+                photo = db.query(Photo).filter(Photo.id == photo_id).first()
+                photo.status = PhotoStatus.READY
+                photo.original_purge_reason = None
+                db.add(photo)
+                db.commit()
+            return PurgeOutcome('failed', decision.reason)
+    return _finish_purge(db, storage, photo, now=now, reason=decision.reason, removed=size or 0, existed=size is not None)
 
 
 def stuck_purging_photo_ids(db: Session, *, now: datetime) -> list[int]:

@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import os
 import sys
+import threading
 from argparse import Namespace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
 from uuid import uuid4
 
 import pytest
@@ -23,6 +23,7 @@ import configure_r2_lifecycle  # noqa: E402
 import purge_expired_objects  # noqa: E402
 from app.api.deps import CurrentActor, get_current_actor, get_db  # noqa: E402
 from app.api.routers import photos, review_queries  # noqa: E402
+from app.core.errors import ApiHTTPException  # noqa: E402
 from app.db.models import (  # noqa: E402
     Base,
     BillingSubscription,
@@ -40,7 +41,7 @@ from app.db.models import (  # noqa: E402
     UserStatus,
 )
 from app.services import guest_cleanup  # noqa: E402
-from app.services.object_retention import OwnerFacts, PhotoFacts, decide_photo, purge_photo_original  # noqa: E402
+from app.services.object_retention import OwnerFacts, PhotoFacts, admit_photo_use, decide_photo, purge_photo_original  # noqa: E402
 
 DATABASE_URL = os.getenv('PICSPEAK_TEST_DATABASE_URL', '').strip()
 NOW = datetime(2026, 10, 25, 12, 0, tzinfo=timezone.utc)
@@ -169,6 +170,7 @@ class FakeStorage:
         self.objects: dict[str, dict] = {}
         self.now = now
         self.fail_deletes = False
+        self.fail_lists = False
         self.deleted: list[str] = []
 
     def put(self, key, size=100, age=timedelta(days=30)):
@@ -187,6 +189,8 @@ class FakeStorage:
         self.deleted.append(Key)
 
     def list_objects_v2(self, Bucket, Prefix='', ContinuationToken=None):  # noqa: N803
+        if self.fail_lists:
+            raise RuntimeError('storage unavailable')
         contents = [{'Key': key, **item} for key, item in sorted(self.objects.items()) if key.startswith(Prefix)]
         return {'Contents': contents, 'IsTruncated': False}
 
@@ -328,23 +332,141 @@ def test_storage_failure_returns_the_photo_to_ready(harness):
     assert harness.status(photo) == PhotoStatus.READY
 
 
-def test_task_created_while_marking_restores_the_photo(harness):
+def _mark_purging(harness, photo):
+    with harness.Session() as db:
+        stored = db.get(Photo, photo.id)
+        stored.status = PhotoStatus.PURGING
+        stored.original_purge_reason = 'free_expired'
+        db.commit()
+
+
+def test_stalled_purge_rechecks_protections_before_deleting(harness):
     photo = harness.photo(harness.user())
-    harness.review(photo)
-    real_commit = Session.commit
-    calls = {'n': 0}
-
-    def commit_then_race(self):
-        real_commit(self)
-        calls['n'] += 1
-        if calls['n'] == 1:
-            harness.live_task(photo)
-
-    with patch.object(Session, 'commit', commit_then_race), harness.Session() as db:
+    harness.review(photo, share=True)  # became public after the stalled run marked it
+    _mark_purging(harness, photo)
+    with harness.Session() as db:
         outcome = purge_photo_original(db, harness.storage, photo.id, now=NOW)
-    assert (outcome.status, outcome.reason) == ('skipped', 'live_task')
+    assert (outcome.status, outcome.reason) == ('skipped', 'public')
     assert harness.status(photo) == PhotoStatus.READY
     assert photo.object_key in harness.storage.objects
+
+
+def test_stalled_purge_respects_the_current_grace_period(harness):
+    photo = harness.photo(harness.user())
+    harness.review(photo)
+    _mark_purging(harness, photo)
+    with harness.Session() as db:
+        outcome = purge_photo_original(db, harness.storage, photo.id, now=NOW, grace_until=NOW + timedelta(days=7))
+    assert (outcome.status, outcome.reason) == ('skipped', 'within_retention')
+    assert harness.status(photo) == PhotoStatus.READY
+
+
+def test_stalled_purge_completes_when_the_original_is_already_gone(harness):
+    photo = harness.photo(harness.user())
+    harness.review(photo, share=True)
+    _mark_purging(harness, photo)
+    del harness.storage.objects[photo.object_key]
+    with harness.Session() as db:
+        outcome = purge_photo_original(db, harness.storage, photo.id, now=NOW)
+    assert outcome.status == 'already_missing'
+    assert harness.status(photo) == PhotoStatus.PURGED
+
+
+def test_thumbnail_failure_after_the_original_is_deleted_keeps_purged(harness):
+    photo = harness.photo(harness.user())
+    harness.review(photo)
+    harness.storage.put(f'gallery-thumbnails/{photo.public_id}/512.webp')
+    harness.storage.fail_lists = True
+    with harness.Session() as db:
+        outcome = purge_photo_original(db, harness.storage, photo.id, now=NOW)
+    assert outcome.status == 'purged'
+    assert harness.status(photo) == PhotoStatus.PURGED
+    assert photo.object_key not in harness.storage.objects
+    harness.storage.fail_lists = False
+    harness.run(execute=True, category=['orphan_thumbnail'])
+    assert f'gallery-thumbnails/{photo.public_id}/512.webp' not in harness.storage.objects
+
+
+def test_admission_rejects_photos_leaving_ready(harness):
+    photo = harness.photo(harness.user())
+    _mark_purging(harness, photo)
+    with harness.Session() as db, pytest.raises(ApiHTTPException) as exc:
+        admit_photo_use(db, photo.id)
+    assert exc.value.status_code == 410
+    assert exc.value.detail['code'] == 'PHOTO_ORIGINAL_EXPIRED'
+    with harness.Session() as db:
+        assert admit_photo_use(db, photo.id, require_ready=False).id == photo.id
+
+
+@pytest.fixture
+def committed_db():
+    if not DATABASE_URL:
+        pytest.skip('requires disposable PostgreSQL via PICSPEAK_TEST_DATABASE_URL')
+    schema = 'objlock_' + uuid4().hex
+    admin = create_engine(DATABASE_URL)
+    with admin.begin() as connection:
+        connection.execute(text(f'CREATE SCHEMA "{schema}"'))
+    engine = create_engine(DATABASE_URL, connect_args={'options': f'-csearch_path={schema},public'})
+    Base.metadata.create_all(engine)
+    try:
+        yield sessionmaker(bind=engine, expire_on_commit=False)
+    finally:
+        engine.dispose()
+        with admin.begin() as connection:
+            connection.execute(text(f'DROP SCHEMA "{schema}" CASCADE'))
+        admin.dispose()
+
+
+def test_purge_waits_for_an_admitted_task_and_then_keeps_the_original(committed_db):
+    storage = FakeStorage(NOW)
+    harness = Harness(committed_db, storage)
+    photo = harness.photo(harness.user())
+    harness.review(photo)
+
+    admitted, release = threading.Event(), threading.Event()
+
+    def admit_and_create_task():
+        with committed_db() as db:
+            admit_photo_use(db, photo.id)
+            admitted.set()
+            release.wait(5)
+            db.add(ReviewTask(
+                public_id='tsk_' + uuid4().hex[:12], photo_id=photo.id, owner_user_id=photo.owner_user_id,
+                mode=ReviewMode.flash, status=TaskStatus.PENDING, request_payload={},
+            ))
+            db.commit()
+
+    creator = threading.Thread(target=admit_and_create_task)
+    creator.start()
+    assert admitted.wait(5)
+    result = {}
+
+    def purge():
+        with committed_db() as db:
+            result['outcome'] = purge_photo_original(db, storage, photo.id, now=NOW)
+
+    purger = threading.Thread(target=purge)
+    purger.start()
+    purger.join(0.5)
+    assert purger.is_alive(), 'purge must wait for the admitted task to commit'
+    release.set()
+    creator.join(5)
+    purger.join(5)
+    assert (result['outcome'].status, result['outcome'].reason) == ('skipped', 'live_task')
+    assert harness.status(photo) == PhotoStatus.READY
+    assert photo.object_key in storage.objects
+
+
+def test_admission_after_purge_starts_sees_the_photo_leaving_ready(committed_db):
+    storage = FakeStorage(NOW)
+    harness = Harness(committed_db, storage)
+    photo = harness.photo(harness.user())
+    harness.review(photo)
+    with committed_db() as db:
+        purge_photo_original(db, storage, photo.id, now=NOW)
+    with committed_db() as db, pytest.raises(ApiHTTPException) as exc:
+        admit_photo_use(db, photo.id)
+    assert exc.value.status_code == 410
 
 
 def test_max_delete_and_grace_until_bound_each_run(harness):

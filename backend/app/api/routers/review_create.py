@@ -55,6 +55,7 @@ from app.services.review_score_cache import (
     writer_contract_for_review_request,
 )
 from app.services.review_quota_reservations import synchronous_review_quota, consume_review_quota, release_review_quota
+from app.services.object_retention import admit_photo_use
 from app.services.object_storage import get_object_read_url
 from .review_support import (
     _attach_billing_info,
@@ -237,6 +238,11 @@ def create_review(
         enforce_user_quota(db, actor.user, mode=mode_enum)
 
     if payload.async_mode:
+        # Keep the photos locked until the task commits so a retention purge
+        # cannot remove an original this task depends on.
+        admit_photo_use(db, photo.id)
+        if source_review is not None:
+            admit_photo_use(db, source_review.photo_id)
         task_payload = payload.model_dump(by_alias=True)
         task_payload['_request_hash'] = request_hash
         if source_review is not None:
@@ -433,6 +439,11 @@ def create_review(
         result_payload['image_type'] = payload.image_type
         if ai_response.cost_rate_version:
             result_payload.setdefault('billing_info', {})['cost_rate_version'] = ai_response.cost_rate_version
+        # The provider read the original during this request; refuse to record a
+        # review if a retention purge removed it meanwhile.
+        admit_photo_use(db, photo.id)
+        if source_review is not None:
+            admit_photo_use(db, source_review.photo_id)
         review = Review(
             public_id=new_public_id('rev'),
             task_id=None,
