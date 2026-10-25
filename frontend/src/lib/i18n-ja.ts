@@ -723,6 +723,7 @@ export const jaTranslations = {
     err_task_failed_action: '評価を再試行',
     err_not_found_title: '見つかりません',
     err_not_found_body: 'リクエストされたコンテンツは存在しないか、削除されています。',
+    err_photo_original_expired_body: 'この写真の元画像は保存期間を過ぎたため削除されました。講評とスコアは引き続き確認できます。再度分析するには、写真をもう一度アップロードしてください。',
     err_unauthorized_body: 'ログイン状態が無効です。もう一度サインインしてください。',
     err_forbidden_body: '現在のアカウントではこの操作を実行できません。',
     err_validation_body: 'リクエスト内容が不足しているか、形式が正しくありません。確認してから再試行してください。',

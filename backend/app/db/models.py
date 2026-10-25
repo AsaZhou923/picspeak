@@ -42,6 +42,10 @@ class PhotoStatus(str, enum.Enum):
     UPLOADING = 'UPLOADING'
     READY = 'READY'
     REJECTED = 'REJECTED'
+    # The stored original is being removed (PURGING) or is gone (PURGED) under the
+    # retention policy; the row, reviews and scores stay.
+    PURGING = 'PURGING'
+    PURGED = 'PURGED'
 
 
 class ReviewMode(str, enum.Enum):
@@ -117,6 +121,8 @@ class Photo(Base):
     nsfw_label: Mapped[str | None] = mapped_column(Text)
     nsfw_score: Mapped[Decimal | None] = mapped_column(Numeric(5, 4))
     rejected_reason: Mapped[str | None] = mapped_column(Text)
+    original_purged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    original_purge_reason: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 
@@ -651,6 +657,7 @@ class GeneratedImage(Base):
     template_key: Mapped[str | None] = mapped_column(Text)
     metadata_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    object_purged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 

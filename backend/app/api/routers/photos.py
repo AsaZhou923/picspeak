@@ -131,6 +131,8 @@ def _find_photo_from_token(db: Session, photo_id: str, photo_token: str, size: i
     )
     if photo is None:
         raise api_error(status.HTTP_404_NOT_FOUND, 'PHOTO_NOT_FOUND', 'Photo not found')
+    if photo.status in (PhotoStatus.PURGING, PhotoStatus.PURGED):
+        raise api_error(status.HTTP_410_GONE, 'PHOTO_ORIGINAL_EXPIRED', 'The stored original was removed under the retention policy')
     if 'review_id' in token_payload:
         review = (
             db.query(Review)

@@ -70,6 +70,8 @@ create table photos
         constraint chk_photos_nsfw_score
             check ((nsfw_score IS NULL) OR ((nsfw_score >= (0)::numeric) AND (nsfw_score <= (1)::numeric))),
     rejected_reason text,
+    original_purged_at timestamp with time zone,
+    original_purge_reason text,
     created_at      timestamp with time zone default now()                     not null,
     updated_at      timestamp with time zone default now()                     not null,
     constraint uq_photos_bucket_object
@@ -529,6 +531,7 @@ create table generated_images
     template_key        text,
     metadata_json       jsonb                    default '{}'::jsonb not null,
     deleted_at          timestamp with time zone,
+    object_purged_at    timestamp with time zone,
     created_at          timestamp with time zone default now()        not null,
     updated_at          timestamp with time zone default now()        not null
 );
@@ -547,6 +550,10 @@ create index idx_generated_images_review_created
 
 create index idx_generated_images_object
     on generated_images (object_bucket asc, object_key asc);
+
+create index idx_generated_images_deleted_unpurged
+    on generated_images (deleted_at)
+    where ((deleted_at IS NOT NULL) AND (object_purged_at IS NULL));
 
 create trigger trg_generated_images_updated_at
     before update

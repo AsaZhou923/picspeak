@@ -578,6 +578,9 @@ def _process_task(db: Session, task: ReviewTask, *, claim_token: str | None = No
     if photo is None:
         _handle_failure(db, task, error_code='PHOTO_NOT_FOUND', error_message='Photo record not found for task', retryable=False)
         return
+    if photo.status in (PhotoStatus.PURGING, PhotoStatus.PURGED):
+        _handle_failure(db, task, error_code='PHOTO_ORIGINAL_EXPIRED', error_message='The stored original was removed', retryable=False)
+        return
 
     # Fetch owner and enforce quota BEFORE calling the AI, so we don't burn tokens
     # on a request that would be rejected anyway.

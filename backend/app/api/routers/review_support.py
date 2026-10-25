@@ -541,8 +541,11 @@ def _review_history_item(
     return ReviewHistoryItem(
         review_id=review.public_id,
         photo_id=photo.public_id,
-        photo_url=_build_photo_proxy_url(request, photo.public_id, owner_public_id),
-        photo_thumbnail_url=_build_photo_proxy_url(request, photo.public_id, owner_public_id, size=PHOTO_THUMBNAIL_SIZE),
+        photo_url=_build_photo_proxy_url(request, photo.public_id, owner_public_id) if photo.status == PhotoStatus.READY else None,
+        photo_thumbnail_url=(
+            _build_photo_proxy_url(request, photo.public_id, owner_public_id, size=PHOTO_THUMBNAIL_SIZE)
+            if photo.status == PhotoStatus.READY else None
+        ),
         mode=review.mode.value,
         status=review.status.value,
         image_type=_review_image_type(review),

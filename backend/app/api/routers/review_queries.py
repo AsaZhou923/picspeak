@@ -77,10 +77,11 @@ def get_review(
     if cutoff is not None and is_owner and not review_is_public(review) and review.created_at < cutoff:
         raise api_error(status.HTTP_404_NOT_FOUND, 'REVIEW_NOT_FOUND', 'Review not found')
 
+    # A purged original has no image to link; clients show their no-image state.
     photo_url = _build_photo_proxy_url(
         request, photo.public_id, photo_owner.public_id,
         **({'public_review': review} if not is_owner else {}),
-    )
+    ) if photo.status == PhotoStatus.READY else None
     review_task_public_id = None
     if is_owner and review.task_id:
         review_task_public_id = db.query(ReviewTask.public_id).filter(ReviewTask.id == review.task_id).scalar()
@@ -166,7 +167,7 @@ def get_public_review(
     photo_url = _build_photo_proxy_url(
         request, photo.public_id, photo_owner.public_id,
         public_review=review, public_channel='share',
-    )
+    ) if photo.status == PhotoStatus.READY else None
     result_response = _review_result_payload(
         dict(review.result_json or {}),
         review.final_score,
