@@ -120,6 +120,9 @@ class Settings(BaseSettings):
     guest_user_cleanup_interval_seconds: int = 3600
     guest_user_stale_days: int = 7
     guest_user_cleanup_batch_size: int = 200
+    # Days of api_request_logs to keep; 0 disables the periodic cleanup.
+    api_request_log_retention_days: int = 30
+    api_request_log_cleanup_batch_size: int = 1000
     notifications_worker_enabled: bool = True
     notifications_worker_interval_seconds: int = 60
     notification_sweep_interval_seconds: int = 60

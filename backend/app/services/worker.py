@@ -6,6 +6,7 @@ import time
 from concurrent.futures import Future, ThreadPoolExecutor, wait
 
 from app.core.config import settings
+from app.services.audit import cleanup_expired_request_logs
 from app.services.guest_cleanup import cleanup_stale_guest_users
 from app.services.image_generation_task_processor import claim_next_pending_image_generation_task, process_image_generation_task
 from app.services.notification_processor import cleanup_expired_notifications, process_pending_notifications
@@ -24,6 +25,7 @@ class ReviewWorker:
         self._notification_stop_event = threading.Event()
         self._notification_thread: threading.Thread | None = None
         self._next_guest_cleanup_at = 0.0
+        self._next_request_log_cleanup_at = 0.0
         self._next_notification_sweep_at = 0.0
         self.worker_name = worker_name or settings.review_worker_name
         # Dedicated thread pool for image generation tasks (blocking I/O, up to 180s).
@@ -74,6 +76,7 @@ class ReviewWorker:
             task_kind = ''
             try:
                 self._run_guest_cleanup_if_due()
+                self._run_request_log_cleanup_if_due()
                 self._prune_done_gen_futures()
 
                 from app.db.session import SessionLocal
@@ -194,6 +197,37 @@ class ReviewWorker:
                 logger.info('Deleted %s stale guest users without review history', deleted_count)
         except Exception:
             logger.exception('Failed to run stale guest cleanup')
+        finally:
+            self._maintenance_lock.release()
+
+    def _run_request_log_cleanup_if_due(self) -> None:
+        if int(settings.api_request_log_retention_days or 0) <= 0:
+            return
+
+        now = time.monotonic()
+        if now < self._next_request_log_cleanup_at:
+            return
+        if not self._maintenance_lock.acquire(blocking=False):
+            return
+
+        try:
+            now = time.monotonic()
+            if now < self._next_request_log_cleanup_at:
+                return
+            self._next_request_log_cleanup_at = now + 60
+
+            from app.db.session import SessionLocal
+
+            db = SessionLocal()
+            try:
+                deleted_count = cleanup_expired_request_logs(db)
+            finally:
+                db.close()
+
+            if deleted_count:
+                logger.info('Deleted %s expired API request log(s)', deleted_count)
+        except Exception:
+            logger.exception('Failed to clean up expired API request logs')
         finally:
             self._maintenance_lock.release()
 

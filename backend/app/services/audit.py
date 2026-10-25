@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import re
 from urllib.parse import parse_qsl, urlencode
 from uuid import uuid4
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.db.models import ApiRequestLog
 
 
@@ -153,3 +155,21 @@ def log_api_request(
         created_at=datetime.now(timezone.utc),
     )
     db.add(record)
+
+
+def cleanup_expired_request_logs(db: Session, *, limit: int | None = None) -> int:
+    """Delete one bounded chunk of request logs older than the retention period."""
+    retention_days = int(settings.api_request_log_retention_days or 0)
+    if retention_days <= 0:
+        return 0
+    chunk = min(max(int(limit or settings.api_request_log_cleanup_batch_size or 1000), 1), 10000)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=retention_days)
+    ids = (
+        select(ApiRequestLog.id)
+        .where(ApiRequestLog.created_at < cutoff)
+        .order_by(ApiRequestLog.created_at, ApiRequestLog.id)
+        .limit(chunk)
+    )
+    deleted = db.query(ApiRequestLog).filter(ApiRequestLog.id.in_(ids)).delete(synchronize_session=False)
+    db.commit()
+    return int(deleted or 0)

@@ -226,6 +226,7 @@ Backend values live in `backend/.env` and are documented by `backend/.env.exampl
 - OpenAI review routing: `OPENAI_API_KEY`, `OPENAI_API_BASE_URL`, `OPENAI_REVIEW_*`, `RETAKE_ANALYSIS_*`
 - Generation AI: `IMAGE_GENERATION_API_KEY`, `IMAGE_GENERATION_*`
 - Workers/queue: `RUN_EMBEDDED_WORKER`, `REVIEW_WORKER_*`, `CLOUD_TASKS_*`
+- Request-log retention: `API_REQUEST_LOG_RETENTION_DAYS` (default 30; 0 disables) and `API_REQUEST_LOG_CLEANUP_BATCH_SIZE`. In production the per-minute Cloud Scheduler call to `/internal/notifications/process` deletes one oldest-first chunk of expired `api_request_logs`; the embedded worker does the same once a minute. Deleted space is reused by autovacuum rather than returned to the database size.
 - Billing: `LEMONSQUEEZY_*`
 - Frontend/CORS: `FRONTEND_ORIGIN`, `BACKEND_CORS_ORIGINS`
 
