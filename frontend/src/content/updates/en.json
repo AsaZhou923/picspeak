@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-31-plan-comparison-copy",
+    "date": "2026-10-31",
+    "showPopup": false,
+    "title": "Clearer Free and Pro comparison",
+    "summary": "Plan comparisons now match what each plan actually includes: Free also gets the full critique, next-shoot advice, and retake comparison, while Pro adds no monthly limit, deep mode on every critique, full history and originals while subscribed, and priority processing. Limits and prices are unchanged.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-10-31-plan-comparison-copy"
+  },
+  {
     "id": "2026-10-24-photo-applicability-and-public-retention",
     "date": "2026-10-24",
     "showPopup": false,

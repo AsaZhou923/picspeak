@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-31-plan-comparison-copy",
+    "date": "2026-10-31",
+    "showPopup": false,
+    "title": "Free 与 Pro 对比说明修正",
+    "summary": "套餐对比现在与实际权益一致：Free 同样包含完整点评、下一次拍摄建议和复拍对比；Pro 的区别是不限月度次数、每次可用深度模式、订阅期内保留完整历史与原图以及优先处理。额度和价格不变。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-10-31-plan-comparison-copy"
+  },
+  {
     "id": "2026-10-24-photo-applicability-and-public-retention",
     "date": "2026-10-24",
     "showPopup": false,

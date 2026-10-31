@@ -18,9 +18,25 @@ const homeSource = readFileSync(
 );
 const shellSource = readFileSync(path.join(FRONTEND_DIR, 'src/components/layout/SiteChrome.tsx'), 'utf8');
 
-test('photo applicability and public retention are released without a popup', () => {
+test('Free and Pro comparison copy fix is the latest update without a popup', () => {
   for (const locale of ['zh', 'en', 'ja'] as const) {
     const latest = getLatestProductUpdate(locale);
+    assert.ok(latest);
+    assert.equal(latest.id, '2026-10-31-plan-comparison-copy');
+    assert.match(latest.summary, /Free/);
+    assert.match(latest.summary, /Pro/);
+    assert.equal(latest.date, '2026-10-31');
+    assert.equal(latest.showPopup, false);
+    assert.equal(shouldShowProductUpdatePopup(latest), false);
+    assert.equal(latest.docPath, `docs/changelog/CHANGELOG.md#${latest.id}`);
+  }
+  assert.equal(getLatestProductUpdateDate('zh'), '2026-10-31');
+  assert.equal(getLatestProductUpdateDate(), '2026-10-31');
+});
+
+test('photo applicability and public retention are released without a popup', () => {
+  for (const locale of ['zh', 'en', 'ja'] as const) {
+    const latest = getProductUpdates(locale).find((entry) => entry.id === '2026-10-24-photo-applicability-and-public-retention');
     assert.ok(latest);
     assert.equal(latest.id, '2026-10-24-photo-applicability-and-public-retention');
     assert.doesNotMatch(latest.title, /准备中|Upcoming:|準備中/);
@@ -32,8 +48,6 @@ test('photo applicability and public retention are released without a popup', ()
     assert.equal(shouldShowProductUpdatePopup(latest), false);
     assert.equal(latest.docPath, `docs/changelog/CHANGELOG.md#${latest.id}`);
   }
-  assert.equal(getLatestProductUpdateDate('zh'), '2026-10-24');
-  assert.equal(getLatestProductUpdateDate(), '2026-10-24');
 });
 
 test('gallery filter and critique cache fixes are published without a popup', () => {

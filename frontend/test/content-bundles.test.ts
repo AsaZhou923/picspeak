@@ -108,7 +108,7 @@ test('current and historical update copy describes mode benefits without reasoni
     assert.match(rollout.summary, /GPT-6 Sol/);
     assert.match(rollout.summary, /GPT-6\.1 Sol/);
     const latest = entries[0];
-    assert.equal(latest.id, '2026-10-24-photo-applicability-and-public-retention');
+    assert.equal(latest.id, '2026-10-31-plan-comparison-copy');
     assert.doesNotMatch(latest.title, /准备中|Upcoming:|準備中/);
     assert.equal(latest.showPopup, false);
   }
