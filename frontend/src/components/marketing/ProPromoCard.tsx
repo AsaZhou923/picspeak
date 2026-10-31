@@ -69,7 +69,7 @@ function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
           },
           pro: {
             title: '你的 Pro 已开通',
-            body: '你已经是 Pro，可以继续使用更强模型评图、永久历史和优先处理。',
+            body: '你已经是 Pro，可以继续使用更强模型评图、完整历史和优先处理。',
           },
         },
         gallery: {
@@ -79,7 +79,7 @@ function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
           },
           pro: {
             title: '你的 Pro 已开通',
-            body: '可以继续使用更强模型评图、永久历史和优先处理。',
+            body: '可以继续使用更强模型评图、完整历史和优先处理。',
           },
         },
         usage: {
@@ -99,7 +99,7 @@ function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
           },
           pro: {
             title: '继续使用 Pro 更强模型分析',
-            body: '当前订阅已生效，可以继续使用更强模型评图和永久历史。',
+            body: '当前订阅已生效，可以继续使用更强模型评图和完整历史。',
           },
         },
       },
@@ -113,8 +113,8 @@ function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
     price: isJa ? '$3.99 / 月' : '$3.99 / month',
     oldPrice: '',
     footnote: isJa
-      ? 'より強いモデルの講評、永久履歴、優先処理、毎月の AI image credits が含まれます。'
-      : 'Includes stronger-model critique, permanent history, priority processing, and monthly AI image credits.',
+      ? 'より強いモデルの講評、契約中の全履歴保存、優先処理、毎月の AI image credits が含まれます。'
+      : 'Includes stronger-model critique, full history while subscribed, priority processing, and monthly AI image credits.',
     features: proFeatures,
     guestCta: isJa ? 'Pro にアップグレード' : 'Upgrade to Pro',
     freeCta: isJa ? '今すぐ Pro にアップグレード' : 'Upgrade to Pro now',
@@ -128,8 +128,8 @@ function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
         pro: {
           title: isJa ? 'Pro プランは有効です' : 'Your Pro plan is active',
           body: isJa
-            ? 'より強いモデルの講評、永久履歴、優先処理をそのまま利用できます。'
-            : 'Your current subscription keeps stronger-model critique, permanent history, and priority processing available.',
+            ? 'より強いモデルの講評、全履歴、優先処理をそのまま利用できます。'
+            : 'Your current subscription keeps stronger-model critique, full history, and priority processing available.',
         },
       },
       gallery: {
@@ -142,8 +142,8 @@ function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
         pro: {
           title: isJa ? 'Pro プランは有効です' : 'Your Pro plan is active',
           body: isJa
-            ? 'より強いモデルの講評、永久履歴、優先処理を引き続き利用できます。'
-            : 'Unlimited-style review flow, permanent history, and priority processing remain available.',
+            ? 'より強いモデルの講評、全履歴、優先処理を引き続き利用できます。'
+            : 'Critiques without a monthly limit, full history, and priority processing remain available.',
         },
       },
       usage: {
@@ -160,8 +160,8 @@ function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
         pro: {
           title: isJa ? 'Pro のより強いモデルで確認できます' : 'This result can still be explored with Pro’s stronger model',
           body: isJa
-            ? '現在の契約は有効なので、より強いモデルの講評と永久履歴を使い続けられます。'
-            : 'Your current subscription is active, so you can keep using stronger-model critique and permanent history.',
+            ? '現在の契約は有効なので、より強いモデルの講評と全履歴を使い続けられます。'
+            : 'Your current subscription is active, so you can keep using stronger-model critique and full history.',
         },
       },
     },

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   getProPlanBoundaryCopy,
   getProUpgradeTriggerCopy,
@@ -25,6 +26,21 @@ test('Free / Pro copy never presents next-shoot guidance or retake comparison as
     const proText = `${pro.body} ${pro.features.join(' ')}`;
     assert.doesNotMatch(proText, /next-shoot guidance|下一次拍摄指导|次回撮影ガイド/i, locale);
     assert.doesNotMatch(proText, /permanent|永久/i, locale);
+  }
+});
+
+test('current product copy never promises permanent Pro history', () => {
+  const sources = [
+    'src/lib/i18n-en.ts',
+    'src/lib/i18n-zh.ts',
+    'src/lib/i18n-ja.ts',
+    'src/lib/llms.ts',
+    'public/llms.txt',
+    'src/components/marketing/ProPromoCard.tsx',
+  ];
+  for (const source of sources) {
+    const text = readFileSync(source, 'utf8');
+    assert.doesNotMatch(text, /permanent history|history permanently|永久历史|历史永久|永久履歴|永続履歴|非公開履歴は永久/i, source);
   }
 });
 

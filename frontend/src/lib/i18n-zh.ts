@@ -175,7 +175,7 @@ export const zhTranslations = {
   plan_free_feature_2: '15 天历史',
   plan_free_feature_3: 'Pro 预览',
   plan_pro_feature: '深度 Pro 点评',
-  plan_pro_feature_2: '永久历史',
+  plan_pro_feature_2: '订阅期内完整历史',
   plan_pro_feature_3: '优先处理',
   feature_flash_title: 'Flash 点评',
   feature_flash_body: '快速获得五维评分，适合立即判断构图、光线、色彩和技术问题。',
@@ -337,7 +337,7 @@ export const zhTranslations = {
   affiliate_intro_body: 'PicSpeak 是面向摄影师、创作者、学生和爱好者的 AI 摄影点评工具。用户上传照片后，几秒内即可获得构图、光线、色彩、感染力和技术完成度的实用反馈。',
   affiliate_intro_item_1: '游客模式降低试用门槛。',
   affiliate_intro_item_2: 'Free 用户登录后可解锁更多额度。',
-  affiliate_intro_item_3: 'Pro 提供深度点评、永久历史记录和优先处理。',
+  affiliate_intro_item_3: 'Pro 提供深度点评、订阅期内完整历史记录和优先处理。',
   affiliate_commission_title: '你能获得什么',
   affiliate_commission_rate_caption: '订阅持续佣金',
   affiliate_commission_window_value: '30 天',
@@ -584,7 +584,7 @@ export const zhTranslations = {
   usage_history_label: '私有历史保留',
   usage_history_none: '不保留',
   usage_history_days: '天',
-  usage_history_permanent: '永久保留',
+  usage_history_permanent: '订阅期内完整保留',
   usage_review_modes: '可用模式',
   usage_priority_label: '队列优先级',
   usage_priority_yes: '优先处理',
@@ -860,7 +860,7 @@ export const zhTranslations = {
   faq_q4: '我的照片数据安全吗？',
   faq_a4: '上传照片仅用于 AI 分析，不会公开分享给其他用户。我们使用加密存储，游客分析结果不会长期保留。',
   faq_q5: '点评结果会保存多久？',
-  faq_a5: '游客结果不长期保存；Free 用户的私有历史保留 15 天。分享链接有效，或作品已审核通过并在长廊公开期间，该条点评及照片永久保存。关闭所有公开访问后，恢复原有私有历史期限。Pro 用户的私有评图历史永久保留。',
+  faq_a5: '游客结果不长期保存；Free 用户的私有历史保留 15 天。分享链接有效，或作品已审核通过并在长廊公开期间，该条点评及照片永久保存。关闭所有公开访问后，恢复原有私有历史期限。Pro 用户在订阅期内保留完整的私有评图历史；Pro 结束后适用 Free 的期限。',
   faq_q6: '摄影构图中的三分法则是什么？',
   faq_a6: '三分法则是基础构图方法：把画面纵横各分成三等份，把主体或地平线放在线条或交叉点附近，让画面更有平衡和张力。',
   faq_q7: '如何改善照片构图？',
@@ -874,12 +874,12 @@ export const zhTranslations = {
 
 
   pro_offer_price_label: '$3.99 / 月',
-  affiliate_intro_item_4: '中文 Pro 为 $3.99/月，按月自动续费，可随时取消，适合需要深度分析、永久历史记录和优先处理的用户。',
+  affiliate_intro_item_4: '中文 Pro 为 $3.99/月，按月自动续费，可随时取消，适合需要深度分析、订阅期内完整历史记录和优先处理的用户。',
   review_promo_guest_body: '登录后不仅能保存这次结果，还能直接继续看 Pro 的更强模型分析。中文 Pro 为 $3.99/月，按月自动续费，可随时取消。',
   review_promo_guest_low_quota_body: '你今天只剩 {n} 次评图了。先登录解锁 Free，再直接切到 Pro 更强模型分析。中文 Pro 为 $3.99/月，可随时取消。',
   review_promo_low_quota_body: '如果你准备继续比较更多照片，Pro 会比反复计算额度更顺手。中文 Pro 为 $3.99/月，可随时取消。',
   review_promo_low_score_body: '分数偏低时，更需要完整拆解和明确修改方向。中文 Pro 为 $3.99/月，可随时取消。',
-  review_promo_standard_body: '更强模型分析加上永久历史记录，更适合连续复盘和稳定提升。中文 Pro 为 $3.99/月，可随时取消。',
+  review_promo_standard_body: '更强模型分析加上订阅期内完整历史记录，更适合连续复盘和稳定提升。中文 Pro 为 $3.99/月，可随时取消。',
 } as const satisfies TranslationDictionary;
 
 export type { TranslationDictionary, TranslationKey };
