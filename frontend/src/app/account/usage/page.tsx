@@ -26,7 +26,7 @@ import {
 } from '@/lib/external-checkout-window';
 import { useCreditPackCheckout } from '@/lib/hooks/useCreditPackCheckout';
 import { getProPlanBoundaryCopy, getUsageDecisionCopy, type ProConversionLocale } from '@/lib/pro-conversion';
-import { activationUiCopy, fixedSubscriptionCopy, formatSubscriptionDate } from '@/lib/usage-page-copy';
+import { activationUiCopy, fixedSubscriptionCopy, formatSubscriptionDate, getBillingStatusNotice, getSubscriptionTermCopy } from '@/lib/usage-page-copy';
 
 function UsageBar({
   label,
@@ -267,6 +267,8 @@ export default function UsagePage() {
   const reviewModesText =
     formatReviewModes(usage?.features.review_modes ?? [], t);
   const subscriptionEndText = formatSubscriptionDate(usage?.subscription?.current_period_ends_at, locale) ?? fixedSubscriptionCopy[locale].pending;
+  const subscriptionTermCopy = getSubscriptionTermCopy(usage?.subscription, locale);
+  const billingStatusNotice = usage ? getBillingStatusNotice(usage, locale) : null;
   const isZhLocale = locale === 'zh';
   const isActivationCodeSubscription = usage?.subscription?.provider === 'activation_code';
   const generationCredits = usage?.generation_credits ?? {
@@ -312,13 +314,13 @@ export default function UsagePage() {
                   )}
                   {usage.plan === 'pro' && (
                     <div className="mt-3 space-y-1">
-                      <p className="text-xs text-ink-muted">{fixedSubscriptionCopy[locale].label}</p>
+                      <p className="text-xs text-ink-muted">{subscriptionTermCopy.label}</p>
                       <p className="text-sm text-ink">{subscriptionEndText}</p>
                       {isZhLocale && isActivationCodeSubscription && (
                         <p className="text-xs text-accent-muted">{activationUiCopy.zh.subscriptionHint}</p>
                       )}
-                      {usage.subscription?.cancelled && (
-                        <p className="text-xs text-accent-muted">{fixedSubscriptionCopy[locale].cancelledHint}</p>
+                      {subscriptionTermCopy.hint && (
+                        <p className="text-xs text-accent-muted">{subscriptionTermCopy.hint}</p>
                       )}
                     </div>
                   )}
@@ -343,6 +345,9 @@ export default function UsagePage() {
                   />
                 )}
               </div>
+              {billingStatusNotice && (
+                <p role="status" className="mt-4 text-sm leading-6 text-accent-muted">{billingStatusNotice}</p>
+              )}
             </div>
 
             <UsageGenerationCreditsPanel

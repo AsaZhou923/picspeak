@@ -145,12 +145,31 @@ def _active_subscription_for_user(db: Session, user: User) -> BillingSubscriptio
     return resolve_active_subscription_for_user(db, user)
 
 
-def _portal_subscription_query(db: Session, user: User) -> Query[BillingSubscription]:
-    # One-time Pro purchases share this table/provider but have only an order
-    # ID. They must not replace checkout or shadow a real subscription's portal.
+def _usage_subscription_summary(subscription: BillingSubscription) -> dict:
+    return {
+        'provider': subscription.provider,
+        'status': subscription.status,
+        'cancelled': subscription.cancelled,
+        'renews_at': subscription.renews_at,
+        'ends_at': subscription.ends_at,
+        'current_period_ends_at': _current_period_ends_at(subscription),
+        'last_payment_status': subscription.last_payment_status,
+    }
+
+
+def _billing_history_query(db: Session, user: User) -> Query[BillingSubscription]:
+    test_mode = False if settings.app_env.strip().lower() in {'prod', 'production'} else settings.lemonsqueezy_webhook_test_mode
     return db.query(BillingSubscription).filter(
         BillingSubscription.user_id == user.id,
         BillingSubscription.provider == 'lemonsqueezy',
+        BillingSubscription.test_mode == test_mode,
+    )
+
+
+def _portal_subscription_query(db: Session, user: User) -> Query[BillingSubscription]:
+    # One-time Pro purchases share this table/provider but have only an order
+    # ID. They must not replace checkout or shadow a real subscription's portal.
+    return _billing_history_query(db, user).filter(
         func.trim(BillingSubscription.provider_subscription_id, ' \t\r\n') != '',
     )
 
@@ -221,22 +240,37 @@ def get_usage(request: Request, db: Session = Depends(get_db), actor: CurrentAct
         else user_usage_snapshot(db, actor.user)
     )
     subscription = None
+    active_subscription = None
     if actor.plan == UserPlan.pro:
         active_subscription = _active_subscription_for_user(db, actor.user)
         if active_subscription is not None:
-            subscription = {
-                'provider': active_subscription.provider,
-                'status': active_subscription.status,
-                'cancelled': active_subscription.cancelled,
-                'renews_at': active_subscription.renews_at,
-                'ends_at': active_subscription.ends_at,
-                'current_period_ends_at': _current_period_ends_at(active_subscription),
-            }
+            subscription = _usage_subscription_summary(active_subscription)
+    # Keep paid-access provenance separate from billing history: an expired or
+    # refunded purchase must not hide another valid pass or activation grant.
+    billing_subscription = None
+    recurring_subscriptions = []
+    if actor.plan != UserPlan.guest:
+        recurring_subscriptions = (
+            _portal_subscription_query(db, actor.user)
+            .order_by(BillingSubscription.updated_at.desc(), BillingSubscription.id.desc())
+            .all()
+        )
+        # A valid one-time pass protects access but must not obscure a failed
+        # recurring payment. Match the billing summary to the recovery target.
+        billing_record = _best_subscription_for_portal(recurring_subscriptions)
+        if billing_record is None and active_subscription is not None and active_subscription.provider == 'lemonsqueezy':
+            billing_record = active_subscription
+        if billing_record is None:
+            billing_record = (
+                _billing_history_query(db, actor.user)
+                .order_by(BillingSubscription.updated_at.desc(), BillingSubscription.id.desc())
+                .first()
+            )
+        if billing_record is not None:
+            billing_subscription = _usage_subscription_summary(billing_record)
     # Billing recovery remains available after paid access has ended. Do not use
     # the active subscription summary or the current plan as portal eligibility.
-    billing_portal_available = actor.plan != UserPlan.guest and (
-        _portal_subscription_query(db, actor.user).first() is not None
-    )
+    billing_portal_available = bool(recurring_subscriptions)
     db.commit()
     return UsageResponse(
         plan=actor.plan.value,
@@ -248,6 +282,7 @@ def get_usage(request: Request, db: Session = Depends(get_db), actor: CurrentAct
             'priority_queue': has_priority_queue(actor.plan),
         },
         subscription=subscription,
+        billing_subscription=billing_subscription,
         billing_portal_available=billing_portal_available,
         rate_limit={},
     )

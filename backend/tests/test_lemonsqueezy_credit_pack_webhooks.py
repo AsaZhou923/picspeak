@@ -92,6 +92,7 @@ def _one_time_pro_event(*, grant_token: str | None = None, variant_id: str = '14
     )
 
 
+@patch('app.services.lemonsqueezy_webhooks.settings.lemonsqueezy_webhook_test_mode', False)
 class LemonSqueezyCreditPackWebhookTests(unittest.TestCase):
     def test_order_created_grants_image_credit_pack_once(self) -> None:
         db = MagicMock()
@@ -134,7 +135,7 @@ class LemonSqueezyCreditPackWebhookTests(unittest.TestCase):
         db.query.return_value.filter.return_value.first.return_value = user
         with patch('app.services.lemonsqueezy_webhooks.settings.lemonsqueezy_image_credit_pack_variant_id', '1574509'):
             outcome, _ = process_lemonsqueezy_webhook_event(db, event)
-        self.assertEqual(outcome, 'ignored_credit_pack_missing_order_id')
+        self.assertEqual(outcome, 'ignored_resource_mismatch')
         db.add.assert_not_called()
 
     def test_order_created_skips_duplicate_credit_pack_grant(self) -> None:

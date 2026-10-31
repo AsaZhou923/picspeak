@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-31-billing-lifecycle",
+    "date": "2026-10-31",
+    "showPopup": false,
+    "title": "付款与订阅状态说明（准备中）",
+    "summary": "准备在账户用量页分别说明付款失败、退款、订阅到期和下次续费时间，同时准确显示仍有效的 Pro 权益。价格和额度不变，尚未发布。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-10-31-billing-lifecycle"
+  },
+  {
     "id": "2026-10-31-plan-comparison-copy",
     "date": "2026-10-31",
     "showPopup": false,

@@ -686,6 +686,7 @@ class UsageSubscription(BaseModel):
     renews_at: datetime | None = None
     ends_at: datetime | None = None
     current_period_ends_at: datetime | None = None
+    last_payment_status: str | None = None
 
 
 class UsageGenerationCredits(BaseModel):
@@ -706,6 +707,7 @@ class UsageResponse(BaseModel):
     generation_credits: UsageGenerationCredits
     features: UsageFeatures
     subscription: UsageSubscription | None = None
+    billing_subscription: UsageSubscription | None = None
     billing_portal_available: bool = False
     rate_limit: dict[str, Any]
 

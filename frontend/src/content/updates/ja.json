@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-31-billing-lifecycle",
+    "date": "2026-10-31",
+    "showPopup": false,
+    "title": "支払いと契約状況の説明を改善（準備中）",
+    "summary": "支払い失敗、返金、契約終了、次回更新日をアカウント使用状況ページで区別し、有効な Pro 利用権も正しく表示する準備を進めています。料金と利用枠は変わりません。まだ公開されていません。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-10-31-billing-lifecycle"
+  },
+  {
     "id": "2026-10-31-plan-comparison-copy",
     "date": "2026-10-31",
     "showPopup": false,

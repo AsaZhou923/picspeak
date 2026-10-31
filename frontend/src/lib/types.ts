@@ -14,6 +14,16 @@ export interface AuthToken {
 
 // ─── Usage ───────────────────────────────────────────────────────────────────
 
+export interface UsageSubscription {
+  provider: string | null;
+  status: string;
+  cancelled: boolean;
+  renews_at: string | null;
+  ends_at: string | null;
+  current_period_ends_at: string | null;
+  last_payment_status?: string | null;
+}
+
 export interface UsageResponse {
   plan: 'guest' | 'free' | 'pro';
   quota: {
@@ -43,14 +53,8 @@ export interface UsageResponse {
     history_retention_days: number | null;
     priority_queue: boolean;
   };
-  subscription: {
-    provider: string | null;
-    status: string;
-    cancelled: boolean;
-    renews_at: string | null;
-    ends_at: string | null;
-    current_period_ends_at: string | null;
-  } | null;
+  subscription: UsageSubscription | null;
+  billing_subscription?: UsageSubscription | null;
   billing_portal_available: boolean;
   rate_limit: {
     limit_per_min: number;

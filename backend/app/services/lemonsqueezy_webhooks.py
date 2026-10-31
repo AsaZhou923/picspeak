@@ -9,6 +9,7 @@ from typing import Any
 
 from fastapi import Request, status
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -31,7 +32,14 @@ HANDLED_LEMONSQUEEZY_EVENTS = {
     'subscription_created',
     'subscription_updated',
     'subscription_cancelled',
+    'subscription_expired',
+    'subscription_resumed',
+    'subscription_paused',
+    'subscription_unpaused',
     'subscription_payment_success',
+    'subscription_payment_recovered',
+    'subscription_payment_failed',
+    'subscription_payment_refunded',
     'order_refunded',
 }
 
@@ -116,6 +124,25 @@ def _parse_iso_datetime(value: Any) -> datetime | None:
 
 def _event_effective_at(attributes: dict[str, Any]) -> datetime | None:
     return _parse_iso_datetime(attributes.get('updated_at')) or _parse_iso_datetime(attributes.get('created_at'))
+
+
+def _test_mode_matches(event: LemonSqueezyWebhookEvent) -> bool:
+    if not isinstance(event.test_mode, bool):
+        return False
+    flags = [event.test_mode]
+    attributes = _payload_attributes(event.data)
+    for source in (event.meta, attributes):
+        if 'test_mode' in source:
+            if not isinstance(source['test_mode'], bool):
+                return False
+            flags.append(source['test_mode'])
+    if any(flag != flags[0] for flag in flags):
+        return False
+    # A production endpoint must never mint test entitlements, even when an old
+    # deployment accidentally retains the development webhook setting.
+    if settings.app_env.strip().lower() in {'prod', 'production'} and event.test_mode:
+        return False
+    return event.test_mode == settings.lemonsqueezy_webhook_test_mode
 
 
 def _payload_attributes(data: dict[str, Any]) -> dict[str, Any]:
@@ -222,13 +249,16 @@ async def verify_lemonsqueezy_webhook(request: Request) -> LemonSqueezyWebhookEv
 
     resource_type = str(data.get('type') or '').strip() or None
     resource_id = str(data.get('id') or '').strip() or None
+    test_mode = meta.get('test_mode', _payload_attributes(data).get('test_mode', False))
+    if not isinstance(test_mode, bool):
+        raise api_error(status.HTTP_400_BAD_REQUEST, 'LEMONSQUEEZY_WEBHOOK_PAYLOAD_INVALID', 'Invalid payment mode')
     return LemonSqueezyWebhookEvent(
         event_name=event_name,
         payload=payload,
         meta=meta,
         data=data,
         event_hash=hashlib.sha256(raw_body).hexdigest(),
-        test_mode=bool(meta.get('test_mode')),
+        test_mode=test_mode,
         resource_type=resource_type,
         resource_id=resource_id,
     )
@@ -255,8 +285,20 @@ def record_lemonsqueezy_webhook_event(db: Session, event: LemonSqueezyWebhookEve
         test_mode=event.test_mode,
         payload_json=event.payload,
     )
-    db.add(record)
-    db.flush()
+    try:
+        # The unique hash is also the concurrency boundary for identical raw
+        # deliveries. Keep a competing insert's rollback inside a savepoint.
+        with db.begin_nested():
+            db.add(record)
+            db.flush()
+    except IntegrityError:
+        existing = db.query(BillingWebhookEvent).filter(
+            BillingWebhookEvent.provider == 'lemonsqueezy',
+            BillingWebhookEvent.event_hash == event.event_hash,
+        ).one_or_none()
+        if existing is None:
+            raise
+        return existing, True
     return record, False
 
 
@@ -308,9 +350,7 @@ def _lookup_subscription(
 
 def _variant_matches_pro_plan(variant_id: str | None) -> bool:
     configured = settings.lemonsqueezy_pro_variant_id.strip()
-    if not configured or not variant_id:
-        return True
-    return configured == variant_id
+    return bool(configured and variant_id and configured == variant_id)
 
 
 def _variant_matches_one_time_pro_plan(variant_id: str | None) -> bool:
@@ -484,7 +524,7 @@ def _order_fully_refunded(attributes: dict[str, Any]) -> bool:
     return str(attributes.get('status') or '').strip().lower() == 'refunded'
 
 
-def _order_refund_already_received(db: Session, order_id: str | None) -> bool:
+def _order_refund_already_received(db: Session, order_id: str | None, *, test_mode: bool) -> bool:
     """Whether a full refund for this order arrived before its grant was processed."""
     if not order_id:
         return False
@@ -494,10 +534,13 @@ def _order_refund_already_received(db: Session, order_id: str | None) -> bool:
             BillingWebhookEvent.provider == 'lemonsqueezy',
             BillingWebhookEvent.event_name == 'order_refunded',
             BillingWebhookEvent.resource_id == order_id,
+            BillingWebhookEvent.test_mode == test_mode,
         )
         .all()
     )
     for refund in refunds:
+        if getattr(refund, 'test_mode', False) != test_mode or getattr(refund, 'outcome', None) == 'ignored_payment_mode_mismatch':
+            continue
         payload = refund.payload_json if isinstance(refund.payload_json, dict) else {}
         data = payload.get('data') if isinstance(payload.get('data'), dict) else {}
         if _order_fully_refunded(_payload_attributes(data)):
@@ -520,10 +563,10 @@ def _process_image_credit_pack_order(db: Session, event: LemonSqueezyWebhookEven
         return 'ignored_credit_pack_missing_order_id', user
     # Serialize both new reservations and grants at the same user boundary.
     # Event hashes alone do not deduplicate distinct deliveries of one order.
-    db.query(User).filter(User.id == user.id).with_for_update().one()
+    db.query(User).filter(User.id == user.id).populate_existing().with_for_update().one()
     if _has_granted_image_credit_pack(db, user, order_id):
         return 'credit_pack_already_granted', user
-    if _order_refund_already_received(db, order_id):
+    if _order_refund_already_received(db, order_id, test_mode=event.test_mode):
         return 'ignored_credit_pack_already_refunded', user
 
     custom = _custom_data(event.meta)
@@ -604,6 +647,8 @@ def _upsert_subscription_from_resource(
     )
     if subscription is None:
         subscription = BillingSubscription(user_id=user.id, provider='lemonsqueezy')
+    elif subscription.user_id != user.id:
+        raise api_error(status.HTTP_409_CONFLICT, 'LEMONSQUEEZY_IDENTITY_MISMATCH', 'Subscription owner does not match')
     before_fingerprint = _subscription_state_fingerprint(subscription) if subscription.id is not None else None
     event_effective_at = _event_effective_at(attributes)
     # Older payment handlers wrote the local invoice receipt time into the
@@ -623,7 +668,7 @@ def _upsert_subscription_from_resource(
     url_map = urls if isinstance(urls, dict) else {}
 
     subscription.provider_customer_id = _attribute_text(attributes, 'customer_id') or subscription.provider_customer_id
-    subscription.provider_order_id = order_id
+    subscription.provider_order_id = order_id or subscription.provider_order_id
     if subscription_id:
         subscription.provider_subscription_id = subscription_id
     subscription.store_id = _attribute_text(attributes, 'store_id') or subscription.store_id
@@ -660,6 +705,14 @@ def _upsert_subscription_from_resource(
 def _sync_subscription_from_api(db: Session, subscription_id: str, user: User | None) -> tuple[BillingSubscription, User]:
     data = retrieve_subscription(subscription_id)
     attributes = _payload_attributes(data)
+    if data.get('type') != 'subscriptions' or str(data.get('id') or '') != subscription_id:
+        raise api_error(status.HTTP_502_BAD_GATEWAY, 'LEMONSQUEEZY_API_FAILED', 'Invalid subscription resource')
+    if attributes.get('test_mode', False) != settings.lemonsqueezy_webhook_test_mode or (
+        settings.app_env.strip().lower() in {'prod', 'production'} and attributes.get('test_mode') is True
+    ):
+        raise api_error(status.HTTP_409_CONFLICT, 'LEMONSQUEEZY_MODE_MISMATCH', 'Subscription belongs to a different payment mode')
+    if not _variant_matches_pro_plan(_attribute_text(attributes, 'variant_id')):
+        raise api_error(status.HTTP_409_CONFLICT, 'LEMONSQUEEZY_VARIANT_MISMATCH', 'Subscription is not a configured Pro offer')
     resolved_user = user
     if resolved_user is None:
         resolved_user = _lookup_user_by_email(db, str(attributes.get('user_email') or '').strip() or None)
@@ -669,6 +722,7 @@ def _sync_subscription_from_api(db: Session, subscription_id: str, user: User | 
             'LEMONSQUEEZY_USER_NOT_FOUND',
             'Unable to match Lemon Squeezy subscription to a user',
         )
+    db.query(User).filter(User.id == resolved_user.id).populate_existing().with_for_update().one()
     subscription, _before_fingerprint, _event_version, _applied = _upsert_subscription_from_resource(
         db,
         event_name='subscription_updated',
@@ -714,17 +768,27 @@ def _process_order_created(db: Session, event: LemonSqueezyWebhookEvent, user: U
     if user is None:
         return 'ignored_user_not_found', None
     order_id = _order_resource_id(event)
+    attributes = _payload_attributes(event.data)
+    variant_id = _attribute_text(attributes, 'variant_id') or _attribute_text(_order_item_attributes(attributes), 'variant_id')
+    if not _is_one_time_pro_order(event) and not _variant_matches_pro_plan(variant_id):
+        return 'ignored_non_pro_variant', user
     if _is_one_time_pro_order(event):
         if _verified_one_time_pro_payload(event, user) is None:
             return 'ignored_one_time_pro_grant_invalid', user
         # Serialize with order_refunded so a concurrent refund sees this grant
         # or this grant sees the committed refund.
-        db.query(User).filter(User.id == user.id).with_for_update().one()
+        db.query(User).filter(User.id == user.id).populate_existing().with_for_update().one()
         existing_subscription = _lookup_subscription(db, provider_order_id=order_id, user_id=user.id)
         if _one_time_pro_already_granted(existing_subscription):
             return 'one_time_pro_already_granted', user
-        if _order_refund_already_received(db, order_id):
+        if _order_refund_already_received(db, order_id, test_mode=event.test_mode):
             return 'ignored_one_time_pro_already_refunded', user
+    else:
+        existing = _lookup_subscription(db, provider_order_id=order_id, user_id=user.id)
+        if existing is not None and existing.provider_subscription_id:
+            # An order receipt is not a subscription snapshot and must not
+            # overwrite active/cancelled/expired state when delivered late.
+            return 'order_recorded', user
     subscription, before_fingerprint, event_version, applied = _upsert_subscription_from_resource(
         db,
         event_name=event.event_name,
@@ -754,7 +818,7 @@ def _process_order_created(db: Session, event: LemonSqueezyWebhookEvent, user: U
 def _revoke_image_credit_pack(
     db: Session, event: LemonSqueezyWebhookEvent, user: User, order_id: str,
 ) -> tuple[str, User | None]:
-    db.query(User).filter(User.id == user.id).with_for_update().one()
+    db.query(User).filter(User.id == user.id).populate_existing().with_for_update().one()
     if _credit_pack_ledger_entry(db, user, order_id, grant_type=CREDIT_PACK_REFUND_GRANT_TYPE) is not None:
         return 'credit_pack_refund_already_applied', user
     grant = _credit_pack_ledger_entry(db, user, order_id, grant_type=CREDIT_PACK_GRANT_TYPE)
@@ -828,7 +892,7 @@ def _process_order_refunded(db: Session, event: LemonSqueezyWebhookEvent, user: 
         return 'ignored_refund_missing_order_id', user
     # Same user boundary as the grant paths, so an overlapping order_created
     # either commits its grant first or observes this refund.
-    db.query(User).filter(User.id == user.id).with_for_update().one()
+    db.query(User).filter(User.id == user.id).populate_existing().with_for_update().one()
     full_refund = _order_fully_refunded(_payload_attributes(event.data))
     if _is_image_credit_pack_order(event) or _has_granted_image_credit_pack(db, user, order_id):
         if not full_refund:
@@ -847,6 +911,11 @@ def _process_order_refunded(db: Session, event: LemonSqueezyWebhookEvent, user: 
 def _process_subscription_event(db: Session, event: LemonSqueezyWebhookEvent, user: User | None) -> tuple[str, User | None]:
     if user is None:
         return 'ignored_user_not_found', None
+    attributes = _payload_attributes(event.data)
+    existing = _lookup_subscription(db, provider_subscription_id=str(event.data.get('id') or ''))
+    variant_id = _attribute_text(attributes, 'variant_id') or (existing.variant_id if existing is not None else None)
+    if not _variant_matches_pro_plan(variant_id):
+        return 'ignored_non_pro_variant', user
     subscription, before_fingerprint, event_version, applied = _upsert_subscription_from_resource(
         db,
         event_name=event.event_name,
@@ -868,7 +937,22 @@ def _process_subscription_event(db: Session, event: LemonSqueezyWebhookEvent, us
     return 'subscription_synced', user
 
 
-def _process_subscription_payment_success(db: Session, event: LemonSqueezyWebhookEvent, user: User | None) -> tuple[str, User | None]:
+def _processed_invoice_events(db: Session, event: LemonSqueezyWebhookEvent) -> list[BillingWebhookEvent]:
+    return (
+        db.query(BillingWebhookEvent)
+        .filter(
+            BillingWebhookEvent.provider == 'lemonsqueezy',
+            BillingWebhookEvent.resource_type == 'subscription-invoices',
+            BillingWebhookEvent.resource_id == str(event.data.get('id') or ''),
+            BillingWebhookEvent.test_mode == event.test_mode,
+            BillingWebhookEvent.processed_at.is_not(None),
+            BillingWebhookEvent.event_name.in_(['subscription_payment_success', 'subscription_payment_recovered', 'subscription_payment_refunded']),
+        )
+        .all()
+    )
+
+
+def _process_subscription_payment(db: Session, event: LemonSqueezyWebhookEvent, user: User | None) -> tuple[str, User | None]:
     attributes = _payload_attributes(event.data)
     subscription_id = (
         str(attributes.get('subscription_id') or '').strip()
@@ -894,20 +978,53 @@ def _process_subscription_payment_success(db: Session, event: LemonSqueezyWebhoo
 
     if resolved_user is None:
         return 'ignored_user_not_found', None
+    if subscription.user_id != resolved_user.id:
+        return 'ignored_identity_mismatch', resolved_user
     if not _variant_matches_pro_plan(subscription.variant_id):
         return 'ignored_non_pro_variant', resolved_user
 
     before_fingerprint = _subscription_state_fingerprint(subscription)
     invoice_id = str(event.data.get('id') or '').strip() or None
+    if not invoice_id:
+        return 'ignored_missing_invoice', resolved_user
+    is_success = event.event_name in {'subscription_payment_success', 'subscription_payment_recovered'}
+    if is_success:
+        previous_events = _processed_invoice_events(db, event)
+        if any(item.event_name == 'subscription_payment_refunded' and item.outcome in {
+            'payment_refunded', 'payment_partial_refund_recorded',
+        } for item in previous_events) or (
+            subscription.last_invoice_id == invoice_id and subscription.last_payment_status in {'refunded', 'partial_refund'}
+        ):
+            return 'payment_already_refunded', resolved_user
+        if any(item.outcome == 'payment_recorded' for item in previous_events) or (
+            subscription.last_invoice_id == invoice_id and subscription.last_payment_status == 'success'
+        ):
+            return 'payment_already_recorded', resolved_user
+    if event.event_name == 'subscription_payment_refunded':
+        payment_status = 'refunded' if _order_fully_refunded(attributes) else 'partial_refund'
+        outcome = 'payment_refunded' if payment_status == 'refunded' else 'payment_partial_refund_recorded'
+    else:
+        payment_status = 'success' if is_success else 'failed'
+        outcome = 'payment_recorded' if is_success else 'payment_failed_recorded'
     payment_effective_at = _event_effective_at(attributes)
     # An invoice is not a subscription-state snapshot. Keep its timestamps and
     # identity separate so delayed/equal-time subscription updates can restore
     # access, and older invoices cannot replace newer payment metadata.
-    if subscription.last_payment_at is None or (
+    # The provider can send recovery/success and refund at the same timestamp.
+    # A refund wins a tie for the same invoice; a failure must not undo success.
+    same_invoice = subscription.last_invoice_id == invoice_id
+    status_rank = {'failed': 0, 'success': 1, 'partial_refund': 2, 'refunded': 3}
+    tied_upgrade = same_invoice and payment_effective_at == subscription.last_payment_at and (
+        status_rank.get(payment_status, -1) > status_rank.get(subscription.last_payment_status or '', -1)
+    )
+    status_can_advance = not same_invoice or (
+        status_rank.get(payment_status, -1) >= status_rank.get(subscription.last_payment_status or '', -1)
+    )
+    if status_can_advance and (subscription.last_payment_at is None or tied_upgrade or (
         payment_effective_at is not None and payment_effective_at > subscription.last_payment_at
-    ):
+    )):
         subscription.last_invoice_id = invoice_id
-        subscription.last_payment_status = 'success'
+        subscription.last_payment_status = payment_status
         subscription.last_payment_at = payment_effective_at
     subscription.updated_at = _utc_now()
     db.add(subscription)
@@ -919,6 +1036,8 @@ def _process_subscription_payment_success(db: Session, event: LemonSqueezyWebhoo
         before_fingerprint=before_fingerprint,
         event_version=event.event_hash or str((subscription.last_payment_at or _utc_now()).isoformat()),
     )
+    if not is_success:
+        return outcome, resolved_user
     record_product_event(
         db,
         event_name='paid_success',
@@ -933,20 +1052,37 @@ def _process_subscription_payment_success(db: Session, event: LemonSqueezyWebhoo
             'event_name': event.event_name,
         },
     )
-    return 'payment_recorded', resolved_user
+    return outcome, resolved_user
 
 
 def process_lemonsqueezy_webhook_event(db: Session, event: LemonSqueezyWebhookEvent) -> tuple[str, str | None]:
     if event.event_name not in HANDLED_LEMONSQUEEZY_EVENTS:
         return 'ignored_unhandled_event', None
+    if not _test_mode_matches(event):
+        return 'ignored_payment_mode_mismatch', None
+    expected_resource = (
+        'orders' if event.event_name.startswith('order_') else
+        'subscription-invoices' if event.event_name.startswith('subscription_payment_') else 'subscriptions'
+    )
+    if event.data.get('type') != expected_resource or not str(event.data.get('id') or '').strip():
+        return 'ignored_resource_mismatch', None
+    event.data = {**event.data, 'attributes': {**_payload_attributes(event.data), 'test_mode': event.test_mode}}
 
     user = _match_user_for_event(db, event)
+    if user is not None and event.event_name.startswith('subscription_'):
+        # Serialize all invoice/state paths for an owner. Refresh any subscription
+        # loaded while matching the user before this lock was acquired.
+        db.query(User).filter(User.id == user.id).populate_existing().with_for_update().one()
+        db.flush()
+        for item in db.identity_map.values():
+            if isinstance(item, BillingSubscription):
+                db.expire(item)
     if event.event_name == 'order_created':
         outcome, resolved_user = _process_order_created(db, event, user)
     elif event.event_name == 'order_refunded':
         outcome, resolved_user = _process_order_refunded(db, event, user)
-    elif event.event_name in {'subscription_created', 'subscription_updated', 'subscription_cancelled'}:
-        outcome, resolved_user = _process_subscription_event(db, event, user)
+    elif event.event_name.startswith('subscription_payment_'):
+        outcome, resolved_user = _process_subscription_payment(db, event, user)
     else:
-        outcome, resolved_user = _process_subscription_payment_success(db, event, user)
+        outcome, resolved_user = _process_subscription_event(db, event, user)
     return outcome, resolved_user.public_id if resolved_user is not None else None

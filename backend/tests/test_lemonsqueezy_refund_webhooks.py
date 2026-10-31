@@ -113,6 +113,7 @@ def _added(db: MagicMock, model) -> list:
     return [call.args[0] for call in db.add.call_args_list if isinstance(call.args[0], model)]
 
 
+@patch('app.services.lemonsqueezy_webhooks.settings.lemonsqueezy_webhook_test_mode', False)
 class CreditPackRefundTests(unittest.TestCase):
     def _process(
         self, db: MagicMock, event: LemonSqueezyWebhookEvent, *,
@@ -192,6 +193,7 @@ class CreditPackRefundTests(unittest.TestCase):
         db.add.assert_not_called()
 
 
+@patch('app.services.lemonsqueezy_webhooks.settings.lemonsqueezy_webhook_test_mode', False)
 class OneTimeProRefundTests(unittest.TestCase):
     def test_full_refund_ends_one_time_pro_access(self) -> None:
         user = _user(UserPlan.pro)

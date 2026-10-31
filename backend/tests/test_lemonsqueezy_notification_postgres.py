@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import sys
+import threading
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -18,8 +19,8 @@ if str(BACKEND_ROOT) not in sys.path:
 
 from app.core.config import settings
 from app.db.base import Base
-from app.db.models import BillingSubscription, NotificationEvent, User, UserPlan, UserStatus
-from app.services.lemonsqueezy_webhooks import LemonSqueezyWebhookEvent, process_lemonsqueezy_webhook_event
+from app.db.models import BillingSubscription, BillingWebhookEvent, NotificationEvent, ProductAnalyticsEvent, User, UserPlan, UserStatus
+from app.services.lemonsqueezy_webhooks import LemonSqueezyWebhookEvent, process_lemonsqueezy_webhook_event, record_lemonsqueezy_webhook_event
 
 
 TEST_DATABASE_URL = os.getenv('PICSPEAK_TEST_DATABASE_URL', '').strip()
@@ -109,6 +110,9 @@ class LemonSqueezyNotificationPostgresTests(unittest.TestCase):
                 admin_engine.dispose()
 
     def setUp(self) -> None:
+        mode = patch('app.services.lemonsqueezy_webhooks.settings.lemonsqueezy_webhook_test_mode', False)
+        mode.start()
+        self.addCleanup(mode.stop)
         self.db = self.Session()
         tables = ', '.join(f'"{table.name}"' for table in reversed(Base.metadata.sorted_tables))
         self.db.execute(text(f'TRUNCATE {tables} RESTART IDENTITY CASCADE'))
@@ -372,6 +376,129 @@ class LemonSqueezyNotificationPostgresTests(unittest.TestCase):
         self.assertEqual(subscription.status, 'active')
         self.assertFalse(subscription.cancelled)
         self.assertEqual(self.db.query(NotificationEvent).count(), 0)
+
+    def _assert_concurrent_invoice_deliveries(self, *, same_hash: bool) -> None:
+        user = self.user()
+        subscription = self.existing_subscription(user)
+        user_id = user.public_id
+        subscription_id = subscription.provider_subscription_id
+        self.db.rollback()
+        barrier = threading.Barrier(2)
+        outcomes, errors = [], []
+
+        def deliver(index):
+            try:
+                data = {'type': 'subscription-invoices', 'id': 'invoice_concurrent', 'attributes': {
+                    'subscription_id': subscription_id, 'status': 'paid', 'updated_at': datetime.now(timezone.utc).isoformat(),
+                }}
+                event = LemonSqueezyWebhookEvent(
+                    event_name='subscription_payment_success',
+                    payload={'meta': {'event_name': 'subscription_payment_success'}, 'data': data},
+                    meta={'custom_data': {'user_id': user_id}}, data=data,
+                    event_hash='same_invoice_hash' if same_hash else f'invoice_hash_{index}',
+                    test_mode=False, resource_type='subscription-invoices', resource_id='invoice_concurrent',
+                )
+                with self.Session() as db:
+                    barrier.wait(timeout=10)
+                    record, duplicate = record_lemonsqueezy_webhook_event(db, event)
+                    if duplicate:
+                        outcomes.append('duplicate')
+                    else:
+                        outcome, _ = process_lemonsqueezy_webhook_event(db, event)
+                        record.outcome = outcome
+                        record.processed_at = datetime.now(timezone.utc)
+                        outcomes.append(outcome)
+                    db.commit()
+            except Exception as exc:
+                errors.append(exc)
+
+        with patch('app.services.lemonsqueezy_webhooks.retrieve_subscription', side_effect=AssertionError('No provider calls')):
+            threads = [threading.Thread(target=deliver, args=(index,)) for index in range(2)]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join(timeout=20)
+        self.assertFalse(any(thread.is_alive() for thread in threads))
+        self.assertEqual(errors, [])
+        self.assertCountEqual(outcomes, ['payment_recorded', 'duplicate' if same_hash else 'payment_already_recorded'])
+        self.assertEqual(self.db.query(ProductAnalyticsEvent).filter(ProductAnalyticsEvent.event_name == 'paid_success').count(), 1)
+        self.assertEqual(self.db.query(BillingWebhookEvent).count(), 1 if same_hash else 2)
+
+    def test_distinct_payloads_for_same_invoice_are_economically_idempotent(self) -> None:
+        self._assert_concurrent_invoice_deliveries(same_hash=False)
+
+    def test_identical_hash_concurrent_delivery_returns_duplicate_without_aborting_transaction(self) -> None:
+        self._assert_concurrent_invoice_deliveries(same_hash=True)
+
+    def _assert_user_plan_is_refreshed_after_waiting_for_lock(self, *, initial_plan, competing_plan, status):
+        from app.services.lemonsqueezy_webhooks import _match_user_for_event
+
+        user = self.user()
+        user.plan = initial_plan
+        subscription = self.existing_subscription(user)
+        user_pk = user.id
+        self.db.rollback()
+        matched = threading.Event()
+        errors = []
+        event = _subscription_event(
+            event_name='subscription_updated', subscription_id=subscription.provider_subscription_id,
+            status=status, cancelled=False, updated_at=datetime.now(timezone.utc) + timedelta(minutes=1),
+        )
+
+        def match_then_signal(db, incoming):
+            result = _match_user_for_event(db, incoming)
+            self.assertEqual(result.plan, initial_plan)
+            matched.set()
+            return result
+
+        def deliver():
+            try:
+                with self.Session() as db:
+                    process_lemonsqueezy_webhook_event(db, event)
+                    db.commit()
+            except Exception as exc:
+                errors.append(exc)
+
+        with self.Session() as competing_db, patch(
+            'app.services.lemonsqueezy_webhooks._match_user_for_event', side_effect=match_then_signal,
+        ):
+            competing_user = competing_db.query(User).filter(User.id == user_pk).with_for_update().one()
+            thread = threading.Thread(target=deliver)
+            thread.start()
+            try:
+                self.assertTrue(matched.wait(timeout=10))
+                competing_user.plan = competing_plan
+                competing_db.commit()
+            finally:
+                competing_db.rollback()
+                thread.join(timeout=15)
+        self.assertFalse(thread.is_alive())
+        self.assertEqual(errors, [])
+        self.db.expire_all()
+        self.assertEqual(self.db.query(User).filter(User.id == user_pk).one().plan, initial_plan)
+
+    def test_waiting_expiry_refreshes_user_plan_before_persisting_downgrade(self) -> None:
+        self._assert_user_plan_is_refreshed_after_waiting_for_lock(
+            initial_plan=UserPlan.free, competing_plan=UserPlan.pro, status='expired',
+        )
+
+    def test_waiting_activation_refreshes_user_plan_before_persisting_upgrade(self) -> None:
+        self._assert_user_plan_is_refreshed_after_waiting_for_lock(
+            initial_plan=UserPlan.pro, competing_plan=UserPlan.free, status='active',
+        )
+
+    def test_reconciliation_uses_an_enforced_read_only_transaction(self) -> None:
+        from app.services.billing_reconciliation import load_billing_reconciliation
+
+        self.db.rollback()
+        self.db.execute(text('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY'))
+        result = load_billing_reconciliation(
+            self.db, start=datetime(2026, 10, 1, tzinfo=timezone.utc), end=datetime(2026, 11, 1, tzinfo=timezone.utc),
+        )
+        self.assertEqual(self.db.execute(text('SHOW transaction_read_only')).scalar_one(), 'on')
+        self.assertEqual(result['received_callbacks'], 0)
+        self.assertIsNone(result['provider_net_settlement'])
+        self.db.rollback()
 
 
 if __name__ == '__main__':

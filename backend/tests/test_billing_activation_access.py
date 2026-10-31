@@ -4,7 +4,7 @@ import sys
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from sqlalchemy.sql.elements import BinaryExpression
 
@@ -33,6 +33,46 @@ def _query_mock(*, first=None, all_rows=None):
 
 
 class BillingActivationAccessTests(unittest.TestCase):
+    def test_production_never_grants_access_from_a_test_subscription(self) -> None:
+        subscription = BillingSubscription(provider='lemonsqueezy', status='active', test_mode=True)
+        with patch('app.services.billing_access.settings.app_env', 'production'), patch(
+            'app.services.billing_access.settings.lemonsqueezy_webhook_test_mode', True,
+        ):
+            self.assertFalse(subscription_grants_pro_access(subscription))
+        subscription.provider = ACTIVATION_CODE_PROVIDER
+        with patch('app.services.billing_access.settings.app_env', 'production'):
+            self.assertTrue(subscription_grants_pro_access(subscription))
+
+    def test_live_webhook_mode_rejects_historical_test_access_in_dev(self) -> None:
+        subscription = BillingSubscription(provider='lemonsqueezy', status='active', test_mode=True)
+        with patch('app.services.billing_access.settings.app_env', 'dev'), patch(
+            'app.services.billing_access.settings.lemonsqueezy_webhook_test_mode', False,
+        ):
+            self.assertFalse(subscription_grants_pro_access(subscription))
+            subscription.test_mode = False
+            self.assertTrue(subscription_grants_pro_access(subscription))
+            subscription.provider = ACTIVATION_CODE_PROVIDER
+            subscription.test_mode = True
+            self.assertTrue(subscription_grants_pro_access(subscription))
+
+    def test_test_webhook_mode_keeps_local_test_access_in_dev(self) -> None:
+        subscription = BillingSubscription(provider='lemonsqueezy', status='active', test_mode=True)
+        with patch('app.services.billing_access.settings.app_env', 'dev'), patch(
+            'app.services.billing_access.settings.lemonsqueezy_webhook_test_mode', True,
+        ):
+            self.assertTrue(subscription_grants_pro_access(subscription))
+
+    def test_live_mode_sync_removes_pro_granted_only_by_a_test_subscription(self) -> None:
+        user = User(id=45, public_id='usr_test_only', plan=UserPlan.pro)
+        test_subscription = BillingSubscription(user_id=user.id, provider='lemonsqueezy', status='active', test_mode=True)
+        db = MagicMock()
+        db.query.return_value = _query_mock(all_rows=[test_subscription])
+        with patch('app.services.billing_access.settings.app_env', 'dev'), patch(
+            'app.services.billing_access.settings.lemonsqueezy_webhook_test_mode', False,
+        ):
+            self.assertEqual(sync_user_billing_plan(db, user), UserPlan.free)
+        self.assertEqual(user.plan, UserPlan.free)
+
     def test_active_subscription_with_past_end_date_does_not_grant_access(self) -> None:
         subscription = BillingSubscription(
             provider=ACTIVATION_CODE_PROVIDER,

@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import status
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.errors import api_error
 from app.db.models import BillingActivationCode, BillingSubscription, User, UserPlan
 
@@ -47,6 +48,15 @@ def activation_code_prefix(value: str) -> str:
 
 
 def subscription_grants_pro_access(subscription: BillingSubscription, *, now: datetime | None = None) -> bool:
+    if (
+        subscription.provider == LEMONSQUEEZY_PROVIDER
+        and subscription.test_mode
+        and (
+            not settings.lemonsqueezy_webhook_test_mode
+            or settings.app_env.strip().lower() in {'prod', 'production'}
+        )
+    ):
+        return False
     current = now or utc_now()
     status_value = (subscription.status or '').strip().lower()
     ends_at = _coerce_utc(subscription.ends_at)

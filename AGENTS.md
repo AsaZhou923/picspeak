@@ -200,6 +200,14 @@ Normal single-photo review uses one combined mode/model choice: Flash defaults t
 - Quotas are tracked through `usage_ledger` and related helpers by IP, user identity, endpoint/category, plan, and generation credit balance.
 - Idempotency matters for creation endpoints; keep `Idempotency-Key` behavior intact when touching task creation.
 
+### Payment lifecycle and minimal business reporting
+
+- The local payment lifecycle implementation distinguishes subscription snapshots from invoice events. `subscription_expired` updates access; failed/recovered/refunded invoices update payment status without cancelling another paid entitlement. Invoice refunds do not themselves cancel a subscription; partial refunds require operator review. Duplicate deliveries use both the webhook hash and invoice identity, with user locking before state changes.
+- `LEMONSQUEEZY_WEBHOOK_TEST_MODE` is an acceptance boundary, not just a webhook-registration option. Automatic and manual live deployments explicitly set it and `LEMONSQUEEZY_CHECKOUT_TEST_MODE` to false. Live payment mode excludes stored test subscriptions from Pro access even on a legacy deployment with `APP_ENV=dev`; production additionally rejects test events regardless of a misconfigured flag. Billing portals also match payment mode. The expanded registration event list requires a separately authorized provider configuration update.
+- `/me/usage.subscription` still describes active access. Additive `billing_subscription` describes the recurring billing/recovery target (or a legacy pass fallback), so another active pass or activation does not hide a failed subscription payment. Render only stable payment status values through the three-language copy helper.
+- `export_monetization_baseline.py` and `reconcile_billing.py` require an explicit database URL for database exports, use PostgreSQL read-only transactions and rollback, and produce aggregate internal reports in the external `07 - Analytics` directory. Missing provider data is unknown, not zero. Owner views and first-observed payments are proxies, not validated reading or lifetime conversion; current account plans are not historical plan snapshots.
+- The 2026-10-31 P0 batch follows the revised strategy: minimal MON01/03, payment MON05, existing MON06 regression and batch MON16. MON02/04/07/15 remain deferred; this work does not authorize production deployment, data repair, new prices, a registration gate or formal experiments.
+
 ### SEO, locale, and content
 
 - English, Chinese, and Japanese content is represented across `i18n-*.ts`, localized routes, blog/update JSON files, and SEO helpers.

@@ -63,6 +63,7 @@ class BillingPortalRouteTests(unittest.TestCase):
         self.addCleanup(self.client.__exit__, None, None, None)
         self.retrieve = self.start_patch(patch.object(billing, 'retrieve_subscription', return_value={'attributes': {}}))
         self.start_patch(patch.object(billing.settings, 'lemonsqueezy_pro_checkout_url', ''))
+        self.start_patch(patch.object(billing.settings, 'lemonsqueezy_webhook_test_mode', False))
         self.start_patch(patch.object(billing, 'user_usage_snapshot', return_value={}))
         self.start_patch(patch.object(billing, 'guest_usage_snapshot', return_value={}))
         self.start_patch(patch.object(billing, '_generation_credit_usage_snapshot', return_value={}))
@@ -116,6 +117,7 @@ class BillingPortalRouteTests(unittest.TestCase):
                 self.assertEqual(usage.status_code, 200, usage.text)
                 self.assertEqual(usage.json()['plan'], expected_plan)
                 self.assertTrue(usage.json()['billing_portal_available'])
+                self.assertEqual(usage.json()['billing_subscription']['status'], subscription_status)
                 if expected_plan == 'free':
                     self.assertIsNone(usage.json()['subscription'])
                 self.retrieve.reset_mock()
@@ -183,6 +185,98 @@ class BillingPortalRouteTests(unittest.TestCase):
         self.assertEqual(usage.json()['plan'], 'pro')
         self.assertEqual(usage.json()['subscription']['provider'], 'activation_code')
         self.assertFalse(usage.json()['billing_portal_available'])
+        self.assertIsNone(usage.json()['billing_subscription'])
+
+    def test_billing_status_keeps_failed_payment_separate_from_valid_activation(self) -> None:
+        user = self.user()
+        recurring = self.subscription(user, status='past_due')
+        self.subscription(user, provider='activation_code', ends_at=datetime.now(timezone.utc) + timedelta(days=20))
+        with self.Session() as db:
+            db.get(BillingSubscription, recurring.id).last_payment_status = 'failed'
+            db.commit()
+
+        response = self.get('/me/usage', user)
+        self.assertEqual(response.status_code, 200, response.text)
+        result = response.json()
+        self.assertEqual(result['plan'], 'pro')
+        self.assertEqual(result['subscription']['provider'], 'activation_code')
+        self.assertEqual(result['billing_subscription']['status'], 'past_due')
+        self.assertEqual(result['billing_subscription']['last_payment_status'], 'failed')
+        self.assertEqual(set(result['billing_subscription']), {
+            'provider', 'status', 'cancelled', 'renews_at', 'ends_at',
+            'current_period_ends_at', 'last_payment_status',
+        })
+
+    def test_current_subscription_takes_priority_over_newer_expired_history(self) -> None:
+        user = self.user()
+        self.subscription(user, status='active')
+        self.subscription(user, status='expired')
+        result = self.get('/me/usage', user).json()
+        self.assertEqual(result['plan'], 'pro')
+        self.assertEqual(result['billing_subscription']['status'], 'active')
+
+    def test_valid_pass_does_not_hide_a_recurring_payment_failure(self) -> None:
+        user = self.user()
+        recurring = self.subscription(user, status='past_due')
+        active_pass = self.subscription(user, ends_at=datetime.now(timezone.utc) + timedelta(days=20))
+        with self.Session() as db:
+            db.get(BillingSubscription, recurring.id).last_payment_status = 'failed'
+            pass_record = db.get(BillingSubscription, active_pass.id)
+            pass_record.provider_subscription_id = None
+            pass_record.provider_order_id = 'legacy_pass'
+            db.commit()
+
+        response = self.get('/me/usage', user)
+        self.assertEqual(response.status_code, 200, response.text)
+        result = response.json()
+        self.assertEqual(result['plan'], 'pro')
+        self.assertEqual(result['subscription']['status'], 'active')
+        self.assertEqual(datetime.fromisoformat(result['subscription']['ends_at']).replace(tzinfo=timezone.utc), active_pass.ends_at)
+        self.assertEqual(result['billing_subscription']['status'], 'past_due')
+        self.assertEqual(result['billing_subscription']['last_payment_status'], 'failed')
+        self.assertTrue(result['billing_portal_available'])
+
+        portal = self.get('/billing/portal', user)
+        self.assertEqual(portal.status_code, 200, portal.text)
+        self.retrieve.assert_called_once_with(recurring.provider_subscription_id)
+
+    def test_refunded_pass_is_reported_without_restoring_paid_access(self) -> None:
+        user = self.user()
+        refunded = self.subscription(user, status='refunded')
+        with self.Session() as db:
+            record = db.get(BillingSubscription, refunded.id)
+            record.provider_subscription_id = None
+            db.commit()
+        result = self.get('/me/usage', user).json()
+        self.assertEqual(result['plan'], 'free')
+        self.assertIsNone(result['subscription'])
+        self.assertFalse(result['billing_portal_available'])
+        self.assertEqual(result['billing_subscription']['status'], 'refunded')
+
+    def test_test_billing_history_is_not_exposed_as_live_billing_state(self) -> None:
+        user = self.user()
+        record = self.subscription(user, status='expired')
+        with self.Session() as db:
+            db.get(BillingSubscription, record.id).test_mode = True
+            db.commit()
+        result = self.get('/me/usage', user).json()
+        self.assertIsNone(result['billing_subscription'])
+        self.assertFalse(result['billing_portal_available'])
+        response = self.get('/billing/portal', user)
+        self.assertEqual(response.status_code, 404)
+        self.retrieve.assert_not_called()
+
+    def test_production_never_routes_to_test_billing_even_with_test_mode_configured(self) -> None:
+        user = self.user()
+        record = self.subscription(user, status='expired')
+        with self.Session() as db:
+            db.get(BillingSubscription, record.id).test_mode = True
+            db.commit()
+        with patch.object(billing.settings, 'app_env', 'production'), patch.object(billing.settings, 'lemonsqueezy_webhook_test_mode', True):
+            usage = self.get('/me/usage', user).json()
+            self.assertIsNone(usage['billing_subscription'])
+            self.assertFalse(usage['billing_portal_available'])
+            self.assertEqual(self.get('/billing/portal', user).status_code, 404)
 
     def test_portal_selects_only_the_owners_lemonsqueezy_record(self) -> None:
         user = self.user()

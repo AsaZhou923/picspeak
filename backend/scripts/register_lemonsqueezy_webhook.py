@@ -22,7 +22,14 @@ DEFAULT_EVENTS = [
     'subscription_created',
     'subscription_updated',
     'subscription_cancelled',
+    'subscription_resumed',
+    'subscription_paused',
+    'subscription_unpaused',
+    'subscription_expired',
     'subscription_payment_success',
+    'subscription_payment_failed',
+    'subscription_payment_recovered',
+    'subscription_payment_refunded',
     'order_refunded',
 ]
 
