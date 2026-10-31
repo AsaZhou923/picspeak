@@ -3,8 +3,8 @@
     "id": "2026-10-31-billing-lifecycle",
     "date": "2026-10-31",
     "showPopup": false,
-    "title": "付款与订阅状态说明（准备中）",
-    "summary": "准备在账户用量页分别说明付款失败、退款、订阅到期和下次续费时间，同时准确显示仍有效的 Pro 权益。价格和额度不变，尚未发布。",
+    "title": "付款与续费状态更清楚",
+    "summary": "账户用量页会分别显示付款失败、退款和订阅到期，并标明下次续费时间或会员有效期。多笔 Pro 权益分开处理，避免一笔退款影响其他有效权益。价格和额度不变。",
     "docPath": "docs/changelog/CHANGELOG.md#2026-10-31-billing-lifecycle"
   },
   {

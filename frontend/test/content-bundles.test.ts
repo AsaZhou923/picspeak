@@ -109,7 +109,7 @@ test('current and historical update copy describes mode benefits without reasoni
     assert.match(rollout.summary, /GPT-6\.1 Sol/);
     const latest = entries[0];
     assert.equal(latest.id, '2026-10-31-billing-lifecycle');
-    assert.match(latest.title, /准备中|upcoming|準備中/i);
+    assert.doesNotMatch(latest.title + latest.summary, /准备中|尚未发布|upcoming|not yet released|準備中|まだ公開/i);
     assert.equal(latest.showPopup, false);
   }
 });

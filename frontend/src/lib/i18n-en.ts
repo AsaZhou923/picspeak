@@ -296,8 +296,8 @@ export const enTranslations = {
     pro_offer_label: '',
     pro_offer_highlight: 'Pro',
     updates_label: 'Updates',
-    updates_hint_home: "Clearer payment and subscription status (upcoming)",
-    updates_hint_latest: "Clearer payment and subscription status (upcoming)",
+    updates_hint_home: "Clearer billing and renewal status",
+    updates_hint_latest: "Clearer billing and renewal status",
     contact_label: 'Contact',
     contact_headline: 'Get in Touch',
 

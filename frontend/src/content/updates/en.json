@@ -3,8 +3,8 @@
     "id": "2026-10-31-billing-lifecycle",
     "date": "2026-10-31",
     "showPopup": false,
-    "title": "Clearer payment and subscription status (upcoming)",
-    "summary": "Upcoming account usage improvements distinguish payment failures, refunds, subscription expiry and the next renewal date while showing any Pro access that remains active. Prices and limits stay the same; this update is not yet released.",
+    "title": "Clearer billing and renewal status",
+    "summary": "The account usage page distinguishes failed payments, refunds and expired subscriptions, and shows your next renewal date or access end date. Each Pro entitlement is handled separately, so a refund does not remove other valid access. Prices and limits are unchanged.",
     "docPath": "docs/changelog/CHANGELOG.md#2026-10-31-billing-lifecycle"
   },
   {

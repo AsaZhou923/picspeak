@@ -18,12 +18,12 @@ const homeSource = readFileSync(
 );
 const shellSource = readFileSync(path.join(FRONTEND_DIR, 'src/components/layout/SiteChrome.tsx'), 'utf8');
 
-test('billing lifecycle preparation is the latest update without a popup', () => {
+test('billing lifecycle update describes user benefits without draft status or a popup', () => {
   for (const locale of ['zh', 'en', 'ja'] as const) {
     const latest = getLatestProductUpdate(locale);
     assert.ok(latest);
     assert.equal(latest.id, '2026-10-31-billing-lifecycle');
-    assert.match(latest.title, /准备中|upcoming|準備中/i);
+    assert.doesNotMatch(latest.title + latest.summary, /准备中|尚未发布|upcoming|not yet released|準備中|まだ公開/i);
     assert.match(latest.summary, /Pro/);
     assert.equal(latest.date, '2026-10-31');
     assert.equal(latest.showPopup, false);

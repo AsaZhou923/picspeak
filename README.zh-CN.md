@@ -191,7 +191,7 @@ npm run build
 
 ## 文档
 
-- [付款与订阅状态说明（准备中）](docs/changelog/CHANGELOG.md#2026-10-31-billing-lifecycle)
+- [付款与续费状态更清楚](docs/changelog/CHANGELOG.md#2026-10-31-billing-lifecycle)
 - [长廊与操作恢复修复](docs/changelog/CHANGELOG.md#2026-10-20-gallery-and-review-cache-fixes)
 - [订阅恢复与生图重试修复](docs/changelog/CHANGELOG.md#2026-10-19-billing-recovery-and-generation-retries)
 - [最新更新：点评重试与草稿修复](docs/changelog/CHANGELOG.md#2026-10-18-critique-and-draft-fixes)

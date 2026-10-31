@@ -195,7 +195,7 @@ The frontend and backend can be deployed independently. The backend includes a c
 
 ## Documentation
 
-- [Clearer payment and subscription status (upcoming)](docs/changelog/CHANGELOG.md#2026-10-31-billing-lifecycle)
+- [Clearer billing and renewal status](docs/changelog/CHANGELOG.md#2026-10-31-billing-lifecycle)
 - [Clearer Free and Pro comparison](docs/changelog/CHANGELOG.md#2026-10-31-plan-comparison-copy)
 - [Photo eligibility and public critique retention](docs/changelog/CHANGELOG.md#2026-10-24-photo-applicability-and-public-retention)
 - [Gallery and recovery fixes](docs/changelog/CHANGELOG.md#2026-10-20-gallery-and-review-cache-fixes)
