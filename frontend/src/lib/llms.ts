@@ -28,13 +28,15 @@ export function getLlmsText(): string {
 - Review-linked reference generation for planning retakes
 - Public gallery of approved critique examples
 - Lens Notes blog covering composition, lighting, color, and review workflows
-- Account history for comparing progress over time
+- Account history for revisiting critiques, originals, and evidence from each retake round
 
 ## Pricing and plans
-- Guest: 3 critiques per day, 30 per month, flash only, no saved history
-- Free account: 60 critiques per month, limited Pro previews, 15-day history, and starter AI image credits
-- Pro: $3.99/month in English/Japanese flows, with no monthly critique limit, full history while subscribed, priority processing, and 199 monthly AI image credits
-- Chinese Pro: $3.99/month auto-renewing subscription, cancel anytime; existing Pro users are unaffected and activation codes remain redeemable
+- Guest: 1 critique per day, 30 per month, Flash only, no sign-up required, no saved history; create a Free account or sign in after the allowance is used
+- Free account: 60 critiques per month, up to 5 per day, 10 Pro-mode critiques per month, 15-day history, and 3 monthly AI image credits
+- Pro: $3.99/month auto-renewing subscription in every supported locale, cancel anytime; full critique history and originals while subscribed, no monthly critique limit, priority processing, and 199 monthly AI image credits
+- Pro monthly soft limit: after 150 critiques in a UTC calendar month, new critiques are limited to 2 per minute until the next UTC month; the monthly critique total remains unlimited and no additional fee is charged automatically
+- After Pro ends: Free history limits apply and originals have a 15-day grace period unless another protection applies; active share links and approved visible Gallery channels retain their public works
+- Existing Pro prices and already-purchased membership expiry dates are unchanged; activation codes remain redeemable
 - Image credit pack: 300 image credits for $3.99 where local payment methods are available
 
 ## Key public URLs
@@ -81,7 +83,7 @@ ${markdownContentLinks}
 - Founder and editor: ${siteConfig.author.name}
 - [Author profile](${siteConfig.url}/author/asa-zhou)
 - [Editorial policy](${siteConfig.url}/editorial-policy)
-- Last reviewed: 2026-08-09
+- Last reviewed: 2026-11-01
 - [X](${siteConfig.social.x})
 - [GitHub profile](${siteConfig.social.githubProfile})
 - [Source code](${siteConfig.repositoryUrl})

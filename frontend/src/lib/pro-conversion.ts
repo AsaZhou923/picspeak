@@ -61,8 +61,8 @@ const COPY: Record<ProConversionLocale, LocaleCopy> = {
   zh: {
     boundary: {
       label: 'Free / Pro 边界',
-      headline: 'Free 完整体验一轮改进，Pro 支持持续练习',
-      body: '两个计划都能拿到完整点评、下一次拍摄建议和复拍对比；Pro 提供更多次数、每次都可用深度模式，并长期保留记录。',
+      headline: 'Free 开始体验，Pro 留下完整摄影记录',
+      body: '两个计划都能拿到完整点评、下一次拍摄建议和复拍对比；Pro 在订阅期内保留完整历史与原图，点评不限月度次数。',
       free: {
         title: 'Free',
         body: '适合偶尔点评和完成一轮复拍：完整建议和复拍对比都可用，次数与历史有限。',
@@ -70,8 +70,8 @@ const COPY: Record<ProConversionLocale, LocaleCopy> = {
       },
       pro: {
         title: 'Pro',
-        body: '适合经常拍摄、需要反复复盘的人：不用计算次数，每次都可用深度模式。',
-        features: ['点评不限月度次数', '每次都可用 Pro 深度模式', '订阅期内保留完整历史与原图'],
+        body: '把摄影记录留在一起：订阅期内完整保存点评与原图，随时回看，并继续点评。',
+        features: ['订阅期内保留完整历史与原图', '点评不限月度次数', '每次都可用 Pro 深度模式'],
       },
     },
     triggers: {
@@ -92,8 +92,8 @@ const COPY: Record<ProConversionLocale, LocaleCopy> = {
       },
       history_trend: {
         badge: '趋势复盘',
-        title: '想看长期趋势时，需要更长的历史',
-        body: 'Free 保留最近 15 天的记录；Pro 在订阅期内保留完整历史和原图，便于把分数、弱项和复拍结果放在一起回看。',
+        title: '过去的拍摄，随时回来复盘',
+        body: 'Free 保留最近 15 天的记录；Pro 在订阅期内保留完整历史和原图，便于回看点评与每一轮复拍依据。分数变化本身不代表能力提升。',
       },
       retake_compare: {
         badge: '复拍对比',
@@ -101,17 +101,17 @@ const COPY: Record<ProConversionLocale, LocaleCopy> = {
         body: '上传修改版或新照片即可与原片对比；每轮对比计 1 次额度。经常复拍时，Pro 不限月度次数。',
       },
       standard: {
-        badge: '持续练习',
-        title: '经常拍摄时，Pro 让练习不受次数限制',
-        body: 'Pro 提供不限月度次数的点评、每次可用的深度模式、完整历史和优先处理。',
+        badge: '摄影记录',
+        title: '你的摄影记录，都留在这里',
+        body: 'Pro 在订阅期内保留完整点评历史与原图，方便随时回看；点评不限月度次数，并包含每次可选的深度模式与优先处理。每个 UTC 月达到 150 次会提醒用量，新点评降为每分钟最多 2 次，至下个 UTC 月恢复；月度总量不限，不自动加收费用。',
       },
     },
     usageDecision: {
-      label: '升级决策',
-      headline: '这不只是账户页，而是 Pro 升级决策页',
-      body: '这里展示付费前后的差异：两个计划的点评内容相同，区别在于次数、深度模式和历史保留。',
+      label: '套餐与记录',
+      headline: '让每次拍摄与点评都有迹可循',
+      body: 'Free 可完成点评与复拍对比；Pro 在订阅期内保留完整历史与原图，支持不限月度次数的持续点评。',
       proHeadline: '你的 Pro 已经开启',
-      proBody: '当前账号点评不限月度次数，每次可用深度模式，订阅期内保留完整历史；这里保留订阅与续期入口。',
+      proBody: '订阅期内完整历史与原图都保留在这里，随时可以回看并继续点评。月度 150 次后，新点评每分钟最多 2 次，至下个 UTC 月恢复；总量仍不限，不自动加收费用。',
       differencesTitle: '付费前后最关键的变化',
       differences: [
         {
@@ -131,14 +131,14 @@ const COPY: Record<ProConversionLocale, LocaleCopy> = {
         },
       ],
       outcomesTitle: '升级后你得到的',
-      outcomes: ['不限月度次数的点评与复拍对比', '每次可用的深度模式', '订阅期内的完整历史与优先处理'],
+      outcomes: ['订阅期内的完整历史与原图', '不限月度次数的点评与复拍对比', '每次可选深度模式与优先处理'],
     },
   },
   en: {
     boundary: {
       label: 'Free / Pro Boundary',
-      headline: 'Free covers a full improvement round. Pro is for steady practice.',
-      body: 'Both plans get the complete critique, next-shoot advice, and retake comparison. Pro adds more critiques, deep mode every time, and long-term records.',
+      headline: 'Start with Free. Keep your photography record with Pro.',
+      body: 'Both plans get the complete critique, next-shoot advice, and retake comparison. Pro keeps full history and originals while subscribed, with no monthly critique limit.',
       free: {
         title: 'Free',
         body: 'Best for occasional critiques and one full retake round: complete advice and retake comparison, with limited usage and history.',
@@ -146,8 +146,8 @@ const COPY: Record<ProConversionLocale, LocaleCopy> = {
       },
       pro: {
         title: 'Pro',
-        body: 'Best for photographers who shoot often and review repeatedly: no counting critiques, deep mode every time.',
-        features: ['No monthly critique limit', 'Pro deep mode on every critique', 'Full history and originals kept while subscribed'],
+        body: 'Keep your photography record together: full critiques and originals while subscribed, ready to revisit as you keep shooting.',
+        features: ['Full history and originals kept while subscribed', 'No monthly critique limit', 'Pro deep mode on every critique'],
       },
     },
     triggers: {
@@ -168,8 +168,8 @@ const COPY: Record<ProConversionLocale, LocaleCopy> = {
       },
       history_trend: {
         badge: 'Trend review',
-        title: 'Long-term trends need longer history',
-        body: 'Free keeps the last 15 days. Pro keeps full history and originals while subscribed, so scores, weak dimensions, and retakes stay side by side.',
+        title: 'Return to past shoots whenever you need them',
+        body: 'Free keeps the last 15 days. Pro keeps full history and originals while subscribed, so you can revisit critiques and the evidence in each retake round. Score changes alone do not prove skill improvement.',
       },
       retake_compare: {
         badge: 'Retake comparison',
@@ -177,17 +177,17 @@ const COPY: Record<ProConversionLocale, LocaleCopy> = {
         body: 'Upload an edited version or a new photo to compare it with the original; each round uses one critique. If you retake often, Pro has no monthly limit.',
       },
       standard: {
-        badge: 'Steady practice',
-        title: 'If you shoot often, Pro removes the critique limit',
-        body: 'Pro gives you critiques without a monthly limit, deep mode every time, full history, and priority processing.',
+        badge: 'Photography record',
+        title: 'Your photography record, all in one place',
+        body: 'Pro keeps full critique history and originals while subscribed, ready to revisit. There is no monthly critique limit, and every critique can use deep mode with priority processing. At 150 critiques in a UTC month, a usage reminder appears and new critiques slow to 2 per minute until the next UTC month; the monthly total remains unlimited with no automatic extra charge.',
       },
     },
     usageDecision: {
-      label: 'Upgrade Decision',
-      headline: 'This is an upgrade decision page, not just billing',
-      body: 'It shows what changes after upgrading: the critique itself is the same on both plans; usage, deep mode, and history differ.',
+      label: 'Plans & records',
+      headline: 'Keep your photos and critiques together',
+      body: 'Free covers critiques and retake comparison. Pro keeps full history and originals while subscribed, with no monthly critique limit.',
       proHeadline: 'Your Pro plan is active',
-      proBody: 'This account has critiques without a monthly limit, deep mode every time, and full history while subscribed. Billing and renewal controls stay here.',
+      proBody: 'Your full history and originals stay together while subscribed, ready to revisit as you keep critiquing. After 150 critiques in a UTC month, new critiques slow to 2 per minute until the next UTC month. The monthly total remains unlimited with no automatic extra charge.',
       differencesTitle: 'What changes after upgrading',
       differences: [
         {
@@ -207,14 +207,14 @@ const COPY: Record<ProConversionLocale, LocaleCopy> = {
         },
       ],
       outcomesTitle: 'What you get with Pro',
-      outcomes: ['Critiques and retake comparisons without a monthly limit', 'Deep mode on every critique', 'Full history and priority processing while subscribed'],
+      outcomes: ['Full history and originals while subscribed', 'Critiques and retake comparisons without a monthly limit', 'Deep mode on every critique and priority processing'],
     },
   },
   ja: {
     boundary: {
       label: 'Free / Pro の境界',
-      headline: 'Free で改善を一通り体験、Pro で継続練習',
-      body: 'どちらのプランでも完全な講評、次の撮影への提案、撮り直し比較を利用できます。Pro は回数が増え、毎回ディープモードを使え、記録を長く残せます。',
+      headline: 'Free で始めて、Pro で写真記録を残す',
+      body: 'どちらのプランでも完全な講評、次の撮影への提案、撮り直し比較を利用できます。Pro は契約中に全履歴と元写真を保存し、講評の月間上限はありません。',
       free: {
         title: 'Free',
         body: 'ときどきの講評と撮り直し 1 回分に向いています。完全な提案と撮り直し比較を使え、回数と履歴に上限があります。',
@@ -222,8 +222,8 @@ const COPY: Record<ProConversionLocale, LocaleCopy> = {
       },
       pro: {
         title: 'Pro',
-        body: 'よく撮影し、繰り返し振り返る人向け。回数を気にせず、毎回ディープモードを使えます。',
-        features: ['講評の月間上限なし', '毎回 Pro ディープモードを利用可能', '契約中は全履歴と元写真を保存'],
+        body: '写真記録をひとつに。契約中は講評と元写真をすべて保存し、撮影を続けながらいつでも見返せます。',
+        features: ['契約中は全履歴と元写真を保存', '講評の月間上限なし', '毎回 Pro ディープモードを利用可能'],
       },
     },
     triggers: {
@@ -244,8 +244,8 @@ const COPY: Record<ProConversionLocale, LocaleCopy> = {
       },
       history_trend: {
         badge: '傾向レビュー',
-        title: '長期の傾向を見るには長い履歴が必要です',
-        body: 'Free は直近 15 日の記録を保存します。Pro は契約中、全履歴と元写真を保存し、スコア・弱点・撮り直しを並べて見返せます。',
+        title: '過去の撮影を、必要なときに見返す',
+        body: 'Free は直近 15 日の記録を保存します。Pro は契約中に全履歴と元写真を保存し、講評と各回の撮り直しの根拠を見返せます。スコアの変化だけでは上達を証明できません。',
       },
       retake_compare: {
         badge: '撮り直し比較',
@@ -253,17 +253,17 @@ const COPY: Record<ProConversionLocale, LocaleCopy> = {
         body: '編集後の写真または新しい写真をアップロードすると元写真と比較できます。1 回の比較で 1 回分を使います。よく撮り直すなら、Pro は月間上限がありません。',
       },
       standard: {
-        badge: '継続練習',
-        title: 'よく撮影するなら、Pro で回数を気にせず練習',
-        body: 'Pro では月間上限のない講評、毎回使えるディープモード、全履歴、優先処理を利用できます。',
+        badge: '写真記録',
+        title: 'あなたの写真記録を、ひとつの場所に',
+        body: 'Pro は契約中に全講評履歴と元写真を保存し、いつでも見返せます。講評の月間上限はなく、毎回ディープモードと優先処理を利用できます。UTC の月ごとに150回に達すると、次の UTC 月まで新しい講評は毎分2回となります。月間総数に上限はなく、自動の追加請求はありません。',
       },
     },
     usageDecision: {
-      label: 'アップグレード判断',
-      headline: 'ここは請求だけでなく、Pro へ進む判断ページです',
-      body: 'アップグレードで変わる点を示します。講評の内容は両プランで同じで、回数・ディープモード・履歴が異なります。',
+      label: 'プランと記録',
+      headline: '写真と講評をまとめて見返す',
+      body: 'Free でも講評と撮り直し比較を利用できます。Pro は契約中に全履歴と元写真を保存し、月間上限なく講評できます。',
       proHeadline: 'Pro プランは有効です',
-      proBody: 'このアカウントでは講評の月間上限がなく、毎回ディープモードを使え、契約中は全履歴を保存します。請求と更新管理もここに残ります。',
+      proBody: '契約中は全履歴と元写真をまとめて保存し、いつでも見返せます。UTC の月ごとに150回以降は、次の月まで新しい講評を毎分2回まで利用できます。月間総数に上限はなく、自動の追加請求はありません。',
       differencesTitle: 'アップグレード後に変わること',
       differences: [
         {
@@ -283,7 +283,7 @@ const COPY: Record<ProConversionLocale, LocaleCopy> = {
         },
       ],
       outcomesTitle: 'Pro で得られるもの',
-      outcomes: ['月間上限のない講評と撮り直し比較', '毎回使えるディープモード', '契約中の全履歴と優先処理'],
+      outcomes: ['契約中の全履歴と元写真', '月間上限のない講評と撮り直し比較', '毎回選べるディープモードと優先処理'],
     },
   },
 };

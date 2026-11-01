@@ -27,7 +27,7 @@ function getEffectiveQuota(
 }
 
 export function useWorkspaceUsage(reviewMode: 'flash' | 'pro') {
-  const { userInfo, ensureToken, isLoading: authLoading, syncPlan } = useAuth();
+  const { userInfo, ensureToken, isLoading: authLoading, syncPlan, captureAuthOwner } = useAuth();
   const [usage, setUsage] = useState<UsageResponse | null>(null);
   const [usageError, setUsageError] = useState(false);
 
@@ -36,19 +36,24 @@ export function useWorkspaceUsage(reviewMode: 'flash' | 'pro') {
   const { remaining: remainingQuota, total: totalQuota } = getEffectiveQuota(usage, reviewMode);
 
   const fetchUsage = useCallback(async (options: { signal?: AbortSignal; force?: boolean } = {}) => {
+    const isOwnerCurrent = captureAuthOwner(userInfo?.user_id ?? null);
+    if (!isOwnerCurrent()) return null;
     try {
       setUsageError(false);
       const tok = await ensureToken();
+      if (!isOwnerCurrent() || options.signal?.aborted) return null;
       const data = await getUsage(tok, { force: options.force, signal: options.signal });
-      if (options.signal?.aborted) return;
+      if (options.signal?.aborted || !isOwnerCurrent()) return null;
       syncPlan(data.plan);
       setUsage(data);
+      return data;
     } catch (err) {
-      if (isAbortError(err)) return;
+      if (isAbortError(err) || !isOwnerCurrent() || options.signal?.aborted) return null;
       logClientError('Failed to fetch usage in workspace', err);
       setUsageError(true);
+      return null;
     }
-  }, [ensureToken, syncPlan]);
+  }, [ensureToken, syncPlan, captureAuthOwner, userInfo?.user_id]);
 
   useEffect(() => {
     if (authLoading) return;

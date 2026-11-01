@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-01-guest-and-pro-records",
+    "date": "2026-11-01",
+    "showPopup": false,
+    "title": "游客体验与 Pro 摄影记录",
+    "summary": "游客每天可免注册体验 1 次点评，用完后可注册 Free 继续点评并保存记录。Pro 以订阅期间的完整点评与原图、持续点评为核心；每个 UTC 月完成 150 次点评后，新点评限为每分钟 2 次，仍可继续使用，不自动加收费用，下月恢复。Free 额度和价格不变。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-11-01-guest-and-pro-records"
+  },
+  {
     "id": "2026-10-31-billing-lifecycle",
     "date": "2026-10-31",
     "showPopup": false,

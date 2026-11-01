@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import type { Translator } from '@/lib/i18n';
 import type { UsageResponse } from '@/lib/types';
+import ProMonthlyUsageNotice from '@/components/billing/ProMonthlyUsageNotice';
 
 type UsageQuotaPanelProps = {
   t: Translator;
@@ -21,6 +22,7 @@ export default function UsageQuotaPanel({
 }: UsageQuotaPanelProps) {
   return (
     <div className="border border-border-subtle rounded-lg bg-raised p-6 space-y-5">
+      <ProMonthlyUsageNotice usage={usage} t={t} />
       {usage.quota.daily_total !== null && usage.quota.daily_used !== null ? (
         <div className="space-y-3">
           <div className="flex items-end gap-2">

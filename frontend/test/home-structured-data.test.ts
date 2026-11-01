@@ -19,6 +19,13 @@ function readFrontendSource(relativePath: string): string {
   return readFileSync(path.join(TEST_DIR, '..', relativePath), 'utf8');
 }
 
+test('homepage advice step uses generic analysis advice rather than Pro marketing or photo-specific demo advice', () => {
+  const source = readFrontendSource('src/components/home/HomeImprovementLoop.tsx');
+  assert.match(source, /title: t\('demo_suggestion'\),\s+body: t\('task_wait_note_ai_body'\)/);
+  assert.doesNotMatch(source, /body: t\('feature_pro_body'\)/);
+  assert.doesNotMatch(source, /body: t\('demo_suggestion_body'\)/);
+});
+
 test('homepage entity graph defines and reuses stable organization and website IDs', () => {
   const organization = buildHomeOrganizationJsonLd(siteConfig);
   const software = buildHomeSoftwareJsonLd(siteConfig, {

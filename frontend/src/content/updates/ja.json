@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-01-guest-and-pro-records",
+    "date": "2026-11-01",
+    "showPopup": false,
+    "title": "ゲスト体験と Pro の写真記録",
+    "summary": "登録なしで1日1回の講評を体験でき、使い終えたら Free に登録して講評を続け、記録を保存できます。Pro は契約期間中の講評履歴と元画像の保存、継続的な講評を中心に案内します。UTC暦月内に150回の講評が完了すると、新しい依頼は翌月まで1分に2回となりますが、その後も利用でき、自動で追加料金が発生することはありません。Free の利用枠と料金は変わりません。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-11-01-guest-and-pro-records"
+  },
+  {
     "id": "2026-10-31-billing-lifecycle",
     "date": "2026-10-31",
     "showPopup": false,

@@ -191,6 +191,8 @@ class GuestNetworkLimitTests(unittest.TestCase):
         self.assertEqual(calls['guest_review_network_monthly']['scope_key'], 'guest:network')
         self.assertEqual(calls['guest_review_network_monthly']['per_minute_limit'], 120)
         self.assertEqual(calls['guest_review_daily']['scope_key'], 'guest:device-quota')
+        self.assertEqual(calls['guest_review_daily']['per_minute_limit'], 1)
+        self.assertEqual(calls['guest_review_monthly']['per_minute_limit'], 30)
         self.assertIn('guest_review_network_daily', limits)
 
     def test_review_network_caps_can_be_disabled(self) -> None:
@@ -234,9 +236,9 @@ class GuestNetworkLimitTests(unittest.TestCase):
 
     def test_usage_snapshot_reports_the_tighter_network_remaining(self) -> None:
         counts = {
-            ('guest_review_daily', 'guest:device'): 1,
+            ('guest_review_daily', 'guest:device'): 0,
             ('guest_review_monthly', 'guest:device'): 1,
-            ('guest_review_network_daily', 'guest:network'): 11,
+            ('guest_review_network_daily', 'guest:network'): 12,
             ('guest_review_network_monthly', 'guest:network'): 119,
         }
 
@@ -247,10 +249,11 @@ class GuestNetworkLimitTests(unittest.TestCase):
             device_only = guest_usage_snapshot(Mock(), 'guest:device')
             with_network = guest_usage_snapshot(Mock(), 'guest:device', network_scope_key='guest:network')
 
-        self.assertEqual(device_only['daily_remaining'], 2)
+        self.assertEqual(device_only['daily_total'], 1)
+        self.assertEqual(device_only['daily_remaining'], 1)
         self.assertEqual(device_only['monthly_remaining'], 29)
-        self.assertEqual(with_network['daily_used'], 1)
-        self.assertEqual(with_network['daily_remaining'], 1)
+        self.assertEqual(with_network['daily_used'], 0)
+        self.assertEqual(with_network['daily_remaining'], 0)
         self.assertEqual(with_network['monthly_remaining'], 1)
 
     def test_review_billing_info_reports_network_remaining(self) -> None:

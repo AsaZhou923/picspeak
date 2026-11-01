@@ -19,7 +19,7 @@ export default function ClerkSignInTrigger({
   return (
     <>
       <Show when="signed-out">
-        <SignInButton mode="modal" fallbackRedirectUrl={fallbackRedirectUrl}>
+        <SignInButton mode="modal" fallbackRedirectUrl={fallbackRedirectUrl} signUpFallbackRedirectUrl={fallbackRedirectUrl}>
           <button type="button" className={className}>
             {children}
           </button>

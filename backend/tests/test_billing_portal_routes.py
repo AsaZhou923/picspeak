@@ -130,6 +130,27 @@ class BillingPortalRouteTests(unittest.TestCase):
                     self.assertEqual(db.get(User, user.id).plan.value, expected_plan)
                     self.assertEqual(db.get(BillingSubscription, subscription.id).status, subscription_status)
 
+    def test_usage_serializes_soft_reminder_without_changing_unlimited_quota_contract(self) -> None:
+        user = self.user(UserPlan.pro)
+        self.subscription(user)
+        reset = datetime(2026, 12, 1, tzinfo=timezone.utc)
+        with patch.object(billing, 'user_usage_snapshot', return_value={
+            'monthly_total': None, 'monthly_used': None, 'monthly_remaining': None,
+            'monthly_soft_limit': 150, 'monthly_soft_used': 151, 'monthly_soft_reached': True,
+            'monthly_soft_resets_at': reset,
+            'monthly_soft_rate_limit_per_minute': 2,
+        }):
+            response = self.get('/me/usage', user)
+        self.assertEqual(response.status_code, 200, response.text)
+        quota = response.json()['quota']
+        self.assertIsNone(quota['monthly_total'])
+        self.assertIsNone(quota['monthly_remaining'])
+        self.assertEqual(quota['monthly_soft_limit'], 150)
+        self.assertEqual(quota['monthly_soft_used'], 151)
+        self.assertTrue(quota['monthly_soft_reached'])
+        self.assertEqual(quota['monthly_soft_resets_at'], '2026-12-01T00:00:00Z')
+        self.assertEqual(quota['monthly_soft_rate_limit_per_minute'], 2)
+
     def test_cancelled_subscription_can_manage_after_its_paid_period_ends(self) -> None:
         user = self.user()
         subscription = self.subscription(

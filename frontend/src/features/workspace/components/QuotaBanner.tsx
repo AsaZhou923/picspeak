@@ -3,6 +3,8 @@ import { planLabel, planColor } from '@/lib/auth-context';
 import { UsageResponse } from '@/lib/types';
 import Badge from '@/components/ui/Badge';
 import { type Translator } from '@/lib/i18n';
+import ClerkSignInTrigger from '@/components/auth/ClerkSignInTrigger';
+import ProMonthlyUsageNotice from '@/components/billing/ProMonthlyUsageNotice';
 
 interface QuotaBannerProps {
   usage: UsageResponse | null;
@@ -11,9 +13,10 @@ interface QuotaBannerProps {
   totalQuota: number | null;
   reviewMode: 'flash' | 'pro';
   t: Translator;
+  signInReturnPath?: string;
 }
 
-export function QuotaBanner({ usage, usageError, remainingQuota, totalQuota, reviewMode, t }: QuotaBannerProps) {
+export function QuotaBanner({ usage, usageError, remainingQuota, totalQuota, reviewMode, t, signInReturnPath = '/workspace' }: QuotaBannerProps) {
   return (
     <div className="mt-5 space-y-2">
       {usage && (
@@ -34,6 +37,19 @@ export function QuotaBanner({ usage, usageError, remainingQuota, totalQuota, rev
           {remainingQuota === 0 && <Badge variant="rust">{t('usage_quota_exhausted')}</Badge>}
         </div>
       )}
+      {usage?.plan === 'guest' && remainingQuota === 0 && (
+        <div className="max-w-xl space-y-3 rounded-control border border-gold/20 bg-gold/5 px-4 py-3">
+          <p className="text-sm leading-6 text-ink-muted">{t('quota_modal_body')}</p>
+          <ClerkSignInTrigger
+            fallbackRedirectUrl={signInReturnPath}
+            className="ui-action-secondary min-h-11 px-4 py-2 text-sm"
+            signedInClassName="hidden"
+          >
+            {t('quota_modal_upgrade')}
+          </ClerkSignInTrigger>
+        </div>
+      )}
+      {usage && <ProMonthlyUsageNotice usage={usage} t={t} />}
       {usageError && (
         <p className="text-xs text-ink-subtle">
           {`${t('usage_error')} ${t('support_contact_prompt')}`}

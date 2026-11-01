@@ -44,7 +44,7 @@ type ProPromoCardProps = {
 function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
   const proFeatures = getProPlanBoundaryCopy(locale).pro.features;
   const workspaceTrigger = getProUpgradeTriggerCopy(locale, 'retake_compare');
-  const reviewTrigger = getProUpgradeTriggerCopy(locale, 'deeper_result');
+  const reviewTrigger = getProUpgradeTriggerCopy(locale, 'history_trend');
   const usageTrigger = getProUpgradeTriggerCopy(locale, 'standard');
 
   if (locale === 'zh') {
@@ -55,7 +55,7 @@ function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
       oldPrice: '',
       footnote: CN_PRO_CHECKOUT_TIP,
       features: proFeatures,
-      guestCta: '升级到 Pro',
+      guestCta: '先注册或登录 Free',
       freeCta: '升级到 Pro',
       proCta: '查看账户页',
       proStatus: '你当前已经是 Pro，可以在账户页管理订阅，或兑换已经收到的激活码。',
@@ -65,27 +65,27 @@ function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
         workspace: {
           default: {
             title: workspaceTrigger.title,
-            body: `${workspaceTrigger.body} Pro 为 $3.99/月，按月自动续费，可随时取消；现有 Pro 用户不受影响。`,
+            body: `${workspaceTrigger.body} Pro 为 $3.99/月，按月自动续费，可随时取消；价格与已购会员有效期保持不变。`,
           },
           pro: {
             title: '你的 Pro 已开通',
-            body: '你已经是 Pro，可以继续使用更强模型评图、完整历史和优先处理。',
+            body: '订阅期内完整历史与原图都保留在这里，可以随时回看并继续点评。',
           },
         },
         gallery: {
           default: {
             title: usageTrigger.title,
-            body: `${usageTrigger.body} Pro 为 $3.99/月，按月自动续费，可随时取消；现有 Pro 用户不受影响。`,
+            body: `${usageTrigger.body} Pro 为 $3.99/月，按月自动续费，可随时取消；价格与已购会员有效期保持不变。`,
           },
           pro: {
             title: '你的 Pro 已开通',
-            body: '可以继续使用更强模型评图、完整历史和优先处理。',
+            body: '可以继续点评，并在订阅期内随时回看完整历史与原图。',
           },
         },
         usage: {
           default: {
             title: usageTrigger.title,
-            body: `${usageTrigger.body} Pro 为 $3.99/月，按月自动续费，可随时取消；现有 Pro 用户不受影响。`,
+            body: `${usageTrigger.body} Pro 为 $3.99/月，按月自动续费，可随时取消；价格与已购会员有效期保持不变。`,
           },
           pro: {
             title: '当前账号已是 Pro',
@@ -95,11 +95,11 @@ function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
         review: {
           default: {
             title: reviewTrigger.title,
-            body: `${reviewTrigger.body} Pro 为 $3.99/月，按月自动续费，可随时取消；现有 Pro 用户不受影响。`,
+            body: `${reviewTrigger.body} Pro 为 $3.99/月，按月自动续费，可随时取消；价格与已购会员有效期保持不变。`,
           },
           pro: {
-            title: '继续使用 Pro 更强模型分析',
-            body: '当前订阅已生效，可以继续使用更强模型评图和完整历史。',
+            title: '这次点评，也留在你的摄影记录里',
+            body: '当前订阅已生效，完整历史与原图会在订阅期内保留，方便日后回看。',
           },
         },
       },
@@ -113,10 +113,10 @@ function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
     price: isJa ? '$3.99 / 月' : '$3.99 / month',
     oldPrice: '',
     footnote: isJa
-      ? 'より強いモデルの講評、契約中の全履歴保存、優先処理、毎月の AI image credits が含まれます。'
-      : 'Includes stronger-model critique, full history while subscribed, priority processing, and monthly AI image credits.',
+      ? '契約中の全履歴と元写真、月間上限のない講評、優先処理、毎月の AI image credits が含まれます。'
+      : 'Includes full history and originals while subscribed, critiques without a monthly limit, priority processing, and monthly AI image credits.',
     features: proFeatures,
-    guestCta: isJa ? 'Pro にアップグレード' : 'Upgrade to Pro',
+    guestCta: isJa ? 'まず無料登録またはサインイン' : 'Start with a Free account',
     freeCta: isJa ? '今すぐ Pro にアップグレード' : 'Upgrade to Pro now',
     proCta: isJa ? 'サブスクリプションを管理' : 'Manage subscription',
     proStatus: isJa ? '現在の契約は Pro プランです' : 'Your subscription is already on the Pro plan',
@@ -128,21 +128,21 @@ function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
         pro: {
           title: isJa ? 'Pro プランは有効です' : 'Your Pro plan is active',
           body: isJa
-            ? 'より強いモデルの講評、全履歴、優先処理をそのまま利用できます。'
-            : 'Your current subscription keeps stronger-model critique, full history, and priority processing available.',
+            ? '契約中は全履歴と元写真を保存し、いつでも見返しながら講評を続けられます。'
+            : 'Your full history and originals stay together while subscribed, ready to revisit as you keep critiquing.',
         },
       },
       gallery: {
         default: {
           title: usageTrigger.title,
           body: isJa
-            ? 'ギャラリーを参考にしながら、次のアップロードを Pro の成長ループへつなげられます。'
-            : 'Use the gallery for reference, then move your next upload into the Pro growth loop.',
+            ? 'ギャラリーを参考に次の写真を講評し、契約中は自分の履歴と元写真をまとめて保存できます。'
+            : 'Use the gallery for reference, critique your next photo, and keep your own history and originals together while subscribed.',
         },
         pro: {
           title: isJa ? 'Pro プランは有効です' : 'Your Pro plan is active',
           body: isJa
-            ? 'より強いモデルの講評、全履歴、優先処理を引き続き利用できます。'
+            ? '契約中は全履歴と元写真を保存し、月間上限なく講評を続けられます。'
             : 'Critiques without a monthly limit, full history, and priority processing remain available.',
         },
       },
@@ -158,10 +158,10 @@ function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
       review: {
         default: { title: reviewTrigger.title, body: reviewTrigger.body },
         pro: {
-          title: isJa ? 'Pro のより強いモデルで確認できます' : 'This result can still be explored with Pro’s stronger model',
+          title: isJa ? 'この講評も、あなたの写真記録に' : 'Keep this critique in your photography record',
           body: isJa
-            ? '現在の契約は有効なので、より強いモデルの講評と全履歴を使い続けられます。'
-            : 'Your current subscription is active, so you can keep using stronger-model critique and full history.',
+            ? '契約中は全履歴と元写真を保存し、必要なときにいつでも見返せます。'
+            : 'Your subscription keeps full history and originals available to revisit throughout its active term.',
         },
       },
     },

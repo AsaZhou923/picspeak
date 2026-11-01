@@ -17,6 +17,28 @@ class SettingsDefaultsTestCase(unittest.TestCase):
         settings = self._settings()
         self.assertTrue(settings.image_audit_enabled)
 
+    def test_guest_daily_critique_default_is_one_without_reducing_other_allowances(self):
+        settings = self._settings()
+        self.assertEqual(settings.guest_review_limit_per_day, 1)
+        self.assertEqual(settings.guest_review_limit_per_month, 30)
+        self.assertEqual(settings.guest_review_network_limit_per_day, 12)
+        self.assertEqual(settings.guest_review_network_limit_per_month, 120)
+        self.assertEqual(settings.free_review_limit_per_day, 5)
+        self.assertEqual(settings.free_review_limit_per_month, 60)
+
+    def test_pro_monthly_soft_limit_defaults_to_150_and_requires_a_positive_threshold(self):
+        self.assertEqual(self._settings().pro_review_soft_limit_per_month, 150)
+        self.assertEqual(self._settings(pro_review_soft_limit_per_month=200).pro_review_soft_limit_per_month, 200)
+        for invalid in (0, -1):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                self._settings(pro_review_soft_limit_per_month=invalid)
+
+    def test_pro_soft_limit_rate_defaults_to_two_and_requires_a_positive_rate(self):
+        self.assertEqual(self._settings().pro_review_soft_limit_rate_per_minute, 2)
+        for invalid in (0, -1):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                self._settings(pro_review_soft_limit_rate_per_minute=invalid)
+
     def test_pro_image_generation_monthly_credits_default_to_199(self):
         settings = self._settings()
         self.assertEqual(settings.image_generation_pro_monthly_credits, 199)

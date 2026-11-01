@@ -56,6 +56,28 @@ test('quota dialogs provide plan-aware, localized recovery actions rather than d
   }
 });
 
+test('Guest quota sign-in returns to the selected retake context instead of billing', () => {
+  const signInReturnPath = '/workspace?source_review_id=review-own&mode=flash&image_type=portrait';
+  const html = renderToStaticMarkup(createElement(QuotaModal, {
+    plan: 'guest', signInReturnPath, t: (key: keyof typeof enTranslations) => enTranslations[key], onClose() {},
+  }));
+  assert.ok(html.includes(`data-sign-in="${signInReturnPath.replaceAll('&', '&amp;')}"`));
+  assert.doesNotMatch(html, /account\/usage|checkout|\$3\.99/);
+});
+
+test('shared Clerk trigger preserves the same return intent after sign-in or switching to sign-up', async () => {
+  const { default: ClerkSignInTrigger } = await import(moduleUrl(await readFile('src/components/auth/ClerkSignInTrigger.tsx', 'utf8'), {
+    '@clerk/nextjs': moduleUrl('export const Show = () => null; export const SignInButton = () => null; export const UserButton = () => null;'),
+  }));
+  for (const fallbackRedirectUrl of [undefined, '/workspace?source_review_id=review-own&next_shoot_action=Keep+space&mode=flash&image_type=portrait']) {
+    const tree = ClerkSignInTrigger({ className: 'sign-in', children: 'Continue', fallbackRedirectUrl });
+    const signInButton = tree.props.children.find((child: any) => child.props.when === 'signed-out').props.children;
+    assert.equal(signInButton.props.mode, 'modal');
+    assert.equal(signInButton.props.fallbackRedirectUrl, fallbackRedirectUrl ?? '/workspace');
+    assert.equal(signInButton.props.signUpFallbackRedirectUrl, fallbackRedirectUrl ?? '/workspace');
+  }
+});
+
 test('profile errors preserve stable login guidance without exposing backend text', async (t) => {
   t.mock.method(globalThis, 'fetch', async () => new Response(JSON.stringify({ error: {
     code: 'PUBLIC_PROFILE_LOGIN_REQUIRED', message: 'Private backend diagnostic', request_id: 'profile-request-123',

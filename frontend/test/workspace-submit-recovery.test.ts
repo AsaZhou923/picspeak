@@ -5,12 +5,26 @@ import { createAuthOwnerState } from './helpers/auth-owner-state.ts';
 import * as reviewRequest from '../src/features/workspace/review-request.ts';
 import * as workspaceTaskFlow from '../src/features/workspace/workspaceTaskFlow.ts';
 
+class ApiException extends Error {
+  status: number;
+  code: string;
+  constructor(status: number, code: string, message: string) {
+    super(message);
+    this.status = status;
+    this.code = code;
+  }
+}
+
 function harness(create: (payload: any, token: string) => Promise<any>, initialOwner?: string, createPractice?: (payload: any, token: string) => Promise<any>) {
   let locale = 'en';
   const authState = createAuthOwnerState(initialOwner ?? `workspace-${crypto.randomUUID()}`);
   let stage = 'ready';
   let errMessage = '';
-  let remainingQuota = 20;
+  let remainingQuota: number | null = 20;
+  let softReached = false;
+  let currentPlan: 'guest' | 'pro' = 'pro';
+  let freshUsage: any = null;
+  const usageRefreshCalls: any[] = [];
   let photo: any = { photo_id: 'photo-a', status: 'READY' };
   let preview: string | null = 'local-preview';
   const pushed: string[] = [];
@@ -21,12 +35,12 @@ function harness(create: (payload: any, token: string) => Promise<any>, initialO
     'next/navigation': { useRouter: () => ({ push: (path: string) => pushed.push(path), replace: (path: string) => replaced.push(path) }) },
     '@/lib/auth-context': { useAuth: auth }, '@/lib/i18n': { useI18n: () => ({ locale, t: (key: string) => `${locale}:${key}` }) },
     '@/lib/api': { createReview: create, createPracticeSession: createPractice, getReview: async () => ({ photo_url: '/source' }), getPracticeConfig: async () => ({ practice_enabled: Boolean(createPractice) }), isAbortError: () => false },
-    '@/lib/types': { ApiException: class extends Error {} },
+    '@/lib/types': { ApiException },
     '@/lib/error-utils': { formatUserFacingError: () => 'localized-error' },
     '@/lib/product-analytics': { trackProductEvent() {} },
     '@/lib/retake-coach': { resolveReviewAnalysisType: () => 'single' },
     '@/lib/retake-coach-copy': { getRetakeCoachCopy: () => ({ dimensions: {} }) },
-    '@/features/workspace/hooks/useWorkspaceUsage': { useWorkspaceUsage: () => ({ usage: {}, fetchUsage() {}, currentPlan: 'pro', isGuest: false, remainingQuota, totalQuota: 20 }) },
+    '@/features/workspace/hooks/useWorkspaceUsage': { useWorkspaceUsage: () => ({ usage: { plan: currentPlan, quota: { monthly_soft_limit: 150, monthly_soft_used: softReached ? 151 : 0, monthly_soft_reached: softReached } }, async fetchUsage(options: any) { usageRefreshCalls.push(options); const result = await freshUsage; if (result?.plan === 'guest') remainingQuota = Math.min(result.quota.daily_remaining, result.quota.monthly_remaining); return result; }, currentPlan, isGuest: currentPlan === 'guest', remainingQuota, totalQuota: remainingQuota === null ? null : 20 }) },
     '@/features/workspace/hooks/useUploadFlow': { useUploadFlow: () => ({ photo, preview, stage, errMessage, setStage(value: string) { stage = value; }, setErrMessage(value: string) { errMessage = value; }, handleFileSelected() {}, handleReset() { stage = 'idle'; errMessage = ''; preview = null; photo = null; } }) },
     '@/features/workspace/hooks/useReplayContext': { useReplayContext: () => ({ clearReplay() {}, ...(createPractice ? { sourceReviewId: 'review-source', nextShootAction: 'Keep the background clear', nextShootDimension: 'composition' } : {}) }) },
     '@/features/workspace/review-request': reviewRequest,
@@ -40,15 +54,76 @@ function harness(create: (payload: any, token: string) => Promise<any>, initialO
   const app = componentHarness(new URL('../src/app/workspace/page.tsx', import.meta.url), modules);
   const render = () => app.render();
   const submit = () => app.nodes((node) => node.type === 'WorkspaceSubmitPanel')[0].props.onSubmit();
-  return { ...app, render, submit, pushed, replaced, get owner() { return authState.owner; }, get stage() { return stage; },
+  return { ...app, render, submit, pushed, replaced, usageRefreshCalls, get owner() { return authState.owner; }, get stage() { return stage; },
     changeOwner(value: string, rerender = true) { authState.changeOwner(value); if (rerender) render(); },
     refreshToken() { authState.refreshToken(); },
     holdToken(value: Promise<string> | null) { authState.holdToken(value); }, changeLocale(value: string) { locale = value; render(); },
     acceptPractice() { return app.nodes((node) => node.type === 'button' && node.props.children === 'Save this goal')[0].props.onClick(); },
     setQuota(value: number) { remainingQuota = value; render(); },
+    reachProReminder() { remainingQuota = null; softReached = true; render(); },
+    staleGuestQuota(fresh: any) { currentPlan = 'guest'; remainingQuota = 1; freshUsage = fresh; render(); },
     changeMode(value: string) { app.nodes((node) => node.type === 'WorkspaceSettingsPanel')[0].props.onReviewModeChange(value); render(); },
   };
 }
+
+test('workspace still submits a Pro critique after the server monthly reminder is reached', async () => {
+  const calls: any[] = [];
+  const app = harness(async (payload) => { calls.push(payload); return { task_id: 'after-soft-reminder' }; });
+  app.render(); await settle(); app.render();
+  app.reachProReminder();
+  const quotaBanner = app.nodes((node) => node.type === 'QuotaBanner')[0];
+  assert.equal(quotaBanner.props.usage.quota.monthly_soft_used, 151);
+  assert.equal(quotaBanner.props.usage.quota.monthly_soft_reached, true);
+  await app.submit();
+  assert.equal(calls.length, 1);
+  assert.deepEqual(app.pushed, ['/tasks/after-soft-reminder?mode=flash']);
+  assert.equal(app.nodes((node) => node.type === 'QuotaModal').length, 0);
+});
+
+for (const code of ['RATE_LIMIT_EXCEEDED', 'QUOTA_EXCEEDED']) test(`workspace refreshes stale Guest usage after ${code} and offers Free only when exhausted`, async () => {
+  const app = harness(async () => { throw new ApiException(code === 'QUOTA_EXCEEDED' ? 403 : 429, code, 'private provider reason'); });
+  app.render(); await settle(); app.render();
+  app.staleGuestQuota({ plan: 'guest', quota: { daily_remaining: 0, monthly_remaining: 29 } });
+  await app.submit(); app.render();
+  assert.equal(app.usageRefreshCalls.length, 1);
+  assert.equal(app.usageRefreshCalls[0].force, true);
+  assert.equal(app.nodes((node) => node.type === 'QuotaModal')[0].props.plan, 'guest');
+  assert.equal(app.nodes((node) => node.type === 'QuotaBanner')[0].props.remainingQuota, 0);
+  assert.equal(app.stage, 'ready');
+});
+
+for (const fresh of [null, { plan: 'guest', quota: { daily_remaining: 1, monthly_remaining: 29 } }]) test(`workspace minute limiting does not claim Guest allowance is exhausted when usage is ${fresh ? 'available' : 'unknown'}`, async () => {
+  const app = harness(async () => { throw new ApiException(429, 'RATE_LIMIT_EXCEEDED', 'private provider reason'); });
+  app.render(); await settle(); app.render();
+  app.staleGuestQuota(fresh);
+  await app.submit(); app.render();
+  assert.equal(app.usageRefreshCalls.length, 1);
+  assert.equal(app.nodes((node) => node.type === 'QuotaModal').length, 0);
+  assert.equal(app.stage, 'ready');
+});
+
+test('workspace ignores late quota recovery after a confirmed account switch', async () => {
+  const fresh = deferred<any>();
+  const app = harness(async () => { throw new ApiException(429, 'RATE_LIMIT_EXCEEDED', 'private provider reason'); });
+  app.render(); await settle(); app.render();
+  app.staleGuestQuota(fresh.promise);
+  const request = app.submit();
+  await settle();
+  app.changeOwner('another-account', false);
+  fresh.resolve({ plan: 'guest', quota: { daily_remaining: 0, monthly_remaining: 29 } });
+  await request; app.render();
+  assert.equal(app.nodes((node) => node.type === 'QuotaModal').length, 0);
+});
+
+test('Pro per-minute limiting refreshes usage and keeps recovery separate from Guest sign-up', async () => {
+  const app = harness(async () => { throw new ApiException(429, 'PRO_REVIEW_RATE_LIMITED', 'private provider reason'); });
+  app.render(); await settle(); app.render();
+  app.reachProReminder();
+  await app.submit(); app.render();
+  assert.equal(app.usageRefreshCalls[0].force, true);
+  assert.equal(app.nodes((node) => node.type === 'QuotaModal').length, 0);
+  assert.equal(app.stage, 'ready');
+});
 
 test('workspace actual handler guards rapid clicks, preserves uncertain retry body, and locks accepted navigation', async () => {
   const response = deferred<any>();
@@ -70,6 +145,24 @@ test('workspace actual handler guards rapid clicks, preserves uncertain retry bo
   app.changeLocale('zh');
   await app.submit();
   assert.equal(calls.length, 2, 'accepted navigation remains locked across re-renders until unmount');
+});
+
+test('workspace retains its original request key when a matching critique is still in progress', async () => {
+  const calls: any[] = [];
+  const app = harness(async (payload) => {
+    calls.push(payload);
+    if (calls.length === 1) throw new ApiException(409, 'IDEMPOTENCY_IN_PROGRESS', 'private provider reason');
+    return { task_id: 'same-request-finished' };
+  });
+  app.render(); await settle(); app.render();
+  await app.submit(); app.render();
+  assert.equal(app.stage, 'ready');
+  await app.submit(); app.render();
+  assert.equal(calls.length, 2);
+  assert.equal(calls[1].idempotency_key, calls[0].idempotency_key);
+  assert.equal(JSON.stringify(calls[1]), JSON.stringify(calls[0]));
+  assert.deepEqual(app.pushed, ['/tasks/same-request-finished?mode=flash']);
+  assert.equal(app.nodes((node) => node.type === 'QuotaModal').length, 0);
 });
 
 for (const reason of ['unmount', 'owner-switch'] as const) test(`workspace ignores a late request result after ${reason}`, async () => {

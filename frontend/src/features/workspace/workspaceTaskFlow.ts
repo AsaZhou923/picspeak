@@ -209,3 +209,10 @@ export function reviewModelLabel(model: ReviewModel): string {
 export function reviewModelForMode(mode: ReviewMode): ReviewModel {
   return mode === 'pro' ? 'gpt-6.1-sol' : 'gpt-6-sol';
 }
+
+export function buildWorkspaceSignInReturnPath(search: string, mode: ReviewMode, imageType: string): string {
+  const params = new URLSearchParams(search);
+  params.set('mode', mode);
+  params.set('image_type', imageType);
+  return `/workspace?${params.toString()}`;
+}

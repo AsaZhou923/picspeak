@@ -3,20 +3,53 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from contextlib import contextmanager
 import logging
+import hashlib
 
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.core.errors import api_error
+from app.core.errors import ApiHTTPException, api_error
 from app.db.models import ReviewMode, ReviewQuotaReservation, ReviewTask, User, UserPlan
-from app.services.guard import enforce_user_quota
+from app.services.guard import enforce_pro_review_soft_rate_limit, enforce_user_quota
 
 logger = logging.getLogger(__name__)
 
 
 @contextmanager
+def synchronous_review_idempotency_lease(db: Session, *, user_id: int, key: str):
+    """Keep one keyed synchronous request in flight across its main commits.
+
+    A separate transaction owns this lock so admission/result commits cannot
+    release it early. Transaction exit releases it before connection pool reuse.
+    """
+    bind = db.get_bind()
+    if bind.dialect.name != 'postgresql':
+        # The production concurrency contract is PostgreSQL; local SQLite
+        # fixtures retain the pre-existing best-effort settlement protection.
+        yield
+        return
+    basis = f'picspeak:sync-review-idempotency-v1:{user_id}:{key}'.encode()
+    lock_key = int.from_bytes(hashlib.sha256(basis).digest()[:8], 'big', signed=True)
+    with bind.engine.connect() as connection, connection.begin():
+        acquired = connection.execute(text('SELECT pg_try_advisory_xact_lock(:key)'), {'key': lock_key}).scalar_one()
+        if not acquired:
+            raise ApiHTTPException(
+                status_code=409, code='IDEMPOTENCY_IN_PROGRESS',
+                message='This critique request is already in progress. Retry with the same key shortly.',
+                headers={'Retry-After': '1'}, extra={'retry_after_seconds': 1},
+            )
+        yield
+
+
+@contextmanager
 def synchronous_review_quota(db: Session, user: User, *, mode: ReviewMode):
     reservation = reserve_review_quota(db, user, mode=mode)
-    db.commit()
+    try:
+        enforce_pro_review_soft_rate_limit(db, user)
+        db.commit()
+    except BaseException:
+        db.rollback()
+        raise
     try:
         yield reservation
     except BaseException:

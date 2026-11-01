@@ -73,6 +73,8 @@ Strengthen the loop:
 - Create a reusable visual and interaction system across public and application routes.
 - Preserve strong SEO, localization, accessibility and responsive behavior.
 
+Pro positioning (2026-11-01): lead with the owner's complete photography record and originals during the active subscription, then continuous critique without a monthly hard cap. Keep model names and mode explanations visible in their controls. Guest can try one critique per day without registering (30 per month); after that, guide them to a Free account. After Pro's 150-critique UTC-month threshold, new critiques slow to 2 per minute until the next UTC month. The monthly total remains unlimited and no extra fee is charged automatically.
+
 ### Non-goals
 
 - Adding a new social network or large content category.

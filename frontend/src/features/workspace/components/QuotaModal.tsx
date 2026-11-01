@@ -8,9 +8,10 @@ interface QuotaModalProps {
   plan: string;
   onClose: () => void;
   t: Translator;
+  signInReturnPath?: string;
 }
 
-export function QuotaModal({ plan, onClose, t }: QuotaModalProps) {
+export function QuotaModal({ plan, onClose, t, signInReturnPath = '/workspace' }: QuotaModalProps) {
   const dialogRef = useModalFocusTrap<HTMLDivElement>({ open: true, onClose });
   const bodyKey = plan === 'guest' ? 'quota_modal_body' : plan === 'pro' ? 'quota_modal_pro_body' : 'quota_modal_free_body';
 
@@ -49,6 +50,7 @@ export function QuotaModal({ plan, onClose, t }: QuotaModalProps) {
         <div className="flex flex-col gap-2 pt-1">
           {plan === 'guest' ? (
             <ClerkSignInTrigger
+              fallbackRedirectUrl={signInReturnPath}
               className="ui-action-primary min-h-11 px-5 py-2.5 text-sm"
               signedInClassName="inline-flex items-center justify-center"
             >

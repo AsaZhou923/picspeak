@@ -75,7 +75,7 @@ export default function HomeImprovementLoop({
     {
       icon: CheckCircle2,
       title: t('demo_suggestion'),
-      body: t('feature_pro_body'),
+      body: t('task_wait_note_ai_body'),
     },
     {
       icon: Repeat2,

@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-01-guest-and-pro-records",
+    "date": "2026-11-01",
+    "showPopup": false,
+    "title": "A guest trial and lasting Pro photo records",
+    "summary": "Try one critique a day without signing up, then join Free to keep reviewing and save your records. Pro focuses on full critique history and originals while subscribed, with ongoing critiques. After 150 completed critiques in a UTC month, new requests are limited to two per minute until next month. You can continue without automatic extra charges. Free limits and prices are unchanged.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-11-01-guest-and-pro-records"
+  },
+  {
     "id": "2026-10-31-billing-lifecycle",
     "date": "2026-10-31",
     "showPopup": false,

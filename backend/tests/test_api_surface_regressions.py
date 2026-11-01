@@ -16,7 +16,7 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 from app.api.deps import bind_guest_token, get_current_actor
-from app.core.errors import api_error
+from app.core.errors import ApiHTTPException, api_error
 from app.db.models import UsageLedger, User, UserPlan, UserStatus
 from app.db.session import get_db
 from app.main import app
@@ -61,6 +61,30 @@ class ApiSurfaceRegressionTests(unittest.TestCase):
                 'pragma',
             }.issubset(allow_headers)
         )
+
+    def test_rate_limit_errors_preserve_retry_after_and_expose_it_to_the_browser(self) -> None:
+        def unavailable_actor():
+            raise ApiHTTPException(
+                status_code=429, code='PRO_REVIEW_RATE_LIMITED', message='Please wait',
+                headers={'Retry-After': '23', 'Cache-Control': 'private, no-store'}, extra={'retry_after_seconds': 23},
+            )
+
+        def override_db():
+            yield MagicMock()
+
+        app.dependency_overrides[get_current_actor] = unavailable_actor
+        app.dependency_overrides[get_db] = override_db
+        with self._client() as client:
+            response = client.get('/api/v1/me/usage', headers={'Origin': 'http://localhost:3000'})
+        self.assertEqual(response.status_code, 429)
+        self.assertEqual(response.headers['retry-after'], '23')
+        self.assertEqual(response.headers['cache-control'], 'private, no-store')
+        self.assertEqual(response.json()['error']['code'], 'PRO_REVIEW_RATE_LIMITED')
+        self.assertEqual(response.json()['error']['extra']['retry_after_seconds'], 23)
+        self.assertEqual(response.headers['access-control-allow-origin'], 'http://localhost:3000')
+        exposed = {value.strip().lower() for value in response.headers['access-control-expose-headers'].split(',')}
+        self.assertIn('retry-after', exposed)
+        self.assertIn('x-request-id', exposed)
 
     def test_cors_preflight_rejects_disallowed_method(self) -> None:
         with self._client() as client:

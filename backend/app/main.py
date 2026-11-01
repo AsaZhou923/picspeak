@@ -62,7 +62,7 @@ app.add_middleware(
         'Cache-Control',
         'Pragma',
     ],
-    expose_headers=['X-Request-Id', 'X-Guest-Access-Token', 'Content-Disposition'],
+    expose_headers=['X-Request-Id', 'X-Guest-Access-Token', 'Content-Disposition', 'Retry-After'],
 )
 app.include_router(router)
 app.include_router(webhook_router)
@@ -113,13 +113,15 @@ def _log_error_response(
 async def http_exception_handler(request: Request, exc: HTTPException):
     code, message, extra = normalize_http_error(exc.status_code, exc.detail)
     _log_error_response(request, status_code=exc.status_code, code=code, message=message, extra=extra)
-    return _error_response(
+    response = _error_response(
         status_code=exc.status_code,
         request_id=getattr(request.state, 'request_id', None),
         code=code,
         message=message,
         extra=extra,
     )
+    response.headers.update(exc.headers or {})
+    return response
 
 
 @app.exception_handler(RequestValidationError)

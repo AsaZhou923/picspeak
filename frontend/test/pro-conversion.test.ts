@@ -7,7 +7,7 @@ import {
   getUsageDecisionCopy,
 } from '../src/lib/pro-conversion.ts';
 
-test('Pro boundary sells usage, deep mode, and history rather than features Free already has', () => {
+test('Pro boundary leads with saved records while preserving usage and mode differences', () => {
   const copy = getProPlanBoundaryCopy('en');
   const freeText = `${copy.free.body} ${copy.free.features.join(' ')}`;
   const proText = `${copy.pro.body} ${copy.pro.features.join(' ')}`;
@@ -18,6 +18,7 @@ test('Pro boundary sells usage, deep mode, and history rather than features Free
   assert.match(proText, /no monthly critique limit/i);
   assert.match(proText, /deep mode/i);
   assert.match(proText, /while subscribed/i);
+  assert.match(copy.pro.features[0], /history and originals/i);
 });
 
 test('Free / Pro copy never presents next-shoot guidance or retake comparison as Pro-only', () => {
@@ -56,18 +57,19 @@ test('Free plan descriptions agree on fifteen-day history in every locale', () =
 test('upgrade triggers speak to quota, deeper advice, history trend, and retake comparison', () => {
   assert.match(getProUpgradeTriggerCopy('zh', 'quota_floor').body, /不用反复计算额度/);
   assert.match(getProUpgradeTriggerCopy('zh', 'deeper_result').body, /深度模式/);
-  assert.match(getProUpgradeTriggerCopy('zh', 'history_trend').title, /趋势/);
+  assert.match(getProUpgradeTriggerCopy('zh', 'history_trend').title, /回.*复盘/);
   assert.match(getProUpgradeTriggerCopy('zh', 'retake_compare').body, /上传修改版或新照片/);
   assert.doesNotMatch(getProUpgradeTriggerCopy('zh', 'retake_compare').body, /同图再分析/);
   assert.doesNotMatch(getProUpgradeTriggerCopy('en', 'retake_compare').body, /same-photo reruns/i);
   assert.doesNotMatch(getProUpgradeTriggerCopy('ja', 'retake_compare').body, /同じ写真の再分析/);
 });
 
-test('usage page copy frames billing as an upgrade decision page', () => {
+test('usage page explains current plan value and the nonblocking monthly reminder', () => {
   const copy = getUsageDecisionCopy('zh');
 
-  assert.match(copy.headline, /升级决策/);
-  assert.match(copy.body, /付费前后/);
+  assert.match(copy.headline, /拍摄.*点评/);
+  assert.match(copy.body, /历史.*原图/);
+  assert.match(copy.proBody, /150.*每分钟最多 2 次.*下个 UTC 月.*不自动加收/);
   assert.deepEqual(
     copy.differences.map((item) => item.label),
     ['点评次数', '深度模式', '历史保留'],

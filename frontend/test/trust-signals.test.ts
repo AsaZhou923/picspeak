@@ -84,7 +84,7 @@ test('AI markdown and llms.txt publish trust metadata consistently', () => {
   assert.equal(llmsText, generatedLlmsText);
   assert.match(llmsText, /\[Editorial and corrections policy\]\(https:\/\/www\.picspeak\.art\/editorial-policy\)/);
   assert.match(llmsText, /\[Author profile\]\(https:\/\/www\.picspeak\.art\/author\/asa-zhou\)/);
-  assert.match(llmsText, /Last reviewed: 2026-08-09/);
+  assert.match(llmsText, /Last reviewed: 2026-11-01/);
   assert.match(llmsText, /do not infer extra license rights/);
   for (const locale of ['en', 'zh', 'ja']) {
     assert.match(llmsText, new RegExp(`https://www\\.picspeak\\.art/${locale}/blog`));
@@ -94,7 +94,7 @@ test('AI markdown and llms.txt publish trust metadata consistently', () => {
   const markdown = buildAiMarkdownContent(policyMirror);
   assert.match(markdown, new RegExp(`Author: ${siteConfig.author.name}`));
   assert.match(markdown, /Source page: https:\/\/www\.picspeak\.art\/editorial-policy/);
-  assert.match(markdown, /Last reviewed: 2026-08-09/);
+  assert.match(markdown, /Last reviewed: 2026-11-01/);
   assert.match(markdown, /Editorial policy: https:\/\/www\.picspeak\.art\/editorial-policy/);
   assert.match(markdown, /Citation boundary:/);
 });

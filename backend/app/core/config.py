@@ -50,7 +50,7 @@ class Settings(BaseSettings):
     guest_api_rate_limit_per_minute: int = 60
     guest_creation_rate_limit_per_minute: int = 10
     guest_review_rate_limit_per_minute: int = 4
-    guest_review_limit_per_day: int = 3
+    guest_review_limit_per_day: int = 1
     guest_review_limit_per_month: int = 30
     # Network-wide guest caps ignore client-supplied device ids, so rotating
     # X-Device-Id or dropping cookies cannot mint fresh guest quota. 0 disables.
@@ -60,6 +60,9 @@ class Settings(BaseSettings):
     free_review_limit_per_day: int = 5
     free_review_limit_per_month: int = 60
     free_pro_review_limit_per_month: int = 10
+    # Fair use slows new admissions after the threshold, without a monthly cap.
+    pro_review_soft_limit_per_month: int = Field(default=150, ge=1)
+    pro_review_soft_limit_rate_per_minute: int = Field(default=2, ge=1)
     practice_enabled: bool = False
 
     oauth_jwt_secret: str = 'change-me-jwt-secret'

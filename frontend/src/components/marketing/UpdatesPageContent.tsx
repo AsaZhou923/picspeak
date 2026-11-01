@@ -16,7 +16,7 @@ function getPageCopy(locale: Locale) {
     return {
       label: '更新履歴',
       title: '最新の更新内容と更新一覧',
-      intro: '最近の変更や準備中の内容を、新しい順にまとめています。',
+      intro: '製品の更新内容を、新しい順にまとめています。',
       latestLabel: '最近の更新',
       listLabel: '最近の更新',
       latestBadge: '最新',
@@ -28,7 +28,7 @@ function getPageCopy(locale: Locale) {
     return {
       label: 'Update Log',
       title: 'Latest Updates and Recent Changes',
-      intro: 'Browse recent changes and upcoming work, with the newest update first.',
+      intro: 'Browse product updates, with the newest changes first.',
       latestLabel: 'Latest Update',
       listLabel: 'Recent Updates',
       latestBadge: 'Latest',
@@ -39,7 +39,7 @@ function getPageCopy(locale: Locale) {
   return {
     label: '更新记录',
     title: '最新更新详情与历史更新列表',
-    intro: '按时间查看最近的产品变化和准备中的内容，最新一条更新展示在顶部。',
+    intro: '按时间查看产品更新，最新一条展示在顶部。',
     latestLabel: '最近更新',
     listLabel: '近期更新',
     latestBadge: '最新',

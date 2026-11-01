@@ -191,6 +191,7 @@ npm run build
 
 ## 文档
 
+- [游客体验与 Pro 摄影记录](docs/changelog/CHANGELOG.md#2026-11-01-guest-and-pro-records)
 - [付款与续费状态更清楚](docs/changelog/CHANGELOG.md#2026-10-31-billing-lifecycle)
 - [长廊与操作恢复修复](docs/changelog/CHANGELOG.md#2026-10-20-gallery-and-review-cache-fixes)
 - [订阅恢复与生图重试修复](docs/changelog/CHANGELOG.md#2026-10-19-billing-recovery-and-generation-retries)

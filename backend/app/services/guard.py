@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import math
 from datetime import date, datetime, timedelta, timezone
 from typing import TYPE_CHECKING
 
@@ -10,7 +11,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.errors import api_error
+from app.core.errors import ApiHTTPException, api_error
 from app.core.network import client_network_from_request, device_key_from_request
 from app.db.models import IdempotencyKey, RateLimitCounter, ReviewMode, ReviewQuotaReservation, ReviewTask, UsageLedger, User, UserPlan
 
@@ -255,17 +256,23 @@ def guest_usage_snapshot(
     }
 
 
-def user_usage_snapshot(db: Session, user: User, *, now: datetime | None = None) -> dict[str, int | None]:
+def user_usage_snapshot(db: Session, user: User, *, now: datetime | None = None) -> dict[str, int | bool | datetime | None]:
     refresh_user_quota(db, user)
-    monthly_used = count_monthly_review_usage(db, user, now=now)
+    current = now or utc_now()
+    current = current.replace(tzinfo=timezone.utc) if current.tzinfo is None else current.astimezone(timezone.utc)
+    monthly_used = count_monthly_review_usage(db, user, now=current)
     daily_total = daily_quota_for_plan(user.plan)
     monthly_total = monthly_quota_for_plan(user.plan)
     pro_monthly_total = pro_mode_monthly_quota_for_plan(user.plan)
-    pro_monthly_used = count_monthly_review_usage(db, user, now=now, mode=ReviewMode.pro) if pro_monthly_total is not None else None
-    today = (now or utc_now()).date()
+    pro_monthly_used = count_monthly_review_usage(db, user, now=current, mode=ReviewMode.pro) if pro_monthly_total is not None else None
+    today = current.date()
     daily_held = count_review_quota_holds(db, user, since=today) if daily_total is not None else 0
     monthly_held = count_review_quota_holds(db, user, since=today.replace(day=1)) if monthly_total is not None else 0
     pro_monthly_held = count_review_quota_holds(db, user, since=today.replace(day=1), mode=ReviewMode.pro) if pro_monthly_total is not None else 0
+    # Completed review_request ledger entries cover Flash, Pro and paired work.
+    # Holds and failed attempts do not count toward this informational reminder.
+    # Never feed it into enforce_user_quota or the null unlimited quota fields.
+    soft_limit = settings.pro_review_soft_limit_per_month if user.plan == UserPlan.pro else None
     return {
         'daily_total': daily_total,
         'daily_used': user.daily_quota_used if daily_total is not None else None,
@@ -276,7 +283,41 @@ def user_usage_snapshot(db: Session, user: User, *, now: datetime | None = None)
         'pro_monthly_total': pro_monthly_total,
         'pro_monthly_used': pro_monthly_used,
         'pro_monthly_remaining': max(pro_monthly_total - pro_monthly_used - pro_monthly_held, 0) if pro_monthly_total is not None and pro_monthly_used is not None else None,
+        'monthly_soft_limit': soft_limit,
+        'monthly_soft_used': monthly_used if soft_limit is not None else None,
+        'monthly_soft_reached': monthly_used >= soft_limit if soft_limit is not None else None,
+        'monthly_soft_resets_at': month_window_start(current) + timedelta(seconds=month_window_seconds(current)) if soft_limit is not None else None,
+        'monthly_soft_rate_limit_per_minute': settings.pro_review_soft_limit_rate_per_minute if soft_limit is not None else None,
     }
+
+
+def enforce_pro_review_soft_rate_limit(db: Session, user: User) -> dict:
+    """Limit new admissions only; accepted tasks and worker retries skip this."""
+    if user.plan != UserPlan.pro:
+        return {}
+    now = utc_now()
+    if count_monthly_review_usage(db, user, now=now) < settings.pro_review_soft_limit_per_month:
+        return {}
+    reset_at = minute_window_start(now) + timedelta(minutes=1)
+    retry_after = max(math.ceil((reset_at - now).total_seconds()), 1)
+    try:
+        return _enforce_scope_rate_limit(
+            db, scope='pro_review_soft_minute', scope_key=f'user:{user.public_id}', endpoint='review_create',
+            per_minute_limit=settings.pro_review_soft_limit_rate_per_minute,
+            window_start=minute_window_start(now), window_seconds=60,
+        )
+    except ApiHTTPException as exc:
+        if exc.status_code != 429:
+            raise
+        raise ApiHTTPException(
+            status_code=429, code='PRO_REVIEW_RATE_LIMITED',
+            message='Monthly fair-use threshold reached. Please wait briefly before starting another critique.',
+            headers={'Retry-After': str(retry_after)},
+            extra={
+                'retry_after_seconds': retry_after, 'reset_at': reset_at.isoformat(),
+                'limit_per_minute': settings.pro_review_soft_limit_rate_per_minute,
+            },
+        ) from exc
 
 
 def _enforce_scope_rate_limit(

@@ -10,6 +10,28 @@ import { localizedErrorMessage } from '../src/lib/error-utils.ts';
 
 const t = (key: keyof typeof enTranslations) => zhTranslations[key] ?? enTranslations[key] ?? key;
 
+test('current plan copy agrees on one Guest critique daily and continued Pro use with a slower minute rate', () => {
+  for (const dictionary of [enTranslations, zhTranslations, jaTranslations]) {
+    assert.doesNotMatch(dictionary.hero_label, /GPT-/);
+    assert.match(dictionary.plan_guest_quota, /1/);
+    assert.match(dictionary.plan_guest_quota, /30/);
+    assert.match(dictionary.faq_a3, /150/);
+    assert.match(dictionary.quota_subhead, /150/);
+    assert.match(dictionary.quota_modal_body, /60/);
+    assert.match(dictionary.quota_modal_body, /15/);
+    assert.doesNotMatch(dictionary.quota_modal_body, /\$3\.99|升级.*Pro|upgrade to Pro/i);
+    assert.match(dictionary.plan_pro_feature, /历史.*原图|history and originals|全履歴と元写真/);
+    assert.match(dictionary.usage_pro_soft_counter, /\{used\}.*\{limit\}/);
+  }
+  assert.match(enTranslations.quota_subhead, /2 per minute.*next UTC month.*no .*automatic extra charge/);
+  assert.match(zhTranslations.quota_subhead, /每分钟最多 2 次.*下个 UTC 月.*不会自动加收/);
+  assert.match(jaTranslations.quota_subhead, /次の UTC 月.*毎分2回.*自動の追加請求はありません/);
+  for (const dictionary of [enTranslations, zhTranslations, jaTranslations]) {
+    assert.equal(localizedErrorMessage((key) => dictionary[key], 'PRO_REVIEW_RATE_LIMITED'), dictionary.err_pro_review_rate_limit_body);
+    assert.match(dictionary.usage_pro_soft_reached, /\{rate\}/);
+  }
+});
+
 test('image credit copy separates monthly and purchased balances and explains quality restrictions', () => {
   for (const dictionary of [enTranslations, zhTranslations, jaTranslations]) {
     assert.notEqual(dictionary.usage_generation_credits_monthly_balance, dictionary.usage_generation_credits_purchased_balance);
@@ -121,6 +143,15 @@ test('idempotency conflicts use request-neutral copy for generation and practice
     }
     assert.doesNotMatch(dictionary.err_idempotency_conflict_body, /practice|练习|練習/i);
     assert.match(dictionary.err_idempotency_conflict_body, /new request|新请求|新しいリクエスト/);
+  }
+});
+
+test('in-progress idempotent critiques use a retry message distinct from conflicting new requests', () => {
+  for (const dictionary of [enTranslations, zhTranslations, jaTranslations]) {
+    const translated = localizedErrorMessage((key) => dictionary[key], 'IDEMPOTENCY_IN_PROGRESS');
+    assert.equal(translated, dictionary.err_idempotency_in_progress_body);
+    assert.notEqual(translated, dictionary.err_idempotency_conflict_body);
+    assert.doesNotMatch(translated, /new request|新请求|新しいリクエスト|upgrade|升级|アップグレード/i);
   }
 });
 

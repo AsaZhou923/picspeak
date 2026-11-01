@@ -33,6 +33,11 @@ export interface UsageResponse {
     monthly_total: number | null;
     monthly_used: number | null;
     monthly_remaining: number | null;
+    monthly_soft_limit?: number | null;
+    monthly_soft_used?: number | null;
+    monthly_soft_reached?: boolean | null;
+    monthly_soft_rate_limit_per_minute?: number | null;
+    monthly_soft_resets_at?: string | null;
     pro_monthly_total: number | null;
     pro_monthly_used: number | null;
     pro_monthly_remaining: number | null;

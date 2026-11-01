@@ -32,6 +32,7 @@ import {
   buildPracticeSemanticKey,
   buildPracticeReviewSemanticKey,
   buildPracticeSuccessCriteria,
+  buildWorkspaceSignInReturnPath,
   clearPendingPracticeState,
   getWorkspaceTaskFlowCopy,
   makePracticeIdempotencyKey,
@@ -182,6 +183,9 @@ function WorkspacePageContent() {
   const [reviewMode, setReviewMode] = useState<'flash' | 'pro'>('flash');
   const [imageType, setImageType] = useState<ImageType>('default');
   const [showQuotaModal, setShowQuotaModal] = useState(false);
+  const signInReturnPath = buildWorkspaceSignInReturnPath(
+    typeof window === 'undefined' ? '' : window.location.search, reviewMode, imageType,
+  );
   const [practiceEnabled, setPracticeEnabled] = useState(false);
   const [practiceSession, setPracticeSession] = useState<PracticeSessionResponse | null>(null);
   const [practiceError, setPracticeError] = useState('');
@@ -650,6 +654,17 @@ function WorkspacePageContent() {
       if (!isCurrent()) return;
       setStage('ready');
       if (err instanceof ApiException) {
+        if (['RATE_LIMIT_EXCEEDED', 'RATE_LIMITED', 'QUOTA_EXCEEDED', 'PRO_REVIEW_RATE_LIMITED'].includes(err.code)) {
+          const freshUsage = await fetchUsage({ force: true });
+          if (!isCurrent()) return;
+          if (freshUsage?.plan === 'guest' && [freshUsage.quota.daily_remaining, freshUsage.quota.monthly_remaining].some(
+            (remaining) => typeof remaining === 'number' && remaining <= 0,
+          )) {
+            setErrMessage(t('quota_modal_body'));
+            setShowQuotaModal(true);
+            return;
+          }
+        }
         if (err.status === 429) {
           setErrMessage(formatUserFacingError(t, err, t('err_rate_limit')));
         } else if (err.code === 'QUOTA_EXCEEDED') {
@@ -666,7 +681,7 @@ function WorkspacePageContent() {
         if (!isOwnerCurrent()) setStage('ready');
       }
     }
-  }, [captureAuthOwner, photo, userInfo?.user_id, practiceSession, unresolvedPracticeSession, canSubmitSameImageRecheck, reviewMode, selectedReviewModel, locale, trustedLocale, imageType, trustedSourceReviewId, sourceReviewId, retakeIntent, nextShootAction, nextShootDimension, sourceGenerationId, contentEntrypoint, contentSlug, galleryReviewId, promptExampleId, ensureToken, router, t, token, usage, remainingQuota, practiceEnabled, savedPracticeSourceUnavailable, setStage, setErrMessage, targetCopy.disabled]);
+  }, [captureAuthOwner, photo, userInfo?.user_id, practiceSession, unresolvedPracticeSession, canSubmitSameImageRecheck, reviewMode, selectedReviewModel, locale, trustedLocale, imageType, trustedSourceReviewId, sourceReviewId, retakeIntent, nextShootAction, nextShootDimension, sourceGenerationId, contentEntrypoint, contentSlug, galleryReviewId, promptExampleId, ensureToken, router, t, token, usage, remainingQuota, fetchUsage, practiceEnabled, savedPracticeSourceUnavailable, setStage, setErrMessage, targetCopy.disabled]);
 
   const flowCopy = getWorkspaceTaskFlowCopy(locale);
   const hasReadyPhoto = Boolean(photo && (stage === 'ready' || stage === 'reviewing'));
@@ -842,7 +857,7 @@ function WorkspacePageContent() {
   return (
     <div className="min-h-screen">
       {showQuotaModal && (
-        <QuotaModal plan={currentPlan} onClose={() => setShowQuotaModal(false)} t={t} />
+        <QuotaModal plan={currentPlan} onClose={() => setShowQuotaModal(false)} t={t} signInReturnPath={signInReturnPath} />
       )}
       <div className="mx-auto max-w-workspace px-4 py-8 sm:px-6 sm:py-12 lg:px-8 lg:py-16">
         <div className="mb-8 max-w-task animate-fade-in sm:mb-10">
@@ -862,6 +877,7 @@ function WorkspacePageContent() {
             totalQuota={totalQuota}
             reviewMode={reviewMode}
             t={t}
+            signInReturnPath={signInReturnPath}
           />
         </div>
 
@@ -1026,7 +1042,7 @@ function WorkspacePageContent() {
           <ProPromoCard
             plan={currentPlan}
             scene="workspace"
-            fallbackRedirectUrl="/workspace"
+            fallbackRedirectUrl={signInReturnPath}
             className="mt-12 animate-slide-up anim-fill-both delay-150"
           />
         </div>

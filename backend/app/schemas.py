@@ -671,6 +671,11 @@ class UsageQuota(BaseModel):
     pro_monthly_total: int | None = None
     pro_monthly_used: int | None = None
     pro_monthly_remaining: int | None = None
+    monthly_soft_limit: int | None = None
+    monthly_soft_used: int | None = None
+    monthly_soft_reached: bool | None = None
+    monthly_soft_resets_at: datetime | None = None
+    monthly_soft_rate_limit_per_minute: int | None = None
 
 
 class UsageFeatures(BaseModel):

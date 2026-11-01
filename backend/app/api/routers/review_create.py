@@ -32,6 +32,7 @@ from app.schemas import ReviewCreateAsyncResponse, ReviewCreateRequest, ReviewCr
 from app.services.ai import AIReviewError, PHOTO_NOT_APPLICABLE_MESSAGE, openai_review_profile_for_mode, run_ai_review
 from app.services.guard import (
     enforce_guest_review_limits,
+    enforce_pro_review_soft_rate_limit,
     enforce_user_quota,
     get_idempotency_record,
     guest_network_scope_key,
@@ -54,7 +55,9 @@ from app.services.review_score_cache import (
     review_uses_current_full_review_contract,
     writer_contract_for_review_request,
 )
-from app.services.review_quota_reservations import synchronous_review_quota, consume_review_quota, release_review_quota
+from app.services.review_quota_reservations import (
+    synchronous_review_idempotency_lease, synchronous_review_quota, consume_review_quota, release_review_quota,
+)
 from app.services.object_retention import admit_photo_use
 from app.services.object_storage import get_object_read_url
 from .review_support import (
@@ -124,6 +127,14 @@ def create_review(
     db: Session = Depends(get_db),
     actor: CurrentActor = Depends(get_current_actor),
 ):
+    idempotency_key = payload.idempotency_key or request.headers.get('Idempotency-Key')
+    if not payload.async_mode and actor.plan == UserPlan.pro and idempotency_key:
+        with synchronous_review_idempotency_lease(db, user_id=actor.user.id, key=idempotency_key):
+            return _create_review(payload, request, db, actor)
+    return _create_review(payload, request, db, actor)
+
+
+def _create_review(payload: ReviewCreateRequest, request: Request, db: Session, actor: CurrentActor):
     if actor.plan == UserPlan.guest and payload.mode == ReviewMode.pro.value:
         raise api_error(status.HTTP_403_FORBIDDEN, 'PLAN_MODE_FORBIDDEN', 'Guest users cannot use pro review mode')
 
@@ -278,6 +289,9 @@ def create_review(
                 photo=photo,
                 task=task,
             )
+            # The unique task/idempotency boundary and validation precede this
+            # admission slot. Rollback removes both task and slot together.
+            enforce_pro_review_soft_rate_limit(db, actor.user)
             record_task_event(
                 db,
                 task,

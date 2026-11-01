@@ -138,7 +138,7 @@ class MonetizationBaselineTests(unittest.TestCase):
                             lemonsqueezy_pro_checkout_url='https://secret.invalid/private',
                             guest_review_limit_per_day=1)
         result = summarize_local_configuration(settings)
-        self.assertEqual(result['values']['guest_review_limit_per_day'], {'default': 3, 'loaded': 1})
+        self.assertEqual(result['values']['guest_review_limit_per_day'], {'default': 1, 'loaded': 1})
         self.assertNotIn('secret-must-never-be-printed', json.dumps(result))
         self.assertNotIn('secret.invalid', json.dumps(result))
         self.assertIsNone(result['provider_product_price_tax_cycle'])

@@ -92,7 +92,7 @@ export function getBillingStatusNotice(
 export const activationUiCopy = {
   zh: {
     title: 'Pro 订阅与激活码',
-    body: 'Pro 为 $3.99/月，按月自动续费，可随时取消；现有 Pro 用户不受影响。月订阅支付成功后会自动生效，已收到激活码的用户仍可在站内兑换。',
+    body: 'Pro 为 $3.99/月，按月自动续费，可随时取消；价格与已购会员有效期保持不变。月订阅支付成功后会自动生效，已收到激活码的用户仍可在站内兑换。',
     stepBuy: '完成 Pro 订阅支付',
     stepReceive: '支付成功后自动同步',
     stepRedeem: '已有激活码也可登录后兑换',

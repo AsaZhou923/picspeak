@@ -46,7 +46,7 @@ class DeploymentMigrationContractTests(unittest.TestCase):
         self.assertIn('Service deployment was blocked', script)
         self.assertIn('Refusing to deploy from a dirty working tree', script)
 
-    def test_deploy_paths_activate_review_profiles_and_live_payments(self) -> None:
+    def test_deploy_paths_activate_review_profiles_live_payments_and_usage_policy(self) -> None:
         config = (REPO_ROOT / 'cloudbuild.yaml').read_text(encoding='utf-8')
         script = (REPO_ROOT / 'deploy' / 'deploy-backend.bat').read_text(encoding='utf-8')
 
@@ -55,7 +55,8 @@ class DeploymentMigrationContractTests(unittest.TestCase):
             'OPENAI_SCORE_REASONING_EFFORT=low,OPENAI_REVIEW_REASONING_EFFORT=low,'
             'RETAKE_ANALYSIS_REASONING_EFFORT=high,OPENAI_PRO_MODEL=gpt-6.1-sol,'
             'OPENAI_PRO_REASONING_EFFORT=high,NOTIFICATIONS_READ_ENABLED=true,NOTIFICATIONS_EVENT_CAPTURE_ENABLED=true,NOTIFICATIONS_WORKER_ENABLED=true,'
-            'LEMONSQUEEZY_CHECKOUT_TEST_MODE=false,LEMONSQUEEZY_WEBHOOK_TEST_MODE=false'
+            'LEMONSQUEEZY_CHECKOUT_TEST_MODE=false,LEMONSQUEEZY_WEBHOOK_TEST_MODE=false,'
+            'GUEST_REVIEW_LIMIT_PER_DAY=1,PRO_REVIEW_SOFT_LIMIT_PER_MONTH=150,PRO_REVIEW_SOFT_LIMIT_RATE_PER_MINUTE=2'
         )
         self.assertIn(f'--update-env-vars={expected}', config)
         self.assertIn(f'--update-env-vars {expected} ^', script)
