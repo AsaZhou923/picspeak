@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Iterable
 
 from sqlalchemy.orm import Session
@@ -45,7 +45,12 @@ def owner_history_cutoff(plan: UserPlan) -> datetime | None:
 def review_access_status(review: Review | None, cutoff: datetime | None) -> str:
     if review is None or review.deleted_at is not None:
         return ACCESS_DELETED
-    if cutoff is not None and review.created_at < cutoff and not review_is_public(review):
+    created_at = review.created_at
+    if created_at.tzinfo is None:
+        created_at = created_at.replace(tzinfo=timezone.utc)
+    if cutoff is not None and cutoff.tzinfo is None:
+        cutoff = cutoff.replace(tzinfo=timezone.utc)
+    if cutoff is not None and created_at < cutoff and not review_is_public(review):
         return ACCESS_EXPIRED
     return ACCESS_AVAILABLE
 

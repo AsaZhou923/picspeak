@@ -18,11 +18,13 @@ from app.db.models import Announcement, GeneratedImage, NotificationEvent, Notif
 EVENT_CATEGORIES = {'review.completed': 'system', 'review.failed': 'system',
                     'generation.completed': 'system', 'generation.failed': 'system',
                     'credits.confirmed': 'system', 'subscription.changed': 'system',
-                    'gallery.review_liked': 'interaction', 'announcement.published': 'announcement'}
+                    'gallery.review_liked': 'interaction', 'announcement.published': 'announcement',
+                    'history.retention_notice': 'system'}
 PARAM_FIELDS = {'review.completed': {'task_id', 'review_id'}, 'review.failed': {'task_id'},
                 'generation.completed': {'task_id', 'generation_id'}, 'generation.failed': {'task_id'},
                 'credits.confirmed': {'grant_id', 'credits'}, 'subscription.changed': {'subscription_id', 'status', 'version'},
-                'gallery.review_liked': {'review_id'}, 'announcement.published': {'announcement_id'}}
+                'gallery.review_liked': {'review_id'}, 'announcement.published': {'announcement_id'},
+                'history.retention_notice': {'policy_version', 'grace_days'}}
 
 
 def utc(value: datetime) -> datetime:

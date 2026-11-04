@@ -874,7 +874,7 @@ export type NotificationCategoryFilter = 'all' | NotificationCategory;
 export type NotificationTargetState = 'available' | 'unavailable' | 'expired' | 'revoked' | string;
 
 export interface NotificationTarget {
-  type: 'review' | 'task' | 'generation' | 'generation_task' | 'usage' | 'updates' | 'blog' | 'workspace' | 'generate' | string | null;
+  type: 'review' | 'task' | 'generation' | 'generation_task' | 'usage' | 'account_history' | 'updates' | 'blog' | 'workspace' | 'generate' | string | null;
   public_id: string | null;
   href: string | null;
   state: NotificationTargetState;

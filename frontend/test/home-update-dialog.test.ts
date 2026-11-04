@@ -18,20 +18,20 @@ const homeSource = readFileSync(
 );
 const shellSource = readFileSync(path.join(FRONTEND_DIR, 'src/components/layout/SiteChrome.tsx'), 'utf8');
 
-test('guest and Pro usage update describes user benefits without draft status or a popup', () => {
+test('private critique access update describes user benefits without draft status or a popup', () => {
   for (const locale of ['zh', 'en', 'ja'] as const) {
     const latest = getLatestProductUpdate(locale);
     assert.ok(latest);
-    assert.equal(latest.id, '2026-11-01-guest-and-pro-records');
+    assert.equal(latest.id, '2026-11-04-private-review-access-and-notices');
     assert.doesNotMatch(latest.title + latest.summary, /准备中|尚未发布|upcoming|not yet released|準備中|まだ公開/i);
     assert.match(latest.summary, /Pro/);
-    assert.equal(latest.date, '2026-11-01');
+    assert.equal(latest.date, '2026-11-04');
     assert.equal(latest.showPopup, false);
     assert.equal(shouldShowProductUpdatePopup(latest), false);
     assert.equal(latest.docPath, `docs/changelog/CHANGELOG.md#${latest.id}`);
   }
-  assert.equal(getLatestProductUpdateDate('zh'), '2026-11-01');
-  assert.equal(getLatestProductUpdateDate(), '2026-11-01');
+  assert.equal(getLatestProductUpdateDate('zh'), '2026-11-04');
+  assert.equal(getLatestProductUpdateDate(), '2026-11-04');
 });
 
 test('photo applicability and public retention are released without a popup', () => {

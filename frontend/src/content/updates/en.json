@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-04-private-review-access-and-notices",
+    "date": "2026-11-04",
+    "showPopup": false,
+    "title": "Private critique access and retention notices",
+    "summary": "Retries now check whether a critique is still accessible, so old requests cannot return deleted or expired private content. Retention notices explain what is affected, show the earliest processing time and link to your history. Cleanup requires at least seven days after notice delivery; public works and active Pro access remain protected.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-11-04-private-review-access-and-notices"
+  },
+  {
     "id": "2026-11-01-guest-and-pro-records",
     "date": "2026-11-01",
     "showPopup": false,

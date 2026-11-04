@@ -87,6 +87,38 @@ function context(locale: Locale, plan: Plan | null) {
   return { auth, calls, modules };
 }
 
+for (const locale of ['en', 'zh', 'ja'] as const) {
+  test(`history retention notice renders the server ${locale} content and opens private history`, async () => {
+    const app = context(locale, 'free');
+    app.modules['@/lib/auth-context'] = loadAuthAdapter(app.auth, true);
+    app.modules['@/lib/api'].getNotificationDetail = async () => ({
+      notification_id: 'history-notice', category: 'system', type: 'history.retention_notice',
+      title: `${locale} server retention title`, summary: `${locale} server retention summary`,
+      body: `${locale} server retention body`, rendered_locale: locale,
+      occurred_at: '2026-11-04T00:00:00Z', delivered_at: '2026-11-04T00:00:00Z',
+      read_at: '2026-11-04T00:00:00Z', archived_at: null,
+      target: { type: 'account_history', public_id: null, href: null, state: 'available' },
+    });
+    const events = { addEventListener() {}, removeEventListener() {} };
+    const harness = componentHarness(source('NotificationDetailClient'), app.modules, {
+      window: events, document: { ...events, visibilityState: 'visible' }, navigator: { onLine: true },
+    });
+    try {
+      harness.render({ notificationId: 'history-notice' }); await settle();
+      harness.render({ notificationId: 'history-notice' });
+      assert.ok(harness.text().includes(`${locale} server retention title`));
+      assert.ok(harness.text().includes(`${locale} server retention summary`));
+      assert.ok(harness.text().includes(`${locale} server retention body`));
+      assert.equal(harness.nodes((node) => node.type === 'a' && node.props.href === '/account/reviews').length, 1);
+      app.auth.userInfo = user('guest'); app.auth.token = 'guest-token';
+      harness.render({ notificationId: 'history-notice' });
+      assert.ok(!harness.text().includes(`${locale} server retention body`));
+    } finally {
+      harness.unmount();
+    }
+  });
+}
+
 // Auth can restore session storage before a delayed account Suspense boundary
 // hydrates. Compare the actual initial HTML, without running passive effects.
 for (const locale of ['en', 'zh', 'ja'] as const) {

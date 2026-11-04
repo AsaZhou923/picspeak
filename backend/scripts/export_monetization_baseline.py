@@ -23,7 +23,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument('--start', required=True, help='Inclusive timestamp with timezone.')
     parser.add_argument('--end', required=True, help='Exclusive timestamp with timezone.')
     parser.add_argument('--as-of', help='Timestamp for evaluating current entitlement rows; defaults to current UTC, not the report window end.')
-    parser.add_argument('--output', help='JSON deliverable path, normally in the external Analytics docs directory; stdout if omitted.')
+    parser.add_argument('--output', help='Raw JSON path in a task-specific directory under D:\\Temp; summarize as Markdown in the docs vault, then delete the raw export. Stdout if omitted.')
     parser.add_argument('--include-local-config', action='store_true', help='Add whitelisted local Settings defaults/loaded values, NOT production settings.')
     args = parser.parse_args(argv)
     try:

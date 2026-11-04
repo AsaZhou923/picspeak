@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-04-private-review-access-and-notices",
+    "date": "2026-11-04",
+    "showPopup": false,
+    "title": "点评隐私与保存期限通知",
+    "summary": "重试旧请求时，会重新核对点评是否仍可访问，避免返回已删除或超期的私有内容。保存期限通知会说明清理范围和最早处理时间，并提供历史页入口；清理须在通知送达至少 7 天后进行，公开作品和有效 Pro 权益继续受保护。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-11-04-private-review-access-and-notices"
+  },
+  {
     "id": "2026-11-01-guest-and-pro-records",
     "date": "2026-11-01",
     "showPopup": false,

@@ -195,6 +195,7 @@ The frontend and backend can be deployed independently. The backend includes a c
 
 ## Documentation
 
+- [Private critique access and retention notices](docs/changelog/CHANGELOG.md#2026-11-04-private-review-access-and-notices)
 - [A guest trial and lasting Pro photo records](docs/changelog/CHANGELOG.md#2026-11-01-guest-and-pro-records)
 - [Clearer billing and renewal status](docs/changelog/CHANGELOG.md#2026-10-31-billing-lifecycle)
 - [Clearer Free and Pro comparison](docs/changelog/CHANGELOG.md#2026-10-31-plan-comparison-copy)

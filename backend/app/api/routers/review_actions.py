@@ -9,7 +9,7 @@ from app.api.deps import CurrentActor, get_current_actor, get_db
 from app.api.routers.gallery import GALLERY_AUDIT_APPROVED, GALLERY_AUDIT_NONE, GALLERY_AUDIT_REJECTED, _ensure_gallery_thumbnail
 from app.api.routers.photos import PHOTO_THUMBNAIL_SIZE, _build_photo_proxy_url
 from app.core.errors import api_error
-from app.db.models import Photo, PhotoStatus, UserPlan
+from app.db.models import Photo, PhotoStatus, User, UserPlan
 from app.schemas import ReviewExportResponse, ReviewMetaResponse, ReviewMetaUpdateRequest, ReviewShareResponse, ReviewVisibilityResponse
 from app.services.guard import review_history_cutoff
 from app.services.content_audit import ContentAuditError, run_content_audit
@@ -31,6 +31,16 @@ from .review_support import (
 router = APIRouter(tags=['reviews'])
 
 
+def _lock_review_owner(db: Session, user_id: int) -> None:
+    db.query(User).filter(User.id == user_id).with_for_update().populate_existing().one()
+
+
+def _reload_live_review(db: Session, review) -> None:
+    db.refresh(review)
+    if review.deleted_at is not None:
+        raise api_error(status.HTTP_404_NOT_FOUND, 'REVIEW_NOT_FOUND', 'Review not found')
+
+
 @router.post('/reviews/{review_id}/share', response_model=ReviewShareResponse)
 def enable_review_share(
     review_id: str,
@@ -38,10 +48,12 @@ def enable_review_share(
     db: Session = Depends(get_db),
     actor: CurrentActor = Depends(get_current_actor),
 ):
+    _lock_review_owner(db, actor.user.id)
     review = _find_review_owned(db, review_id, actor.user.id)
     # Serialise with retention purges: a purge either sees this public channel or
     # finishes first. Sharing a critique whose original is gone stays allowed.
     admit_photo_use(db, review.photo_id, require_ready=False)
+    _reload_live_review(db, review)
     if not review.share_token:
         review.share_token = _generate_review_share_token(db)
     _sync_review_public_flag(review)
@@ -63,6 +75,7 @@ def revoke_review_share(
     db: Session = Depends(get_db),
     actor: CurrentActor = Depends(get_current_actor),
 ):
+    _lock_review_owner(db, actor.user.id)
     review = _find_review_owned(db, review_id, actor.user.id)
     review.share_token = None
     _sync_review_public_flag(review)
@@ -79,6 +92,7 @@ def get_review_visibility(
     db: Session = Depends(get_db),
     actor: CurrentActor = Depends(get_current_actor),
 ):
+    _lock_review_owner(db, actor.user.id)
     review = _find_review_owned(db, review_id, actor.user.id)
     _sync_review_public_flag(review)
     db.add(review)
@@ -94,6 +108,7 @@ def disable_review_public_visibility(
     db: Session = Depends(get_db),
     actor: CurrentActor = Depends(get_current_actor),
 ):
+    _lock_review_owner(db, actor.user.id)
     review = _find_review_owned(db, review_id, actor.user.id)
     review.share_token = None
     review.gallery_visible = False
@@ -114,6 +129,7 @@ def update_review_meta(
     db: Session = Depends(get_db),
     actor: CurrentActor = Depends(get_current_actor),
 ):
+    _lock_review_owner(db, actor.user.id)
     review = _find_review_owned(db, review_id, actor.user.id)
     photo = db.query(Photo).filter(Photo.id == review.photo_id).first()
     if payload.favorite is not None:
@@ -127,6 +143,7 @@ def update_review_meta(
                 raise api_error(status.HTTP_404_NOT_FOUND, 'PHOTO_NOT_FOUND', 'Photo not found')
             # The audit and thumbnail need the original; hold it against retention purges.
             photo = admit_photo_use(db, photo.id)
+            _reload_live_review(db, review)
             try:
                 audit_result = run_content_audit(get_object_read_url(photo.object_key, bucket=photo.bucket))
             except ContentAuditError as exc:
@@ -197,6 +214,7 @@ def delete_review(
     db: Session = Depends(get_db),
     actor: CurrentActor = Depends(get_current_actor),
 ):
+    _lock_review_owner(db, actor.user.id)
     review = _find_review_owned(db, review_id, actor.user.id, include_deleted=True)
     if review.deleted_at is None:
         review.deleted_at = datetime.now(timezone.utc)

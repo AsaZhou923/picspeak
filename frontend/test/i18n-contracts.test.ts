@@ -123,6 +123,15 @@ test('frontend error formatter maps stable backend codes to localized text inste
   assert.equal(localizedErrorMessage(t, 'UNMAPPED_CODE', 'fallback'), 'fallback');
 });
 
+test('removed review links and replay sources use the existing localized unavailable-content message', () => {
+  for (const dictionary of [enTranslations, zhTranslations, jaTranslations]) {
+    const translate = (key: keyof typeof enTranslations) => dictionary[key];
+    assert.equal(localizedErrorMessage(translate, 'REVIEW_NOT_FOUND'), dictionary.err_not_found_body);
+    assert.equal(localizedErrorMessage(translate, 'SOURCE_REVIEW_NOT_FOUND'), dictionary.err_not_found_body);
+    assert.equal(localizedErrorMessage(translate, { code: 'REVIEW_NOT_FOUND' }, 'private backend detail'), dictionary.err_not_found_body);
+  }
+});
+
 test('photography applicability messages use a dedicated outcome and new-photo action in every locale', () => {
   for (const dictionary of [enTranslations, zhTranslations, jaTranslations]) {
     for (const key of ['task_not_applicable_label', 'task_not_applicable_detail', 'task_not_applicable_no_charge', 'task_upload_photograph', 'practice_attempt_not_applicable'] as const) {

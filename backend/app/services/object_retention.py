@@ -97,6 +97,7 @@ class PhotoFacts:
     active_review_count: int = 0
     latest_active_review_at: datetime | None = None
     latest_deleted_review_at: datetime | None = None
+    policy_deleted_review_count: int = 0
 
 
 @dataclass(frozen=True)
@@ -119,7 +120,7 @@ def decide_photo(facts: PhotoFacts, *, now: datetime, grace_until: datetime | No
     owner = facts.owner
     if facts.status != PhotoStatus.READY:
         expires_at, reason = created_at + UNCONFIRMED_UPLOAD_AGE, 'unconfirmed_upload'
-    elif facts.review_count > 0 and facts.active_review_count == 0:
+    elif facts.review_count > 0 and facts.active_review_count == 0 and facts.policy_deleted_review_count == 0:
         # Every critique of this photo was deleted by its owner.
         expires_at = _utc(facts.latest_deleted_review_at or created_at) + DELETED_REVIEW_GRACE
         reason = 'reviews_deleted'
@@ -207,6 +208,11 @@ def collect_photo_facts(db: Session, photos: list[Photo], *, now: datetime) -> d
     for photo in photos:
         items = reviews.get(photo.id, [])
         active = [item for item in items if item.deleted_at is None]
+        policy_deleted = [item for item in items if (
+            item.deleted_at is not None
+            and isinstance((item.result_json or {}).get('_history_retention'), dict)
+            and item.result_json['_history_retention'].get('policy_version') == 'free-private-history-v1'
+        )]
         facts[photo.id] = PhotoFacts(
             status=photo.status,
             created_at=_utc(photo.created_at),
@@ -215,8 +221,11 @@ def collect_photo_facts(db: Session, photos: list[Photo], *, now: datetime) -> d
             has_public_review=any(review_is_public(item) for item in active),
             review_count=len(items),
             active_review_count=len(active),
-            latest_active_review_at=_max(*(_utc(item.created_at) for item in active)),
+            # Policy tombstones preserve the original expiry clock. They must
+            # never become a fresh owner-deletion 24-hour grace period.
+            latest_active_review_at=_max(*(_utc(item.created_at) for item in active + policy_deleted)),
             latest_deleted_review_at=_max(*(_utc(item.deleted_at) for item in items if item.deleted_at is not None)),
+            policy_deleted_review_count=len(policy_deleted),
         )
     return facts
 

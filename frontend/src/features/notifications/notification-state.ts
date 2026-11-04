@@ -51,6 +51,7 @@ export function resolveNotificationHref(target: NotificationTarget | null): stri
   if (target.type === 'generation' && id) return `/generations/${id}`;
   if (target.type === 'generation_task' && id) return `/generation-tasks/${id}`;
   if (target.type === 'usage') return '/account/usage';
+  if (target.type === 'account_history') return '/account/reviews';
   if (target.type === 'updates') return '/updates';
   if (target.type === 'workspace') return '/workspace';
   if (target.type === 'generate') return '/generate';
@@ -58,5 +59,5 @@ export function resolveNotificationHref(target: NotificationTarget | null): stri
 }
 
 function isKnownNotificationPath(href: string): boolean {
-  return /^\/(?:account\/usage|reviews\/[^/?#]+|tasks\/[^/?#]+|generations\/[^/?#]+|generation-tasks\/[^/?#]+|updates(?:$|[/?#])|blog(?:$|[/?#])|workspace(?:$|[/?#])|generate(?:$|[/?#]))/.test(href);
+  return /^\/(?:account\/usage|account\/reviews(?:$|[?#])|reviews\/[^/?#]+|tasks\/[^/?#]+|generations\/[^/?#]+|generation-tasks\/[^/?#]+|updates(?:$|[/?#])|blog(?:$|[/?#])|workspace(?:$|[/?#])|generate(?:$|[/?#]))/.test(href);
 }

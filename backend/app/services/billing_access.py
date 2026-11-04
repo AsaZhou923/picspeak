@@ -147,6 +147,7 @@ def redeem_activation_code_for_user(
     user: User,
     raw_code: str,
 ) -> tuple[BillingActivationCode, BillingSubscription]:
+    db.query(User).filter(User.id == user.id).with_for_update().populate_existing().one()
     current = utc_now()
     normalized = normalize_activation_code(raw_code)
     code_hash = hashlib.sha256(normalized.encode('utf-8')).hexdigest()

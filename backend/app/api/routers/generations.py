@@ -119,6 +119,9 @@ def create_generation(
     if actor.plan == UserPlan.guest:
         raise api_error(status.HTTP_403_FORBIDDEN, 'GENERATION_LOGIN_REQUIRED', 'Sign in before generating images')
 
+    # Entitlement changes and content cleanup take this owner lock before photos.
+    db.query(User).filter(User.id == actor.user.id).with_for_update().populate_existing().one()
+
     quality = normalize_generation_quality(payload.quality)
     size = normalize_generation_size(payload.size)
     source_photo_internal_id: int | None = None
@@ -211,6 +214,10 @@ def create_generation(
     if source_photo_internal_id is not None:
         # Held until the task commits so a retention purge cannot remove the reference photo.
         admit_photo_use(db, source_photo_internal_id)
+        if source_review is not None:
+            db.refresh(source_review)
+            if source_review.deleted_at is not None:
+                raise api_error(status.HTTP_404_NOT_FOUND, 'SOURCE_REVIEW_NOT_FOUND', 'Source review not found')
     task = make_generation_task(
         owner_user_id=actor.user.id,
         prompt=final_prompt,

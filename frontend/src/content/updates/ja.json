@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-04-private-review-access-and-notices",
+    "date": "2026-11-04",
+    "showPopup": false,
+    "title": "非公開講評へのアクセスと保存期間のお知らせ",
+    "summary": "過去の依頼を再試行する際にも、講評へ現在アクセスできるか確認し、削除済みや期限切れの非公開内容が再表示されないようにしました。保存期間のお知らせには対象範囲、処理開始の最早日時、履歴へのリンクを表示します。整理は通知配信から少なくとも7日後に行われ、公開作品と有効な Pro 利用権は引き続き保護されます。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-11-04-private-review-access-and-notices"
+  },
+  {
     "id": "2026-11-01-guest-and-pro-records",
     "date": "2026-11-01",
     "showPopup": false,

@@ -201,6 +201,37 @@ class SynchronousReviewIdempotencyTests(unittest.TestCase):
         self.assertEqual(self.ai.call_count, 1)
         self.assert_state(1)
 
+    def test_removed_review_cannot_be_recovered_from_its_old_sync_key(self):
+        response = self.post()
+        self.assertEqual(response.status_code, 200)
+        with self.Session() as db:
+            review = db.query(Review).one()
+            review.deleted_at = datetime.now(timezone.utc)
+            review.result_json = {'_history_retention': {'policy_version': 'free-private-history-v1'}}
+            db.get(Photo, 1).status = PhotoStatus.PURGED
+            record = db.query(IdempotencyKey).one()
+            record.response_json = {key: value for key, value in record.response_json.items() if key != 'result'}
+            db.commit()
+        replay = self.post()
+        self.assertEqual(replay.status_code, 404)
+        self.assertEqual(replay.json()['detail']['code'], 'REVIEW_NOT_FOUND')
+        self.assertEqual(self.ai.call_count, 1)
+        self.assert_state(1)
+
+    def test_expired_private_review_cannot_bypass_history_access_with_its_sync_key(self):
+        from datetime import timedelta
+
+        response = self.post()
+        self.assertEqual(response.status_code, 200)
+        with self.Session() as db:
+            db.query(Review).one().created_at = datetime.now(timezone.utc) - timedelta(days=20)
+            db.commit()
+        replay = self.post()
+        self.assertEqual(replay.status_code, 404)
+        self.assertEqual(replay.json()['detail']['code'], 'REVIEW_NOT_FOUND')
+        self.assertEqual(self.ai.call_count, 1)
+        self.assert_state(1)
+
     def test_overlapping_different_payload_settlements_conflict_without_new_charge(self):
         def overlap(*args, **kwargs):
             if self.ai.call_count == 1:

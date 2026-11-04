@@ -296,8 +296,8 @@ export const enTranslations = {
     pro_offer_label: '',
     pro_offer_highlight: 'Pro',
     updates_label: 'Updates',
-    updates_hint_home: "A guest trial and lasting Pro photo records",
-    updates_hint_latest: "A guest trial and lasting Pro photo records",
+    updates_hint_home: "Private critique access and retention notices",
+    updates_hint_latest: "Private critique access and retention notices",
     contact_label: 'Contact',
     contact_headline: 'Get in Touch',
 

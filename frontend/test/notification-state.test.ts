@@ -54,6 +54,18 @@ test('resolves available notification targets to internal routes only', () => {
   assert.equal(resolveNotificationHref({ type: 'review', public_id: 'rev_1', href: null, state: 'unavailable' }), null);
 });
 
+test('history retention notices resolve only to the private account history route', () => {
+  assert.equal(resolveNotificationHref({ type: 'account_history', public_id: null, href: null, state: 'available' }), '/account/reviews');
+  assert.equal(resolveNotificationHref({ type: null, public_id: null, href: '/account/reviews', state: 'available' }), '/account/reviews');
+  assert.equal(resolveNotificationHref({ type: null, public_id: null, href: '/account/reviews?view=reviews', state: 'available' }), '/account/reviews?view=reviews');
+  for (const href of ['/account/reviews-other', '/account/reviews/other-user', 'https://example.test/account/reviews', '//example.test/account/reviews']) {
+    assert.equal(resolveNotificationHref({ type: null, public_id: null, href, state: 'available' }), null);
+  }
+  assert.equal(resolveNotificationHref({ type: 'account_history', public_id: null, href: '/account/reviews', state: 'unavailable' }), null);
+  const layout = readFileSync(fileURLToPath(new URL('../src/app/account/layout.tsx', import.meta.url)), 'utf8');
+  assert.match(layout, /robots: NO_INDEX_ROBOTS/);
+});
+
 test('notification page refresh reloads the inbox list as well as unread count', () => {
   const source = readFileSync(
     fileURLToPath(new URL('../src/features/notifications/NotificationsPageClient.tsx', import.meta.url)),

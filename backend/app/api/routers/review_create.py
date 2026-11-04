@@ -50,6 +50,7 @@ from app.services.notification_events import record_review_terminal
 from app.services.retake_comparison import run_retake_comparison
 from app.services.practice import prepare_practice_attempt_for_task
 from app.services.review_visibility import retained_review_filter
+from app.services.practice_access import ACCESS_AVAILABLE, review_access_status
 from app.services.review_score_cache import (
     canonical_score_cache_lease,
     review_uses_current_full_review_contract,
@@ -66,6 +67,7 @@ from .review_support import (
     _review_model_version,
     _review_result_payload,
     _review_share_info,
+    _find_review_owned,
 )
 
 router = APIRouter(tags=['reviews'])
@@ -75,6 +77,15 @@ _OPENAI_REVIEW_MODELS = {'gpt-5.5', 'gpt-5.6-luna', 'gpt-6-luna', 'gpt-6-sol', '
 
 def _replay_review_response(db: Session, actor: CurrentActor, stored_response: dict) -> dict:
     response = dict(stored_response)
+    review_id = response.get('review_id')
+    if review_id:
+        review = _find_review_owned(db, review_id, actor.user.id)
+        if review_access_status(review, review_history_cutoff(actor.plan)) != ACCESS_AVAILABLE:
+            raise api_error(status.HTTP_404_NOT_FOUND, 'REVIEW_NOT_FOUND', 'Review not found')
+        response['result'] = _review_result_payload(
+            dict(review.result_json or {}), review.final_score,
+            model_name=review.model_name, model_version=_review_model_version(review),
+        )
     task_id = response.get('task_id')
     if task_id:
         task = db.query(ReviewTask).filter(
@@ -141,9 +152,6 @@ def _create_review(payload: ReviewCreateRequest, request: Request, db: Session, 
     mode_enum = ReviewMode(payload.mode)
     photo = _find_photo_owned(db, payload.photo_id, actor.user.id)
     source_review = _resolve_source_review(db, actor, payload, photo)
-    if photo.status != PhotoStatus.READY:
-        raise api_error(status.HTTP_400_BAD_REQUEST, 'PHOTO_NOT_READY', 'Photo is not ready for review')
-
     idempotency_key = payload.idempotency_key or request.headers.get('Idempotency-Key')
     payload_dump = json.dumps(_review_request_hash_payload(db, actor, payload), ensure_ascii=False, sort_keys=True)
     request_hash = hash_request(payload_dump)
@@ -154,6 +162,9 @@ def _create_review(payload: ReviewCreateRequest, request: Request, db: Session, 
             raise api_error(status.HTTP_409_CONFLICT, 'IDEMPOTENCY_CONFLICT', 'Idempotency key was used with different review content')
         if record is not None and record.response_json is not None:
             return _replay_review_response(db, actor, record.response_json)
+
+    if photo.status != PhotoStatus.READY:
+        raise api_error(status.HTTP_400_BAD_REQUEST, 'PHOTO_NOT_READY', 'Photo is not ready for review')
 
     if payload.practice_session_id and not payload.async_mode:
         raise api_error(status.HTTP_400_BAD_REQUEST, 'PRACTICE_ASYNC_REQUIRED', 'Practice attempts must be created asynchronously')
@@ -254,6 +265,9 @@ def _create_review(payload: ReviewCreateRequest, request: Request, db: Session, 
         admit_photo_use(db, photo.id)
         if source_review is not None:
             admit_photo_use(db, source_review.photo_id)
+            db.refresh(source_review)
+            if review_access_status(source_review, review_history_cutoff(actor.plan)) != ACCESS_AVAILABLE:
+                raise api_error(status.HTTP_404_NOT_FOUND, 'REVIEW_NOT_FOUND', 'Review not found')
         task_payload = payload.model_dump(by_alias=True)
         task_payload['_request_hash'] = request_hash
         if source_review is not None:
@@ -383,6 +397,12 @@ def _create_review(payload: ReviewCreateRequest, request: Request, db: Session, 
         return response
 
     with synchronous_review_quota(db, actor.user, mode=mode_enum) as quota_reservation:
+        photo = admit_photo_use(db, photo.id)
+        if source_review is not None:
+            admit_photo_use(db, source_review.photo_id)
+            db.refresh(source_review)
+            if review_access_status(source_review, review_history_cutoff(actor.plan)) != ACCESS_AVAILABLE:
+                raise api_error(status.HTTP_404_NOT_FOUND, 'REVIEW_NOT_FOUND', 'Review not found')
         image_url = get_object_read_url(photo.object_key, bucket=photo.bucket)
         try:
             if payload.analysis_type == 'retake_compare':

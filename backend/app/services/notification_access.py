@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import re
 from typing import Any
 
@@ -15,6 +15,11 @@ SUPPORTED_LOCALES = {'en', 'zh', 'ja'}
 LOCALE_FALLBACK = 'en'
 
 SYSTEM_COPY: dict[str, dict[str, tuple[str, str, str]]] = {
+    'history.retention_notice': {
+        'en': ('Private critique retention', 'Free private critiques older than 15 days will be cleared after advance notice.', 'Processing starts at least 7 days after this notice is delivered. Critique text and notes are removed from history. Active share links, approved visible Gallery works and active Pro access remain protected. Originals are removed only when no newer critique, public channel or active task protects them. Save any still-accessible private material you want to keep before processing starts.'),
+        'zh': ('私有点评保存期限', 'Free 私有点评超过15天后，将在提前通知后清理。', '本通知送达至少7天后，才会处理符合条件的超期记录。点评正文与备注会从历史中清除。有效分享、已批准且可见的长廊作品以及有效 Pro 权益继续受保护。原图仅在没有较新点评、公开渠道或运行任务保护时清理。请在处理开始前保存仍可访问且需要长期保留的私有内容。'),
+        'ja': ('非公開講評の保存期間', 'Free の非公開講評は15日を超えると、事前通知後に整理されます。', 'この通知の配信から少なくとも7日後に、条件を満たす期限切れの記録を処理します。講評本文とメモは履歴から削除されます。有効な共有リンク、承認済みで公開中のギャラリー作品、有効な Pro 利用権は保護されます。元画像は新しい講評、公開経路、実行中のタスクによる保護がない場合に削除されます。引き続きアクセスできる必要な非公開データは、処理開始前に保存してください。'),
+    },
     'review.completed': {
         'en': ('Review completed', 'Your photo critique is ready.', 'Open the result to review scores and next-shoot actions.'),
         'zh': ('点评已完成', '你的照片点评已经生成。', '打开结果查看评分与下一次拍摄建议。'),
@@ -53,6 +58,7 @@ SYSTEM_COPY: dict[str, dict[str, tuple[str, str, str]]] = {
 }
 
 TEMPLATE_EVENT_TYPES = {
+    'history_retention_notice': 'history.retention_notice',
     'review_completed': 'review.completed',
     'review_failed': 'review.failed',
     'generation_completed': 'generation.completed',
@@ -225,6 +231,8 @@ def _target(db: Session, notification: Notification) -> dict[str, Any] | None:
         return _generation_task_target(db, notification, target_id)
     if target_type in {'account_usage', 'usage'}:
         return {'type': 'usage', 'public_id': None, 'href': '/account/usage', 'state': 'available'}
+    if target_type == 'account_history':
+        return {'type': 'account_history', 'public_id': None, 'href': '/account/reviews', 'state': 'available'}
     return {'type': target_type, 'public_id': target_id, 'href': None, 'state': 'available'} if target_type else None
 
 
@@ -264,6 +272,18 @@ def render_notification(db: Session, notification: Notification, *, locale: str 
     payload = notification.template_params_json or {}
     if event_type == 'subscription.changed':
         summary = SUBSCRIPTION_STATUS_COPY.get(payload.get('status'), {}).get(rendered_locale, summary)
+    if event_type == 'history.retention_notice':
+        removal_detail = {
+            'en': 'Cleared critique content cannot be restored in PicSpeak. Necessary billing and relationship records are retained.',
+            'zh': '清理后的点评内容无法在站内恢复。必要的账单与关联记录仍会保留。',
+            'ja': '削除された講評内容は PicSpeak 内で復元できません。必要な請求記録と関連付けの記録は保持されます。',
+        }[rendered_locale]
+        body = f'{body}\n\n{removal_detail}'
+        starts_at = notification.delivered_at
+        starts_at = starts_at.replace(tzinfo=timezone.utc) if starts_at.tzinfo is None else starts_at.astimezone(timezone.utc)
+        starts_at += timedelta(days=7)
+        label = {'en': 'Earliest processing time', 'zh': '最早处理时间', 'ja': '処理開始の最早日時'}[rendered_locale]
+        body = f'{body}\n\n{label} {starts_at:%Y-%m-%d %H:%M} UTC'
     credits = payload.get('credits')
     if event_type == 'credits.confirmed' and (
         type(credits) is int or (isinstance(credits, str) and re.fullmatch(r'[0-9]{1,9}', credits))

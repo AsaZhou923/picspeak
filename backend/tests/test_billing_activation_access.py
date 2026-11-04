@@ -157,6 +157,7 @@ class BillingActivationAccessTests(unittest.TestCase):
 
         db = MagicMock()
         db.query.side_effect = [
+            _query_mock(first=user),
             _query_mock(first=code),
             _query_mock(first=existing_subscription),
             _query_mock(all_rows=[existing_subscription]),
@@ -200,6 +201,7 @@ class BillingActivationAccessTests(unittest.TestCase):
         subscription_query = _query_mock(first=None, all_rows=[])
         db = MagicMock()
         db.query.side_effect = [
+            _query_mock(first=user),
             code_query,
             subscription_query,
             _query_mock(all_rows=[BillingSubscription(user_id=user.id, provider=ACTIVATION_CODE_PROVIDER, status='active', ends_at=now + timedelta(days=30))]),

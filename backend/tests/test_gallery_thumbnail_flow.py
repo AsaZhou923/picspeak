@@ -269,6 +269,7 @@ class GalleryThumbnailFlowTests(unittest.TestCase):
 
         review = SimpleNamespace(
             photo_id=5,
+            deleted_at=None,
             favorite=False,
             gallery_visible=False,
             gallery_added_at=None,
@@ -312,7 +313,7 @@ class GalleryThumbnailFlowTests(unittest.TestCase):
         self.assertIn(call(photo), db.add.call_args_list)
         self.assertIn(call(review), db.add.call_args_list)
         db.commit.assert_called_once()
-        db.refresh.assert_called_once_with(review)
+        db.refresh.assert_called_with(review)
 
 
 if __name__ == '__main__':

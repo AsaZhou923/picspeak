@@ -28,6 +28,7 @@ TEMPLATE_KEYS = {
     'subscription.changed': 'subscription_changed',
     'gallery.review_liked': 'gallery_review_liked',
     'announcement.published': 'announcement_published',
+    'history.retention_notice': 'history_retention_notice',
 }
 
 
@@ -164,7 +165,7 @@ def _deliver(db: Session, event: NotificationEvent, user_id: int, announcement: 
         not isinstance(v, str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,100}', v) for v in params.values()
     ):
         raise ValueError('Invalid notification parameters')
-    expires_at = now + timedelta(days=90)
+    expires_at = None if event.event_type == 'history.retention_notice' else now + timedelta(days=90)
     if announcement and announcement.expires_at:
         expires_at = min(expires_at, utc(announcement.expires_at))
     target_type = None
@@ -186,6 +187,8 @@ def _deliver(db: Session, event: NotificationEvent, user_id: int, announcement: 
         target_public_id = params.get('task_id')
     elif event.event_type in {'credits.confirmed', 'subscription.changed'}:
         target_type = 'account_usage'
+    elif event.event_type == 'history.retention_notice':
+        target_type = 'account_history'
 
     insert_once(db, Notification, {
         'public_id': f'not_{uuid4().hex}', 'recipient_user_id': user_id,
@@ -317,6 +320,9 @@ def cleanup_expired_notifications(db: Session, *, limit: int = 100) -> int:
     now = database_now(db)
     chunk = min(max(limit, 1), 500)
     ids = select(Notification.id).where(
+        # The inbox hides old policy notices after 90 days. Keep their minimal
+        # delivered receipt so the retention operator can still verify notice.
+        Notification.notification_type != 'history.retention_notice',
         or_(
             Notification.expires_at <= now,
             Notification.delivered_at <= now - timedelta(days=90),
