@@ -1,227 +1,150 @@
+<div align="center">
+
+<img src="frontend/public/brand-mark.svg" alt="PicSpeak" width="88">
+
 # PicSpeak
 
-[English](README.md) | [简体中文](README.zh-CN.md)
+**把摄影点评真正变成下一次拍摄。**
 
-[![CI](https://github.com/AsaZhou923/picspeak/actions/workflows/ci.yml/badge.svg)](https://github.com/AsaZhou923/picspeak/actions/workflows/ci.yml)
-[![Next.js](https://img.shields.io/badge/Next.js-15-black)](https://nextjs.org/)
-[![Python](https://img.shields.io/badge/Python-3.11-blue)](https://www.python.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![CI](https://img.shields.io/github/actions/workflow/status/AsaZhou923/picspeak/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/AsaZhou923/picspeak/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-MIT-d5aa67?style=flat-square)](LICENSE)
+[![Next.js](https://img.shields.io/badge/Next.js-15-000?style=flat-square&logo=nextdotjs)](https://nextjs.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-Python_3.11-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14+-4169E1?style=flat-square&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 
-**把摄影点评真正变成下一次拍摄。** PicSpeak 从构图、光线、色彩、感染力和技术五个维度评分，解释画面证据，把最弱项转成可执行的复拍目标，并可继续生成 GPT Image 2 视觉参考。游客无需注册即可开始体验。
+[**在线体验**](https://www.picspeak.art/zh) · [点评示例](https://www.picspeak.art/reviews/rev_8424d4fbde054759) · [复拍教练](https://www.picspeak.art/retake) · [提示词案例库](https://www.picspeak.art/generate/prompts) · [影像长廊](https://www.picspeak.art/gallery)
 
-[在线体验](https://www.picspeak.art/zh) · [公开点评示例](https://www.picspeak.art/reviews/rev_8424d4fbde054759) · [复拍教练](https://www.picspeak.art/retake) · [提示词案例库](https://www.picspeak.art/generate/prompts) · [影像长廊](https://www.picspeak.art/gallery)
+[English](README.md) | 简体中文
 
-![PicSpeak 首页展示五维 AI 摄影点评体验](docs/assets/screenshots/home.jpg)
+<img src="docs/assets/screenshots/home.jpg" alt="PicSpeak 首页展示五维 AI 摄影点评" width="100%">
 
-## 从一次点评到可衡量的练习
+</div>
 
-普通点评工具往往停在“描述这一张照片”。PicSpeak 会把建议持续带到下一次尝试：
+## ✨ 功能
 
-```text
-上传照片
-  -> 五维评分与可见证据
-  -> 下一次拍摄动作与成功条件
-  -> 上传复拍照片
-  -> 用同一把尺比较原片与复拍
-  -> 保存进步，并生成下一轮视觉目标
-```
+- **📸 五维点评：** 从构图、光线、色彩、感染力、技术五个维度评分，并指出每项分数背后的画面证据。Flash（GPT-6 Sol）速度快，Pro（GPT-6.1 Sol）分析更深入。
+- **🔁 复拍教练：** 上传复拍后，两张照片按同一把尺一起评分。所有分差由服务端计算，每张来源照片都有自己的进步链。
+- **🎯 下一次拍摄：** 最弱项会转成具体的复拍目标，并附上可观察的成功条件。
+- **🎨 AI 创作：** 用 GPT Image 2 生成与点评关联的构图、光线、色彩参考图，另有 50 个公开提示词案例。
+- **🌏 开放分享：** 公开长廊、镜头手记，界面完整支持中、英、日三语。游客无需注册即可体验。
 
-- **单张照片点评：** Flash 使用 GPT-6 Sol 做快速点评；Pro 使用更强的 GPT-6.1 Sol 做深度分析，提供更完整的改进建议。工作台将模式与模型合并为一个选择区；后端保留 Qwen 兼容接口，供已有客户端继续调用。
-- **复拍教练：** 所选 Flash 或 Pro 模型在同一次请求中接收原片和复拍；所有分差均由服务端确定性计算。
-- **AI 创作：** 使用 GPT Image 2 生成视觉参考，包括点评关联的构图、光线、色彩与复拍方向。
-- **学习入口：** 在点评、公开长廊、镜头手记、提示词案例、点评历史和同源复拍链之间继续练习。
+<table>
+  <tr>
+    <td width="50%"><img src="docs/assets/screenshots/review.jpg" alt="包含评分、证据和下一次拍摄建议的点评"></td>
+    <td width="50%"><img src="docs/assets/screenshots/retake.jpg" alt="比较原片与复拍的复拍教练"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>摄影点评</b></td>
+    <td align="center"><b>复拍教练</b></td>
+  </tr>
+  <tr>
+    <td><img src="docs/assets/screenshots/prompts.jpg" alt="GPT Image 2 提示词案例库"></td>
+    <td><img src="docs/assets/screenshots/gallery.jpg" alt="公开点评长廊"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>提示词案例库</b></td>
+    <td align="center"><b>影像长廊</b></td>
+  </tr>
+</table>
 
-## 产品界面
+## 🚀 快速开始
 
-| 公开点评 | GPT-6 复拍教练 |
-|---|---|
-| ![包含评分、证据和下一次拍摄建议的公开点评](docs/assets/screenshots/review.jpg) | ![原片、目标、复拍、比较四步复拍教练](docs/assets/screenshots/retake.jpg) |
-
-| GPT Image 2 提示词案例库 | 公开点评长廊 |
-|---|---|
-| ![覆盖摄影、海报、产品、UI 与实验视觉的 GPT Image 2 提示词案例](docs/assets/screenshots/prompts.jpg) | ![带点评摘要和练习动作的公开长廊卡片](docs/assets/screenshots/gallery.jpg) |
-
-<p align="center">
-  <img src="docs/assets/screenshots/mobile.jpg" alt="PicSpeak 响应式移动端首页与点评示例" width="320">
-</p>
-
-## 核心能力
-
-| 领域 | 能力 |
-|---|---|
-| 摄影点评 | 游客模式、对象存储直传、Flash / Pro 深度、五维评分、结合 EXIF 的证据、分享、导出与再次分析 |
-| 练习闭环 | 下一次拍摄清单、来源点评上下文、同图重跑、新图复拍、收藏与可筛选历史 |
-| 复拍教练 | 原片 / 复拍配对评估、可比性与置信度处理、确定性分差、剩余问题、成功条件与进步链 |
-| AI 创作 | 模板和提示词控制、质量与画幅选择、GPT Image 2 credits、点评关联参考图、下载、复用与生成历史 |
-| 公开学习 | 50 个可抓取提示词案例、点评长廊、三语镜头手记、更新记录与服务端渲染的 SEO / GEO 内容 |
-| 多语言体验 | 导航、错误提示、公开说明、提示词语言标记、生成与结账流程支持英文、简体中文和日文 |
-| 平台能力 | Clerk 登录、游客 / 用户额度、Lemon Squeezy 计费、WebSocket 任务更新、PostgreSQL 与 S3 兼容存储 |
-
-## 公开入口
-
-| 页面 | 地址 |
-|---|---|
-| 中文产品首页 | [picspeak.art/zh](https://www.picspeak.art/zh) |
-| 公开点评导览 | [/reviews/rev_8424d4fbde054759](https://www.picspeak.art/reviews/rev_8424d4fbde054759) |
-| 复拍教练 | [/retake](https://www.picspeak.art/retake) |
-| GPT Image 2 提示词案例 | [/generate/prompts](https://www.picspeak.art/generate/prompts) |
-| 点评长廊 | [/gallery](https://www.picspeak.art/gallery) |
-| 镜头手记 | [/zh/blog](https://www.picspeak.art/zh/blog) |
-| 产品更新 | [/zh/updates](https://www.picspeak.art/zh/updates) |
-
-## 系统架构
-
-```text
-Next.js 15 / React 18
-  -> 图片直传 S3 兼容对象存储
-  -> FastAPI 点评与生图 API
-  -> 内嵌或独立异步 worker
-  -> OpenAI Responses 点评 / GPT Image 2
-  -> PostgreSQL 点评、任务、计费与进步记录
-```
-
-| 层级 | 技术 |
-|---|---|
-| 前端 | Next.js 15 · React 18 · TypeScript · Tailwind CSS |
-| 后端 | Python 3.11 · FastAPI · SQLAlchemy 2.x · Alembic |
-| 数据库 | PostgreSQL |
-| 存储 | S3 兼容对象存储，包括 Cloudflare R2 或 MinIO |
-| 身份认证 | Clerk，以及游客会话和旧 Google OAuth 兼容路径 |
-| 计费 | Lemon Squeezy 订阅、激活码与生图点数包 |
-
-## OpenAI Build Week 2026
-
-PicSpeak 在提交窗口前已经存在。Build Week 的贡献是在原有单张照片产品上建立可审计的复拍闭环，而不是只替换模型名称。活动前基线为 [`b74ddfb`](https://github.com/AsaZhou923/picspeak/commit/b74ddfb88ae32e37965ba8b29f40c9ebcbbf77fc)，配对比较核心实现落在 [`2a626aa`](https://github.com/AsaZhou923/picspeak/commit/2a626aabab30d5cdb45ca0450fdd1ce7a5387b4c)。
-
-最初的 Build Week 实现使用 GPT-5.6 Terra；当前运行时按所选模式区分：Flash 使用 GPT-6 Sol，Pro 使用更强的 GPT-6.1 Sol。配对评分和服务端计算分差的契约保持不变，已保存结果保留当时实际使用的模型。
-
-| Build Week 前 | Build Week 期间新增 |
-|---|---|
-| 单张照片点评 | 同一次 GPT-5.6 Terra 请求配对评估原片与复拍 |
-| 五个独立分数 | 前后评分、可见证据与服务端计算的分差 |
-| 基于一张图推断的建议 | 带可观察成功条件的下一轮拍摄动作 |
-| 最近记录与历史平均值 | 只聚合同一复拍链的进步曲线 |
-| 点评关联生图提示词 | 把配对诊断转成 GPT Image 2 视觉目标 |
-
-三个实现原则保证结果可审计：
-
-1. 原片和复拍在同一次请求、同一评分口径下重新打分。
-2. 所有分差由 Python 计算，不让模型负责算术。
-3. 无关图片或低置信度配对仍可查看，但不会计入“进步”。
-
-## 本地开发
-
-### 前置依赖
-
-- Python 3.11+
-- Node.js 20+（CI 使用 Node.js 24）
-- PostgreSQL 14+
-- S3 兼容对象存储
-- OpenAI 协议兼容的点评 API Key
-- GPT-6 Sol OpenAI API 访问权限
-
-### 1. 克隆并配置后端
+**依赖：** Python 3.11+、Node.js 20+、PostgreSQL 14+、S3 兼容存储，以及一个 OpenAI API Key。
 
 ```bash
-git clone https://github.com/AsaZhou923/picspeak.git
-cd picspeak
+git clone https://github.com/AsaZhou923/picspeak.git && cd picspeak
+cp backend/.env.example backend/.env                 # 填写 DATABASE_URL、OBJECT_*、OPENAI_API_KEY
+cp frontend/.env.local.example frontend/.env.local   # 设置 NEXT_PUBLIC_API_URL
+```
 
-cp backend/.env.example backend/.env
-python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
+```bash
+# 终端 1：后端 http://localhost:8000
+python -m venv .venv && source .venv/bin/activate    # Windows：.venv\Scripts\activate
 pip install -r backend/requirements.txt
+cd backend && python scripts/ensure_runtime_schema.py && uvicorn app.main:app --reload --port 8000
 ```
-
-工作台使用下列模型专属的 OpenAI 配置；保留的 Qwen 兼容后端路径独立配置：
-
-```dotenv
-OPENAI_API_KEY=
-OPENAI_API_BASE_URL=https://api.openai.com/v1
-OPENAI_SCORE_MODEL=gpt-6-sol
-OPENAI_SCORE_REASONING_EFFORT=low
-OPENAI_REVIEW_MODEL=gpt-6-sol
-OPENAI_REVIEW_REASONING_EFFORT=low
-OPENAI_REVIEW_TIMEOUT_SECONDS=180
-OPENAI_PRO_MODEL=gpt-6.1-sol
-OPENAI_PRO_REASONING_EFFORT=high
-
-# 可选：完整 endpoint；留空时会在 base URL 后追加 /responses。
-RETAKE_ANALYSIS_API_URL=
-RETAKE_ANALYSIS_MODEL=gpt-6.1-sol
-RETAKE_ANALYSIS_REASONING_EFFORT=high
-RETAKE_ANALYSIS_TIMEOUT_SECONDS=180
-```
-
-执行迁移并启动 API：
 
 ```bash
-cd backend
-python scripts/ensure_runtime_schema.py
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+# 终端 2：前端 http://localhost:3000
+cd frontend && npm install && npm run dev
 ```
 
-### 2. 配置并启动前端
+<details>
+<summary><b>环境变量</b></summary>
+
+<br>
+
+完整列表见 [`backend/.env.example`](backend/.env.example)。
+
+| 用途 | 变量 |
+|---|---|
+| 必填 | `DATABASE_URL`、`APP_SECRET`、`OAUTH_JWT_SECRET`、`OBJECT_*`、`OPENAI_API_KEY` |
+| 模型 | `OPENAI_SCORE_MODEL` / `OPENAI_REVIEW_MODEL`（Flash，`gpt-6-sol`）、`OPENAI_PRO_MODEL`（Pro，`gpt-6.1-sol`）、`RETAKE_ANALYSIS_*` |
+| 图像生成 | `IMAGE_GENERATION_*` |
+| 可选 | `CLERK_*`（登录）、`LEMONSQUEEZY_*`（计费）、`CLOUD_TASKS_*`（队列）、`AI_*`（Qwen 兼容接口） |
+
+</details>
+
+<details>
+<summary><b>测试</b></summary>
+
+<br>
 
 ```bash
-cp frontend/.env.local.example frontend/.env.local
-cd frontend
-npm install
-npm run dev
+.venv/bin/python -m pytest backend/tests                           # 后端
+cd frontend && npm run typecheck && npm run lint && npm run test   # 前端
 ```
 
-浏览器打开 [http://localhost:3000](http://localhost:3000)。
+</details>
 
-### 3. 验证改动
+<details>
+<summary><b>部署</b></summary>
 
-```bash
-# 后端：从仓库根目录执行
-./.venv/bin/python -m pytest backend/tests
+<br>
 
-# 前端
-cd frontend
-npm run typecheck
-npm run lint
-npm run test
-npm run build
+- **前端：** 标准 Next.js 应用，仓库已包含 [`vercel.json`](vercel.json)，也可以运行 `npm run build && npm run start` 自行托管。
+- **后端：** 由 [`backend/Dockerfile`](backend/Dockerfile) 构建容器镜像，[`cloudbuild.yaml`](cloudbuild.yaml) 负责构建。worker 默认运行在 API 进程内，运行 `python -m app.worker_main` 可拆成独立进程。
+- **图片读取**走签名 URL 和后端代理，bucket 可以保持私有。`backend/scripts/` 中的脚本默认 dry-run。
+
+</details>
+
+## 🏗️ 架构
+
+```text
+Next.js 15 ──上传──▶ S3 / R2
+    │
+    ▼
+FastAPI ──▶ 异步 worker ──▶ OpenAI Responses（点评）· GPT Image 2（创作）
+    │
+    ▼
+PostgreSQL：点评 · 任务 · 计费 · 进步记录
 ```
 
-## 部署
+登录使用 Clerk 和游客会话，计费使用 Lemon Squeezy。更多细节见：[系统架构](docs/architecture/系统架构.md) · [设计系统](DESIGN.md)。
 
-前端与后端可以独立部署。后端包含容器定义，可以使用内嵌 worker，也可以把 `python -m app.worker_main` 作为独立进程运行。前端使用 `npm run build && npm run start` 构建并启动。
+<details>
+<summary><b>OpenAI Build Week 2026</b></summary>
 
-## 文档
+<br>
 
-- [点评隐私与保存期限通知](docs/changelog/CHANGELOG.md#2026-11-04-private-review-access-and-notices)
-- [游客体验与 Pro 摄影记录](docs/changelog/CHANGELOG.md#2026-11-01-guest-and-pro-records)
-- [付款与续费状态更清楚](docs/changelog/CHANGELOG.md#2026-10-31-billing-lifecycle)
-- [长廊与操作恢复修复](docs/changelog/CHANGELOG.md#2026-10-20-gallery-and-review-cache-fixes)
-- [订阅恢复与生图重试修复](docs/changelog/CHANGELOG.md#2026-10-19-billing-recovery-and-generation-retries)
-- [最新更新：点评重试与草稿修复](docs/changelog/CHANGELOG.md#2026-10-18-critique-and-draft-fixes)
-- [长廊浏览更直接](docs/changelog/CHANGELOG.md#2026-10-10-gallery-browsing)
-- [消息中心已开放](docs/changelog/CHANGELOG.md#2026-10-10-inbox-live)
-- [点评阅读指南与公开案例](docs/changelog/CHANGELOG.md#2026-10-10-critique-reading-guides)
+PicSpeak 在 Build Week 之前已经存在。活动期间，单张点评扩展成了可审计的复拍闭环：基线为 [`b74ddfb`](https://github.com/AsaZhou923/picspeak/commit/b74ddfb88ae32e37965ba8b29f40c9ebcbbf77fc)，配对比较的核心实现在 [`2a626aa`](https://github.com/AsaZhou923/picspeak/commit/2a626aabab30d5cdb45ca0450fdd1ce7a5387b4c)。三个原则保证结果可信：
 
-- [此前评分反馈开放与站内消息准备记录](docs/changelog/CHANGELOG.md#2026-10-10-inbox-score-feedback-prep)
-- [Flash 快速点评，Pro 升级更强模型](docs/changelog/CHANGELOG.md#2026-10-09-gpt6-sol-review-rollout)
-- [此前中文公告：评图模型升级与 Pro 价格调整预告](docs/changelog/CHANGELOG.md#2026-10-08-gpt6-sol-and-pro-pricing)
-- [此前评图与照片浏览稳定性优化](docs/changelog/CHANGELOG.md#2026-10-07-review-reliability-and-gallery)
-- [此前评分标准优化与长廊重评](docs/changelog/CHANGELOG.md#2026-10-06-photo-rubric-and-gallery-reassessment)
-- [此前长廊 v5 评图免费重评](docs/changelog/CHANGELOG.md#2026-10-06-gallery-critique-reassessment)
-- [此前评图全面升级 GPT-6](docs/changelog/CHANGELOG.md#2026-10-02-gpt6-workspace-upgrade)
-- [此前工作台评图更新](docs/changelog/CHANGELOG.md#2026-09-30-workspace-gpt-review-only)
-- [此前长廊与点评说明更新](docs/changelog/CHANGELOG.md#2026-09-26-gallery-and-critique-clarity)
-- [此前长廊与操作提示更新](docs/changelog/CHANGELOG.md#2026-09-25-gallery-actions-and-clearer-controls)
-- [此前历史、分享与练习更新](docs/changelog/CHANGELOG.md#2026-09-24-critique-organization-and-sharing)
-- [此前准备记录](docs/changelog/CHANGELOG.md#2026-09-23-critique-practice-and-sharing)
-- [前端设计系统](DESIGN.md)
-- [SEO / GEO 审计报告](docs/seo/seo-audit-2026-05-01.md)
-- [系统架构说明](docs/architecture/系统架构.md)
-- [Google 登录接入指南](docs/guides/Google登录接入指南.md)
+1. 两张照片在同一次请求、同一评分口径下重新打分。
+2. 所有分差由 Python 计算，不让模型负责算术。
+3. 无关图片或低置信度配对不计入“进步”。
 
-## 参与贡献
+活动版本使用 GPT-5.6 Terra。当前运行时 Flash 使用 GPT-6 Sol，Pro 使用 GPT-6.1 Sol，每条已保存结果都会记录生成它的模型。
 
-欢迎提交 Issue 和 Pull Request。请保持改动范围清晰，补充相关测试，并维持公开演示与用户私有点评之间的隐私边界。
+</details>
 
-## 开源许可
+## 📝 更新记录
+
+最新条目：[点评隐私与保存期限通知](docs/changelog/CHANGELOG.md#2026-11-04-private-review-access-and-notices)。更早的条目见[完整 Changelog](docs/changelog/CHANGELOG.md)。
+
+## 🤝 参与贡献
+
+欢迎提交 Issue 和 PR。请保持改动范围清晰，为改动的行为补充测试，并让公开演示与用户私有点评保持分离。
+
+## 📄 开源许可
 
 [MIT](LICENSE)

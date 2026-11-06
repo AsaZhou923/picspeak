@@ -1,236 +1,150 @@
+<div align="center">
+
+<img src="frontend/public/brand-mark.svg" alt="PicSpeak" width="88">
+
 # PicSpeak
 
-[English](README.md) | [简体中文](README.zh-CN.md)
+**AI photography critique that turns feedback into the next shot.**
 
-[![CI](https://github.com/AsaZhou923/picspeak/actions/workflows/ci.yml/badge.svg)](https://github.com/AsaZhou923/picspeak/actions/workflows/ci.yml)
-[![Next.js](https://img.shields.io/badge/Next.js-15-black)](https://nextjs.org/)
-[![Python](https://img.shields.io/badge/Python-3.11-blue)](https://www.python.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![CI](https://img.shields.io/github/actions/workflow/status/AsaZhou923/picspeak/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/AsaZhou923/picspeak/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-MIT-d5aa67?style=flat-square)](LICENSE)
+[![Next.js](https://img.shields.io/badge/Next.js-15-000?style=flat-square&logo=nextdotjs)](https://nextjs.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-Python_3.11-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14+-4169E1?style=flat-square&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 
-**AI photography critique that turns feedback into the next shot.** PicSpeak scores composition, lighting, color, impact, and technique, explains the visible evidence, converts the weakest point into a practical retake target, and can generate a GPT Image 2 visual reference. Guest mode works without registration.
+[**Live demo**](https://www.picspeak.art/en) · [Example critique](https://www.picspeak.art/reviews/rev_8424d4fbde054759) · [Retake Coach](https://www.picspeak.art/retake) · [Prompt library](https://www.picspeak.art/generate/prompts) · [Gallery](https://www.picspeak.art/gallery)
 
-[Live product](https://www.picspeak.art/en) · [Public critique example](https://www.picspeak.art/reviews/rev_8424d4fbde054759) · [Retake Coach](https://www.picspeak.art/retake) · [Prompt library](https://www.picspeak.art/generate/prompts) · [Gallery](https://www.picspeak.art/gallery)
+English | [简体中文](README.zh-CN.md)
 
-![PicSpeak home showing the five-dimension AI photography critique experience](docs/assets/screenshots/home.jpg)
+<img src="docs/assets/screenshots/home.jpg" alt="PicSpeak home showing the five-dimension AI photography critique" width="100%">
 
-## From critique to measurable practice
+</div>
 
-Most critique tools stop after describing one image. PicSpeak keeps the advice attached to the next attempt:
+## ✨ Features
 
-```text
-Upload a photo
-  -> five-dimension critique with visible evidence
-  -> prioritized next-shoot action and success check
-  -> upload the retake
-  -> compare original and retake on one rubric
-  -> save progress and generate the next visual target
-```
+- **📸 Five-dimension critique.** Scores composition, lighting, color, impact, and technique, and points to the visible evidence behind each score. Flash (GPT-6 Sol) is fast; Pro (GPT-6.1 Sol) goes deeper.
+- **🔁 Retake Coach.** Upload a retake and both photos are scored together on one rubric. The server calculates every delta and keeps a progress chain for each source photo.
+- **🎯 Next-shoot actions.** The weakest point becomes a concrete retake target with an observable success check.
+- **🎨 AI Create.** GPT Image 2 references for composition, lighting, and color, linked to your critique, plus 50 public prompt examples.
+- **🌏 Built to share.** Public gallery, Lens Notes, and full English, Chinese, and Japanese UI. Guests can try it without signing up.
 
-- **Single-photo critique:** Flash uses GPT-6 Sol for quick diagnosis; Pro uses the stronger GPT-6.1 Sol for deeper analysis and improvement advice. Choose the mode and its model together in one workspace control. The Qwen-compatible backend API remains available for existing clients.
-- **Retake Coach:** the selected Flash or Pro model receives the original and retake together; the server calculates every score delta deterministically.
-- **AI Create:** generate visual references with GPT Image 2, including review-linked composition, lighting, color, and retake directions.
-- **Learning surfaces:** move between critiques, the public gallery, Lens Notes, prompt examples, review history, and same-source retake chains.
+<table>
+  <tr>
+    <td width="50%"><img src="docs/assets/screenshots/review.jpg" alt="Critique with score, evidence, and next-shoot guidance"></td>
+    <td width="50%"><img src="docs/assets/screenshots/retake.jpg" alt="Retake Coach comparing original and retake"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Critique</b></td>
+    <td align="center"><b>Retake Coach</b></td>
+  </tr>
+  <tr>
+    <td><img src="docs/assets/screenshots/prompts.jpg" alt="GPT Image 2 prompt library"></td>
+    <td><img src="docs/assets/screenshots/gallery.jpg" alt="Public critique gallery"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Prompt library</b></td>
+    <td align="center"><b>Gallery</b></td>
+  </tr>
+</table>
 
-## Product tour
+## 🚀 Quick start
 
-| Public critique | GPT-6 Retake Coach |
-|---|---|
-| ![Public critique with score, evidence, and next-shoot guidance](docs/assets/screenshots/review.jpg) | ![Retake Coach original-target-retake-compare workflow](docs/assets/screenshots/retake.jpg) |
-
-| GPT Image 2 prompt library | Public critique gallery |
-|---|---|
-| ![GPT Image 2 prompt examples across photography, posters, products, UI, and experimental visuals](docs/assets/screenshots/prompts.jpg) | ![Public gallery cards with critique summaries and practice actions](docs/assets/screenshots/gallery.jpg) |
-
-<p align="center">
-  <img src="docs/assets/screenshots/mobile.jpg" alt="PicSpeak responsive mobile home and sample critique" width="320">
-</p>
-
-## Core capabilities
-
-| Area | What it provides |
-|---|---|
-| Critique | Guest mode, direct object-storage upload, Flash and Pro depth, five scored dimensions, EXIF-aware evidence, sharing, export, and re-analysis |
-| Practice loop | Next-shoot checklists, source-review continuity, same-photo reruns, new-photo retakes, favorites, and filtered history |
-| Retake Coach | Paired original/retake evaluation, comparability and confidence handling, deterministic deltas, remaining gaps, success checks, and progress chains |
-| AI Create | Template and prompt controls, quality and aspect-ratio choices, GPT Image 2 credits, review-linked references, download, reuse, and generation history |
-| Public learning | 50 crawlable prompt examples, critique gallery, trilingual Lens Notes, update history, and server-rendered SEO/GEO content |
-| Multilingual UX | English, Simplified Chinese, and Japanese across navigation, errors, public guidance, prompt-language labels, generation, and checkout |
-| Platform | Clerk sign-in, guest/authenticated quotas, Lemon Squeezy billing, WebSocket task updates, PostgreSQL persistence, and S3-compatible storage |
-
-## Public routes
-
-| Surface | URL |
-|---|---|
-| Product home | [picspeak.art/en](https://www.picspeak.art/en) |
-| Public critique walkthrough | [/reviews/rev_8424d4fbde054759](https://www.picspeak.art/reviews/rev_8424d4fbde054759) |
-| Retake Coach | [/retake](https://www.picspeak.art/retake) |
-| GPT Image 2 prompt examples | [/generate/prompts](https://www.picspeak.art/generate/prompts) |
-| Critique gallery | [/gallery](https://www.picspeak.art/gallery) |
-| Lens Notes | [/en/blog](https://www.picspeak.art/en/blog) |
-| Product updates | [/en/updates](https://www.picspeak.art/en/updates) |
-
-## Architecture
-
-```text
-Next.js 15 / React 18
-  -> direct image upload to S3-compatible storage
-  -> FastAPI review and generation APIs
-  -> in-process or standalone async worker
-  -> OpenAI Responses critique / GPT Image 2
-  -> PostgreSQL review, task, billing, and progress records
-```
-
-| Layer | Technology |
-|---|---|
-| Frontend | Next.js 15 · React 18 · TypeScript · Tailwind CSS |
-| Backend | Python 3.11 · FastAPI · SQLAlchemy 2.x · Alembic |
-| Database | PostgreSQL |
-| Storage | S3-compatible object storage, including Cloudflare R2 or MinIO |
-| Authentication | Clerk plus guest sessions and legacy Google OAuth compatibility |
-| Billing | Lemon Squeezy subscriptions, activation codes, and generation credit packs |
-
-Storage reads use short-lived S3 GET URLs for AI requests and generated images. Photo results use the signed backend image proxy; public Gallery thumbnails use a stable backend route that checks the current publication and approval state. `OBJECT_BASE_URL` is retained for configuration compatibility and is no longer required for these image reads.
-
-For an existing public R2 bucket, deploy and verify these read paths before disabling its public development URL and any other public bucket domains. Turning off the public URL before the backend update can interrupt image display and AI requests. Storage cleanup is a separate maintenance operation; changing the Free history window does not delete objects.
-
-## OpenAI Build Week 2026
-
-PicSpeak existed before the submission window. The Build Week contribution extended the existing single-photo product into an auditable retake loop rather than only replacing a model name. The pre-event baseline is [`b74ddfb`](https://github.com/AsaZhou923/picspeak/commit/b74ddfb88ae32e37965ba8b29f40c9ebcbbf77fc); the core paired-comparison implementation landed in [`2a626aa`](https://github.com/AsaZhou923/picspeak/commit/2a626aabab30d5cdb45ca0450fdd1ce7a5387b4c).
-
-The original Build Week implementation used GPT-5.6 Terra. The current runtime follows the selected mode: GPT-6 Sol for Flash and the stronger GPT-6.1 Sol for Pro. The paired scoring and server-owned delta contract remain unchanged, and saved results retain their actual model provenance.
-
-| Before Build Week | Added during Build Week |
-|---|---|
-| One-photo critique | One GPT-5.6 Terra request evaluates the original and retake together |
-| Five standalone scores | Before/after scores, visible evidence, and server-calculated deltas |
-| Advice inferred from one image | Prioritized next-shoot actions with observable success checks |
-| Recent-vs-previous history averages | Progress curves limited to the same retake chain |
-| Review-linked image prompts | The paired diagnosis becomes a GPT Image 2 visual target |
-
-Three implementation rules keep the result auditable:
-
-1. Both photos are rescored inside the same request and rubric.
-2. Python calculates all deltas; the model does not perform the arithmetic.
-3. Unrelated or low-confidence pairs remain inspectable but never count as improvement.
-
-## Local development
-
-### Prerequisites
-
-- Python 3.11+
-- Node.js 20+ (CI uses Node.js 24)
-- PostgreSQL 14+
-- S3-compatible object storage
-- An OpenAI-compatible critique API key
-- An OpenAI API key with GPT-6 Sol access
-
-### 1. Clone and configure the backend
+**Requirements:** Python 3.11+, Node.js 20+, PostgreSQL 14+, S3-compatible storage, and an OpenAI API key.
 
 ```bash
-git clone https://github.com/AsaZhou923/picspeak.git
-cd picspeak
+git clone https://github.com/AsaZhou923/picspeak.git && cd picspeak
+cp backend/.env.example backend/.env                 # fill in DATABASE_URL, OBJECT_*, OPENAI_API_KEY
+cp frontend/.env.local.example frontend/.env.local   # set NEXT_PUBLIC_API_URL
+```
 
-cp backend/.env.example backend/.env
-python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
+```bash
+# Terminal 1: backend at http://localhost:8000
+python -m venv .venv && source .venv/bin/activate    # Windows: .venv\Scripts\activate
 pip install -r backend/requirements.txt
+cd backend && python scripts/ensure_runtime_schema.py && uvicorn app.main:app --reload --port 8000
 ```
-
-The workspace uses the model-specific OpenAI settings below. The retained Qwen-compatible backend path is configured independently:
-
-```dotenv
-OPENAI_API_KEY=
-OPENAI_API_BASE_URL=https://api.openai.com/v1
-OPENAI_SCORE_MODEL=gpt-6-sol
-OPENAI_SCORE_REASONING_EFFORT=low
-OPENAI_REVIEW_MODEL=gpt-6-sol
-OPENAI_REVIEW_REASONING_EFFORT=low
-OPENAI_REVIEW_TIMEOUT_SECONDS=180
-OPENAI_PRO_MODEL=gpt-6.1-sol
-OPENAI_PRO_REASONING_EFFORT=high
-
-# Optional complete endpoint override; otherwise /responses is appended.
-RETAKE_ANALYSIS_API_URL=
-RETAKE_ANALYSIS_MODEL=gpt-6.1-sol
-RETAKE_ANALYSIS_REASONING_EFFORT=high
-RETAKE_ANALYSIS_TIMEOUT_SECONDS=180
-```
-
-Run migrations and start the API:
 
 ```bash
-cd backend
-python scripts/ensure_runtime_schema.py
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+# Terminal 2: frontend at http://localhost:3000
+cd frontend && npm install && npm run dev
 ```
 
-### 2. Configure and start the frontend
+<details>
+<summary><b>Environment variables</b></summary>
+
+<br>
+
+The full list is in [`backend/.env.example`](backend/.env.example).
+
+| Purpose | Variables |
+|---|---|
+| Required | `DATABASE_URL`, `APP_SECRET`, `OAUTH_JWT_SECRET`, `OBJECT_*`, `OPENAI_API_KEY` |
+| Models | `OPENAI_SCORE_MODEL` / `OPENAI_REVIEW_MODEL` (Flash, `gpt-6-sol`), `OPENAI_PRO_MODEL` (Pro, `gpt-6.1-sol`), `RETAKE_ANALYSIS_*` |
+| Image generation | `IMAGE_GENERATION_*` |
+| Optional | `CLERK_*` (sign-in), `LEMONSQUEEZY_*` (billing), `CLOUD_TASKS_*` (queue), `AI_*` (Qwen-compatible API) |
+
+</details>
+
+<details>
+<summary><b>Tests</b></summary>
+
+<br>
 
 ```bash
-cp frontend/.env.local.example frontend/.env.local
-cd frontend
-npm install
-npm run dev
+.venv/bin/python -m pytest backend/tests                           # backend
+cd frontend && npm run typecheck && npm run lint && npm run test   # frontend
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+</details>
 
-### 3. Verify changes
+<details>
+<summary><b>Deployment</b></summary>
 
-```bash
-# Backend, from the repository root
-./.venv/bin/python -m pytest backend/tests
+<br>
 
-# Frontend
-cd frontend
-npm run typecheck
-npm run lint
-npm run test
-npm run build
+- **Frontend:** a standard Next.js app ([`vercel.json`](vercel.json) is included), or run `npm run build && npm run start`.
+- **Backend:** container image from [`backend/Dockerfile`](backend/Dockerfile), built by [`cloudbuild.yaml`](cloudbuild.yaml). The worker runs inside the API by default. Run `python -m app.worker_main` to split it into its own process.
+- **Images** are read through signed URLs and a backend proxy, so the bucket can stay private. Scripts in `backend/scripts/` default to dry-run.
+
+</details>
+
+## 🏗️ Architecture
+
+```text
+Next.js 15 ──upload──▶ S3 / R2
+    │
+    ▼
+FastAPI ──▶ async worker ──▶ OpenAI Responses (critique) · GPT Image 2 (create)
+    │
+    ▼
+PostgreSQL: reviews · tasks · billing · progress
 ```
 
-## Deployment
+Auth uses Clerk plus guest sessions, and billing uses Lemon Squeezy. More detail: [system architecture](docs/architecture/系统架构.md) (Chinese) · [design system](DESIGN.md).
 
-The frontend and backend can be deployed independently. The backend includes a container definition and can run an embedded worker or `python -m app.worker_main` as a separate process. Build and serve the frontend with `npm run build && npm run start`.
+<details>
+<summary><b>OpenAI Build Week 2026</b></summary>
 
-## Documentation
+<br>
 
-- [Private critique access and retention notices](docs/changelog/CHANGELOG.md#2026-11-04-private-review-access-and-notices)
-- [A guest trial and lasting Pro photo records](docs/changelog/CHANGELOG.md#2026-11-01-guest-and-pro-records)
-- [Clearer billing and renewal status](docs/changelog/CHANGELOG.md#2026-10-31-billing-lifecycle)
-- [Clearer Free and Pro comparison](docs/changelog/CHANGELOG.md#2026-10-31-plan-comparison-copy)
-- [Photo eligibility and public critique retention](docs/changelog/CHANGELOG.md#2026-10-24-photo-applicability-and-public-retention)
-- [Gallery and recovery fixes](docs/changelog/CHANGELOG.md#2026-10-20-gallery-and-review-cache-fixes)
-- [Subscription recovery and image retry fixes](docs/changelog/CHANGELOG.md#2026-10-19-billing-recovery-and-generation-retries)
-- [Critique and draft fixes](docs/changelog/CHANGELOG.md#2026-10-18-critique-and-draft-fixes)
-- [Gallery browsing is more direct](docs/changelog/CHANGELOG.md#2026-10-10-gallery-browsing)
-- [The message center is available](docs/changelog/CHANGELOG.md#2026-10-10-inbox-live)
-- [Critique reading guides and public examples](docs/changelog/CHANGELOG.md#2026-10-10-critique-reading-guides)
+PicSpeak existed before Build Week. During the event, the single-photo product became an auditable retake loop: [`b74ddfb`](https://github.com/AsaZhou923/picspeak/commit/b74ddfb88ae32e37965ba8b29f40c9ebcbbf77fc) is the baseline and [`2a626aa`](https://github.com/AsaZhou923/picspeak/commit/2a626aabab30d5cdb45ca0450fdd1ce7a5387b4c) is the core paired comparison. Three rules keep the results honest:
 
-- [Earlier score-feedback rollout and inbox preparation](docs/changelog/CHANGELOG.md#2026-10-10-inbox-score-feedback-prep)
-- [Quick Flash critique and stronger Pro analysis](docs/changelog/CHANGELOG.md#2026-10-09-gpt6-sol-review-rollout)
-- [Controlled photo access](docs/changelog/CHANGELOG.md#2026-10-08-private-image-access)
-- [15-day Free critique history](docs/changelog/CHANGELOG.md#2026-10-08-free-history-fifteen-days)
-- [Previous announcement for Chinese users: model and Pro pricing schedule](docs/changelog/CHANGELOG.md#2026-10-08-gpt6-sol-and-pro-pricing)
-- [Previous critique reliability and gallery improvements](docs/changelog/CHANGELOG.md#2026-10-07-review-reliability-and-gallery)
-- [Previous scoring refinement and gallery reassessment](docs/changelog/CHANGELOG.md#2026-10-06-photo-rubric-and-gallery-reassessment)
-- [Previous v5 gallery critique reassessment](docs/changelog/CHANGELOG.md#2026-10-06-gallery-critique-reassessment)
-- [Previous GPT-6 critique upgrade](docs/changelog/CHANGELOG.md#2026-10-02-gpt6-workspace-upgrade)
-- [Previous workspace GPT review update](docs/changelog/CHANGELOG.md#2026-09-30-workspace-gpt-review-only)
-- [Previous gallery and critique clarity update](docs/changelog/CHANGELOG.md#2026-09-26-gallery-and-critique-clarity)
-- [Previous gallery and controls update](docs/changelog/CHANGELOG.md#2026-09-25-gallery-actions-and-clearer-controls)
-- [Previous history, sharing, and practice update](docs/changelog/CHANGELOG.md#2026-09-24-critique-organization-and-sharing)
-- [Earlier preparation record](docs/changelog/CHANGELOG.md#2026-09-23-critique-practice-and-sharing)
-- [Frontend design system](DESIGN.md)
-- [UI copy and controls review](docs/frontend/ui-review-2026-09-25.md)
-- [SEO / GEO audit](docs/seo/seo-audit-2026-05-01.md)
-- [System architecture](docs/architecture/系统架构.md)
-- [Google sign-in integration](docs/guides/Google登录接入指南.md)
+1. Both photos are rescored in the same request, on the same rubric.
+2. Python calculates every delta. The model never does the arithmetic.
+3. Unrelated or low-confidence pairs never count as improvement.
 
-## Contributing
+The event version used GPT-5.6 Terra. The current runtime uses GPT-6 Sol (Flash) and GPT-6.1 Sol (Pro), and every saved result records the model that produced it.
 
-Issues and pull requests are welcome. Keep changes scoped, include the relevant tests, and preserve the privacy boundary between public demos and private user reviews.
+</details>
 
-## License
+## 📝 Changelog
+
+The latest entry is [private critique access and retention notices](docs/changelog/CHANGELOG.md#2026-11-04-private-review-access-and-notices). See the [full changelog](docs/changelog/CHANGELOG.md) for older entries.
+
+## 🤝 Contributing
+
+Issues and PRs are welcome. Keep changes scoped, add tests for the behavior you change, and keep public demos separate from private user reviews.
+
+## 📄 License
 
 [MIT](LICENSE)
