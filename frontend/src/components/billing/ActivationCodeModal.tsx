@@ -1,7 +1,7 @@
 'use client';
 
 import { X } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import ClerkSignInTrigger from '@/components/auth/ClerkSignInTrigger';
 import { useAuth } from '@/lib/auth-context';
@@ -44,6 +44,7 @@ export default function ActivationCodeModal({
   const [code, setCode] = useState('');
   const [message, setMessage] = useState('');
   const [redeeming, setRedeeming] = useState(false);
+  const codeInputId = useId();
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const dialogRef = useModalFocusTrap<HTMLDivElement>({
     open,
@@ -92,13 +93,13 @@ export default function ActivationCodeModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-6"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6"
       onClick={onClose}
     >
       <div className="absolute inset-0 bg-black/70 backdrop-blur-md" />
       <div
         ref={dialogRef}
-        className="relative w-full max-w-[560px] rounded-[26px] border border-white/10 bg-[#171717]/95 p-9 shadow-[0_40px_120px_rgba(0,0,0,0.55)]"
+        className="relative max-h-[calc(100dvh-2rem)] w-full max-w-[560px] overflow-y-auto rounded-feature border border-border-subtle bg-surface p-6 text-ink shadow-level-3 sm:p-9"
         onClick={(event) => event.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -109,27 +110,26 @@ export default function ActivationCodeModal({
           ref={closeButtonRef}
           type="button"
           onClick={onClose}
-          className="absolute right-5 top-5 text-white/65 transition-colors hover:text-white"
+          className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-raised hover:text-ink sm:right-4 sm:top-4"
           aria-label={t('quota_modal_close')}
         >
           <X size={20} />
         </button>
 
         <div className="space-y-4 pr-8">
-          <p className="text-xs font-mono uppercase tracking-[0.24em] text-accent-muted">{t('activation_code_label')}</p>
-          <h2 className="font-display text-4xl leading-none text-white">{t('activation_code_title')}</h2>
-          <p className="max-w-[420px] text-lg leading-8 text-white/72">
+          <h2 className="font-display text-3xl leading-tight text-ink sm:text-4xl">{t('activation_code_title')}</h2>
+          <p className="max-w-[420px] text-base leading-7 text-ink-muted">
             {t('activation_code_body')}
           </p>
         </div>
 
         {requiresSignIn ? (
           <div className="mt-8 space-y-5">
-            <p className="rounded-2xl border border-gold/15 bg-gold/10 px-5 py-4 text-sm leading-7 text-white/82">
+            <p className="rounded-control border border-gold/20 bg-gold/10 px-4 py-3 text-sm leading-7 text-ink">
               {t('activation_code_signin_hint')}
             </p>
             <ClerkSignInTrigger
-              className="inline-flex w-full items-center justify-center rounded-full bg-gold px-6 py-4 text-lg font-medium text-void transition-colors hover:bg-gold-light"
+              className="ui-action-primary w-full px-6 py-3 text-base"
               signedInClassName="hidden"
             >
               {t('activation_code_signin_cta')}
@@ -138,12 +138,13 @@ export default function ActivationCodeModal({
         ) : (
           <div className="mt-8 space-y-5">
             <div className="space-y-2">
-              <label className="block text-sm text-white/82">{t('activation_code_input_label')}</label>
+              <label htmlFor={codeInputId} className="block text-sm text-ink">{t('activation_code_input_label')}</label>
               <input
+                id={codeInputId}
                 value={code}
                 onChange={(event) => setCode(event.target.value.toUpperCase())}
                 placeholder={t('activation_code_placeholder')}
-                className="w-full rounded-2xl border border-white/10 bg-surface px-5 py-4 text-xl text-white outline-none transition-colors placeholder:text-white/35 focus:border-gold/40"
+                className="w-full rounded-control border border-border bg-void px-4 py-3 text-base text-ink outline-none transition-colors placeholder:text-ink-subtle focus:border-gold focus:ring-2 focus:ring-gold/20 sm:text-lg"
                 autoCapitalize="characters"
                 autoCorrect="off"
                 spellCheck={false}
@@ -151,7 +152,7 @@ export default function ActivationCodeModal({
             </div>
 
             {message && (
-              <p className="rounded-2xl border border-gold/15 bg-gold/10 px-5 py-4 text-sm leading-7 text-white/82">
+              <p className="rounded-control border border-gold/20 bg-gold/10 px-4 py-3 text-sm leading-7 text-ink" role="status">
                 {message}
               </p>
             )}
@@ -161,14 +162,14 @@ export default function ActivationCodeModal({
                 type="button"
                 onClick={() => void handleRedeem()}
                 disabled={redeeming || !code.trim()}
-                className="inline-flex flex-1 items-center justify-center rounded-full bg-gold px-6 py-4 text-lg font-medium text-void transition-colors hover:bg-gold-light disabled:cursor-wait disabled:opacity-70"
+                className="ui-action-primary flex-1 px-6 py-3 text-base disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
               >
                 {redeeming ? t('activation_code_redeeming') : t('activation_code_submit')}
               </button>
               <button
                 type="button"
                 onClick={onClose}
-                className="inline-flex flex-1 items-center justify-center rounded-full border border-white/10 bg-white/[0.03] px-6 py-4 text-lg font-medium text-white transition-colors hover:border-gold/30 hover:text-gold"
+                className="ui-action-secondary flex-1 px-6 py-3 text-base"
               >
                 {t('quota_modal_close')}
               </button>
