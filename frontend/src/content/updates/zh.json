@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-11-photo-first-redesign",
+    "date": "2026-11-11",
+    "showPopup": false,
+    "title": "全新界面，照片成为主角",
+    "summary": "PicSpeak 换了一套新的外观：首页、长廊和点评结果页以照片为中心，长廊按照片原有比例展示，点评结果页把照片、总分和最先要改的一处放在最前面。配色与字体更清晰，深色模式改为不刺眼的暖棕色，手机上的常用入口移到了屏幕底部。你的照片、点评记录、额度和订阅都不受影响。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-11-11-photo-first-redesign"
+  },
+  {
     "id": "2026-11-04-private-review-access-and-notices",
     "date": "2026-11-04",
     "showPopup": false,

@@ -296,8 +296,8 @@ export const enTranslations = {
     pro_offer_label: '',
     pro_offer_highlight: 'Pro',
     updates_label: 'Updates',
-    updates_hint_home: "Private critique access and retention notices",
-    updates_hint_latest: "Private critique access and retention notices",
+    updates_hint_home: "A new look that puts your photos first",
+    updates_hint_latest: "A new look that puts your photos first",
     contact_label: 'Contact',
     contact_headline: 'Get in Touch',
 

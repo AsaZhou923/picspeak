@@ -85,8 +85,8 @@ export const zhTranslations = {
   pro_offer_label: '',
   pro_offer_highlight: 'Pro',
   updates_label: '更新记录',
-  updates_hint_home: "点评隐私与保存期限通知",
-  updates_hint_latest: "点评隐私与保存期限通知",
+  updates_hint_home: "全新界面，照片成为主角",
+  updates_hint_latest: "全新界面，照片成为主角",
   contact_label: '联系',
   contact_headline: '联系我',
 

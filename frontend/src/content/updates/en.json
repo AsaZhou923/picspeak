@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-11-photo-first-redesign",
+    "date": "2026-11-11",
+    "showPopup": false,
+    "title": "A new look that puts your photos first",
+    "summary": "PicSpeak has a new look. The homepage, Gallery and critique results now centre on the photograph: Gallery shows each photo at its own proportions, and a critique opens with the photo, the overall score and the first thing to fix. Colours and type are clearer, dark mode is a softer warm brown, and on phones the main sections sit in a bar at the bottom of the screen. Your photos, critique history, quota and subscription are unchanged.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-11-11-photo-first-redesign"
+  },
+  {
     "id": "2026-11-04-private-review-access-and-notices",
     "date": "2026-11-04",
     "showPopup": false,

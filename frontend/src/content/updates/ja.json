@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-11-photo-first-redesign",
+    "date": "2026-11-11",
+    "showPopup": false,
+    "title": "写真が主役の新しいデザイン",
+    "summary": "PicSpeak のデザインを一新しました。ホーム、ギャラリー、講評結果は写真を中心に構成し、ギャラリーでは写真を本来の比率で表示、講評結果では写真・総合スコア・最初に直す点を冒頭にまとめています。配色と文字が読みやすくなり、ダークモードは落ち着いた暖かいブラウンに。スマートフォンでは主な入口を画面下部に移しました。写真、講評履歴、利用枠、サブスクリプションに変更はありません。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-11-11-photo-first-redesign"
+  },
+  {
     "id": "2026-11-04-private-review-access-and-notices",
     "date": "2026-11-04",
     "showPopup": false,
