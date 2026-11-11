@@ -550,7 +550,8 @@ def test_guest_cleanup_waits_until_originals_are_purged(harness, monkeypatch):
         assert guest_cleanup.cleanup_stale_guest_users(db) == 1
 
 
-def test_purged_originals_have_no_image_link_and_a_stable_error(harness):
+def test_purged_originals_have_no_image_link_and_a_stable_error(harness, monkeypatch):
+    monkeypatch.setattr('app.services.guard.utc_now', lambda: NOW)
     user = harness.user()
     photo = harness.photo(user)
     review = harness.review(photo, days=2)
@@ -572,9 +573,13 @@ def test_purged_originals_have_no_image_link_and_a_stable_error(harness):
     app.dependency_overrides[get_db] = db_dependency
     app.dependency_overrides[get_current_actor] = actor_dependency
     with TestClient(app) as client:
-        detail = client.get('/api/v1/reviews/' + review.public_id).json()
+        response = client.get('/api/v1/reviews/' + review.public_id)
+        assert response.status_code == 200
+        detail = response.json()
         assert detail['photo_url'] is None
-        history = client.get('/api/v1/me/reviews').json()['items']
+        response = client.get('/api/v1/me/reviews')
+        assert response.status_code == 200
+        history = response.json()['items']
         assert history[0]['photo_url'] is None and history[0]['photo_thumbnail_url'] is None
         request = SimpleNamespace(
             base_url='http://testserver/', headers={},
