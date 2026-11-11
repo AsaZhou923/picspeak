@@ -1,6 +1,6 @@
 # PicSpeak Design System
 
-Status: Active; refreshed 2026-09-26 after the image-led Gallery and accessibility pass
+Status: Active; visual language refreshed 2026-11-11 (darkroom and photo paper); structure last refreshed 2026-09-26
 Owner: product/frontend
 Applies to: `frontend/src/app`, `frontend/src/components`, `frontend/src/features`
 
@@ -117,7 +117,7 @@ Needs: a real output preview, product loop explanation, transparent limits and o
 ### Navigation rules
 
 - Desktop navigation exposes the primary Improve and Create entries; secondary discovery links can live in a grouped menu or footer.
-- Mobile navigation contains at most five persistent destinations and uses labels, not icons alone.
+- Mobile navigation contains at most five persistent destinations and uses labels, not icons alone. It is a fixed bottom tab bar; the shared shell reserves its height so it never covers content.
 - The active destination is indicated by shape and typography in addition to color.
 - The header owns its layout offset. Pages must not guess fixed-header height independently.
 - Marketing routes and application routes may use distinct headers, but they share brand, token and interaction rules.
@@ -166,34 +166,36 @@ Make processing, failure, confidence limits, quotas and paid actions explicit. N
 
 ### 7.1 Color roles
 
-Keep the warm neutral foundation and separate decorative accent from readable text roles.
+The page is photo paper; the photograph sits in a darkroom. One accent, film orange, marks the primary action and the single most important finding.
 
 | Role | Light theme | Dark theme | Use |
 | --- | --- | --- | --- |
-| Canvas | warm ivory | warm charcoal | page background |
-| Surface | paper beige | graphite | standard panels |
-| Raised | warm white | raised graphite | menus, dialogs, emphasized panels |
-| Ink | near-black | warm white | primary text |
-| Muted ink | cool warm-gray | light warm-gray | supporting text; still AA-compliant |
-| Action fill | burnished ochre | luminous warm gold | primary buttons, selected state |
-| Action ink | dark espresso | dark espresso | text on action fill |
-| Accent text | dark ochre | pale gold | links, labels and small text |
-| Positive | deep sage | pale sage | strengths/success |
-| Caution | deep rust | pale rust | problems/warnings |
-| Focus | high-contrast gold/blue ring | high-contrast gold/blue ring | keyboard focus |
+| Canvas | warm photo paper | warm dark brown, not black | page background |
+| Surface | lighter paper white | lifted warm brown | panels; lighter than the canvas |
+| Raised | deeper paper | raised warm brown | menus, dialogs, hover fills |
+| Ink | warm near-black | warm white | primary text |
+| Muted ink | warm gray | light warm gray | supporting text; still AA-compliant |
+| Action fill | film orange | bright film orange | primary buttons, selected state |
+| Action ink | warm white | dark espresso | text on action fill |
+| Accent text | dark film orange | pale orange | links, labels and small text |
+| Positive | deep green | pale green | strengths/success |
+| Caution | red, distinct from the accent | pale red | problems/warnings |
+| Focus | accent ring | accent ring | keyboard focus |
 
 Rules:
 
-- `gold` is not a universal text color. Small light-theme text uses a darker `accent-ink` role.
+- The `gold` token names are kept for compatibility and now carry the film-orange accent. `gold` is not a universal text color; small light-theme text uses the darker `accent` role.
+- `.darkroom` is an always-dark band (homepage hero) that reuses the dark palette inside a light page. `.ui-matte` is the dark mount behind a photograph. `.ui-paper` is a slip that stays light on any background.
+- Do not reintroduce beige-on-beige layering, gold fills, film grain, blurred orbs or button shine.
 - Status is communicated with icon/label/shape, never color alone.
 - Ambient gradients stay below content contrast and disappear in reduced-motion/high-contrast contexts.
 - Body copy targets WCAG AA: 4.5:1 for normal text and 3:1 for large text.
 
 ### 7.2 Typography
 
-- Display: Cormorant Garamond for brand moments, editorial page titles and score numerals.
-- Body: DM Sans for navigation, controls, explanatory copy and data labels.
-- Mono: JetBrains Mono for IDs, timestamps, camera metadata and technical state only.
+- Display: Noto Serif SC at heavy weight (Noto Serif JP on Japanese pages) for page titles, section titles and score numerals. `h1`/`h2` default to 900, `h3` to 600. Never let CJK headings fall back to a thin system serif.
+- Body: DM Sans for Latin, with the platform CJK sans (PingFang, Hiragino, Microsoft YaHei) as explicit fallbacks.
+- Mono: JetBrains Mono for IDs, timestamps, camera metadata and film-edge captions; CJK inside mono labels falls back to the CJK sans.
 - Marketing headlines may use display type; application task titles use body type unless a restrained editorial moment improves hierarchy.
 - Limit display type to short phrases. Never use it for long instructions or button labels.
 
@@ -223,19 +225,21 @@ Type scale:
 
 Use four semantic radius levels:
 
-- `control`: 12px.
-- `card`: 20px.
-- `feature`: 28px.
-- `pill`: 999px.
+- `control`: 10px.
+- `card`: 12px.
+- `feature`: 16px.
+- `pill`: 999px; primary and secondary buttons are pills.
+- Photographs use a 3–4px corner so they read as prints, not cards.
 
 Do not introduce one-off radii unless an image crop or device silhouette requires it.
 
 ### 7.5 Elevation
 
-- Level 0: border only; default cards and list rows.
-- Level 1: soft short shadow; raised controls and hoverable cards.
-- Level 2: focused task panel or sticky action surface.
+- Level 0: flat paper with a hairline border; default for panels and list rows.
+- Level 1: a barely visible contact shadow.
+- Level 2: a print or paper slip lifted off the table.
 - Level 3: dialog/popover only.
+- Panels do not carry soft ambient shadows; separate content with space, hairlines and the lighter paper surface.
 
 Use warm/black translucent shadows tied to the theme. Avoid unique arbitrary shadow strings per component.
 
@@ -253,7 +257,8 @@ Use warm/black translucent shadows tied to the theme. Avoid unique arbitrary sha
 - Entrance animation is used once, in reading order, and never blocks interaction.
 - Marquee and ambient drift are optional brand accents, not required content carriers.
 - `prefers-reduced-motion: reduce` disables marquee, orbit, shimmer, parallax and entrance transforms; state transitions remain immediate and legible.
-- The global atmosphere uses restrained warm photographic light and grain. Indigo/teal aurora fields and star particles must be removed or reduced to static, low-contrast texture when they compete with evidence or imply a generic sci-fi product.
+- Signature motion: a photograph "develops" from safelight red into full color (`anim-develop`), the score slip slides onto the print (`anim-slip-in`), overall scores count up once, and section content fades up as it scrolls into view (`Reveal`). Each runs once and never gates interaction.
+- No global ambient layer: no grain, orbs, aurora fields or particles.
 
 ## 8. Core page patterns
 

@@ -1,34 +1,43 @@
 import type { Metadata } from 'next';
 import { headers } from 'next/headers';
-import { Cormorant_Garamond, DM_Sans, JetBrains_Mono } from 'next/font/google';
+import { DM_Sans, JetBrains_Mono, Noto_Serif_JP, Noto_Serif_SC } from 'next/font/google';
 import './globals.css';
 import SiteChrome from '@/components/layout/SiteChrome';
 import AppProviders from '@/components/providers/AppProviders';
 import PerformanceTelemetry from '@/components/performance/PerformanceTelemetry';
-import DeferredBackgroundEffect from '@/components/ui/DeferredBackgroundEffect';
 import { getInitialTranslations } from '@/lib/i18n-initial';
 import { isSupportedLocale } from '@/lib/locale';
 import { HOME_LANGUAGE_ALTERNATES, OPEN_GRAPH_LOCALES } from '@/lib/seo';
 import { siteConfig } from '@/lib/site';
 
-const cormorant = Cormorant_Garamond({
-  subsets: ['latin'],
-  weight: ['400', '500', '600'],
-  variable: '--font-display',
+// Display serif. The CJK families are sliced by unicode-range, so a page only
+// downloads the glyph groups it actually renders; Japanese pages switch to the
+// JP cut in globals.css to get the correct glyph forms.
+const serifSc = Noto_Serif_SC({
+  weight: ['600', '900'],
+  variable: '--font-serif-sc',
   display: 'swap',
+  preload: false,
+});
+
+const serifJp = Noto_Serif_JP({
+  weight: ['600', '900'],
+  variable: '--font-serif-jp',
+  display: 'swap',
+  preload: false,
 });
 
 const dmSans = DM_Sans({
   subsets: ['latin'],
   weight: ['400', '500', '600'],
-  variable: '--font-body',
+  variable: '--font-sans-latin',
   display: 'swap',
 });
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ['latin'],
   weight: ['400', '500'],
-  variable: '--font-mono',
+  variable: '--font-mono-latin',
   display: 'swap',
   preload: false,
 });
@@ -112,7 +121,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html
       lang={lang}
-      className={`${cormorant.variable} ${dmSans.variable} ${jetbrainsMono.variable}`}
+      className={`${serifSc.variable} ${serifJp.variable} ${dmSans.variable} ${jetbrainsMono.variable}`}
       suppressHydrationWarning
     >
       <head>
@@ -132,9 +141,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           initialMessages={initialLocale ? getInitialTranslations(initialLocale) : undefined}
         >
           {enablePerformanceTelemetry ? <PerformanceTelemetry /> : null}
-          <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
-            <DeferredBackgroundEffect />
-          </div>
           <SiteChrome>{children}</SiteChrome>
         </AppProviders>
       </body>

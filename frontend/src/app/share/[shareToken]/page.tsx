@@ -104,7 +104,7 @@ export default function SharedReviewPage() {
         <div className="space-y-4 text-center">
           <AlertCircle size={40} className="mx-auto text-rust" />
           <div>
-            <h1 className="text-2xl font-semibold text-ink">{error?.title ?? copy.errorTitle}</h1>
+            <h1 className="text-2xl font-black text-ink">{error?.title ?? copy.errorTitle}</h1>
             <p className="mt-2 max-w-md text-sm leading-6 text-rust">{error?.body ?? t('review_err_fetch')}</p>
           </div>
           <Link

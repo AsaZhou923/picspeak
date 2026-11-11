@@ -864,7 +864,7 @@ function WorkspacePageContent() {
           <p className="ui-eyebrow mb-3">
             {isRetakeCoachFlow ? coachCopy.label : t('workspace_label')}
           </p>
-          <h1 className="text-balance font-display text-4xl text-ink sm:text-5xl">
+          <h1 className="text-balance font-display text-4xl text-ink sm:text-6xl">
             {isRetakeCoachFlow ? coachCopy.workspaceTitle : t('workspace_headline')}
           </h1>
           {isRetakeCoachFlow && (

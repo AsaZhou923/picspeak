@@ -141,15 +141,15 @@ export function PromptExampleGallery({ onApply }: PromptExampleGalleryProps) {
                 key={example.id}
                 className="group grid overflow-hidden rounded-card border border-border-subtle bg-surface/90 transition-all hover:border-gold/35 hover:shadow-level-1"
               >
-                <div className="relative aspect-[4/3] bg-void/75 p-2">
+                <div className="relative aspect-[4/5] overflow-hidden bg-raised">
                   <Image
                     src={example.imagePath}
                     alt={title}
                     fill
                     sizes="(min-width: 1280px) 260px, (min-width: 640px) 45vw, 100vw"
-                    className="rounded-control object-contain p-2 transition-transform duration-500 group-hover:scale-[1.02]"
+                    className="object-cover object-top transition-transform duration-700 ease-out group-hover:scale-[1.04]"
                   />
-                  <div className="absolute left-3 top-3 rounded-control border border-void/30 bg-void/80 px-2.5 py-1 text-[11px] font-medium text-ink shadow-level-1 backdrop-blur">
+                  <div className="absolute left-3 top-3 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-medium text-white">
                     {t(CATEGORY_LABEL_KEYS[example.category])}
                   </div>
                 </div>

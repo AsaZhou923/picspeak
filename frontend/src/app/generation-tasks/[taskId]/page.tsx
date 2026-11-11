@@ -167,7 +167,7 @@ export default function GenerationTaskPage() {
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div className="min-w-0">
                   <p className="ui-eyebrow">{t('generation_wait_label')}</p>
-                  <h1 id="generation-task-status" aria-live="polite" className="mt-2 text-3xl font-semibold tracking-tight text-ink">
+                  <h1 id="generation-task-status" aria-live="polite" className="mt-2 text-3xl font-black tracking-tight text-ink">
                     {failed ? t('generation_task_failed_title') : statusTitle}
                   </h1>
                   <p className="mt-3 break-all font-mono text-xs text-ink-subtle">

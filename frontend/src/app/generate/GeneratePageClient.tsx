@@ -434,7 +434,7 @@ function GeneratePageContent() {
                     <span className="text-sm font-medium text-ink-muted">{t('generation_credits_unit')}</span>
                   </p>
                 </div>
-                <div className="flex h-11 w-11 items-center justify-center rounded-control border border-gold/30 bg-gold/10 text-gold">
+                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gold/10 text-gold">
                   <ImageIcon size={21} aria-hidden="true" />
                 </div>
               </div>

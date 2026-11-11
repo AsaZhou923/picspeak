@@ -507,7 +507,7 @@ function GalleryPageContent() {
           </section>
         ) : (
           <>
-            <section data-testid="gallery-grid" className={`mt-4 grid gap-4 ${galleryGridClassName(preferences.columns)}`}>
+            <section data-testid="gallery-grid" className={`mt-4 grid items-start gap-x-5 gap-y-8 ${galleryGridClassName(preferences.columns)}`}>
               {items.map((item, idx) => (
                 <GalleryCard
                   key={item.review_id}

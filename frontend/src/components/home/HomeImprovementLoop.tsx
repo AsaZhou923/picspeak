@@ -1,7 +1,7 @@
 'use client';
 
-import { Aperture, BarChart2, CheckCircle2, Repeat2, UploadCloud } from 'lucide-react';
 import Link from 'next/link';
+import { Reveal } from '@/components/ui/Reveal';
 import type { Locale, Translator } from '@/lib/i18n';
 import { buildWorkspaceConversionHref } from '@/lib/content-conversion';
 import { markProductAttributionSource, trackProductEvent } from '@/lib/product-analytics';
@@ -63,33 +63,28 @@ export default function HomeImprovementLoop({
   const copy = PRACTICE_COPY[locale];
   const defaultSteps = [
     {
-      icon: UploadCloud,
       title: t('workspace_headline'),
       body: t('hero_desc'),
     },
     {
-      icon: Aperture,
       title: t('feature_flash_title'),
       body: t('feature_flash_body'),
     },
     {
-      icon: CheckCircle2,
       title: t('demo_suggestion'),
       body: t('task_wait_note_ai_body'),
     },
     {
-      icon: Repeat2,
       title: retakeTitle,
       body: retakeBody,
     },
     {
-      icon: BarChart2,
       title: t('feature_history_title'),
       body: t('feature_history_body'),
     },
   ];
   const steps = practiceEnabled
-    ? copy.steps.map(([title, body], index) => ({ icon: defaultSteps[index].icon, title, body }))
+    ? copy.steps.map(([title, body]) => ({ title, body }))
     : defaultSteps;
   const headline = practiceEnabled ? copy.title : t('features_headline');
 
@@ -101,28 +96,21 @@ export default function HomeImprovementLoop({
           {headline}
         </h2>
 
-        <ol
-          className="mt-12 grid border-l border-border md:grid-cols-5 md:border-l-0 md:border-t"
-          aria-label={headline}
-        >
-          {steps.map((step, index) => {
-            const StepIcon = step.icon;
-            return (
-              <li
-                key={`${step.title}-${index}`}
-                className="relative pb-10 pl-9 last:pb-0 md:px-3 md:pb-0 md:pt-9 first:md:pl-0 last:md:pr-0"
+        <ol className="mt-12 grid gap-3 sm:grid-cols-2 lg:grid-cols-5" aria-label={headline}>
+          {steps.map((step, index) => (
+            <li key={`${step.title}-${index}`}>
+              <Reveal
+                delay={index * 80}
+                className="h-full rounded-card bg-surface p-5"
               >
-                <span className="absolute -left-[1.1rem] top-0 flex h-9 w-9 items-center justify-center rounded-full border border-gold/40 bg-void text-gold shadow-level-1 md:-top-[1.1rem] md:left-3 first:md:left-0">
-                  <StepIcon size={15} aria-hidden="true" />
-                </span>
-                <p className="font-mono text-[11px] font-semibold tracking-[0.18em] text-gold">
-                  {String(index + 1).padStart(2, '0')}
+                <p className="font-display text-4xl font-black leading-none text-gold" aria-hidden="true">
+                  {index + 1}
                 </p>
-                <h3 className="mt-2 font-display text-xl leading-snug text-ink">{step.title}</h3>
-                <p className="mt-3 text-sm leading-6 text-ink-muted">{step.body}</p>
-              </li>
-            );
-          })}
+                <h3 className="mt-4 font-body text-base font-bold leading-snug text-ink">{step.title}</h3>
+                <p className="mt-2 text-sm leading-6 text-ink-muted">{step.body}</p>
+              </Reveal>
+            </li>
+          ))}
         </ol>
         {practiceEnabled && (
           <div className="mt-10 border-t border-border-subtle pt-6">

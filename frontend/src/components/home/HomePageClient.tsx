@@ -14,6 +14,7 @@ import {
 import HomeContactSection from '@/components/home/HomeContactSection';
 import HomeCritiqueArtifact from '@/components/home/HomeCritiqueArtifact';
 import HomeCritiqueGuide from '@/components/home/HomeCritiqueGuide';
+import HomeGalleryStrip from '@/components/home/HomeGalleryStrip';
 import HomeGenerationPricingSection from '@/components/home/HomeGenerationPricingSection';
 import HomeImprovementLoop from '@/components/home/HomeImprovementLoop';
 import { usePracticeEnabled } from '@/features/practice/usePracticeEnabled';
@@ -83,12 +84,8 @@ export function HomePageContent() {
     <>
       <HomeAuthWidgets />
 
-      <section className="relative overflow-hidden px-5 py-12 sm:px-6 sm:py-16 lg:py-20">
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute -left-40 top-0 h-[34rem] w-[34rem] rounded-full bg-[radial-gradient(circle,rgba(200,162,104,0.1),transparent_68%)]"
-        />
-        <div className="relative mx-auto grid max-w-editorial items-center gap-10 lg:grid-cols-[minmax(0,0.74fr)_minmax(0,1.26fr)] lg:gap-14">
+      <section className="darkroom relative overflow-hidden px-5 py-12 sm:px-6 sm:py-16 lg:py-20">
+        <div className="relative mx-auto grid max-w-editorial items-center gap-12 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-16">
           <div className="max-w-xl">
             <div className="ui-eyebrow inline-flex items-center gap-2">
               <Aperture size={13} aria-hidden="true" />
@@ -97,7 +94,7 @@ export function HomePageContent() {
 
             <div
               aria-hidden="true"
-              className="mt-5 text-balance font-display text-[clamp(2.5rem,4vw,3.5rem)] leading-[1.14] tracking-[-0.035em] text-ink"
+              className="mt-5 text-balance font-display text-[clamp(2.4rem,4.3vw,3.9rem)] font-black leading-[1.18] text-ink"
             >
               {t('hero_headline_1')}
               <span className="mt-1 block text-gold">{t('hero_headline_2')}</span>
@@ -115,7 +112,7 @@ export function HomePageContent() {
               {entryCopy.start}
               <ArrowRight size={15} aria-hidden="true" />
             </Link>
-            <p className="mt-4 text-xs leading-6 text-ink-muted">{entryCopy.results}</p>
+            <p className="mt-4 text-xs leading-6 text-ink-subtle">{entryCopy.results}</p>
           </div>
 
           <HomeCritiqueArtifact t={t} />
@@ -131,6 +128,8 @@ export function HomePageContent() {
             className="flex min-h-[46px] items-center justify-center"
           />
         </div>
+
+        <HomeGalleryStrip t={t} />
       </section>
 
       {locale === 'en' ? <HomeCritiqueGuide /> : null}
@@ -147,7 +146,7 @@ export function HomePageContent() {
         <div className="mx-auto max-w-editorial">
           <div className="grid gap-5 lg:grid-cols-2">
             <article className="ui-feature-panel flex flex-col overflow-hidden p-6 sm:p-8">
-              <div className="flex h-11 w-11 items-center justify-center rounded-control border border-sage/35 bg-sage/10 text-sage">
+              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-sage/10 text-sage">
                 <Repeat2 size={18} aria-hidden="true" />
               </div>
               <p className="ui-eyebrow mt-6 text-sage">{t('nav_workspace')}</p>
@@ -162,7 +161,7 @@ export function HomePageContent() {
             </article>
 
             <article className="ui-panel flex flex-col p-6 sm:p-8">
-              <div className="flex h-11 w-11 items-center justify-center rounded-control border border-gold/30 bg-gold/10 text-gold">
+              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gold/10 text-gold">
                 <Wand2 size={18} aria-hidden="true" />
               </div>
               <p className="ui-eyebrow mt-6">{t('nav_generate')}</p>

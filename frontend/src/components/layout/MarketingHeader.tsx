@@ -70,7 +70,7 @@ export default function MarketingHeader() {
       : 'text-ink-muted hover:text-ink';
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border-subtle bg-void/90 backdrop-blur-xl">
+    <header className="sticky top-0 z-50 border-b border-border-subtle bg-void">
       <div className="max-w-editorial mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link
@@ -86,7 +86,7 @@ export default function MarketingHeader() {
               className="rounded object-contain"
               priority
             />
-            <span className="font-display text-lg tracking-wide hidden lg:inline">PicSpeak</span>
+            <span className="font-display text-lg font-black hidden lg:inline">PicSpeak</span>
           </Link>
           <Link
             href={homeHref}
@@ -123,20 +123,20 @@ export default function MarketingHeader() {
 
         <HeaderRightControls headerVisibility={headerVisibility} className="shrink-0" />
       </div>
-      <div className="md:hidden border-t border-border-subtle/40 px-3 py-2">
-        <nav className="flex items-stretch rounded-card bg-surface/70 p-1 gap-0.5">
+      <div className="md:hidden fixed inset-x-0 bottom-0 z-50 border-t border-border-subtle bg-surface px-2 pb-[env(safe-area-inset-bottom)]">
+        <nav className="flex items-stretch">
           {MOBILE_MARKETING_LINKS.filter((link) => link.href !== '/account/practice' || practiceEnabled === true).map(({ href, key, kind, icon: Icon }) => (
             <Link
               key={href}
               href={href}
               aria-current={isActive(href) ? 'page' : undefined}
-              className={`flex-1 flex flex-col items-center justify-center gap-1 rounded-control py-2 text-[10px] font-medium transition-all duration-200 ${
+              className={`flex-1 flex flex-col items-center justify-center gap-1 min-h-[3.5rem] py-2 text-[11px] font-medium transition-all duration-200 ${
                 isActive(href)
-                  ? 'bg-void shadow-sm text-gold'
+                  ? 'font-semibold text-gold'
                   : 'text-ink-subtle hover:text-ink-muted active:scale-95'
               }`}
             >
-              <Icon size={14} />
+              <Icon size={18} aria-hidden="true" />
               <span className="tracking-wide">{kind === 'retake' ? retakeCopy.navShort : t(key!)}</span>
             </Link>
           ))}

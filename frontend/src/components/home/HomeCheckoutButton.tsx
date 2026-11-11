@@ -42,7 +42,7 @@ export default function HomeCheckoutButton() {
         <ClerkSignInTrigger
           fallbackRedirectUrl="/account/usage"
           signedInClassName="hidden"
-          className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-gold px-4 py-3 text-sm font-medium text-void transition-all duration-200 hover:bg-gold-light hover:shadow-[0_0_24px_rgba(200,162,104,0.35)]"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-gold px-4 py-3 text-sm font-medium text-void transition-all duration-200 hover:bg-gold-light hover:shadow-[0_0_24px_rgb(var(--color-action)/0.35)]"
         >
           {t('usage_login_now')}
           <ArrowRight size={14} />
@@ -52,7 +52,7 @@ export default function HomeCheckoutButton() {
           type="button"
           onClick={() => void handleCheckout()}
           disabled={checkoutLoading}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-gold px-4 py-3 text-sm font-medium text-void transition-all duration-200 hover:bg-gold-light hover:shadow-[0_0_24px_rgba(200,162,104,0.35)] disabled:cursor-wait disabled:opacity-70"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-gold px-4 py-3 text-sm font-medium text-void transition-all duration-200 hover:bg-gold-light hover:shadow-[0_0_24px_rgb(var(--color-action)/0.35)] disabled:cursor-wait disabled:opacity-70"
         >
           {checkoutLoading ? t('usage_checkout_loading') : t('usage_checkout_pro')}
           <ArrowRight size={14} />

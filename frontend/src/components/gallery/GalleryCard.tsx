@@ -22,12 +22,6 @@ interface GalleryCardProps {
   density?: GalleryDensityPreference;
 }
 
-function scoreTone(score: number): string {
-  if (score >= 8) return 'text-sage border-sage/30 bg-sage/10';
-  if (score >= 6) return 'text-gold border-gold/30 bg-gold/10';
-  return 'text-rust border-rust/30 bg-rust/10';
-}
-
 function trimSummary(summary: string, maxLength = 78): string {
   const normalized = summary.replace(/\s+/g, ' ').trim();
   if (!normalized) return '';
@@ -99,45 +93,70 @@ function GalleryCard({
   return (
     <article
       data-review-id={item.review_id}
-      className="group flex h-full flex-col overflow-hidden rounded-card border border-border-subtle bg-surface/70 shadow-level-1 transition-all duration-300 hover:-translate-y-0.5 hover:border-gold/25 hover:bg-surface animate-slide-up"
+      className="group flex flex-col animate-slide-up"
       style={{
         animationDelay: `${index * 50}ms`,
         animationFillMode: 'both',
       }}
     >
-      <div className="overflow-hidden">
-        <GalleryCardImage item={item} alt={t('photo_thumbnail_alt')} compact={isCompact} />
+      {/* The photograph is the card: it opens the critique and carries author and score. */}
+      <div className="relative overflow-hidden rounded-[4px]">
+        <Link
+          href={reviewHref}
+          onClick={() => persistGalleryState(item.review_id)}
+          aria-label={`${t('gallery_open_review')} · ${author.label} · ${item.final_score.toFixed(1)}`}
+          className="block"
+        >
+          <GalleryCardImage item={item} alt={t('photo_thumbnail_alt')} compact={isCompact} />
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/65 to-transparent"
+          />
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute bottom-3 right-3.5 font-display text-3xl font-black leading-none text-white"
+          >
+            {item.final_score.toFixed(1)}
+          </span>
+        </Link>
+
+        <div className="absolute bottom-2.5 left-3 flex max-w-[65%] items-center gap-2 text-white">
+          {item.owner_avatar_url ? (
+            <Image
+              src={item.owner_avatar_url}
+              alt=""
+              width={24}
+              height={24}
+              className="h-6 w-6 shrink-0 rounded-full border border-white/40 object-cover"
+            />
+          ) : (
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-action text-[10px] font-semibold text-action-ink">
+              {author.initial}
+            </span>
+          )}
+          {item.owner_profile_url ? (
+            <Link
+              href={item.owner_profile_url}
+              className="truncate py-2 text-sm font-medium text-white underline-offset-4 hover:underline"
+            >
+              {author.label}
+            </Link>
+          ) : (
+            <span className="truncate text-sm font-medium">{author.label}</span>
+          )}
+        </div>
       </div>
 
-      <div className={`flex flex-1 flex-col px-4 pb-4 ${isCompact ? 'pt-3' : 'pt-4'}`}>
-        <div className="flex min-w-0 items-center justify-between gap-3 text-xs text-ink-subtle">
-          <div className="flex min-w-0 items-center gap-2">
-            {item.owner_avatar_url ? (
-              <Image
-                src={item.owner_avatar_url}
-                alt={author.label}
-                width={24}
-                height={24}
-                className="h-6 w-6 shrink-0 rounded-full border border-border object-cover"
-              />
-            ) : (
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-action text-[10px] font-semibold text-action-ink">
-                {author.initial}
-              </span>
-            )}
-            {item.owner_profile_url ? (
-              <Link
-                href={item.owner_profile_url}
-                className="truncate text-sm font-medium text-ink transition-colors hover:text-gold"
-                onClick={(event) => event.stopPropagation()}
-              >
-                {author.label}
-              </Link>
-            ) : (
-              <span className="truncate text-sm font-medium text-ink">{author.label}</span>
-            )}
-          </div>
-          <time className="shrink-0 [font-variant-numeric:tabular-nums]" dateTime={item.gallery_added_at}>
+      <div className="flex flex-1 flex-col pt-3">
+        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-ink-subtle">
+          {item.recommended && (
+            <span className="font-medium text-gold">{t('gallery_recommended')}</span>
+          )}
+          <span className="inline-flex items-center gap-1">
+            <ModeIcon size={11} strokeWidth={1.8} className={modeBadge.iconClassName} aria-hidden="true" />
+            {modeBadge.label}
+          </span>
+          <time className="ml-auto shrink-0 [font-variant-numeric:tabular-nums]" dateTime={item.gallery_added_at}>
             {new Date(item.gallery_added_at).toLocaleDateString(dateLocale, {
               year: 'numeric',
               month: 'short',
@@ -146,30 +165,9 @@ function GalleryCard({
           </time>
         </div>
 
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          <span
-            className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${scoreTone(
-              item.final_score
-            )}`}
-          >
-            {item.final_score.toFixed(1)}
-          </span>
-          {item.recommended && (
-            <span className="rounded-full border border-gold/30 bg-gold/10 px-2.5 py-1 text-[11px] font-medium text-gold">
-              {t('gallery_recommended')}
-            </span>
-          )}
-          <span
-            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium ${modeBadge.className}`}
-          >
-            <ModeIcon size={11} strokeWidth={1.8} className={modeBadge.iconClassName} />
-            {modeBadge.label}
-          </span>
-        </div>
-
         {!isCompact && (
           <p
-            className="mt-3 text-xs leading-6 text-ink-muted"
+            className="mt-2 text-sm leading-6 text-ink-muted"
             style={{
               display: '-webkit-box',
               WebkitLineClamp: 2,
@@ -181,22 +179,20 @@ function GalleryCard({
           </p>
         )}
 
-        <div className={`mt-auto flex items-center gap-2 ${isCompact ? 'pt-3' : 'pt-4'}`}>
+        <div className="mt-1 flex items-center gap-1">
           <button
             type="button"
             onClick={() => void handleLikeToggle(item)}
             disabled={likeBusyId === item.review_id}
-            className={`inline-flex min-h-11 min-w-16 items-center justify-center gap-1.5 rounded-control border px-3 py-2 text-sm transition-all active:scale-95 disabled:opacity-60 ${
-              item.liked_by_viewer
-                ? 'border-rust/35 bg-rust/10 text-rust hover:bg-rust/15'
-                : 'border-border text-ink-muted hover:border-rust/35 hover:text-rust'
+            className={`-ml-2 inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-full px-2 text-sm transition-colors active:scale-95 disabled:opacity-60 ${
+              item.liked_by_viewer ? 'text-rust' : 'text-ink-muted hover:text-rust'
             }`}
             aria-pressed={item.liked_by_viewer}
             aria-label={item.liked_by_viewer ? t('gallery_unlike') : t('gallery_like')}
           >
             <Heart
-              size={14}
-              className={`transition-transform duration-300 ${item.liked_by_viewer ? 'fill-current scale-110' : 'group-hover:scale-110'}`}
+              size={15}
+              className={`transition-transform duration-300 ${item.liked_by_viewer ? 'fill-current scale-110' : ''}`}
             />
             <span>{item.like_count}</span>
           </button>
@@ -204,14 +200,14 @@ function GalleryCard({
           <Link
             href={reviewHref}
             onClick={() => persistGalleryState(item.review_id)}
-            className="ui-action-primary min-h-11 flex-1 rounded-control px-3 py-2 text-sm active:scale-[0.98]"
+            className="ml-auto inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-gold transition-colors hover:text-gold-dim"
           >
             {t('gallery_open_review')}
-            <ChevronRight size={14} className="transition-transform group-hover:translate-x-0.5" />
+            <ChevronRight size={14} className="transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
           </Link>
         </div>
 
-        <div className={`flex flex-wrap gap-x-3 gap-y-2 border-t border-border-subtle pt-3 ${isCompact ? 'mt-3' : 'mt-4'}`}>
+        <div className="flex flex-wrap gap-x-4 border-t border-border-subtle">
           <Link
             href={workspaceCtas.practice.href}
             onClick={() => handleWorkspaceCtaClick(workspaceCtas.practice.entrypoint)}

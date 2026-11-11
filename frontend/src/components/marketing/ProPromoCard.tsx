@@ -205,17 +205,16 @@ export default function ProPromoCard({
 
   return (
     <section
-      className={`relative overflow-hidden rounded-[24px] border border-gold/30 bg-[radial-gradient(circle_at_top_left,rgba(200,171,90,0.18),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(149,113,87,0.16),transparent_38%),rgb(var(--color-surface)/0.78)] px-5 py-5 shadow-[0_24px_64px_rgba(0,0,0,0.22)] ${className}`.trim()}
+      className={`relative overflow-hidden rounded-feature border border-border-subtle bg-surface px-5 py-6 sm:px-8 sm:py-8 ${className}`.trim()}
     >
-      <div className="absolute inset-0 opacity-25 [background-image:linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] [background-size:20px_20px]" />
       <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
         <div className="max-w-2xl">
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-2 rounded-full border border-gold/25 bg-gold/10 px-3 py-1 text-[11px] uppercase tracking-[0.24em] text-gold/85">
+            <span className="inline-flex items-center gap-2 rounded-full border border-gold/25 bg-gold/10 px-3 py-1 text-[11px] uppercase tracking-[0.12em] text-accent">
               <Ticket size={12} />
               {copy.badge}
             </span>
-            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] uppercase tracking-[0.22em] text-ink-subtle">
+            <span className="rounded-full border border-border-subtle px-3 py-1 text-[11px] uppercase tracking-[0.12em] text-ink-subtle">
               {copy.discount}
             </span>
           </div>
@@ -227,7 +226,7 @@ export default function ProPromoCard({
             {copy.features.map((feature) => (
               <span
                 key={feature}
-                className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-ink-subtle"
+                className="rounded-full border border-border-subtle px-3 py-1 text-xs text-ink-subtle"
               >
                 {feature}
               </span>
@@ -235,10 +234,10 @@ export default function ProPromoCard({
           </div>
         </div>
 
-        <div className="w-full max-w-sm rounded-[22px] border border-gold/20 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] p-5 backdrop-blur-sm">
+        <div className="w-full max-w-sm border-t border-border-subtle pt-5 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
           <p className="text-[11px] uppercase tracking-[0.24em] text-accent-muted">{copy.discount}</p>
           <div className="mt-3 flex items-end gap-3">
-            <p className="font-display text-4xl text-gold">{copy.price}</p>
+            <p className="font-display text-5xl font-black text-ink">{copy.price}</p>
             {copy.oldPrice && copy.oldPrice !== copy.price && (
               <p className="pb-1 text-sm text-ink-subtle line-through">{copy.oldPrice}</p>
             )}
@@ -264,7 +263,7 @@ export default function ProPromoCard({
                 <button
                   type="button"
                   onClick={() => setActivationOpen(true)}
-                  className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm font-medium text-ink transition-colors hover:border-gold/30 hover:text-gold"
+                  className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border border-border-subtle px-5 py-3 text-sm font-medium text-ink transition-colors hover:border-gold/30 hover:text-gold"
                 >
                   {copy.activationRenewCta}
                 </button>
@@ -276,7 +275,7 @@ export default function ProPromoCard({
                 <ClerkSignInTrigger
                   fallbackRedirectUrl={fallbackRedirectUrl}
                   signedInClassName="hidden"
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-gold px-5 py-3 text-sm font-medium text-void transition-colors hover:bg-gold-light"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-action px-5 py-3 text-sm font-semibold text-action-ink transition-colors hover:bg-action-hover"
                 >
                   <Sparkles size={14} />
                   {copy.guestCta}
@@ -287,7 +286,7 @@ export default function ProPromoCard({
                   type="button"
                   onClick={() => void handleCheckout()}
                   disabled={checkoutLoading}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-gold px-5 py-3 text-sm font-medium text-void transition-colors hover:bg-gold-light disabled:cursor-wait disabled:opacity-70"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-action px-5 py-3 text-sm font-semibold text-action-ink transition-colors hover:bg-action-hover disabled:cursor-wait disabled:opacity-70"
                 >
                   <Sparkles size={14} />
                   {checkoutLoading ? t('usage_checkout_loading') : copy.freeCta}
@@ -298,7 +297,7 @@ export default function ProPromoCard({
                 <button
                   type="button"
                   onClick={() => setActivationOpen(true)}
-                  className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm font-medium text-ink transition-colors hover:border-gold/30 hover:text-gold"
+                  className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border border-border-subtle px-5 py-3 text-sm font-medium text-ink transition-colors hover:border-gold/30 hover:text-gold"
                 >
                   {copy.activationCta}
                 </button>

@@ -48,14 +48,14 @@ function blend(foreground: readonly number[], background: readonly number[], alp
 }
 
 test('light-theme semantic accent text meets normal-text contrast on core surfaces', () => {
-  const canvas = [250, 249, 247] as const;
-  const surface = [243, 239, 233] as const;
+  const canvas = [244, 239, 230] as const;
+  const surface = [252, 250, 245] as const;
   const accents = {
-    gold: [132, 88, 32],
-    accent: [116, 77, 27],
-    accentMuted: [93, 68, 38],
-    sage: [66, 107, 70],
-    rust: [139, 70, 57],
+    gold: [184, 60, 11],
+    accent: [168, 54, 10],
+    accentMuted: [140, 52, 18],
+    sage: [47, 110, 70],
+    rust: [170, 44, 44],
   } as const;
 
   for (const [name, color] of Object.entries(accents)) {
@@ -63,7 +63,7 @@ test('light-theme semantic accent text meets normal-text contrast on core surfac
     assert.ok(contrast(color, surface) >= 4.5, `${name} must pass on a surface`);
   }
 
-  const oldSmallGold = [132, 88, 32] as const;
+  const oldSmallGold = [184, 60, 11] as const;
   assert.ok(contrast(blend(oldSmallGold, canvas, 0.7), canvas) < 4.5, 'gold/70 demonstrates why small accent text needs a solid semantic role');
   assert.ok(contrast(accents.accentMuted, canvas) >= 4.5, 'accent muted must pass on the canvas');
   assert.ok(contrast(accents.accentMuted, surface) >= 4.5, 'accent muted must pass on a surface');

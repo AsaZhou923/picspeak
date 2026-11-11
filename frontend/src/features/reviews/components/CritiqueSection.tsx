@@ -85,7 +85,7 @@ export function CritiqueSection({
               key={i}
               id={cardId}
               data-suggestion-tags={tagData}
-              className={`group ${bgColor} border-l-2 ${isPriority ? 'border-l-[3px]' : ''} ${borderColor} rounded-r-md px-4 py-3 ${cardId && cardId === highlightedId ? 'animate-card-highlight' : ''}`}
+              className={`group border-l-2 ${borderColor} pl-4 ${isPriority ? `${bgColor} rounded-r-md border-l-[3px] py-3 pr-4` : 'py-1 pr-1'} ${cardId && cardId === highlightedId ? 'animate-card-highlight' : ''}`}
             >
               {isPriority && (
                 <div className={`text-[10px] font-semibold ${accent} opacity-60 mb-1.5 tracking-widest uppercase`}>

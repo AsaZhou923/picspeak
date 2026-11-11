@@ -49,7 +49,7 @@ export function WaitingBlogWindow({ variant }: { variant: WaitingBlogWindowVaria
   return (
     <aside
       aria-label={t('wait_blog_aria_label')}
-      className="flex w-full max-h-[calc(100vh-7rem)] flex-col rounded-lg border border-border-subtle bg-[linear-gradient(145deg,rgba(200,162,104,0.10),transparent_42%),rgb(var(--color-surface)/0.78)] p-4 text-left shadow-[0_18px_50px_rgba(0,0,0,0.14)] backdrop-blur-sm lg:sticky lg:top-20"
+      className="flex w-full max-h-[calc(100vh-7rem)] flex-col rounded-lg border border-border-subtle bg-[linear-gradient(145deg,rgb(var(--color-action)/0.10),transparent_42%),rgb(var(--color-surface)/0.78)] p-4 text-left shadow-[0_18px_50px_rgba(0,0,0,0.14)] backdrop-blur-sm lg:sticky lg:top-20"
     >
       <div className="flex items-center justify-between gap-3 border-b border-border-subtle/70 pb-3">
         <div className="flex items-center gap-1.5">

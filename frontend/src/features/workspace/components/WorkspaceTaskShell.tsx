@@ -1,13 +1,8 @@
 import type { ReactNode } from 'react';
-import { Check, ImageIcon, Send, SlidersHorizontal } from 'lucide-react';
+import { Check } from 'lucide-react';
 import type { WorkspaceTaskFlowCopy, WorkspaceTaskStep } from '../workspaceTaskFlow';
 
 const STEPS: WorkspaceTaskStep[] = ['image', 'settings', 'submit'];
-const STEP_ICONS = {
-  image: ImageIcon,
-  settings: SlidersHorizontal,
-  submit: Send,
-};
 
 interface WorkspaceTaskShellProps {
   copy: WorkspaceTaskFlowCopy;
@@ -35,36 +30,26 @@ export function WorkspaceTaskShell({
         {STEPS.map((step, index) => {
           const completed = completedSteps.includes(step);
           const active = activeStep === step;
-          const Icon = STEP_ICONS[step];
 
           return (
             <li
               key={step}
               aria-current={active ? 'step' : undefined}
               className={`min-w-0 border-r border-border-subtle px-3 py-3 last:border-r-0 sm:px-4 sm:py-4 ${
-                active ? 'bg-action/10' : ''
+                active ? 'shadow-[inset_0_-2px_0_rgb(var(--color-action))]' : ''
               }`}
             >
               <div className="flex items-center gap-2.5">
                 <span
-                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-control border text-xs font-bold ${
-                    completed
-                      ? 'border-sage/30 bg-sage/10 text-sage'
-                      : active
-                        ? 'border-action bg-action text-action-ink shadow-level-1'
-                        : 'border-border-subtle bg-raised/50 text-ink-subtle'
+                  className={`flex w-7 shrink-0 items-center justify-center font-display text-2xl font-black leading-none ${
+                    completed ? 'text-sage' : active ? 'text-gold' : 'text-ink-subtle'
                   }`}
                   aria-hidden="true"
                 >
-                  {completed ? <Check size={15} strokeWidth={2.4} /> : <Icon size={14} />}
+                  {completed ? <Check size={20} strokeWidth={2.6} /> : index + 1}
                 </span>
-                <span className="min-w-0">
-                  <span className="block font-mono text-[10px] uppercase tracking-[0.16em] text-ink-subtle">
-                    {String(index + 1).padStart(2, '0')}
-                  </span>
-                  <span className={`block truncate text-xs font-bold sm:text-sm ${active ? 'text-ink' : 'text-ink-muted'}`}>
-                    {copy.steps[step]}
-                  </span>
+                <span className={`min-w-0 truncate text-xs font-bold sm:text-sm ${active ? 'text-ink' : 'text-ink-muted'}`}>
+                  {copy.steps[step]}
                 </span>
               </div>
             </li>

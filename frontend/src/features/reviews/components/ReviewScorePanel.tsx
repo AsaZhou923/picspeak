@@ -51,18 +51,18 @@ export function ReviewPhotoPanel({
   const { t } = useI18n();
 
   return (
-    <div className="overflow-hidden rounded-feature border border-border-subtle bg-raised shadow-level-2">
+    <div className="ui-matte overflow-hidden rounded-[4px] p-3 sm:p-6 lg:sticky lg:top-20">
       {photoUrl && !photoError ? (
         <button
           type="button"
-          onClick={onZoomOpen}
           aria-label={t('img_zoom_label')}
           className="photo-frame group relative block w-full cursor-zoom-in overflow-hidden text-left"
+          onClick={onZoomOpen}
         >
           <img
             src={photoUrl}
             alt={t('review_photo_alt')}
-            className="max-h-[72vh] h-auto w-full max-w-full object-contain"
+            className="anim-develop max-h-[72vh] h-auto w-full max-w-full object-contain"
             onError={() => { void onPhotoError(); }}
             onLoad={(event) => {
               const img = event.currentTarget;
@@ -79,7 +79,7 @@ export function ReviewPhotoPanel({
           </span>
         </button>
       ) : (
-        <div className="flex h-64 items-center justify-center px-6 text-center text-sm text-ink-subtle">
+        <div className="flex h-64 items-center justify-center px-6 text-center text-sm text-white/70">
           {t('review_no_image')}
         </div>
       )}

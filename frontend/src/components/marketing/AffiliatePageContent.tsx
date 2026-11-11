@@ -97,7 +97,7 @@ export default function AffiliatePageContent() {
             href={affiliateUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="btn-gold inline-flex items-center gap-2 px-7 py-3 bg-gold text-void text-sm font-medium rounded hover:bg-gold-light transition-all duration-200 hover:shadow-[0_0_24px_rgba(200,162,104,0.35)]"
+            className="btn-gold inline-flex items-center gap-2 px-7 py-3 bg-gold text-void text-sm font-medium rounded hover:bg-gold-light transition-all duration-200 hover:shadow-[0_0_24px_rgb(var(--color-action)/0.35)]"
           >
             {t('affiliate_cta_primary')}
             <ArrowRight size={14} />
@@ -126,7 +126,7 @@ export default function AffiliatePageContent() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-gold/30 bg-raised p-8 shadow-[0_0_48px_rgba(200,162,104,0.12)]">
+        <div className="rounded-2xl border border-gold/30 bg-raised p-8 shadow-[0_0_48px_rgb(var(--color-action)/0.12)]">
           <div className="flex items-center gap-2 text-gold mb-4">
             <Repeat2 size={16} />
             <h2 className="font-display text-2xl text-ink">{t('affiliate_commission_title')}</h2>
@@ -193,7 +193,7 @@ export default function AffiliatePageContent() {
             href={affiliateUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center justify-center gap-2 rounded-md bg-gold px-6 py-3 text-sm font-medium text-void transition-all duration-200 hover:bg-gold-light hover:shadow-[0_0_24px_rgba(200,162,104,0.35)]"
+            className="inline-flex items-center justify-center gap-2 rounded-md bg-gold px-6 py-3 text-sm font-medium text-void transition-all duration-200 hover:bg-gold-light hover:shadow-[0_0_24px_rgb(var(--color-action)/0.35)]"
           >
             {t('affiliate_join_cta')}
             <ArrowRight size={14} />

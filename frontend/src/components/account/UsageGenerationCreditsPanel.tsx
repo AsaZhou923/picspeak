@@ -31,7 +31,7 @@ export default function UsageGenerationCreditsPanel({
   const hasPurchasedBalance = generationCredits.available_total !== undefined;
 
   return (
-    <div className="overflow-hidden rounded-lg border border-gold/25 bg-[linear-gradient(135deg,rgba(200,162,104,0.16),transparent_44%),rgb(var(--color-raised)/0.78)] p-6">
+    <div className="overflow-hidden rounded-lg border border-gold/25 bg-[linear-gradient(135deg,rgb(var(--color-action)/0.16),transparent_44%),rgb(var(--color-raised)/0.78)] p-6">
       <div className="flex flex-wrap items-start justify-between gap-5">
         <div className="flex max-w-md items-start gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-gold/30 bg-gold/10 text-gold">

@@ -103,14 +103,14 @@ const config: Config = {
           '100%': { backgroundPosition: '200% center' },
         },
         glowPulse: {
-          '0%, 100%': { boxShadow: '0 0 0 0 rgba(200,162,104,0)' },
-          '50%': { boxShadow: '0 0 18px 3px rgba(200,162,104,0.22)' },
+          '0%, 100%': { boxShadow: '0 0 0 0 rgb(var(--color-action) / 0)' },
+          '50%': { boxShadow: '0 0 18px 3px rgb(var(--color-action) / 0.22)' },
         },
         cardHighlight: {
-          '0%':       { boxShadow: '0 0 0 0 rgba(200,162,104,0)' },
-          '15%':      { boxShadow: '0 0 0 2px rgba(200,162,104,0.55), 0 0 14px 3px rgba(200,162,104,0.18)' },
-          '75%':      { boxShadow: '0 0 0 2px rgba(200,162,104,0.55), 0 0 14px 3px rgba(200,162,104,0.18)' },
-          '100%':     { boxShadow: '0 0 0 0 rgba(200,162,104,0)' },
+          '0%':       { boxShadow: '0 0 0 0 rgb(var(--color-action) / 0)' },
+          '15%':      { boxShadow: '0 0 0 2px rgb(var(--color-action) / 0.55), 0 0 14px 3px rgb(var(--color-action) / 0.18)' },
+          '75%':      { boxShadow: '0 0 0 2px rgb(var(--color-action) / 0.55), 0 0 14px 3px rgb(var(--color-action) / 0.18)' },
+          '100%':     { boxShadow: '0 0 0 0 rgb(var(--color-action) / 0)' },
         },
         marquee: {
           '0%': { transform: 'translateX(0%)' },

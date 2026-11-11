@@ -58,7 +58,7 @@ export default function GenerateFormPanel({
     <div className="min-w-0 space-y-5">
       <section className="ui-feature-panel p-4 sm:p-6" aria-labelledby="generation-prompt-heading">
         <div className="mb-4 flex items-center gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-control border border-gold/30 bg-gold/10 text-gold">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gold/10 text-gold">
             <Sparkles size={18} aria-hidden="true" />
           </span>
           <label id="generation-prompt-heading" htmlFor="generation-prompt" className="text-base font-semibold text-ink">

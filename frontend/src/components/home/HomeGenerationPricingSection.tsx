@@ -56,7 +56,7 @@ export default function HomeGenerationPricingSection({ t }: HomeGenerationPricin
               key={item.title}
               className={`rounded-lg border p-6 transition-all duration-300 ${
                 item.featured
-                  ? 'border-gold/45 bg-raised shadow-[0_20px_54px_rgba(200,162,104,0.14)]'
+                  ? 'border-gold/45 bg-raised shadow-[0_20px_54px_rgb(var(--color-action)/0.14)]'
                   : 'border-border-subtle bg-raised/35 hover:border-gold/25'
               }`}
             >

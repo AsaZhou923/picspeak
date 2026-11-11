@@ -178,7 +178,7 @@ export default function ReviewPrintPage() {
       <article className="rounded-card border border-border-subtle bg-surface p-8 shadow-level-1 print:break-after-page print:rounded-none print:border-0 print:bg-white print:p-10 print:shadow-none">
         <header className="border-b border-border-subtle pb-5">
           <p className="ui-eyebrow">PicSpeak</p>
-          <h1 className="mt-2 text-3xl font-semibold text-ink">{copy.panelTitle}</h1>
+          <h1 className="mt-2 text-3xl font-black text-ink">{copy.panelTitle}</h1>
           <p className="mt-2 text-sm text-ink-muted">{copy.createdAt}: {new Date(exportPayload.review.created_at).toLocaleString(locale)}</p>
         </header>
 

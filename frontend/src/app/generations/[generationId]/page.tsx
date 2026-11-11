@@ -217,7 +217,7 @@ function GenerationDetail({ generationId }: { generationId: string }) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center px-4 py-12 text-center sm:px-6">
         <div role="alert" className="ui-panel w-full max-w-lg space-y-4 p-6">
-          <h1 className="text-2xl font-semibold text-ink">{t('generation_detail_fetch_error')}</h1>
+          <h1 className="text-2xl font-black text-ink">{t('generation_detail_fetch_error')}</h1>
           <p className="text-sm leading-7 text-rust">{error}</p>
           <Link href="/generate" className="ui-action-secondary w-full px-4 text-sm sm:w-auto">
             <ArrowLeft size={15} aria-hidden="true" />
@@ -232,7 +232,7 @@ function GenerationDetail({ generationId }: { generationId: string }) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center px-4 py-12 text-center sm:px-6">
         <div className="ui-panel w-full max-w-lg space-y-4 p-6">
-          <h1 className="text-2xl font-semibold text-ink">{t('generation_detail_title')}</h1>
+          <h1 className="text-2xl font-black text-ink">{t('generation_detail_title')}</h1>
           <p className="text-sm text-ink-muted">{t('generation_detail_empty')}</p>
           <Link href="/generate" className="ui-action-secondary w-full px-4 text-sm sm:w-auto">
             <ArrowLeft size={15} aria-hidden="true" />
@@ -249,7 +249,7 @@ function GenerationDetail({ generationId }: { generationId: string }) {
         <header className="mb-7 flex flex-col gap-5 border-b border-border-subtle pb-6 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="ui-eyebrow">{t('generation_ai_badge')}</p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-ink sm:text-4xl">{t('generation_detail_title')}</h1>
+            <h1 className="mt-2 text-3xl font-black tracking-tight text-ink sm:text-4xl">{t('generation_detail_title')}</h1>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <span className="inline-flex min-h-11 items-center gap-2 rounded-full border border-sage/30 bg-sage/10 px-3 text-xs font-semibold text-sage">
@@ -302,7 +302,7 @@ function GenerationDetail({ generationId }: { generationId: string }) {
           <aside className="space-y-5">
             <section className="ui-panel p-5" aria-labelledby="generation-result-prompt">
               <div className="mb-4 flex items-center gap-3">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-control border border-gold/30 bg-gold/10 text-gold">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gold/10 text-gold">
                   <ImageIcon size={20} aria-hidden="true" />
                 </div>
                 <h2 id="generation-result-prompt" className="text-base font-semibold text-ink">{t('generation_prompt_label')}</h2>

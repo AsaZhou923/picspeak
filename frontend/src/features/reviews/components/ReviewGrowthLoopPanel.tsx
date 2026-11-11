@@ -157,7 +157,7 @@ export function ReviewGrowthLoopPanel({
             className="group rounded-card border border-gold/25 bg-gold/5 p-4 text-left transition-colors hover:border-gold/45 hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <div className="flex items-start gap-3">
-              <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-control border border-gold/25 bg-surface text-gold">
+              <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gold/10 text-gold">
                 <PenLine size={16} aria-hidden="true" />
               </span>
               <span className="min-w-0">

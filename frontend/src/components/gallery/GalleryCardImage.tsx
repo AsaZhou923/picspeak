@@ -32,21 +32,19 @@ function GalleryCardImage({
   };
 
   return (
-    <div className={`relative flex w-full items-center justify-center overflow-hidden rounded-t-card bg-void/35 ${compact ? 'min-h-48 sm:aspect-[5/4] sm:min-h-0' : 'min-h-56 sm:aspect-[4/3] sm:min-h-0'}`}>
+    <div className={`relative w-full overflow-hidden bg-raised ${compact ? 'aspect-[4/3]' : 'min-h-40'}`}>
       {!broken && src ? (
-        <div className="w-full sm:h-full">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={src}
-            alt={alt}
-            loading="lazy"
-            decoding="async"
-            className={`w-full object-contain transition-transform duration-700 group-hover:scale-[1.015] ${compact ? 'h-48 p-1 sm:h-full' : 'h-auto max-h-[36rem] p-1.5 sm:h-full sm:max-h-none'}`}
-            onError={handleError}
-          />
-        </div>
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img
+          src={src}
+          alt={alt}
+          loading="lazy"
+          decoding="async"
+          className={`block w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04] ${compact ? 'h-full' : 'h-auto max-h-[34rem]'}`}
+          onError={handleError}
+        />
       ) : (
-        <div className="flex h-full w-full items-center justify-center bg-surface px-6 text-center text-sm leading-6 text-ink-subtle">
+        <div className="flex min-h-40 w-full items-center justify-center bg-surface px-6 text-center text-sm leading-6 text-ink-subtle">
           {alt}
         </div>
       )}

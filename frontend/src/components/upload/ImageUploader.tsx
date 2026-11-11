@@ -196,10 +196,10 @@ export default function ImageUploader({
         aria-busy={compressing}
         aria-describedby={disabledReason || compressing ? uploaderHintId : undefined}
         className={`
-          relative cursor-pointer border border-dashed rounded-lg
+          group relative cursor-pointer border-2 border-dashed rounded-card
           flex flex-col items-center justify-center gap-4
-          min-h-52 transition-all duration-200
-          ${dragOver ? 'drop-zone-active' : 'border-border hover:border-gold/40 hover:bg-raised/50'}
+          min-h-64 sm:min-h-80 transition-all duration-200
+          ${dragOver ? 'drop-zone-active' : 'border-border hover:border-gold hover:bg-gold/5'}
           ${isUploaderDisabled ? 'opacity-60 cursor-not-allowed' : 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold/70'}
         `}
       >
@@ -217,8 +217,8 @@ export default function ImageUploader({
         <div className="flex flex-col items-center gap-3 px-8 py-10 text-center">
           {compressing ? (
             <>
-              <div className="w-14 h-14 border border-gold/30 rounded-lg flex items-center justify-center bg-raised">
-                <Loader size={22} className="text-gold animate-spin" style={{ animationDuration: '1.5s' }} aria-hidden="true" />
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-raised">
+                <Loader size={24} className="text-gold animate-spin" style={{ animationDuration: '1.5s' }} aria-hidden="true" />
               </div>
               <div>
                 <p className="text-sm text-ink-muted">{t('uploader_compressing')}</p>
@@ -227,11 +227,11 @@ export default function ImageUploader({
             </>
           ) : (
             <>
-              <div className="w-14 h-14 border border-border rounded-lg flex items-center justify-center bg-raised">
-                <Camera size={22} className="text-ink-muted" aria-hidden="true" />
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-action text-action-ink transition-transform duration-200 group-hover:-translate-y-1">
+                <Camera size={26} aria-hidden="true" />
               </div>
               <div>
-                <p className="text-sm text-ink-muted">
+                <p className="text-base font-semibold text-ink">
                   {dragOver ? t('uploader_drop_hint') : t('uploader_idle_hint')}
                 </p>
                 <p className="text-xs text-ink-subtle mt-1">

@@ -249,7 +249,7 @@ function BlogPostContent({ slug }: { slug: string }) {
             </section>
           ) : null}
 
-          <section className="mt-10 rounded-[30px] border border-border-subtle bg-[linear-gradient(135deg,rgba(200,162,104,0.12),transparent_42%),rgb(var(--color-surface)/0.78)] p-6 sm:p-7">
+          <section className="mt-10 rounded-[30px] border border-border-subtle bg-[linear-gradient(135deg,rgb(var(--color-action)/0.12),transparent_42%),rgb(var(--color-surface)/0.78)] p-6 sm:p-7">
             <p className="text-xs uppercase tracking-[0.22em] text-accent-muted">{workspaceCta.label}</p>
             <h2 className="mt-3 font-display text-3xl text-ink">{workspaceCta.title}</h2>
             <p className="mt-4 text-sm leading-7 text-ink-muted">{workspaceCta.body}</p>

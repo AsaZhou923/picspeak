@@ -40,7 +40,7 @@ export default function Header() {
       : 'text-ink-muted hover:text-ink'}`;
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border-subtle bg-void/90 backdrop-blur-xl">
+    <header className="sticky top-0 z-50 border-b border-border-subtle bg-void">
       <div className="max-w-editorial mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
         {/* Left side: Logo and Mobile Home */}
         <div className="flex items-center gap-3">
@@ -57,7 +57,7 @@ export default function Header() {
               className="rounded object-contain"
               priority
             />
-            <span className="font-display text-lg tracking-wide hidden lg:inline">PicSpeak</span>
+            <span className="font-display text-lg font-black hidden lg:inline">PicSpeak</span>
           </Link>
           <Link 
             href={homeHref}
@@ -103,66 +103,66 @@ export default function Header() {
       </div>
 
       {headerVisibility.showMobileTabs && (
-        <div className="md:hidden border-t border-border-subtle/40 px-3 py-2">
-          <nav className="flex items-stretch bg-surface/70 rounded-card p-1 gap-0.5">
+        <div className="md:hidden fixed inset-x-0 bottom-0 z-50 border-t border-border-subtle bg-surface px-2 pb-[env(safe-area-inset-bottom)]">
+          <nav className="flex items-stretch">
             <Link
               href="/workspace"
               aria-current={isActive('/workspace') ? 'page' : undefined}
-              className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-control text-[10px] font-medium transition-all duration-200 ${
+              className={`flex-1 flex flex-col items-center justify-center gap-1 min-h-[3.5rem] py-2 text-[11px] font-medium transition-all duration-200 ${
                 isActive('/workspace')
-                  ? 'bg-void shadow-sm text-gold'
+                  ? 'font-semibold text-gold'
                   : 'text-ink-subtle hover:text-ink-muted active:scale-95'
               }`}
             >
-              <Camera size={14} />
+              <Camera size={18} aria-hidden="true" />
               <span className="tracking-wide">{t('nav_critique')}</span>
             </Link>
             <Link
               href="/gallery"
               aria-current={isActive('/gallery') ? 'page' : undefined}
-              className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-control text-[10px] font-medium transition-all duration-200 ${
+              className={`flex-1 flex flex-col items-center justify-center gap-1 min-h-[3.5rem] py-2 text-[11px] font-medium transition-all duration-200 ${
                 isActive('/gallery')
-                  ? 'bg-void shadow-sm text-gold'
+                  ? 'font-semibold text-gold'
                   : 'text-ink-subtle hover:text-ink-muted active:scale-95'
               }`}
             >
-              <LayoutGrid size={14} />
+              <LayoutGrid size={18} aria-hidden="true" />
               <span className="tracking-wide">{t('nav_gallery')}</span>
             </Link>
             <Link
               href="/retake"
               aria-current={isActive('/retake') ? 'page' : undefined}
-              className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-control text-[10px] font-medium transition-all duration-200 ${
+              className={`flex-1 flex flex-col items-center justify-center gap-1 min-h-[3.5rem] py-2 text-[11px] font-medium transition-all duration-200 ${
                 isActive('/retake')
                   ? 'bg-void shadow-sm text-sage'
                   : 'text-ink-subtle hover:text-ink-muted active:scale-95'
               }`}
             >
-              <Repeat2 size={14} />
+              <Repeat2 size={18} aria-hidden="true" />
               <span className="tracking-wide">{retakeCopy.navShort}</span>
             </Link>
             <Link
               href="/generate"
               aria-current={isActive('/generate') ? 'page' : undefined}
-              className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-control text-[10px] font-medium transition-all duration-200 ${
+              className={`flex-1 flex flex-col items-center justify-center gap-1 min-h-[3.5rem] py-2 text-[11px] font-medium transition-all duration-200 ${
                 isActive('/generate')
-                  ? 'bg-void shadow-sm text-gold'
+                  ? 'font-semibold text-gold'
                   : 'text-ink-subtle hover:text-ink-muted active:scale-95'
               }`}
             >
-              <Wand2 size={14} />
+              <Wand2 size={18} aria-hidden="true" />
               <span className="tracking-wide">{t('nav_generate_short')}</span>
             </Link>
             {practiceEnabled === true && <Link
               href="/account/practice"
               aria-current={isActive('/account/practice') ? 'page' : undefined}
-              className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-control text-[10px] font-medium transition-all duration-200 ${
+              className={`flex-1 flex flex-col items-center justify-center gap-1 min-h-[3.5rem] py-2 text-[11px] font-medium transition-all duration-200 ${
                 isActive('/account/practice')
-                  ? 'bg-void shadow-sm text-gold'
+                  ? 'font-semibold text-gold'
                   : 'text-ink-subtle hover:text-ink-muted active:scale-95'
               }`}
             >
-              <Target size={14} />
+              <Target size={18} aria-hidden="true" />
               <span className="tracking-wide">{t('nav_practice')}</span>
             </Link>}
           </nav>

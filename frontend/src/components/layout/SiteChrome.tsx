@@ -18,7 +18,7 @@ export default function SiteChrome({ children }: { children: ReactNode }) {
   const marketing = isMarketingRoute(pathname);
 
   return (
-    <div className="relative z-10 min-h-screen flex flex-col">
+    <div className="relative z-10 flex min-h-screen flex-col pb-[calc(3.5rem+env(safe-area-inset-bottom))] md:pb-0">
       <a href="#main-content" className="skip-link">
         {t('skip_to_content')}
       </a>

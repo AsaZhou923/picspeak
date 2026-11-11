@@ -6,9 +6,9 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { AlertCircle, ArrowLeft, ChevronDown, History, Lightbulb, ThumbsDown, ThumbsUp, TrendingDown } from 'lucide-react';
 import ProPromoCard from '@/components/marketing/ProPromoCard';
 import { useAuth } from '@/lib/auth-context';
-import { FinalScoreRing } from '@/components/ui/ScoreRing';
 import { SkeletonBlock } from '@/components/ui/LoadingSpinner';
 import { isDemoReviewId } from '@/lib/demo-review';
+import { CountUp } from '@/components/ui/Reveal';
 import { useI18n } from '@/lib/i18n';
 import { localeToIntlLocale } from '@/lib/locale';
 import {
@@ -232,7 +232,7 @@ export default function ReviewPage() {
   }
 
   if (!review) return <section className="mx-auto max-w-reading px-5 py-12">
-    <h1 className="text-xl font-semibold text-ink">{t('score_feedback_unavailable')}</h1>
+    <h1 className="text-xl font-black text-ink">{t('score_feedback_unavailable')}</h1>
     {unavailableFeedback?.reviewId === reviewId && <ScoreFeedbackWithdrawal feedback={unavailableFeedback.feedback} ownerId={unavailableFeedback.ownerId} />}
     <button type="button" className="mt-4 min-h-11 text-sm underline" onClick={handleBackNavigation}>{t('back_btn')}</button>
   </section>;
@@ -475,13 +475,16 @@ export default function ReviewPage() {
           <div className="min-w-0 space-y-5">
             <header>
               <p className="ui-eyebrow">{t('review_page_label')}</p>
-              <ReviewResultHeading className="mt-2 text-3xl font-semibold leading-tight text-ink sm:text-4xl">
+              <ReviewResultHeading className="mt-2 text-3xl font-black leading-tight text-ink sm:text-4xl">
                 {t('review_page_headline')}
               </ReviewResultHeading>
               {!isGoalPracticeReview && (
-                <div className="mt-4 ui-panel flex items-center gap-4 p-4 sm:p-5">
-                  <FinalScoreRing score={r.final_score} />
-                  <div className="min-w-0">
+                <div className="mt-5 flex flex-wrap items-end gap-x-5 gap-y-3 border-b border-border-subtle pb-5">
+                  <p className="font-display text-7xl font-black leading-[0.85] text-ink [font-variant-numeric:tabular-nums] sm:text-8xl">
+                    <span className="sr-only">{t('demo_final_score')} </span>
+                    <CountUp value={r.final_score} />
+                  </p>
+                  <div className="min-w-0 pb-1">
                     <p className={`text-xl font-semibold leading-none ${scoreLabelColor}`}>{scoreLabel}</p>
                     <p className="mt-2 text-sm leading-6 text-ink-muted">{scoreSummary}</p>
                     <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-ink-subtle">
@@ -527,15 +530,15 @@ export default function ReviewPage() {
 
             {!isGoalPracticeReview && (
               <>
-                <section className="ui-panel border-l-4 border-l-rust p-5" aria-labelledby="review-strongest-finding-title">
-                  <div className="flex items-center gap-2 text-rust">
+                <section className="rounded-card bg-gold/10 p-5 sm:p-6" aria-labelledby="review-strongest-finding-title">
+                  <div className="flex items-center gap-2 text-gold">
                     <TrendingDown size={16} aria-hidden="true" />
                     <p className="text-xs font-semibold uppercase tracking-[0.16em]">{hierarchyCopy.strongestLabel}</p>
                   </div>
-                  <h2 id="review-strongest-finding-title" className="mt-2 text-xl font-semibold text-ink">
+                  <h2 id="review-strongest-finding-title" className="mt-2 text-2xl font-black leading-snug text-ink">
                     {hierarchyCopy.strongestTitle}
                   </h2>
-                  <p className="mt-2 text-sm leading-7 text-ink-muted">{strongestFinding}</p>
+                  <p className="mt-2 text-[0.9375rem] leading-7 text-ink">{strongestFinding}</p>
                   <p className="mt-3 text-xs text-ink-subtle">
                     {t('review_score_lowest')}: <span className="font-medium text-rust">{weakestDim.label}</span>
                   </p>
