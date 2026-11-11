@@ -25,6 +25,7 @@ from app.services.ai_prompts import (
     _writing_prompt,
 )
 from app.services.audit import mask_capability_url_text
+from app.services.openai_fallback import redact_provider_error, request_with_openai_fallback
 from app.services.review_pricing import ReviewModelUsage, estimate_review_usage_cost
 
 
@@ -759,6 +760,19 @@ def _request_openai_multimodal_json(
     call_sequence: str | int | None = None,
 ) -> AIJSONResponse:
     resolved_model_name = model_name or settings.openai_review_model
+    failed_primary_attempts = 0
+
+    def record_primary_failure() -> None:
+        nonlocal failed_primary_attempts
+        failed_primary_attempts += 1
+        if call_stage is not None:
+            notify_ai_provider_call(
+                stage=call_stage,
+                outcome='failed',
+                model_name=resolved_model_name,
+                sequence=f'{call_sequence}:primary:{failed_primary_attempts}',
+            )
+
     payload = {
         'model': resolved_model_name,
         'store': False,
@@ -784,15 +798,15 @@ def _request_openai_multimodal_json(
 
     started = time.perf_counter()
     try:
-        response = pooled_request(
-            'POST',
-            _openai_responses_endpoint(),
+        response = request_with_openai_fallback(
+            primary_endpoint=_openai_responses_endpoint(),
+            primary_api_key=settings.openai_api_key,
+            fallback_api_key=settings.openai_fallback_api_key,
+            primary_attempts=settings.openai_fallback_primary_attempts,
             body=json.dumps(payload, ensure_ascii=False).encode('utf-8'),
-            headers={
-                'Authorization': f'Bearer {settings.openai_api_key}',
-                'Content-Type': 'application/json',
-            },
             timeout_seconds=timeout_seconds or settings.openai_review_timeout_seconds,
+            request=pooled_request,
+            on_primary_failure=record_primary_failure,
         )
         body = json.loads(response.data.decode('utf-8'))
     except PooledHTTPStatusError as exc:
@@ -803,7 +817,11 @@ def _request_openai_multimodal_json(
                 model_name=resolved_model_name,
                 sequence=call_sequence,
             )
-        error_body = mask_capability_url_text(exc.response.data.decode('utf-8', errors='ignore'))
+        error_body = mask_capability_url_text(redact_provider_error(
+            exc.response.data.decode('utf-8', errors='ignore'),
+            settings.openai_api_key,
+            settings.openai_fallback_api_key,
+        ))
         raise AIReviewError(f'OpenAI review API HTTP {exc.response.status}: {error_body[:300]}') from exc
     except PooledHTTPRequestError as exc:
         if call_stage is not None:
@@ -813,7 +831,10 @@ def _request_openai_multimodal_json(
                 model_name=resolved_model_name,
                 sequence=call_sequence,
             )
-        raise AIReviewError(f'OpenAI review API request failed: {mask_capability_url_text(str(exc))}') from exc
+        error_text = mask_capability_url_text(redact_provider_error(
+            str(exc), settings.openai_api_key, settings.openai_fallback_api_key,
+        ))
+        raise AIReviewError(f'OpenAI review API request failed: {error_text}') from exc
     except json.JSONDecodeError as exc:
         if call_stage is not None:
             notify_ai_provider_call(

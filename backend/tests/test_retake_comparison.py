@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 from app.core.http_client import PooledHTTPResponse, PooledHTTPStatusError
 from app.goal_assessment import GOAL_ASSESSMENT_VERSION, GoalAssessmentContext
-from app.services.ai import AIReviewError
+from app.services.ai import AIReviewError, observe_ai_provider_calls
 from app.services.retake_comparison import (
     DIMENSION_KEYS,
     RETAKE_RESPONSE_SCHEMA,
@@ -198,6 +198,38 @@ class RetakeComparisonTests(unittest.TestCase):
             goal_context=goal_context,
         )
 
+    def test_paired_review_falls_back_with_same_images_and_profile(self) -> None:
+        response = PooledHTTPResponse(
+            status=200, data=json.dumps(_response_body()).encode('utf-8'), headers={}, reason='OK',
+        )
+        failure = PooledHTTPStatusError(PooledHTTPResponse(
+            status=401, data=b'Invalid primary key', headers={}, reason='Unauthorized',
+        ))
+        observed = []
+        with patch.multiple(
+            'app.services.retake_comparison.settings',
+            openai_api_key='primary-test-key', openai_fallback_api_key='official-test-key',
+            openai_fallback_primary_attempts=3,
+            retake_analysis_api_url='https://primary.example/custom/responses',
+            openai_pro_model='gpt-6.1-sol', openai_pro_reasoning_effort='high',
+        ), patch('app.services.openai_fallback.time.sleep'), patch(
+            'app.services.retake_comparison.pooled_request', side_effect=[failure] * 3 + [response],
+        ) as request, observe_ai_provider_calls(observed.append):
+            result = self._run(mode='pro')
+
+        self.assertIsNotNone(result.result.comparison)
+        self.assertEqual(request.call_count, 4)
+        primary, fallback = request.call_args_list[0], request.call_args_list[3]
+        self.assertEqual(primary.args[1], 'https://primary.example/custom/responses')
+        self.assertEqual(fallback.args[1], 'https://api.openai.com/v1/responses')
+        self.assertEqual(fallback.kwargs['headers']['Authorization'], 'Bearer official-test-key')
+        self.assertEqual(primary.kwargs['body'], fallback.kwargs['body'])
+        self.assertEqual(json.loads(fallback.kwargs['body'])['model'], 'gpt-6.1-sol')
+        self.assertEqual(json.loads(fallback.kwargs['body'])['reasoning'], {'effort': 'high'})
+        self.assertEqual([call.outcome for call in observed], ['failed'] * 3 + ['unknown'])
+        self.assertTrue(all(call.stage == 'pair' for call in observed))
+        self.assertEqual(len({call.sequence for call in observed}), 4)
+
     def test_posts_two_ordered_images_with_strict_structured_output(self) -> None:
         response = PooledHTTPResponse(
             status=200,
@@ -205,7 +237,8 @@ class RetakeComparisonTests(unittest.TestCase):
             headers={},
             reason='OK',
         )
-        with patch('app.services.retake_comparison.settings') as mocked_settings:
+        with patch('app.services.retake_comparison.settings',
+                   openai_fallback_api_key='', openai_fallback_primary_attempts=3) as mocked_settings:
             mocked_settings.openai_api_key = 'test-openai-key'
             mocked_settings.retake_analysis_model = 'gpt-6-luna'
             mocked_settings.retake_analysis_reasoning_effort = 'xhigh'
@@ -256,7 +289,8 @@ class RetakeComparisonTests(unittest.TestCase):
             headers={},
             reason='OK',
         )
-        with patch('app.services.retake_comparison.settings') as mocked_settings:
+        with patch('app.services.retake_comparison.settings',
+                   openai_fallback_api_key='', openai_fallback_primary_attempts=3) as mocked_settings:
             mocked_settings.openai_api_key = 'test-openai-key'
             mocked_settings.retake_analysis_model = 'gpt-6-sol'
             mocked_settings.retake_analysis_reasoning_effort = 'high'
@@ -281,7 +315,8 @@ class RetakeComparisonTests(unittest.TestCase):
         pro_body['model'] = 'gpt-6.1-sol-2026-10-09'
         pro_response = PooledHTTPResponse(status=200, data=json.dumps(pro_body).encode('utf-8'), headers={}, reason='OK')
 
-        with patch('app.services.retake_comparison.settings') as mocked_settings, patch.multiple(
+        with patch('app.services.retake_comparison.settings',
+                   openai_fallback_api_key='', openai_fallback_primary_attempts=3) as mocked_settings, patch.multiple(
             'app.services.ai.settings',
             openai_score_model='gpt-6-sol',
             openai_score_reasoning_effort='low',
@@ -323,7 +358,8 @@ class RetakeComparisonTests(unittest.TestCase):
             headers={},
             reason='OK',
         )
-        with patch('app.services.retake_comparison.settings') as mocked_settings:
+        with patch('app.services.retake_comparison.settings',
+                   openai_fallback_api_key='', openai_fallback_primary_attempts=3) as mocked_settings:
             mocked_settings.openai_api_key = 'test-openai-key'
             mocked_settings.retake_analysis_model = 'gpt-6-luna'
             mocked_settings.retake_analysis_reasoning_effort = 'xhigh'
@@ -362,7 +398,8 @@ class RetakeComparisonTests(unittest.TestCase):
                     headers={},
                     reason='OK',
                 )
-                with patch('app.services.retake_comparison.settings') as mocked_settings:
+                with patch('app.services.retake_comparison.settings',
+                   openai_fallback_api_key='', openai_fallback_primary_attempts=3) as mocked_settings:
                     mocked_settings.openai_api_key = 'test-openai-key'
                     mocked_settings.retake_analysis_model = 'gpt-6-luna'
                     mocked_settings.retake_analysis_reasoning_effort = 'xhigh'
@@ -394,7 +431,8 @@ class RetakeComparisonTests(unittest.TestCase):
             headers={},
             reason='OK',
         )
-        with patch('app.services.retake_comparison.settings') as mocked_settings:
+        with patch('app.services.retake_comparison.settings',
+                   openai_fallback_api_key='', openai_fallback_primary_attempts=3) as mocked_settings:
             mocked_settings.openai_api_key = 'test-openai-key'
             mocked_settings.retake_analysis_model = 'gpt-6-luna'
             mocked_settings.retake_analysis_reasoning_effort = 'xhigh'
@@ -421,7 +459,8 @@ class RetakeComparisonTests(unittest.TestCase):
             headers={},
             reason='OK',
         )
-        with patch('app.services.retake_comparison.settings') as mocked_settings:
+        with patch('app.services.retake_comparison.settings',
+                   openai_fallback_api_key='', openai_fallback_primary_attempts=3) as mocked_settings:
             mocked_settings.openai_api_key = 'test-openai-key'
             mocked_settings.retake_analysis_model = 'gpt-6-luna'
             mocked_settings.retake_analysis_reasoning_effort = 'xhigh'
@@ -449,7 +488,8 @@ class RetakeComparisonTests(unittest.TestCase):
             headers={},
             reason='OK',
         )
-        with patch('app.services.retake_comparison.settings') as mocked_settings:
+        with patch('app.services.retake_comparison.settings',
+                   openai_fallback_api_key='', openai_fallback_primary_attempts=3) as mocked_settings:
             mocked_settings.openai_api_key = 'test-openai-key'
             mocked_settings.retake_analysis_model = 'gpt-6-luna'
             mocked_settings.retake_analysis_reasoning_effort = 'xhigh'
@@ -484,7 +524,8 @@ class RetakeComparisonTests(unittest.TestCase):
                     headers={},
                     reason='OK',
                 )
-                with patch('app.services.retake_comparison.settings') as mocked_settings:
+                with patch('app.services.retake_comparison.settings',
+                   openai_fallback_api_key='', openai_fallback_primary_attempts=3) as mocked_settings:
                     mocked_settings.openai_api_key = 'test-openai-key'
                     mocked_settings.retake_analysis_model = 'gpt-6-luna'
                     mocked_settings.retake_analysis_reasoning_effort = 'xhigh'
@@ -508,7 +549,8 @@ class RetakeComparisonTests(unittest.TestCase):
             headers={},
             reason='OK',
         )
-        with patch('app.services.retake_comparison.settings') as mocked_settings:
+        with patch('app.services.retake_comparison.settings',
+                   openai_fallback_api_key='', openai_fallback_primary_attempts=3) as mocked_settings:
             mocked_settings.openai_api_key = 'test-openai-key'
             mocked_settings.retake_analysis_model = 'gpt-6-luna'
             mocked_settings.retake_analysis_reasoning_effort = 'xhigh'
@@ -526,7 +568,8 @@ class RetakeComparisonTests(unittest.TestCase):
             headers={},
             reason='OK',
         )
-        with patch('app.services.retake_comparison.settings') as mocked_settings:
+        with patch('app.services.retake_comparison.settings',
+                   openai_fallback_api_key='', openai_fallback_primary_attempts=3) as mocked_settings:
             mocked_settings.openai_api_key = 'test-openai-key'
             mocked_settings.retake_analysis_model = 'gpt-6-luna'
             mocked_settings.retake_analysis_reasoning_effort = 'xhigh'
@@ -545,7 +588,8 @@ class RetakeComparisonTests(unittest.TestCase):
             headers={},
             reason='OK',
         )
-        with patch('app.services.retake_comparison.settings') as mocked_settings:
+        with patch('app.services.retake_comparison.settings',
+                   openai_fallback_api_key='', openai_fallback_primary_attempts=3) as mocked_settings:
             mocked_settings.openai_api_key = 'test-openai-key'
             mocked_settings.retake_analysis_model = 'gpt-6-luna'
             mocked_settings.retake_analysis_reasoning_effort = 'xhigh'
@@ -564,7 +608,8 @@ class RetakeComparisonTests(unittest.TestCase):
             headers={},
             reason='OK',
         )
-        with patch('app.services.retake_comparison.settings') as mocked_settings:
+        with patch('app.services.retake_comparison.settings',
+                   openai_fallback_api_key='', openai_fallback_primary_attempts=3) as mocked_settings:
             mocked_settings.openai_api_key = 'test-openai-key'
             mocked_settings.retake_analysis_model = 'gpt-6-luna'
             mocked_settings.retake_analysis_reasoning_effort = 'xhigh'
@@ -588,7 +633,8 @@ class RetakeComparisonTests(unittest.TestCase):
             headers={},
             reason='OK',
         )
-        with patch('app.services.retake_comparison.settings') as mocked_settings:
+        with patch('app.services.retake_comparison.settings',
+                   openai_fallback_api_key='', openai_fallback_primary_attempts=3) as mocked_settings:
             mocked_settings.openai_api_key = 'test-openai-key'
             mocked_settings.retake_analysis_model = 'gpt-6-luna'
             mocked_settings.retake_analysis_reasoning_effort = 'xhigh'
@@ -606,7 +652,8 @@ class RetakeComparisonTests(unittest.TestCase):
         body = _response_body()
         body['model'] = 'gpt-6-luna-2026-08-20'
         response = PooledHTTPResponse(status=200, data=json.dumps(body).encode('utf-8'), headers={}, reason='OK')
-        with patch('app.services.retake_comparison.settings') as mocked_settings:
+        with patch('app.services.retake_comparison.settings',
+                   openai_fallback_api_key='', openai_fallback_primary_attempts=3) as mocked_settings:
             mocked_settings.openai_api_key = 'test-openai-key'
             mocked_settings.retake_analysis_model = 'gpt-6-luna'
             mocked_settings.retake_analysis_reasoning_effort = 'xhigh'
@@ -623,7 +670,8 @@ class RetakeComparisonTests(unittest.TestCase):
         self.assertEqual(ai_response.cost_usd, 0.000137)
 
     def test_requires_openai_api_key(self) -> None:
-        with patch('app.services.retake_comparison.settings') as mocked_settings:
+        with patch('app.services.retake_comparison.settings',
+                   openai_fallback_api_key='', openai_fallback_primary_attempts=3) as mocked_settings:
             mocked_settings.openai_api_key = ''
             with self.assertRaisesRegex(AIReviewError, 'OPENAI_API_KEY'):
                 self._run()
@@ -635,7 +683,8 @@ class RetakeComparisonTests(unittest.TestCase):
             headers={},
             reason='OK',
         )
-        with patch('app.services.retake_comparison.settings') as mocked_settings:
+        with patch('app.services.retake_comparison.settings',
+                   openai_fallback_api_key='', openai_fallback_primary_attempts=3) as mocked_settings:
             mocked_settings.openai_api_key = 'test-openai-key'
             mocked_settings.openai_api_base_url = 'https://gateway.example/v1/'
             mocked_settings.retake_analysis_api_url = ''
@@ -661,7 +710,8 @@ class RetakeComparisonTests(unittest.TestCase):
         status_error = PooledHTTPStatusError(
             PooledHTTPResponse(status=400, data=json.dumps(body).encode('utf-8'), headers={}, reason='Bad Request')
         )
-        with patch('app.services.retake_comparison.settings') as mocked_settings:
+        with patch('app.services.retake_comparison.settings',
+                   openai_fallback_api_key='', openai_fallback_primary_attempts=3) as mocked_settings:
             mocked_settings.openai_api_key = 'test-openai-key'
             mocked_settings.retake_analysis_model = 'gpt-6-luna'
             mocked_settings.retake_analysis_reasoning_effort = 'xhigh'
@@ -684,7 +734,8 @@ class RetakeComparisonTests(unittest.TestCase):
             headers={},
             reason='OK',
         )
-        with patch('app.services.retake_comparison.settings') as mocked_settings:
+        with patch('app.services.retake_comparison.settings',
+                   openai_fallback_api_key='', openai_fallback_primary_attempts=3) as mocked_settings:
             mocked_settings.openai_api_key = 'test-openai-key'
             mocked_settings.retake_analysis_model = 'gpt-6-luna'
             mocked_settings.retake_analysis_reasoning_effort = 'xhigh'
@@ -703,7 +754,8 @@ class RetakeComparisonTests(unittest.TestCase):
             'output': [],
         }
         response = PooledHTTPResponse(status=200, data=json.dumps(body).encode('utf-8'), headers={}, reason='OK')
-        with patch('app.services.retake_comparison.settings') as mocked_settings:
+        with patch('app.services.retake_comparison.settings',
+                   openai_fallback_api_key='', openai_fallback_primary_attempts=3) as mocked_settings:
             mocked_settings.openai_api_key = 'test-openai-key'
             mocked_settings.retake_analysis_model = 'gpt-6-luna'
             mocked_settings.retake_analysis_reasoning_effort = 'xhigh'
@@ -723,7 +775,8 @@ class RetakeComparisonTests(unittest.TestCase):
             }],
         }
         response = PooledHTTPResponse(status=200, data=json.dumps(body).encode('utf-8'), headers={}, reason='OK')
-        with patch('app.services.retake_comparison.settings') as mocked_settings:
+        with patch('app.services.retake_comparison.settings',
+                   openai_fallback_api_key='', openai_fallback_primary_attempts=3) as mocked_settings:
             mocked_settings.openai_api_key = 'test-openai-key'
             mocked_settings.retake_analysis_model = 'gpt-6-luna'
             mocked_settings.retake_analysis_reasoning_effort = 'xhigh'
@@ -747,7 +800,8 @@ class RetakeComparisonTests(unittest.TestCase):
         parsed['dimensions'].pop('technical')
         content['text'] = json.dumps(parsed)
         response = PooledHTTPResponse(status=200, data=json.dumps(body).encode('utf-8'), headers={}, reason='OK')
-        with patch('app.services.retake_comparison.settings') as mocked_settings:
+        with patch('app.services.retake_comparison.settings',
+                   openai_fallback_api_key='', openai_fallback_primary_attempts=3) as mocked_settings:
             mocked_settings.openai_api_key = 'test-openai-key'
             mocked_settings.retake_analysis_model = 'gpt-6-luna'
             mocked_settings.retake_analysis_reasoning_effort = 'xhigh'

@@ -58,6 +58,66 @@ def _cached_sol_score():
 
 
 class OpenAIPhotoReviewTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.enterContext(patch('app.services.ai.settings.openai_fallback_api_key', ''))
+
+    def test_scorer_and_writer_fall_back_independently_with_usage_accounting(self) -> None:
+        scoring = _response(model_score_payload(LOW_SCORES), model='gpt-6-sol')
+        writing = _response({
+            'advantage': 'Clear subject separation.',
+            'critique': 'The light is visually flat.',
+            'suggestions': 'Move the subject closer to the side light.',
+        }, model='gpt-6-sol')
+        failure = PooledHTTPStatusError(PooledHTTPResponse(
+            status=401, data=b'Invalid key', headers={}, reason='Unauthorized',
+        ))
+        calls = [failure, failure, failure, scoring, failure, failure, failure, writing]
+        observed = []
+        with patch.multiple(
+            'app.services.ai.settings',
+            openai_api_key='primary-test-key',
+            openai_api_base_url='https://primary.example/v1',
+            openai_fallback_api_key='official-test-key',
+            openai_fallback_primary_attempts=3,
+            openai_score_model='gpt-6-sol',
+            openai_review_model='gpt-6-sol',
+        ), patch('app.services.openai_fallback.time.sleep'), patch(
+            'app.services.ai.pooled_request', side_effect=calls,
+        ) as request, observe_ai_provider_calls(observed.append):
+            response = run_ai_review(
+                mode='flash', image_url='data:image/jpeg;base64,abc',
+                locale='en', image_type='portrait', review_model='gpt-6-sol',
+                enforce_suggestion_structure=False,
+            )
+
+        self.assertEqual(response.result.final_score, sum(LOW_SCORES.values()) / len(LOW_SCORES))
+        self.assertEqual(request.call_count, 8)
+        self.assertEqual([call.outcome for call in observed], ['failed'] * 3 + ['unknown'] + ['failed'] * 3 + ['unknown'])
+        self.assertEqual([call.stage for call in observed], ['scorer'] * 4 + ['writer'] * 4)
+        self.assertEqual(len({(call.stage, call.sequence) for call in observed}), 8)
+        for offset in (0, 4):
+            primary, fallback = request.call_args_list[offset], request.call_args_list[offset + 3]
+            self.assertEqual(fallback.args[1], 'https://api.openai.com/v1/responses')
+            self.assertEqual(fallback.kwargs['headers']['Authorization'], 'Bearer official-test-key')
+            self.assertEqual(primary.kwargs['body'], fallback.kwargs['body'])
+
+    def test_official_error_redacts_both_keys(self) -> None:
+        primary_failure = PooledHTTPStatusError(PooledHTTPResponse(
+            status=401, data=b'Invalid primary-test-key', headers={}, reason='Unauthorized',
+        ))
+        official_failure = PooledHTTPStatusError(PooledHTTPResponse(
+            status=401, data=b'Invalid official-test-key; primary-test-key', headers={}, reason='Unauthorized',
+        ))
+        with patch.multiple(
+            'app.services.ai.settings', openai_api_key='primary-test-key',
+            openai_fallback_api_key='official-test-key', openai_fallback_primary_attempts=3,
+        ), patch('app.services.openai_fallback.time.sleep'), patch(
+            'app.services.ai.pooled_request', side_effect=[primary_failure] * 3 + [official_failure],
+        ), self.assertRaises(AIReviewError) as raised:
+            run_ai_review(mode='flash', image_url='data:image/jpeg;base64,abc', review_model='gpt-6-sol')
+        self.assertNotIn('official-test-key', str(raised.exception))
+        self.assertNotIn('primary-test-key', str(raised.exception))
+
     def test_gpt_review_uses_responses_image_input_and_locks_scores(self) -> None:
         scoring = _response(
             model_score_payload(LOW_SCORES),

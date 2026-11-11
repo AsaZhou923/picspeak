@@ -159,10 +159,10 @@ def _resolved_observed_outcomes(
         return [(call, 'succeeded' if call.outcome == 'unknown' else call.outcome) for call in calls]
 
     last_unknown_index = None
-    has_explicit_failure = False
+    last_failure_index = -1
     for index, call in enumerate(calls):
         if call.outcome == 'failed':
-            has_explicit_failure = True
+            last_failure_index = index
         elif call.outcome == 'unknown':
             last_unknown_index = index
 
@@ -170,7 +170,7 @@ def _resolved_observed_outcomes(
     for index, call in enumerate(calls):
         if call.outcome == 'failed':
             outcome: ReviewCallOutcome = 'failed'
-        elif call.outcome == 'unknown' and not has_explicit_failure and index == last_unknown_index:
+        elif call.outcome == 'unknown' and index == last_unknown_index and index > last_failure_index:
             outcome = 'failed'
         elif call.outcome == 'unknown':
             outcome = 'succeeded'

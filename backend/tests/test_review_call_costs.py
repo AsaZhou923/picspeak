@@ -162,6 +162,32 @@ def test_observed_network_failure_keeps_usage_and_cost_null():
     assert records[0].cost_usd is None
 
 
+def test_invalid_fallback_output_is_failed_after_primary_retries():
+    task = SimpleNamespace(id=11, owner_user_id=22, attempt_count=1)
+    calls = [
+        AIProviderCallUsage(stage='writer', sequence=f'primary:{attempt}', outcome='failed')
+        for attempt in range(1, 4)
+    ] + [AIProviderCallUsage(stage='writer', outcome='unknown', input_tokens=30, output_tokens=10)]
+
+    records = record_observed_provider_call_costs(_db(), task=task, calls=calls, failed=True)
+
+    assert [record.outcome for record in records] == ['failed'] * 4
+    assert len({record.call_key for record in records}) == 4
+    assert records[-1].input_tokens == 30
+
+
+def test_successful_scorer_stays_successful_when_writer_transport_fails():
+    task = SimpleNamespace(id=11, owner_user_id=22, attempt_count=1)
+    calls = [
+        AIProviderCallUsage(stage='scorer', outcome='unknown'),
+        AIProviderCallUsage(stage='writer', outcome='failed'),
+    ]
+
+    records = record_observed_provider_call_costs(_db(), task=task, calls=calls, failed=True)
+
+    assert [record.outcome for record in records] == ['succeeded', 'failed']
+
+
 def test_unclassified_observed_calls_preserve_unknown_outcome():
     task = SimpleNamespace(id=11, owner_user_id=22, attempt_count=1)
     db = _db()

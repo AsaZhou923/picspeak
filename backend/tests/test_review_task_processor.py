@@ -427,6 +427,7 @@ class ReviewTaskProcessorTests(unittest.TestCase):
     def test_review_task_stale_timeout_covers_scorer_and_writer_calls(self) -> None:
         with patch('app.services.review_task_processor.settings') as mocked_settings:
             mocked_settings.review_task_stale_timeout_seconds = 180
+            mocked_settings.openai_fallback_api_key = ''
             mocked_settings.openai_score_timeout_seconds = 180
             mocked_settings.openai_review_timeout_seconds = 180
             mocked_settings.pro_ai_timeout_seconds = 180
@@ -434,6 +435,20 @@ class ReviewTaskProcessorTests(unittest.TestCase):
             mocked_settings.retake_analysis_timeout_seconds = 180
 
             self.assertEqual(_review_task_stale_timeout_seconds(), 600)
+
+    def test_review_task_stale_timeout_covers_fallback_and_long_paired_calls(self) -> None:
+        with patch('app.services.review_task_processor.settings') as mocked_settings:
+            mocked_settings.review_task_stale_timeout_seconds = 180
+            mocked_settings.openai_score_timeout_seconds = 180
+            mocked_settings.openai_review_timeout_seconds = 180
+            mocked_settings.retake_analysis_timeout_seconds = 900
+            mocked_settings.openai_fallback_api_key = 'test-fallback'
+            mocked_settings.openai_fallback_primary_attempts = 3
+
+            self.assertEqual(_review_task_stale_timeout_seconds(), 1940)
+
+            mocked_settings.retake_analysis_timeout_seconds = 180
+            self.assertLess(_review_task_stale_timeout_seconds(), 1800)
 
     def test_serialize_task_status_identifies_writer_failure_stage(self) -> None:
         task = SimpleNamespace(

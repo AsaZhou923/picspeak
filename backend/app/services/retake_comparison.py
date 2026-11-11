@@ -26,6 +26,7 @@ from app.services.ai import (
 )
 from app.services.ai_prompts import _photo_applicability_guide
 from app.services.audit import mask_capability_url_text
+from app.services.openai_fallback import redact_provider_error, request_with_openai_fallback
 from app.services.review_pricing import ReviewModelUsage, estimate_review_usage_cost
 
 
@@ -478,6 +479,15 @@ def run_retake_comparison(
     if not settings.openai_api_key:
         raise AIReviewError('OPENAI_API_KEY is not configured for OpenAI retake comparison')
     profile = _profile_for_retake_mode(mode)
+    failed_primary_attempts = 0
+
+    def record_primary_failure() -> None:
+        nonlocal failed_primary_attempts
+        failed_primary_attempts += 1
+        notify_ai_provider_call(
+            stage='pair', outcome='failed', model_name=profile.writer_model_name,
+            sequence=f'primary:{failed_primary_attempts}',
+        )
 
     payload = {
         'model': profile.writer_model_name,
@@ -507,24 +517,31 @@ def run_retake_comparison(
 
     started = time.perf_counter()
     try:
-        response = pooled_request(
-            'POST',
-            _responses_endpoint(),
+        response = request_with_openai_fallback(
+            primary_endpoint=_responses_endpoint(),
+            primary_api_key=settings.openai_api_key,
+            fallback_api_key=settings.openai_fallback_api_key,
+            primary_attempts=settings.openai_fallback_primary_attempts,
             body=json.dumps(payload, ensure_ascii=False).encode('utf-8'),
-            headers={
-                'Authorization': f'Bearer {settings.openai_api_key}',
-                'Content-Type': 'application/json',
-            },
             timeout_seconds=settings.retake_analysis_timeout_seconds,
+            request=pooled_request,
+            on_primary_failure=record_primary_failure,
         )
         body = json.loads(response.data.decode('utf-8'))
     except PooledHTTPStatusError as exc:
         notify_ai_provider_call(stage='pair', outcome='failed', model_name=profile.writer_model_name)
-        error_body = mask_capability_url_text(exc.response.data.decode('utf-8', errors='ignore'))
+        error_body = mask_capability_url_text(redact_provider_error(
+            exc.response.data.decode('utf-8', errors='ignore'),
+            settings.openai_api_key,
+            settings.openai_fallback_api_key,
+        ))
         raise AIReviewError(f'OpenAI retake comparison API HTTP {exc.response.status}: {error_body[:300]}') from exc
     except PooledHTTPRequestError as exc:
         notify_ai_provider_call(stage='pair', outcome='failed', model_name=profile.writer_model_name)
-        raise AIReviewError(f'OpenAI retake comparison API request failed: {mask_capability_url_text(str(exc))}') from exc
+        error_text = mask_capability_url_text(redact_provider_error(
+            str(exc), settings.openai_api_key, settings.openai_fallback_api_key,
+        ))
+        raise AIReviewError(f'OpenAI retake comparison API request failed: {error_text}') from exc
     except json.JSONDecodeError as exc:
         notify_ai_provider_call(stage='pair', outcome='failed', model_name=profile.writer_model_name)
         raise AIReviewError('OpenAI retake comparison API returned invalid JSON') from exc

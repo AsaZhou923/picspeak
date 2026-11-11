@@ -148,6 +148,8 @@ class Settings(BaseSettings):
 
     openai_api_key: str = ''
     openai_api_base_url: str = 'https://api.openai.com/v1'
+    openai_fallback_api_key: str = Field(default='', repr=False)
+    openai_fallback_primary_attempts: int = Field(default=3, ge=1, le=5)
     openai_score_model: str = 'gpt-6-sol'
     openai_score_reasoning_effort: str = 'low'
     openai_score_timeout_seconds: int = 180
@@ -249,6 +251,7 @@ class Settings(BaseSettings):
         'lemonsqueezy_image_credit_pack_variant_id',
         'lemonsqueezy_webhook_signing_secret',
         'openai_api_key',
+        'openai_fallback_api_key',
         'openai_score_reasoning_effort',
         'openai_review_reasoning_effort',
         'openai_pro_reasoning_effort',

@@ -26,6 +26,7 @@ from app.services.ai import (
 )
 from app.services.guard import guest_usage_snapshot, increment_quota, release_task_guest_review_quota, user_usage_snapshot
 from app.services.notification_events import record_review_terminal
+from app.services.openai_fallback import fallback_request_timeout_budget
 from app.services.practice import attach_practice_review, resolve_task_practice
 from app.services.practice_events import record_practice_analysis_completed
 from app.services.retake_comparison import run_retake_comparison
@@ -156,8 +157,17 @@ def public_task_error_message(
 def _review_task_stale_timeout_seconds() -> int:
     scorer_timeout = int(getattr(settings, 'openai_score_timeout_seconds', 180) or 180)
     writer_timeout = int(getattr(settings, 'openai_review_timeout_seconds', 180) or 180)
+    retake_timeout = int(settings.retake_analysis_timeout_seconds)
     # A high-scoring candidate gets one additional scoring pass before the writer.
-    return max(int(settings.review_task_stale_timeout_seconds), 2 * scorer_timeout + writer_timeout + 60, 30)
+    call_budget = max(2 * scorer_timeout + writer_timeout, retake_timeout)
+    if settings.openai_fallback_api_key:
+        attempts = settings.openai_fallback_primary_attempts
+        call_budget = max(
+            2 * fallback_request_timeout_budget(scorer_timeout, attempts)
+            + fallback_request_timeout_budget(writer_timeout, attempts),
+            fallback_request_timeout_budget(retake_timeout, attempts),
+        )
+    return max(int(settings.review_task_stale_timeout_seconds), call_budget + 60, 30)
 
 
 def _normalize_review_result_payload(

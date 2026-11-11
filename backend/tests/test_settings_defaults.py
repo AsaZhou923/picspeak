@@ -13,6 +13,19 @@ class SettingsDefaultsTestCase(unittest.TestCase):
     def _settings(self, **overrides):
         return Settings(_env_file=None, database_url='sqlite://localhost/picspeak-test', **overrides)
 
+    def test_openai_fallback_is_optional_and_attempts_are_bounded(self):
+        settings = self._settings()
+        self.assertEqual(settings.openai_fallback_api_key, '')
+        self.assertEqual(settings.openai_fallback_primary_attempts, 3)
+        for invalid in (0, 6):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                self._settings(openai_fallback_primary_attempts=invalid)
+
+    def test_openai_fallback_key_is_trimmed_and_hidden_from_repr(self):
+        settings = self._settings(openai_fallback_api_key='  official-test-key  ')
+        self.assertEqual(settings.openai_fallback_api_key, 'official-test-key')
+        self.assertNotIn('official-test-key', repr(settings))
+
     def test_image_audit_enabled_defaults_to_true(self):
         settings = self._settings()
         self.assertTrue(settings.image_audit_enabled)
