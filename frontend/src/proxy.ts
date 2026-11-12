@@ -8,6 +8,7 @@ import {
   resolveRequestLocale,
 } from '@/lib/locale';
 import { hasKnownAppPath } from '@/lib/app-route-roots';
+import { lookupPublicProfile } from '@/features/profile/public-profile-metadata';
 import { siteConfig } from '@/lib/site';
 
 const NOT_FOUND_COPY: Record<SupportedLocale, { title: string; heading: string; body: string; cta: string }> = {
@@ -43,6 +44,28 @@ function escapeHtml(value: string): string {
     .replace(/"/g, '&quot;');
 }
 
+const PUBLIC_PROFILE_PATH = /^\/u\/([^/]+)\/?$/;
+
+/**
+ * A rendered `notFound()` cannot change an already streamed 200, so document
+ * requests for a profile the backend definitively reports missing get the
+ * early 404 here. Outages and network errors fall through to the page.
+ */
+async function isMissingPublicProfile(request: { method: string; headers: Headers; nextUrl: URL }): Promise<boolean> {
+  if (request.method !== 'GET' && request.method !== 'HEAD') return false;
+  // Client router (RSC) navigations render the layout's not-found UI instead.
+  if (request.headers.get('rsc') || request.headers.get('next-router-prefetch')) return false;
+  const match = request.nextUrl.pathname.match(PUBLIC_PROFILE_PATH);
+  if (!match) return false;
+  let publicProfileId: string;
+  try {
+    publicProfileId = decodeURIComponent(match[1]);
+  } catch {
+    return true;
+  }
+  return (await lookupPublicProfile(publicProfileId)).state === 'missing';
+}
+
 function unknownRouteResponse(locale: SupportedLocale): NextResponse {
   const copy = NOT_FOUND_COPY[locale];
   return new NextResponse(
@@ -71,7 +94,7 @@ const developmentOrigins =
 const authorizedParties = Array.from(new Set([...developmentOrigins, productionOrigin, productionWwwOrigin]));
 
 export default clerkMiddleware(
-  (_auth, request) => {
+  async (_auth, request) => {
     const cookieLocale = request.cookies.get(LOCALE_COOKIE_NAME)?.value;
     const locale = resolveRequestLocale(
       request.nextUrl.pathname,
@@ -79,7 +102,7 @@ export default clerkMiddleware(
       request.headers.get('accept-language'),
     );
     const hasExplicitLocalePath = Boolean(request.nextUrl.pathname.match(/^\/(zh|en|ja)(?:\/|$)/));
-    if (!hasKnownAppPath(request.nextUrl.pathname)) {
+    if (!hasKnownAppPath(request.nextUrl.pathname) || await isMissingPublicProfile(request)) {
       return unknownRouteResponse(locale ?? 'en');
     }
 
