@@ -296,8 +296,8 @@ export const enTranslations = {
     pro_offer_label: '',
     pro_offer_highlight: 'Pro',
     updates_label: 'Updates',
-    updates_hint_home: "A new look that puts your photos first",
-    updates_hint_latest: "A new look that puts your photos first",
+    updates_hint_home: "Public pages stay open when sign-in has trouble",
+    updates_hint_latest: "Public pages stay open when sign-in has trouble",
     contact_label: 'Contact',
     contact_headline: 'Get in Touch',
 
@@ -738,6 +738,7 @@ export const enTranslations = {
     err_practice_goal_invalid_body: 'This practice goal is incomplete. Choose a visible goal and at least one success check.',
     err_practice_kind_invalid_body: 'This practice path is not available for the selected goal.',
     err_practice_assessment_invalid_body: 'The goal result could not be validated, so PicSpeak did not count it as a completed practice loop.',
+    err_auth_unavailable_body: 'The sign-in service could not be reached. Refresh the page to try again; if you use a content blocker, allow PicSpeak sign-in.',
     err_service_unavailable_body: 'The service is temporarily unavailable. Please try again shortly.',
     err_generation_login_required_body: 'Sign in before generating images.',
     err_generation_quality_forbidden_body: 'Free accounts can only use low quality. Pro unlocks medium and high quality.',

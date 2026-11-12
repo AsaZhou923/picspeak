@@ -221,6 +221,13 @@ export default function ReviewPage() {
           <AlertCircle size={40} className="text-rust mx-auto" />
           <p className="text-rust text-sm">{error}</p>
           <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="mx-auto min-h-11 rounded-sm border border-border px-4 text-xs font-medium text-ink hover:border-ink-muted"
+          >
+            {t('app_error_retry')}
+          </button>
+          <button
             onClick={handleBackNavigation}
             className="flex items-center gap-1 text-xs text-ink-subtle hover:text-ink-muted mx-auto"
           >

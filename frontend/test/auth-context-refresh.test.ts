@@ -17,7 +17,7 @@ type AuthValue = {
 type Slot = { value?: any; deps?: unknown[]; cleanup?: () => void; effect?: () => void | (() => void) };
 
 /** Runs the actual provider with deterministic hook renders and deferred API responses. */
-function authHarness(initial: AuthToken | null = owner(), signedIn = true, initialExchange?: (token: string) => Promise<AuthToken>, options: { loaded?: boolean; waitTimeoutMs?: number } = {}) {
+function authHarness(initial: AuthToken | null = owner(), signedIn = true, initialExchange?: (token: string) => Promise<AuthToken>, options: { loaded?: boolean; waitTimeoutMs?: number; clerkStatus?: string; cookie?: string; clerkLoadTimeoutMs?: number } = {}) {
   let now = 100_000, cursor = 0, dirty = false;
   let effects: Array<() => void> = [];
   let unauthorized: ((token: string) => Promise<string | null>) | null = null;
@@ -29,6 +29,13 @@ function authHarness(initial: AuthToken | null = owner(), signedIn = true, initi
   const snapshots: Array<{ owner: string | null; token: string | null; loading: boolean }> = [];
   const session = new Map<string, string>(initial ? [['ps_token', JSON.stringify(initial)]] : []);
   const storage = (map: Map<string, string>) => ({ getItem: (key: string) => map.get(key) ?? null, setItem: (key: string, val: string) => map.set(key, val), removeItem: (key: string) => map.delete(key) });
+  const statusListeners = new Set<(status: string) => void>();
+  const clerkInstance = {
+    status: options.clerkStatus ?? (options.loaded === false ? 'loading' : 'ready'),
+    on(event: string, handler: (status: string) => void, opt?: { notify?: boolean }) { if (event === 'status') { statusListeners.add(handler); if (opt?.notify) handler(clerkInstance.status); } },
+    off(event: string, handler: (status: string) => void) { if (event === 'status') statusListeners.delete(handler); },
+    emit(status: string) { clerkInstance.status = status; statusListeners.forEach((listener) => listener(status)); },
+  };
   const clerk = { isLoaded: options.loaded ?? true, isSignedIn: signedIn, userId: signedIn ? 'clerk-owner' : null as string | null, getToken: async (): Promise<string | null> => `session-${clerk.userId}` };
   const memo = (factory: () => any, deps: unknown[]) => {
     const index = cursor++;
@@ -40,8 +47,8 @@ function authHarness(initial: AuthToken | null = owner(), signedIn = true, initi
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
   }).outputText;
   vm.runInNewContext(compiled, {
-    exports, atob, document: { cookie: '' }, Date: class extends Date { static now() { return now; } },
-    window: { sessionStorage: storage(session), localStorage: storage(new Map()), setTimeout: (fn: () => void, delay: number) => setTimeout(fn, options.waitTimeoutMs ?? delay), clearTimeout },
+    exports, atob, document: { get cookie() { return options.cookie ?? ''; }, set cookie(_value: string) { /* writes only expire ps_token */ } }, Date: class extends Date { static now() { return now; } },
+    window: { sessionStorage: storage(session), localStorage: storage(new Map()), setTimeout: (fn: () => void, delay: number) => setTimeout(fn, delay === 8000 ? options.clerkLoadTimeoutMs ?? delay : options.waitTimeoutMs ?? delay), clearTimeout },
     require(name: string) {
       if (name === 'react/jsx-runtime') return { jsx: (type: unknown, props: any) => ({ type, props }) };
       if (name === 'react') return {
@@ -60,7 +67,7 @@ function authHarness(initial: AuthToken | null = owner(), signedIn = true, initi
           }
         },
       };
-      if (name === '@clerk/nextjs') return { useAuth: () => clerk };
+      if (name === '@clerk/nextjs') return { useAuth: () => clerk, useClerk: () => clerkInstance };
       if (name === './api') return {
         authClerkExchange: (token: string) => { exchangeCalls++; return exchange(token); },
         authGuest: () => { guestCalls++; return createGuest(); },
@@ -87,7 +94,7 @@ function authHarness(initial: AuthToken | null = owner(), signedIn = true, initi
   };
   render();
   return {
-    render, snapshots, session, clerk,
+    render, snapshots, session, clerk, clerkInstance,
     get value() { return value; }, get cacheClears() { return cacheClears; }, get exchangeCalls() { return exchangeCalls; }, get guestCalls() { return guestCalls; },
     expire() { now = 201_000; },
     exchange(fn: typeof exchange) { exchange = fn; }, createGuest(fn: typeof createGuest) { createGuest = fn; },
@@ -301,6 +308,70 @@ test('StrictMode setup-cleanup-setup does not join an invalidated initializer pr
   app.replayMountEffects(); await settle();
   assert.equal(app.exchangeCalls, 1, 'only the live initializer reaches the API');
   response.resolve(owner('owner', 400)); await settle(); app.render();
+  assert.equal(app.value.userInfo?.user_id, 'owner'); assert.equal(app.value.isLoading, false);
+  app.unmount();
+});
+
+const clerkSessionCookie = (id: string) => `__client_uat=1700000000; __session=${jwt(id, 9_999_999_999)}`;
+
+test('failed Clerk script lets a signed-out visitor continue as guest instead of waiting forever', async () => {
+  const app = authHarness(null, false, undefined, { loaded: false, clerkStatus: 'error', cookie: '__client_uat=0' });
+  await settle(); app.render();
+  assert.equal(app.value.isLoading, false, 'loading resolves once Clerk is known to be unavailable');
+  assert.equal(await app.value.ensureToken(), jwt('guest'));
+  assert.equal(app.guestCalls, 1); assert.equal(app.exchangeCalls, 0);
+  app.render(); assert.equal(app.value.userInfo?.user_id, 'guest');
+  app.unmount();
+});
+
+test('failed Clerk script keeps a persisted guest session without creating another guest', async () => {
+  const app = authHarness(guest(), false, undefined, { loaded: false, clerkStatus: 'error' });
+  await settle(); app.render();
+  assert.equal(app.value.isLoading, false); assert.equal(app.value.userInfo?.user_id, 'guest');
+  assert.equal(await app.value.ensureToken(), jwt('guest')); assert.equal(app.guestCalls, 0);
+  app.unmount();
+});
+
+test('failed Clerk script never downgrades a signed-in browser to guest and reports AUTH_UNAVAILABLE', async () => {
+  const app = authHarness(null, false, undefined, { loaded: false, clerkStatus: 'error', cookie: clerkSessionCookie('clerk-owner') });
+  await settle(); app.render();
+  assert.equal(app.value.isLoading, false, 'dependent pages stop showing skeletons');
+  await assert.rejects(app.value.ensureToken(), { code: 'AUTH_UNAVAILABLE' });
+  assert.equal(app.guestCalls, 0); assert.equal(app.exchangeCalls, 0);
+  app.unmount();
+});
+
+test('failed Clerk script reuses an unexpired session only for the same Clerk user cookie', async () => {
+  const same = authHarness(owner(), false, undefined, { loaded: false, clerkStatus: 'error', cookie: clerkSessionCookie('clerk-owner') });
+  await settle(); same.render();
+  assert.equal(same.value.userInfo?.user_id, 'owner');
+  assert.equal(await same.value.ensureToken(), jwt('owner'));
+  same.unmount();
+
+  const other = authHarness(owner(), false, undefined, { loaded: false, clerkStatus: 'error', cookie: clerkSessionCookie('clerk-someone-else') });
+  await settle(); other.render();
+  assert.equal(other.value.userInfo, null);
+  await assert.rejects(other.value.ensureToken(), { code: 'AUTH_UNAVAILABLE' });
+  assert.equal(other.guestCalls, 0);
+  other.unmount();
+});
+
+test('a Clerk script that never settles is treated as unavailable after the load timeout', async () => {
+  const app = authHarness(null, false, undefined, { loaded: false, clerkLoadTimeoutMs: 1 });
+  assert.equal(app.value.isLoading, true, 'a merely slow Clerk keeps loading at first');
+  await new Promise((resolve) => setTimeout(resolve, 10)); app.render();
+  assert.equal(app.value.isLoading, false);
+  assert.equal(await app.value.ensureToken(), jwt('guest'));
+  app.unmount();
+});
+
+test('Clerk loading after a fallback resumes the normal signed-in exchange', async () => {
+  const app = authHarness(null, false, undefined, { loaded: false, clerkStatus: 'error', cookie: clerkSessionCookie('clerk-owner') });
+  await settle(); app.render();
+  app.clerkInstance.emit('ready');
+  app.clerk.isLoaded = true; app.clerk.isSignedIn = true; app.clerk.userId = 'clerk-owner';
+  app.render(); await settle(); app.render();
+  assert.equal(app.exchangeCalls, 1);
   assert.equal(app.value.userInfo?.user_id, 'owner'); assert.equal(app.value.isLoading, false);
   app.unmount();
 });

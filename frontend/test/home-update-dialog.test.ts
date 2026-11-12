@@ -31,19 +31,19 @@ test('private critique access update describes user benefits without draft statu
   }
 });
 
-test('photo-first redesign is the latest update in every locale without a popup', () => {
+test('public-pages maintenance fix is the latest update in every locale without a popup', () => {
   for (const locale of ['zh', 'en', 'ja'] as const) {
     const latest = getLatestProductUpdate(locale);
     assert.ok(latest);
-    assert.equal(latest.id, '2026-11-11-photo-first-redesign');
-    assert.equal(latest.date, '2026-11-11');
+    assert.equal(latest.id, '2026-11-12-public-pages-stay-open');
+    assert.equal(latest.date, '2026-11-12');
     assert.doesNotMatch(latest.title + latest.summary, /准备中|尚未发布|upcoming|not yet released|準備中|まだ公開/i);
     assert.equal(latest.showPopup, false);
     assert.equal(shouldShowProductUpdatePopup(latest), false);
     assert.equal(latest.docPath, `docs/changelog/CHANGELOG.md#${latest.id}`);
   }
-  assert.equal(getLatestProductUpdateDate('zh'), '2026-11-11');
-  assert.equal(getLatestProductUpdateDate(), '2026-11-11');
+  assert.equal(getLatestProductUpdateDate('zh'), '2026-11-12');
+  assert.equal(getLatestProductUpdateDate(), '2026-11-12');
 });
 
 test('photo applicability and public retention are released without a popup', () => {

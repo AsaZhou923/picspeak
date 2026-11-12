@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import Request, status
+from fastapi import HTTPException, Request, status
 from sqlalchemy import Float, cast, func, literal
 from sqlalchemy.orm import Session
 
@@ -191,7 +191,14 @@ def _optional_gallery_viewer(authorization: str | None, db: Session) -> User | N
   token = authorization[7:].strip()
   if not token:
     return None
-  return get_user_from_token(token, db)
+  try:
+    return get_user_from_token(token, db)
+  except HTTPException as exc:
+    # The viewer is optional: an expired, forged, rotated-key or inactive
+    # account token only loses `liked_by_viewer`, never the public gallery.
+    if exc.status_code in (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN):
+      return None
+    raise
 
 
 def _gallery_recommendation_map(db: Session, review_ids: list[int]) -> dict[int, dict[str, float | bool | None]]:

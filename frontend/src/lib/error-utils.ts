@@ -96,6 +96,7 @@ const ERROR_CODE_KEYS: Record<string, TranslationKey> = {
   INTERNAL_ERROR: 'err_unknown_body',
   UPSTREAM_ERROR: 'err_service_unavailable_body',
   SERVICE_UNAVAILABLE: 'err_service_unavailable_body',
+  AUTH_UNAVAILABLE: 'err_auth_unavailable_body',
 };
 
 export function localizedErrorMessage(

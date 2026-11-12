@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-12-public-pages-stay-open",
+    "date": "2026-11-12",
+    "showPopup": false,
+    "title": "Public pages stay open when sign-in has trouble",
+    "summary": "If the sign-in service cannot load — a blocked script, a content blocker or a weak connection — you can still upload as a guest and open public critiques instead of waiting on an endless loading screen; signed-in visitors see a clear message with a retry button rather than a network error. The Gallery keeps loading even when an old sign-in has expired. Public profile pages now have their own page title and link previews, and a profile that no longer exists says so plainly.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-11-12-public-pages-stay-open"
+  },
+  {
     "id": "2026-11-11-photo-first-redesign",
     "date": "2026-11-11",
     "showPopup": false,

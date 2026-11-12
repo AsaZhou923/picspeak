@@ -27,6 +27,7 @@ export default function PublicProfilePage() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
+  const [notFound, setNotFound] = useState(false);
   const requestRef = useRef(0);
 
   useEffect(() => {
@@ -35,6 +36,7 @@ export default function PublicProfilePage() {
     const controller = new AbortController();
     setLoading(true);
     setError('');
+    setNotFound(false);
 
     getPublicProfile(publicProfileId, { signal: controller.signal })
       .then((payload) => {
@@ -45,14 +47,19 @@ export default function PublicProfilePage() {
       .catch((err) => {
         if (requestRef.current !== requestId || controller.signal.aborted) return;
         setProfile(null);
-        setError(formatUserFacingError(t, err, copy.unavailable));
+        if ((err as { status?: number })?.status === 404) {
+          // Missing or private is not a temporary failure: no request id.
+          setNotFound(true);
+        } else {
+          setError(formatUserFacingError(t, err, copy.unavailableBody));
+        }
         setLoading(false);
       });
 
     return () => {
       controller.abort();
     };
-  }, [copy.unavailable, publicProfileId, t]);
+  }, [copy.unavailableBody, publicProfileId, t]);
 
   const loadMore = useCallback(async () => {
     if (!profile?.next_cursor || loadingMore) return;
@@ -70,11 +77,11 @@ export default function PublicProfilePage() {
         };
       });
     } catch (err) {
-      setError(formatUserFacingError(t, err, copy.unavailable));
+      setError(formatUserFacingError(t, err, copy.unavailableBody));
     } finally {
       setLoadingMore(false);
     }
-  }, [copy.unavailable, loadingMore, profile?.next_cursor, publicProfileId, t]);
+  }, [copy.unavailableBody, loadingMore, profile?.next_cursor, publicProfileId, t]);
 
   if (loading) {
     return (
@@ -96,8 +103,8 @@ export default function PublicProfilePage() {
       <section className="flex min-h-screen items-center justify-center px-6">
         <div className="max-w-md text-center">
           <AlertCircle size={40} className="mx-auto text-rust" />
-          <h1 className="mt-5 font-display text-3xl text-ink">{copy.unavailable}</h1>
-          <p className="mt-3 text-sm leading-7 text-ink-muted">{error || copy.unavailable}</p>
+          <h1 className="mt-5 font-display text-3xl text-ink">{notFound ? copy.notFound : copy.unavailable}</h1>
+          <p className="mt-3 text-sm leading-7 text-ink-muted">{notFound ? copy.notFoundBody : error || copy.unavailableBody}</p>
           <Link href="/gallery" className="ui-action-secondary mt-6 inline-flex px-4 py-2">
             <GalleryHorizontal size={15} />
             {copy.backGallery}

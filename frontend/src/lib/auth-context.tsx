@@ -9,16 +9,22 @@ import React, {
   useState,
   useSyncExternalStore,
 } from 'react';
-import { useAuth as useClerkAuth } from '@clerk/nextjs';
+import { useAuth as useClerkAuth, useClerk } from '@clerk/nextjs';
 import { authClerkExchange, authGuest, clearUsageCache, registerUnauthorizedHandler } from './api';
 import { clearPhotoPreviewCache } from './photo-preview-cache';
 import { trackProductEvent } from './product-analytics';
 import { clearReviewThumbnailCache } from './review-thumbnail-cache';
-import { AuthToken } from './types';
+import type { AuthToken } from './types';
 
 const TOKEN_KEY = 'ps_token';
 const PHOTO_UPLOAD_CACHE_KEY = 'ps_uploaded_photos_v1';
 const SIGN_IN_EVENT_KEY = 'ps_sign_in_event_v1';
+// Shorter than the 10s readiness wait so a hung Clerk script is classified
+// before waiting callers give up.
+const CLERK_LOAD_TIMEOUT_MS = 8000;
+
+/** What the browser's Clerk cookies say when the Clerk script itself is unavailable. */
+type ClerkSessionHint = { signedIn: boolean; clerkUserId: string | null };
 
 interface AuthState {
   token: string | null;
@@ -53,6 +59,50 @@ function isExpiredToken(token: string): boolean {
   const payload = decodeJwtPayload(token);
   const exp = payload?.exp;
   return typeof exp !== 'number' || exp <= Math.floor(Date.now() / 1000);
+}
+
+/**
+ * Reads Clerk's first-party cookies without Clerk JS. `__client_uat` is `0`
+ * (or absent) for signed-out browsers; `__session` carries the signed-in
+ * user's id. Instance-suffixed variants (`__client_uat_xxxx`) are accepted.
+ */
+function readClerkSessionHint(): ClerkSessionHint {
+  let cookies = '';
+  try {
+    cookies = document.cookie || '';
+  } catch {
+    // Restricted cookie access means no evidence of a signed-in session.
+  }
+  let clientUat: boolean | null = null;
+  let clerkUserId: string | null = null;
+  for (const part of cookies.split(';')) {
+    const separator = part.indexOf('=');
+    if (separator < 0) continue;
+    const name = part.slice(0, separator).trim();
+    let value = part.slice(separator + 1).trim();
+    try {
+      value = decodeURIComponent(value);
+    } catch {
+      // Keep the raw value.
+    }
+    if (/^__client_uat(_[\w-]+)?$/.test(name)) {
+      clientUat = clientUat === true || (value !== '' && value !== '0');
+    } else if (/^__session(_[\w-]+)?$/.test(name) && value) {
+      const sub = decodeJwtPayload(value)?.sub;
+      if (typeof sub === 'string' && sub) clerkUserId = sub;
+    }
+  }
+  const signedIn = clientUat ?? Boolean(clerkUserId);
+  return { signedIn, clerkUserId: signedIn ? clerkUserId : null };
+}
+
+/** Shaped like ApiException so error-utils maps the stable code without an import cycle. */
+function authUnavailableError(): Error & { status: number; code: string } {
+  return Object.assign(new Error('Sign-in service is unavailable'), {
+    name: 'ApiException',
+    status: 503,
+    code: 'AUTH_UNAVAILABLE',
+  });
 }
 
 function readSessionAuthToken(): AuthToken | null {
@@ -151,6 +201,14 @@ function staleAuthError(): Error {
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { isLoaded: isClerkLoaded, isSignedIn, userId: clerkUserId, getToken } = useClerkAuth();
+  const clerk = useClerk();
+  const [clerkStatus, setClerkStatus] = useState<string | undefined>(() => clerk?.status);
+  const [clerkLoadTimedOut, setClerkLoadTimedOut] = useState(false);
+  // Clerk JS failed to load (blocked script, outage) or never finished. Public
+  // and guest paths must keep working; a signed-in browser must not silently
+  // become a guest.
+  const clerkFailed = !isClerkLoaded && (clerkStatus === 'error' || clerkLoadTimedOut);
+  const clerkFallbackRef = useRef<ClerkSessionHint | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [userInfo, setUserInfo] = useState<AuthToken | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -349,6 +407,70 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [login, logout]);
 
   useEffect(() => {
+    if (!clerk || typeof clerk.on !== 'function') return;
+    const onStatus = (status: string) => setClerkStatus(status);
+    clerk.on('status', onStatus, { notify: true });
+    return () => {
+      if (typeof clerk.off === 'function') clerk.off('status', onStatus);
+    };
+  }, [clerk]);
+
+  useEffect(() => {
+    if (isClerkLoaded) {
+      setClerkLoadTimedOut(false);
+      return;
+    }
+    const timeoutId = window.setTimeout(() => setClerkLoadTimedOut(true), CLERK_LOAD_TIMEOUT_MS);
+    return () => window.clearTimeout(timeoutId);
+  }, [isClerkLoaded]);
+
+  useEffect(() => {
+    if (!clerkFailed) {
+      clerkFallbackRef.current = null;
+      return;
+    }
+    const hint = readClerkSessionHint();
+    clerkFallbackRef.current = hint;
+    clearLegacyReadableAuthToken();
+    const parsed = readSessionAuthToken();
+    const previousAuth = currentAuthRef.current ?? invalidatedAuthRef.current;
+    if (!hint.signedIn) {
+      // Same as Clerk reporting a signed-out browser: guests continue.
+      if (parsed?.auth_provider === 'clerk' || previousAuth?.auth_provider === 'clerk') {
+        logout();
+      } else if (parsed) {
+        login(parsed);
+      } else {
+        isLoadingRef.current = false;
+        setIsLoading(false);
+        resolveReadyWaiters();
+      }
+      return;
+    }
+    // Signed-in browser: keep an already exchanged session for the same Clerk
+    // user, otherwise stop loading and report the outage on demand.
+    if (parsed && hint.clerkUserId && isMatchingClerkSession(parsed, hint.clerkUserId)) {
+      login(parsed);
+      return;
+    }
+    if (parsed?.auth_provider === 'clerk' && hint.clerkUserId && parsed.clerk_user_id !== hint.clerkUserId) {
+      // The browser is signed in as someone else: the stored session is stale.
+      logout();
+      return;
+    }
+    if (currentAuthRef.current) {
+      // Unverifiable owner (guest or unknown Clerk user): hide it until Clerk recovers.
+      authEpochRef.current += 1;
+      currentAuthRef.current = null;
+      setToken(null);
+      setUserInfo(null);
+    }
+    isLoadingRef.current = false;
+    setIsLoading(false);
+    resolveReadyWaiters();
+  }, [clerkFailed, login, logout, resolveReadyWaiters]);
+
+  useEffect(() => {
     if (!isClerkLoaded) return;
 
     let cancelled = false;
@@ -427,12 +549,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const requestedEpoch = authEpochRef.current;
 
     const session = clerkSessionRef.current;
-    if (!session.isClerkLoaded) throw new Error('Authentication is not ready');
+    const identity: ClerkSessionHint | null = session.isClerkLoaded
+      ? { signedIn: Boolean(session.isSignedIn), clerkUserId: session.clerkUserId ?? null }
+      : clerkFallbackRef.current;
+    if (!identity) throw authUnavailableError();
     const currentUserInfo = currentAuthRef.current ?? readSessionAuthToken();
     const currentToken = currentUserInfo?.access_token;
     const canReuse = (auth: AuthToken | null) => Boolean(auth &&
       auth.access_token !== rejectedTokenRef.current && !isExpiredToken(auth.access_token) &&
-      (session.isSignedIn ? isMatchingClerkIdentity(auth, session.clerkUserId) : auth.auth_provider !== 'clerk'));
+      (identity.signedIn ? isMatchingClerkIdentity(auth, identity.clerkUserId) : auth.auth_provider !== 'clerk'));
     if (canReuse(currentUserInfo) && currentUserInfo && currentToken) {
       if (!currentAuthRef.current) login(currentUserInfo);
       return currentToken;
@@ -441,7 +566,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Expiry/rejection is a credential refresh, not an owner change. Keep the
     // established identity and private draft until logout or a new owner is known.
     const isCurrent = () => requestedEpoch === authEpochRef.current;
-    if (session.isClerkLoaded && session.isSignedIn) {
+    if (identity.signedIn) {
+      // Without Clerk JS there is no way to prove or renew this session.
+      if (!session.isClerkLoaded) throw authUnavailableError();
       return renewClerkToken();
     }
 
