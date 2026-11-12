@@ -85,8 +85,8 @@ export const zhTranslations = {
   pro_offer_label: '',
   pro_offer_highlight: 'Pro',
   updates_label: '更新记录',
-  updates_hint_home: "全新界面，照片成为主角",
-  updates_hint_latest: "全新界面，照片成为主角",
+  updates_hint_home: "登录服务异常时，公开页面照常可用",
+  updates_hint_latest: "登录服务异常时，公开页面照常可用",
   contact_label: '联系',
   contact_headline: '联系我',
 
@@ -697,6 +697,7 @@ export const zhTranslations = {
   err_practice_goal_invalid_body: '练习目标不完整。请选择一个可观察的目标，并保留至少一条成功条件。',
   err_practice_kind_invalid_body: '当前目标不能使用这个练习路径。',
   err_practice_assessment_invalid_body: '目标结果没有通过校验，因此不会计为一次完成的练习闭环。',
+  err_auth_unavailable_body: '无法连接登录服务。请刷新页面重试；如果使用了内容拦截插件，请允许 PicSpeak 登录服务。',
   err_service_unavailable_body: '服务暂时不可用，请稍后再试。',
   err_generation_login_required_body: '请先登录，再生成图片。',
   err_generation_quality_forbidden_body: 'Free 账户只能使用 Low 质量。升级 Pro 后可使用 Medium 和 High。',

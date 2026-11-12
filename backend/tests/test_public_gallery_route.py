@@ -426,3 +426,82 @@ class PublicGalleryRoutePostgresTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class OptionalGalleryViewerTests(unittest.TestCase):
+    """Issue #59: a broken viewer token must fall back to anonymous browsing."""
+
+    def _viewer(self, authorization, error=None, user=None):
+        from app.api.routers import gallery_support
+
+        def fake_get_user(token, db):
+            if error is not None:
+                raise error
+            return user
+
+        with patch.object(gallery_support, 'get_user_from_token', side_effect=fake_get_user) as mocked:
+            return gallery_support._optional_gallery_viewer(authorization, MagicMock()), mocked
+
+    def test_invalid_expired_missing_or_inactive_token_is_anonymous(self) -> None:
+        from app.core.errors import api_error
+
+        for status_code, code in (
+            (401, 'AUTH_TOKEN_INVALID'),
+            (401, 'AUTH_SUB_MISSING'),
+            (401, 'AUTH_USER_NOT_FOUND'),
+            (403, 'AUTH_USER_INACTIVE'),
+        ):
+            with self.subTest(code=code):
+                viewer, mocked = self._viewer('Bearer stale-token', error=api_error(status_code, code, code))
+                self.assertIsNone(viewer)
+                mocked.assert_called_once()
+
+    def test_valid_token_returns_viewer_and_unexpected_errors_propagate(self) -> None:
+        user = SimpleNamespace(id=7)
+        viewer, _ = self._viewer('Bearer good-token', user=user)
+        self.assertIs(viewer, user)
+        with self.assertRaises(HTTPException):
+            self._viewer('Bearer good-token', error=HTTPException(status_code=500, detail='boom'))
+
+    def test_missing_or_non_bearer_header_skips_token_lookup(self) -> None:
+        for header in (None, '', 'Basic abc', 'Bearer   '):
+            with self.subTest(header=header):
+                viewer, mocked = self._viewer(header)
+                self.assertIsNone(viewer)
+                mocked.assert_not_called()
+
+    def test_list_public_gallery_with_forged_bearer_token_stays_public(self) -> None:
+        db = MagicMock()
+        count_query = MagicMock()
+        count_query.filter.return_value = count_query
+        count_query.scalar.return_value = 1
+        row_review = SimpleNamespace(id=101, gallery_added_at=datetime(2026, 3, 21, 12, 0, tzinfo=timezone.utc))
+        list_query = MagicMock()
+        for name in ('join', 'filter', 'order_by', 'limit'):
+            getattr(list_query, name).return_value = list_query
+        list_query.all.return_value = [(row_review, object(), object(), 8.8)]
+        db.query.side_effect = [count_query, list_query]
+        item = {
+            'review_id': 'rev_1', 'photo_id': 'pho_1', 'photo_url': None, 'photo_thumbnail_url': None,
+            'mode': 'pro', 'image_type': 'street', 'final_score': 8.5, 'score_version': 'score-v2-strict',
+            'summary': 's', 'owner_username': 'tester', 'owner_avatar_url': None, 'like_count': 0,
+            'recommended': False, 'score_percentile': None,
+            'gallery_added_at': row_review.gallery_added_at, 'created_at': row_review.gallery_added_at,
+        }
+
+        def build_item(*args, **kwargs):
+            return {**item, 'liked_by_viewer': kwargs['liked_by_viewer']}
+
+        with patch('app.api.routers.gallery._gallery_like_counts', return_value={}), \
+             patch('app.api.routers.gallery._gallery_viewer_likes', return_value=set()) as viewer_likes, \
+             patch('app.api.routers.gallery._gallery_recommendation_map', return_value={}), \
+             patch('app.api.routers.gallery._public_gallery_item', side_effect=build_item):
+            payload = list_public_gallery(
+                request=SimpleNamespace(), limit=12, cursor=None, created_from=None, created_to=None,
+                min_score=None, max_score=None, image_type=None,
+                authorization='Bearer forged.token.value', db=db,
+            )
+
+        self.assertEqual(len(payload.items), 1)
+        self.assertFalse(payload.items[0].liked_by_viewer)
+        self.assertIsNone(viewer_likes.call_args.args[2], 'forged token is treated as anonymous')

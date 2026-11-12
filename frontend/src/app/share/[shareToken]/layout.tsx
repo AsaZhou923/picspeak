@@ -5,6 +5,8 @@ export const metadata: Metadata = {
   title: 'Shared AI Photo Critique Result and Score Overview',
   description:
     'Open a shared PicSpeak critique result to review the photo score, strengths, weaknesses, and practical AI-generated suggestions in one page.',
+  // A noindex share link must not inherit the homepage canonical/hreflang.
+  alternates: null,
   robots: NO_INDEX_ROBOTS,
 };
 

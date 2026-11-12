@@ -60,3 +60,68 @@ test('profile pages support stale-request cancellation, pagination and clipboard
   assert.match(publicSource, /profile\.total_like_count/);
   assert.match(copySource, /copyFailed/);
 });
+
+test('public profile metadata gives real profiles their own canonical and keeps unresolved ones out of the index (#61)', async () => {
+  const { buildPublicProfileMetadata, lookupPublicProfile } = await import('../src/features/profile/public-profile-metadata.ts');
+  const profile = {
+    public_profile_id: 'upp_abc',
+    username: 'Mira',
+    avatar_url: null,
+    gallery_review_count: 3,
+    total_like_count: 1,
+    items: [],
+    next_cursor: null,
+  };
+  const found = buildPublicProfileMetadata({ state: 'found', profile }, 'en');
+  assert.equal(found.alternates?.canonical, '/u/upp_abc');
+  assert.equal((found.robots as { index?: boolean }).index, true);
+  assert.match(String(found.title), /^Mira/);
+  assert.doesNotMatch(String(found.title), /PicSpeak/, 'the root title template appends the brand');
+  assert.match(String(found.description), /3 public Gallery photos/);
+
+  for (const state of ['missing', 'unknown'] as const) {
+    const metadata = buildPublicProfileMetadata({ state }, 'zh');
+    assert.equal(metadata.alternates, null, `${state} profile must not inherit the homepage canonical`);
+    assert.equal((metadata.robots as { index?: boolean }).index, false);
+  }
+
+  process.env.NEXT_PUBLIC_API_URL = 'https://api.example.test';
+  const originalFetch = globalThis.fetch;
+  const respond = (status: number, body: unknown = {}) => {
+    globalThis.fetch = (async () => new Response(JSON.stringify(body), { status })) as typeof fetch;
+  };
+  try {
+    respond(404, { error: { code: 'PUBLIC_PROFILE_NOT_FOUND' } });
+    assert.deepEqual(await lookupPublicProfile('upp_gone'), { state: 'missing' });
+    respond(503);
+    assert.deepEqual(await lookupPublicProfile('upp_flaky'), { state: 'unknown' }, 'an outage is not a 404');
+    globalThis.fetch = (async () => { throw new TypeError('network'); }) as typeof fetch;
+    assert.deepEqual(await lookupPublicProfile('upp_offline'), { state: 'unknown' });
+    respond(200, profile);
+    assert.deepEqual(await lookupPublicProfile('upp_abc'), { state: 'found', profile });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('public profile layout returns a real 404 for missing profiles and the page separates missing from temporary failures (#61)', async () => {
+  const [layout, page] = await Promise.all([
+    readFile('src/app/u/[publicProfileId]/layout.tsx', 'utf8'),
+    readFile('src/app/u/[publicProfileId]/page.tsx', 'utf8'),
+  ]);
+  assert.match(layout, /export async function generateMetadata/);
+  assert.match(layout, /lookup\.state === 'missing'\) notFound\(\)/);
+  assert.match(page, /status === 404/);
+  assert.match(page, /copy\.notFoundBody/);
+  for (const locale of ['zh', 'en', 'ja'] as const) {
+    const copy = getProfileCopy(locale);
+    assert.notEqual(copy.notFound, copy.unavailable);
+    assert.notEqual(copy.unavailable, copy.unavailableBody, 'heading and body are not the same sentence');
+  }
+});
+
+test('noindex share pages do not inherit the homepage canonical (#61)', async () => {
+  const shareLayout = await readFile('src/app/share/[shareToken]/layout.tsx', 'utf8');
+  assert.match(shareLayout, /alternates: null/);
+  assert.match(shareLayout, /robots: NO_INDEX_ROBOTS/);
+});

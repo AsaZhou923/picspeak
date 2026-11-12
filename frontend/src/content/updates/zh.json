@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-12-public-pages-stay-open",
+    "date": "2026-11-12",
+    "showPopup": false,
+    "title": "登录服务异常时，公开页面照常可用",
+    "summary": "登录服务加载失败时（脚本被拦截、使用内容拦截插件或网络较弱），你仍可以游客身份上传照片、打开公开点评，不会一直停在加载画面；已登录的用户会看到明确提示和“重试”按钮，而不是“请检查网络连接”。登录状态过期时，长廊也会照常加载。公开主页现在有自己的页面标题和分享预览，不存在的主页会直接说明“找不到这个主页”。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-11-12-public-pages-stay-open"
+  },
+  {
     "id": "2026-11-11-photo-first-redesign",
     "date": "2026-11-11",
     "showPopup": false,

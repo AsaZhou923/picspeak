@@ -139,7 +139,7 @@ PicSpeak 在 Build Week 之前已经存在。活动期间，单张点评扩展�
 
 ## 📝 更新记录
 
-最新条目：[全新界面，照片成为主角](docs/changelog/CHANGELOG.md#2026-11-11-photo-first-redesign)。更早的条目见[完整 Changelog](docs/changelog/CHANGELOG.md)。
+最新条目：[登录服务异常时，公开页面照常可用](docs/changelog/CHANGELOG.md#2026-11-12-public-pages-stay-open)。更早的条目见[完整 Changelog](docs/changelog/CHANGELOG.md)。
 
 ## 🤝 参与贡献
 

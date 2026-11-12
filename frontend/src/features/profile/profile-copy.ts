@@ -29,7 +29,12 @@ export function getProfileCopy(locale: ProfileLocale) {
       emptyBody: 'ギャラリーで承認された作品がここに表示されます。',
       openReview: '講評を見る',
       backGallery: 'ギャラリーへ戻る',
-      unavailable: 'プロフィールを表示できません',
+      unavailable: 'プロフィールを一時的に表示できません',
+      unavailableBody: '時間をおいて再度お試しください。',
+      notFound: 'このプロフィールは見つかりません',
+      notFoundBody: 'プロフィールが非公開になったか、リンクが正しくありません。',
+      metaTitleSuffix: 'の写真ポートフォリオ',
+      metaDescription: (name: string, count: number) => `${name} がギャラリーで公開している ${count} 件の写真と AI 講評。`,
     };
   }
 
@@ -61,7 +66,12 @@ export function getProfileCopy(locale: ProfileLocale) {
       emptyBody: 'Approved Gallery work will appear here.',
       openReview: 'Open critique',
       backGallery: 'Back to Gallery',
-      unavailable: 'This profile is unavailable',
+      unavailable: 'This profile is temporarily unavailable',
+      unavailableBody: 'Please try again in a moment.',
+      notFound: 'This profile could not be found',
+      notFoundBody: 'It may have been made private, or the link is incorrect.',
+      metaTitleSuffix: ' — photography portfolio',
+      metaDescription: (name: string, count: number) => `${count} public Gallery photo${count === 1 ? '' : 's'} with AI critiques by ${name} on PicSpeak.`,
     };
   }
 
@@ -92,6 +102,11 @@ export function getProfileCopy(locale: ProfileLocale) {
     emptyBody: '通过长廊审核的作品会显示在这里。',
     openReview: '查看点评',
     backGallery: '返回长廊',
-    unavailable: '这个主页暂时不可访问',
+    unavailable: '这个主页暂时无法加载',
+    unavailableBody: '请稍后再试。',
+    notFound: '找不到这个主页',
+    notFoundBody: '主页可能已关闭公开，或者链接有误。',
+    metaTitleSuffix: '的摄影作品集',
+    metaDescription: (name: string, count: number) => `${name} 在 PicSpeak 长廊公开的 ${count} 张照片与 AI 点评。`,
   };
 }

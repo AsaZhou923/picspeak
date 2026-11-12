@@ -139,7 +139,7 @@ The event version used GPT-5.6 Terra. The current runtime uses GPT-6 Sol (Flash)
 
 ## 📝 Changelog
 
-The latest entry is [a new look that puts your photos first](docs/changelog/CHANGELOG.md#2026-11-11-photo-first-redesign). See the [full changelog](docs/changelog/CHANGELOG.md) for older entries.
+The latest entry is [public pages stay open when sign-in has trouble](docs/changelog/CHANGELOG.md#2026-11-12-public-pages-stay-open). See the [full changelog](docs/changelog/CHANGELOG.md) for older entries.
 
 ## 🤝 Contributing
 
