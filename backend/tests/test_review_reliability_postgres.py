@@ -34,7 +34,9 @@ from app.services.review_quota_reservations import (
     reserve_review_quota, consume_review_quota, release_review_quota,
     synchronous_review_quota,
 )
-from app.services.review_task_processor import process_review_task, _claim_task, _ensure_review_claim, ReviewTaskLeaseLost
+from app.services.review_task_processor import (
+    process_review_task, expire_review_tasks, _claim_task, _ensure_review_claim, ReviewTaskLeaseLost,
+)
 
 DATABASE_URL = os.getenv('PICSPEAK_TEST_DATABASE_URL', '')
 
@@ -465,6 +467,74 @@ class ReviewReliabilityPostgresTests(unittest.TestCase):
             enforce_guest_review_limits(db, actor, request_scope_key=key, quota_scope_key=key, network_scope_key=network)
             db.commit()
             self.assertEqual(guest_usage_snapshot(db, key, network_scope_key=network, now=now)['daily_remaining'], 0)
+
+    def _guest_task_with_two_admissions(self, *, key, network, **task_fields):
+        actor = SimpleNamespace(plan=UserPlan.guest)
+        with self.Session() as db, patch('app.services.guard.settings.guest_review_limit_per_day', 2):
+            db.query(User).filter_by(id=self.user_id).update({'plan': UserPlan.guest})
+            enforce_guest_review_limits(db, actor, request_scope_key=key, quota_scope_key=key, network_scope_key=network)
+            limits = enforce_guest_review_limits(
+                db, actor, request_scope_key=key, quota_scope_key=key, network_scope_key=network,
+            )
+            task = ReviewTask(
+                public_id=f'tsk_guest_terminal_{uuid4().hex}', owner_user_id=self.user_id, photo_id=self.photo_id,
+                mode=ReviewMode.flash, request_payload={'_guest_quota_reservations': limits['_quota_reservations']},
+                **task_fields,
+            )
+            db.add(task)
+            db.commit()
+            return task.public_id
+
+    def _guest_counters(self, db, key, network):
+        return {row.scope: row.hit_count for row in db.query(RateLimitCounter).filter(
+            RateLimitCounter.scope_key.in_([key, network]),
+        ).all()}
+
+    def _assert_one_personal_slot_returned(self, db, public_id, key, network):
+        task = db.query(ReviewTask).filter_by(public_id=public_id).one()
+        self.assertTrue(task.request_payload['_guest_quota_released'])
+        counters = self._guest_counters(db, key, network)
+        self.assertEqual(counters['guest_review_daily'], 1)
+        self.assertEqual(counters['guest_review_monthly'], 1)
+        self.assertEqual(counters['guest_review_minute'], 2)
+        self.assertEqual(counters['guest_review_network_daily'], 2)
+        self.assertEqual(counters['guest_review_network_monthly'], 2)
+        release_task_guest_review_quota(db, task)
+        db.commit()
+        self.assertEqual(self._guest_counters(db, key, network)['guest_review_daily'], 1)
+
+    def test_dead_lettered_guest_task_returns_its_personal_slot_once(self):
+        key, network = f'guest-dead:{self.suffix}', f'network-dead:{self.suffix}'
+        public_id = self._guest_task_with_two_admissions(
+            key=key, network=network, status=TaskStatus.PENDING, max_attempts=1,
+            expire_at=datetime.now(timezone.utc) + timedelta(minutes=30),
+        )
+        with (
+            patch('app.services.review_task_processor.SessionLocal', self.Session),
+            patch('app.services.review_task_processor.canonical_score_cache_lease', return_value=nullcontext(None)),
+            patch('app.services.review_call_costs.SessionLocal', self.Session),
+            patch('app.services.review_task_processor.run_ai_review', side_effect=AIReviewError('upstream down', stage='scoring')),
+        ):
+            process_review_task(public_id, worker_name='worker')
+        with self.Session() as db:
+            task = db.query(ReviewTask).filter_by(public_id=public_id).one()
+            self.assertEqual(task.status, TaskStatus.DEAD_LETTER)
+            self.assertEqual(task.error_code, 'AI_SCORING_FAILED')
+            self._assert_one_personal_slot_returned(db, public_id, key, network)
+
+    def test_expired_guest_task_returns_its_personal_slot_once(self):
+        key, network = f'guest-expired:{self.suffix}', f'network-expired:{self.suffix}'
+        public_id = self._guest_task_with_two_admissions(
+            key=key, network=network, status=TaskStatus.PENDING,
+            expire_at=datetime.now(timezone.utc) - timedelta(minutes=1),
+        )
+        with self.Session() as db:
+            expire_review_tasks(db)
+            expire_review_tasks(db)
+        with self.Session() as db:
+            task = db.query(ReviewTask).filter_by(public_id=public_id).one()
+            self.assertEqual(task.status, TaskStatus.EXPIRED)
+            self._assert_one_personal_slot_returned(db, public_id, key, network)
 
     def test_pro_soft_threshold_tracks_successful_modes_and_pairing_but_never_blocks_admission(self):
         at = datetime(2026, 11, 30, 23, 59, tzinfo=timezone.utc)

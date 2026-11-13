@@ -175,7 +175,21 @@ test('service failures keep the ordinary failure state and retry action', async 
   const rendered = JSON.stringify(app.render());
   assert.equal(app.find((node) => node.type === 'h1').props.children, 'en:task_failed_label');
   assert.match(rendered, /task_retry/);
+  assert.match(rendered, /task_failed_no_charge/);
   assert.doesNotMatch(rendered, /task_upload_photograph|task_not_applicable_no_charge|UNSAFE_BACKEND_DETAIL/);
+  app.unmount();
+});
+
+for (const status of ['DEAD_LETTER', 'EXPIRED'] as const) test(`${status} tasks explain the outcome in user terms and confirm no allowance was used`, async () => {
+  const app = harness(taskFile);
+  app.api.getTask = async () => ({ ...task('task-a', status), error: { code: 'AI_CALL_FAILED', message: 'UNSAFE_BACKEND_DETAIL' } });
+  app.render(); await app.flush();
+  const rendered = JSON.stringify(app.render());
+  const label = status === 'DEAD_LETTER' ? 'task_dead_letter_label' : 'task_expired_label';
+  assert.equal(app.find((node) => node.type === 'h1').props.children, `en:${label}`);
+  assert.match(rendered, /task_failed_no_charge/);
+  assert.match(rendered, /task_retry/);
+  assert.doesNotMatch(rendered, /task_not_applicable_no_charge|UNSAFE_BACKEND_DETAIL/);
   app.unmount();
 });
 

@@ -275,6 +275,7 @@ def expire_review_tasks(db: Session) -> None:
     )
     for task in expired_tasks:
         release_task_review_quota(db, task.id)
+        release_task_guest_review_quota(db, task)
         task.status = TaskStatus.EXPIRED
         task.finished_at = now
         task.error_code = 'TASK_EXPIRED'
@@ -495,8 +496,9 @@ def _complete_task(
     task.error_code = error_code
     task.error_message = error_message
     if status != TaskStatus.SUCCEEDED:
+        # A critique that produced no result never spends personal quota, for
+        # registered users and guests alike; guest network budgets stay spent.
         release_task_review_quota(db, task.id)
-    if error_code == 'REVIEW_NOT_APPLICABLE':
         release_task_guest_review_quota(db, task)
     if dead_letter:
         task.dead_lettered_at = now
