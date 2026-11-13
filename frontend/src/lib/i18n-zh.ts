@@ -645,6 +645,7 @@ export const zhTranslations = {
   task_expired_detail: '任务等待时间过长，系统已终止。',
   task_dead_letter_label: '点评暂时没能完成',
   task_dead_letter_detail: '我们尝试了多次，仍没能完成这次点评，请重新发起。',
+  task_retrying_notice: '上一次尝试没有完成，系统正在自动重试，无需重新提交。',
   task_failed_no_charge: '本次没有生成点评结果，不会扣除你的点评额度。',
   task_timeout_error: '等待时间过长，请刷新或重新发起点评。',
   task_fetch_error: '查询任务状态失败，请刷新页面重试。',

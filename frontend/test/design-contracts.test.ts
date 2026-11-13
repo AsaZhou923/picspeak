@@ -146,6 +146,24 @@ test('shared chrome participates in normal flow and owns the route main landmark
   assert.doesNotMatch(marketingHeader, /href="\/blog"/);
 });
 
+test('desktop headers keep every label on one line in all locales between md and xl', () => {
+  // Japanese labels are the widest; at 768-1279px they used to break mid-word and push into the logo.
+  const controls = read('src/components/layout/HeaderControls.tsx');
+  for (const file of ['src/components/layout/Header.tsx', 'src/components/layout/MarketingHeader.tsx']) {
+    const header = read(file);
+    assert.match(header, /<div className="flex shrink-0 items-center gap-3">/, `${file}: logo group must not collapse`);
+    assert.match(header, /<nav className="hidden md:flex items-center gap-3 text-\[13px\] lg:gap-5 xl:gap-6 xl:text-sm">/, file);
+    assert.match(header, /<HeaderRightControls headerVisibility=\{headerVisibility\} className="shrink-0" \/>/, file);
+    assert.ok((header.match(/whitespace-nowrap/g) ?? []).length >= 1, `${file}: nav links must not wrap`);
+  }
+  assert.match(read('src/components/layout/Header.tsx'), /`whitespace-nowrap transition-colors \$\{active/);
+  assert.match(read('src/components/layout/MarketingHeader.tsx'), /'whitespace-nowrap font-semibold text-gold[^']*'\s*: 'whitespace-nowrap text-ink-muted hover:text-ink'/);
+  assert.match(controls, /flex h-11 items-center gap-1 whitespace-nowrap rounded-control px-2 text-sm text-ink-muted/);
+  assert.match(controls, /<span className="hidden whitespace-nowrap sm:inline md:hidden xl:inline">\{t\('nav_more'\)\}<\/span>/);
+  const signUpButtons = controls.match(/sm:inline-flex sm:px-3 md:hidden lg:inline-flex"\s*>\s*\{authLabels\.signUp\}/g) ?? [];
+  assert.equal(signUpButtons.length, 2, 'both sign-up buttons step aside between md and lg; sign-in stays visible');
+});
+
 test('route content does not introduce a second main landmark', () => {
   const mainOwners = listTsx('src/')
     .filter((file) => /<main\b/.test(read(file)))

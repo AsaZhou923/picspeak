@@ -685,6 +685,7 @@ export const enTranslations = {
     task_expired_detail: 'The task waited too long and was terminated.',
     task_dead_letter_label: "Critique couldn't be completed",
     task_dead_letter_detail: 'We tried several times but could not finish this critique. Please start it again.',
+    task_retrying_notice: "The last attempt didn't finish, so we're retrying automatically. You don't need to submit again.",
     task_failed_no_charge: 'No critique result was produced, so this attempt did not use your critique allowance.',
     task_timeout_error: 'Waited too long. Please refresh or start a new critique.',
     task_fetch_error: 'Failed to fetch task status. Please refresh.',

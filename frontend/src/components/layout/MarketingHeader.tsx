@@ -66,13 +66,13 @@ export default function MarketingHeader() {
 
   const activeClass = (href: string) =>
     isActive(href)
-      ? 'font-semibold text-gold underline decoration-gold decoration-2 underline-offset-8'
-      : 'text-ink-muted hover:text-ink';
+      ? 'whitespace-nowrap font-semibold text-gold underline decoration-gold decoration-2 underline-offset-8'
+      : 'whitespace-nowrap text-ink-muted hover:text-ink';
 
   return (
     <header className="sticky top-0 z-50 border-b border-border-subtle bg-void">
       <div className="max-w-editorial mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-        <div className="flex items-center gap-3">
+        <div className="flex shrink-0 items-center gap-3">
           <Link
             href={homeHref}
             aria-label="PicSpeak"
@@ -101,7 +101,7 @@ export default function MarketingHeader() {
           </Link>
         </div>
 
-        <nav className="hidden md:flex items-center gap-4 text-[13px] lg:gap-6 lg:text-sm">
+        <nav className="hidden md:flex items-center gap-3 text-[13px] lg:gap-5 xl:gap-6 xl:text-sm">
           {MARKETING_LINKS.map((link) => {
             if ('href' in link && link.href === '/account/practice' && practiceEnabled !== true) return null;
             if (!('href' in link)) {

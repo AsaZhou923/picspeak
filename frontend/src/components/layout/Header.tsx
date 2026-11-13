@@ -35,7 +35,7 @@ export default function Header() {
   const homeActive = pathname === '/' || pathname === homeHref;
   const isActive = (href: string) => pathname === href || pathname?.startsWith(`${href}/`);
   const desktopLinkClass = (active: boolean) =>
-    `transition-colors ${active
+    `whitespace-nowrap transition-colors ${active
       ? 'font-semibold text-gold underline decoration-gold decoration-2 underline-offset-8'
       : 'text-ink-muted hover:text-ink'}`;
 
@@ -43,7 +43,7 @@ export default function Header() {
     <header className="sticky top-0 z-50 border-b border-border-subtle bg-void">
       <div className="max-w-editorial mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
         {/* Left side: Logo and Mobile Home */}
-        <div className="flex items-center gap-3">
+        <div className="flex shrink-0 items-center gap-3">
           <Link
             href={homeHref}
             aria-label="PicSpeak"
@@ -73,7 +73,7 @@ export default function Header() {
         </div>
 
         {/* Nav */}
-        <nav className="hidden md:flex items-center gap-4 text-[13px] lg:gap-6 lg:text-sm">
+        <nav className="hidden md:flex items-center gap-3 text-[13px] lg:gap-5 xl:gap-6 xl:text-sm">
           <Link href={homeHref} aria-current={homeActive ? 'page' : undefined} className={desktopLinkClass(homeActive)}>
             {t('nav_home')}
           </Link>
@@ -99,7 +99,7 @@ export default function Header() {
           )}
         </nav>
 
-        <HeaderRightControls headerVisibility={headerVisibility} />
+        <HeaderRightControls headerVisibility={headerVisibility} className="shrink-0" />
       </div>
 
       {headerVisibility.showMobileTabs && (

@@ -432,7 +432,12 @@ export default function TaskPage() {
             {t('task_not_applicable_no_charge')}
           </p>
         )}
-        {task?.error && !isNotApplicable && (
+        {task?.error && !isFinal && (
+          <p role="status" className="rounded-control border border-border bg-raised px-4 py-2.5 text-sm text-ink-muted">
+            {t('task_retrying_notice')}
+          </p>
+        )}
+        {task?.error && isFinal && !isNotApplicable && (
           <p role="alert" className="rounded-control border border-rust/25 bg-rust/10 px-4 py-2.5 text-sm text-rust">
             {taskErrorMessage}
           </p>

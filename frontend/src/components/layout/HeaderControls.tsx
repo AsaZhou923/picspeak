@@ -60,7 +60,7 @@ export function LanguageSwitcher() {
         ref={triggerRef}
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="flex h-11 items-center gap-1 rounded-control px-2 text-sm text-ink-muted transition-colors hover:text-ink"
+        className="flex h-11 items-center gap-1 whitespace-nowrap rounded-control px-2 text-sm text-ink-muted transition-colors hover:text-ink"
         aria-label={t('language_switcher_label')}
         aria-expanded={open}
         aria-controls="header-language-options"
@@ -143,7 +143,7 @@ function QuickLinksMenu() {
           open ? 'border-gold/40 text-gold' : ''
         }`}
       >
-        <span className="hidden sm:inline">{t('nav_more')}</span>
+        <span className="hidden whitespace-nowrap sm:inline md:hidden xl:inline">{t('nav_more')}</span>
         <ChevronDown size={13} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
@@ -251,7 +251,7 @@ export function HeaderRightControls({
                 <SignUpButton mode="modal" fallbackRedirectUrl="/workspace">
                   <button
                     type="button"
-                    className="hidden h-11 items-center justify-center whitespace-nowrap rounded-control border border-border px-2.5 text-sm text-ink-muted transition-colors hover:border-gold/40 hover:text-gold sm:inline-flex sm:px-3"
+                    className="hidden h-11 items-center justify-center whitespace-nowrap rounded-control border border-border px-2.5 text-sm text-ink-muted transition-colors hover:border-gold/40 hover:text-gold sm:inline-flex sm:px-3 md:hidden lg:inline-flex"
                   >
                     {authLabels.signUp}
                   </button>
@@ -278,7 +278,7 @@ export function HeaderRightControls({
             <SignUpButton mode="modal" fallbackRedirectUrl="/workspace">
               <button
                 type="button"
-                className="hidden h-11 items-center justify-center whitespace-nowrap rounded-control border border-border px-2.5 text-sm text-ink-muted transition-colors hover:border-gold/40 hover:text-gold sm:inline-flex sm:px-3"
+                className="hidden h-11 items-center justify-center whitespace-nowrap rounded-control border border-border px-2.5 text-sm text-ink-muted transition-colors hover:border-gold/40 hover:text-gold sm:inline-flex sm:px-3 md:hidden lg:inline-flex"
               >
                 {authLabels.signUp}
               </button>

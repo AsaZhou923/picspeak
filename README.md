@@ -139,7 +139,7 @@ The event version used GPT-5.6 Terra. The current runtime uses GPT-6 Sol (Flash)
 
 ## 📝 Changelog
 
-The latest entry is [failed critiques no longer use a guest's allowance](docs/changelog/CHANGELOG.md#2026-11-13-failed-critiques-no-charge). See the [full changelog](docs/changelog/CHANGELOG.md) for older entries.
+The latest entry is [Japanese navigation fits on one line; retries no longer look like errors](docs/changelog/CHANGELOG.md#2026-11-13-header-fit-and-retry-notice). See the [full changelog](docs/changelog/CHANGELOG.md) for older entries.
 
 ## 🤝 Contributing
 

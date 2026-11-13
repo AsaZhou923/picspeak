@@ -147,7 +147,7 @@ test('photography applicability messages use a dedicated outcome and new-photo a
 test('terminal task failures use plain language and state that no allowance was used', () => {
   const internalQueueTerms = /dead[\s-]*letter|queue|死信|队列|デッドレター|キュー/i;
   for (const dictionary of [enTranslations, zhTranslations, jaTranslations]) {
-    for (const key of ['task_failed_label', 'task_failed_detail', 'task_expired_label', 'task_expired_detail', 'task_dead_letter_label', 'task_dead_letter_detail', 'task_failed_no_charge'] as const) {
+    for (const key of ['task_failed_label', 'task_failed_detail', 'task_expired_label', 'task_expired_detail', 'task_dead_letter_label', 'task_dead_letter_detail', 'task_failed_no_charge', 'task_retrying_notice'] as const) {
       assert.ok(dictionary[key].trim(), key);
       assert.doesNotMatch(dictionary[key], internalQueueTerms, key);
     }

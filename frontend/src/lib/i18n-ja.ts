@@ -687,6 +687,7 @@ export const jaTranslations = {
     task_expired_detail: 'タスクの待機時間が長すぎたため、システムに終了されました。',
     task_dead_letter_label: '講評を完了できませんでした',
     task_dead_letter_detail: '何度か試しましたが、この講評を完了できませんでした。もう一度開始してください。',
+    task_retrying_notice: '前回の処理が完了しなかったため、自動で再試行しています。もう一度送信する必要はありません。',
     task_failed_no_charge: '講評結果は作成されなかったため、今回の講評は利用枠を消費していません。',
     task_timeout_error: '待機時間が長すぎます。後ほど手動で更新するか、評価を再開始してください。',
     task_fetch_error: 'タスク状態の取得に失敗しました。ページを更新してください。',
