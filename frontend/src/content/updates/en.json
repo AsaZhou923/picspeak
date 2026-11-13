@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-13-failed-critiques-no-charge",
+    "date": "2026-11-13",
+    "showPopup": false,
+    "title": "Failed critiques no longer use a guest's allowance",
+    "summary": "When a critique cannot be completed because of a problem on our side — repeated retries, a timeout or a model service error — guests now get their daily and monthly critique allowance back, just like signed-in users, and can try again right away. The failure page no longer shows internal terms such as “Dead Letter Queue”; it says the critique couldn't be completed and confirms that no allowance was used. Anti-abuse network and per-minute limits are unchanged.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-11-13-failed-critiques-no-charge"
+  },
+  {
     "id": "2026-11-12-public-pages-stay-open",
     "date": "2026-11-12",
     "showPopup": false,

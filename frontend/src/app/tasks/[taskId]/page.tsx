@@ -437,6 +437,11 @@ export default function TaskPage() {
             {taskErrorMessage}
           </p>
         )}
+        {isFinal && !isNotApplicable && (
+          <p role="status" className="rounded-control border border-border bg-raised px-4 py-2.5 text-sm text-ink-muted">
+            {t('task_failed_no_charge')}
+          </p>
+        )}
 
         {completedReviewId && (
           <Link href={`/reviews/${completedReviewId}`} className="ui-action-primary min-h-11 px-6 text-sm">

@@ -445,10 +445,10 @@ def _create_review(payload: ReviewCreateRequest, request: Request, db: Session, 
                     )
         except AIReviewError as exc:
             logger.warning('AI review failed for photo %s: %s', photo.public_id, exc)
+            if guest_reservations:
+                release_guest_review_reservations(db, guest_reservations)
+                db.commit()
             if exc.stage == 'applicability':
-                if guest_reservations:
-                    release_guest_review_reservations(db, guest_reservations)
-                    db.commit()
                 raise api_error(status.HTTP_422_UNPROCESSABLE_ENTITY, 'REVIEW_NOT_APPLICABLE', PHOTO_NOT_APPLICABLE_MESSAGE) from exc
             raise api_error(status.HTTP_502_BAD_GATEWAY, 'AI_REVIEW_FAILED', 'AI review could not be completed') from exc
 

@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-13-failed-critiques-no-charge",
+    "date": "2026-11-13",
+    "showPopup": false,
+    "title": "点评没能完成时，不再扣除游客额度",
+    "summary": "因为我们这边的原因（多次重试仍失败、等待超时或模型服务出错）导致点评没能完成时，游客和已登录用户一样会退还当天和当月的点评额度，可以马上重新发起。失败页不再显示“死信队列”这类内部说法，改为“点评暂时没能完成”，并说明本次没有扣除额度。防滥用的网络限额和每分钟频率限制保持不变。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-11-13-failed-critiques-no-charge"
+  },
+  {
     "id": "2026-11-12-public-pages-stay-open",
     "date": "2026-11-12",
     "showPopup": false,

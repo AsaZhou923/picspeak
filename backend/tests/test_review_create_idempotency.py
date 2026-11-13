@@ -139,6 +139,25 @@ class SynchronousReviewIdempotencyTests(unittest.TestCase):
         self.assertEqual(release.call_args.args[1], reservations)
         self.assert_state(0)
 
+    def test_sync_guest_provider_failure_releases_its_personal_reservation(self):
+        with self.Session() as db:
+            db.get(User, 1).plan = UserPlan.guest
+            db.commit()
+        reservations = [{
+            'scope': 'guest_review_daily', 'scope_key': 'server-owned-scope',
+            'window_start': datetime.now(timezone.utc).isoformat(), 'window_seconds': 86400,
+        }]
+        self.ai.side_effect = AIReviewError('upstream timeout', stage='scoring')
+        with patch.object(review_create, 'enforce_guest_review_limits', return_value={
+            '_quota_reservations': reservations,
+        }), patch.object(review_create, 'release_guest_review_reservations') as release:
+            response = self.post()
+        self.assertEqual(response.status_code, 502, response.text)
+        self.assertEqual(response.json()['detail']['code'], 'AI_REVIEW_FAILED')
+        release.assert_called_once()
+        self.assertEqual(release.call_args.args[1], reservations)
+        self.assert_state(0)
+
     def test_failed_final_commit_rolls_back_result_and_charge(self):
         def fail_result_commit(db):
             if any(isinstance(row, IdempotencyKey) for row in db.new):
