@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-13-public-critique-pages-and-genre-guides",
+    "date": "2026-11-13",
+    "showPopup": false,
+    "title": "长廊作品有了独立公开页面，新增人像、街头、风景点评指南",
+    "summary": "审核通过的长廊点评现在都有独立页面，展示照片、五个维度分数、优点、主要问题和下一次拍摄建议，并可能被搜索引擎收录。分享链接页面不会提交给搜索引擎，把作品移出长廊后页面随即下线。新增人像、街头、风景题材点评页，说明每个题材下各项分数看什么；Lens Notes 新增 7 篇文章，涵盖读懂第一份点评、夜景、手机、婚礼和胶片照片等。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-11-13-public-critique-pages-and-genre-guides"
+  },
+  {
     "id": "2026-11-13-zh-pro-one-time-pass",
     "date": "2026-11-13",
     "showPopup": false,

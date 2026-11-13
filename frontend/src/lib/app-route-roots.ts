@@ -18,11 +18,13 @@ export const APP_ROUTE_ROOTS = new Set([
   'indexnow-key.txt',
   'llms.txt',
   'payment-success',
+  'photo-critique',
   'photos',
   'privacy',
   'retake',
   'reviews',
   'robots.txt',
+  'sitemap-gallery.xml',
   'share',
   'sitemap-images.xml',
   'sitemap-news.xml',
@@ -45,7 +47,16 @@ export const PUBLIC_BLOG_SLUGS = new Set([
   'gpt-image-2-prompt-examples-workflow',
   'compare-photo-retakes-real-improvement',
   'subject-background-separation-portrait-street',
+  'read-your-first-ai-photo-critique',
+  'exposure-sharpness-focus-checks',
+  'night-low-light-photo-critique',
+  'smartphone-photo-critique-guide',
+  'wedding-photo-feedback-guide',
+  'film-photo-critique-guide',
+  'how-to-choose-your-best-shot',
 ]);
+
+export const PUBLIC_PHOTO_CRITIQUE_TOPIC_SLUGS = new Set(['portrait', 'street', 'landscape']);
 
 export const PUBLIC_PROMPT_EXAMPLE_IDS = new Set([
   'photo-convenience-store-neon-portrait',
@@ -100,6 +111,9 @@ export const PUBLIC_PROMPT_EXAMPLE_IDS = new Set([
   'photo-golden-hour-street-profile',
 ]);
 
+/** Public Gallery critique pages; mirrors `isValidGalleryReviewId` in gallery-review-page.ts. */
+const PUBLIC_GALLERY_REVIEW_SEGMENT = /^rev_[A-Za-z0-9_-]{4,64}$/;
+
 const STRICT_SINGLE_PAGE_ROOTS = new Set([
   '.well-known',
   'affiliate',
@@ -113,6 +127,7 @@ const STRICT_SINGLE_PAGE_ROOTS = new Set([
   'privacy',
   'retake',
   'robots.txt',
+  'sitemap-gallery.xml',
   'sitemap-images.xml',
   'sitemap-news.xml',
   'sitemap.xml',
@@ -146,6 +161,10 @@ export function hasKnownAppPath(pathname: string): boolean {
     if (segments.length === 1) return true;
     if (segments[1] !== 'prompts') return false;
     return segments.length === 2 || (segments.length === 3 && PUBLIC_PROMPT_EXAMPLE_IDS.has(segments[2]));
+  }
+  if (routeRoot === 'photo-critique') return segments.length === 2 && PUBLIC_PHOTO_CRITIQUE_TOPIC_SLUGS.has(segments[1]);
+  if (routeRoot === 'gallery') {
+    return segments.length === 1 || (segments.length === 2 && PUBLIC_GALLERY_REVIEW_SEGMENT.test(segments[1]));
   }
   if (routeRoot === 'author') return segments.length === 2 && segments[1] === 'asa-zhou';
   if (routeRoot === 'u') return segments.length === 2;

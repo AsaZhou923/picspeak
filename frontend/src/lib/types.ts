@@ -975,6 +975,7 @@ export type ProductAnalyticsSource =
   | 'gallery'
   | 'notifications'
   | 'prompt_library'
+  | 'topic_landing'
   | 'share'
   | 'checkout'
   | 'system_performance'

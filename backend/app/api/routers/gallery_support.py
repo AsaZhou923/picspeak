@@ -19,7 +19,8 @@ from app.api.routers.photos import (
     _photo_client_meta,
 )
 from app.core.errors import api_error
-from app.db.models import Photo, Review, ReviewLike, ReviewStatus, User
+from app.db.models import Photo, PhotoStatus, Review, ReviewLike, ReviewStatus, User, UserStatus
+from app.gallery_scoreboard_schemas import PublicGalleryReviewDetail
 from app.schemas import PublicGalleryItem
 from app.services.gallery_summary import extract_review_gallery_summary
 from app.services.object_storage import get_object_storage_client
@@ -176,6 +177,23 @@ def _public_gallery_filters() -> tuple[Any, ...]:
   )
 
 
+PUBLIC_REVIEW_LOCALES = frozenset({'zh', 'en', 'ja'})
+
+
+def _indexable_gallery_filters() -> tuple[Any, ...]:
+  """Approved Gallery critiques that may appear on public, indexable pages.
+
+  Share links are deliberately excluded: a link shared with someone is not
+  consent to search-engine indexing. Callers must join Photo and the review
+  owner (User) for the availability checks.
+  """
+  return (
+    *_public_gallery_filters(),
+    Photo.status == PhotoStatus.READY,
+    User.status == UserStatus.active,
+  )
+
+
 def _find_public_gallery_review(db: Session, review_public_id: str) -> Review:
   review = db.query(Review).filter(Review.public_id == review_public_id, *_public_gallery_filters()).first()
   if review is None:
@@ -293,6 +311,61 @@ def _public_gallery_item(
     ),
     gallery_added_at=review.gallery_added_at or review.created_at,
     created_at=review.created_at,
+  )
+
+
+def _public_review_text(payload: dict[str, Any], key: str) -> str:
+  value = payload.get(key)
+  return value.strip() if isinstance(value, str) else ''
+
+
+def _public_review_locale(payload: dict[str, Any]) -> str | None:
+  value = str(payload.get('review_locale') or '').strip().lower()
+  return value if value in PUBLIC_REVIEW_LOCALES else None
+
+
+def _public_gallery_detail(
+  request: Request,
+  review: Review,
+  photo: Photo,
+  owner: User,
+  *,
+  like_count: int = 0,
+  owner_profile_url: str | None = None,
+) -> PublicGalleryReviewDetail:
+  # Imported lazily: review_support imports this router package at module load.
+  from app.api.routers.review_support import _coerce_review_scores
+
+  payload = dict(review.result_json or {})
+  photo_available = getattr(photo, 'status', None) == PhotoStatus.READY
+  return PublicGalleryReviewDetail(
+    review_id=review.public_id,
+    photo_id=photo.public_id,
+    photo_url=(
+      _build_photo_proxy_url(
+        request, photo.public_id, owner.public_id, public_review=review, public_channel='gallery',
+      )
+      if photo_available
+      else None
+    ),
+    photo_thumbnail_url=_build_public_gallery_thumbnail_url(request, review.public_id) if photo_available else None,
+    mode=review.mode.value,
+    image_type=_review_image_type_gallery(review),
+    final_score=float(review.final_score),
+    score_version=str(payload.get('score_version') or 'legacy'),
+    scores=_coerce_review_scores(payload.get('scores')),
+    advantage=_public_review_text(payload, 'advantage'),
+    critique=_public_review_text(payload, 'critique'),
+    suggestions=_public_review_text(payload, 'suggestions'),
+    summary=_review_gallery_summary(review),
+    review_locale=_public_review_locale(payload),
+    owner_username=public_display_name(owner),
+    owner_avatar_url=owner.avatar_url,
+    owner_profile_url=owner_profile_url,
+    like_count=max(0, int(like_count)),
+    gallery_added_at=review.gallery_added_at or review.created_at,
+    created_at=review.created_at,
+    updated_at=review.updated_at or review.gallery_added_at or review.created_at,
   )
 
 

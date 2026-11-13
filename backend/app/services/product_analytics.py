@@ -28,6 +28,11 @@ STAGE_A_EVENT_CATALOG: dict[str, dict[str, Any]] = {
         'stage': 'A',
         'description': 'Gallery session entry used for source attribution.',
     },
+    'topic_page_viewed': {
+        'label': '进入题材落地页',
+        'stage': 'A',
+        'description': 'Photo-critique topic landing page entry (/photo-critique/*) used for source attribution.',
+    },
     'share_viewed': {
         'label': '进入分享页',
         'stage': 'A',
@@ -226,6 +231,7 @@ KNOWN_SOURCES = {
     'blog',
     'gallery',
     'prompt_library',
+    'topic_landing',
     'share',
     'checkout',
     'notifications',
@@ -240,10 +246,13 @@ VISITOR_EVENT_BY_SOURCE = {
     'blog': 'blog_post_viewed',
     'gallery': 'gallery_viewed',
     'prompt_library': 'prompt_library_viewed',
+    'topic_landing': 'topic_page_viewed',
     'share': 'share_viewed',
 }
 
-CONTENT_CONVERSION_SOURCES = ('blog', 'gallery', 'prompt_library', 'retake_coach')
+CONTENT_CONVERSION_SOURCES = ('blog', 'gallery', 'prompt_library', 'topic_landing', 'retake_coach')
+# Entry points reported even with zero traffic, so new surfaces are visibly measured from day one.
+CONTENT_ENTRYPOINTS_ALWAYS_REPORTED = ('gallery_detail', 'topic_landing')
 GENERATION_FUNNEL_EVENTS = (
     'generation_page_viewed',
     'prompt_library_viewed',
@@ -392,6 +401,53 @@ def _daily_reviews_with_second_use(reviews: list[ReviewSample]) -> dict[str, dic
             metric['users'] += 1
 
     return rows
+
+
+def _content_entrypoint(event: AnalyticsEventSample) -> str:
+    # Clicks carry `entrypoint`; workspace review requests carry `content_entrypoint`.
+    return _event_metadata_text(event, 'entrypoint') or _event_metadata_text(event, 'content_entrypoint')
+
+
+def _build_content_entrypoint_weekly(
+    period_events: list[AnalyticsEventSample],
+    all_events: list[AnalyticsEventSample],
+) -> dict[str, dict[str, Any]]:
+    clicks_by_entrypoint: dict[str, list[AnalyticsEventSample]] = {}
+    requests_by_entrypoint: dict[str, list[AnalyticsEventSample]] = {}
+    for event in period_events:
+        entrypoint = _content_entrypoint(event)
+        if not entrypoint:
+            continue
+        if event.event_name == 'content_workspace_clicked':
+            clicks_by_entrypoint.setdefault(entrypoint, []).append(event)
+        elif event.event_name == 'review_requested':
+            requests_by_entrypoint.setdefault(entrypoint, []).append(event)
+
+    entrypoints = sorted(set(CONTENT_ENTRYPOINTS_ALWAYS_REPORTED) | set(clicks_by_entrypoint) | set(requests_by_entrypoint))
+    report: dict[str, dict[str, Any]] = {}
+    for entrypoint in entrypoints:
+        clicks = clicks_by_entrypoint.get(entrypoint, [])
+        requests = requests_by_entrypoint.get(entrypoint, [])
+        workspace_clicks = _count_distinct(clicks, event_names={'content_workspace_clicked'}, key_builder=_guest_conversion_key)
+        review_requests = _count_distinct(requests, event_names={'review_requested'}, key_builder=_review_causal_key)
+        review_results = _review_completion_metric(requests, all_events)
+        content_slugs = {
+            slug
+            for slug in (
+                _event_metadata_text(event, 'content_slug') or _event_metadata_text(event, 'gallery_review_id')
+                for event in [*clicks, *requests]
+            )
+            if slug
+        }
+        report[entrypoint] = {
+            'workspace_clicks': workspace_clicks,
+            'review_requests': review_requests,
+            'review_results': review_results['users'],
+            'distinct_content_items': len(content_slugs),
+            'click_to_request_rate': _safe_rate(review_requests, workspace_clicks),
+            'request_result_rate': _safe_rate(review_results['users'], review_requests),
+        }
+    return report
 
 
 def _build_content_conversion_weekly(
@@ -1370,6 +1426,7 @@ def build_stage_a_snapshot(
         'daily_rows': daily_rows,
         'source_breakdown': source_breakdown,
         'content_conversion_weekly': _build_content_conversion_weekly(period_events, normalized_events),
+        'content_entrypoint_weekly': _build_content_entrypoint_weekly(period_events, normalized_events),
         'plan_breakdown': plan_breakdown,
         'locale_breakdown': _build_locale_breakdown(period_events, normalized_events),
         'generation_funnel': _build_generation_funnel(period_events, normalized_events),
@@ -1706,6 +1763,29 @@ def render_content_conversion_weekly_markdown(snapshot: dict[str, Any]) -> str:
             )
         )
 
+    entrypoint_rows = snapshot.get('content_entrypoint_weekly') or {}
+    lines.extend(
+        [
+            '',
+            '## 内容入口位',
+            '',
+            '| 入口位 | 工作台点击 | 发起点评 | cohort 查看结果 | 涉及内容数 | 点击→点评 | 点评→结果 |',
+            '| --- | ---: | ---: | ---: | ---: | ---: | ---: |',
+        ]
+    )
+    for entrypoint, row in entrypoint_rows.items():
+        lines.append(
+            '| {entrypoint} | {workspace_clicks} | {review_requests} | {review_results} | {items} | {click_rate} | {result_rate} |'.format(
+                entrypoint=entrypoint,
+                workspace_clicks=row.get('workspace_clicks', 0),
+                review_requests=row.get('review_requests', 0),
+                review_results=row.get('review_results', 0),
+                items=row.get('distinct_content_items', 0),
+                click_rate=_format_percent(row.get('click_to_request_rate', 0.0)),
+                result_rate=_format_percent(row.get('request_result_rate', 0.0)),
+            )
+        )
+
     lines.extend(
         [
             '',
@@ -1715,6 +1795,8 @@ def render_content_conversion_weekly_markdown(snapshot: dict[str, Any]) -> str:
             '- Blog 请求 cohort 结果查看率：以 `task_id/review_id` 配对 Blog 来源请求与 D0/D+1 首次结果查看；重复或无因果键事件不进入转化率。',
             '- Gallery 上传转化率：`upload_succeeded(source=gallery) / gallery_viewed`。',
             '- Prompt Library 点击率：`content_workspace_clicked(source=prompt_library) / prompt_library_viewed`。',
+            '- 题材页点击率：`content_workspace_clicked(source=topic_landing) / topic_page_viewed`；Gallery 详情页并入 gallery 来源，入口位为 `gallery_detail`。',
+            '- 入口位：点击取 `metadata.entrypoint`，点评请求取 `metadata.content_entrypoint`；涉及内容数按 `content_slug` 或 `gallery_review_id` 去重。',
             '- 工作台进入和上传成功都继承前端会话级来源，点击事件用来确认具体入口位。',
         ]
     )

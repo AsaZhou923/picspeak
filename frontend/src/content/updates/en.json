@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-13-public-critique-pages-and-genre-guides",
+    "date": "2026-11-13",
+    "showPopup": false,
+    "title": "Gallery critiques get their own public pages, plus portrait, street, and landscape guides",
+    "summary": "Each approved gallery critique now has its own page with the photo, five scores, strengths, issues, and next-shoot suggestions, and these pages may appear in search results. Share-link pages are not submitted to search engines, and removing a work from the gallery takes its page offline. New portrait, street, and landscape critique guides explain what each score checks for that genre, and Lens Notes adds seven articles, from reading your first critique to night, phone, wedding, and film photos.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-11-13-public-critique-pages-and-genre-guides"
+  },
+  {
     "id": "2026-11-13-zh-pro-one-time-pass",
     "date": "2026-11-13",
     "showPopup": false,

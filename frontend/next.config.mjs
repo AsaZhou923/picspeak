@@ -179,6 +179,9 @@ const aiContentCanonicalHeaders = [
   ['/ai-content/gallery.md', 'https://www.picspeak.art/gallery'],
   ['/ai-content/updates.md', 'https://www.picspeak.art/updates'],
   ['/ai-content/editorial-policy.md', 'https://www.picspeak.art/editorial-policy'],
+  ['/ai-content/photo-critique-portrait.md', 'https://www.picspeak.art/photo-critique/portrait'],
+  ['/ai-content/photo-critique-street.md', 'https://www.picspeak.art/photo-critique/street'],
+  ['/ai-content/photo-critique-landscape.md', 'https://www.picspeak.art/photo-critique/landscape'],
 ];
 
 const cacheablePublicPageSources = [
@@ -191,6 +194,8 @@ const cacheablePublicPageSources = [
 const localizedPublicPageSources = [
   '/',
   '/gallery',
+  '/gallery/:reviewId(rev_[A-Za-z0-9_-]+)',
+  '/photo-critique/:topic(portrait|street|landscape)',
   '/updates',
   '/generate/prompts',
   '/generate/prompts/:id*',

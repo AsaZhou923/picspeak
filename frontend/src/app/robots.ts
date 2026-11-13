@@ -1,4 +1,5 @@
 import type { MetadataRoute } from 'next';
+import { GALLERY_SITEMAP_PATH } from '../lib/gallery-review-page.ts';
 import { IMAGE_SITEMAP_PATH } from '../lib/image-sitemap.ts';
 import { NEWS_SITEMAP_PATH } from '../lib/news-sitemap.ts';
 import { siteConfig } from '../lib/site.ts';
@@ -45,6 +46,7 @@ export default function robots(): MetadataRoute.Robots {
       `${siteConfig.url}/sitemap.xml`,
       `${siteConfig.url}${IMAGE_SITEMAP_PATH}`,
       `${siteConfig.url}${NEWS_SITEMAP_PATH}`,
+      `${siteConfig.url}${GALLERY_SITEMAP_PATH}`,
     ],
     host: siteConfig.url,
   };

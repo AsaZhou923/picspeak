@@ -34,6 +34,52 @@ class ProductAnalyticsServiceTests(unittest.TestCase):
         self.assertEqual(snapshot['content_conversion_weekly']['retake_coach']['visitors'], 1)
         self.assertIn('retake_coach', snapshot['generation_funnel']['by_source'])
 
+    def test_topic_and_gallery_detail_entrypoints_are_reported_with_review_outcomes(self) -> None:
+        when = datetime(2026, 11, 14, 10, tzinfo=timezone.utc)
+
+        def event(name, minute, device, source, **metadata):
+            return AnalyticsEventSample(
+                event_name=name, occurred_at=when.replace(minute=minute), device_id=device,
+                session_id=f'{device}-session', source=source, metadata=metadata or None,
+            )
+
+        snapshot = build_stage_a_snapshot(
+            events=[
+                event('topic_page_viewed', 0, 'topic-dev', 'topic_landing'),
+                event('content_workspace_clicked', 1, 'topic-dev', 'topic_landing', entrypoint='topic_landing', content_slug='street'),
+                event('review_requested', 3, 'topic-dev', 'topic_landing', task_id='rt_topic', content_entrypoint='topic_landing', content_slug='street'),
+                event('review_result_viewed', 5, 'topic-dev', 'topic_landing', task_id='rt_topic'),
+                event('gallery_viewed', 10, 'gallery-dev', 'gallery'),
+                event('content_workspace_clicked', 11, 'gallery-dev', 'gallery', entrypoint='gallery_detail', gallery_review_id='rev_a'),
+                event('content_workspace_clicked', 12, 'gallery-dev-2', 'gallery', entrypoint='gallery_detail', gallery_review_id='rev_b'),
+            ],
+            reviews=[], start_date=when.date(), end_date=when.date(),
+        )
+
+        topic_source = snapshot['content_conversion_weekly']['topic_landing']
+        self.assertEqual(topic_source['visitors'], 1)
+        self.assertEqual(topic_source['workspace_clicks'], 1)
+
+        entrypoints = snapshot['content_entrypoint_weekly']
+        self.assertEqual(entrypoints['topic_landing']['workspace_clicks'], 1)
+        self.assertEqual(entrypoints['topic_landing']['review_requests'], 1)
+        self.assertEqual(entrypoints['topic_landing']['review_results'], 1)
+        self.assertEqual(entrypoints['topic_landing']['distinct_content_items'], 1)
+        self.assertEqual(entrypoints['gallery_detail']['workspace_clicks'], 2)
+        self.assertEqual(entrypoints['gallery_detail']['review_requests'], 0)
+        self.assertEqual(entrypoints['gallery_detail']['distinct_content_items'], 2)
+
+        markdown = render_content_conversion_weekly_markdown(snapshot)
+        self.assertIn('| topic_landing |', markdown)
+        self.assertIn('## 内容入口位', markdown)
+        self.assertIn('| gallery_detail | 2 | 0 | 0 | 2 |', markdown)
+
+    def test_new_content_entrypoints_are_reported_even_without_traffic(self) -> None:
+        when = datetime(2026, 11, 14, 10, tzinfo=timezone.utc)
+        snapshot = build_stage_a_snapshot(events=[], reviews=[], start_date=when.date(), end_date=when.date())
+        self.assertEqual(snapshot['content_entrypoint_weekly']['gallery_detail']['workspace_clicks'], 0)
+        self.assertEqual(snapshot['content_entrypoint_weekly']['topic_landing']['review_requests'], 0)
+
     def test_stage_a_event_catalog_covers_required_funnel_events(self) -> None:
         required_events = {
             'home_viewed',
