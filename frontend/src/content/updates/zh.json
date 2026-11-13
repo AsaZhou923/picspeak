@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-13-header-fit-and-retry-notice",
+    "date": "2026-11-13",
+    "showPopup": false,
+    "title": "日文导航不再折行，自动重试时不再提示“出错”",
+    "summary": "在 768–1279 像素宽的屏幕上（例如平板横屏或小尺寸笔记本），日文界面顶部导航不再把“ホーム”等标签折成两行，也不会压到 PicSpeak 标志上；所有语言在这个宽度范围内都能完整显示：注册按钮在 768–1023 像素时暂时收起（可从登录窗口进入注册），“更多”菜单只显示箭头。点评自动重试时，任务页不再显示红色错误，而是提示系统正在自动重试、无需重新提交；只有点评最终没能完成时才显示错误提示。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-11-13-header-fit-and-retry-notice"
+  },
+  {
     "id": "2026-11-13-failed-critiques-no-charge",
     "date": "2026-11-13",
     "showPopup": false,

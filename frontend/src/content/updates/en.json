@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-13-header-fit-and-retry-notice",
+    "date": "2026-11-13",
+    "showPopup": false,
+    "title": "Japanese navigation fits on one line; retries no longer look like errors",
+    "summary": "On screens 768–1279 pixels wide, such as a tablet in landscape or a small laptop, the Japanese navigation no longer breaks labels like “ホーム” onto two lines or pushes into the PicSpeak logo, and every language now fits: the Sign up button steps aside between 768 and 1023 pixels (sign-up is still available from the sign-in window) and the More menu shows just its arrow. While a critique retries automatically, the task page now shows a calm note that it is retrying and you don't need to submit again, instead of a red error. The error message appears only if the critique finally can't be completed.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-11-13-header-fit-and-retry-notice"
+  },
+  {
     "id": "2026-11-13-failed-critiques-no-charge",
     "date": "2026-11-13",
     "showPopup": false,

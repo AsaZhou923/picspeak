@@ -139,7 +139,7 @@ PicSpeak 在 Build Week 之前已经存在。活动期间，单张点评扩展�
 
 ## 📝 更新记录
 
-最新条目：[点评没能完成时，不再扣除游客额度](docs/changelog/CHANGELOG.md#2026-11-13-failed-critiques-no-charge)。更早的条目见[完整 Changelog](docs/changelog/CHANGELOG.md)。
+最新条目：[日文导航不再折行，自动重试时不再提示“出错”](docs/changelog/CHANGELOG.md#2026-11-13-header-fit-and-retry-notice)。更早的条目见[完整 Changelog](docs/changelog/CHANGELOG.md)。
 
 ## 🤝 参与贡献
 

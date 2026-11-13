@@ -180,6 +180,16 @@ test('service failures keep the ordinary failure state and retry action', async 
   app.unmount();
 });
 
+for (const status of ['PENDING', 'RUNNING'] as const) test(`a ${status} task with a retryable error shows a neutral retry notice instead of a failure alert`, async () => {
+  const app = harness(taskFile);
+  app.api.getTask = async () => ({ ...task('task-a', status), error: { code: 'AI_CALL_FAILED', message: 'UNSAFE_BACKEND_DETAIL', retryable: true } });
+  app.render(); await app.flush();
+  const rendered = JSON.stringify(app.render());
+  assert.match(rendered, /task_retrying_notice/);
+  assert.doesNotMatch(rendered, /"role":"alert"|text-rust|task_failed_no_charge|task_retry"|UNSAFE_BACKEND_DETAIL/);
+  app.unmount();
+});
+
 for (const status of ['DEAD_LETTER', 'EXPIRED'] as const) test(`${status} tasks explain the outcome in user terms and confirm no allowance was used`, async () => {
   const app = harness(taskFile);
   app.api.getTask = async () => ({ ...task('task-a', status), error: { code: 'AI_CALL_FAILED', message: 'UNSAFE_BACKEND_DETAIL' } });
