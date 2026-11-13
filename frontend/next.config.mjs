@@ -168,6 +168,14 @@ const localizedPublicPageCacheHeaders = [
   { key: 'Vary', value: 'Cookie, Accept-Language' },
 ];
 
+// Public Gallery critique pages: a short shared-cache window without stale
+// serving, so withdrawing or deleting a critique takes the page offline quickly.
+const galleryReviewPageSource = '/gallery/:reviewId(rev_[A-Za-z0-9_-]+)';
+const galleryReviewPageCacheHeaders = [
+  { key: 'Cache-Control', value: 'public, s-maxage=60' },
+  { key: 'Vary', value: 'Cookie, Accept-Language' },
+];
+
 const aiDiscoveryIndexHeaders = [
   { key: 'X-Robots-Tag', value: 'noindex, follow' },
 ];
@@ -194,7 +202,6 @@ const cacheablePublicPageSources = [
 const localizedPublicPageSources = [
   '/',
   '/gallery',
-  '/gallery/:reviewId(rev_[A-Za-z0-9_-]+)',
   '/photo-critique/:topic(portrait|street|landscape)',
   '/updates',
   '/generate/prompts',
@@ -255,6 +262,10 @@ const nextConfig = {
         source,
         headers: localizedPublicPageCacheHeaders,
       })),
+      {
+        source: galleryReviewPageSource,
+        headers: galleryReviewPageCacheHeaders,
+      },
       ...['/llms.txt', '/.well-known/llms.txt', '/ai-content/:slug*'].map((source) => ({
         source,
         headers: aiDiscoveryIndexHeaders,

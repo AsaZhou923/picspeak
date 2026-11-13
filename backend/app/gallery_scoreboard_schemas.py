@@ -51,6 +51,8 @@ class PublicGalleryReviewDetail(BaseModel):
   owner_avatar_url: str | None = None
   owner_profile_url: str | None = None
   like_count: int = 0
+  # Only true for an authorized owner request; anonymous/cached reads are always false.
+  viewer_is_owner: bool = False
   gallery_added_at: datetime
   created_at: datetime
   updated_at: datetime

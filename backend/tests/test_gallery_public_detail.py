@@ -44,6 +44,7 @@ def _review(**overrides):
     values = {
         'id': 41,
         'public_id': 'rev_public_1',
+        'owner_user_id': 7,
         'mode': ReviewMode.flash,
         'image_type': 'street',
         'final_score': Decimal('7.40'),
@@ -122,7 +123,7 @@ class PublicGalleryDetailPayloadTests(unittest.TestCase):
                 'review_id', 'photo_id', 'photo_url', 'photo_thumbnail_url', 'mode', 'image_type',
                 'final_score', 'score_version', 'scores', 'advantage', 'critique', 'suggestions',
                 'summary', 'review_locale', 'owner_username', 'owner_avatar_url', 'owner_profile_url',
-                'like_count', 'gallery_added_at', 'created_at', 'updated_at',
+                'like_count', 'viewer_is_owner', 'gallery_added_at', 'created_at', 'updated_at',
             },
         )
         serialized = repr(payload)
@@ -192,7 +193,36 @@ class PublicGalleryDetailRouteTests(unittest.TestCase):
         self.assertEqual(body['owner_username'], 'lens_owner')
         self.assertEqual(body['like_count'], 3)
         self.assertEqual(response.headers['cache-control'], 'public, max-age=60')
+        self.assertFalse(body['viewer_is_owner'])
         self.assertNotIn('set-cookie', {key.lower() for key in response.headers})
+
+    def _get_with_viewer(self, viewer):
+        db = self._db_returning((_review(), _photo(), _owner()))
+        with patch(
+            'app.api.routers.gallery_support._build_photo_proxy_url',
+            return_value='https://api.example.test/photo',
+        ), patch(
+            'app.api.routers.gallery_support._build_public_gallery_thumbnail_url',
+            return_value='https://api.example.test/thumb',
+        ), patch('app.api.routers.gallery._gallery_like_count', return_value=0), patch(
+            'app.api.routers.gallery._optional_gallery_viewer', return_value=viewer,
+        ):
+            return self._client(db).get('/gallery/rev_public_1', headers={'Authorization': 'Bearer token'})
+
+    def test_owner_request_is_flagged_and_never_shared_cached(self) -> None:
+        response = self._get_with_viewer(SimpleNamespace(id=7))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()['viewer_is_owner'])
+        self.assertEqual(response.headers['cache-control'], 'private, no-store')
+        self.assertEqual(response.headers['vary'], 'Authorization')
+
+    def test_other_or_invalid_viewer_is_not_owner(self) -> None:
+        for viewer in (SimpleNamespace(id=8), None):
+            response = self._get_with_viewer(viewer)
+            self.assertEqual(response.status_code, 200)
+            self.assertFalse(response.json()['viewer_is_owner'])
+            self.assertEqual(response.headers['cache-control'], 'private, no-store')
 
     def test_sitemap_entries_paginate_by_internal_id(self) -> None:
         rows = [

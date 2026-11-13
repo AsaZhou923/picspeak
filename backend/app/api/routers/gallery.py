@@ -340,12 +340,15 @@ def get_public_gallery_review(
   request: Request,
   review_id: str,
   response: Response,
+  authorization: str | None = Header(default=None),
   db: Session = Depends(get_db),
 ):
   """Anonymous, cacheable read of one approved Gallery critique.
 
   Deliberately takes no actor dependency, so crawler and server-render requests
-  never mint guest identities. Share-link-only critiques return 404.
+  never mint guest identities. Share-link-only critiques return 404. An optional
+  bearer token only sets `viewer_is_owner` (so the owner sees their action
+  entry points); such responses are private and never shared-cached.
   """
   row = (
     db.query(Review, Photo, User)
@@ -357,7 +360,12 @@ def get_public_gallery_review(
   if row is None:
     raise api_error(status.HTTP_404_NOT_FOUND, 'REVIEW_NOT_FOUND', 'Review not found')
   review, photo, owner = row
-  response.headers['Cache-Control'] = PUBLIC_GALLERY_DETAIL_CACHE_CONTROL
+  viewer = _optional_gallery_viewer(authorization, db)
+  if authorization:
+    response.headers['Cache-Control'] = 'private, no-store'
+  else:
+    response.headers['Cache-Control'] = PUBLIC_GALLERY_DETAIL_CACHE_CONTROL
+  response.headers['Vary'] = 'Authorization'
   return _public_gallery_detail(
     request,
     review,
@@ -365,4 +373,5 @@ def get_public_gallery_review(
     owner,
     like_count=_gallery_like_count(db, review.id),
     owner_profile_url=_owner_profile_url(owner),
+    viewer_is_owner=viewer is not None and viewer.id == review.owner_user_id,
   )

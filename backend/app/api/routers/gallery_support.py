@@ -332,6 +332,7 @@ def _public_gallery_detail(
   *,
   like_count: int = 0,
   owner_profile_url: str | None = None,
+  viewer_is_owner: bool = False,
 ) -> PublicGalleryReviewDetail:
   # Imported lazily: review_support imports this router package at module load.
   from app.api.routers.review_support import _coerce_review_scores
@@ -363,6 +364,7 @@ def _public_gallery_detail(
     owner_avatar_url=owner.avatar_url,
     owner_profile_url=owner_profile_url,
     like_count=max(0, int(like_count)),
+    viewer_is_owner=bool(viewer_is_owner),
     gallery_added_at=review.gallery_added_at or review.created_at,
     created_at=review.created_at,
     updated_at=review.updated_at or review.gallery_added_at or review.created_at,

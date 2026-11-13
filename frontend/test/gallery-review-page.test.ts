@@ -11,6 +11,7 @@ import {
   buildGalleryReviewWorkspaceHref,
   buildGallerySitemapXml,
   buildGalleryTypeFilterHref,
+  getGalleryReviewChromeCopy,
   galleryReviewPath,
   isIndexableGalleryReview,
   isValidGalleryReviewId,
@@ -146,7 +147,24 @@ test('gallery detail pages are discoverable through cards, robots and cache rule
   assert.match(card, /const reviewHref = `\/gallery\/\$\{item\.review_id\}/);
   assert.match(clientPage, /`\/gallery\/\$\{reviewId\}\?back=/);
   assert.match(robots, /GALLERY_SITEMAP_PATH/);
-  assert.match(localizedSources, /'\/gallery\/:reviewId\(rev_\[A-Za-z0-9_-\]\+\)'/);
+  // Short, non-stale cache window of its own rather than the hour-long public page rule.
+  assert.match(nextConfig, /const galleryReviewPageSource = '\/gallery\/:reviewId\(rev_\[A-Za-z0-9_-\]\+\)'/);
+  assert.doesNotMatch(localizedSources, /reviewId/);
+  assert.match(source('src', 'app', 'gallery', '[reviewId]', 'page.tsx'), /export const revalidate = 60;/);
+});
+
+test('public critique view hides withdrawn critiques and keeps owner actions visible', () => {
+  const view = source('src', 'components', 'gallery', 'PublicGalleryReviewView.tsx');
+
+  assert.match(view, /response\.status === 404/);
+  assert.match(view, /live\.unavailable \?/);
+  assert.match(view, /viewer_is_owner/);
+  assert.match(view, /live\.viewerIsOwner &&/);
+  assert.match(view, /chrome\.ownerAction/);
+  for (const locale of ['en', 'zh', 'ja'] as const) {
+    const chrome = getGalleryReviewChromeCopy(locale);
+    assert.ok(chrome.ownerAction && chrome.ownerBody && chrome.unavailableTitle && chrome.unavailableBody);
+  }
 });
 
 test('gallery submission copy discloses search indexing in every locale', () => {

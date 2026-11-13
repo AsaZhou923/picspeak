@@ -38,6 +38,8 @@ export type PublicGalleryReview = {
   owner_avatar_url: string | null;
   owner_profile_url: string | null;
   like_count: number;
+  /** Only set on the owner's own authorized client read; always false in cached server HTML. */
+  viewer_is_owner?: boolean;
   gallery_added_at: string;
   created_at: string;
   updated_at: string;
@@ -71,6 +73,12 @@ type ChromeCopy = {
   ctaBody: (typeLabel: string) => string;
   ctaPrimary: string;
   interactiveView: string;
+  ownerTitle: string;
+  ownerBody: string;
+  ownerAction: string;
+  unavailableTitle: string;
+  unavailableBody: string;
+  unavailableAction: string;
   moreOfType: (typeLabel: string) => string;
   topicGuide: (typeLabel: string) => string;
 };
@@ -162,6 +170,12 @@ const CHROME_COPY: Record<SupportedLocale, ChromeCopy> = {
     ctaBody: (typeLabel) => `Upload a ${typeLabel.toLowerCase()} frame and PicSpeak scores the same five dimensions with a concrete next-shoot action.`,
     ctaPrimary: 'Critique my photo',
     interactiveView: 'Open the interactive critique view',
+    ownerTitle: 'This is your critique',
+    ownerBody: 'Manage Gallery display, favorites, sharing and export from your critique view.',
+    ownerAction: 'Manage this critique',
+    unavailableTitle: 'This critique is no longer public',
+    unavailableBody: 'Its owner withdrew it from the Gallery or deleted it.',
+    unavailableAction: 'Browse the Gallery',
     moreOfType: (typeLabel) => `More ${typeLabel.toLowerCase()} critiques`,
     topicGuide: (typeLabel) => `How PicSpeak critiques ${typeLabel.toLowerCase()} photos`,
   },
@@ -175,6 +189,12 @@ const CHROME_COPY: Record<SupportedLocale, ChromeCopy> = {
     ctaBody: (typeLabel) => `上传一张${typeLabel}照片，PicSpeak 会按同样的五个维度打分，并给出下一次拍摄可以执行的建议。`,
     ctaPrimary: '点评我的照片',
     interactiveView: '打开完整点评视图',
+    ownerTitle: '这是你的点评',
+    ownerBody: '在点评页里管理长廊展示、收藏、分享和导出。',
+    ownerAction: '管理这条点评',
+    unavailableTitle: '这条点评已不再公开',
+    unavailableBody: '作者已将它移出长廊或删除。',
+    unavailableAction: '浏览长廊',
     moreOfType: (typeLabel) => `更多${typeLabel}点评`,
     topicGuide: (typeLabel) => `PicSpeak 如何点评${typeLabel}照片`,
   },
@@ -188,6 +208,12 @@ const CHROME_COPY: Record<SupportedLocale, ChromeCopy> = {
     ctaBody: (typeLabel) => `${typeLabel}写真をアップロードすると、同じ5項目で採点し、次の撮影で実行できる提案を返します。`,
     ctaPrimary: '写真を講評する',
     interactiveView: 'インタラクティブ表示で開く',
+    ownerTitle: 'あなたの講評です',
+    ownerBody: 'ギャラリー掲載、お気に入り、共有、書き出しは講評画面で管理できます。',
+    ownerAction: 'この講評を管理',
+    unavailableTitle: 'この講評は公開されていません',
+    unavailableBody: '投稿者がギャラリーから取り下げたか、削除しました。',
+    unavailableAction: 'ギャラリーを見る',
     moreOfType: (typeLabel) => `${typeLabel}の講評をもっと見る`,
     topicGuide: (typeLabel) => `PicSpeak の${typeLabel}写真講評について`,
   },

@@ -6,6 +6,12 @@ import {
 } from '@/lib/gallery-review-page';
 
 export const GALLERY_REVIEW_REVALIDATE_SECONDS = 3600;
+/**
+ * Critique detail cache window. Kept short (matching the API's public max-age)
+ * so withdrawing or deleting a critique takes its public page offline within
+ * about a minute; the client also re-checks availability after hydration.
+ */
+export const GALLERY_REVIEW_DETAIL_REVALIDATE_SECONDS = 60;
 const SITEMAP_PAGE_SIZE = 1000;
 const SITEMAP_MAX_PAGES = 20;
 
@@ -18,7 +24,7 @@ export async function fetchPublicGalleryReview(reviewId: string): Promise<Public
   if (!isValidGalleryReviewId(reviewId)) return null;
   const response = await fetch(buildGalleryApiUrl(`/gallery/${encodeURIComponent(reviewId)}`), {
     headers: { Accept: 'application/json' },
-    next: { revalidate: GALLERY_REVIEW_REVALIDATE_SECONDS, tags: [`gallery-review:${reviewId}`] },
+    next: { revalidate: GALLERY_REVIEW_DETAIL_REVALIDATE_SECONDS, tags: [`gallery-review:${reviewId}`] },
   });
   if (response.status === 404) return null;
   if (!response.ok) {
