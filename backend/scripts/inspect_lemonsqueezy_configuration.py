@@ -30,6 +30,7 @@ except Exception:
 
 VARIANT_SETTINGS = {
     'pro_monthly': 'LEMONSQUEEZY_PRO_VARIANT_ID',
+    'pro_one_time': 'LEMONSQUEEZY_PRO_ONE_TIME_VARIANT_ID',
     'legacy_zh': 'LEMONSQUEEZY_ZH_PRO_VARIANT_ID',
     'image_credits': 'LEMONSQUEEZY_IMAGE_CREDIT_PACK_VARIANT_ID',
 }

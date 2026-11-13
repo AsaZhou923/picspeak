@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-13-zh-pro-one-time-pass",
+    "date": "2026-11-13",
+    "showPopup": false,
+    "title": "中国語版の Pro 購入が WeChat Pay・Alipay に対応",
+    "summary": "中国語の画面から Pro にアップグレードすると、WeChat Pay または Alipay で支払える 30 日間のパスを購入できるようになりました。自動更新はなく、期間終了後に再購入できます。支払い後は Pro が自動で有効になります。英語・日本語の購入は引き続き月額サブスクリプションで、既存の契約は変わりません。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-11-13-zh-pro-one-time-pass"
+  },
+  {
     "id": "2026-11-13-header-fit-and-retry-notice",
     "date": "2026-11-13",
     "showPopup": false,

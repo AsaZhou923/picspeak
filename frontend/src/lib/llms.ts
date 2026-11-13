@@ -33,7 +33,7 @@ export function getLlmsText(): string {
 ## Pricing and plans
 - Guest: 1 critique per day, 30 per month, Flash only, no sign-up required, no saved history; create a Free account or sign in after the allowance is used
 - Free account: 60 critiques per month, up to 5 per day, 10 Pro-mode critiques per month, 15-day history, and 3 monthly AI image credits
-- Pro: $3.99/month auto-renewing subscription in every supported locale, cancel anytime; full critique history and originals while subscribed, no monthly critique limit, priority processing, and 199 monthly AI image credits
+- Pro: $3.99/month auto-renewing subscription, cancel anytime; Chinese checkout instead sells a $3.99 30-day one-time pass with WeChat Pay / Alipay and no auto-renewal; full critique history and originals while subscribed, no monthly critique limit, priority processing, and 199 monthly AI image credits
 - Pro monthly soft limit: after 150 critiques in a UTC calendar month, new critiques are limited to 2 per minute until the next UTC month; the monthly critique total remains unlimited and no additional fee is charged automatically
 - After Pro ends: Free history limits apply and originals have a 15-day grace period unless another protection applies; active share links and approved visible Gallery channels retain their public works
 - Existing Pro prices and already-purchased membership expiry dates are unchanged; activation codes remain redeemable

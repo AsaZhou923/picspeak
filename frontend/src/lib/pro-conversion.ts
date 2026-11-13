@@ -62,7 +62,7 @@ const COPY: Record<ProConversionLocale, LocaleCopy> = {
     boundary: {
       label: 'Free / Pro 边界',
       headline: 'Free 开始体验，Pro 留下完整摄影记录',
-      body: '两个计划都能拿到完整点评、下一次拍摄建议和复拍对比；Pro 在订阅期内保留完整历史与原图，点评不限月度次数。',
+      body: '两个计划都能拿到完整点评、下一次拍摄建议和复拍对比；Pro 在有效期内保留完整历史与原图，点评不限月度次数。',
       free: {
         title: 'Free',
         body: '适合偶尔点评和完成一轮复拍：完整建议和复拍对比都可用，次数与历史有限。',
@@ -70,8 +70,8 @@ const COPY: Record<ProConversionLocale, LocaleCopy> = {
       },
       pro: {
         title: 'Pro',
-        body: '把摄影记录留在一起：订阅期内完整保存点评与原图，随时回看，并继续点评。',
-        features: ['订阅期内保留完整历史与原图', '点评不限月度次数', '每次都可用 Pro 深度模式'],
+        body: '把摄影记录留在一起：有效期内完整保存点评与原图，随时回看，并继续点评。',
+        features: ['有效期内保留完整历史与原图', '点评不限月度次数', '每次都可用 Pro 深度模式'],
       },
     },
     triggers: {
@@ -93,7 +93,7 @@ const COPY: Record<ProConversionLocale, LocaleCopy> = {
       history_trend: {
         badge: '趋势复盘',
         title: '过去的拍摄，随时回来复盘',
-        body: 'Free 保留最近 15 天的记录；Pro 在订阅期内保留完整历史和原图，便于回看点评与每一轮复拍依据。分数变化本身不代表能力提升。',
+        body: 'Free 保留最近 15 天的记录；Pro 在有效期内保留完整历史和原图，便于回看点评与每一轮复拍依据。分数变化本身不代表能力提升。',
       },
       retake_compare: {
         badge: '复拍对比',
@@ -103,15 +103,15 @@ const COPY: Record<ProConversionLocale, LocaleCopy> = {
       standard: {
         badge: '摄影记录',
         title: '你的摄影记录，都留在这里',
-        body: 'Pro 在订阅期内保留完整点评历史与原图，方便随时回看；点评不限月度次数，并包含每次可选的深度模式与优先处理。每个 UTC 月达到 150 次会提醒用量，新点评降为每分钟最多 2 次，至下个 UTC 月恢复；月度总量不限，不自动加收费用。',
+        body: 'Pro 在有效期内保留完整点评历史与原图，方便随时回看；点评不限月度次数，并包含每次可选的深度模式与优先处理。每个 UTC 月达到 150 次会提醒用量，新点评降为每分钟最多 2 次，至下个 UTC 月恢复；月度总量不限，不自动加收费用。',
       },
     },
     usageDecision: {
       label: '套餐与记录',
       headline: '让每次拍摄与点评都有迹可循',
-      body: 'Free 可完成点评与复拍对比；Pro 在订阅期内保留完整历史与原图，支持不限月度次数的持续点评。',
+      body: 'Free 可完成点评与复拍对比；Pro 在有效期内保留完整历史与原图，支持不限月度次数的持续点评。',
       proHeadline: '你的 Pro 已经开启',
-      proBody: '订阅期内完整历史与原图都保留在这里，随时可以回看并继续点评。月度 150 次后，新点评每分钟最多 2 次，至下个 UTC 月恢复；总量仍不限，不自动加收费用。',
+      proBody: '有效期内完整历史与原图都保留在这里，随时可以回看并继续点评。月度 150 次后，新点评每分钟最多 2 次，至下个 UTC 月恢复；总量仍不限，不自动加收费用。',
       differencesTitle: '付费前后最关键的变化',
       differences: [
         {
@@ -127,11 +127,11 @@ const COPY: Record<ProConversionLocale, LocaleCopy> = {
         {
           label: '历史保留',
           before: 'Free 保留最近 15 天的记录。',
-          after: 'Pro 在订阅期内保留完整历史和原图。',
+          after: 'Pro 在有效期内保留完整历史和原图。',
         },
       ],
       outcomesTitle: '升级后你得到的',
-      outcomes: ['订阅期内的完整历史与原图', '不限月度次数的点评与复拍对比', '每次可选深度模式与优先处理'],
+      outcomes: ['有效期内的完整历史与原图', '不限月度次数的点评与复拍对比', '每次可选深度模式与优先处理'],
     },
   },
   en: {

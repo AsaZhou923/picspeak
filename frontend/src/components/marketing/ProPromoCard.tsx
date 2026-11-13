@@ -50,42 +50,42 @@ function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
   if (locale === 'zh') {
     return {
       badge: 'Pro',
-      discount: '按月订阅',
-      price: '$3.99 / 月',
+      discount: '30 天一次性开通',
+      price: '$3.99 / 30 天',
       oldPrice: '',
       footnote: CN_PRO_CHECKOUT_TIP,
       features: proFeatures,
       guestCta: '先注册或登录 Free',
       freeCta: '升级到 Pro',
       proCta: '查看账户页',
-      proStatus: '你当前已经是 Pro，可以在账户页管理订阅，或兑换已经收到的激活码。',
+      proStatus: '你当前已经是 Pro，可以在账户页查看有效期，或兑换已经收到的激活码。',
       activationCta: '输入激活码',
       activationRenewCta: '输入新的激活码',
       scenes: {
         workspace: {
           default: {
             title: workspaceTrigger.title,
-            body: `${workspaceTrigger.body} Pro 为 $3.99/月，按月自动续费，可随时取消；价格与已购会员有效期保持不变。`,
+            body: `${workspaceTrigger.body} Pro 为 $3.99 一次性开通 30 天，不会自动续费，支持微信 / 支付宝；到期后可再次购买。`,
           },
           pro: {
             title: '你的 Pro 已开通',
-            body: '订阅期内完整历史与原图都保留在这里，可以随时回看并继续点评。',
+            body: '有效期内完整历史与原图都保留在这里，可以随时回看并继续点评。',
           },
         },
         gallery: {
           default: {
             title: usageTrigger.title,
-            body: `${usageTrigger.body} Pro 为 $3.99/月，按月自动续费，可随时取消；价格与已购会员有效期保持不变。`,
+            body: `${usageTrigger.body} Pro 为 $3.99 一次性开通 30 天，不会自动续费，支持微信 / 支付宝；到期后可再次购买。`,
           },
           pro: {
             title: '你的 Pro 已开通',
-            body: '可以继续点评，并在订阅期内随时回看完整历史与原图。',
+            body: '可以继续点评，并在有效期内随时回看完整历史与原图。',
           },
         },
         usage: {
           default: {
             title: usageTrigger.title,
-            body: `${usageTrigger.body} Pro 为 $3.99/月，按月自动续费，可随时取消；价格与已购会员有效期保持不变。`,
+            body: `${usageTrigger.body} Pro 为 $3.99 一次性开通 30 天，不会自动续费，支持微信 / 支付宝；到期后可再次购买。`,
           },
           pro: {
             title: '当前账号已是 Pro',
@@ -95,11 +95,11 @@ function getPromoCopy(locale: 'zh' | 'en' | 'ja'): LocalePromoCopy {
         review: {
           default: {
             title: reviewTrigger.title,
-            body: `${reviewTrigger.body} Pro 为 $3.99/月，按月自动续费，可随时取消；价格与已购会员有效期保持不变。`,
+            body: `${reviewTrigger.body} Pro 为 $3.99 一次性开通 30 天，不会自动续费，支持微信 / 支付宝；到期后可再次购买。`,
           },
           pro: {
             title: '这次点评，也留在你的摄影记录里',
-            body: '当前订阅已生效，完整历史与原图会在订阅期内保留，方便日后回看。',
+            body: '当前 Pro 已生效，完整历史与原图会在有效期内保留，方便日后回看。',
           },
         },
       },

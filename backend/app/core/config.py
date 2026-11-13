@@ -85,6 +85,8 @@ class Settings(BaseSettings):
     lemonsqueezy_zh_pro_variant_id: str = ''
     lemonsqueezy_pro_checkout_url: str = ''
     lemonsqueezy_zh_pro_checkout_url: str = ''
+    lemonsqueezy_pro_one_time_variant_id: str = ''
+    lemonsqueezy_pro_one_time_checkout_url: str = ''
     lemonsqueezy_image_credit_pack_checkout_url: str = ''
     lemonsqueezy_image_credit_pack_variant_id: str = ''
     lemonsqueezy_webhook_signing_secret: str = ''
@@ -247,6 +249,8 @@ class Settings(BaseSettings):
         'lemonsqueezy_zh_pro_variant_id',
         'lemonsqueezy_pro_checkout_url',
         'lemonsqueezy_zh_pro_checkout_url',
+        'lemonsqueezy_pro_one_time_variant_id',
+        'lemonsqueezy_pro_one_time_checkout_url',
         'lemonsqueezy_image_credit_pack_checkout_url',
         'lemonsqueezy_image_credit_pack_variant_id',
         'lemonsqueezy_webhook_signing_secret',
@@ -291,6 +295,7 @@ class Settings(BaseSettings):
         'clerk_api_url',
         'lemonsqueezy_pro_checkout_url',
         'lemonsqueezy_zh_pro_checkout_url',
+        'lemonsqueezy_pro_one_time_checkout_url',
         'lemonsqueezy_webhook_url',
         'lemonsqueezy_checkout_success_url',
         'openai_api_base_url',
