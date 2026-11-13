@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-13-zh-pro-one-time-pass",
+    "date": "2026-11-13",
+    "showPopup": false,
+    "title": "中文 Pro 支持微信 / 支付宝，一次开通 30 天",
+    "summary": "在中文界面升级 Pro，现在是 $3.99 一次性开通 30 天，可以用微信或支付宝付款，不会自动续费；到期后可再次购买。支付成功后 Pro 会自动生效，无需激活码。已开通的月订阅不受影响，仍可在账户页管理或取消；激活码照常可以兑换。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-11-13-zh-pro-one-time-pass"
+  },
+  {
     "id": "2026-11-13-header-fit-and-retry-notice",
     "date": "2026-11-13",
     "showPopup": false,

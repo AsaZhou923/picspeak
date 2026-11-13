@@ -31,11 +31,11 @@ test('private critique access update describes user benefits without draft statu
   }
 });
 
-test('header-fit and retry-notice fix is the latest update in every locale without a popup', () => {
+test('Chinese one-time Pro pass record is the latest update in every locale without a popup', () => {
   for (const locale of ['zh', 'en', 'ja'] as const) {
     const latest = getLatestProductUpdate(locale);
     assert.ok(latest);
-    assert.equal(latest.id, '2026-11-13-header-fit-and-retry-notice');
+    assert.equal(latest.id, '2026-11-13-zh-pro-one-time-pass');
     assert.equal(latest.date, '2026-11-13');
     assert.doesNotMatch(latest.title + latest.summary, /准备中|尚未发布|upcoming|not yet released|準備中|まだ公開/i);
     assert.equal(latest.showPopup, false);

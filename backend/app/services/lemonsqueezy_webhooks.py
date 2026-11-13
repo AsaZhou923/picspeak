@@ -19,6 +19,9 @@ from app.db.models import BillingSubscription, BillingWebhookEvent, UsageLedger,
 from app.services.billing_access import current_period_ends_at, subscription_grants_pro_access, sync_user_billing_plan
 from app.services.generation_credit_reservations import PURCHASED_BALANCE_VERSION, generation_credit_balance_snapshot
 from app.services.lemonsqueezy import (
+    ONE_TIME_PRO_BILLING_MODE,
+    ONE_TIME_PRO_DURATION_DAYS,
+    ONE_TIME_PRO_GRANT_PURPOSE,
     LemonSqueezyAPIError,
     LemonSqueezyConfigurationError,
     retrieve_subscription,
@@ -45,9 +48,6 @@ HANDLED_LEMONSQUEEZY_EVENTS = {
 
 IMAGE_CREDIT_PACK_KEY = 'image_credits_300'
 IMAGE_CREDIT_PACK_CREDITS = 300
-ONE_TIME_PRO_BILLING_MODE = 'one_time_pro'
-ONE_TIME_PRO_DURATION_DAYS = 30
-ONE_TIME_PRO_GRANT_PURPOSE = 'lemonsqueezy_one_time_pro'
 CREDIT_PACK_GRANT_TYPE = 'lemonsqueezy_credit_pack'
 CREDIT_PACK_REFUND_GRANT_TYPE = 'lemonsqueezy_credit_pack_refund'
 ONE_TIME_PRO_REFUNDED_STATUS = 'refunded'
@@ -354,9 +354,18 @@ def _variant_matches_pro_plan(variant_id: str | None) -> bool:
 
 
 def _variant_matches_one_time_pro_plan(variant_id: str | None) -> bool:
-    configured = settings.lemonsqueezy_zh_pro_variant_id.strip()
+    # The current one-time variant sells new passes; the legacy Chinese variant
+    # stays accepted so delayed or replayed orders from the old product resolve.
+    configured = {
+        value
+        for value in (
+            settings.lemonsqueezy_pro_one_time_variant_id.strip(),
+            settings.lemonsqueezy_zh_pro_variant_id.strip(),
+        )
+        if value
+    }
     if configured:
-        return variant_id == configured
+        return bool(variant_id) and variant_id in configured
     return _variant_matches_pro_plan(variant_id)
 
 

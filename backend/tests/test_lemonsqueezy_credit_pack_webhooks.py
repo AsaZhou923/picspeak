@@ -189,6 +189,13 @@ class LemonSqueezyCreditPackWebhookTests(unittest.TestCase):
         record_product_event.assert_not_called()
 
     def test_order_created_grants_one_time_pro_without_auto_renewal(self) -> None:
+        # The current one-time variant sells new passes; the legacy Chinese
+        # variant must keep resolving delayed orders from the old product.
+        for variant_id in ('1445229', '1418094'):
+            with self.subTest(variant_id=variant_id):
+                self._assert_one_time_pro_granted(variant_id)
+
+    def _assert_one_time_pro_granted(self, variant_id: str) -> None:
         user = User(
             id=53,
             public_id='usr_one_time_pro_paid',
@@ -224,12 +231,15 @@ class LemonSqueezyCreditPackWebhookTests(unittest.TestCase):
         ]
 
         with patch('app.services.lemonsqueezy_webhooks.settings.lemonsqueezy_zh_pro_variant_id', '1418094'), patch(
+            'app.services.lemonsqueezy_webhooks.settings.lemonsqueezy_pro_one_time_variant_id',
+            '1445229',
+        ), patch(
             'app.services.lemonsqueezy_webhooks.settings.lemonsqueezy_pro_variant_id',
             '1417896',
         ), patch(
             'app.services.lemonsqueezy_webhooks.record_product_event'
         ) as record_product_event:
-            outcome, user_public_id = process_lemonsqueezy_webhook_event(db, _one_time_pro_event())
+            outcome, user_public_id = process_lemonsqueezy_webhook_event(db, _one_time_pro_event(variant_id=variant_id))
 
         self.assertEqual(outcome, 'one_time_pro_granted')
         self.assertEqual(user_public_id, 'usr_one_time_pro_paid')
@@ -305,6 +315,9 @@ class LemonSqueezyCreditPackWebhookTests(unittest.TestCase):
         ]
 
         with patch('app.services.lemonsqueezy_webhooks.settings.lemonsqueezy_zh_pro_variant_id', '1418094'), patch(
+            'app.services.lemonsqueezy_webhooks.settings.lemonsqueezy_pro_one_time_variant_id',
+            '1445229',
+        ), patch(
             'app.services.lemonsqueezy_webhooks.record_product_event'
         ) as record_product_event:
             outcome, user_public_id = process_lemonsqueezy_webhook_event(

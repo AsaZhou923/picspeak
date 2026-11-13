@@ -37,7 +37,7 @@ export const AI_MARKDOWN_CONTENT_PAGES: readonly AiMarkdownContentPage[] = [
         bullets: [
           'Guest requires no registration: 1 critique per day, 30 per month, Flash only, with no saved history. Create a Free account or sign in to continue after the allowance is used.',
           'Free includes 60 critiques per month, up to 5 per day, 10 Pro-mode critiques per month, and 15-day history.',
-          'Pro is $3.99/month, auto-renewing and cancellable anytime. It keeps full critique history and originals while subscribed, with no monthly critique limit.',
+          'Pro is $3.99/month, auto-renewing and cancellable anytime; Chinese checkout instead sells a $3.99 30-day one-time pass with WeChat Pay / Alipay. It keeps full critique history and originals while subscribed, with no monthly critique limit.',
           'After 150 critiques in a UTC month, Pro limits new critiques to 2 per minute until the next UTC month. The monthly critique total remains unlimited and no extra fee is charged automatically.',
           'After Pro ends, Free history limits apply; originals have a 15-day grace period unless another protection applies. Effective public channels keep their public works available.',
         ],

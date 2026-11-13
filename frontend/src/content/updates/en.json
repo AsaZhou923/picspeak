@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-13-zh-pro-one-time-pass",
+    "date": "2026-11-13",
+    "showPopup": false,
+    "title": "Chinese Pro checkout adds WeChat Pay and Alipay",
+    "summary": "Upgrading to Pro from the Chinese interface now buys a 30-day pass that can be paid with WeChat Pay or Alipay and does not renew automatically; it can be bought again after it ends. Pro starts automatically after payment. English and Japanese checkout stay on the monthly subscription, and existing subscriptions are unchanged.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-11-13-zh-pro-one-time-pass"
+  },
+  {
     "id": "2026-11-13-header-fit-and-retry-notice",
     "date": "2026-11-13",
     "showPopup": false,

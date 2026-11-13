@@ -56,6 +56,8 @@ class DeploymentMigrationContractTests(unittest.TestCase):
             'RETAKE_ANALYSIS_REASONING_EFFORT=high,OPENAI_PRO_MODEL=gpt-6.1-sol,'
             'OPENAI_PRO_REASONING_EFFORT=high,NOTIFICATIONS_READ_ENABLED=true,NOTIFICATIONS_EVENT_CAPTURE_ENABLED=true,NOTIFICATIONS_WORKER_ENABLED=true,'
             'LEMONSQUEEZY_CHECKOUT_TEST_MODE=false,LEMONSQUEEZY_WEBHOOK_TEST_MODE=false,'
+            'LEMONSQUEEZY_PRO_ONE_TIME_CHECKOUT_URL=https://picspeak.lemonsqueezy.com/checkout/buy/c2fbdd32-49e0-4dd6-9924-4d85d5e27522,'
+            'LEMONSQUEEZY_PRO_ONE_TIME_VARIANT_ID=1445229,'
             'GUEST_REVIEW_LIMIT_PER_DAY=1,PRO_REVIEW_SOFT_LIMIT_PER_MONTH=150,PRO_REVIEW_SOFT_LIMIT_RATE_PER_MINUTE=2'
         )
         self.assertIn(f'--update-env-vars={expected}', config)
