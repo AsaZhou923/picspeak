@@ -168,6 +168,14 @@ const localizedPublicPageCacheHeaders = [
   { key: 'Vary', value: 'Cookie, Accept-Language' },
 ];
 
+// Public Gallery critique pages: a short shared-cache window without stale
+// serving, so withdrawing or deleting a critique takes the page offline quickly.
+const galleryReviewPageSource = '/gallery/:reviewId(rev_[A-Za-z0-9_-]+)';
+const galleryReviewPageCacheHeaders = [
+  { key: 'Cache-Control', value: 'public, s-maxage=60' },
+  { key: 'Vary', value: 'Cookie, Accept-Language' },
+];
+
 const aiDiscoveryIndexHeaders = [
   { key: 'X-Robots-Tag', value: 'noindex, follow' },
 ];
@@ -179,6 +187,9 @@ const aiContentCanonicalHeaders = [
   ['/ai-content/gallery.md', 'https://www.picspeak.art/gallery'],
   ['/ai-content/updates.md', 'https://www.picspeak.art/updates'],
   ['/ai-content/editorial-policy.md', 'https://www.picspeak.art/editorial-policy'],
+  ['/ai-content/photo-critique-portrait.md', 'https://www.picspeak.art/photo-critique/portrait'],
+  ['/ai-content/photo-critique-street.md', 'https://www.picspeak.art/photo-critique/street'],
+  ['/ai-content/photo-critique-landscape.md', 'https://www.picspeak.art/photo-critique/landscape'],
 ];
 
 const cacheablePublicPageSources = [
@@ -191,6 +202,7 @@ const cacheablePublicPageSources = [
 const localizedPublicPageSources = [
   '/',
   '/gallery',
+  '/photo-critique/:topic(portrait|street|landscape)',
   '/updates',
   '/generate/prompts',
   '/generate/prompts/:id*',
@@ -250,6 +262,10 @@ const nextConfig = {
         source,
         headers: localizedPublicPageCacheHeaders,
       })),
+      {
+        source: galleryReviewPageSource,
+        headers: galleryReviewPageCacheHeaders,
+      },
       ...['/llms.txt', '/.well-known/llms.txt', '/ai-content/:slug*'].map((source) => ({
         source,
         headers: aiDiscoveryIndexHeaders,

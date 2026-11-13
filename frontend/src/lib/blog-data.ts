@@ -85,6 +85,13 @@ const STARTER_BLOG_SLUGS = [
   'gpt-image-2-prompt-examples-workflow',
   'compare-photo-retakes-real-improvement',
   'subject-background-separation-portrait-street',
+  'read-your-first-ai-photo-critique',
+  'exposure-sharpness-focus-checks',
+  'night-low-light-photo-critique',
+  'smartphone-photo-critique-guide',
+  'wedding-photo-feedback-guide',
+  'film-photo-critique-guide',
+  'how-to-choose-your-best-shot',
 ] as const;
 
 const BLOG_POSTS_BY_LOCALE: Record<Locale, Map<string, BlogPost>> = {

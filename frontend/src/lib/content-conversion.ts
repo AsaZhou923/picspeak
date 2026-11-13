@@ -1,12 +1,14 @@
 import { normalizeLocale } from './locale.ts';
 
 export type ContentConversionLocale = 'zh' | 'en' | 'ja';
-export type ContentConversionSource = 'home_direct' | 'blog' | 'gallery' | 'prompt_library';
+export type ContentConversionSource = 'home_direct' | 'blog' | 'gallery' | 'prompt_library' | 'topic_landing';
 export type ContentConversionEntrypoint =
   | 'blog_same_critique'
   | 'blog_topic_upload'
   | 'gallery_practice'
   | 'gallery_score_standard'
+  | 'gallery_detail'
+  | 'topic_landing'
   | 'prompt_library_retake'
   | 'home_new_user'
   | 'home_content_reader';
@@ -201,6 +203,48 @@ const BLOG_TOPIC_BY_SLUG: Record<string, BlogTopic> = {
       topic: '被写体と背景の分離',
       body: 'ポートレートやストリート写真で、輪郭・明暗・色・被写界深度・背景距離を確認します。',
     },
+  },
+  'read-your-first-ai-photo-critique': {
+    imageType: 'default',
+    zh: { topic: '读懂点评', body: '上传一张照片拿到第一份点评，先看最低的维度，只带走一条下一次拍摄动作。' },
+    en: { topic: 'first critique', body: 'Upload one photo, read the weakest dimension first, and leave with a single next-shoot action.' },
+    ja: { topic: '講評の読み方', body: '1枚アップロードして最初の講評を受け、最も低い項目から読み、次の撮影アクションを1つだけ持ち帰ります。' },
+  },
+  'exposure-sharpness-focus-checks': {
+    imageType: 'default',
+    zh: { topic: '曝光与对焦', body: '上传一张发虚或曝光不对的照片，确认是跑焦、手抖、运动模糊还是高光溢出。' },
+    en: { topic: 'exposure and focus', body: 'Upload a soft or badly exposed frame and find out whether it is focus, shake, motion, or clipping.' },
+    ja: { topic: '露出とピント', body: '甘い写真や露出が合わない写真をアップロードし、ピント・手ブレ・被写体ブレ・白飛びのどれかを確かめます。' },
+  },
+  'night-low-light-photo-critique': {
+    imageType: 'default',
+    zh: { topic: '夜景点评', body: '上传一张夜景或弱光照片，检查主体是否清楚、光源是否溢出、色温是否统一。' },
+    en: { topic: 'night photo', body: 'Upload a night or low-light frame and check subject sharpness, blown light sources, and mixed color.' },
+    ja: { topic: '夜景講評', body: '夜景や低照度の写真をアップロードし、主題のシャープさ、光源の白飛び、色温度を確認します。' },
+  },
+  'smartphone-photo-critique-guide': {
+    imageType: 'default',
+    zh: { topic: '手机照片', body: '上传一张手机照片，检查人像模式边缘、HDR 光晕和取景是否太宽。' },
+    en: { topic: 'phone photo', body: 'Upload a phone photo and check portrait-mode edges, HDR halos, and whether the frame is too wide.' },
+    ja: { topic: 'スマホ写真', body: 'スマホ写真をアップロードし、ポートレートモードの輪郭、HDR ハロー、画角の広すぎを確認します。' },
+  },
+  'wedding-photo-feedback-guide': {
+    imageType: 'portrait',
+    zh: { topic: '婚礼人像', body: '上传一张婚礼人像，检查人脸光色、婚纱高光和背景干扰。' },
+    en: { topic: 'wedding portrait', body: 'Upload a wedding portrait and check skin tone in mixed light, dress highlights, and background distractions.' },
+    ja: { topic: 'ウェディングポートレート', body: 'ウェディングのポートレートをアップロードし、ミックス光での肌色、ドレスのハイライト、背景の邪魔を確認します。' },
+  },
+  'film-photo-critique-guide': {
+    imageType: 'default',
+    zh: { topic: '胶片照片', body: '上传一张胶片扫描件，区分哪些问题属于拍摄、哪些属于扫描。' },
+    en: { topic: 'film photo', body: 'Upload a film scan and separate the problems that belong to the shot from those that belong to the scan.' },
+    ja: { topic: 'フィルム写真', body: 'フィルムのスキャンをアップロードし、撮影の問題とスキャンの問題を分けて確認します。' },
+  },
+  'how-to-choose-your-best-shot': {
+    imageType: 'default',
+    zh: { topic: '选出的那张', body: '选完片后，上传最终选出的那一张，看它为什么成立、下一张怎样更好。' },
+    en: { topic: 'final pick', body: 'After culling, upload the frame you chose to see why it works and how the next one can be stronger.' },
+    ja: { topic: '選んだ1枚', body: 'セレクトを終えたら、選んだ1枚をアップロードし、成立している理由と次の1枚を良くする方法を確認します。' },
   },
 };
 

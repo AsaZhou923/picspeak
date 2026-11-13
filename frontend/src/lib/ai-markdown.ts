@@ -1,3 +1,4 @@
+import { PHOTO_CRITIQUE_TOPICS, getPhotoCritiqueTopicPath } from '../content/topics/photo-critique-topics.ts';
 import { siteConfig } from './site.ts';
 
 export type AiMarkdownContentPage = {
@@ -116,6 +117,8 @@ export const AI_MARKDOWN_CONTENT_PAGES: readonly AiMarkdownContentPage[] = [
           'Shows approved public examples of AI photo critique output.',
           'Useful for understanding PicSpeak scoring dimensions and critique formatting.',
           'Best treated as illustrative examples rather than normative photography advice.',
+          'Each approved critique has its own page at /gallery/{review_id} with the photo, five dimension scores, strengths, issues, and next-shoot suggestions in the language the critique was written in.',
+          'Removing a critique from the gallery takes its page offline; share-link pages are never indexed.',
         ],
       },
     ],
@@ -163,6 +166,20 @@ export const AI_MARKDOWN_CONTENT_PAGES: readonly AiMarkdownContentPage[] = [
       },
     ],
   },
+  ...PHOTO_CRITIQUE_TOPICS.map((topic) => ({
+    slug: `photo-critique-${topic.slug}`,
+    markdownPath: `/ai-content/photo-critique-${topic.slug}.md`,
+    sourcePath: getPhotoCritiqueTopicPath(topic.slug),
+    title: topic.copy.en.metaTitle,
+    description: topic.copy.en.metaDescription,
+    sections: [
+      {
+        heading: topic.copy.en.checksTitle,
+        bullets: Object.values(topic.copy.en.dimensions).map((dimension) => `${dimension.label}: ${dimension.body}`),
+      },
+      { heading: topic.copy.en.limitsTitle, bullets: topic.copy.en.limits },
+    ],
+  })),
 ] as const;
 
 export function getAiMarkdownContentPage(rawSlug: string): AiMarkdownContentPage | null {

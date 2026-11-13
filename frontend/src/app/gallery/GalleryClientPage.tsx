@@ -363,7 +363,7 @@ function GalleryPageContent() {
   };
 
   const buildReviewHref = useCallback((reviewId: string) => (
-    `/reviews/${reviewId}?back=${encodeURIComponent(backHref)}&gallery_query=${encodeURIComponent(galleryContextQuery)}`
+    `/gallery/${reviewId}?back=${encodeURIComponent(backHref)}&gallery_query=${encodeURIComponent(galleryContextQuery)}`
   ), [backHref, galleryContextQuery]);
 
   const handleLikeToggle = useCallback(

@@ -7,10 +7,12 @@ import {
   APP_ROUTE_ROOTS,
   hasKnownAppPath,
   PUBLIC_BLOG_SLUGS,
+  PUBLIC_PHOTO_CRITIQUE_TOPIC_SLUGS,
   PUBLIC_PROMPT_EXAMPLE_IDS,
 } from '../src/lib/app-route-roots.ts';
 import { getBlogSlugs } from '../src/lib/blog-data.ts';
 import { GENERATION_PROMPT_EXAMPLES } from '../src/content/generation/prompt-examples.ts';
+import { PHOTO_CRITIQUE_TOPICS } from '../src/content/topics/photo-critique-topics.ts';
 import {
   getLocalizedBlogRedirectPath,
   isSupportedLocale,
@@ -85,6 +87,13 @@ test('route-root guard rejects invalid locale-shaped paths without blocking app 
   assert.equal(hasKnownAppPath('/en/blog/example'), false);
   assert.equal(hasKnownAppPath('/generate/prompts/example'), false);
   assert.equal(hasKnownAppPath('/privacy/example'), false);
+  assert.equal(hasKnownAppPath('/gallery/rev_8424d4fbde054759'), true);
+  assert.equal(hasKnownAppPath('/gallery/not-a-review'), false);
+  assert.equal(hasKnownAppPath('/gallery/rev_8424d4fbde054759/extra'), false);
+  assert.equal(hasKnownAppPath('/sitemap-gallery.xml'), true);
+  assert.equal(hasKnownAppPath('/photo-critique/street'), true);
+  assert.equal(hasKnownAppPath('/photo-critique'), false);
+  assert.equal(hasKnownAppPath('/photo-critique/wedding'), false);
   assert.equal(hasKnownAppPath('/editorial-policy'), true);
   assert.equal(hasKnownAppPath('/_vercel/speed-insights/vitals'), true);
   assert.equal(hasKnownAppPath('/__clerk/v1/client'), true);
@@ -99,6 +108,10 @@ test('route-root guard rejects invalid locale-shaped paths without blocking app 
   }
 
   assert.deepEqual([...PUBLIC_BLOG_SLUGS], getBlogSlugs());
+  assert.deepEqual(
+    [...PUBLIC_PHOTO_CRITIQUE_TOPIC_SLUGS],
+    PHOTO_CRITIQUE_TOPICS.map((topic) => topic.slug),
+  );
   assert.deepEqual(
     [...PUBLIC_PROMPT_EXAMPLE_IDS],
     GENERATION_PROMPT_EXAMPLES.map((example) => example.id),

@@ -699,6 +699,495 @@
           ]
         }
       ]
+    },
+    {
+      "slug": "read-your-first-ai-photo-critique",
+      "title": "How to read your first AI photo critique without drowning in feedback",
+      "seoTitle": "How to Read Your First AI Photo Critique",
+      "description": "A first AI photo critique gives you five scores, strengths, problems, and suggestions at once. This beginner guide walks through a real example, shows which number to read first, and turns the whole report into one action for your next shoot.",
+      "seoDescription": "A beginner's walkthrough of a real AI photo critique: read the five scores as a profile, start with the weakest one, and leave with one next-shoot action.",
+      "excerpt": "Read the five scores as a profile, start with the weakest dimension, and leave with exactly one action. A worked example shows how.",
+      "category": "AI Critique",
+      "readingTime": "5 min read",
+      "publishedAt": "2026-11-13",
+      "updatedAt": "2026-11-13",
+      "keywords": [
+        "how to read AI photo critique",
+        "AI photo critique for beginners",
+        "photo critique explained",
+        "photography feedback beginner"
+      ],
+      "intro": "The first critique is usually the most overwhelming one. You get an overall score, five dimension scores, a list of strengths, a list of problems, and several suggestions, all at once. Most of that is useful later. Today you only need one thing from it: the single change most likely to improve your next photo. This guide uses PicSpeak's public example critique of an autumn ginkgo photo to show how to find it.",
+      "takeawayTitle": "Read it in this order",
+      "takeawayItems": [
+        "Treat the five scores as a profile, not a grade.",
+        "Start with the lowest dimension and the problem that explains it.",
+        "Keep one suggestion, write down how you will know it worked, and reshoot."
+      ],
+      "sections": [
+        {
+          "title": "1. The overall score is a summary, not the message",
+          "paragraphs": [
+            "The example photo scored 7.4 overall. That number is the average of five dimension scores: composition, lighting, color, impact, and technique. It tells you roughly where the frame sits, but it does not tell you what to do.",
+            "PicSpeak scores against strong work in the same genre, so a 7 is not a failing grade and an 8 is not a trophy. Comparing your 6.8 to someone else's 7.6 says little when the subjects, genres, and light are different. The useful comparison is your own photo against a reshoot of the same scene."
+          ]
+        },
+        {
+          "title": "2. Read the five scores as a shape",
+          "paragraphs": [
+            "Look at which dimensions are high and which are low. In the ginkgo example, color and lighting were the strengths: golden leaves against a soft gradient sky, and backlight that gave the leaf edges a clean rim. The weaker side was depth and storytelling: the trees sat on almost one plane and nothing in the foreground anchored the scene.",
+            "That shape is more informative than any single number. Strong color and light with weak depth means the photographer found good conditions but did not yet build the frame around them. That points to camera position, not to editing or new gear."
+          ],
+          "bullets": [
+            "High light and color, low composition: the conditions were right, so work on position and framing.",
+            "High composition, low technique: the idea works, so check focus, shake, and exposure.",
+            "Everything middling with low impact: the frame is clean but says little, so look for a moment or a clearer subject."
+          ]
+        },
+        {
+          "title": "3. Match each problem to a dimension",
+          "paragraphs": [
+            "The critique section lists problems in plain language. Connect each one to the score it explains. In the example, \"flat depth\" and \"cluttered right canopy\" explain the composition score, and \"no narrative\" explains impact. Problems that do not connect to a low score are usually secondary.",
+            "This step also protects you from fixing the wrong thing. If the lowest score is composition, a long list of color-grading tips can wait, even when they are correct."
+          ]
+        },
+        {
+          "title": "4. Keep exactly one action and a way to check it",
+          "paragraphs": [
+            "The example suggested three things: step back 5 to 8 meters and lower the camera to include fallen leaves as a foreground line, adjust highlights and shadows in RAW, and shoot closer to sunrise. All three are reasonable. Only the first one addresses the weakest dimension, so that is the one to keep.",
+            "Write it with a success condition you can see: \"there is a foreground element in the bottom third that leads toward the trees.\" Then go back to a similar scene, reshoot, and use Retake Coach to compare the two frames in one paired critique. If the foreground condition is met and the composition score moves, the advice worked. If not, you have learned something specific about the next attempt."
+          ]
+        },
+        {
+          "title": "5. What the critique cannot tell you",
+          "paragraphs": [
+            "An AI critique reads the frame you uploaded. It does not know what you intended, what happened just before the shutter, or whether this photo matters to you. Treat it as a fast, consistent second opinion, not a verdict.",
+            "If a suggestion conflicts with what you were deliberately going for, keep your intent and check whether the frame communicates it. A deliberate style should survive the critique; an accident usually will not."
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "exposure-sharpness-focus-checks",
+      "title": "Exposure, sharpness, and focus: what to check before blaming your camera",
+      "seoTitle": "Exposure, Sharpness and Focus Checks for Photos",
+      "description": "Blurry or badly exposed photos usually have one of a handful of causes: missed focus, camera shake, subject motion, shallow depth of field, or clipped highlights. Learn how to tell them apart at 100% and which setting actually fixes each one.",
+      "seoDescription": "Tell missed focus, camera shake, motion blur, and clipped highlights apart at 100%, then fix the setting that actually caused the problem.",
+      "excerpt": "Most technical misses come from a short list of causes. Zoom to 100%, identify which one you have, and change the one setting that fixes it.",
+      "category": "Technique",
+      "readingTime": "7 min read",
+      "publishedAt": "2026-11-13",
+      "updatedAt": "2026-11-13",
+      "keywords": [
+        "exposure triangle",
+        "why are my photos blurry",
+        "photo sharpness",
+        "focus problems photography",
+        "clipped highlights"
+      ],
+      "intro": "When a photo looks soft or the sky turns white, the instinct is to blame the lens or the camera. Usually the cause is simpler and fixable on the next shot. The trick is to identify which problem you actually have, because each one has a different fix. This guide covers the exposure triangle in practical terms, then the five common reasons a photo is not sharp.",
+      "takeawayTitle": "Diagnose before you change settings",
+      "takeawayItems": [
+        "Exposure is a trade between aperture, shutter speed, and ISO; changing one moves the others.",
+        "Check the histogram and highlight warnings for clipping instead of trusting the screen.",
+        "At 100%, missed focus, shake, motion blur, and shallow depth of field look different."
+      ],
+      "sections": [
+        {
+          "title": "1. The exposure triangle in one paragraph",
+          "paragraphs": [
+            "Three settings decide how bright the image is. Aperture (the f-number) controls how much light the lens lets in and how much of the scene is in focus. Shutter speed controls how long the sensor collects light and whether movement blurs. ISO controls how strongly the signal is amplified, at the cost of more noise as it rises.",
+            "Because all three affect brightness, a change to one is paid for by another. Opening the aperture to get a faster shutter also narrows depth of field. Raising ISO to keep a fast shutter at night adds noise. Most exposure decisions are about which side effect you can live with in this particular frame."
+          ]
+        },
+        {
+          "title": "2. Read exposure from the histogram, not the screen",
+          "paragraphs": [
+            "Camera and phone screens are bright and contrasty, so a frame can look fine outdoors and turn out muddy on a monitor, or the other way round. The histogram and the highlight warning are more reliable. A graph piled against the right edge means highlights are clipped: those areas are pure white and have no detail left to recover.",
+            "Not every clipped pixel is a problem. A bare light bulb or a specular reflection can be white. Clipping matters when it removes detail the photo relies on, such as the texture of a white dress, the shape of clouds, or a face near a window."
+          ],
+          "bullets": [
+            "Clipped sky with detailed ground: expose slightly darker or bracket.",
+            "Dark subject in front of a bright window: expose for the face and accept a brighter window, or add light.",
+            "Everything crowded in the middle: the light may simply be flat; contrast will not rescue it."
+          ]
+        },
+        {
+          "title": "3. Five reasons a photo is not sharp",
+          "paragraphs": [
+            "Zoom to 100% on the part that should be sharpest, usually the nearest eye or the main subject, and compare it with the rest of the frame."
+          ],
+          "bullets": [
+            "Missed focus: something else in the frame is crisp, just not the subject. Fix by choosing the focus point or using eye detection.",
+            "Camera shake: everything is smeared in the same direction, including still objects. Fix with a faster shutter, better bracing, or stabilization.",
+            "Subject motion: the background is crisp but the moving subject is streaked. Fix with a faster shutter or by timing the peak of the movement.",
+            "Depth of field too shallow: only a thin slice is sharp, for example the eyes but not the ears. Fix by stopping down or stepping back.",
+            "Noise reduction smearing: fine texture looks painted, common in phone night shots. Fix by giving the scene more light or a steadier, longer exposure."
+          ]
+        },
+        {
+          "title": "4. A practical starting point",
+          "paragraphs": [
+            "A common rule of thumb for handheld shooting is a shutter speed at least as fast as one over the focal length, so about 1/50 s at 50 mm, faster for moving subjects. Stabilization helps with shake but does nothing for subject motion. For people walking, something around 1/250 s is a safer start.",
+            "When light runs out, decide in this order: how fast the shutter must be to freeze what matters, how much depth of field the subject needs, and then let ISO take the rest. A slightly noisy sharp photo is almost always better than a clean blurred one."
+          ]
+        },
+        {
+          "title": "5. How PicSpeak reads technique",
+          "paragraphs": [
+            "The Technique score looks at focus, exposure control, and clarity where the photo needs them, and its meaning shifts with the photo type: focus and background blur for portraits, capture sharpness for street, exposure and clarity for landscapes. Soft atmosphere, deep shadows, and grain are not counted as flaws by themselves; a deduction needs visible harm to the picture.",
+            "If your Technique score is the lowest of the five, read the critique for the specific cause before changing anything. Then reshoot the same scene with one setting changed and compare the two frames with Retake Coach."
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "night-low-light-photo-critique",
+      "title": "Night and low-light photos: what makes them work and how to critique them",
+      "seoTitle": "Night and Low-Light Photography: Critique Guide",
+      "description": "Night photos fail in predictable ways: blur from slow shutters, smeared noise, blown street lights, and muddy mixed color. Learn which darkness is a deliberate choice, which is a technical miss, and how to judge a low-light frame before you reshoot.",
+      "seoDescription": "Separate deliberate darkness from technical misses in night photos: blur, noise, blown lights, and mixed color, with a checklist for the reshoot.",
+      "excerpt": "Darkness is not a flaw; blur, smeared texture, and blown light sources usually are. Here is how to tell them apart and what to change.",
+      "category": "Lighting",
+      "readingTime": "6 min read",
+      "publishedAt": "2026-11-13",
+      "updatedAt": "2026-11-13",
+      "keywords": [
+        "night photography tips",
+        "low light photography",
+        "night photo critique",
+        "street photography at night",
+        "noise vs blur"
+      ],
+      "intro": "Night scenes are where many photographers fall in love with photography and where many frames quietly fail. The temptation is to brighten everything until it looks like daytime. That rarely works. A good night photo keeps the darkness and controls the few things that matter: the light sources, the subject, and the color. This guide separates deliberate low-key choices from the technical misses that undermine them.",
+      "takeawayTitle": "Keep the dark, control the light",
+      "takeawayItems": [
+        "Deep shadow is a choice; blur, smeared texture, and blown lights are usually misses.",
+        "Freeze what matters first, then accept noise rather than motion blur.",
+        "Mixed light sources need a decision: unify them or make the contrast intentional."
+      ],
+      "sections": [
+        {
+          "title": "1. Darkness is not the problem",
+          "paragraphs": [
+            "Large black areas, silhouettes, and pools of light are part of what makes night photography feel like night. A critique should not ask you to lift every shadow. PicSpeak's scoring treats deep shadow, grain, and muted color as weaknesses only when they visibly harm the photo rather than support it.",
+            "The question to ask is whether the eye still finds the subject. If the brightest or most contrasting area is the thing you meant to show, the darkness is working. If the eye lands on a random lamp or a bright window instead, the frame needs a different position or a different moment."
+          ]
+        },
+        {
+          "title": "2. The blur versus noise trade",
+          "paragraphs": [
+            "At night every setting is stretched. A slow shutter lets in light but blurs movement and shake; a high ISO keeps the shutter fast but adds noise. For people and traffic, a sharp frame with visible grain almost always reads better than a clean frame where the subject is a smear.",
+            "Phones hide this trade by combining several exposures and smoothing the result. That works for still scenes, but moving subjects can ghost and fine texture can look painted. If faces or signs look waxy at 100%, the scene needed more light or a steadier camera, not more processing."
+          ],
+          "bullets": [
+            "Moving subject: shutter first, then aperture, then let ISO rise.",
+            "Static scene with a support: lower ISO and use a longer exposure.",
+            "Phone night mode: brace the phone and ask the subject to hold still for the whole capture."
+          ]
+        },
+        {
+          "title": "3. Light sources make or break the frame",
+          "paragraphs": [
+            "Street lights, signs, and windows are usually the brightest things in a night photo, and they clip easily. A small blown lamp is acceptable; a large white blob next to the subject pulls attention and hides shape. Expose so the light sources keep some detail, or move so the brightest source sits behind something.",
+            "Mixed light is the other common problem: orange sodium lamps, green-tinted fluorescent tubes, and blue LED signs in one frame. Either pick one source to correct for and let the others stay colored, or frame so a single color temperature dominates. A deliberate contrast, such as warm interior light against a blue dusk sky, reads as a choice; random casts read as noise."
+          ]
+        },
+        {
+          "title": "4. A reshoot checklist for low light",
+          "paragraphs": [
+            "Before you upload a night frame for critique, check it against these points. Then, after the critique, reshoot with only the one change it identifies as most important."
+          ],
+          "bullets": [
+            "Is the subject sharp at 100%, or only the background?",
+            "Do the brightest light sources keep any detail?",
+            "Does the eye land on the subject before it lands on a lamp or sign?",
+            "Is there one dominant color temperature, or a contrast you chose on purpose?",
+            "Would arriving during blue hour, when the sky still has color, give the scene more shape?"
+          ]
+        },
+        {
+          "title": "5. Using critique on night work",
+          "paragraphs": [
+            "Upload the frame with the photo type that matches the subject: Street for city night scenes, Landscape for night skies and cityscapes, Portrait for people under available light. The type changes how the five scores are read, for example decisive-moment tension and capture sharpness for street, or exposure and clarity for landscape.",
+            "Low-light shooting is a good fit for Retake Coach, because conditions repeat: the same street corner looks similar every evening. Shoot, critique, change one thing, and compare the next night's frame with the original in one paired critique."
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "smartphone-photo-critique-guide",
+      "title": "Getting useful critique on smartphone photos",
+      "seoTitle": "Smartphone Photo Critique: Fix Phone Photos",
+      "description": "Phone photos have their own failure modes: portrait-mode edge errors, HDR halos, digital zoom mush, smudged lenses, and wide-angle distortion. Learn how to spot them, which ones critique can catch, and what to change on your next phone shot.",
+      "seoDescription": "Spot the phone-specific problems in your photos: portrait-mode edges, HDR halos, digital zoom, smudged lenses, and wide-angle distortion.",
+      "excerpt": "Most phone photo problems are not about the phone's quality. They come from a few habits that are easy to change once you can see them.",
+      "category": "Field",
+      "readingTime": "6 min read",
+      "publishedAt": "2026-11-13",
+      "updatedAt": "2026-11-13",
+      "keywords": [
+        "smartphone photo critique",
+        "phone photography tips",
+        "iPhone photo feedback",
+        "phone portrait mode problems",
+        "improve phone photos"
+      ],
+      "intro": "A modern phone can make a technically clean photo of almost anything. That is exactly why phone photos often look alike: the camera solves exposure and focus, and the remaining decisions, where to stand, what to include, and when to press, are left on autopilot. Critique is most useful on phone photos when it points at those decisions, plus a few artifacts that only phone processing produces.",
+      "takeawayTitle": "What to change first",
+      "takeawayItems": [
+        "Wipe the lens and step closer before reaching for zoom.",
+        "Check portrait-mode edges and HDR halos at full size.",
+        "Most phone critiques end up about position and framing, not the camera."
+      ],
+      "sections": [
+        {
+          "title": "1. Phone-specific artifacts to check",
+          "paragraphs": [
+            "Phones process every image heavily. That processing is usually helpful, but it leaves recognizable traces. Look for them at full size before deciding the photo is finished."
+          ],
+          "bullets": [
+            "Portrait-mode edges: hair, glasses, and fingers blurred into the background, or background sharp inside the outline.",
+            "HDR halos: a bright glow along the edges of buildings or trees against the sky.",
+            "Digital zoom: textures that look smeared or painted, especially past the phone's longest lens.",
+            "Smudged lens: a soft haze or flare around lights, often from a fingerprint on the glass.",
+            "Wide-angle distortion: faces near the edge of the frame stretched, or buildings leaning in."
+          ]
+        },
+        {
+          "title": "2. Step closer instead of zooming",
+          "paragraphs": [
+            "The default lens on most phones is wide, which pulls in more of the surroundings than the photographer notices. Many weak phone photos are simply too wide: the subject is small and the edges are full of clutter. Taking two steps forward usually helps more than any setting.",
+            "When you cannot get closer, use the phone's dedicated telephoto lens if it has one, and stop at its native zoom level. Beyond that, the phone is cropping and reconstructing detail, and the result often looks painted."
+          ]
+        },
+        {
+          "title": "3. Portrait mode is a tool, not a fix",
+          "paragraphs": [
+            "Simulated background blur can separate a subject nicely, but it cannot rescue a busy background or bad light on the face. Check the edges first. If they fail, a real separation, more distance between subject and background, or a simpler background, will look better than software blur.",
+            "PicSpeak reads portrait-mode blur like any other background blur: it is judged by whether it separates the subject cleanly, not by whether it came from a big lens."
+          ]
+        },
+        {
+          "title": "4. What a critique can and cannot see",
+          "paragraphs": [
+            "A critique sees the final image. It can point out a clipped sky, a merged edge, a subject placed where the eye does not go, or a cluttered corner. It cannot know whether you could have stood elsewhere, so treat position suggestions as experiments for the next time you are in a similar place.",
+            "Missing camera data is not a problem. Phone photos sent through messaging apps often lose their EXIF, and PicSpeak does not treat missing camera data as a reason to reject a photo."
+          ]
+        },
+        {
+          "title": "5. A simple phone practice loop",
+          "paragraphs": [
+            "Phones are ideal for short practice loops because you always have one. Pick a scene you pass every day, shoot it, get a critique, and change only the one thing it ranks most important. Shoot the same scene again the next day and compare both frames with Retake Coach.",
+            "Choose the photo type that matches the subject when you upload, such as Street, Portrait, or Landscape. The type changes how the five scores are read, which makes the feedback more specific than a generic photo check."
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "wedding-photo-feedback-guide",
+      "title": "Wedding photo feedback: using AI critique on portraits and candid moments",
+      "seoTitle": "Wedding Photo Feedback with AI Critique",
+      "description": "AI critique can help with individual wedding frames: faces in mixed reception light, white dresses near clipping, and busy backgrounds behind couples. It cannot judge an album or a client's story. Here is how to use it for practice without overstating what it does.",
+      "seoDescription": "Use AI critique on individual wedding frames: mixed light, white-dress highlights, focus on faces, and busy backgrounds, with its limits stated plainly.",
+      "excerpt": "Use critique on single frames, couple portraits and candid moments, and keep album storytelling and client judgment for yourself.",
+      "category": "Field",
+      "readingTime": "6 min read",
+      "publishedAt": "2026-11-13",
+      "updatedAt": "2026-11-13",
+      "keywords": [
+        "wedding photo feedback",
+        "wedding photography critique",
+        "wedding portrait tips",
+        "reception lighting",
+        "white dress exposure"
+      ],
+      "intro": "Wedding photography combines almost every hard condition at once: mixed light, fast moments, white and black clothing in one frame, and no second chances. Feedback on single frames is still useful, especially when you are building a portfolio or reviewing a second-shooter's work. This guide explains what an AI critique can usefully check in wedding images and where human judgment has to take over.",
+      "takeawayTitle": "Use it on frames, not on albums",
+      "takeawayItems": [
+        "Critique individual portraits and candid frames, one at a time.",
+        "Check faces, white fabric highlights, and backgrounds before composition details.",
+        "Ask permission before publishing guests' or clients' photos anywhere public."
+      ],
+      "sections": [
+        {
+          "title": "1. What PicSpeak does and does not do for weddings",
+          "paragraphs": [
+            "PicSpeak has no wedding-specific scoring mode. It critiques one photo at a time using the photo type you choose. For couple portraits, choose Portrait, which reads composition, facial light, skin tone, expression, and focus. For candid documentary moments, Street is often the better fit, because it reads frame organization, ambient light, and decisive-moment tension.",
+            "It does not evaluate an album, a sequence, or whether a set of images tells the day's story. It also does not know what the couple asked for. Use it as a consistent second look at single frames."
+          ]
+        },
+        {
+          "title": "2. Faces first, in mixed light",
+          "paragraphs": [
+            "Receptions often mix warm tungsten, cool window light, colored stage LEDs, and on-camera flash. Skin is where these clashes show most. Before anything else, check whether faces have a consistent, believable tone and whether the eyes are sharp.",
+            "If one side of a face is orange and the other blue, decide which light to correct for and reposition the couple so that one source dominates. A deliberate warm-against-cool contrast can work; an accidental one on skin rarely does."
+          ]
+        },
+        {
+          "title": "3. White dresses and dark suits in one frame",
+          "paragraphs": [
+            "A white dress next to a black suit stretches the exposure range. The common failure is a dress with no fabric detail. Check the highlight warning: if the texture of the dress is gone, expose darker and lift the suit's shadows later rather than the other way round.",
+            "Not all white needs detail. A bright window or a specular reflection can clip. The fabric, lace, and folds usually should not."
+          ]
+        },
+        {
+          "title": "4. Backgrounds and the moment",
+          "paragraphs": [
+            "Wedding venues are full of distractions: exit signs, guests' phones, chairs, and stray light. Many otherwise good frames are weakened by something bright at the edge. A quick check of the four corners before pressing the shutter catches most of them.",
+            "For candid frames, the moment matters more than polish. A slightly soft frame with a genuine expression can be the strongest image of the day. Critique can tell you that the moment carries tension; it cannot tell you whether it mattered to the couple."
+          ],
+          "bullets": [
+            "Are the eyes sharp on the person who matters in this frame?",
+            "Is there a bright or saturated distraction near the edge?",
+            "Does the fabric of the dress keep its texture?",
+            "Is there one dominant light color on the faces?"
+          ]
+        },
+        {
+          "title": "5. Permission and privacy",
+          "paragraphs": [
+            "Wedding photos contain other people's faces. Uploading a frame for a private critique is different from publishing it. Do not submit clients' or guests' photos to the public gallery or share links without their permission.",
+            "For practice, a good routine is to critique a handful of representative frames after each event, note the one recurring issue, and work on it at the next wedding or in a staged portrait session."
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "film-photo-critique-guide",
+      "title": "Critiquing film photos: what belongs to the shot and what belongs to the scan",
+      "seoTitle": "Film Photography Critique: Shot vs Scan",
+      "description": "When you critique a film photo you are critiquing a scan. Some problems, like dust, color casts, and flat contrast, come from scanning; others, like missed focus and underexposure, come from the shot. Learn to separate them so you fix the right thing.",
+      "seoDescription": "Separate scan problems from shooting problems in film photos: dust, color casts, and flat contrast versus focus and exposure, judged fairly.",
+      "excerpt": "Grain and color shifts are often part of the look. Dust, scanner casts, and thin negatives are not. Here is how to tell which is which.",
+      "category": "Field",
+      "readingTime": "6 min read",
+      "publishedAt": "2026-11-13",
+      "updatedAt": "2026-11-13",
+      "keywords": [
+        "film photography critique",
+        "film photo feedback",
+        "35mm film tips",
+        "film scan color cast",
+        "underexposed film"
+      ],
+      "intro": "Film photographers often hesitate to ask for critique because the look of film, its grain, its color, its softer contrast, is part of why they shoot it. A fair critique should not ask a Portra frame to look like a digital file. It should separate what the photographer decided from what the lab or scanner did, so the next roll improves where it can.",
+      "takeawayTitle": "Fix the right stage",
+      "takeawayItems": [
+        "Grain and film color are judged by their role, not removed by default.",
+        "Dust, scratches, and odd casts usually come from scanning, not shooting.",
+        "Thin, muddy shadows usually mean the negative was underexposed."
+      ],
+      "sections": [
+        {
+          "title": "1. You are critiquing a scan",
+          "paragraphs": [
+            "Any critique of a film photo, by a person or by software, sees a digital scan. Lab scanners apply their own color correction and contrast, and home scans depend on the light source, the camera or scanner, and the inversion settings. Two scans of the same negative can look like different photographs.",
+            "So before you act on color or contrast feedback, ask whether the scan is a faithful starting point. If you can, rescan or reinvert one frame and compare. Composition and timing feedback does not depend on the scan, so act on that with confidence."
+          ]
+        },
+        {
+          "title": "2. Grain and color are not defects by default",
+          "paragraphs": [
+            "PicSpeak judges grain, muted palettes, and monochrome by what they do in the frame. Grain becomes a problem only when it hides something the photo needs, such as the expression on a small face. A warm, slightly shifted film palette is fine when it is consistent; it becomes a problem when skin turns an unnatural color or the cast fights the subject.",
+            "For black-and-white film, the Color score reads tonal relationships, contrast, and grayscale separation rather than hue."
+          ]
+        },
+        {
+          "title": "3. Problems that usually come from the shot",
+          "paragraphs": [
+            "Some issues cannot be fixed in scanning and point back to the camera."
+          ],
+          "bullets": [
+            "Thin negatives: shadows look grey and muddy with heavy grain. The roll was likely underexposed; rate the film a little slower or meter for the shadows.",
+            "Missed focus: common with rangefinders and fast lenses wide open. Check the eye or main subject in a high-resolution scan.",
+            "Camera shake: everything smeared in one direction, often from slow shutter speeds in dim light.",
+            "Composition and timing: the same as digital, and the part a critique can help with most."
+          ]
+        },
+        {
+          "title": "4. Problems that usually come from the scan",
+          "paragraphs": [
+            "Dust spots and hairs, fine scratches, a uniform color cast across the whole roll, crushed blacks, and flat contrast are often scanning issues. Clean the negative and the scanner, try a different inversion, or ask the lab for a flatter scan you can adjust yourself.",
+            "If a critique flags a color cast that you see on every frame of the roll, it is probably the scan. If it flags one frame only, it may have been the light at the time."
+          ]
+        },
+        {
+          "title": "5. A roll-by-roll practice loop",
+          "paragraphs": [
+            "Film slows the feedback loop, which makes each review more valuable. After each roll, pick three representative frames, get a critique for each, and write down the one recurring issue that belongs to the shot, not the scan. Shoot the next roll with that single change in mind.",
+            "Choose the photo type that matches the subject when you upload. There is no special film mode; film is judged as photography, with its look treated as a choice."
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "how-to-choose-your-best-shot",
+      "title": "How to cull photos and choose your best shot",
+      "seoTitle": "How to Cull Photos and Choose Your Best Shot",
+      "description": "Choosing the best frame from a burst or a whole shoot is a skill. This guide gives a three-pass culling method: reject technical failures, compare near-duplicates on the moment, then judge the survivors as photographs, plus how critique fits in afterwards.",
+      "seoDescription": "A three-pass method to cull photos: reject technical misses, compare near-duplicates on the moment, then judge the survivors as finished pictures.",
+      "excerpt": "Cull in three passes: technical rejects, near-duplicate comparisons, then whole-picture judgment. Critique the pick afterwards, not the whole card.",
+      "category": "Workflow",
+      "readingTime": "6 min read",
+      "publishedAt": "2026-11-13",
+      "updatedAt": "2026-11-13",
+      "keywords": [
+        "how to cull photos",
+        "choose best photo",
+        "photo culling workflow",
+        "pick the best shot",
+        "photo selection tips"
+      ],
+      "intro": "Most photographers take far more frames than they show. Choosing which to keep is where a lot of quality is won or lost: a strong frame buried among twenty similar ones never gets seen, and a weak frame shown because it was the last one shot drags a set down. Culling is a separate skill from shooting, and it improves with a repeatable method.",
+      "takeawayTitle": "Three passes, then one critique",
+      "takeawayItems": [
+        "Pass one removes technical failures quickly and without debate.",
+        "Pass two compares near-duplicates side by side on the moment.",
+        "Pass three judges survivors as finished pictures; critique the final pick."
+      ],
+      "sections": [
+        {
+          "title": "1. Pass one: remove technical failures",
+          "paragraphs": [
+            "Go through every frame quickly and reject the ones that fail for reasons you cannot fix: the subject is out of focus, the frame is shaken, the exposure lost the detail the photo depends on, or someone blinked. Do not linger. If you have to think about it, keep it for the next pass.",
+            "This pass should be fast because it is not about taste. It removes a large share of a typical shoot and leaves the real decisions for later."
+          ]
+        },
+        {
+          "title": "2. Pass two: compare near-duplicates on the moment",
+          "paragraphs": [
+            "Bursts and repeated attempts create groups of almost identical frames. View each group side by side and choose by the thing that changes between them: expression, gesture, the position of a passer-by, the gap between two figures. At this stage technical differences are small; the moment is what differs.",
+            "Keep one frame per group, occasionally two if they say genuinely different things. Keeping five versions of the same moment only postpones the decision."
+          ],
+          "bullets": [
+            "Faces: eyes open, expression natural, nearest eye sharp.",
+            "Street: gesture at its peak, no awkward overlaps, clean edges.",
+            "Landscape: the best light on the key feature, horizon placed deliberately."
+          ]
+        },
+        {
+          "title": "3. Pass three: judge the survivors as pictures",
+          "paragraphs": [
+            "Now look at each remaining frame on its own, as someone who was not there would. Does it hold attention without the memory of the day? Is the subject clear? Would you crop it, and if so, does the crop make it stronger or just different?",
+            "This is where a second opinion helps most. Take a break before this pass, or ask someone else to pick their top three without explanation and compare with yours."
+          ]
+        },
+        {
+          "title": "4. Where AI critique fits",
+          "paragraphs": [
+            "PicSpeak critiques one photo at a time; it does not sort or rank a batch for you. That is deliberate: culling decisions depend on your intent and on comparisons across a whole set. Use critique after you have chosen, on the frames you intend to show or print.",
+            "The critique then tells you why the pick works and what would make the next one stronger. Over several shoots, the recurring weakest dimension tells you what your culling cannot fix and your shooting has to."
+          ]
+        },
+        {
+          "title": "5. Keep culling honest",
+          "paragraphs": [
+            "Two habits keep selection from drifting. First, do not fall for effort: a frame that took an hour to get is not better because of the hour. Second, do not keep a frame only because it is the only one of a subject; ask whether it would make the cut if you had ten.",
+            "Revisit an old shoot after a few months. The frames you skipped and still do not miss confirm the method works; the ones you now prefer show how your eye has changed."
+          ]
+        }
+      ]
     }
   ]
 }

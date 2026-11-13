@@ -43,7 +43,7 @@ export default function PrivacyPage() {
     path: '/privacy',
     name: title,
     description,
-    dateModified: '2026-05-14',
+    dateModified: '2026-11-13',
   });
   const breadcrumbJsonLd = buildPublicBreadcrumbJsonLd({
     site: siteConfig,

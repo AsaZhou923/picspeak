@@ -18,7 +18,7 @@
 - AI Create for GPT Image 2 visual reference generation
 - Curated prompt library with example outputs
 - Review-linked reference generation for planning retakes
-- Public gallery of approved critique examples
+- Public gallery of approved critique examples, each with its own page at /gallery/{review_id}
 - Lens Notes blog covering composition, lighting, color, and review workflows
 - Account history for revisiting critiques, originals, and evidence from each retake round
 
@@ -44,6 +44,9 @@
 - [Chinese Blog index](https://www.picspeak.art/zh/blog)
 - [Japanese Blog index](https://www.picspeak.art/ja/blog)
 - [Gallery](https://www.picspeak.art/gallery)
+- [Portrait photo critique](https://www.picspeak.art/photo-critique/portrait)
+- [Street photography critique](https://www.picspeak.art/photo-critique/street)
+- [Landscape photo critique](https://www.picspeak.art/photo-critique/landscape)
 - [Updates / x-default](https://www.picspeak.art/updates)
 - [English Updates](https://www.picspeak.art/en/updates)
 - [Chinese Updates](https://www.picspeak.art/zh/updates)
@@ -57,6 +60,9 @@
 - [PicSpeak public gallery overview](https://www.picspeak.art/ai-content/gallery.md): source https://www.picspeak.art/gallery
 - [PicSpeak updates overview](https://www.picspeak.art/ai-content/updates.md): source https://www.picspeak.art/updates
 - [PicSpeak editorial and corrections policy](https://www.picspeak.art/ai-content/editorial-policy.md): source https://www.picspeak.art/editorial-policy
+- [AI Portrait Photo Critique: Scores and Feedback](https://www.picspeak.art/ai-content/photo-critique-portrait.md): source https://www.picspeak.art/photo-critique/portrait
+- [Street Photography Critique and Feedback with AI](https://www.picspeak.art/ai-content/photo-critique-street.md): source https://www.picspeak.art/photo-critique/street
+- [Landscape Photo Critique: AI Scores and Feedback](https://www.picspeak.art/ai-content/photo-critique-landscape.md): source https://www.picspeak.art/photo-critique/landscape
 
 ## Lens Notes topics
 - AI photo critique workflows

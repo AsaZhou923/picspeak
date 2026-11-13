@@ -11,7 +11,15 @@ from app.api.deps import CurrentActor, get_db, get_registered_actor
 from app.api.routers.photos import _build_photo_proxy_url, _build_thumbnail_bytes, _get_photo_object
 from app.core.errors import api_error
 from app.db.models import Photo, Review, ReviewLike, User, UserPlan
-from app.gallery_scoreboard_schemas import GalleryListResponse, GalleryNeighborsResponse, GalleryScoreboardResponse, GalleryScoreboardItem
+from app.gallery_scoreboard_schemas import (
+  GalleryListResponse,
+  GalleryNeighborsResponse,
+  GalleryScoreboardItem,
+  GalleryScoreboardResponse,
+  GallerySitemapEntry,
+  GallerySitemapResponse,
+  PublicGalleryReviewDetail,
+)
 from app.schemas import GalleryLikeResponse
 from app.services.gallery_scoreboard import (
   SCOREBOARD_ALLOWED_WINDOWS,
@@ -37,7 +45,9 @@ from .gallery_support import (
   _gallery_rank_score_value,
   _gallery_recommendation_map,
   _gallery_viewer_likes,
+  _indexable_gallery_filters,
   _optional_gallery_viewer,
+  _public_gallery_detail,
   _public_gallery_filters,
   _public_gallery_item,
   _review_gallery_summary,
@@ -273,3 +283,95 @@ def unlike_public_gallery_review(
 
   like_count = _gallery_like_count(db, review.id)
   return GalleryLikeResponse(review_id=review.public_id, like_count=like_count, liked_by_viewer=False)
+
+
+PUBLIC_GALLERY_DETAIL_CACHE_CONTROL = 'public, max-age=60'
+
+
+def _decode_sitemap_cursor(cursor: str | None) -> int | None:
+  if cursor is None:
+    return None
+  try:
+    value = int(cursor)
+  except ValueError as exc:
+    raise api_error(status.HTTP_400_BAD_REQUEST, 'CURSOR_INVALID', 'Invalid cursor') from exc
+  if value <= 0:
+    raise api_error(status.HTTP_400_BAD_REQUEST, 'CURSOR_INVALID', 'Invalid cursor')
+  return value
+
+
+@router.get('/sitemap-entries', response_model=GallerySitemapResponse)
+def list_gallery_sitemap_entries(
+  response: Response,
+  limit: int = Query(default=500, ge=1, le=1000),
+  cursor: str | None = Query(default=None, max_length=32),
+  db: Session = Depends(get_db),
+):
+  """Indexable Gallery critiques for the public sitemap, newest first."""
+  cursor_id = _decode_sitemap_cursor(cursor)
+  query = (
+    db.query(Review.id, Review.public_id, Review.image_type, Review.updated_at, Review.gallery_added_at, Review.created_at)
+    .join(Photo, Photo.id == Review.photo_id)
+    .join(User, User.id == Review.owner_user_id)
+    .filter(*_indexable_gallery_filters())
+  )
+  if cursor_id is not None:
+    query = query.filter(Review.id < cursor_id)
+  rows = query.order_by(Review.id.desc()).limit(limit + 1).all()
+  has_next = len(rows) > limit
+  rows = rows[:limit]
+  items = [
+    GallerySitemapEntry(
+      review_id=row.public_id,
+      image_type=str(row.image_type or 'default'),
+      last_modified=row.updated_at or row.gallery_added_at or row.created_at,
+    )
+    for row in rows
+  ]
+  response.headers['Cache-Control'] = PUBLIC_GALLERY_DETAIL_CACHE_CONTROL
+  return GallerySitemapResponse(
+    items=items,
+    next_cursor=str(rows[-1].id) if has_next and rows else None,
+  )
+
+
+@router.get('/{review_id}', response_model=PublicGalleryReviewDetail)
+def get_public_gallery_review(
+  request: Request,
+  review_id: str,
+  response: Response,
+  authorization: str | None = Header(default=None),
+  db: Session = Depends(get_db),
+):
+  """Anonymous, cacheable read of one approved Gallery critique.
+
+  Deliberately takes no actor dependency, so crawler and server-render requests
+  never mint guest identities. Share-link-only critiques return 404. An optional
+  bearer token only sets `viewer_is_owner` (so the owner sees their action
+  entry points); such responses are private and never shared-cached.
+  """
+  row = (
+    db.query(Review, Photo, User)
+    .join(Photo, Photo.id == Review.photo_id)
+    .join(User, User.id == Review.owner_user_id)
+    .filter(Review.public_id == review_id, *_indexable_gallery_filters())
+    .first()
+  )
+  if row is None:
+    raise api_error(status.HTTP_404_NOT_FOUND, 'REVIEW_NOT_FOUND', 'Review not found')
+  review, photo, owner = row
+  viewer = _optional_gallery_viewer(authorization, db)
+  if authorization:
+    response.headers['Cache-Control'] = 'private, no-store'
+  else:
+    response.headers['Cache-Control'] = PUBLIC_GALLERY_DETAIL_CACHE_CONTROL
+  response.headers['Vary'] = 'Authorization'
+  return _public_gallery_detail(
+    request,
+    review,
+    photo,
+    owner,
+    like_count=_gallery_like_count(db, review.id),
+    owner_profile_url=_owner_profile_url(owner),
+    viewer_is_owner=viewer is not None and viewer.id == review.owner_user_id,
+  )

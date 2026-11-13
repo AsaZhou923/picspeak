@@ -39,7 +39,7 @@ const LEGAL_COPY: Record<LegalPageKind, Record<Locale, LegalCopy>> = {
       intro:
         'How PicSpeak handles photos, prompts, generation records, account data, payments, analytics, and support requests.',
       updatedLabel: 'Last updated',
-      updatedAt: 'May 14, 2026',
+      updatedAt: 'November 13, 2026',
       summaryTitle: 'At a glance',
       summaryItems: [
         'Uploaded photos and prompts are used to provide the critique or AI reference you request.',
@@ -66,6 +66,7 @@ const LEGAL_COPY: Record<LegalPageKind, Record<Locale, LegalCopy>> = {
           body: [
             'Uploaded photos, prompts, generated references, and critique text are processed to complete the request you start. They are not shown publicly by default.',
             'If you submit content to the public gallery, create a public share link, or otherwise choose a public workflow, the selected content and related critique data may be visible to others.',
+            'Approved gallery critiques get their own public page that search engines may index. Share-link pages are not submitted for indexing. Removing a critique from the gallery takes its page offline; search engines may take some time to drop cached copies.',
           ],
         },
         {
@@ -109,7 +110,7 @@ const LEGAL_COPY: Record<LegalPageKind, Record<Locale, LegalCopy>> = {
       intro:
         '说明 PicSpeak 在你使用 AI 摄影点评、AI Create、账号、支付、分析和客服功能时如何处理相关数据。',
       updatedLabel: '最后更新',
-      updatedAt: '2026 年 5 月 14 日',
+      updatedAt: '2026 年 11 月 13 日',
       summaryTitle: '快速了解',
       summaryItems: [
         '你上传的照片和输入的提示词会用于完成你发起的 AI 点评或 AI 参考图生成请求。',
@@ -136,6 +137,7 @@ const LEGAL_COPY: Record<LegalPageKind, Record<Locale, LegalCopy>> = {
           body: [
             '上传照片、提示词、生成参考图和点评文本会用于完成你主动发起的请求，默认不会公开展示。',
             '如果你把内容提交到公开长廊、创建公开分享链接，或选择其他公开流程，被选中的内容和相关点评数据可能被其他人看到。',
+            '审核通过的长廊点评会有独立的公开页面，并可能被搜索引擎收录；分享链接页面不会提交给搜索引擎。把点评移出长廊后，该页面随即下线，搜索引擎清除缓存副本可能需要一段时间。',
           ],
         },
         {
@@ -179,7 +181,7 @@ const LEGAL_COPY: Record<LegalPageKind, Record<Locale, LegalCopy>> = {
       intro:
         'PicSpeak が AI 写真講評、AI Create、アカウント、決済、分析、サポート機能で扱うデータについて説明します。',
       updatedLabel: '最終更新',
-      updatedAt: '2026年5月14日',
+      updatedAt: '2026年11月13日',
       summaryTitle: '要点',
       summaryItems: [
         'アップロードした写真と prompt は、依頼した講評または AI 参考画像の生成に使われます。',
@@ -206,6 +208,7 @@ const LEGAL_COPY: Record<LegalPageKind, Record<Locale, LegalCopy>> = {
           body: [
             'アップロード写真、prompt、生成参考画像、講評テキストは、あなたが開始したリクエストを完了するために処理されます。標準では公開されません。',
             '公開ギャラリーへの投稿、公開共有リンクの作成、その他の公開ワークフローを選んだ場合、選択した内容と関連する講評データが他の人に表示されることがあります。',
+            '承認されたギャラリー講評には個別の公開ページが作られ、検索エンジンにインデックスされることがあります。共有リンクのページは検索エンジンに送信されません。ギャラリーから外すとページは公開停止になりますが、検索エンジンのキャッシュが消えるまで時間がかかる場合があります。',
           ],
         },
         {

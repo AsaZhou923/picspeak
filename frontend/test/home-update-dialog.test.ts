@@ -31,11 +31,13 @@ test('private critique access update describes user benefits without draft statu
   }
 });
 
-test('Chinese one-time Pro pass record is the latest update in every locale without a popup', () => {
+test('public gallery pages record is the latest update in every locale without a popup', () => {
   for (const locale of ['zh', 'en', 'ja'] as const) {
     const latest = getLatestProductUpdate(locale);
     assert.ok(latest);
-    assert.equal(latest.id, '2026-11-13-zh-pro-one-time-pass');
+    assert.equal(latest.id, '2026-11-13-public-critique-pages-and-genre-guides');
+    assert.match(latest.summary, /search|搜索引擎|検索/);
+    assert.ok(getProductUpdates(locale).some((entry) => entry.id === '2026-11-13-zh-pro-one-time-pass'));
     assert.equal(latest.date, '2026-11-13');
     assert.doesNotMatch(latest.title + latest.summary, /准备中|尚未发布|upcoming|not yet released|準備中|まだ公開/i);
     assert.equal(latest.showPopup, false);

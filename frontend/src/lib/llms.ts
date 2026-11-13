@@ -26,7 +26,7 @@ export function getLlmsText(): string {
 - AI Create for GPT Image 2 visual reference generation
 - Curated prompt library with example outputs
 - Review-linked reference generation for planning retakes
-- Public gallery of approved critique examples
+- Public gallery of approved critique examples, each with its own page at /gallery/{review_id}
 - Lens Notes blog covering composition, lighting, color, and review workflows
 - Account history for revisiting critiques, originals, and evidence from each retake round
 
@@ -52,6 +52,9 @@ export function getLlmsText(): string {
 - [Chinese Blog index](${siteConfig.url}/zh/blog)
 - [Japanese Blog index](${siteConfig.url}/ja/blog)
 - [Gallery](${siteConfig.url}/gallery)
+- [Portrait photo critique](${siteConfig.url}/photo-critique/portrait)
+- [Street photography critique](${siteConfig.url}/photo-critique/street)
+- [Landscape photo critique](${siteConfig.url}/photo-critique/landscape)
 - [Updates / x-default](${siteConfig.url}/updates)
 - [English Updates](${siteConfig.url}/en/updates)
 - [Chinese Updates](${siteConfig.url}/zh/updates)

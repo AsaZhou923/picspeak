@@ -9,6 +9,7 @@ import { getBlogPost, getRelatedBlogPosts, getBlogUi } from '@/lib/blog-data';
 import { getBlogReferences } from '@/lib/blog-references';
 import { formatBlogViewCount, shouldTrackBlogView } from '@/lib/blog-view-stats';
 import { getBlogWorkspaceCta, type ContentConversionEntrypoint } from '@/lib/content-conversion';
+import { PHOTO_CRITIQUE_TOPICS, getPhotoCritiqueTopicPath } from '@/content/topics/photo-critique-topics';
 import { I18nProvider, useI18n, type Locale } from '@/lib/i18n';
 import { getInitialTranslations } from '@/lib/i18n-initial';
 import { serializeJsonLd } from '@/lib/json-ld';
@@ -67,6 +68,7 @@ function BlogPostContent({ slug }: { slug: string }) {
       },
     });
   };
+  const critiqueTopic = PHOTO_CRITIQUE_TOPICS.find((topic) => topic.imageType === workspaceCta.imageType);
   const generateHref = `/generate?source=blog&entrypoint=blog_reference_generation&content_slug=${encodeURIComponent(post.slug)}&image_type=${encodeURIComponent(workspaceCta.imageType)}`;
 
   useEffect(() => {
@@ -293,6 +295,13 @@ function BlogPostContent({ slug }: { slug: string }) {
                 {ui.moreArticlesCta}
               </Link>
             </div>
+            {critiqueTopic && (
+              <p className="mt-5 text-sm">
+                <Link href={getPhotoCritiqueTopicPath(critiqueTopic.slug)} className="text-ink-muted underline-offset-4 transition-colors hover:text-gold hover:underline">
+                  {critiqueTopic.copy[locale].title}
+                </Link>
+              </p>
+            )}
           </section>
 
           {relatedPosts.length > 0 ? (

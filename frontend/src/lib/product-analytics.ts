@@ -21,6 +21,7 @@ export type ProductAnalyticsEventName =
   | 'export_clicked'
   | 'content_workspace_clicked'
   | 'prompt_library_viewed'
+  | 'topic_page_viewed'
   | 'next_shoot_action_clicked'
   | 'upgrade_pro_clicked'
   | 'checkout_started'
@@ -59,6 +60,8 @@ export function normalizeProductAnalyticsSource(value: string | null | undefined
       return 'notifications';
     case 'prompt_library':
       return 'prompt_library';
+    case 'topic_landing':
+      return 'topic_landing';
     case 'share':
       return 'share';
     case 'checkout':
@@ -138,7 +141,10 @@ export function derivePageEvent(pathname: string): ProductAnalyticsEventName | n
   if (/^\/generate\/prompts(?:\/[^/]+)?$/.test(pathname)) {
     return 'prompt_library_viewed';
   }
-  if (pathname === '/gallery') {
+  if (/^\/photo-critique\/[^/]+$/.test(pathname)) {
+    return 'topic_page_viewed';
+  }
+  if (pathname === '/gallery' || /^\/gallery\/rev_[^/]+$/.test(pathname)) {
     return 'gallery_viewed';
   }
   if (pathname === '/payment-success') {
@@ -163,11 +169,14 @@ export function deriveAttributionSourceForPath(pathname: string): ProductAnalyti
   if (pathname === '/') {
     return 'home_direct';
   }
-  if (pathname === '/gallery') {
+  if (pathname === '/gallery' || /^\/gallery\/rev_[^/]+$/.test(pathname)) {
     return 'gallery';
   }
   if (/^\/generate\/prompts(?:\/[^/]+)?$/.test(pathname)) {
     return 'prompt_library';
+  }
+  if (/^\/photo-critique\/[^/]+$/.test(pathname)) {
+    return 'topic_landing';
   }
   if (/^\/share\/[^/]+$/.test(pathname)) {
     return 'share';

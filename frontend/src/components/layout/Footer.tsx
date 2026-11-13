@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { Github, Twitter } from 'lucide-react';
+import { PHOTO_CRITIQUE_TOPICS, getPhotoCritiqueTopicCopy, getPhotoCritiqueTopicPath } from '@/content/topics/photo-critique-topics';
 import { getBlogUi } from '@/lib/blog-data';
 import { useI18n } from '@/lib/i18n';
 
@@ -128,6 +129,11 @@ export default function Footer() {
           <Link href={`/${locale}/updates`} className="hover:text-ink transition-colors">
             {t('updates_label')}
           </Link>
+          {PHOTO_CRITIQUE_TOPICS.map((topic) => (
+            <Link key={topic.slug} href={getPhotoCritiqueTopicPath(topic.slug)} className="hover:text-ink transition-colors">
+              {getPhotoCritiqueTopicCopy(topic, locale).eyebrow}
+            </Link>
+          ))}
           <Link href="/affiliate" className="hover:text-ink transition-colors">
             {t('footer_affiliate')}
           </Link>

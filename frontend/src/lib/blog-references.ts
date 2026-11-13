@@ -18,6 +18,26 @@ const NIKON_LIGHTING: BlogReference = {
   url: 'https://www.nikonusa.com/learn-and-explore/c/tips-and-techniques/photography-lighting-tutorial-part-1-control-of-color',
 };
 
+const NIKON_ISO: BlogReference = {
+  name: 'Nikon: Understanding ISO Sensitivity',
+  url: 'https://www.nikonusa.com/learn-and-explore/c/tips-and-techniques/understanding-iso-sensitivity',
+};
+
+const NIKON_SHUTTER_SPEED: BlogReference = {
+  name: 'Nikon: Understanding Shutter Speed',
+  url: 'https://www.nikonusa.com/learn-and-explore/c/tips-and-techniques/understanding-shutter-speed',
+};
+
+const NIKON_APERTURE: BlogReference = {
+  name: 'Nikon: What is Aperture? The Key to Sharper, More Creative Photography',
+  url: 'https://www.nikonusa.com/learn-and-explore/c/tips-and-techniques/what-is-aperture',
+};
+
+const NIKON_BOKEH: BlogReference = {
+  name: 'Nikon: Bokeh for Beginners',
+  url: 'https://www.nikonusa.com/learn-and-explore/c/tips-and-techniques/bokeh-for-beginners',
+};
+
 const BLOG_REFERENCES: Record<string, readonly BlogReference[]> = {
   'ai-photo-critique-daily-practice': [
     {
@@ -65,6 +85,13 @@ const BLOG_REFERENCES: Record<string, readonly BlogReference[]> = {
     },
     NIKON_COMPOSITION,
   ],
+  'read-your-first-ai-photo-critique': [NIKON_COMPOSITION, NIKON_EXPOSURE],
+  'exposure-sharpness-focus-checks': [NIKON_EXPOSURE, NIKON_APERTURE, NIKON_SHUTTER_SPEED, NIKON_ISO],
+  'night-low-light-photo-critique': [NIKON_SHUTTER_SPEED, NIKON_ISO, NIKON_LIGHTING],
+  'smartphone-photo-critique-guide': [NIKON_COMPOSITION, NIKON_BOKEH],
+  'wedding-photo-feedback-guide': [NIKON_EXPOSURE, NIKON_LIGHTING, NIKON_APERTURE],
+  'film-photo-critique-guide': [NIKON_EXPOSURE, NIKON_ISO],
+  'how-to-choose-your-best-shot': [NIKON_COMPOSITION, NIKON_SHUTTER_SPEED],
 };
 
 export function getBlogReferences(slug: string): readonly BlogReference[] {

@@ -73,7 +73,8 @@ function GalleryCard({
   const workspaceCtas = getGalleryWorkspaceCtas(locale, item);
   const isCompact = density === 'compact';
   const generateHref = `/generate?source=gallery&entrypoint=gallery_reference_generation&gallery_review_id=${encodeURIComponent(item.review_id)}&image_type=${encodeURIComponent(item.image_type)}`;
-  const reviewHref = `/reviews/${item.review_id}?back=${encodeURIComponent(backHref)}&gallery_query=${encodeURIComponent(galleryQuery)}`;
+  // Public, indexable critique page; it links on to the interactive /reviews view with the same context.
+  const reviewHref = `/gallery/${item.review_id}?back=${encodeURIComponent(backHref)}&gallery_query=${encodeURIComponent(galleryQuery)}`;
 
   const handleWorkspaceCtaClick = (entrypoint: ContentConversionEntrypoint) => {
     markProductAttributionSource('gallery');

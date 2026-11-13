@@ -15,6 +15,13 @@ const ARTICLE_SLUG = 'five-photo-composition-checks';
 const NEW_ARTICLE_SLUGS = [
   'compare-photo-retakes-real-improvement',
   'subject-background-separation-portrait-street',
+  'read-your-first-ai-photo-critique',
+  'exposure-sharpness-focus-checks',
+  'night-low-light-photo-critique',
+  'smartphone-photo-critique-guide',
+  'wedding-photo-feedback-guide',
+  'film-photo-critique-guide',
+  'how-to-choose-your-best-shot',
 ];
 const LOCALE_CASES = [
   { locale: 'zh', documentLang: 'zh-CN' },

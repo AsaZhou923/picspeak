@@ -1,5 +1,6 @@
 import type { MetadataRoute } from 'next';
 import { GENERATION_PROMPT_EXAMPLES } from '@/content/generation/prompt-examples';
+import { PHOTO_CRITIQUE_TOPICS, getPhotoCritiqueTopicPath } from '@/content/topics/photo-critique-topics';
 import { DEMO_REVIEW_ID } from '@/lib/demo-review';
 import { getBlogPosts } from '@/lib/blog-data';
 import { siteConfig } from '@/lib/site';
@@ -79,7 +80,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     },
     {
       url: `${siteConfig.url}/privacy`,
-      lastModified: new Date('2026-05-14'),
+      lastModified: new Date('2026-11-13'),
       changeFrequency: 'yearly',
       priority: 0.45,
       alternates: singleUrlAlternates('/privacy'),
@@ -98,6 +99,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.8,
       alternates: singleUrlAlternates('/gallery'),
     },
+    ...PHOTO_CRITIQUE_TOPICS.map((topic) => ({
+      url: `${siteConfig.url}${getPhotoCritiqueTopicPath(topic.slug)}`,
+      lastModified: new Date(topic.lastReviewed),
+      changeFrequency: 'monthly' as const,
+      priority: 0.82,
+      alternates: singleUrlAlternates(getPhotoCritiqueTopicPath(topic.slug)),
+    })),
     {
       url: `${siteConfig.url}/author/asa-zhou`,
       lastModified: SEO_CONTENT_LAST_MODIFIED,
