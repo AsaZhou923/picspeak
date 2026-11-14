@@ -13,6 +13,13 @@ import { siteConfig } from '@/lib/site';
 import { VALID_LOCALES } from '../locales';
 import { BlogViewCount, BlogViewCountProvider } from './BlogViewCount';
 
+/**
+ * "Start here" is a short reading path beside the featured post. The full
+ * list lives in the grid below, so listing every post here only made the
+ * sidebar far taller than the column next to it.
+ */
+const START_HERE_LIMIT = 5;
+
 function resolveBlogLocale(locale?: string): Locale {
   return VALID_LOCALES.includes(locale as Locale) ? (locale as Locale) : 'en';
 }
@@ -23,6 +30,9 @@ export default function BlogIndexPageContent({ locale }: { locale?: string }) {
   const posts = getBlogPostsByFreshness(pinnedLocale);
   const featuredPost = getFeaturedBlogPost(pinnedLocale);
   const starterPosts = getStarterBlogPosts(pinnedLocale);
+  const startHerePosts = starterPosts
+    .filter((post) => post.slug !== featuredPost?.slug)
+    .slice(0, START_HERE_LIMIT);
   const postSlugs = posts.map((post) => post.slug);
 
   const collectionJsonLd = {
@@ -164,9 +174,9 @@ export default function BlogIndexPageContent({ locale }: { locale?: string }) {
                 <h2 className="mt-5 font-display text-3xl">{ui.startTitle}</h2>
                 <p className="mt-3 text-sm leading-7 text-ink-muted">{ui.startIntro}</p>
                 <div className="mt-6 grid gap-3 text-sm text-ink-muted">
-                  {starterPosts.map((post, index) => (
+                  {startHerePosts.map((post, index) => (
                     <Link key={post.slug} href={`/${pinnedLocale}/blog/${post.slug}`} className="rounded-control border border-border-subtle bg-raised/40 px-4 py-3 transition-colors hover:border-gold/30 hover:text-ink">
-                      <p className="text-[11px] uppercase tracking-[0.22em] text-accent-muted">0{index + 1}</p>
+                      <p className="text-[11px] uppercase tracking-[0.22em] text-accent-muted">{String(index + 1).padStart(2, '0')}</p>
                       <p className="mt-2 leading-6">{post.title}</p>
                     </Link>
                   ))}

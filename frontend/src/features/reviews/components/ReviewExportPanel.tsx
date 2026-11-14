@@ -301,7 +301,7 @@ export default function ReviewExportPanel({
       </div>
 
       <details
-        className="group mt-4 overflow-hidden rounded-card border border-border-subtle bg-surface/55"
+        className="group/advanced mt-4 overflow-hidden rounded-card border border-border-subtle bg-surface/55"
         open={advancedOpen}
         onToggle={(event) => setAdvancedOpen(event.currentTarget.open)}
       >
@@ -310,7 +310,8 @@ export default function ReviewExportPanel({
             <p className="text-sm font-semibold text-ink">{copy.editExcerpts}</p>
             <p className="mt-1 text-xs leading-5 text-ink-subtle">{copy.fullReportNote}</p>
           </div>
-          <ChevronDown size={16} className="shrink-0 text-ink-subtle transition-transform group-open:rotate-180" aria-hidden="true" />
+          {/* Named group: this panel sits inside the page's own `group` disclosure, whose open state must not rotate this chevron. */}
+          <ChevronDown size={16} className="shrink-0 text-ink-subtle transition-transform group-open/advanced:rotate-180" aria-hidden="true" />
         </summary>
 
         <div className="border-t border-border-subtle p-4">

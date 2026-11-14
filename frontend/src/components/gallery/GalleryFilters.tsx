@@ -137,7 +137,7 @@ export default function GalleryFilters({
   }, [hasAdvancedFilters, hasInvalidFilters]);
 
   return (
-    <section id="gallery-filters" className="mt-5 rounded-card border border-border-subtle bg-surface/70 p-3 shadow-level-1">
+    <section id="gallery-filters" className="mt-5 scroll-mt-20 rounded-card border border-border-subtle bg-surface/70 p-3 shadow-level-1">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-sm text-ink">
           <SlidersHorizontal size={15} className="text-gold" />

@@ -85,8 +85,8 @@ export const zhTranslations = {
   pro_offer_label: '',
   pro_offer_highlight: 'Pro',
   updates_label: '更新记录',
-  updates_hint_home: "长廊作品有了独立公开页面",
-  updates_hint_latest: "长廊作品有了独立公开页面",
+  updates_hint_home: "导航滚动时留在顶部，修正几处显示问题",
+  updates_hint_latest: "导航滚动时留在顶部，修正几处显示问题",
   contact_label: '联系',
   contact_headline: '联系我',
 
@@ -545,8 +545,6 @@ export const zhTranslations = {
   pagination_total: '共 {n} 页',
   pagination_showing: '当前显示 {from}-{to} / 共 {total} 项',
   pagination_showing_empty: '暂时还没有可显示的作品',
-  pagination_first: '第一页',
-  pagination_last: '最后页',
   pagination_previous: '上一页',
   pagination_next: '下一页',
 

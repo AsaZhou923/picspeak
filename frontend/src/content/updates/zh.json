@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-14-navigation-and-display-fixes",
+    "date": "2026-11-14",
+    "showPopup": false,
+    "title": "导航滚动时留在顶部，修正几处显示不一致",
+    "summary": "页面向下滚动时，顶部导航会留在屏幕上方。AI 创作页默认选中当前账户可以直接生成的质量档位，Free 账户不用先改设置。长廊作品页的五个维度改用和点评结果页相同的名称与分数格式，长廊顶部新增「排序与筛选」入口，手机端底部导航在所有页面保持同一顺序。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-11-14-navigation-and-display-fixes"
+  },
+  {
     "id": "2026-11-13-public-critique-pages-and-genre-guides",
     "date": "2026-11-13",
     "showPopup": false,

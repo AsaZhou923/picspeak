@@ -8,6 +8,8 @@ interface ClerkSignInTriggerProps {
   className: string;
   fallbackRedirectUrl?: string;
   signedInClassName?: string;
+  /** Render nothing once signed in, for surfaces where the header already owns the account menu. */
+  hideWhenSignedIn?: boolean;
 }
 
 export default function ClerkSignInTrigger({
@@ -15,6 +17,7 @@ export default function ClerkSignInTrigger({
   className,
   fallbackRedirectUrl = '/workspace',
   signedInClassName = 'inline-flex items-center',
+  hideWhenSignedIn = false,
 }: ClerkSignInTriggerProps) {
   return (
     <>
@@ -25,11 +28,13 @@ export default function ClerkSignInTrigger({
           </button>
         </SignInButton>
       </Show>
-      <Show when="signed-in">
-        <div className={signedInClassName}>
-          <UserButton />
-        </div>
-      </Show>
+      {hideWhenSignedIn ? null : (
+        <Show when="signed-in">
+          <div className={signedInClassName}>
+            <UserButton />
+          </div>
+        </Show>
+      )}
     </>
   );
 }

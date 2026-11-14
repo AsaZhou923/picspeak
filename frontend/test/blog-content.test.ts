@@ -249,6 +249,12 @@ test('blog index keeps static article data server-rendered with a small client v
   assert.match(blogContentSource, /getBlogPostsByFreshness\(pinnedLocale\)/);
   assert.match(blogContentSource, /getFeaturedBlogPost\(pinnedLocale\)/);
   assert.match(blogContentSource, /getStarterBlogPosts\(pinnedLocale\)/);
+  // The sidebar is a short reading path, not a second copy of the full list,
+  // and its numbering must stay two digits past the ninth entry.
+  assert.match(blogContentSource, /const START_HERE_LIMIT = \d;/);
+  assert.match(blogContentSource, /\.slice\(0, START_HERE_LIMIT\)/);
+  assert.match(blogContentSource, /String\(index \+ 1\)\.padStart\(2, '0'\)/);
+  assert.doesNotMatch(blogContentSource, />0\{index \+ 1\}</);
   assert.match(blogContentSource, /ui\.updatedLabel/);
   assert.match(blogContentSource, /BlogViewCountProvider/);
   assert.doesNotMatch(blogContentSource, /useEffect|useState|getBlogViewCounts/);

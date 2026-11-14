@@ -118,7 +118,10 @@ export function HomePageContent() {
           <HomeCritiqueArtifact t={t} />
         </div>
 
-        <div className="relative mx-auto mt-8 flex max-w-editorial flex-wrap items-center justify-center gap-3 lg:justify-start">
+        <div
+          id="home-auth-actions"
+          className="relative mx-auto mt-8 flex max-w-editorial flex-wrap items-center justify-center gap-3 lg:justify-start"
+        >
           <div
             id="home-signin-slot"
             className="flex min-h-[46px] items-center justify-center"

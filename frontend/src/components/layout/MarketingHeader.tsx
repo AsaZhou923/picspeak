@@ -32,10 +32,11 @@ const MOBILE_MARKETING_LINKS: Array<{
   kind?: 'retake';
   icon: typeof Camera;
 }> = [
+  // Same order as the app header's mobile tabs, so tabs do not move between pages.
   { href: '/workspace', key: 'nav_critique', icon: Camera },
+  { href: '/gallery', key: 'nav_gallery', icon: LayoutGrid },
   { href: '/retake', kind: 'retake', icon: Repeat2 },
   { href: '/generate', key: 'nav_generate_short', icon: Wand2 },
-  { href: '/gallery', key: 'nav_gallery', icon: LayoutGrid },
   { href: '/account/practice', key: 'nav_practice', icon: Target },
 ];
 

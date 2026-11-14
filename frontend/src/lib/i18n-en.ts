@@ -296,8 +296,8 @@ export const enTranslations = {
     pro_offer_label: '',
     pro_offer_highlight: 'Pro',
     updates_label: 'Updates',
-    updates_hint_home: "Gallery critiques now have their own public pages",
-    updates_hint_latest: "Gallery critiques now have their own public pages",
+    updates_hint_home: "Navigation now stays on screen as you scroll",
+    updates_hint_latest: "Navigation now stays on screen as you scroll",
     contact_label: 'Contact',
     contact_headline: 'Get in Touch',
 
@@ -563,8 +563,6 @@ export const enTranslations = {
     pagination_total: '{n} pages total',
     pagination_showing: 'Showing {from}-{to} of {total}',
     pagination_showing_empty: 'No works available yet',
-    pagination_first: 'First',
-    pagination_last: 'Last',
     pagination_previous: 'Previous',
     pagination_next: 'Next',
 

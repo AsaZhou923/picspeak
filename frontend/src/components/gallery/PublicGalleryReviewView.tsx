@@ -12,6 +12,7 @@ import {
   buildGalleryReviewWorkspaceHref,
   buildGalleryTypeFilterHref,
   formatGalleryScore,
+  galleryScoreBarClass,
   getGalleryImageTypeLabel,
   getGalleryReviewArticleCopy,
   getGalleryReviewChromeCopy,
@@ -195,12 +196,12 @@ export default function PublicGalleryReviewView({ review, topicHref }: Props) {
                 {GALLERY_REVIEW_DIMENSIONS.map((dimension) => {
                   const value = Math.max(0, Math.min(10, Number(review.scores[dimension] ?? 0)));
                   return (
-                    <div key={dimension} className="grid grid-cols-[6.5rem_minmax(0,1fr)_2rem] items-center gap-3 text-sm">
+                    <div key={dimension} className="grid grid-cols-[6.5rem_minmax(0,1fr)_2.5rem] items-center gap-3 text-sm">
                       <dt className="text-ink-muted">{article.dimensions[dimension]}</dt>
                       <dd className="h-1.5 overflow-hidden rounded-full bg-border-subtle" aria-hidden="true">
-                        <span className="block h-full rounded-full bg-sage" style={{ width: `${value * 10}%` }} />
+                        <span className={`block h-full rounded-full ${galleryScoreBarClass(value)}`} style={{ width: `${value * 10}%` }} />
                       </dd>
-                      <dd className="text-right font-mono text-ink">{value}</dd>
+                      <dd className="text-right font-mono text-ink">{formatGalleryScore(value)}</dd>
                     </div>
                   );
                 })}
