@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { SlidersHorizontal } from 'lucide-react';
 import { buildWorkspaceConversionHref } from '@/lib/content-conversion';
 import { getGallerySeoHeroCopy } from '@/lib/gallery-seo-copy';
 import { useI18n } from '@/lib/i18n';
@@ -41,6 +42,24 @@ export default function GallerySeoHero() {
           >
             {copy.exampleCta}
           </Link>
+          {/* Works stay first on this page; this link keeps the controls below them reachable from the top. */}
+          <a
+            href="#gallery-filters"
+            onClick={(event) => {
+              // A streamed copy of the page can stay in the DOM inside a hidden
+              // container, and it comes first, so the bare fragment may resolve to
+              // an element with no box. Scroll to the copy that is actually laid out.
+              const target = Array.from(document.querySelectorAll<HTMLElement>('#gallery-filters'))
+                .find((element) => element.getClientRects().length > 0);
+              if (!target) return;
+              event.preventDefault();
+              target.scrollIntoView({ block: 'start' });
+            }}
+            className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-ink-muted transition-colors hover:text-gold"
+          >
+            <SlidersHorizontal size={14} aria-hidden="true" />
+            {copy.filtersCta}
+          </a>
         </div>
       </div>
     </section>

@@ -113,8 +113,20 @@ html[lang='ja'] {
 html,
 body {
   max-width: 100vw;
-  overflow-x: hidden;
   color: rgb(var(--color-ink));
+}
+
+/*
+ * Horizontal overflow is hidden on the root only. `hidden` on <body> as well
+ * turns it into a scroll container, which stops `position: sticky` chrome
+ * from following the viewport. `clip` trims overflow without that side effect.
+ */
+html {
+  overflow-x: hidden;
+}
+
+body {
+  overflow-x: clip;
 }
 
 body {

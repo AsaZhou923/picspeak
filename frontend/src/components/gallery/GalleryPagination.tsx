@@ -86,16 +86,8 @@ const GalleryPagination = memo(function GalleryPagination({
         </p>
       </div>
       <div className="flex flex-col items-center gap-3 sm:items-end">
+        {/* The numbered row below always includes the first and last page, so there are no separate first/last buttons. */}
         <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-end">
-          <button
-            type="button"
-            onClick={() => void goToPage(0)}
-            disabled={pageIndex === 0 || paging || disabled}
-            className="ui-action-secondary px-4 py-2 text-sm disabled:opacity-40"
-          >
-            <ChevronLeft size={14} />
-            {t('pagination_first')}
-          </button>
           <button
             type="button"
             onClick={handlePrevPage}
@@ -112,15 +104,6 @@ const GalleryPagination = memo(function GalleryPagination({
             className="ui-action-primary px-4 py-2 text-sm disabled:opacity-40"
           >
             {paging ? t('reviews_loading_more') : t('pagination_next')}
-            <ChevronRight size={14} />
-          </button>
-          <button
-            type="button"
-            onClick={() => void goToPage(totalPages - 1)}
-            disabled={pageIndex === totalPages - 1 || paging || disabled}
-            className="ui-action-secondary px-4 py-2 text-sm disabled:opacity-40"
-          >
-            {t('pagination_last')}
             <ChevronRight size={14} />
           </button>
         </div>

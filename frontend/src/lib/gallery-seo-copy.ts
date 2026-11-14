@@ -6,6 +6,8 @@ export type GallerySeoHeroCopy = {
   body: string;
   primaryCta: string;
   exampleCta: string;
+  /** Jump link to the sort and filter controls, which sit below the works by design. */
+  filtersCta: string;
 };
 
 const GALLERY_SEO_HERO_COPY: Record<SupportedLocale, GallerySeoHeroCopy> = {
@@ -16,6 +18,7 @@ const GALLERY_SEO_HERO_COPY: Record<SupportedLocale, GallerySeoHeroCopy> = {
       '看看公开作品的评分、画面依据和改进建议，找到与你的题材相近的例子，再点评自己的照片。',
     primaryCta: '开始点评',
     exampleCta: '查看完整点评示例',
+    filtersCta: '排序与筛选',
   },
   en: {
     eyebrow: 'AI photo critique examples',
@@ -24,6 +27,7 @@ const GALLERY_SEO_HERO_COPY: Record<SupportedLocale, GallerySeoHeroCopy> = {
       'Explore the scores, visible evidence, and practical suggestions behind published works. Find a comparable scene, then critique your own photo.',
     primaryCta: 'Start a critique',
     exampleCta: 'View a full critique example',
+    filtersCta: 'Sort and filter',
   },
   ja: {
     eyebrow: 'AI 写真講評の事例',
@@ -32,6 +36,7 @@ const GALLERY_SEO_HERO_COPY: Record<SupportedLocale, GallerySeoHeroCopy> = {
       '公開作品のスコア、写真上の根拠、改善案を見比べましょう。近い題材を探したら、自分の写真も講評できます。',
     primaryCta: '講評を始める',
     exampleCta: '講評の完全な例を見る',
+    filtersCta: '並べ替えと絞り込み',
   },
 };
 

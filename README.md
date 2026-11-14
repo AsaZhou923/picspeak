@@ -139,7 +139,7 @@ The event version used GPT-5.6 Terra. The current runtime uses GPT-6 Sol (Flash)
 
 ## 📝 Changelog
 
-The latest entry is [Gallery critiques get their own public pages, plus portrait, street, and landscape guides](docs/changelog/CHANGELOG.md#2026-11-13-public-critique-pages-and-genre-guides). See the [full changelog](docs/changelog/CHANGELOG.md) for older entries.
+The latest entry is [Navigation stays on screen while you scroll, plus several display fixes](docs/changelog/CHANGELOG.md#2026-11-14-navigation-and-display-fixes). See the [full changelog](docs/changelog/CHANGELOG.md) for older entries.
 
 ## 🤝 Contributing
 

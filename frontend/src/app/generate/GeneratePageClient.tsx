@@ -82,7 +82,7 @@ function GeneratePageContent() {
   const initialUrlPromptAppliedRef = useRef(false);
   const [templateKey, setTemplateKey] = useState('photo_inspiration');
   const [prompt, setPrompt] = useState<string>(() => t(TEMPLATE_COPY_KEYS.photo_inspiration.prompt));
-  const [quality, setQuality] = useState<GenerationQuality>('medium');
+  const [chosenQuality, setQuality] = useState<GenerationQuality | null>(null);
   const [size, setSize] = useState<GenerationSize>('1024x1536');
   const [style, setStyle] = useState('cinematic');
   const [negativePrompt, setNegativePrompt] = useState('');
@@ -105,6 +105,9 @@ function GeneratePageContent() {
   const authReady = hasHydrated && !authLoading;
   const plan = authReady ? userInfo?.plan ?? 'guest' : 'guest';
   const isGuest = plan === 'guest';
+  // Until the user picks a quality, start from one their plan can submit:
+  // Free (and guests, who become Free on sign-in) only have Low.
+  const quality: GenerationQuality = chosenQuality ?? (plan === 'pro' ? 'medium' : 'low');
   const isFreeQualityBlocked = plan === 'free' && quality !== 'low';
   const selectedTemplate = useMemo(() => getTemplateByKey(templateKey), [templateKey]);
   const selectedTemplateCopy = templateCopyKey(selectedTemplate.key);

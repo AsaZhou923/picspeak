@@ -139,7 +139,7 @@ PicSpeak 在 Build Week 之前已经存在。活动期间，单张点评扩展�
 
 ## 📝 更新记录
 
-最新条目：[长廊作品有了独立公开页面，新增人像、街头、风景点评指南](docs/changelog/CHANGELOG.md#2026-11-13-public-critique-pages-and-genre-guides)。更早的条目见[完整 Changelog](docs/changelog/CHANGELOG.md)。
+最新条目：[导航滚动时留在顶部，修正几处显示不一致](docs/changelog/CHANGELOG.md#2026-11-14-navigation-and-display-fixes)。更早的条目见[完整 Changelog](docs/changelog/CHANGELOG.md)。
 
 ## 🤝 参与贡献
 

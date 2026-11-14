@@ -196,3 +196,56 @@ test('portal action slots and gallery hero conversion remain accessible and attr
   assert.match(galleryHero, /markProductAttributionSource\('gallery'\)/);
   assert.match(galleryHero, /trackProductEvent\('content_workspace_clicked'/);
 });
+
+test('sticky headers are not defeated by a scroll container on body', () => {
+  const css = read('src/app/globals.css').replace(/\/\*[\s\S]*?\*\//g, '');
+  const bodyRules = [...css.matchAll(/(?:^|\n)([^{}\n]*\bbody\b[^{}]*)\{([^}]*)\}/g)];
+
+  assert.ok(bodyRules.length > 0, 'globals.css styles body');
+  for (const [, selector, declarations] of bodyRules) {
+    // `overflow-x: hidden` on body makes it the scroll container, so the
+    // `sticky top-0` headers scroll away with the page instead of sticking.
+    assert.doesNotMatch(declarations, /overflow(?:-x)?:\s*hidden/, `${selector.trim()} must not hide overflow`);
+  }
+  assert.match(css, /\nhtml \{\s*overflow-x: hidden;/);
+});
+
+test('mobile tab bar keeps one order across the app and marketing headers', () => {
+  const tabOrder = (file: string) => {
+    const source = read(file);
+    const tabs = source.slice(source.lastIndexOf('fixed inset-x-0 bottom-0'));
+    return [...tabs.matchAll(/href="(\/[a-z/]+)"/g)].map((match) => match[1]);
+  };
+  const marketing = read('src/components/layout/MarketingHeader.tsx');
+  const marketingList = marketing.slice(marketing.indexOf('const MOBILE_MARKETING_LINKS'), marketing.indexOf('export default function'));
+  const marketingOrder = [...marketingList.matchAll(/href: '(\/[a-z/]+)'/g)].map((match) => match[1]);
+  const appOrder = tabOrder('src/components/layout/Header.tsx');
+
+  assert.deepEqual(appOrder, ['/workspace', '/gallery', '/retake', '/generate', '/account/practice']);
+  assert.deepEqual(marketingOrder, appOrder);
+});
+
+test('signed-in visitors do not get a second account button in the home hero', () => {
+  const trigger = read('src/components/auth/ClerkSignInTrigger.tsx');
+  const homeSignIn = read('src/components/home/HomeSignInButton.tsx');
+
+  assert.match(trigger, /hideWhenSignedIn \? null : \(/);
+  assert.match(homeSignIn, /hideWhenSignedIn/);
+  assert.doesNotMatch(homeSignIn, /signedInClassName/);
+});
+
+test('nested review disclosures rotate their own chevron only', () => {
+  const exportPanel = read('src/features/reviews/components/ReviewExportPanel.tsx');
+
+  // The export panel renders inside the review page's `group` disclosure.
+  assert.match(exportPanel, /className="group\/advanced /);
+  assert.match(exportPanel, /group-open\/advanced:rotate-180/);
+  assert.doesNotMatch(exportPanel, /group-open:rotate-180/);
+});
+
+test('generate page starts from a quality the current plan can submit', () => {
+  const page = read('src/app/generate/GeneratePageClient.tsx');
+
+  assert.match(page, /chosenQuality \?\? \(plan === 'pro' \? 'medium' : 'low'\)/);
+  assert.doesNotMatch(page, /useState<GenerationQuality>\('medium'\)/);
+});

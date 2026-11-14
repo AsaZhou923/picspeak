@@ -31,21 +31,34 @@ test('private critique access update describes user benefits without draft statu
   }
 });
 
-test('public gallery pages record is the latest update in every locale without a popup', () => {
+test('navigation and display fixes are the latest update in every locale without a popup', () => {
   for (const locale of ['zh', 'en', 'ja'] as const) {
     const latest = getLatestProductUpdate(locale);
     assert.ok(latest);
-    assert.equal(latest.id, '2026-11-13-public-critique-pages-and-genre-guides');
-    assert.match(latest.summary, /search|搜索引擎|検索/);
-    assert.ok(getProductUpdates(locale).some((entry) => entry.id === '2026-11-13-zh-pro-one-time-pass'));
-    assert.equal(latest.date, '2026-11-13');
+    assert.equal(latest.id, '2026-11-14-navigation-and-display-fixes');
+    assert.match(latest.summary, /scroll|滚动|スクロール/);
+    assert.equal(latest.date, '2026-11-14');
     assert.doesNotMatch(latest.title + latest.summary, /准备中|尚未发布|upcoming|not yet released|準備中|まだ公開/i);
     assert.equal(latest.showPopup, false);
     assert.equal(shouldShowProductUpdatePopup(latest), false);
     assert.equal(latest.docPath, `docs/changelog/CHANGELOG.md#${latest.id}`);
   }
-  assert.equal(getLatestProductUpdateDate('zh'), '2026-11-13');
-  assert.equal(getLatestProductUpdateDate(), '2026-11-13');
+  assert.equal(getLatestProductUpdateDate('zh'), '2026-11-14');
+  assert.equal(getLatestProductUpdateDate(), '2026-11-14');
+});
+
+test('public gallery pages record stays in every locale without a popup', () => {
+  for (const locale of ['zh', 'en', 'ja'] as const) {
+    const entry = getProductUpdates(locale).find((item) => item.id === '2026-11-13-public-critique-pages-and-genre-guides');
+    assert.ok(entry);
+    assert.match(entry.summary, /search|搜索引擎|検索/);
+    assert.ok(getProductUpdates(locale).some((item) => item.id === '2026-11-13-zh-pro-one-time-pass'));
+    assert.equal(entry.date, '2026-11-13');
+    assert.doesNotMatch(entry.title + entry.summary, /准备中|尚未发布|upcoming|not yet released|準備中|まだ公開/i);
+    assert.equal(entry.showPopup, false);
+    assert.equal(shouldShowProductUpdatePopup(entry), false);
+    assert.equal(entry.docPath, `docs/changelog/CHANGELOG.md#${entry.id}`);
+  }
 });
 
 test('photo applicability and public retention are released without a popup', () => {

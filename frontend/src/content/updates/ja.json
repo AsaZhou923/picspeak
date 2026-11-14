@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-14-navigation-and-display-fixes",
+    "date": "2026-11-14",
+    "showPopup": false,
+    "title": "スクロール中もナビゲーションを表示、表示の不一致を修正",
+    "summary": "長いページをスクロールしても、上部のナビゲーションが画面上部に残るようになりました。AI 作成ページは、現在のプランですぐに生成できる品質が最初から選ばれます。ギャラリー作品ページの5項目は講評結果ページと同じ名称とスコア表記になり、ギャラリー上部に「並べ替えと絞り込み」への近道を追加しました。モバイルの下部タブはどのページでも同じ順序です。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-11-14-navigation-and-display-fixes"
+  },
+  {
     "id": "2026-11-13-public-critique-pages-and-genre-guides",
     "date": "2026-11-13",
     "showPopup": false,

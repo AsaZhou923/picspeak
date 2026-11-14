@@ -83,6 +83,8 @@ type ChromeCopy = {
   topicGuide: (typeLabel: string) => string;
 };
 
+// Dimension labels match the owner's critique view (`score_*` in the i18n
+// dictionaries) so a published critique reads the same on both pages.
 const ARTICLE_COPY: Record<SupportedLocale, ArticleCopy> = {
   en: {
     imageTypes: {
@@ -100,7 +102,7 @@ const ARTICLE_COPY: Record<SupportedLocale, ArticleCopy> = {
       lighting: 'Lighting',
       color: 'Color',
       impact: 'Impact',
-      technical: 'Technique',
+      technical: 'Technical',
     },
     strengths: 'What works',
     critique: 'What holds it back',
@@ -124,7 +126,7 @@ const ARTICLE_COPY: Record<SupportedLocale, ArticleCopy> = {
       composition: '构图',
       lighting: '光线',
       color: '色彩',
-      impact: '表达',
+      impact: '感染力',
       technical: '技术',
     },
     strengths: '优点',
@@ -148,7 +150,7 @@ const ARTICLE_COPY: Record<SupportedLocale, ArticleCopy> = {
       composition: '構図',
       lighting: '光',
       color: '色彩',
-      impact: '印象',
+      impact: 'インパクト',
       technical: '技術',
     },
     strengths: '良い点',
@@ -267,6 +269,11 @@ export function getGalleryImageTypeLabel(locale: string | null | undefined, imag
 
 export function formatGalleryScore(score: number): string {
   return Number.isFinite(score) ? score.toFixed(1) : '0.0';
+}
+
+/** Same thresholds as the history `ScoreBar`, so one score has one colour everywhere. */
+export function galleryScoreBarClass(score: number): string {
+  return score >= 8 ? 'bg-sage' : score >= 6 ? 'bg-gold' : 'bg-rust';
 }
 
 export function buildGalleryReviewHeading(review: Pick<PublicGalleryReview, 'image_type' | 'final_score' | 'review_locale' | 'advantage' | 'critique' | 'suggestions'>): string {

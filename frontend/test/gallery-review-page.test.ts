@@ -11,13 +11,19 @@ import {
   buildGalleryReviewWorkspaceHref,
   buildGallerySitemapXml,
   buildGalleryTypeFilterHref,
+  formatGalleryScore,
+  getGalleryReviewArticleCopy,
   getGalleryReviewChromeCopy,
   galleryReviewPath,
+  galleryScoreBarClass,
   isIndexableGalleryReview,
   isValidGalleryReviewId,
   resolveGalleryReviewContentLocale,
   type PublicGalleryReview,
 } from '../src/lib/gallery-review-page.ts';
+import { enTranslations } from '../src/lib/i18n-en.ts';
+import { jaTranslations } from '../src/lib/i18n-ja.ts';
+import { zhTranslations } from '../src/lib/i18n-zh.ts';
 import { siteConfig } from '../src/lib/site.ts';
 
 const TEST_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -175,4 +181,31 @@ test('gallery submission copy discloses search indexing in every locale', () => 
   assert.match(legal, /Share-link pages are not submitted for indexing/);
   assert.match(legal, /分享链接页面不会提交给搜索引擎/);
   assert.match(legal, /共有リンクのページは検索エンジンに送信されません/);
+});
+
+test('public critique dimensions use the same names, format and colours as the owner view', () => {
+  const dictionaries = { en: enTranslations, zh: zhTranslations, ja: jaTranslations } as const;
+  for (const locale of ['en', 'zh', 'ja'] as const) {
+    const { dimensions } = getGalleryReviewArticleCopy(locale);
+    const t = dictionaries[locale];
+    assert.deepEqual(dimensions, {
+      composition: t.score_composition,
+      lighting: t.score_lighting,
+      color: t.score_color,
+      impact: t.score_impact,
+      technical: t.score_technical,
+    });
+  }
+
+  assert.equal(formatGalleryScore(8), '8.0');
+  assert.equal(galleryScoreBarClass(8), 'bg-sage');
+  assert.equal(galleryScoreBarClass(7), 'bg-gold');
+  assert.equal(galleryScoreBarClass(5.9), 'bg-rust');
+
+  const view = source('src', 'components', 'gallery', 'PublicGalleryReviewView.tsx');
+  assert.match(view, /galleryScoreBarClass\(value\)/);
+  assert.match(view, /formatGalleryScore\(value\)/);
+
+  const history = source('src', 'features', 'reviews', 'components', 'ReviewHistoryPanels.tsx');
+  assert.match(history, /score >= 8 \? 'bg-sage' : score >= 6 \? 'bg-gold' : 'bg-rust'/);
 });
