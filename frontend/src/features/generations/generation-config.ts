@@ -95,6 +95,18 @@ export function formatGenerationOutputSpec(quality: GenerationQuality, size: Gen
   return GENERATION_OUTPUT_SPECS[quality]?.[size] ?? size;
 }
 
+/**
+ * Display name for the generation model. Stored names are API identifiers,
+ * sometimes with a dated snapshot suffix (`gpt-image-2-2026-04-21`), which is
+ * not something to show beside a finished image.
+ */
+export function formatGenerationModelName(modelName: string | null | undefined): string {
+  const name = (modelName ?? '').trim();
+  if (!name) return '-';
+  if (/^gpt-image-2(?:-|$)/i.test(name)) return 'GPT Image 2';
+  return name.replace(/-\d{4}-\d{2}-\d{2}$/, '');
+}
+
 export function estimateGenerationCredits(
   creditsTable: GenerationCreditsTable | null | undefined,
   quality: GenerationQuality,

@@ -11,6 +11,7 @@ import { isDemoReviewId } from '@/lib/demo-review';
 import { CountUp } from '@/components/ui/Reveal';
 import { useI18n } from '@/lib/i18n';
 import { localeToIntlLocale } from '@/lib/locale';
+import { stripSoleListMarker } from '@/lib/critique-text';
 import {
   CARD_HIGHLIGHT_DURATION_MS,
   DIM_TO_TAGS,
@@ -83,7 +84,7 @@ function getReviewHierarchyCopy(locale: 'zh' | 'en' | 'ja') {
       evidenceLabel: '評価の詳細',
       evidenceTitle: '評価の根拠を確認する',
       secondaryLabel: '写真と講評',
-      secondaryTitle: '共有と写真の管理',
+      secondaryTitle: '共有・参考画像・写真の情報',
       referenceTool: '参考画像を生成',
       metaTool: '撮影情報',
       exportTool: '共有画像と印刷用レポート',
@@ -98,7 +99,7 @@ function getReviewHierarchyCopy(locale: 'zh' | 'en' | 'ja') {
       evidenceLabel: 'Detailed evidence',
       evidenceTitle: 'Inspect the critique evidence',
       secondaryLabel: 'Review record',
-      secondaryTitle: 'Sharing and photo details',
+      secondaryTitle: 'Sharing, reference images and photo details',
       referenceTool: 'Generate a visual reference',
       metaTool: 'Photo metadata',
       exportTool: 'Share image and print report',
@@ -112,7 +113,7 @@ function getReviewHierarchyCopy(locale: 'zh' | 'en' | 'ja') {
     evidenceLabel: '详细依据',
     evidenceTitle: '查看评分与点评依据',
     secondaryLabel: '点评记录',
-    secondaryTitle: '分享与照片管理',
+    secondaryTitle: '分享、参考图与照片信息',
     referenceTool: '生成参考图',
     metaTool: '拍摄信息',
     exportTool: '分享图片与打印报告',
@@ -284,7 +285,7 @@ export default function ReviewPage() {
     : displaySuggestions;
   const sourceContextCopy = getReviewSourceContextCopy(locale);
   const hierarchyCopy = getReviewHierarchyCopy(locale);
-  const strongestFinding = r.comparison?.summary || displayCritique;
+  const strongestFinding = stripSoleListMarker(r.comparison?.summary || displayCritique);
   const isGoalPracticeReview = Boolean(
     r.comparison &&
     activeReview.practice?.session_id &&
@@ -527,11 +528,13 @@ export default function ReviewPage() {
                   onExportSummary={handleOpenExportTools}
                   t={t}
                 />
-                {(actionFeedback || actionError) && (
-                  <div role={actionError ? 'alert' : 'status'} className={`rounded-control border px-4 py-3 text-sm ${actionError ? 'border-rust/25 bg-rust/5 text-rust' : 'border-sage/25 bg-sage/5 text-sage'}`}>
-                    {actionError || actionFeedback}
+                {actionError && (
+                  <div role="alert" className="rounded-control border border-rust/25 bg-rust/5 px-4 py-3 text-sm text-rust">
+                    {actionError}
                   </div>
                 )}
+                {/* One reserved line, so a confirmation appearing does not push the critique down. */}
+                <p role="status" className="min-h-5 text-sm leading-5 text-sage">{actionError ? '' : actionFeedback}</p>
               </div>
             )}
 

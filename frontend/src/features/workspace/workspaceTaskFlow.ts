@@ -141,7 +141,7 @@ export function clearPendingPracticeState(expectedSemanticKey?: string): void {
 export function getWorkspaceTaskFlowCopy(locale: 'zh' | 'en' | 'ja'): WorkspaceTaskFlowCopy {
   if (locale === 'en') {
     return {
-      steps: { image: 'Image', settings: 'Intent & settings', submit: 'Submit' },
+      steps: { image: 'Image', settings: 'Type & mode', submit: 'Submit' },
       stepHints: {
         image: 'Choose the frame PicSpeak should critique.',
         settings: 'Set the photo context and critique mode.',
@@ -159,7 +159,7 @@ export function getWorkspaceTaskFlowCopy(locale: 'zh' | 'en' | 'ja'): WorkspaceT
 
   if (locale === 'ja') {
     return {
-      steps: { image: '画像', settings: '目的と設定', submit: '送信' },
+      steps: { image: '画像', settings: 'タイプとモード', submit: '送信' },
       stepHints: {
         image: '講評する写真を選びます。',
         settings: '写真タイプと講評モードを設定します。',
@@ -176,7 +176,7 @@ export function getWorkspaceTaskFlowCopy(locale: 'zh' | 'en' | 'ja'): WorkspaceT
   }
 
   return {
-    steps: { image: '图片', settings: '意图与设置', submit: '提交' },
+    steps: { image: '图片', settings: '类型与模式', submit: '提交' },
     stepHints: {
       image: '选择要让 PicSpeak 点评的照片。',
       settings: '设置图片语境和点评模式。',

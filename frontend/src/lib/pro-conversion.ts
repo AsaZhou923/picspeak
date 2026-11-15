@@ -97,8 +97,8 @@ const COPY: Record<ProConversionLocale, LocaleCopy> = {
       },
       retake_compare: {
         badge: '复拍对比',
-        title: '复拍对比在 Free 中同样可用',
-        body: '上传修改版或新照片即可与原片对比；每轮对比计 1 次额度。经常复拍时，Pro 不限月度次数。',
+        title: '经常复拍？Pro 不限月度次数',
+        body: '复拍对比在 Free 中同样可用：上传修改版或新照片即可与原片对比，每轮对比计 1 次额度。Pro 不限月度次数。',
       },
       standard: {
         badge: '摄影记录',
@@ -173,8 +173,8 @@ const COPY: Record<ProConversionLocale, LocaleCopy> = {
       },
       retake_compare: {
         badge: 'Retake comparison',
-        title: 'Retake comparison works on Free too',
-        body: 'Upload an edited version or a new photo to compare it with the original; each round uses one critique. If you retake often, Pro has no monthly limit.',
+        title: 'Retake often? Pro has no monthly limit',
+        body: 'Retake comparison works on Free too: upload an edited version or a new photo to compare it with the original, and each round uses one critique. Pro has no monthly limit.',
       },
       standard: {
         badge: 'Photography record',
@@ -249,8 +249,8 @@ const COPY: Record<ProConversionLocale, LocaleCopy> = {
       },
       retake_compare: {
         badge: '撮り直し比較',
-        title: '撮り直し比較は Free でも使えます',
-        body: '編集後の写真または新しい写真をアップロードすると元写真と比較できます。1 回の比較で 1 回分を使います。よく撮り直すなら、Pro は月間上限がありません。',
+        title: 'よく撮り直すなら、Pro は月間上限なし',
+        body: '撮り直し比較は Free でも使えます。編集後の写真または新しい写真をアップロードすると元写真と比較でき、1 回の比較で 1 回分を使います。Pro は月間上限がありません。',
       },
       standard: {
         badge: '写真記録',

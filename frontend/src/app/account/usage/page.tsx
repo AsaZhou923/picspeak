@@ -37,6 +37,7 @@ function UsageBar({
   used: number;
   total: number;
 }) {
+  const { t } = useI18n();
   const pct = total > 0 ? Math.min((used / total) * 100, 100) : 0;
   const color = pct >= 90 ? 'bg-rust' : pct >= 60 ? 'bg-gold' : 'bg-sage';
 
@@ -44,9 +45,8 @@ function UsageBar({
     <div className="space-y-2">
       <div className="flex justify-between text-xs text-ink-muted">
         <span>{label}</span>
-        <span>
-          {used} / {total}
-        </span>
+        {/* Says "used" outright: the headline figure above each bar is what remains. */}
+        <span>{t('usage_bar_used')} {used} / {total}</span>
       </div>
       <div className="w-full h-1 bg-border rounded-full overflow-hidden">
         <div
@@ -307,11 +307,6 @@ export default function UsagePage() {
                   <p className={`text-2xl font-display ${planColor(usage.plan)}`}>
                     {planLabel(usage.plan)}
                   </p>
-                  {userInfo?.user_id && (
-                    <p className="text-xs text-ink-muted font-mono mt-1 truncate max-w-[220px]">
-                      {userInfo.user_id}
-                    </p>
-                  )}
                   {usage.plan === 'pro' && (
                     <div className="mt-3 space-y-1">
                       <p className="text-xs text-ink-muted">{subscriptionTermCopy.label}</p>

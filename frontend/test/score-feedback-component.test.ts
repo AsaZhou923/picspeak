@@ -57,7 +57,7 @@ const feedbackUrl = moduleUrl(await readFile(new URL('../src/features/reviews/co
   '@/lib/score-feedback': scoreHelperUrl,
 });
 const scorePanelUrl = moduleUrl(await readFile(new URL('../src/features/reviews/components/ReviewScorePanel.tsx', import.meta.url), 'utf8'), {
-  'lucide-react': moduleUrl('export function TrendingDown() { return null; } export function ZoomIn() { return null; }'),
+  'lucide-react': moduleUrl('export function ChevronRight() { return null; } export function TrendingDown() { return null; } export function ZoomIn() { return null; }'),
   '@/lib/i18n': i18nUrl,
   '@/lib/locale': moduleUrl(`export function localeToIntlLocale(locale) { return locale; }`),
   '@/lib/review-growth': moduleUrl(`export function getScoreVersionLabel() { return 'Rubric'; }`),

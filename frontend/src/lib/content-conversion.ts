@@ -402,7 +402,7 @@ const HOME_INTENT_COPY: Record<ContentConversionLocale, HomeIntentEntrance[]> = 
     },
     {
       intent: 'content_reader',
-      label: '内容流量',
+      label: '读过文章',
       title: '从文章直接进入工作台',
       body: '读完构图、光线或街拍文章后，直接带着同题材标准上传照片。',
       cta: '按文章方法试一张',
@@ -433,7 +433,7 @@ const HOME_INTENT_COPY: Record<ContentConversionLocale, HomeIntentEntrance[]> = 
     },
     {
       intent: 'content_reader',
-      label: 'Content traffic',
+      label: 'From an article',
       title: 'Move from article to workspace',
       body: 'After reading a guide, upload a matching frame with that subject standard already selected.',
       cta: 'Try one from a guide',
@@ -464,7 +464,7 @@ const HOME_INTENT_COPY: Record<ContentConversionLocale, HomeIntentEntrance[]> = 
     },
     {
       intent: 'content_reader',
-      label: '記事からの流入',
+      label: '記事を読んだ方',
       title: '記事から直接ワークスペースへ',
       body: '構図・光・ストリートの記事を読んだ後、同じ基準で写真をアップロードします。',
       cta: '記事の方法で試す',

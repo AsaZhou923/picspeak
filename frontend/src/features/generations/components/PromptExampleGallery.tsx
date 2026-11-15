@@ -39,10 +39,17 @@ function formatByline(message: string, author: string) {
   return message.replace('{author}', author);
 }
 
+/**
+ * Examples are revealed a page at a time. The list used to sit in its own
+ * scroll area, which trapped the mouse wheel halfway down the page.
+ */
+const PAGE_SIZE = 9;
+
 export function PromptExampleGallery({ onApply }: PromptExampleGalleryProps) {
   const { t, locale } = useI18n();
   const [activeCategory, setActiveCategory] = useState<CategoryFilter>('all');
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   const categoryCounts = useMemo(() => {
     const counts: Record<CategoryFilter, number> = {
@@ -111,7 +118,10 @@ export function PromptExampleGallery({ onApply }: PromptExampleGalleryProps) {
               key={category}
               type="button"
               aria-pressed={activeCategory === category}
-              onClick={() => setActiveCategory(category)}
+              onClick={() => {
+                setActiveCategory(category);
+                setVisibleCount(PAGE_SIZE);
+              }}
               className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-control border px-3 text-xs font-medium transition-colors ${
                 activeCategory === category
                   ? 'border-gold/45 bg-gold/10 text-gold'
@@ -129,9 +139,9 @@ export function PromptExampleGallery({ onApply }: PromptExampleGalleryProps) {
         {t('generation_examples_label')}: {examples.length}
       </p>
 
-      <div className="lg:max-h-[760px] lg:overflow-y-auto lg:pr-1">
+      <div>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {examples.map((example) => {
+          {examples.slice(0, visibleCount).map((example) => {
             const copied = copiedId === example.id;
             const title = getLocalizedPromptExampleTitle(example, locale);
             const promptPresentation = getPromptExamplePromptPresentation(example, locale);
@@ -204,6 +214,17 @@ export function PromptExampleGallery({ onApply }: PromptExampleGalleryProps) {
             );
           })}
         </div>
+        {examples.length > visibleCount && (
+          <div className="mt-4 flex justify-center">
+            <button
+              type="button"
+              onClick={() => setVisibleCount((count) => count + PAGE_SIZE)}
+              className="ui-action-secondary min-h-11 px-5 py-2 text-sm"
+            >
+              {t('generation_load_more')} ({examples.length - visibleCount})
+            </button>
+          </div>
+        )}
       </div>
     </section>
   );

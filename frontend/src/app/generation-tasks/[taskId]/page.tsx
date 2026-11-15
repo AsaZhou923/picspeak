@@ -170,19 +170,13 @@ export default function GenerationTaskPage() {
                   <h1 id="generation-task-status" aria-live="polite" className="mt-2 text-3xl font-black tracking-tight text-ink">
                     {failed ? t('generation_task_failed_title') : statusTitle}
                   </h1>
-                  <p className="mt-3 break-all font-mono text-xs text-ink-subtle">
-                    {t('generation_task_id_label')} {taskId}
-                  </p>
+                  {/* The id only helps when reporting a problem, so it is hidden while the image is generating. */}
+                  {failed && (
+                    <p className="mt-3 break-all font-mono text-xs text-ink-subtle">
+                      {t('generation_task_id_label')} {taskId}
+                    </p>
+                  )}
                 </div>
-                <span
-                  className={`inline-flex min-h-9 items-center rounded-full border px-3 py-1 font-mono text-xs font-semibold ${
-                    failed
-                      ? 'border-rust/35 bg-rust/10 text-rust'
-                      : 'border-gold/35 bg-gold/10 text-gold'
-                  }`}
-                >
-                  {task?.status ?? 'PENDING'}
-                </span>
               </div>
 
               <div className="mt-7">

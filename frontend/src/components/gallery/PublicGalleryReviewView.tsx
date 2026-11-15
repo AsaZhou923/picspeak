@@ -8,7 +8,7 @@ import { useAuth } from '@/lib/auth-context';
 import { buildGalleryApiUrl } from '@/lib/gallery-scoreboard-api';
 import {
   GALLERY_REVIEW_DIMENSIONS,
-  buildGalleryReviewHeading,
+  buildGalleryReviewVisibleHeading,
   buildGalleryReviewWorkspaceHref,
   buildGalleryTypeFilterHref,
   formatGalleryScore,
@@ -20,6 +20,7 @@ import {
   type PublicGalleryReview,
 } from '@/lib/gallery-review-page';
 import { useI18n } from '@/lib/i18n';
+import { stripSoleListMarker } from '@/lib/critique-text';
 import { localeToIntlLocale } from '@/lib/locale';
 import { markProductAttributionSource, trackProductEvent } from '@/lib/product-analytics';
 
@@ -92,7 +93,7 @@ function CritiqueSection({ title, body }: { title: string; body: string }) {
   return (
     <section className="border-t border-border-subtle pt-6">
       <h2 className="text-lg font-semibold text-ink">{title}</h2>
-      <p className="mt-3 whitespace-pre-line text-sm leading-7 text-ink-muted sm:text-base sm:leading-8">{body}</p>
+      <p className="mt-3 whitespace-pre-line text-sm leading-7 text-ink-muted sm:text-base sm:leading-8">{stripSoleListMarker(body)}</p>
     </section>
   );
 }
@@ -184,7 +185,7 @@ export default function PublicGalleryReviewView({ review, topicHref }: Props) {
             <div>
               <p className="ui-eyebrow">{contentTypeLabel}</p>
               <h1 className="mt-3 text-balance font-display text-3xl leading-tight text-ink sm:text-4xl">
-                {buildGalleryReviewHeading(review)}
+                {buildGalleryReviewVisibleHeading(review)}
               </h1>
 
               <div className="mt-6 flex items-end gap-3">

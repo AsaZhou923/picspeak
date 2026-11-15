@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { AlertCircle, ArrowRight, CheckCircle2, RefreshCw } from 'lucide-react';
+import { AlertCircle, ArrowRight, CheckCircle2, ChevronDown, RefreshCw } from 'lucide-react';
 import {
   createPracticeSession,
   getPracticeGuidanceProfile,
@@ -302,8 +302,8 @@ function PracticeAccountContent() {
       {hasLoaded && practiceEnabled === true && (
         practiceSessions.length === 0
           ? <PracticeStartPanel templates={profile?.templates ?? []} />
-          : <details className="rounded-card border border-border-subtle" onToggle={(event) => setStartOpen(event.currentTarget.open)}>
-              <summary className="cursor-pointer px-5 py-4 text-sm font-semibold text-ink">{flowCopy.start}</summary>
+          : <details className="group rounded-card border border-border-subtle bg-surface/60" onToggle={(event) => setStartOpen(event.currentTarget.open)}>
+              <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-sm font-semibold text-ink marker:content-none [&::-webkit-details-marker]:hidden"><span>{flowCopy.start}</span><ChevronDown size={16} className="shrink-0 text-ink-subtle transition-transform group-open:rotate-180" aria-hidden="true" /></summary>
               {startOpen && <PracticeStartPanel templates={profile?.templates ?? []} />}
             </details>
       )}
@@ -322,8 +322,8 @@ function PracticeAccountContent() {
         </div>
       )}
 
-      {practiceSessions.length > 0 && <details className="rounded-card border border-border-subtle">
-        <summary className="cursor-pointer px-5 py-4 text-sm font-semibold text-ink">{flowCopy.insights}</summary>
+      {practiceSessions.length > 0 && <details className="group rounded-card border border-border-subtle bg-surface/60">
+        <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-sm font-semibold text-ink marker:content-none [&::-webkit-details-marker]:hidden"><span>{flowCopy.insights}</span><ChevronDown size={16} className="shrink-0 text-ink-subtle transition-transform group-open:rotate-180" aria-hidden="true" /></summary>
         <div className="space-y-5 p-4 pt-0">
       <section className="rounded-card border border-border-subtle bg-raised/45 p-5">
         {loading && !profile ? (

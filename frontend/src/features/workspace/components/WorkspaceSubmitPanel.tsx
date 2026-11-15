@@ -41,7 +41,7 @@ export function WorkspaceSubmitPanel({
         <p className="text-xs font-bold text-ink-muted">{copy.requestSummary}</p>
         <dl className="mt-3 grid grid-cols-3 gap-3 text-xs">
           <div className="min-w-0">
-            <dt className="text-ink-subtle">{t('select_image_type')}</dt>
+            <dt className="text-ink-subtle">{t('filter_image_type')}</dt>
             <dd className="mt-1 truncate font-bold text-ink">{t(`image_type_${imageType}`)}</dd>
           </div>
           <div className="min-w-0">
@@ -49,7 +49,7 @@ export function WorkspaceSubmitPanel({
             <dd className="mt-1 truncate font-bold text-ink">{reviewModelLabel(reviewModel)}</dd>
           </div>
           <div className="min-w-0">
-            <dt className="text-ink-subtle">{t('select_mode')}</dt>
+            <dt className="text-ink-subtle">{copy.critiqueMode}</dt>
             <dd className="mt-1 truncate font-bold text-ink">{modeLabel}</dd>
           </div>
         </dl>
