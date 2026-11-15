@@ -1,5 +1,5 @@
 /* eslint-disable @next/next/no-img-element -- Review preview uses client-side cached object URLs */
-import { TrendingDown, ZoomIn } from 'lucide-react';
+import { ChevronRight, TrendingDown, ZoomIn } from 'lucide-react';
 import type { ReviewGetResponse } from '@/lib/types';
 import { useI18n } from '@/lib/i18n';
 import { localeToIntlLocale } from '@/lib/locale';
@@ -150,7 +150,8 @@ export function ReviewScorePanel({
                 </span>
                 {isWeakest && <TrendingDown size={12} className="shrink-0 text-rust" aria-label={t('review_score_lowest')} />}
                 {hasTarget && (
-                  <span className="shrink-0 text-xs text-gold" aria-hidden="true">↓</span>
+                  // A chevron, not a down arrow: next to a score an arrow reads as "this score dropped".
+                  <ChevronRight size={13} className="shrink-0 text-ink-subtle" aria-hidden="true" />
                 )}
               </span>
               <span
@@ -160,7 +161,7 @@ export function ReviewScorePanel({
                 {dimension.desc}
                 {hasTarget && (
                   <span className="mt-1 block border-t border-border-subtle pt-1 text-gold">
-                    <span aria-hidden="true">↓ </span>{t('dim_click_hint')}
+                    {t('dim_click_hint')}
                   </span>
                 )}
               </span>
@@ -207,6 +208,9 @@ export function ReviewMetadataPanel({ review, imgNaturalSize }: ReviewMetadataPa
           <p>{t('review_img_resolution')}: {imgNaturalSize.w} × {imgNaturalSize.h}</p>
         )}
       </div>
+      {rows.length === 0 && (
+        <p className="mt-4 border-t border-border-subtle pt-4 text-xs leading-5 text-ink-muted">{t('review_exif_missing')}</p>
+      )}
       {rows.length > 0 && (
         <dl className="mt-4 grid gap-2 border-t border-border-subtle pt-4 text-xs sm:grid-cols-2">
           {rows.map(([label, value]) => (

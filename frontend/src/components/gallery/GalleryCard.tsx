@@ -7,6 +7,7 @@ import { Camera, ChevronRight, Gauge, Heart, Sparkles, Star, Zap } from 'lucide-
 import type { PublicGalleryItem, GalleryDensityPreference } from '@/lib/gallery-ux-types';
 import { useI18n } from '@/lib/i18n';
 import { getGalleryWorkspaceCtas, type ContentConversionEntrypoint } from '@/lib/content-conversion';
+import { summarizeGalleryCritique } from '@/lib/gallery-review-page';
 import { markProductAttributionSource, trackProductEvent } from '@/lib/product-analytics';
 import GalleryCardImage from './GalleryCardImage';
 
@@ -23,7 +24,7 @@ interface GalleryCardProps {
 }
 
 function trimSummary(summary: string, maxLength = 78): string {
-  const normalized = summary.replace(/\s+/g, ' ').trim();
+  const normalized = summarizeGalleryCritique(summary);
   if (!normalized) return '';
   if (normalized.length <= maxLength) return normalized;
   return `${normalized.slice(0, maxLength).trim()}...`;

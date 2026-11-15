@@ -11,7 +11,8 @@ import { GeneratedImageDetailResponse } from '@/lib/types';
 import { useI18n } from '@/lib/i18n';
 import { formatUserFacingError } from '@/lib/error-utils';
 import { readProductAttributionSource, trackProductEvent } from '@/lib/product-analytics';
-import { formatGenerationOutputSpec } from '@/features/generations/generation-config';
+import { formatGenerationModelName, formatGenerationOutputSpec } from '@/features/generations/generation-config';
+import { QUALITY_COPY_KEYS } from '@/features/generations/generation-page-copy';
 import { prepareGenerationRequest, completeGenerationRequest } from '@/features/generations/generation-request';
 
 export default function GenerationDetailPage() {
@@ -305,13 +306,13 @@ function GenerationDetail({ generationId }: { generationId: string }) {
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gold/10 text-gold">
                   <ImageIcon size={20} aria-hidden="true" />
                 </div>
-                <h2 id="generation-result-prompt" className="text-base font-semibold text-ink">{t('generation_prompt_label')}</h2>
+                <h2 id="generation-result-prompt" className="text-base font-semibold text-ink">{t('generation_detail_prompt')}</h2>
               </div>
               <p className="text-sm leading-7 text-ink-muted">{generation.prompt}</p>
               <div className="mt-5 grid grid-cols-2 gap-3 text-xs">
                 <div className="rounded-control border border-border bg-raised/70 p-3">
                   <p className="text-ink-subtle">{t('generation_detail_quality')}</p>
-                  <p className="mt-1 text-ink">{generation.quality}</p>
+                  <p className="mt-1 text-ink">{QUALITY_COPY_KEYS[generation.quality] ? t(QUALITY_COPY_KEYS[generation.quality].label) : generation.quality}</p>
                 </div>
                 <div className="rounded-control border border-border bg-raised/70 p-3">
                   <p className="text-ink-subtle">{t('generation_detail_size')}</p>
@@ -323,7 +324,7 @@ function GenerationDetail({ generationId }: { generationId: string }) {
                 </div>
                 <div className="rounded-control border border-border bg-raised/70 p-3">
                   <p className="text-ink-subtle">{t('generation_detail_model')}</p>
-                  <p className="mt-1 truncate text-ink">{generation.model_snapshot ?? generation.model_name}</p>
+                  <p className="mt-1 truncate text-ink">{formatGenerationModelName(generation.model_name)}</p>
                 </div>
               </div>
             </section>

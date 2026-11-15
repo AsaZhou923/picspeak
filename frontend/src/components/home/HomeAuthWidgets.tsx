@@ -7,6 +7,17 @@ import HomeCheckoutButton from '@/components/home/HomeCheckoutButton';
 import HomeSignInButton from '@/components/home/HomeSignInButton';
 import HomeSignUpButton from '@/components/home/HomeSignUpButton';
 
+/**
+ * A streamed copy of the page can linger in a hidden container ahead of the
+ * visible one. `getElementById` returns that hidden copy, so the buttons were
+ * sometimes portalled into markup nobody sees (an empty Pro card, a missing
+ * sign-in button). Prefer the slot that is actually laid out.
+ */
+function findSlot(id: string): HTMLElement | null {
+  const matches = Array.from(document.querySelectorAll<HTMLElement>(`#${id}`));
+  return matches.find((element) => element.getClientRects().length > 0) ?? matches[0] ?? null;
+}
+
 export default function HomeAuthWidgets() {
   const [mounted, setMounted] = useState(false);
 
@@ -28,9 +39,9 @@ export default function HomeAuthWidgets() {
 
   if (!mounted) return null;
 
-  const signInSlot = document.getElementById('home-signin-slot');
-  const signUpSlot = document.getElementById('home-signup-slot');
-  const checkoutSlot = document.getElementById('home-checkout-slot');
+  const signInSlot = findSlot('home-signin-slot');
+  const signUpSlot = findSlot('home-signup-slot');
+  const checkoutSlot = findSlot('home-checkout-slot');
 
   if (!signInSlot && !signUpSlot && !checkoutSlot) return null;
 

@@ -54,6 +54,8 @@ export type GallerySitemapEntry = {
 type ArticleCopy = {
   imageTypes: Record<ConversionImageType, string>;
   heading: (typeLabel: string, score: string) => string;
+  /** On-page H1. The score is shown as its own figure right below, so it is left out here. */
+  visibleHeading: (typeLabel: string) => string;
   titleSnippetSeparator: string;
   dimensions: Record<GalleryReviewDimension, string>;
   strengths: string;
@@ -96,6 +98,7 @@ const ARTICLE_COPY: Record<SupportedLocale, ArticleCopy> = {
       architecture: 'Architecture',
     },
     heading: (typeLabel, score) => `${typeLabel === 'General' ? 'AI' : typeLabel} photo critique: ${score}/10`,
+    visibleHeading: (typeLabel) => `${typeLabel === 'General' ? 'AI' : typeLabel} photo critique`,
     titleSnippetSeparator: ' — ',
     dimensions: {
       composition: 'Composition',
@@ -121,6 +124,7 @@ const ARTICLE_COPY: Record<SupportedLocale, ArticleCopy> = {
       architecture: '建筑',
     },
     heading: (typeLabel, score) => `${typeLabel === '通用' ? 'AI ' : typeLabel}摄影点评：${score}/10`,
+    visibleHeading: (typeLabel) => `${typeLabel === '通用' ? 'AI ' : typeLabel}摄影点评`,
     titleSnippetSeparator: '｜',
     dimensions: {
       composition: '构图',
@@ -145,6 +149,7 @@ const ARTICLE_COPY: Record<SupportedLocale, ArticleCopy> = {
       architecture: '建築',
     },
     heading: (typeLabel, score) => `${typeLabel === '汎用' ? 'AI ' : typeLabel}写真講評：${score}/10`,
+    visibleHeading: (typeLabel) => `${typeLabel === '汎用' ? 'AI ' : typeLabel}写真講評`,
     titleSnippetSeparator: '｜',
     dimensions: {
       composition: '構図',
@@ -280,6 +285,24 @@ export function buildGalleryReviewHeading(review: Pick<PublicGalleryReview, 'ima
   const locale = resolveGalleryReviewContentLocale(review);
   const copy = ARTICLE_COPY[locale];
   return copy.heading(copy.imageTypes[normalizeGalleryImageType(review.image_type)], formatGalleryScore(review.final_score));
+}
+
+/** The page's visible H1: the same heading as the metadata title, without the score. */
+export function buildGalleryReviewVisibleHeading(review: Pick<PublicGalleryReview, 'image_type' | 'review_locale' | 'advantage' | 'critique' | 'suggestions'>): string {
+  const copy = ARTICLE_COPY[resolveGalleryReviewContentLocale(review)];
+  return copy.visibleHeading(copy.imageTypes[normalizeGalleryImageType(review.image_type)]);
+}
+
+/**
+ * Card-sized summary of a critique. Suggestions are stored as
+ * "Observation: …; Reason: …; Action: …"; a card only has room for the
+ * observation, so the label and everything from the reason on are dropped.
+ * Text in any other shape is returned as is.
+ */
+export function summarizeGalleryCritique(summary: string | null | undefined): string {
+  const text = collapseWhitespace((summary ?? '').trim().replace(/^\d+(?:[.．](?!\d)|、)\s*/, ''));
+  const match = text.match(/^(?:观察|Observation|観察)\s*[:：]\s*(.+)/i);
+  return match ? match[1].split(/\s*[;；]\s*(?:原因|Reason|理由)\s*[:：]/i)[0] : text;
 }
 
 /** Topic-only metadata title (the root template appends the brand); unique per critique via a summary snippet. */

@@ -1011,8 +1011,6 @@ function WorkspacePageContent() {
                     reviewMode={reviewMode}
                     isGuest={isGuest}
                     locale={locale}
-                    remainingQuota={remainingQuota}
-                    totalQuota={totalQuota}
                     onImageTypeChange={setImageType}
                     onReviewModeChange={setReviewMode}
                     t={t}

@@ -11,8 +11,6 @@ interface WorkspaceSettingsPanelProps {
   reviewMode: ReviewMode;
   isGuest: boolean;
   locale: 'zh' | 'en' | 'ja';
-  remainingQuota: number | null;
-  totalQuota: number | null;
   onImageTypeChange: (type: ImageType) => void;
   onReviewModeChange: (mode: ReviewMode) => void;
   t: Translator;
@@ -58,14 +56,11 @@ export function WorkspaceSettingsPanel({
   reviewMode,
   isGuest,
   locale,
-  remainingQuota,
-  totalQuota,
   onImageTypeChange,
   onReviewModeChange,
   t,
 }: WorkspaceSettingsPanelProps) {
   const copy = getWorkspaceTaskFlowCopy(locale);
-  const quotaNote = copy.quotaAvailable(remainingQuota, totalQuota);
   const modeLabel = reviewMode === 'pro' ? 'Pro' : 'Flash';
   const activeModelLabel = reviewModelLabel(reviewModelForMode(reviewMode));
 
@@ -78,7 +73,6 @@ export function WorkspaceSettingsPanel({
 
         <MobileSetting label={copy.critiqueMode} value={`${modeLabel} · ${activeModelLabel}`}>
           <ModePicker value={reviewMode} onChange={onReviewModeChange} isGuest={isGuest} variant="compact" t={t} />
-          <p className="mt-3 text-xs leading-5 text-ink-muted">{copy.quotaImpact(reviewMode)} {quotaNote}</p>
         </MobileSetting>
       </div>
 
@@ -89,7 +83,6 @@ export function WorkspaceSettingsPanel({
 
         <DesktopSetting label={copy.critiqueMode}>
           <ModePicker value={reviewMode} onChange={onReviewModeChange} isGuest={isGuest} t={t} />
-          <p className="mt-3 text-xs leading-5 text-ink-muted">{copy.quotaImpact(reviewMode)} {quotaNote}</p>
         </DesktopSetting>
       </div>
     </>

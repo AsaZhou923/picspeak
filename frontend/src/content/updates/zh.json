@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-15-clearer-results-and-plain-wording",
+    "date": "2026-11-15",
+    "showPopup": false,
+    "title": "点评结果、等待页和额度页更清楚",
+    "summary": "点评结果页的评分箭头、单条编号和收藏提示不再让人误会，大图预览改用深色背景。等待页只在失败时显示任务编号；额度页标题和进度条更直白，并更正了额度包说明：Free 账户购买 credits 后仍只能使用低质量。AI 创作页的提示词库改为“加载更多”，滚动不再卡住。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-11-15-clearer-results-and-plain-wording"
+  },
+  {
     "id": "2026-11-14-navigation-and-display-fixes",
     "date": "2026-11-14",
     "showPopup": false,

@@ -37,17 +37,17 @@ test('workspace model summaries show the active GPT model and retain the legacy 
 test('workspace task flow keeps the image, settings and submit hierarchy localized', () => {
   assert.deepEqual(getWorkspaceTaskFlowCopy('zh').steps, {
     image: '图片',
-    settings: '意图与设置',
+    settings: '类型与模式',
     submit: '提交',
   });
   assert.deepEqual(getWorkspaceTaskFlowCopy('en').steps, {
     image: 'Image',
-    settings: 'Intent & settings',
+    settings: 'Type & mode',
     submit: 'Submit',
   });
   assert.deepEqual(getWorkspaceTaskFlowCopy('ja').steps, {
     image: '画像',
-    settings: '目的と設定',
+    settings: 'タイプとモード',
     submit: '送信',
   });
 

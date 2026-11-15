@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-15-clearer-results-and-plain-wording",
+    "date": "2026-11-15",
+    "showPopup": false,
+    "title": "講評結果・待機ページ・クォータページを分かりやすく",
+    "summary": "講評結果ページでは、スコア横の矢印、1件だけの番号、お気に入り通知が誤解を招かないようになり、写真の拡大表示は暗い背景になりました。待機ページのタスク ID は失敗時のみ表示されます。クォータページは見出しと使用済み表示が分かりやすくなり、クレジットパックの説明を訂正しました（Free では購入後も低画質のみ）。AI 作成のプロンプト集は「さらに読み込む」方式になり、スクロールが止まらなくなりました。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-11-15-clearer-results-and-plain-wording"
+  },
+  {
     "id": "2026-11-14-navigation-and-display-fixes",
     "date": "2026-11-14",
     "showPopup": false,

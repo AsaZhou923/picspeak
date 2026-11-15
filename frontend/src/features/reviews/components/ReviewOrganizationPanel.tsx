@@ -6,7 +6,6 @@ import type { ReviewHistoryItem } from '@/lib/types';
 import {
   REVIEW_ORGANIZATION_NOTE_MAX_LENGTH,
   REVIEW_ORGANIZATION_TAG_LIMIT,
-  REVIEW_ORGANIZATION_TAG_MAX_LENGTH,
   buildReviewOrganizationPayload,
   draftFromReviewOrganization,
   reviewOrganizationDraftIsDirty,
@@ -213,7 +212,7 @@ export function ReviewOrganizationPanel({
                 className="w-full rounded-control border border-border bg-void/60 px-3 py-2.5 text-sm text-ink outline-none focus:border-gold/40 disabled:opacity-50"
               />
               <p className="text-[11px] leading-5 text-ink-subtle">
-                {copy.tagsHint} {tagStats.accepted.length}/{REVIEW_ORGANIZATION_TAG_LIMIT}, {REVIEW_ORGANIZATION_TAG_MAX_LENGTH}
+                {copy.tagsHint} {tagStats.accepted.length}/{REVIEW_ORGANIZATION_TAG_LIMIT}
               </p>
               {tagStats.hasOverflow && (
                 <p className="text-[11px] leading-5 text-rust">
@@ -243,7 +242,7 @@ export function ReviewOrganizationPanel({
         <button
           type="button"
           onClick={handleSave}
-          disabled={!item || busy || tagStats.hasOverflow}
+          disabled={!item || busy || !dirty || tagStats.hasOverflow}
           className="ui-action-primary px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Save size={13} />
@@ -252,7 +251,7 @@ export function ReviewOrganizationPanel({
         <button
           type="button"
           onClick={handleCancel}
-          disabled={!item || busy}
+          disabled={!item || busy || !dirty}
           className="ui-action-secondary px-4 py-2 text-sm disabled:opacity-50"
         >
           <RotateCcw size={13} />

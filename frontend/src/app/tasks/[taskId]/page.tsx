@@ -305,7 +305,8 @@ export default function TaskPage() {
     <div className="min-h-screen px-6 py-8 lg:flex lg:items-center lg:py-12">
       <div className={`mx-auto grid w-full items-center justify-items-center gap-6 lg:justify-items-stretch ${waitingLayoutClass}`}>
         <div className="mx-auto w-full max-w-xl text-center space-y-10 animate-fade-in">
-        <p className="text-xs text-ink-muted font-mono">{t('task_id_label')} {taskId}</p>
+        {/* The id only helps when reporting a problem, so it is hidden while the critique runs. */}
+        {isFinal && <p className="text-xs text-ink-muted font-mono">{t('task_id_label')} {taskId}</p>}
 
         {isFinal ? (
           <div className="space-y-4">

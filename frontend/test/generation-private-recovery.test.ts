@@ -10,7 +10,8 @@ const baseModules = {
   '@/features/generations/generation-request': generationRequest,
   'lucide-react': {}, '@/lib/i18n': { useI18n: () => ({ t, locale: 'en' }) },
   '@/lib/error-utils': { formatUserFacingError: () => 'localized-error' },
-  '@/features/generations/generation-config': { formatGenerationOutputSpec: () => 'output' },
+  '@/features/generations/generation-config': { formatGenerationOutputSpec: () => 'output', formatGenerationModelName: (name: string) => name },
+  '@/features/generations/generation-page-copy': { QUALITY_COPY_KEYS: { low: { label: 'low' }, medium: { label: 'medium' }, high: { label: 'high' } } },
   '@/lib/locale': { localeToIntlLocale: () => 'en-US' },
 };
 const item = (id: string) => ({ generation_id: id, prompt: `private-${id}`, image_url: `https://example.test/${id}.webp`, created_at: '2026-10-20T00:00:00Z', metadata: {} });
