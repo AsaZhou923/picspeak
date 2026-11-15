@@ -5,7 +5,6 @@
  */
 export function stripSoleListMarker(body: string | null | undefined): string {
   const text = (body ?? '').trim();
-  if (!/^1[.、．]\s*/.test(text)) return text;
-  if (/(?:^|\s)2[.、．]\s/.test(text)) return text;
-  return text.replace(/^1[.、．]\s*/, '');
+  if (/(?:^|\s)2(?:[.．](?!\d)|、)/.test(text)) return text;
+  return text.replace(/^1(?:[.．](?!\d)|、)\s*/, '');
 }

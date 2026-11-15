@@ -22,6 +22,10 @@ test('a critique with one point loses its lone list marker, longer lists keep th
   assert.equal(stripSoleListMarker('1. 右下方的枝叶连成一片。'), '右下方的枝叶连成一片。');
   assert.equal(stripSoleListMarker('1、只有一条'), '只有一条');
   assert.equal(stripSoleListMarker('1. first 2. second'), '1. first 2. second');
+  assert.equal(stripSoleListMarker('1、第一条\n2、第二条'), '1、第一条\n2、第二条');
+  assert.equal(stripSoleListMarker('1．第一条\n2．第二条'), '1．第一条\n2．第二条');
+  assert.equal(stripSoleListMarker('1.5 stops brighter, with recovered shadow detail.'), '1.5 stops brighter, with recovered shadow detail.');
+  assert.equal(stripSoleListMarker('1. Recover 2.5 stops of shadow detail.'), 'Recover 2.5 stops of shadow detail.');
   assert.equal(stripSoleListMarker('No marker here'), 'No marker here');
   assert.equal(stripSoleListMarker(null), '');
 });
@@ -31,6 +35,10 @@ test('gallery cards show the observation instead of the raw structured suggestio
   assert.equal(summarizeGalleryCritique('1. Observation: The peak enters as a fragment; Reason: its edge is cut'), 'The peak enters as a fragment');
   assert.equal(summarizeGalleryCritique('観察：橋の線が重なる；理由：暗部がつながる'), '橋の線が重なる');
   assert.equal(summarizeGalleryCritique('A plain sentence.'), 'A plain sentence.');
+  assert.equal(summarizeGalleryCritique('Observation: The peak enters as a fragment'), 'The peak enters as a fragment');
+  assert.equal(summarizeGalleryCritique('观察：行人上身清楚'), '行人上身清楚');
+  assert.equal(summarizeGalleryCritique('観察：橋の線が重なる'), '橋の線が重なる');
+  assert.equal(summarizeGalleryCritique('1.5 stops brighter.'), '1.5 stops brighter.');
   assert.match(read('src/components/gallery/GalleryCard.tsx'), /summarizeGalleryCritique\(summary\)/);
 });
 

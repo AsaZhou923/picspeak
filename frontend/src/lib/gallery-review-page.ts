@@ -300,9 +300,9 @@ export function buildGalleryReviewVisibleHeading(review: Pick<PublicGalleryRevie
  * Text in any other shape is returned as is.
  */
 export function summarizeGalleryCritique(summary: string | null | undefined): string {
-  const text = collapseWhitespace((summary ?? '').replace(/^\d+[.、．]\s*/, ''));
-  const match = text.match(/^(?:观察|Observation|観察)\s*[:：]\s*(.+?)\s*[;；]\s*(?:原因|Reason|理由)\s*[:：]/i);
-  return match ? match[1] : text;
+  const text = collapseWhitespace((summary ?? '').trim().replace(/^\d+(?:[.．](?!\d)|、)\s*/, ''));
+  const match = text.match(/^(?:观察|Observation|観察)\s*[:：]\s*(.+)/i);
+  return match ? match[1].split(/\s*[;；]\s*(?:原因|Reason|理由)\s*[:：]/i)[0] : text;
 }
 
 /** Topic-only metadata title (the root template appends the brand); unique per critique via a summary snippet. */
