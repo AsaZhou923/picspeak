@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 from urllib.parse import urlsplit, urlunsplit
 
 from fastapi import APIRouter, Depends, Request, status
@@ -11,7 +11,7 @@ from sqlalchemy.orm import Query, Session
 from app.api.deps import CurrentActor, get_current_actor, get_db, get_registered_actor
 from app.core.config import settings
 from app.core.errors import api_error
-from app.db.models import BillingSubscription, UsageLedger, User, UserPlan
+from app.db.models import BillingSubscription, User, UserPlan
 from app.schemas import (
     ActivationCodeRedeemRequest,
     ActivationCodeRedeemResponse,
@@ -20,8 +20,6 @@ from app.schemas import (
     BillingPortalResponse,
     CreditPackCheckoutRequest,
     CreditPackCheckoutResponse,
-    ImageCreditCodeRedeemRequest,
-    ImageCreditCodeRedeemResponse,
     UsageResponse,
 )
 from app.services.billing_access import (
@@ -50,14 +48,12 @@ from app.services.lemonsqueezy import (
     create_image_credit_pack_checkout_for_user,
     retrieve_subscription,
 )
-from app.services.notification_events import record_credit_confirmed, record_subscription_changed
+from app.services.notification_events import record_subscription_changed
 from app.services.product_analytics import record_product_event
 
 router = APIRouter(tags=['billing'])
 logger = logging.getLogger(__name__)
 
-IMAGE_CREDIT_PROMO_CODE = 'PICSPEAKART'
-IMAGE_CREDIT_PROMO_CREDITS = 30
 IMAGE_CREDIT_PACK_KEY = 'image_credits_300'
 IMAGE_CREDIT_PACK_CREDITS = 300
 IMAGE_CREDIT_PACK_PRICES = {
@@ -209,23 +205,6 @@ def _generation_credit_usage_snapshot(db: Session, user: User, plan: UserPlan) -
         }
 
     return generation_credit_balance_snapshot(db, user, plan=plan)
-
-
-def _normalize_image_credit_code(raw_code: str) -> str:
-    return ''.join(str(raw_code or '').strip().upper().split())
-
-
-def _has_redeemed_image_credit_code(db: Session, user: User, code: str) -> bool:
-    return (
-        db.query(UsageLedger)
-        .filter(
-            UsageLedger.user_id == user.id,
-            UsageLedger.usage_type == 'image_generation_credit',
-            UsageLedger.metadata_json.contains({'grant_type': 'promo_code', 'grant_code': code}),
-        )
-        .first()
-        is not None
-    )
 
 
 @router.get('/me/usage', response_model=UsageResponse)
@@ -438,58 +417,6 @@ def redeem_activation_code(
         provider=subscription.provider,
         message='Activation code redeemed successfully.',
         activated_until=activated_until,
-    )
-
-
-@router.post('/billing/image-credit-code/redeem', response_model=ImageCreditCodeRedeemResponse)
-def redeem_image_credit_code(
-    payload: ImageCreditCodeRedeemRequest,
-    db: Session = Depends(get_db),
-    actor: CurrentActor = Depends(get_current_actor),
-):
-    if actor.plan == UserPlan.guest:
-        raise api_error(status.HTTP_403_FORBIDDEN, 'BILLING_SIGNIN_REQUIRED', 'Please sign in before redeeming a credit code')
-
-    # Shared promo codes are short; count every attempt, including rejected ones.
-    enforce_activation_code_rate_limit(db, actor.user, scope='image_credit_code_redeem')
-    db.commit()
-    code = _normalize_image_credit_code(payload.code)
-    if code != IMAGE_CREDIT_PROMO_CODE:
-        raise api_error(status.HTTP_404_NOT_FOUND, 'IMAGE_CREDIT_CODE_INVALID', 'This credit code is not valid')
-
-    # Serialize redemptions per user so concurrent requests cannot both pass
-    # the one-time check below.
-    db.query(User).filter(User.id == actor.user.id).with_for_update().populate_existing().one()
-    if _has_redeemed_image_credit_code(db, actor.user, code):
-        raise api_error(status.HTTP_409_CONFLICT, 'IMAGE_CREDIT_CODE_ALREADY_REDEEMED', 'This credit code has already been redeemed')
-
-    ledger = UsageLedger(
-            user_id=actor.user.id,
-            review_id=None,
-            task_id=None,
-            usage_type='image_generation_credit',
-            amount=-IMAGE_CREDIT_PROMO_CREDITS,
-            unit='credits',
-            bill_date=datetime.now(timezone.utc).date(),
-            metadata_json={
-                'grant_type': 'promo_code',
-                'grant_code': code,
-                'credits_granted': IMAGE_CREDIT_PROMO_CREDITS,
-            },
-        )
-    db.add(ledger)
-    db.flush()
-    record_credit_confirmed(db, actor.user, grant_id=f'ledger_{ledger.id}', credits=IMAGE_CREDIT_PROMO_CREDITS)
-    db.commit()
-    snapshot = _generation_credit_usage_snapshot(db, actor.user, actor.plan)
-    return ImageCreditCodeRedeemResponse(
-        status='redeemed',
-        code=code,
-        credits_granted=IMAGE_CREDIT_PROMO_CREDITS,
-        message='Credit code redeemed successfully.',
-        monthly_total=snapshot['monthly_total'],
-        monthly_used=snapshot['monthly_used'],
-        monthly_remaining=snapshot['monthly_remaining'],
     )
 
 

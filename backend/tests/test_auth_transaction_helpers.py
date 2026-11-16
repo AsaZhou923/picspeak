@@ -13,7 +13,7 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 from app.api.deps import create_guest_user
-from app.api.routers.auth_support import _build_unique_username, _login_from_google_claims
+from app.api.routers.auth_support import _build_unique_username
 from app.db.models import UserPlan
 
 
@@ -27,33 +27,6 @@ class AuthTransactionHelperTests(unittest.TestCase):
         self.assertEqual(user.public_id, 'gst_test_123')
         self.assertEqual(user.plan, UserPlan.guest)
         db.add.assert_called_once_with(user)
-        db.flush.assert_called_once()
-        db.commit.assert_not_called()
-        db.refresh.assert_not_called()
-
-    def test_login_from_google_claims_flushes_without_committing(self) -> None:
-        db = MagicMock()
-        db.query.return_value.filter.return_value.first.return_value = None
-
-        claims = {
-            'email': 'tester@example.com',
-            'email_verified': True,
-            'aud': 'client-id.apps.googleusercontent.com',
-            'iss': 'https://accounts.google.com',
-        }
-
-        with patch(
-            'app.api.routers.auth_support.settings.google_oauth_client_id',
-            'client-id.apps.googleusercontent.com',
-        ), patch('app.api.routers.auth_support.new_public_id', return_value='usr_test_123'), patch(
-            'app.api.routers.auth_support.create_access_token',
-            return_value='jwt-token',
-        ):
-            response = _login_from_google_claims(claims, db)
-
-        self.assertEqual(response.access_token, 'jwt-token')
-        self.assertEqual(response.user_id, 'usr_test_123')
-        self.assertEqual(response.plan, 'free')
         db.flush.assert_called_once()
         db.commit.assert_not_called()
         db.refresh.assert_not_called()

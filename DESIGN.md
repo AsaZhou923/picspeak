@@ -21,7 +21,8 @@ The screenshots under `docs/assets/screenshots/` are historical evidence, not pi
 
 Current evidence: the user-provided result-page screenshots, all frontend route families,
 shared navigation, review visibility handlers, and the zh/en/ja UI dictionaries. The
-2026-09-25 audit and verification record lives in `docs/frontend/ui-review-2026-09-25.md`.
+2026-09-25 audit and verification record is kept in the internal documentation vault,
+outside this repository.
 
 ## 2. Brand
 
@@ -447,4 +448,4 @@ Task flows additionally define draft preservation, navigation-away behavior and 
 - Supporting routes inherit the new visual system without breaking functionality.
 - Automated frontend checks and a production build pass.
 - Representative screenshots are reviewed against the brand hierarchy and page-pattern requirements above.
-- A dated implementation and verification record is kept in `docs/frontend/` alongside the code.
+- A dated implementation and verification record is kept in the internal documentation vault, not in this repository.

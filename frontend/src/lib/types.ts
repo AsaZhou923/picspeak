@@ -99,16 +99,6 @@ export interface ActivationCodeRedeemResponse {
   activated_until: string;
 }
 
-export interface ImageCreditCodeRedeemResponse {
-  status: string;
-  code: string;
-  credits_granted: number;
-  message: string;
-  monthly_total: number | null;
-  monthly_used: number | null;
-  monthly_remaining: number | null;
-}
-
 // ─── Upload ──────────────────────────────────────────────────────────────────
 
 export interface PresignRequest {

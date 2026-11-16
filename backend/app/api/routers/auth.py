@@ -1,12 +1,8 @@
 from __future__ import annotations
 
 import logging
-import secrets
-from urllib import error as urllib_error
-from urllib import parse
 
-from fastapi import APIRouter, Cookie, Depends, Header, HTTPException, Query, Request, Response, status
-from fastapi.responses import RedirectResponse
+from fastapi import APIRouter, Cookie, Depends, Header, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import (
@@ -26,7 +22,6 @@ from app.db.session import get_db
 from app.schemas import (
     AuthClerkExchangeRequest,
     AuthGuestResponse,
-    AuthGoogleLoginRequest,
     AuthTokenResponse,
     GuestReviewMigrateRequest,
     GuestReviewMigrateResponse,
@@ -40,14 +35,7 @@ from app.services.guard import (
     guest_rate_limit_scope_key,
 )
 from .auth_support import (
-    GOOGLE_OAUTH_STATE_COOKIE,
-    _bind_google_oauth_state,
-    _clear_google_oauth_state,
     _extract_bearer_token,
-    _google_exchange_code,
-    _google_token_info,
-    _http_exception_message,
-    _login_from_google_claims,
     _migrate_guest_records,
     _process_clerk_webhook_event,
     _serialize_auth_response,
@@ -58,28 +46,6 @@ from .auth_support import (
 router = APIRouter(prefix='/auth', tags=['auth'])
 webhooks_router = APIRouter(prefix='/webhooks', tags=['auth-webhooks'])
 _logger = logging.getLogger(__name__)
-
-
-@router.get('/google/start')
-def auth_google_start():
-    client_id = settings.google_oauth_client_id.strip()
-    redirect_uri = settings.google_oauth_redirect_uri.strip()
-    if not client_id or not redirect_uri:
-        raise api_error(status.HTTP_500_INTERNAL_SERVER_ERROR, 'GOOGLE_OAUTH_NOT_CONFIGURED', 'Google OAuth is not configured')
-
-    state = secrets.token_urlsafe(32)
-    params = parse.urlencode({
-        'client_id': client_id,
-        'redirect_uri': redirect_uri,
-        'response_type': 'code',
-        'scope': 'openid email profile',
-        'access_type': 'offline',
-        'prompt': 'select_account',
-        'state': state,
-    })
-    response = RedirectResponse(f'https://accounts.google.com/o/oauth2/v2/auth?{params}', status_code=302)
-    _bind_google_oauth_state(response, state)
-    return response
 
 
 @router.post('/guest', response_model=AuthGuestResponse)
@@ -112,32 +78,6 @@ def auth_guest(
         plan=user.plan.value,
         auth_provider='guest',
     )
-
-
-@router.post('/google/login', response_model=AuthTokenResponse)
-def auth_google_login(payload: AuthGoogleLoginRequest, request: Request, db: Session = Depends(get_db)):
-    if not settings.google_oauth_client_id.strip():
-        # Without a configured client there is no audience to check tokens against.
-        raise api_error(status.HTTP_404_NOT_FOUND, 'GOOGLE_OAUTH_NOT_CONFIGURED', 'Google sign-in is not available')
-    network_scope_key = guest_network_scope_key(request)
-    if network_scope_key:
-        enforce_minute_rate_limit(
-            db,
-            scope='auth_exchange_minute',
-            scope_key=network_scope_key,
-            endpoint='google_login',
-            limit=settings.auth_exchange_rate_limit_per_minute,
-        )
-        # Commit now so rejected tokens still count toward the limit.
-        db.commit()
-    try:
-        claims = _google_token_info(payload.id_token)
-    except urllib_error.URLError as exc:
-        raise api_error(status.HTTP_502_BAD_GATEWAY, 'GOOGLE_TOKEN_VERIFY_FAILED', 'Google token verification failed') from exc
-
-    auth_data = _login_from_google_claims(claims, db)
-    db.commit()
-    return auth_data
 
 
 @router.post('/clerk/exchange', response_model=AuthTokenResponse)
@@ -206,62 +146,6 @@ def migrate_guest_reviews(
     )
     db.commit()
     return GuestReviewMigrateResponse(migrated_reviews=migrated_reviews, migrated_photos=migrated_photos)
-
-
-@router.get('/google/callback')
-def auth_google_callback(
-    code: str = Query(..., min_length=1),
-    state: str = Query(..., min_length=1),
-    oauth_state_cookie: str | None = Cookie(default=None, alias=GOOGLE_OAUTH_STATE_COOKIE),
-    db: Session = Depends(get_db),
-):
-    frontend_callback = f'{settings.frontend_origin.rstrip("/")}/auth/callback/google'
-    if not oauth_state_cookie or not secrets.compare_digest(state, oauth_state_cookie):
-        response = RedirectResponse(f'{frontend_callback}?error=invalid_oauth_state', status_code=302)
-        _clear_google_oauth_state(response)
-        return response
-
-    try:
-        token_resp = _google_exchange_code(code)
-    except urllib_error.URLError as exc:
-        error_msg = parse.quote(f'Google code exchange failed: {exc}')
-        response = RedirectResponse(f'{frontend_callback}?error={error_msg}', status_code=302)
-        _clear_google_oauth_state(response)
-        return response
-
-    id_token = token_resp.get('id_token')
-    if not isinstance(id_token, str) or not id_token.strip():
-        response = RedirectResponse(f'{frontend_callback}?error=missing_id_token', status_code=302)
-        _clear_google_oauth_state(response)
-        return response
-
-    try:
-        claims = _google_token_info(id_token)
-    except urllib_error.URLError as exc:
-        error_msg = parse.quote(f'Token verification failed: {exc}')
-        response = RedirectResponse(f'{frontend_callback}?error={error_msg}', status_code=302)
-        _clear_google_oauth_state(response)
-        return response
-
-    try:
-        auth_data = _login_from_google_claims(claims, db)
-    except HTTPException as exc:
-        error_msg = parse.quote(_http_exception_message(exc))
-        response = RedirectResponse(f'{frontend_callback}?error={error_msg}', status_code=302)
-        _clear_google_oauth_state(response)
-        return response
-    db.commit()
-
-    params = parse.urlencode({
-        'access_token': auth_data.access_token,
-        'token_type': auth_data.token_type,
-        'user_id': auth_data.user_id,
-        'plan': auth_data.plan,
-        'auth_provider': auth_data.auth_provider,
-    })
-    response = RedirectResponse(f'{frontend_callback}#{params}', status_code=302)
-    _clear_google_oauth_state(response)
-    return response
 
 
 @webhooks_router.post('/clerk')

@@ -763,24 +763,6 @@ class ActivationCodeRedeemResponse(BaseModel):
     activated_until: datetime
 
 
-class ImageCreditCodeRedeemRequest(BaseModel):
-    code: str = Field(min_length=3, max_length=64)
-
-
-class ImageCreditCodeRedeemResponse(BaseModel):
-    status: str
-    code: str
-    credits_granted: int
-    message: str
-    monthly_total: int | None
-    monthly_used: int | None
-    monthly_remaining: int | None
-
-
-class AuthGoogleLoginRequest(BaseModel):
-    id_token: str
-
-
 class AuthTokenResponse(BaseModel):
     access_token: str
     token_type: str = 'bearer'

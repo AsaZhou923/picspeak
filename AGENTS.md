@@ -36,7 +36,7 @@ Core product areas:
 - **AI critique**: Mode-specific photo scoring, critique writing and paired comparison through OpenAI Responses: Flash uses GPT-6 Sol with low reasoning, Pro uses GPT-6.1 Sol with high reasoning; the Qwen-compatible backend API remains available for existing clients
 - **AI generation**: OpenAI-compatible image generation endpoint, task queue, credit pricing, and object-storage persistence
 - **Task processing**: In-process async worker by default, optional standalone worker and Cloud Tasks configuration
-- **Authentication**: Clerk plus legacy Google OAuth/guest JWT support
+- **Authentication**: Clerk plus guest JWT support
 - **Billing**: Lemon Squeezy Pro checkout, activation codes, image credit packs, and webhooks
 
 
@@ -150,7 +150,6 @@ npm run test
 
 - `backend/alembic/` - Alembic migrations
 - `backend/scripts/ensure_runtime_schema.py` - Runtime schema guard used during local startup/deploys
-- `create_schema.sql` - Full schema snapshot, useful for reviewing table/index intent
 
 ### Frontend (`frontend/src/`)
 
@@ -242,7 +241,7 @@ Normal single-photo review uses one combined mode/model choice: Flash defaults t
 Backend values live in `backend/.env` and are documented by `backend/.env.example`. Important groups include:
 
 - Database: `DATABASE_URL`
-- Security/auth: `APP_SECRET`, `OAUTH_JWT_SECRET`, Clerk secrets, Google OAuth values
+- Security/auth: `APP_SECRET`, `OAUTH_JWT_SECRET`, Clerk secrets
 - Storage: `OBJECT_*`
 - Critique AI: `AI_API_BASE_URL`, `AI_API_KEY`, `AI_MODEL_NAME`, `FLASH_MODEL_NAME`, `PRO_MODEL_NAME`
 - OpenAI review routing: `OPENAI_API_KEY`, `OPENAI_API_BASE_URL`, `OPENAI_REVIEW_*`, `RETAKE_ANALYSIS_*`

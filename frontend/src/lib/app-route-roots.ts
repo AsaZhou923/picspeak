@@ -6,7 +6,6 @@ export const APP_ROUTE_ROOTS = new Set([
   'affiliate',
   'ai-content',
   'api',
-  'auth',
   'author',
   'blog',
   'editorial-policy',

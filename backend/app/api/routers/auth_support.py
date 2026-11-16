@@ -1,20 +1,14 @@
 from __future__ import annotations
 
-import json
 from datetime import datetime, timezone
-from secrets import token_hex
 from typing import Any
-from urllib import error as urllib_error
-from urllib import parse
 
-from fastapi import HTTPException, Response, status
+from fastapi import HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_user_from_token, new_public_id, quota_for_plan
-from app.core.config import settings
 from app.core.errors import api_error
-from app.core.http_client import PooledHTTPRequestError, PooledHTTPStatusError, pooled_request
 from app.core.security import create_access_token
 from app.db.models import (
     IdempotencyKey,
@@ -37,22 +31,11 @@ from app.schemas import AuthTokenResponse
 from app.services.clerk_auth import ClerkIdentity
 from app.services.clerk_webhooks import ClerkWebhookEvent
 from app.services.public_identity import (
-    LEGACY_GOOGLE_USERNAME_PREFIX,
     normalize_username_seed,
     username_derived_from_email,
 )
 
-GOOGLE_OAUTH_STATE_COOKIE = 'ps_google_oauth_state'
-GOOGLE_OAUTH_STATE_TTL_SECONDS = 600
-GOOGLE_ID_TOKEN_ISSUERS = frozenset({'accounts.google.com', 'https://accounts.google.com'})
 MAX_USERNAME_ATTEMPTS = 100
-
-
-def _http_exception_message(exc: HTTPException) -> str:
-    detail = exc.detail
-    if isinstance(detail, dict):
-        return str(detail.get('message') or detail.get('detail') or 'Request failed')
-    return str(detail)
 
 
 def _extract_bearer_token(authorization: str | None) -> str:
@@ -501,120 +484,3 @@ def _migrate_guest_records(
         db.flush()
 
     return migrated_reviews, migrated_photos
-
-
-def _google_token_info(id_token: str) -> dict:
-    url = f'https://oauth2.googleapis.com/tokeninfo?id_token={parse.quote(id_token)}'
-    try:
-        response = pooled_request('GET', url, timeout_seconds=10)
-        return json.loads(response.data.decode('utf-8'))
-    except PooledHTTPStatusError as exc:
-        raise urllib_error.URLError(f'Google tokeninfo HTTP {exc.response.status}') from exc
-    except (PooledHTTPRequestError, json.JSONDecodeError) as exc:
-        raise urllib_error.URLError(str(exc)) from exc
-
-
-def _google_exchange_code(code: str) -> dict:
-    redirect_uri = settings.google_oauth_redirect_uri.strip()
-    payload = parse.urlencode({
-        'code': code,
-        'client_id': settings.google_oauth_client_id,
-        'client_secret': settings.google_oauth_client_secret,
-        'redirect_uri': redirect_uri,
-        'grant_type': 'authorization_code',
-    }).encode('utf-8')
-    try:
-        response = pooled_request(
-            'POST',
-            'https://oauth2.googleapis.com/token',
-            body=payload,
-            headers={'Content-Type': 'application/x-www-form-urlencoded'},
-            timeout_seconds=10,
-        )
-        return json.loads(response.data.decode('utf-8'))
-    except PooledHTTPStatusError as exc:
-        raise urllib_error.URLError(f'Google token exchange HTTP {exc.response.status}') from exc
-    except (PooledHTTPRequestError, json.JSONDecodeError) as exc:
-        raise urllib_error.URLError(str(exc)) from exc
-
-
-def _bind_google_oauth_state(response: Response, state: str) -> None:
-    response.set_cookie(
-        key=GOOGLE_OAUTH_STATE_COOKIE,
-        value=state,
-        max_age=GOOGLE_OAUTH_STATE_TTL_SECONDS,
-        httponly=True,
-        secure=settings.cookie_secure,
-        samesite='lax',
-        path='/',
-    )
-
-
-def _clear_google_oauth_state(response: Response) -> None:
-    response.delete_cookie(
-        key=GOOGLE_OAUTH_STATE_COOKIE,
-        path='/',
-    )
-
-
-def _verify_google_token_claims(claims: dict) -> None:
-    """Accept only ID tokens that Google issued to this application.
-
-    The tokeninfo endpoint validates the signature and expiry of any Google ID
-    token, including ones issued to other OAuth clients. Without the audience
-    check, a token a user gave to an unrelated site would sign them in here.
-    """
-    client_id = settings.google_oauth_client_id.strip()
-    if not client_id:
-        raise api_error(status.HTTP_404_NOT_FOUND, 'GOOGLE_OAUTH_NOT_CONFIGURED', 'Google sign-in is not available')
-    if not isinstance(claims, dict):
-        raise api_error(status.HTTP_401_UNAUTHORIZED, 'GOOGLE_TOKEN_INVALID', 'Invalid Google token')
-    audience = claims.get('aud')
-    if not isinstance(audience, str) or audience != client_id:
-        raise api_error(status.HTTP_401_UNAUTHORIZED, 'GOOGLE_TOKEN_AUDIENCE_INVALID', 'Google token was not issued for this application')
-    if claims.get('iss') not in GOOGLE_ID_TOKEN_ISSUERS:
-        raise api_error(status.HTTP_401_UNAUTHORIZED, 'GOOGLE_TOKEN_ISSUER_INVALID', 'Google token issuer is not valid')
-
-
-def _google_email_verified(value: Any) -> bool:
-    # tokeninfo reports booleans as the strings "true" / "false".
-    if isinstance(value, bool):
-        return value
-    return isinstance(value, str) and value.strip().lower() == 'true'
-
-
-def _login_from_google_claims(claims: dict, db: Session) -> AuthTokenResponse:
-    _verify_google_token_claims(claims)
-
-    email = claims.get('email')
-    if not isinstance(email, str) or not email:
-        raise api_error(status.HTTP_400_BAD_REQUEST, 'GOOGLE_EMAIL_MISSING', 'Google token missing email')
-
-    if not _google_email_verified(claims.get('email_verified')):
-        raise api_error(status.HTTP_401_UNAUTHORIZED, 'GOOGLE_EMAIL_UNVERIFIED', 'Google email is not verified')
-
-    user = _find_user_by_email(db, email)
-    if user is None:
-        user = User(
-            public_id=new_public_id('usr'),
-            email=email,
-            username=f'{LEGACY_GOOGLE_USERNAME_PREFIX}{token_hex(6)}',
-            password_hash=None,
-            plan=UserPlan.free,
-            daily_quota_total=quota_for_plan(UserPlan.free),
-            daily_quota_used=0,
-            status=UserStatus.active,
-            last_login_at=datetime.now(timezone.utc),
-        )
-        db.add(user)
-    else:
-        if user.status != UserStatus.active:
-            raise api_error(status.HTTP_403_FORBIDDEN, 'AUTH_USER_INACTIVE', 'User is not active')
-        user.last_login_at = datetime.now(timezone.utc)
-        if user.plan == UserPlan.guest:
-            user.plan = UserPlan.free
-        user.daily_quota_total = quota_for_plan(user.plan)
-        db.add(user)
-
-    db.flush()
-    return _serialize_auth_response(user, provider='google')

@@ -4,13 +4,12 @@ import sys
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-from app.api.routers.auth_support import _login_from_google_claims, _username_seed
+from app.api.routers.auth_support import _username_seed
 from app.services.public_identity import public_display_name, username_derived_from_email
 
 
@@ -58,24 +57,6 @@ class NewUsernameTests(unittest.TestCase):
 
         self.assertEqual(_username_seed(identity), 'user_12345678')
 
-    def test_new_google_account_username_does_not_contain_the_email(self) -> None:
-        db = MagicMock()
-        db.query.return_value.filter.return_value.first.return_value = None
-        claims = {
-            'email': 'zhang.san@gmail.com',
-            'email_verified': True,
-            'aud': 'client-id.apps.googleusercontent.com',
-            'iss': 'https://accounts.google.com',
-        }
-
-        with patch(
-            'app.api.routers.auth_support.settings.google_oauth_client_id',
-            'client-id.apps.googleusercontent.com',
-        ), patch('app.api.routers.auth_support.create_access_token', return_value='jwt'):
-            _login_from_google_claims(claims, db)
-
-        created = db.add.call_args.args[0]
-        self.assertRegex(created.username, r'^google_[0-9a-f]{12}$')
 
 
 if __name__ == '__main__':

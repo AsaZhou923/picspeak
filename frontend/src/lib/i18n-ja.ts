@@ -709,9 +709,6 @@ export const jaTranslations = {
     task_wait_prompt: '待っている間に写真の端を見てみましょう。明るすぎる点、雑物、切れた被写体はありませんか？',
 
     // Error configs
-    err_google_failed_title: 'Googleログイン失敗',
-    err_google_failed_body: 'Google認証を完了できませんでした。再試行するか、ゲストとして続行してください。',
-    err_google_failed_action: 'ゲストとして続行',
     err_quota_exceeded_title: 'プラン上限に達しました',
     err_quota_exceeded_body: '現在のプランで使える上限に達しました。Guest と Free は日次と月次の上限があり、Free の Pro 深度分析は月10回までです。Pro は無制限です。',
     err_quota_exceeded_action: '使用状況を確認',
@@ -756,22 +753,8 @@ export const jaTranslations = {
 
     // Auth callback
     auth_processing_label: 'ログイン処理中…',
-    auth_processing_title: 'ログイン中',
-    auth_processing_body: 'Googleアカウントを確認しています…',
     auth_success_title: 'ログイン成功',
     auth_success_body: 'ワークスペースへ移動します…',
-    auth_error_title: 'ログイン失敗',
-    auth_error_missing_params: 'コールバックパラメータが不足しています。再度ログインしてください。',
-    auth_continue_guest: 'ゲストとして続行',
-    auth_back_home: 'ホームへ戻る',
-    auth_migrate_title: 'ゲスト履歴をインポート',
-    auth_migrate_body: 'ゲストとして行った分析が見つかりました。アカウントに引き継ぎますか？',
-    auth_migrate_confirm: '引き継ぐ',
-    auth_migrate_skip: 'スキップ',
-    auth_migrate_failed: 'ゲスト履歴の引き継ぎに失敗しました。確認が終わるまで続行しないでください。',
-    auth_migrating_body: 'ゲスト履歴をインポート中…',
-    auth_migrate_done: '{count} 件の分析をインポートしました。移動します…',
-    auth_migrate_none: 'インポートするゲスト記録がありません。移動します…',
 
     // Image uploader
     uploader_invalid_type: '非対応の形式（JPG / PNG / WebP のみ）',

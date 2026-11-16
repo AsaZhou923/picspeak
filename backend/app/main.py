@@ -174,7 +174,6 @@ _AUDIT_BINARY_CONTENT_TYPES = ('application/octet-stream', 'multipart/form-data'
 # Audited without request bodies: their bodies are redeemable codes.
 _AUDIT_BODY_SKIP_PATHS = {
     '/api/v1/billing/activation-code/redeem',
-    '/api/v1/billing/image-credit-code/redeem',
 }
 
 

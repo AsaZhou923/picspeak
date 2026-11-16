@@ -174,9 +174,7 @@ class ClerkAbuseLimitTests(unittest.TestCase):
 
 class AuditBodyTests(unittest.TestCase):
     def test_redeem_request_bodies_are_not_captured(self) -> None:
-        for path in ('/api/v1/billing/activation-code/redeem', '/api/v1/billing/image-credit-code/redeem'):
-            with self.subTest(path=path):
-                self.assertFalse(_should_capture_audit_body(_request(path)))
+        self.assertFalse(_should_capture_audit_body(_request('/api/v1/billing/activation-code/redeem')))
 
 
 class UploadHardeningTests(unittest.TestCase):

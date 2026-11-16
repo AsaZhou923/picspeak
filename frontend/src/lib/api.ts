@@ -15,7 +15,6 @@ import {
   GenerationTaskStatusResponse,
   GenerationTemplatesResponse,
   GuestMigrateResponse,
-  ImageCreditCodeRedeemResponse,
   NotificationArchiveResponse,
   NotificationDetail,
   NotificationListQuery,
@@ -80,7 +79,6 @@ function resolveApiBase(): string {
 }
 
 const API_BASE = resolveApiBase();
-const GOOGLE_OAUTH_START_PATH = '/auth/google/start';
 const USAGE_CACHE_TTL_MS = 30_000;
 const DEVICE_ID_KEY = 'ps_device_id';
 
@@ -287,17 +285,6 @@ export async function authGuest(): Promise<AuthToken> {
   return request<AuthToken>('/auth/guest', { method: 'POST' });
 }
 
-export async function authGoogleCallback(code: string): Promise<AuthToken> {
-  return request<AuthToken>(`/auth/google/callback?code=${encodeURIComponent(code)}`);
-}
-
-export async function authGoogleLogin(idToken: string): Promise<AuthToken> {
-  return request<AuthToken>('/auth/google/login', {
-    method: 'POST',
-    body: JSON.stringify({ id_token: idToken }),
-  });
-}
-
 export async function authClerkExchange(
   sessionToken: string,
   guestToken?: string,
@@ -399,17 +386,6 @@ export async function getBillingPortal(token: string): Promise<BillingPortalResp
 
 export async function redeemActivationCode(token: string, code: string): Promise<ActivationCodeRedeemResponse> {
   const response = await request<ActivationCodeRedeemResponse>('/billing/activation-code/redeem', {
-    method: 'POST',
-    body: JSON.stringify({ code }),
-    token,
-    unauthorizedRecovery: 'guest',
-  });
-  clearUsageCache(token);
-  return response;
-}
-
-export async function redeemImageCreditCode(token: string, code: string): Promise<ImageCreditCodeRedeemResponse> {
-  const response = await request<ImageCreditCodeRedeemResponse>('/billing/image-credit-code/redeem', {
     method: 'POST',
     body: JSON.stringify({ code }),
     token,
@@ -1011,10 +987,4 @@ export async function updateNotificationPreferences(
     signal,
     cache: 'no-store',
   });
-}
-
-// ─── Google OAuth URL builder ─────────────────────────────────────────────────
-
-export function buildGoogleOAuthUrl(): string {
-  return buildApiUrl(GOOGLE_OAUTH_START_PATH);
 }

@@ -30,11 +30,6 @@ function ErrorContent() {
     string,
     { title: string; body: string; action?: { label: string; href: string } }
   > = {
-    google_failed: {
-      title: t('err_google_failed_title'),
-      body: t('err_google_failed_body'),
-      action: { label: t('err_google_failed_action'), href: '/workspace' },
-    },
     quota_exceeded: {
       title: t('err_quota_exceeded_title'),
       body: t('err_quota_exceeded_body'),
