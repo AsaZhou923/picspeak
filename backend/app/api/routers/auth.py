@@ -115,7 +115,21 @@ def auth_guest(
 
 
 @router.post('/google/login', response_model=AuthTokenResponse)
-def auth_google_login(payload: AuthGoogleLoginRequest, db: Session = Depends(get_db)):
+def auth_google_login(payload: AuthGoogleLoginRequest, request: Request, db: Session = Depends(get_db)):
+    if not settings.google_oauth_client_id.strip():
+        # Without a configured client there is no audience to check tokens against.
+        raise api_error(status.HTTP_404_NOT_FOUND, 'GOOGLE_OAUTH_NOT_CONFIGURED', 'Google sign-in is not available')
+    network_scope_key = guest_network_scope_key(request)
+    if network_scope_key:
+        enforce_minute_rate_limit(
+            db,
+            scope='auth_exchange_minute',
+            scope_key=network_scope_key,
+            endpoint='google_login',
+            limit=settings.auth_exchange_rate_limit_per_minute,
+        )
+        # Commit now so rejected tokens still count toward the limit.
+        db.commit()
     try:
         claims = _google_token_info(payload.id_token)
     except urllib_error.URLError as exc:

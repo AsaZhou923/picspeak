@@ -457,6 +457,9 @@ def redeem_image_credit_code(
     if code != IMAGE_CREDIT_PROMO_CODE:
         raise api_error(status.HTTP_404_NOT_FOUND, 'IMAGE_CREDIT_CODE_INVALID', 'This credit code is not valid')
 
+    # Serialize redemptions per user so concurrent requests cannot both pass
+    # the one-time check below.
+    db.query(User).filter(User.id == actor.user.id).with_for_update().populate_existing().one()
     if _has_redeemed_image_credit_code(db, actor.user, code):
         raise api_error(status.HTTP_409_CONFLICT, 'IMAGE_CREDIT_CODE_ALREADY_REDEEMED', 'This credit code has already been redeemed')
 

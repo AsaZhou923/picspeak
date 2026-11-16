@@ -44,6 +44,7 @@ from app.services.public_identity import (
 
 GOOGLE_OAUTH_STATE_COOKIE = 'ps_google_oauth_state'
 GOOGLE_OAUTH_STATE_TTL_SECONDS = 600
+GOOGLE_ID_TOKEN_ISSUERS = frozenset({'accounts.google.com', 'https://accounts.google.com'})
 MAX_USERNAME_ATTEMPTS = 100
 
 
@@ -556,13 +557,40 @@ def _clear_google_oauth_state(response: Response) -> None:
     )
 
 
+def _verify_google_token_claims(claims: dict) -> None:
+    """Accept only ID tokens that Google issued to this application.
+
+    The tokeninfo endpoint validates the signature and expiry of any Google ID
+    token, including ones issued to other OAuth clients. Without the audience
+    check, a token a user gave to an unrelated site would sign them in here.
+    """
+    client_id = settings.google_oauth_client_id.strip()
+    if not client_id:
+        raise api_error(status.HTTP_404_NOT_FOUND, 'GOOGLE_OAUTH_NOT_CONFIGURED', 'Google sign-in is not available')
+    if not isinstance(claims, dict):
+        raise api_error(status.HTTP_401_UNAUTHORIZED, 'GOOGLE_TOKEN_INVALID', 'Invalid Google token')
+    audience = claims.get('aud')
+    if not isinstance(audience, str) or audience != client_id:
+        raise api_error(status.HTTP_401_UNAUTHORIZED, 'GOOGLE_TOKEN_AUDIENCE_INVALID', 'Google token was not issued for this application')
+    if claims.get('iss') not in GOOGLE_ID_TOKEN_ISSUERS:
+        raise api_error(status.HTTP_401_UNAUTHORIZED, 'GOOGLE_TOKEN_ISSUER_INVALID', 'Google token issuer is not valid')
+
+
+def _google_email_verified(value: Any) -> bool:
+    # tokeninfo reports booleans as the strings "true" / "false".
+    if isinstance(value, bool):
+        return value
+    return isinstance(value, str) and value.strip().lower() == 'true'
+
+
 def _login_from_google_claims(claims: dict, db: Session) -> AuthTokenResponse:
+    _verify_google_token_claims(claims)
+
     email = claims.get('email')
     if not isinstance(email, str) or not email:
         raise api_error(status.HTTP_400_BAD_REQUEST, 'GOOGLE_EMAIL_MISSING', 'Google token missing email')
 
-    email_verified = claims.get('email_verified')
-    if not email_verified:
+    if not _google_email_verified(claims.get('email_verified')):
         raise api_error(status.HTTP_401_UNAUTHORIZED, 'GOOGLE_EMAIL_UNVERIFIED', 'Google email is not verified')
 
     user = _find_user_by_email(db, email)
