@@ -707,9 +707,6 @@ export const enTranslations = {
     task_wait_prompt: 'While waiting, scan the photo edges: any bright spots, clutter, or cropped subjects stealing attention?',
 
     // Error configs
-    err_google_failed_title: 'Google Sign-in Failed',
-    err_google_failed_body: 'Could not complete Google authentication. Please try again or continue as a guest.',
-    err_google_failed_action: 'Continue as Guest',
     err_quota_exceeded_title: 'Plan quota exhausted',
     err_quota_exceeded_body: 'You have reached the available quota for your current plan. Guest and Free have daily and monthly caps, Free Pro mode also has a 10/month cap, and Pro remains unlimited.',
     err_quota_exceeded_action: 'View Quota',
@@ -754,22 +751,8 @@ export const enTranslations = {
 
     // Auth callback
     auth_processing_label: 'Signing in…',
-    auth_processing_title: 'Signing In',
-    auth_processing_body: 'Please wait while we verify your Google account…',
     auth_success_title: 'Signed In',
     auth_success_body: 'Redirecting to workspace…',
-    auth_error_title: 'Sign-in Failed',
-    auth_error_missing_params: 'Missing callback parameters, please sign in again.',
-    auth_continue_guest: 'Continue as Guest',
-    auth_back_home: 'Go Home',
-    auth_migrate_title: 'Import Guest Analyses',
-    auth_migrate_body: 'We found analyses from your guest session. Would you like to import them into your account?',
-    auth_migrate_confirm: 'Import',
-    auth_migrate_skip: 'Skip',
-    auth_migrate_failed: 'We could not import your guest analyses. Please do not continue until we check it.',
-    auth_migrating_body: 'Importing guest analyses…',
-    auth_migrate_done: '{count} analyses imported. Redirecting…',
-    auth_migrate_none: 'No guest analyses found. Redirecting…',
 
     // Image uploader
     uploader_invalid_type: 'Unsupported format (JPG / PNG / WebP only)',

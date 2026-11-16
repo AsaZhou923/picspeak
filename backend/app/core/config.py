@@ -75,9 +75,6 @@ class Settings(BaseSettings):
     # Number of trusted proxies that append to X-Forwarded-For. Cloud Run
     # direct ingress appends one entry; an external load balancer adds one more.
     trusted_proxy_hops: int = 1
-    google_oauth_client_id: str = ''
-    google_oauth_client_secret: str = ''
-    google_oauth_redirect_uri: str = ''
     clerk_secret_key: str = ''
     clerk_webhook_signing_secret: str = ''
     clerk_api_url: str = 'https://api.clerk.com'
