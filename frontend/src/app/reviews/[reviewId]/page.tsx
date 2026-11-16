@@ -195,10 +195,14 @@ export default function ReviewPage() {
     }
   }
 
+  const isDemoReview = isDemoReviewId(reviewId);
+  const UnavailableHeading = isDemoReview ? 'h2' : 'h1';
+
   if (loading) {
     return (
       <div className="min-h-screen">
         <div className="max-w-6xl mx-auto px-6 py-12">
+          {!isDemoReview && <h1 className="sr-only">{t('nav_critique')}</h1>}
           <SkeletonBlock className="h-6 w-32 mb-8" />
           <div className="grid lg:grid-cols-[45%_1fr] gap-8">
             <SkeletonBlock className="h-[500px] w-full rounded-lg" />
@@ -219,6 +223,7 @@ export default function ReviewPage() {
     return (
       <div className="flex min-h-screen items-center justify-center px-6">
         <div className="text-center space-y-4">
+          {!isDemoReview && <h1 className="sr-only">{t('nav_critique')}</h1>}
           <AlertCircle size={40} className="text-rust mx-auto" />
           <p className="text-rust text-sm">{error}</p>
           <button
@@ -240,7 +245,7 @@ export default function ReviewPage() {
   }
 
   if (!review) return <section className="mx-auto max-w-reading px-5 py-12">
-    <h1 className="text-xl font-black text-ink">{t('score_feedback_unavailable')}</h1>
+    <UnavailableHeading className="text-xl font-black text-ink">{t('score_feedback_unavailable')}</UnavailableHeading>
     {unavailableFeedback?.reviewId === reviewId && <ScoreFeedbackWithdrawal feedback={unavailableFeedback.feedback} ownerId={unavailableFeedback.ownerId} />}
     <button type="button" className="mt-4 min-h-11 text-sm underline" onClick={handleBackNavigation}>{t('back_btn')}</button>
   </section>;
@@ -248,7 +253,6 @@ export default function ReviewPage() {
   const activeReview = review;
   const r = activeReview.result;
   const isPro = activeReview.mode === 'pro';
-  const isDemoReview = isDemoReviewId(reviewId);
   const ReviewResultHeading = isDemoReview ? 'h2' : 'h1';
   const displayAdvantage   = isDemoReview ? t('demo_review_advantage') : r.advantage;
   const displayCritique    = isDemoReview ? t('demo_review_critique') : r.critique;

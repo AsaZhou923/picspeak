@@ -1,7 +1,10 @@
 import enBlogBundle from '../content/blog/en.json' with { type: 'json' };
 import jaBlogBundle from '../content/blog/ja.json' with { type: 'json' };
 import zhBlogBundle from '../content/blog/zh.json' with { type: 'json' };
+import { blogConfig, getBlogUi, type BlogUiCopy } from './blog-ui.ts';
 import type { Locale } from './i18n.ts';
+
+export { blogConfig, getBlogUi, type BlogUiCopy };
 
 export interface BlogPostSection {
   title: string;
@@ -25,41 +28,6 @@ export interface BlogPost {
   takeawayTitle: string;
   takeawayItems: string[];
   sections: BlogPostSection[];
-}
-
-export interface BlogUiCopy {
-  name: string;
-  label: string;
-  navLabel: string;
-  footerLabel: string;
-  homeLabel: string;
-  homeHint: string;
-  title: string;
-  description: string;
-  keywords: string[];
-  introPrimary: string;
-  introSecondary: string;
-  starterPostsLabel: string;
-  primaryTopicsLabel: string;
-  seoDirectionLabel: string;
-  primaryTopicsText: string;
-  seoDirectionText: string;
-  startTitle: string;
-  startIntro: string;
-  featuredLabel: string;
-  allPostsLabel: string;
-  allPostsHeading: string;
-  updatedLabel: string;
-  readFeaturedCta: string;
-  readMoreCta: string;
-  backToBlog: string;
-  nextStepLabel: string;
-  nextStepTitle: string;
-  nextStepBody: string;
-  nextStepCta: string;
-  moreArticlesCta: string;
-  relatedLabel: string;
-  relatedHeading: string;
 }
 
 type BlogLocaleBundle = {
@@ -99,12 +67,6 @@ const BLOG_POSTS_BY_LOCALE: Record<Locale, Map<string, BlogPost>> = {
   en: new Map(BLOG_BUNDLES.en.posts.map((post) => [post.slug, post])),
   ja: new Map(BLOG_BUNDLES.ja.posts.map((post) => [post.slug, post])),
 };
-
-export const blogConfig = BLOG_BUNDLES.en.ui;
-
-export function getBlogUi(locale: Locale): BlogUiCopy {
-  return BLOG_BUNDLES[locale].ui;
-}
 
 export function getBlogPosts(locale: Locale): BlogPost[] {
   return BLOG_BUNDLES[locale].posts;

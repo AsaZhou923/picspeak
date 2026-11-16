@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { BookOpenText, Clock3 } from 'lucide-react';
-import { getBlogPosts, getBlogUi, type BlogPost } from '@/lib/blog-data';
-import { useI18n } from '@/lib/i18n';
+import type { BlogPost } from '@/lib/blog-data';
+import { getBlogUi } from '@/lib/blog-ui';
+import { useI18n, type Locale } from '@/lib/i18n';
 
 type WaitingBlogWindowVariant = 'review' | 'generation';
 
@@ -19,6 +20,18 @@ const FEATURED_SLUGS: Record<WaitingBlogWindowVariant, string[]> = {
     'lighting-mistakes-ai-catches',
   ],
 };
+
+async function loadBlogPostsForLocale(locale: Locale): Promise<BlogPost[]> {
+  switch (locale) {
+    case 'zh':
+      return (await import('@/content/blog/zh.json')).posts as BlogPost[];
+    case 'ja':
+      return (await import('@/content/blog/ja.json')).posts as BlogPost[];
+    case 'en':
+    default:
+      return (await import('@/content/blog/en.json')).posts as BlogPost[];
+  }
+}
 
 function pickWaitingPosts(posts: BlogPost[], variant: WaitingBlogWindowVariant) {
   const bySlug = new Map(posts.map((post) => [post.slug, post]));
@@ -40,8 +53,24 @@ function pickWaitingPosts(posts: BlogPost[], variant: WaitingBlogWindowVariant) 
 export function WaitingBlogWindow({ variant }: { variant: WaitingBlogWindowVariant }) {
   const { locale, t } = useI18n();
   const ui = getBlogUi(locale);
-  const posts = pickWaitingPosts(getBlogPosts(locale), variant);
-  const [activeSlug, setActiveSlug] = useState(posts[0]?.slug ?? '');
+  const [posts, setPosts] = useState<BlogPost[]>([]);
+  const [activeSlug, setActiveSlug] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadBlogPostsForLocale(locale).then((loadedPosts) => {
+      if (cancelled) return;
+      const nextPosts = pickWaitingPosts(loadedPosts, variant);
+      setPosts(nextPosts);
+      setActiveSlug((current) =>
+        nextPosts.some((post) => post.slug === current) ? current : (nextPosts[0]?.slug ?? ''),
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [locale, variant]);
+
   const activePost = posts.find((post) => post.slug === activeSlug) ?? posts[0];
   const title = variant === 'generation' ? t('wait_blog_generation_title') : t('wait_blog_review_title');
   const body = variant === 'generation' ? t('wait_blog_generation_body') : t('wait_blog_review_body');

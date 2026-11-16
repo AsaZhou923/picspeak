@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { Camera, LayoutGrid, Repeat2, Target, Wand2 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
-import { getBlogUi } from '@/lib/blog-data';
+import { getBlogUi } from '@/lib/blog-ui';
 import { useI18n } from '@/lib/i18n';
 import { useEffect, useState } from 'react';
 import { HeaderRightControls } from './HeaderControls';

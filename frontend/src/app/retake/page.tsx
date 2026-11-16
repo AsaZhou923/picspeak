@@ -200,7 +200,13 @@ function RetakeCoachSession() {
           </div>
 
           {loading ? (
-            <div aria-label={copy.loading} className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <div
+              role="status"
+              aria-busy="true"
+              aria-label={copy.loading}
+              className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3"
+            >
+              <span className="sr-only">{copy.loading}</span>
               {Array.from({ length: 6 }, (_, index) => <SourceSkeleton key={index} />)}
             </div>
           ) : error ? (

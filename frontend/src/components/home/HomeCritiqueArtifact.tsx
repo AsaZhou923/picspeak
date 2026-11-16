@@ -4,8 +4,9 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { CountUp } from '@/components/ui/Reveal';
-import { DEMO_IMAGE_URL, DEMO_REVIEW_ID } from '@/lib/demo-review';
+import { DEMO_REVIEW_ID } from '@/lib/demo-review';
 import type { Translator } from '@/lib/i18n';
+import demoGinkgoImage from '../../../public/demo-ginkgo.jpg';
 
 const DEMO_SCORES = [
   { labelKey: 'score_composition' as const, score: 7 },
@@ -33,11 +34,12 @@ export default function HomeCritiqueArtifact({ t }: HomeCritiqueArtifactProps) {
 
       <div className="relative aspect-[4/3] overflow-hidden rounded-[3px] shadow-level-2 sm:aspect-[3/2]">
         <Image
-          src={DEMO_IMAGE_URL}
+          src={demoGinkgoImage}
           alt={t('demo_image_alt')}
           fill
           priority
           fetchPriority="high"
+          placeholder="blur"
           quality={70}
           className="anim-develop object-cover"
           sizes="(min-width: 1280px) 720px, (min-width: 1024px) 56vw, calc(100vw - 40px)"

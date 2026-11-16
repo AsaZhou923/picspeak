@@ -138,7 +138,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body className="text-ink min-h-screen">
         <AppProviders
           initialLocale={initialLocale}
-          initialMessages={initialLocale ? getInitialTranslations(initialLocale) : undefined}
+          initialMessages={getInitialTranslations(initialLocale ?? 'en')}
         >
           {enablePerformanceTelemetry ? <PerformanceTelemetry /> : null}
           <SiteChrome>{children}</SiteChrome>

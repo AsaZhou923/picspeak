@@ -276,7 +276,10 @@ export default function ImageUploader({
       )}
 
       {error && (
-        <div className="flex items-center gap-2 text-rust text-sm bg-rust/5 border border-rust/20 rounded px-3 py-2">
+        <div
+          role="alert"
+          className="flex items-center gap-2 text-rust text-sm bg-rust/5 border border-rust/20 rounded px-3 py-2"
+        >
           <AlertCircle size={14} className="shrink-0" aria-hidden="true" />
           <span>{error}</span>
           <button
@@ -284,7 +287,7 @@ export default function ImageUploader({
             title={t('quota_modal_close')}
             aria-label={t('quota_modal_close')}
             onClick={() => setError(null)}
-            className="ml-auto text-rust/60 hover:text-rust"
+            className="ml-auto -mr-1 inline-flex min-h-6 min-w-6 shrink-0 items-center justify-center rounded text-rust/60 hover:text-rust"
           >
             <X size={12} aria-hidden="true" />
           </button>

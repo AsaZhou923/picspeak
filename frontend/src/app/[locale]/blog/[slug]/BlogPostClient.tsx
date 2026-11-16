@@ -3,20 +3,18 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { ArrowLeft, ArrowRight, Clock3, Eye, Sparkles } from 'lucide-react';
-import { notFound } from 'next/navigation';
 import { getBlogViewCounts, incrementBlogPostView } from '@/lib/api';
-import { getBlogPost, getRelatedBlogPosts, getBlogUi } from '@/lib/blog-data';
+import type { BlogPost, BlogUiCopy } from '@/lib/blog-data';
 import { getBlogReferences } from '@/lib/blog-references';
 import { formatBlogViewCount, shouldTrackBlogView } from '@/lib/blog-view-stats';
 import { getBlogWorkspaceCta, type ContentConversionEntrypoint } from '@/lib/content-conversion';
 import { PHOTO_CRITIQUE_TOPICS, getPhotoCritiqueTopicPath } from '@/content/topics/photo-critique-topics';
-import { I18nProvider, useI18n, type Locale } from '@/lib/i18n';
-import { getInitialTranslations } from '@/lib/i18n-initial';
+import { I18nProvider, type Locale } from '@/lib/i18n';
+import type { TranslationDictionary } from '@/lib/i18n-en';
 import { serializeJsonLd } from '@/lib/json-ld';
 import { markProductAttributionSource, trackProductEvent } from '@/lib/product-analytics';
 import { buildBlogBreadcrumbJsonLd, buildBlogPostingJsonLd } from '@/lib/seo';
 import { siteConfig } from '@/lib/site';
-import { VALID_LOCALES } from '../../locales';
 
 const TRUST_COPY: Record<Locale, { by: string; policy: string; sources: string; sourceIntro: string }> = {
   zh: {
@@ -39,19 +37,20 @@ const TRUST_COPY: Record<Locale, { by: string; policy: string; sources: string; 
   },
 };
 
-function BlogPostContent({ slug }: { slug: string }) {
-  const { locale } = useI18n();
-  const ui = getBlogUi(locale);
-  const post = getBlogPost(locale, slug);
+function BlogPostContent({
+  locale,
+  post,
+  relatedPosts,
+  ui,
+}: {
+  locale: Locale;
+  post: BlogPost;
+  relatedPosts: BlogPost[];
+  ui: BlogUiCopy;
+}) {
   const trustCopy = TRUST_COPY[locale];
-  const references = getBlogReferences(slug);
+  const references = getBlogReferences(post.slug);
   const [viewCounts, setViewCounts] = useState<Record<string, number>>({});
-
-  if (!post) {
-    notFound();
-  }
-
-  const relatedPosts = getRelatedBlogPosts(locale, post.slug);
   const workspaceCta = getBlogWorkspaceCta(locale, post);
 
   const handleWorkspaceCtaClick = (entrypoint: ContentConversionEntrypoint = workspaceCta.entrypoint) => {
@@ -73,8 +72,7 @@ function BlogPostContent({ slug }: { slug: string }) {
 
   useEffect(() => {
     let cancelled = false;
-    const relatedSlugs = getRelatedBlogPosts(locale, post.slug)
-      .map((entry) => entry.slug);
+    const relatedSlugs = relatedPosts.map((entry) => entry.slug);
     const pendingRequests: Promise<Record<string, number>>[] = [getBlogViewCounts([post.slug, ...relatedSlugs])];
 
     if (shouldTrackBlogView(post.slug)) {
@@ -101,7 +99,7 @@ function BlogPostContent({ slug }: { slug: string }) {
     return () => {
       cancelled = true;
     };
-  }, [locale, post.slug]);
+  }, [post.slug, relatedPosts]);
 
   const authorJsonLd = {
     '@context': 'https://schema.org',
@@ -337,17 +335,30 @@ function BlogPostContent({ slug }: { slug: string }) {
   );
 }
 
-export default function BlogPostClient({ locale, slug }: { locale?: string; slug: string }) {
-  const pinnedLocale = VALID_LOCALES.includes(locale as Locale)
-    ? (locale as Locale)
-    : undefined;
-
+export default function BlogPostClient({
+  locale,
+  post,
+  relatedPosts,
+  ui,
+  initialMessages,
+}: {
+  locale: Locale;
+  post: BlogPost;
+  relatedPosts: BlogPost[];
+  ui: BlogUiCopy;
+  initialMessages: TranslationDictionary;
+}) {
   return (
     <I18nProvider
-      initialLocale={pinnedLocale}
-      initialMessages={pinnedLocale ? getInitialTranslations(pinnedLocale) : undefined}
+      initialLocale={locale}
+      initialMessages={initialMessages}
     >
-      <BlogPostContent slug={slug} />
+      <BlogPostContent
+        locale={locale}
+        post={post}
+        relatedPosts={relatedPosts}
+        ui={ui}
+      />
     </I18nProvider>
   );
 }

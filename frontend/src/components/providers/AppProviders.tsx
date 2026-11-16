@@ -25,8 +25,9 @@ function RouteScopedProviders({ children }: { children: ReactNode }) {
         <AuthProvider>
           <NotificationProvider>
             <Suspense fallback={null}>
-              <ProductAnalyticsProvider>{children}</ProductAnalyticsProvider>
+              <ProductAnalyticsProvider>{null}</ProductAnalyticsProvider>
             </Suspense>
+            {children}
           </NotificationProvider>
         </AuthProvider>
       </ThemeProvider>
