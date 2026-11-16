@@ -1,8 +1,7 @@
 'use client';
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { enTranslations, type TranslationDictionary, type TranslationKey } from './i18n-en';
-import { zhTranslations } from './i18n-zh';
+import type { TranslationDictionary, TranslationKey } from './i18n-en';
 import { isSupportedLocale, LOCALE_COOKIE_NAME, localeFromLanguagePreferences } from './locale';
 
 export type { TranslationKey } from './i18n-en';
@@ -48,19 +47,23 @@ function detectPathLocale(): Locale | null {
   return isLocale(firstSegment) ? firstSegment : null;
 }
 
-async function loadTranslations(locale: Locale): Promise<TranslationDictionary> {
+async function loadTranslations(locale: Locale): Promise<Partial<TranslationDictionary>> {
   try {
     switch (locale) {
       case 'zh':
-        return zhTranslations;
+        return (await import('./i18n-zh')).zhTranslations;
       case 'ja':
         return (await import('./i18n-ja')).jaTranslations;
       case 'en':
       default:
-        return enTranslations;
+        return (await import('./i18n-en')).enTranslations;
     }
   } catch {
-    return enTranslations;
+    try {
+      return (await import('./i18n-en')).enTranslations;
+    } catch {
+      return {};
+    }
   }
 }
 
@@ -100,8 +103,9 @@ export function I18nProvider({
   /** Initial SSR translation bundle so crawlers receive localized HTML. */
   initialMessages?: TranslationDictionary;
 }) {
-  const [locale, setLocaleState] = useState<Locale>(initialLocale ?? defaultLocale);
-  const [messages, setMessages] = useState<TranslationDictionary>(initialMessages ?? enTranslations);
+  const initialMessagesLocale = initialLocale ?? defaultLocale;
+  const [locale, setLocaleState] = useState<Locale>(initialMessagesLocale);
+  const [messages, setMessages] = useState<Partial<TranslationDictionary>>(() => initialMessages ?? {});
 
   useEffect(() => {
     // If a locale was pinned by the URL route, honour it and persist it.
@@ -153,6 +157,11 @@ export function I18nProvider({
   }, [initialLocale]);
 
   useEffect(() => {
+    if (initialMessages && locale === initialMessagesLocale) {
+      setMessages(initialMessages);
+      return;
+    }
+
     let cancelled = false;
 
     async function syncMessages() {
@@ -167,7 +176,7 @@ export function I18nProvider({
     return () => {
       cancelled = true;
     };
-  }, [locale]);
+  }, [initialMessages, initialMessagesLocale, locale]);
 
   const setLocale = useCallback((l: Locale) => {
     setLocaleState(l);
@@ -184,9 +193,9 @@ export function I18nProvider({
 
   const t = useCallback(
     (key: TranslationKey): string => {
-      return messages[key] ?? enTranslations[key] ?? key;
+      return messages[key] ?? initialMessages?.[key] ?? key;
     },
-    [messages]
+    [initialMessages, messages]
   );
 
   return (

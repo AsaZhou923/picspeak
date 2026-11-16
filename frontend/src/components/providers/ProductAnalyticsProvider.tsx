@@ -14,7 +14,7 @@ import {
   trackProductEvent,
 } from '@/lib/product-analytics';
 
-export default function ProductAnalyticsProvider({ children }: { children: ReactNode }) {
+export default function ProductAnalyticsProvider({ children }: { children?: ReactNode }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { token, isLoading } = useAuth();
@@ -54,5 +54,5 @@ export default function ProductAnalyticsProvider({ children }: { children: React
     });
   }, [isLoading, locale, pathname, searchParams, token]);
 
-  return <>{children}</>;
+  return children ? <>{children}</> : null;
 }

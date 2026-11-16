@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Github, Twitter } from 'lucide-react';
 import { PHOTO_CRITIQUE_TOPICS, getPhotoCritiqueTopicCopy, getPhotoCritiqueTopicPath } from '@/content/topics/photo-critique-topics';
-import { getBlogUi } from '@/lib/blog-data';
+import { getBlogUi } from '@/lib/blog-ui';
 import { useI18n } from '@/lib/i18n';
 
 const PRODUCT_HUNT_BADGE_HREF =
@@ -33,6 +33,7 @@ export default function Footer() {
           alt={t('footer_product_hunt_alt')}
           width={250}
           height={54}
+          loading="lazy"
           unoptimized
         />
       </a>
@@ -42,7 +43,7 @@ export default function Footer() {
         rel="noopener noreferrer"
         className={badgeLinkClass}
       >
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-gold/25 bg-gold/10 text-xs font-semibold uppercase tracking-[0.18em] text-gold">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-gold/25 bg-gold/10 text-xs font-semibold uppercase tracking-[0.18em] text-ink">
           IA
         </span>
         <span className="flex flex-col leading-tight">

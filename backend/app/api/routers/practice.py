@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Header, Query, Request
+from fastapi import APIRouter, Depends, Header, Query, Request, Response
 from sqlalchemy.orm import Session
 
 from app.api.deps import CurrentActor, get_current_actor, get_db
@@ -43,7 +43,8 @@ router = APIRouter(prefix='/practice', tags=['practice'])
 
 
 @router.get('/config', response_model=PracticeConfigResponse)
-def get_practice_config():
+def get_practice_config(response: Response):
+    response.headers['Cache-Control'] = 'public, max-age=60'
     return PracticeConfigResponse(practice_enabled=bool(settings.practice_enabled))
 
 

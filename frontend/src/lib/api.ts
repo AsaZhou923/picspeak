@@ -482,7 +482,6 @@ export async function getPracticeConfig(
   return request<PracticeConfigResponse>('/practice/config', {
     token,
     signal,
-    cache: 'no-store',
   });
 }
 

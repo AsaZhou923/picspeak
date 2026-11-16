@@ -35,20 +35,20 @@ export function WorkspaceTaskShell({
             <li
               key={step}
               aria-current={active ? 'step' : undefined}
-              className={`min-w-0 border-r border-border-subtle px-3 py-3 last:border-r-0 sm:px-4 sm:py-4 ${
+              className={`min-w-0 border-r border-border-subtle px-2 py-2.5 last:border-r-0 sm:px-4 sm:py-4 ${
                 active ? 'shadow-[inset_0_-2px_0_rgb(var(--color-action))]' : ''
               }`}
             >
-              <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-1.5 sm:gap-2.5">
                 <span
-                  className={`flex w-7 shrink-0 items-center justify-center font-display text-2xl font-black leading-none ${
+                  className={`flex w-5 shrink-0 items-center justify-center font-display text-lg font-black leading-none sm:w-7 sm:text-2xl ${
                     completed ? 'text-sage' : active ? 'text-gold' : 'text-ink-subtle'
                   }`}
                   aria-hidden="true"
                 >
-                  {completed ? <Check size={20} strokeWidth={2.6} /> : index + 1}
+                  {completed ? <Check size={18} strokeWidth={2.6} /> : index + 1}
                 </span>
-                <span className={`min-w-0 truncate text-xs font-bold sm:text-sm ${active ? 'text-ink' : 'text-ink-muted'}`}>
+                <span className={`min-w-0 break-words text-xs font-bold leading-snug sm:truncate sm:text-sm ${active ? 'text-ink' : 'text-ink-muted'}`}>
                   {copy.steps[step]}
                 </span>
               </div>

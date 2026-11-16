@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import BlogPostClient from './BlogPostClient';
-import { getBlogPost, getBlogSlugs, getBlogUi } from '@/lib/blog-data';
+import { getBlogPost, getBlogSlugs, getBlogUi, getRelatedBlogPosts } from '@/lib/blog-data';
+import { getInitialTranslations } from '@/lib/i18n-initial';
 import { INDEXABLE_ROBOTS } from '@/lib/seo';
 import { siteConfig } from '@/lib/site';
 import type { Locale } from '@/lib/i18n';
@@ -70,9 +71,23 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function BlogPostPage({ params }: Props) {
   const { locale, slug } = await params;
 
-  if (!getBlogSlugs().includes(slug)) {
+  if (!VALID_LOCALES.includes(locale as Locale) || !getBlogSlugs().includes(slug)) {
     notFound();
   }
 
-  return <BlogPostClient locale={locale} slug={slug} />;
+  const typedLocale = locale as Locale;
+  const post = getBlogPost(typedLocale, slug);
+  if (!post) {
+    notFound();
+  }
+
+  return (
+    <BlogPostClient
+      locale={typedLocale}
+      post={post}
+      relatedPosts={getRelatedBlogPosts(typedLocale, post.slug)}
+      ui={getBlogUi(typedLocale)}
+      initialMessages={getInitialTranslations(typedLocale)}
+    />
+  );
 }

@@ -7,7 +7,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from fastapi import HTTPException
+from fastapi import HTTPException, Response
 from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError
 
@@ -16,6 +16,7 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 from app.api.routers.auth_support import _migrate_guest_records
+from app.api.routers.practice import get_practice_config
 from app.api.routers.review_create import _matches_request_hash, _review_request_hash_payload, create_review
 from app.api.routers.review_support import _review_result_payload
 from app.db.models import PhotoStatus, PracticeAttempt, PracticeFeedback, PracticeSession, Review, ReviewTask, TaskStatus, UserPlan, UserStatus
@@ -296,6 +297,14 @@ class PracticeContractTests(unittest.TestCase):
         self.assertEqual((migrated_reviews, migrated_photos), (1, 1))
         self.assertEqual({review.owner_user_id, photo.owner_user_id, task.owner_user_id, session.owner_user_id, attempt.owner_user_id, feedback.owner_user_id}, {20})
         self.assertEqual(guest.status, UserStatus.deleted)
+
+    def test_practice_config_sets_short_public_cache_header(self) -> None:
+        response = Response()
+        with patch('app.api.routers.practice.settings.practice_enabled', True):
+            payload = get_practice_config(response)
+
+        self.assertTrue(payload.practice_enabled)
+        self.assertEqual(response.headers.get('Cache-Control'), 'public, max-age=60')
 
 
 if __name__ == '__main__':

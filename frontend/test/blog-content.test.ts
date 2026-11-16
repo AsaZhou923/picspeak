@@ -9,6 +9,7 @@ import {
   getRelatedBlogPosts,
   getStarterBlogPosts,
 } from '../src/lib/blog-data.ts';
+import { getBlogUi } from '../src/lib/blog-ui.ts';
 import { getBlogReferences } from '../src/lib/blog-references.ts';
 import { buildBlogPostingJsonLd, estimateBlogPostWordCount } from '../src/lib/seo.ts';
 import { siteConfig } from '../src/lib/site.ts';
@@ -329,4 +330,42 @@ test('every Lens Notes slug has at least two explicit citation targets', () => {
     assert.ok(references.length >= 2, `${post.slug} should have at least two references`);
     assert.ok(references.every((reference) => /^https:\/\//.test(reference.url)));
   }
+});
+
+test('layout chrome and i18n provider avoid statically bundling full blog posts or all locale dictionaries', () => {
+  for (const locale of LOCALES) {
+    assert.deepEqual(getBlogUi(locale), readBundle(locale).ui);
+  }
+
+  for (const relativePath of [
+    '../src/components/layout/Header.tsx',
+    '../src/components/layout/MarketingHeader.tsx',
+    '../src/components/layout/Footer.tsx',
+  ]) {
+    const source = readFileSync(new URL(relativePath, import.meta.url), 'utf8');
+    assert.match(source, /@\/lib\/blog-ui/);
+    assert.doesNotMatch(source, /@\/lib\/blog-data/);
+  }
+
+  const waitingSource = readFileSync(new URL('../src/components/blog/WaitingBlogWindow.tsx', import.meta.url), 'utf8');
+  assert.match(waitingSource, /@\/lib\/blog-ui/);
+  assert.doesNotMatch(waitingSource, /import\s+(?!type\b)[^;]*from\s+['"]@\/lib\/blog-data['"]/);
+  assert.match(waitingSource, /import\(['"]@\/content\/blog\/en\.json['"]\)/);
+
+  const postClientSource = readFileSync(
+    new URL('../src/app/[locale]/blog/[slug]/BlogPostClient.tsx', import.meta.url),
+    'utf8',
+  );
+  assert.doesNotMatch(postClientSource, /import\s+(?!type\b)[^;]*from\s+['"]@\/lib\/blog-data['"]/);
+  assert.doesNotMatch(postClientSource, /@\/lib\/i18n-initial/);
+
+  const i18nSource = readFileSync(new URL('../src/lib/i18n.tsx', import.meta.url), 'utf8');
+  assert.doesNotMatch(i18nSource, /import\s+\{[^}]*zhTranslations/);
+  assert.doesNotMatch(i18nSource, /import\s+\{[^}]*enTranslations/);
+  assert.match(i18nSource, /import\(['"]\.\/i18n-zh['"]\)/);
+  assert.match(i18nSource, /import\(['"]\.\/i18n-en['"]\)/);
+  assert.match(i18nSource, /import\(['"]\.\/i18n-ja['"]\)/);
+
+  const rootLayoutSource = readFileSync(new URL('../src/app/layout.tsx', import.meta.url), 'utf8');
+  assert.match(rootLayoutSource, /getInitialTranslations\(initialLocale \?\? 'en'\)/);
 });
