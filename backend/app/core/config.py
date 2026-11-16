@@ -47,7 +47,10 @@ class Settings(BaseSettings):
 
     rate_limit_per_minute: int = 10
     ip_rate_limit_per_minute: int = 30
+    # Per guest and route template.
     guest_api_rate_limit_per_minute: int = 60
+    # Per guest across all routes; 0 disables.
+    guest_api_total_rate_limit_per_minute: int = 240
     guest_creation_rate_limit_per_minute: int = 10
     guest_review_rate_limit_per_minute: int = 4
     guest_review_limit_per_day: int = 1

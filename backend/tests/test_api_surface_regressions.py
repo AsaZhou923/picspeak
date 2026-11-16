@@ -145,6 +145,12 @@ class ApiSurfaceRegressionTests(unittest.TestCase):
         self.assertIn('object_key', body)
         self.assertTrue(body['object_key'].startswith('user_usr_upload_test/'))
         self.assertEqual(body['put_url'], 'https://storage.example.com/presigned-put')
+        # The declared size is signed into the URL so storage enforces it.
+        presign_params = storage.generate_presigned_url.call_args.kwargs['Params']
+        self.assertEqual(presign_params['ContentLength'], 1024)
+        self.assertEqual(presign_params['ContentType'], 'image/jpeg')
+        # Browsers set Content-Length themselves and refuse to let scripts set it.
+        self.assertNotIn('Content-Length', body['headers'])
 
     def test_guest_cookie_forces_lax_same_site_in_dev(self) -> None:
         response = Response()
@@ -329,6 +335,9 @@ class ApiSurfaceRegressionTests(unittest.TestCase):
         self.assertEqual(ledger.amount, -30)
         self.assertEqual(ledger.unit, 'credits')
         self.assertEqual(ledger.metadata_json['grant_code'], 'PICSPEAKART')
+        # The user row is locked before the one-time check, so concurrent
+        # requests cannot both grant the credits.
+        db.query.return_value.filter.return_value.with_for_update.assert_called_once_with()
         # One commit records the rate-limited attempt, the other the redemption.
         self.assertEqual(db.commit.call_count, 2)
 

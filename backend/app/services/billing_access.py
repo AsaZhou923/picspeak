@@ -151,7 +151,15 @@ def redeem_activation_code_for_user(
     current = utc_now()
     normalized = normalize_activation_code(raw_code)
     code_hash = hashlib.sha256(normalized.encode('utf-8')).hexdigest()
-    code = db.query(BillingActivationCode).filter(BillingActivationCode.code_hash == code_hash).first()
+    # Lock the code row as well as the user: two accounts redeeming one code at
+    # the same moment must not both read it as unused.
+    code = (
+        db.query(BillingActivationCode)
+        .filter(BillingActivationCode.code_hash == code_hash)
+        .with_for_update()
+        .populate_existing()
+        .first()
+    )
 
     if code is None:
         raise api_error(status.HTTP_404_NOT_FOUND, 'ACTIVATION_CODE_NOT_FOUND', 'Activation code is invalid')

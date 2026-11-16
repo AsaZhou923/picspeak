@@ -27,6 +27,16 @@ GUEST_TOKEN_TTL_SECONDS = 14 * 24 * 3600
 LOGIN_TOUCH_INTERVAL = timedelta(minutes=5)
 
 
+def rate_limit_endpoint(request: Request) -> str:
+    """Route template such as ``/api/v1/tasks/{task_id}``, never the concrete URL.
+
+    Keying a limit on the raw path gives every resource id its own bucket, so
+    the limit stops bounding anything and the counter table grows per id.
+    """
+    template = getattr(request.scope.get('route'), 'path', None)
+    return template if isinstance(template, str) and template else 'unmatched'
+
+
 class CurrentActor:
     def __init__(self, user: User):
         self.user = user
@@ -146,7 +156,7 @@ def get_current_actor(
     authorization: str | None = Header(default=None),
     guest_cookie_token: str | None = Cookie(default=None, alias=GUEST_TOKEN_COOKIE),
 ) -> CurrentActor:
-    endpoint = request.url.path
+    endpoint = rate_limit_endpoint(request)
     token: str | None = None
     if authorization:
         token = _extract_bearer_token(authorization)

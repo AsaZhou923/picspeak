@@ -61,9 +61,17 @@ class NewUsernameTests(unittest.TestCase):
     def test_new_google_account_username_does_not_contain_the_email(self) -> None:
         db = MagicMock()
         db.query.return_value.filter.return_value.first.return_value = None
-        claims = {'email': 'zhang.san@gmail.com', 'email_verified': True}
+        claims = {
+            'email': 'zhang.san@gmail.com',
+            'email_verified': True,
+            'aud': 'client-id.apps.googleusercontent.com',
+            'iss': 'https://accounts.google.com',
+        }
 
-        with patch('app.api.routers.auth_support.create_access_token', return_value='jwt'):
+        with patch(
+            'app.api.routers.auth_support.settings.google_oauth_client_id',
+            'client-id.apps.googleusercontent.com',
+        ), patch('app.api.routers.auth_support.create_access_token', return_value='jwt'):
             _login_from_google_claims(claims, db)
 
         created = db.add.call_args.args[0]

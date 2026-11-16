@@ -35,9 +35,17 @@ class AuthTransactionHelperTests(unittest.TestCase):
         db = MagicMock()
         db.query.return_value.filter.return_value.first.return_value = None
 
-        claims = {'email': 'tester@example.com', 'email_verified': True}
+        claims = {
+            'email': 'tester@example.com',
+            'email_verified': True,
+            'aud': 'client-id.apps.googleusercontent.com',
+            'iss': 'https://accounts.google.com',
+        }
 
-        with patch('app.api.routers.auth_support.new_public_id', return_value='usr_test_123'), patch(
+        with patch(
+            'app.api.routers.auth_support.settings.google_oauth_client_id',
+            'client-id.apps.googleusercontent.com',
+        ), patch('app.api.routers.auth_support.new_public_id', return_value='usr_test_123'), patch(
             'app.api.routers.auth_support.create_access_token',
             return_value='jwt-token',
         ):

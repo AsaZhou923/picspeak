@@ -250,6 +250,11 @@ def create_upload_presign(
                 'Bucket': settings.object_bucket,
                 'Key': object_key,
                 'ContentType': payload.content_type,
+                # Signing the length binds the URL to the declared size, which
+                # was checked against the upload limit above. Storage rejects
+                # a body of any other size instead of accepting it until the
+                # confirm step.
+                'ContentLength': payload.size_bytes,
             },
             ExpiresIn=600,
             HttpMethod='PUT',

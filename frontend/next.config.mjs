@@ -1,28 +1,51 @@
-function buildRemotePatterns() {
-  const patterns = [
-    {
-      protocol: 'https',
-      hostname: '**',
-    },
-    {
-      protocol: 'http',
-      hostname: 'localhost',
-      port: '8000',
-    },
-    {
-      protocol: 'http',
-      hostname: '127.0.0.1',
-      port: '8000',
-    },
-  ];
+// Hosts the image optimizer may fetch from. Keep this an explicit list: a
+// wildcard host turns /_next/image into an open proxy that anyone can point at
+// arbitrary images and bill to this deployment.
+const staticImageRemotePatterns = [
+  // Site-hosted images referenced by absolute URL (homepage demo photo).
+  { protocol: 'https', hostname: 'www.picspeak.art' },
+  // Account avatars served by Clerk.
+  { protocol: 'https', hostname: 'img.clerk.com' },
+  { protocol: 'https', hostname: 'images.clerk.dev' },
+  // Signed URLs for generated images in Cloudflare R2.
+  { protocol: 'https', hostname: '**.r2.cloudflarestorage.com' },
+  // Local backend photo proxy.
+  { protocol: 'http', hostname: 'localhost', port: '8000' },
+  { protocol: 'http', hostname: '127.0.0.1', port: '8000' },
+];
 
-  for (const rawUrl of [process.env.NEXT_PUBLIC_API_URL, process.env.NEXT_PUBLIC_SITE_URL]) {
+const IMAGE_HOSTNAME_PATTERN = /^(\*{1,2}\.)?[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/;
+
+function addRemotePattern(patterns, nextPattern) {
+  const exists = patterns.some(
+    (pattern) =>
+      pattern.protocol === nextPattern.protocol &&
+      pattern.hostname === nextPattern.hostname &&
+      (pattern.port ?? '') === (nextPattern.port ?? '')
+  );
+
+  if (!exists) {
+    patterns.push(nextPattern);
+  }
+}
+
+function buildRemotePatterns() {
+  const patterns = staticImageRemotePatterns.map((pattern) => ({ ...pattern }));
+
+  for (const rawUrl of [
+    process.env.NEXT_PUBLIC_API_URL,
+    process.env.NEXT_PUBLIC_SITE_URL,
+    process.env.NEXT_PUBLIC_DEMO_IMAGE_URL,
+  ]) {
     if (!rawUrl) {
       continue;
     }
 
     try {
       const parsed = new URL(rawUrl);
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        continue;
+      }
       const nextPattern = {
         protocol: parsed.protocol.replace(':', ''),
         hostname: parsed.hostname,
@@ -32,18 +55,19 @@ function buildRemotePatterns() {
         nextPattern.port = parsed.port;
       }
 
-      const exists = patterns.some(
-        (pattern) =>
-          pattern.protocol === nextPattern.protocol &&
-          pattern.hostname === nextPattern.hostname &&
-          (pattern.port ?? '') === (nextPattern.port ?? '')
-      );
-
-      if (!exists) {
-        patterns.push(nextPattern);
-      }
+      addRemotePattern(patterns, nextPattern);
     } catch {
       // Ignore invalid env values and keep the static safe defaults.
+    }
+  }
+
+  // Extra HTTPS image hosts for deployments whose storage or avatars live
+  // elsewhere: a comma-separated list of hostnames, optionally with a leading
+  // "*." or "**." wildcard label. A bare wildcard is never accepted.
+  for (const rawHost of (process.env.IMAGE_REMOTE_HOSTS ?? '').split(',')) {
+    const hostname = rawHost.trim().toLowerCase();
+    if (IMAGE_HOSTNAME_PATTERN.test(hostname)) {
+      addRemotePattern(patterns, { protocol: 'https', hostname });
     }
   }
 

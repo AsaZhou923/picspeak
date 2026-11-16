@@ -573,9 +573,23 @@ def enforce_guest_api_rate_limit(db: Session, actor: 'CurrentActor', endpoint: s
         window_start=minute_window_start(now),
         window_seconds=60,
     )
-    return {
+    limits = {
         'guest_api_minute': minute_rate,
     }
+    total_limit = int(settings.guest_api_total_rate_limit_per_minute or 0)
+    if total_limit > 0:
+        # The per-route limit alone lets a guest multiply its allowance by the
+        # number of routes; this bucket bounds the guest's requests overall.
+        limits['guest_api_total_minute'] = _enforce_scope_rate_limit(
+            db,
+            scope='guest_api_total_minute',
+            scope_key=scope_key,
+            endpoint='guest_api',
+            per_minute_limit=total_limit,
+            window_start=minute_window_start(now),
+            window_seconds=60,
+        )
+    return limits
 
 
 def enforce_guest_creation_rate_limit(db: Session, scope_key: str, network_scope_key: str | None = None) -> dict:

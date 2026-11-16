@@ -27,6 +27,8 @@ def _query_mock(*, first=None, all_rows=None):
     query = MagicMock()
     query.filter.return_value = query
     query.order_by.return_value = query
+    query.with_for_update.return_value = query
+    query.populate_existing.return_value = query
     query.first.return_value = first
     query.all.return_value = all_rows if all_rows is not None else []
     return query
@@ -209,6 +211,8 @@ class BillingActivationAccessTests(unittest.TestCase):
 
         redeem_activation_code_for_user(db, user=user, raw_code=raw_code)
 
+        # The code row is locked so a concurrent redemption waits and then sees it used.
+        code_query.with_for_update.assert_called_once_with()
         expression = code_query.filter.call_args.args[0]
         self.assertIsInstance(expression, BinaryExpression)
         self.assertEqual(getattr(expression.left, 'name', None), BillingActivationCode.code_hash.key)
