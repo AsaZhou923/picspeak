@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-17-faster-pages-and-accessibility",
+    "date": "2026-11-17",
+    "showPopup": false,
+    "title": "Faster page loads and easier-to-use controls",
+    "summary": "Pages download less code up front: Lens Notes articles and other languages now load only when you open them, and the homepage example image loads directly from PicSpeak. Upload errors are announced by screen readers and are easier to dismiss, loading screens are labelled for assistive technology, and long step labels on narrow phones wrap instead of being cut off.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-11-17-faster-pages-and-accessibility"
+  },
+  {
     "id": "2026-11-15-clearer-results-and-plain-wording",
     "date": "2026-11-15",
     "showPopup": false,

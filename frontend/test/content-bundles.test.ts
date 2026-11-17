@@ -108,7 +108,7 @@ test('current and historical update copy describes mode benefits without reasoni
     assert.match(rollout.summary, /GPT-6 Sol/);
     assert.match(rollout.summary, /GPT-6\.1 Sol/);
     const latest = entries[0];
-    assert.equal(latest.id, '2026-11-15-clearer-results-and-plain-wording');
+    assert.equal(latest.id, '2026-11-17-faster-pages-and-accessibility');
     assert.doesNotMatch(latest.title + latest.summary, /准备中|尚未发布|upcoming|not yet released|準備中|まだ公開/i);
     assert.equal(latest.showPopup, false);
   }
