@@ -124,21 +124,38 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     return response
 
 
+def _validation_error_fields(exc: RequestValidationError) -> list[dict]:
+    """Keep only JSON-safe location, type and message for each validation error.
+
+    Custom validators put the raised exception object in ``ctx``, which
+    JSONResponse cannot serialize; ``input`` may echo user content into logs.
+    """
+    fields: list[dict] = []
+    for error in exc.errors():
+        fields.append({
+            'type': str(error.get('type', '')),
+            'loc': [part if isinstance(part, (str, int)) else str(part) for part in error.get('loc', ())],
+            'msg': str(error.get('msg', '')),
+        })
+    return fields
+
+
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    fields = _validation_error_fields(exc)
     _log_error_response(
         request,
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         code='VALIDATION_ERROR',
         message='Request validation failed',
-        extra={'fields': exc.errors()},
+        extra={'fields': fields},
     )
     return _error_response(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         request_id=getattr(request.state, 'request_id', None),
         code='VALIDATION_ERROR',
         message='Request validation failed',
-        extra={'fields': exc.errors()},
+        extra={'fields': fields},
     )
 
 

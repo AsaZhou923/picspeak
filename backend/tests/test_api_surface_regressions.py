@@ -576,3 +576,68 @@ class ApiSurfaceRegressionTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class MalformedInputRegressionTests(unittest.TestCase):
+    """Issue #85: client input errors must stay 4xx, never 500 INTERNAL_ERROR."""
+
+    def tearDown(self) -> None:
+        app.dependency_overrides.clear()
+
+    @contextmanager
+    def _client(self):
+        def override_db():
+            yield MagicMock()
+
+        app.dependency_overrides[get_db] = override_db
+        with patch('app.main.worker.start'), patch('app.main.worker.stop'):
+            with TestClient(app, raise_server_exceptions=False) as client:
+                yield client
+
+    def test_custom_validator_errors_return_json_safe_422(self) -> None:
+        oversized = {str(index): index for index in range(500)}
+        with self._client() as client:
+            response = client.post('/api/v1/analytics/events', json={'event_name': 'x', 'metadata': oversized})
+
+        self.assertEqual(response.status_code, 422, response.text)
+        body = response.json()['error']
+        self.assertEqual(body['code'], 'VALIDATION_ERROR')
+        for field in body['extra']['fields']:
+            self.assertEqual(set(field), {'type', 'loc', 'msg'}, 'ctx and raw input are not echoed back')
+
+    def test_plain_missing_field_still_returns_422(self) -> None:
+        with self._client() as client:
+            response = client.post('/api/v1/analytics/events', json={})
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(response.json()['error']['code'], 'VALIDATION_ERROR')
+
+    def test_malformed_photo_token_signature_is_400(self) -> None:
+        with self._client() as client:
+            for path in ('/api/v1/photos/pho_x/image', '/api/v1/photos/pho_x/thumbnail'):
+                for token in ('abc.A', 'abc.ü', 'abc.@@@'):
+                    with self.subTest(path=path, token=token):
+                        response = client.get(path, params={'photo_token': token})
+                        self.assertEqual(response.status_code, 400, response.text)
+                        self.assertEqual(response.json()['error']['code'], 'TOKEN_SIGNATURE_INVALID')
+
+    def test_malformed_bearer_token_structure_is_401(self) -> None:
+        with self._client() as client:
+            for token in ('W10.e30.AA', 'MQ.e30.AA', 'bnVsbA.e30.AA', 'e30.W10.AA', 'abc'):
+                with self.subTest(token=token):
+                    response = client.get('/api/v1/me/usage', headers={'Authorization': f'Bearer {token}'})
+                    self.assertEqual(response.status_code, 401, response.text)
+                    self.assertEqual(response.json()['error']['code'], 'AUTH_TOKEN_INVALID')
+
+
+class VerifyPayloadRobustnessTests(unittest.TestCase):
+    def test_undecodable_signature_and_payload_raise_api_errors(self) -> None:
+        from app.core.security import sign_payload
+
+        valid = sign_payload({'photo_id': 'pho_x'}, ttl_seconds=60, purpose='photo_proxy')
+        self.assertEqual(verify_payload(valid, expected_purpose='photo_proxy')['photo_id'], 'pho_x')
+        for token, code in (('abc.A', 'TOKEN_SIGNATURE_INVALID'), ('abc.éé', 'TOKEN_SIGNATURE_INVALID'), ('no-dot', 'TOKEN_FORMAT_INVALID')):
+            with self.subTest(token=token):
+                with self.assertRaises(ApiHTTPException) as raised:
+                    verify_payload(token)
+                self.assertEqual(raised.exception.status_code, 400)
+                self.assertEqual(raised.exception.detail['code'], code)

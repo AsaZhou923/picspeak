@@ -54,12 +54,19 @@ def verify_payload(token: str, *, expected_purpose: str | None = None) -> dict[s
         raise api_error(400, 'TOKEN_FORMAT_INVALID', 'Invalid token format') from exc
 
     expected = hmac.new(settings.app_secret.encode('utf-8'), payload_encoded.encode('utf-8'), hashlib.sha256).digest()
-    received = _b64url_decode(signature_encoded)
+    try:
+        received = _b64url_decode(signature_encoded)
+    except ValueError as exc:  # binascii.Error and non-ASCII input are ValueErrors
+        raise api_error(400, 'TOKEN_SIGNATURE_INVALID', 'Invalid token signature') from exc
     if not hmac.compare_digest(expected, received):
         raise api_error(400, 'TOKEN_SIGNATURE_INVALID', 'Invalid token signature')
 
-    payload = json.loads(_b64url_decode(payload_encoded).decode('utf-8'))
-    if int(payload.get('exp', 0)) < int(time.time()):
+    try:
+        payload = json.loads(_b64url_decode(payload_encoded).decode('utf-8'))
+        expires_at = int(payload.get('exp', 0))
+    except (ValueError, TypeError, AttributeError) as exc:
+        raise api_error(400, 'TOKEN_FORMAT_INVALID', 'Invalid token format') from exc
+    if expires_at < int(time.time()):
         raise api_error(400, 'TOKEN_EXPIRED', 'Token expired')
     if expected_purpose is not None and payload.get('purpose') != expected_purpose:
         raise api_error(400, 'TOKEN_PURPOSE_INVALID', 'Invalid token purpose')
@@ -102,6 +109,8 @@ def validate_access_token(token: str) -> dict[str, Any]:
         signature = _b64url_decode(signature_b64)
     except (json.JSONDecodeError, ValueError) as exc:
         raise JWTValidationError('invalid jwt encoding') from exc
+    if not isinstance(header, dict) or not isinstance(payload, dict):
+        raise JWTValidationError('invalid jwt structure')
 
     if header.get('alg') != 'HS256':
         raise JWTValidationError('unsupported jwt alg')

@@ -552,6 +552,19 @@ class ReassessScoreVersionScriptTests(unittest.TestCase):
 @unittest.skipUnless(TEST_DATABASE_URL, 'requires disposable PostgreSQL via PICSPEAK_TEST_DATABASE_URL')
 class ReassessScoreVersionPostgresTests(unittest.TestCase):
     def setUp(self) -> None:
+        # Pin the model profile so a developer's local .env cannot change the
+        # runtime check this test exercises (#79).
+        self.settings_patcher = patch.multiple(
+            script.settings,
+            openai_score_model='gpt-6-sol',
+            openai_score_reasoning_effort='low',
+            openai_review_model='gpt-6-sol',
+            openai_review_reasoning_effort='low',
+            openai_pro_model='gpt-6.1-sol',
+            openai_pro_reasoning_effort='high',
+        )
+        self.settings_patcher.start()
+        self.addCleanup(self.settings_patcher.stop)
         self.engine = create_engine(TEST_DATABASE_URL, pool_pre_ping=True)
         self.connection = self.engine.connect()
         self.Session = sessionmaker(bind=self.connection, autoflush=False, autocommit=False)
