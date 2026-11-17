@@ -31,20 +31,30 @@ test('private critique access update describes user benefits without draft statu
   }
 });
 
-test('clearer results record is the latest update in every locale without a popup', () => {
+test('clearer results record keeps its no-popup maintenance entry in every locale', () => {
+  for (const locale of ['zh', 'en', 'ja'] as const) {
+    const entry = getProductUpdates(locale).find((item) => item.id === '2026-11-15-clearer-results-and-plain-wording');
+    assert.ok(entry);
+    assert.match(entry.summary, /credits|クレジット|积分|额度/);
+    assert.equal(entry.date, '2026-11-15');
+    assert.equal(entry.showPopup, false);
+    assert.equal(shouldShowProductUpdatePopup(entry), false);
+  }
+});
+
+test('faster pages and accessibility record is the latest update in every locale without a popup', () => {
   for (const locale of ['zh', 'en', 'ja'] as const) {
     const latest = getLatestProductUpdate(locale);
     assert.ok(latest);
-    assert.equal(latest.id, '2026-11-15-clearer-results-and-plain-wording');
-    assert.match(latest.summary, /credits|クレジット/);
-    assert.equal(latest.date, '2026-11-15');
+    assert.equal(latest.id, '2026-11-17-faster-pages-and-accessibility');
+    assert.equal(latest.date, '2026-11-17');
     assert.doesNotMatch(latest.title + latest.summary, /准备中|尚未发布|upcoming|not yet released|準備中|まだ公開/i);
     assert.equal(latest.showPopup, false);
     assert.equal(shouldShowProductUpdatePopup(latest), false);
     assert.equal(latest.docPath, `docs/changelog/CHANGELOG.md#${latest.id}`);
   }
-  assert.equal(getLatestProductUpdateDate('zh'), '2026-11-15');
-  assert.equal(getLatestProductUpdateDate(), '2026-11-15');
+  assert.equal(getLatestProductUpdateDate('zh'), '2026-11-17');
+  assert.equal(getLatestProductUpdateDate(), '2026-11-17');
 });
 
 test('navigation and display fixes record stays in every locale without a popup', () => {

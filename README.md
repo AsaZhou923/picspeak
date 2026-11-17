@@ -139,7 +139,7 @@ The event version used GPT-5.6 Terra. The current runtime uses GPT-6 Sol (Flash)
 
 ## 📝 Changelog
 
-The latest entry is [Clearer critique results, waiting pages, and quota page](docs/changelog/CHANGELOG.md#2026-11-15-clearer-results-and-plain-wording). See the [full changelog](docs/changelog/CHANGELOG.md) for older entries.
+The latest entry is [faster page loads and easier-to-use controls](docs/changelog/CHANGELOG.md#2026-11-17-faster-pages-and-accessibility). See the [full changelog](docs/changelog/CHANGELOG.md) for older entries.
 
 ## 🤝 Contributing
 

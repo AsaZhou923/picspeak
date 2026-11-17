@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-17-faster-pages-and-accessibility",
+    "date": "2026-11-17",
+    "showPopup": false,
+    "title": "ページの表示が速くなり、操作しやすくなりました",
+    "summary": "最初に読み込むコードを減らしました。Lens Notes の記事やほかの言語は開いたときだけ読み込み、ホームのサンプル画像は PicSpeak から直接表示します。アップロードエラーはスクリーンリーダーで読み上げられ、閉じるボタンも押しやすくなりました。読み込み中の画面は支援技術で認識でき、幅の狭いスマートフォンでも長いステップ名が切れずに折り返して表示されます。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-11-17-faster-pages-and-accessibility"
+  },
+  {
     "id": "2026-11-15-clearer-results-and-plain-wording",
     "date": "2026-11-15",
     "showPopup": false,

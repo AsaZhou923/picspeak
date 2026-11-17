@@ -139,7 +139,7 @@ PicSpeak 在 Build Week 之前已经存在。活动期间，单张点评扩展�
 
 ## 📝 更新记录
 
-最新条目：[点评结果、等待页和额度页更清楚](docs/changelog/CHANGELOG.md#2026-11-15-clearer-results-and-plain-wording)。更早的条目见[完整 Changelog](docs/changelog/CHANGELOG.md)。
+最新条目：[页面打开更快，操作更顺手](docs/changelog/CHANGELOG.md#2026-11-17-faster-pages-and-accessibility)。更早的条目见[完整 Changelog](docs/changelog/CHANGELOG.md)。
 
 ## 🤝 参与贡献
 
