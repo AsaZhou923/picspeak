@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-17-clearer-request-errors",
+    "date": "2026-11-17",
+    "showPopup": false,
+    "title": "無効なリクエストのエラー表示が分かりやすくなりました",
+    "summary": "リクエストのデータが無効な場合やリンクが古くなっている場合、PicSpeak は汎用的なエラーではなく原因を表示するようになりました。期限切れや破損した写真リンク、形式の正しくないログイン情報、大きすぎるアクティビティデータが対象で、これまではサーバーエラーとして返っていました。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-11-17-clearer-request-errors"
+  },
+  {
     "id": "2026-11-17-faster-pages-and-accessibility",
     "date": "2026-11-17",
     "showPopup": false,

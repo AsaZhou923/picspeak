@@ -42,11 +42,21 @@ test('clearer results record keeps its no-popup maintenance entry in every local
   }
 });
 
-test('faster pages and accessibility record is the latest update in every locale without a popup', () => {
+test('faster pages record keeps its no-popup maintenance entry in every locale', () => {
+  for (const locale of ['zh', 'en', 'ja'] as const) {
+    const entry = getProductUpdates(locale).find((item) => item.id === '2026-11-17-faster-pages-and-accessibility');
+    assert.ok(entry);
+    assert.equal(entry.date, '2026-11-17');
+    assert.equal(entry.showPopup, false);
+    assert.equal(shouldShowProductUpdatePopup(entry), false);
+  }
+});
+
+test('clearer request errors record is the latest update in every locale without a popup', () => {
   for (const locale of ['zh', 'en', 'ja'] as const) {
     const latest = getLatestProductUpdate(locale);
     assert.ok(latest);
-    assert.equal(latest.id, '2026-11-17-faster-pages-and-accessibility');
+    assert.equal(latest.id, '2026-11-17-clearer-request-errors');
     assert.equal(latest.date, '2026-11-17');
     assert.doesNotMatch(latest.title + latest.summary, /准备中|尚未发布|upcoming|not yet released|準備中|まだ公開/i);
     assert.equal(latest.showPopup, false);
