@@ -4,7 +4,7 @@ import os
 import sys
 import threading
 import unittest
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from uuid import uuid4
 from unittest.mock import patch
@@ -35,6 +35,7 @@ from app.services.image_generation_task_processor import (  # noqa: E402
     _claim_generation_task,
     deliver_generation_request_event,
     deliver_generation_terminal_event,
+    process_image_generation_task,
     stage_generation_request_event,
     stage_generation_terminal_event,
 )
@@ -46,6 +47,33 @@ TEST_DATABASE_URL = os.getenv('PICSPEAK_TEST_DATABASE_URL', '').strip()
 
 @unittest.skipUnless(TEST_DATABASE_URL, 'requires disposable PostgreSQL via PICSPEAK_TEST_DATABASE_URL')
 class GenerationCreditReservationPostgresTests(unittest.TestCase):
+    def test_cloud_retry_only_recovers_its_stalled_generation(self) -> None:
+        engine = create_engine(TEST_DATABASE_URL)
+        self.addCleanup(engine.dispose)
+        suffix = uuid4().hex
+        with engine.connect() as connection, connection.begin() as transaction:
+            Session = sessionmaker(bind=connection, join_transaction_mode='create_savepoint')
+            with Session() as db:
+                user = User(public_id=f'usr_{suffix}', email=f'{suffix}@example.test', username=suffix)
+                db.add(user)
+                db.flush()
+                ids = [f'igt_{suffix}_{index}' for index in range(2)]
+                for public_id in ids:
+                    db.add(ImageGenerationTask(
+                        public_id=public_id, owner_user_id=user.id, status=TaskStatus.RUNNING,
+                        generation_mode='general', intent='photo_inspiration', prompt='fixture',
+                        prompt_hash=suffix, attempt_count=1, max_attempts=2,
+                        last_heartbeat_at=datetime.now(timezone.utc) - timedelta(days=1),
+                    ))
+                db.commit()
+            with patch('app.services.image_generation_task_processor.SessionLocal', Session):
+                self.assertEqual(process_image_generation_task(ids[0], worker_name='cloud-tasks'),
+                                 {'result': 'delayed', 'status': 'PENDING'})
+            with Session() as db:
+                self.assertEqual(db.query(ImageGenerationTask.status).filter_by(public_id=ids[1]).scalar(),
+                                 TaskStatus.RUNNING)
+            transaction.rollback()
+
     def test_generation_request_event_outbox_is_durable(self) -> None:
         engine = create_engine(TEST_DATABASE_URL, pool_pre_ping=True)
         Session = sessionmaker(bind=engine, expire_on_commit=False)

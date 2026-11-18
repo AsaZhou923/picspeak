@@ -12,7 +12,6 @@ from app.db.models import Review, ReviewTask, ReviewTaskEvent, TaskStatus
 from app.schemas import InternalTaskExecuteRequest, TaskStatusResponse
 from app.services.image_generation_task_processor import process_image_generation_task
 from app.services.review_task_processor import (
-    expire_review_tasks,
     process_review_task,
     public_task_error_message,
     review_task_failure_stage,
@@ -59,7 +58,6 @@ def _serialize_task_status(task: ReviewTask, review: Review | None = None) -> di
 
 
 def _load_task_snapshot(db: Session, *, task_id: str, owner_user_id: int) -> tuple[ReviewTask | None, Review | None, ReviewTaskEvent | None]:
-    expire_review_tasks(db)
     task = db.query(ReviewTask).filter(ReviewTask.public_id == task_id, ReviewTask.owner_user_id == owner_user_id).first()
     if task is None:
         return None, None, None

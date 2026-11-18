@@ -28,12 +28,14 @@ from app.schemas import (
     NotificationUnreadCountResponse,
 )
 from app.services.audit import cleanup_expired_request_logs
+from app.services.image_generation_task_processor import expire_image_generation_tasks
 from app.services.notification_access import render_notification
 from app.services.notification_events import database_now, read_preferences, update_preferences
 from app.services.notification_processor import (
     cleanup_expired_notifications,
     process_pending_notifications,
 )
+from app.services.review_task_processor import expire_review_tasks
 
 router = APIRouter(tags=['notifications'])
 
@@ -377,6 +379,8 @@ def process_notifications(
     header_secret = request.headers.get('X-Task-Dispatch-Secret', '')
     if not secrets.compare_digest(header_secret, settings.cloud_tasks_secret):
         raise api_error(status.HTTP_401_UNAUTHORIZED, 'TASK_DISPATCH_UNAUTHORIZED', 'Invalid task dispatch secret')
+    expire_review_tasks(db)
+    expire_image_generation_tasks(db)
     processed = process_pending_notifications(db, limit=payload.limit if payload else 100)
     expired_deleted = cleanup_expired_notifications(db, limit=100)
     db.commit()

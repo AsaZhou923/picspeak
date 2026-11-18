@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-18-lighter-critique-waiting",
+    "date": "2026-11-18",
+    "showPopup": false,
+    "title": "Less overhead while you wait for a critique",
+    "summary": "Keeping a critique waiting page open now uses fewer service resources to check progress. Critique and image-generation tasks also avoid repeated background checks, reducing their impact on other page actions.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-11-18-lighter-critique-waiting"
+  },
+  {
     "id": "2026-11-17-faster-pages-and-accessibility",
     "date": "2026-11-17",
     "showPopup": false,
