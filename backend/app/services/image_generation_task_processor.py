@@ -9,7 +9,7 @@ from typing import Any
 from uuid import uuid4
 
 from PIL import Image, ImageOps, UnidentifiedImageError
-from sqlalchemy import case, func, text
+from sqlalchemy import case, func, select, text
 from sqlalchemy.orm import Query, Session
 
 from app.api.deps import new_public_id
@@ -277,6 +277,22 @@ def _new_generation_claim_token(worker_name: str) -> str:
     return f'{worker_name}:{uuid4().hex}'
 
 
+class GenerationTaskLeaseLost(RuntimeError):
+    pass
+
+
+def _lock_generation_claim(db: Session, task: ImageGenerationTask, claim_token: str) -> None:
+    # Recovery and execution both lock the task before its credit reservation.
+    with db.no_autoflush:
+        claim = db.execute(select(ImageGenerationTask.id).where(
+            ImageGenerationTask.id == task.id,
+            ImageGenerationTask.status == TaskStatus.RUNNING,
+            ImageGenerationTask.claimed_by == claim_token,
+        ).with_for_update()).first()
+    if claim is None:
+        raise GenerationTaskLeaseLost('Image generation task lease changed')
+
+
 def _database_dialect_name(db: Session) -> str | None:
     bind = getattr(db, 'bind', None) or getattr(db, 'get_bind', lambda: None)()
     dialect = getattr(bind, 'dialect', None)
@@ -403,7 +419,9 @@ def process_image_generation_task(
             return {'result': 'noop', 'status': task.status.value, 'reason': 'lease_mismatch'}
 
         try:
-            _process_generation_task(db, task)
+            _process_generation_task(db, task, claim_token=claim_token)
+        except GenerationTaskLeaseLost:
+            raise
         except Exception as exc:
             logger.exception('Unhandled image generation task error for task %s', task_public_id)
             db.rollback()
@@ -412,20 +430,25 @@ def process_image_generation_task(
                 _handle_generation_failure(
                     db,
                     fresh_task,
+                    claim_token=claim_token,
                     error_code='IMAGE_GENERATION_PROCESSING_FAILED',
                     error_message=str(exc),
                     retryable=True,
                 )
             return {'result': 'failed'}
         return {'result': 'processed', 'status': task.status.value}
+    except GenerationTaskLeaseLost:
+        db.rollback()
+        return {'result': 'noop', 'reason': 'lease_mismatch'}
     finally:
         db.close()
 
 
-def _process_generation_task(db: Session, task: ImageGenerationTask) -> None:
+def _process_generation_task(db: Session, task: ImageGenerationTask, *, claim_token: str) -> None:
+    _lock_generation_claim(db, task, claim_token)
     owner = db.query(User).filter(User.id == task.owner_user_id).first()
     if owner is None:
-        _handle_generation_failure(db, task, error_code='USER_NOT_FOUND', error_message='Task owner not found', retryable=False)
+        _handle_generation_failure(db, task, claim_token=claim_token, error_code='USER_NOT_FOUND', error_message='Task owner not found', retryable=False)
         return
 
     payload = dict(getattr(task, 'request_payload', None) or {})
@@ -440,6 +463,7 @@ def _process_generation_task(db: Session, task: ImageGenerationTask) -> None:
         _handle_generation_failure(
             db,
             task,
+            claim_token=claim_token,
             error_code='IMAGE_GENERATION_RESERVATION_INVALID',
             error_message=str(exc),
             retryable=False,
@@ -471,6 +495,7 @@ def _process_generation_task(db: Session, task: ImageGenerationTask) -> None:
         _handle_generation_failure(
             db,
             task,
+            claim_token=claim_token,
             error_code='OPENAI_IMAGE_GENERATION_FAILED',
             error_message=str(exc),
             retryable=True,
@@ -481,7 +506,6 @@ def _process_generation_task(db: Session, task: ImageGenerationTask) -> None:
         estimate_image_generation_cost_usd(quality=quality, size=size, reference_image_count=reference_count)
     )
     output_format = _output_format_for_content_type(result.content_type, fallback=output_format)
-    task.request_payload = {**payload, 'output_format': output_format}
 
     generated_public_id = new_public_id('gen')
     object_key = generation_object_key(
@@ -501,6 +525,7 @@ def _process_generation_task(db: Session, task: ImageGenerationTask) -> None:
         _handle_generation_failure(
             db,
             task,
+            claim_token=claim_token,
             error_code='IMAGE_GENERATION_STORAGE_FAILED',
             error_message=str(exc),
             retryable=True,
@@ -508,6 +533,8 @@ def _process_generation_task(db: Session, task: ImageGenerationTask) -> None:
         return
 
     try:
+        _lock_generation_claim(db, task, claim_token)
+        task.request_payload = {**payload, 'output_format': output_format}
         generated = _persist_successful_generation(
             db,
             task=task,
@@ -561,6 +588,10 @@ def _process_generation_task(db: Session, task: ImageGenerationTask) -> None:
             db,
             [(task, owner, 'generation_succeeded', success_metadata)],
         )
+    except GenerationTaskLeaseLost:
+        db.rollback()
+        _delete_uploaded_generation_object(storage, bucket=settings.object_bucket, object_key=object_key, task_public_id=task.public_id)
+        raise
     except GenerationCreditReservationError as exc:
         db.rollback()
         cleanup = _delete_uploaded_generation_object(
@@ -572,6 +603,7 @@ def _process_generation_task(db: Session, task: ImageGenerationTask) -> None:
         _handle_generation_failure(
             db,
             task,
+            claim_token=claim_token,
             error_code='IMAGE_GENERATION_RESERVATION_INVALID',
             error_message=str(exc),
             retryable=False,
@@ -591,6 +623,7 @@ def _process_generation_task(db: Session, task: ImageGenerationTask) -> None:
         _handle_generation_failure(
             db,
             task,
+            claim_token=claim_token,
             error_code='IMAGE_GENERATION_PERSISTENCE_FAILED',
             error_message=str(exc),
             retryable=False,
@@ -1139,11 +1172,13 @@ def _handle_generation_failure(
     db: Session,
     task: ImageGenerationTask,
     *,
+    claim_token: str,
     error_code: str,
     error_message: str,
     retryable: bool,
     event_metadata: dict[str, Any] | None = None,
 ) -> None:
+    _lock_generation_claim(db, task, claim_token)
     retry_delay: int | None = None
     if retryable and task.attempt_count < task.max_attempts:
         retry_delay = _generation_retry_delay_seconds(task.attempt_count)
@@ -1191,7 +1226,11 @@ def _handle_generation_failure(
             enqueue_image_generation_task(task.public_id, delay_seconds=retry_delay)
         except TaskDispatchError as exc:
             logger.exception('Failed to enqueue Cloud Task retry for image generation task %s', task.public_id)
-            failed_task = db.query(ImageGenerationTask).filter(ImageGenerationTask.id == task.id).first()
+            failed_task = db.query(ImageGenerationTask).filter(
+                ImageGenerationTask.id == task.id,
+                ImageGenerationTask.status == TaskStatus.PENDING,
+                ImageGenerationTask.claimed_by == claim_token,
+            ).with_for_update().first()
             if failed_task is not None:
                 now = datetime.now(timezone.utc)
                 failed_task.status = TaskStatus.FAILED

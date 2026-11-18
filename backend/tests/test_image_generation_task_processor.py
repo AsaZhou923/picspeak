@@ -18,6 +18,7 @@ from app.db.models import GeneratedImage, TaskStatus, UserPlan  # noqa: E402
 from app.services.generation_credit_reservations import GenerationCreditReservationError  # noqa: E402
 from app.services.image_generation import ImageGenerationResult  # noqa: E402
 from app.services.image_generation_task_processor import (  # noqa: E402
+    GenerationTaskLeaseLost,
     _load_reference_image,
     _claim_generation_task,
     _reconcile_pending_generation_terminal_events,
@@ -403,11 +404,37 @@ class ImageGenerationTaskProcessorTests(unittest.TestCase):
             unittest.mock.patch('app.services.image_generation_task_processor._handle_generation_failure') as handle_failure,
             unittest.mock.patch('app.services.image_generation_task_processor.OpenAIImageGenerationClient') as generation_client,
         ):
-            _process_generation_task(db, task)
+            _process_generation_task(db, task, claim_token='test-lease')
 
         generation_client.assert_not_called()
         handle_failure.assert_called_once()
         self.assertEqual(handle_failure.call_args.kwargs['error_code'], 'IMAGE_GENERATION_RESERVATION_INVALID')
+
+    def test_replaced_lease_discards_its_uploaded_output_without_charging(self) -> None:
+        db = MagicMock()
+        task = SimpleNamespace(
+            id=10, public_id='igt_superseded', owner_user_id=20, prompt='fixture',
+            request_payload={'quality': 'low', 'size': '1024x1024'},
+        )
+        db.query.return_value.filter.return_value.first.return_value = SimpleNamespace(public_id='usr_owner')
+        # The attempt still owns the lease at startup, but recovery takes it while the provider runs.
+        db.execute.return_value.first.side_effect = [(task.id,), None]
+        with (
+            patch('app.services.image_generation_task_processor.require_held_generation_credit_reservation'),
+            patch('app.services.image_generation_task_processor.OpenAIImageGenerationClient') as client,
+            patch('app.services.image_generation_task_processor.get_object_storage_client') as storage,
+            patch('app.services.image_generation_task_processor.consume_generation_credit_reservation') as charge,
+            patch('app.services.image_generation_task_processor._handle_generation_failure') as fail,
+        ):
+            client.return_value.generate.return_value = SimpleNamespace(
+                cost_usd=0.01, content_type='image/webp', image_bytes=b'fixture',
+            )
+            with self.assertRaises(GenerationTaskLeaseLost):
+                _process_generation_task(db, task, claim_token='obsolete-lease')
+        uploaded = storage.return_value.put_object.call_args.kwargs
+        storage.return_value.delete_object.assert_called_once_with(Bucket=uploaded['Bucket'], Key=uploaded['Key'])
+        charge.assert_not_called()
+        fail.assert_not_called()
 
     def test_process_generation_task_deletes_uploaded_object_when_persist_fails(self) -> None:
         db = MagicMock()
@@ -455,7 +482,7 @@ class ImageGenerationTaskProcessorTests(unittest.TestCase):
             unittest.mock.patch('app.services.image_generation_task_processor._generated_image_was_committed', return_value=False),
             unittest.mock.patch('app.services.image_generation_task_processor._handle_generation_failure') as handle_failure,
         ):
-            _process_generation_task(db, task)
+            _process_generation_task(db, task, claim_token='test-lease')
 
         storage.put_object.assert_called_once()
         storage.delete_object.assert_called_once()
@@ -509,7 +536,7 @@ class ImageGenerationTaskProcessorTests(unittest.TestCase):
             ),
             unittest.mock.patch('app.services.image_generation_task_processor._handle_generation_failure') as handle_failure,
         ):
-            _process_generation_task(db, task)
+            _process_generation_task(db, task, claim_token='test-lease')
 
         storage.delete_object.assert_called_once()
         self.assertEqual(storage.delete_object.call_args.kwargs['Bucket'], 'generated-bucket')
@@ -561,7 +588,7 @@ class ImageGenerationTaskProcessorTests(unittest.TestCase):
             unittest.mock.patch('app.services.image_generation_task_processor.record_generation_task_event_once') as record_event,
             unittest.mock.patch('app.services.image_generation_task_processor._handle_generation_failure') as handle_failure,
         ):
-            _process_generation_task(db, task)
+            _process_generation_task(db, task, claim_token='test-lease')
 
         storage.delete_object.assert_not_called()
         record_event.assert_not_called()
@@ -730,6 +757,7 @@ class ImageGenerationTaskProcessorTests(unittest.TestCase):
             _handle_generation_failure(
                 db,
                 task,
+                claim_token='test-lease',
                 error_code='IMAGE_GENERATION_PERSISTENCE_FAILED',
                 error_message='commit failed',
                 retryable=False,
