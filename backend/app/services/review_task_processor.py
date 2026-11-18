@@ -8,7 +8,7 @@ import logging
 from uuid import uuid4
 
 from sqlalchemy import case
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Query, Session
 from pydantic import ValidationError
 
 from app.api.deps import new_public_id
@@ -260,12 +260,14 @@ def _normalize_review_result_payload(
     }
 
 
-def expire_review_tasks(db: Session) -> None:
-    _reconcile_completed_tasks(db)
+def expire_review_tasks(db: Session, *, task_public_id: str | None = None) -> None:
+    tasks = db.query(ReviewTask)
+    if task_public_id is not None:
+        tasks = tasks.filter(ReviewTask.public_id == task_public_id)
+    _reconcile_completed_tasks(db, tasks)
     now = datetime.now(timezone.utc)
     expired_tasks = (
-        db.query(ReviewTask)
-        .filter(
+        tasks.filter(
             ReviewTask.status.in_([TaskStatus.PENDING, TaskStatus.RUNNING]),
             ReviewTask.expire_at.is_not(None),
             ReviewTask.expire_at < now,
@@ -289,8 +291,7 @@ def expire_review_tasks(db: Session) -> None:
     stale_timeout = _review_task_stale_timeout_seconds()
     stale_cutoff = now - timedelta(seconds=stale_timeout)
     stalled_query = (
-        db.query(ReviewTask)
-        .filter(
+        tasks.filter(
             ReviewTask.status == TaskStatus.RUNNING,
             ReviewTask.finished_at.is_(None),
             ReviewTask.last_heartbeat_at.is_not(None),
@@ -324,12 +325,13 @@ def expire_review_tasks(db: Session) -> None:
             )
 
 
-def _reconcile_completed_tasks(db: Session) -> None:
+def _reconcile_completed_tasks(db: Session, tasks: Query) -> None:
     now = datetime.now(timezone.utc)
     completed_pairs = (
-        db.query(ReviewTask, Review)
+        tasks.add_entity(Review)
         .join(Review, Review.task_id == ReviewTask.id)
         .filter(ReviewTask.status.in_([TaskStatus.PENDING, TaskStatus.RUNNING]))
+        .with_for_update(of=ReviewTask)
         .all()
     )
     if not completed_pairs:
@@ -357,7 +359,8 @@ def _reconcile_completed_tasks(db: Session) -> None:
 def process_review_task(task_public_id: str, *, worker_name: str, claim_token: str | None = None) -> dict[str, str]:
     db = SessionLocal()
     try:
-        expire_review_tasks(db)
+        # A delivery can race the periodic sweep or follow a crashed attempt.
+        expire_review_tasks(db, task_public_id=task_public_id)
         task = db.query(ReviewTask).filter(ReviewTask.public_id == task_public_id).first()
         if task is None:
             return {'result': 'missing'}
@@ -411,13 +414,13 @@ def process_review_task(task_public_id: str, *, worker_name: str, claim_token: s
 
 
 def claim_next_pending_review_task(db: Session, *, worker_name: str) -> ReviewTask | None:
-    expire_review_tasks(db)
     now = datetime.now(timezone.utc)
     candidate = (
         db.query(ReviewTask)
         .join(User, User.id == ReviewTask.owner_user_id)
         .filter(
             ReviewTask.status == TaskStatus.PENDING,
+            (ReviewTask.expire_at.is_(None) | (ReviewTask.expire_at >= now)),
             (ReviewTask.next_attempt_at.is_(None) | (ReviewTask.next_attempt_at <= now)),
         )
         .order_by(
@@ -438,7 +441,11 @@ def _claim_task(db: Session, task_id: int, worker_name: str) -> bool:
     now = datetime.now(timezone.utc)
     updated = (
         db.query(ReviewTask)
-        .filter(ReviewTask.id == task_id, ReviewTask.status == TaskStatus.PENDING)
+        .filter(
+            ReviewTask.id == task_id,
+            ReviewTask.status == TaskStatus.PENDING,
+            (ReviewTask.expire_at.is_(None) | (ReviewTask.expire_at >= now)),
+        )
         .update(
             {
                 ReviewTask.status: TaskStatus.RUNNING,

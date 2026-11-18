@@ -1,10 +1,18 @@
 [
   {
+    "id": "2026-11-18-lighter-critique-waiting",
+    "date": "2026-11-18",
+    "showPopup": false,
+    "title": "講評の待機中の負荷を軽減",
+    "summary": "講評の待機ページを開いたままにしても、進捗確認で使うサービスのリソースが少なくなりました。講評や画像生成で繰り返していたバックグラウンドの確認も減らし、ほかのページ操作への影響を抑えました。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-11-18-lighter-critique-waiting"
+  },
+  {
     "id": "2026-11-17-clearer-request-errors",
     "date": "2026-11-17",
     "showPopup": false,
     "title": "無効なリクエストのエラー表示が分かりやすくなりました",
-    "summary": "リクエストのデータが無効な場合やリンクが古くなっている場合、PicSpeak は汎用的なエラーではなく原因を表示するようになりました。期限切れや破損した写真リンク、形式の正しくないログイン情報、大きすぎるアクティビティデータが対象で、これまではサーバーエラーとして返っていました。",
+    "summary": "PicSpeak はサイズが大きすぎるアクティビティデータに入力エラーを返し、形式が壊れた写真リンクやログイン情報を無効として扱います。",
     "docPath": "docs/changelog/CHANGELOG.md#2026-11-17-clearer-request-errors"
   },
   {

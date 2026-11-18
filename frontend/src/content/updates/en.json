@@ -1,10 +1,18 @@
 [
   {
+    "id": "2026-11-18-lighter-critique-waiting",
+    "date": "2026-11-18",
+    "showPopup": false,
+    "title": "Less overhead while you wait for a critique",
+    "summary": "Keeping a critique waiting page open now uses fewer service resources to check progress. Critique and image-generation tasks also avoid repeated background checks, reducing their impact on other page actions.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-11-18-lighter-critique-waiting"
+  },
+  {
     "id": "2026-11-17-clearer-request-errors",
     "date": "2026-11-17",
     "showPopup": false,
     "title": "Clearer errors for invalid requests",
-    "summary": "When a request contains invalid data or an outdated link, PicSpeak now shows what went wrong instead of a generic error. This covers expired or damaged photo links, malformed sign-in data and oversized activity data, which previously came back as a server error.",
+    "summary": "PicSpeak now returns a validation error for oversized activity data and identifies malformed photo links or sign-in tokens as invalid.",
     "docPath": "docs/changelog/CHANGELOG.md#2026-11-17-clearer-request-errors"
   },
   {

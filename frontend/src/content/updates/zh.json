@@ -1,10 +1,18 @@
 [
   {
+    "id": "2026-11-18-lighter-critique-waiting",
+    "date": "2026-11-18",
+    "showPopup": false,
+    "title": "等待点评时减少对其他操作的影响",
+    "summary": "长时间打开点评等待页时，进度更新占用的服务资源更少。点评和生图等待期间也减少了重复检查，降低对其他页面操作的影响。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-11-18-lighter-critique-waiting"
+  },
+  {
     "id": "2026-11-17-clearer-request-errors",
     "date": "2026-11-17",
     "showPopup": false,
     "title": "无效请求的错误提示更清楚",
-    "summary": "请求中的数据无效或链接已失效时，PicSpeak 现在会说明具体问题，而不是显示笼统的“出错了”。这包括已失效或损坏的照片链接、格式错误的登录信息，以及过大的活动数据；这些情况以前会被当成服务器错误。",
+    "summary": "PicSpeak 现在会明确拒绝过大的活动数据，并将格式损坏的照片链接或登录凭据识别为无效。",
     "docPath": "docs/changelog/CHANGELOG.md#2026-11-17-clearer-request-errors"
   },
   {
