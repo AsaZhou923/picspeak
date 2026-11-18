@@ -1,9 +1,9 @@
 import json
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
 from pydantic import Field, field_validator, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 BACKEND_ROOT = REPO_ROOT / 'backend'
@@ -101,7 +101,9 @@ class Settings(BaseSettings):
     # Set to 'none' only when frontend and backend are on different domains AND you've
     # added explicit CSRF protections; requires secure=True (enforced automatically).
     cookie_samesite: str = 'lax'
-    backend_cors_origins: list[str] = Field(
+    # NoDecode hands the raw env/.env string to parse_backend_cors_origins, so
+    # comma-separated, single-origin and empty values work as well as JSON arrays.
+    backend_cors_origins: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: ['http://localhost:3000', 'http://127.0.0.1:3000']
     )
     backend_cors_origin_regex: str = ''

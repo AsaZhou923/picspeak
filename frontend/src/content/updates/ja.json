@@ -8,6 +8,14 @@
     "docPath": "docs/changelog/CHANGELOG.md#2026-11-18-lighter-critique-waiting"
   },
   {
+    "id": "2026-11-17-clearer-request-errors",
+    "date": "2026-11-17",
+    "showPopup": false,
+    "title": "無効なリクエストのエラー表示が分かりやすくなりました",
+    "summary": "PicSpeak はサイズが大きすぎるアクティビティデータに入力エラーを返し、形式が壊れた写真リンクやログイン情報を無効として扱います。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-11-17-clearer-request-errors"
+  },
+  {
     "id": "2026-11-17-faster-pages-and-accessibility",
     "date": "2026-11-17",
     "showPopup": false,

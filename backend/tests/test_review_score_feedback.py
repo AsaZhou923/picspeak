@@ -32,10 +32,7 @@ from app.schemas import ScoreFeedbackPutRequest
 from app.services import review_score_feedback as service
 from scripts.export_review_score_feedback_report import build_report
 
-TEST_DATABASE_URL = os.getenv(
-    'PICSPEAK_TEST_DATABASE_URL',
-    'postgresql+psycopg2://postgres:local-picspeak-test@localhost:55432/picspeak_goal',
-).strip()
+TEST_DATABASE_URL = os.getenv('PICSPEAK_TEST_DATABASE_URL', '').strip()
 
 
 def review_fixture(**kwargs) -> Review:

@@ -42,6 +42,18 @@ test('clearer results record keeps its no-popup maintenance entry in every local
   }
 });
 
+test('November 17 updates keep their no-popup maintenance entries in every locale', () => {
+  for (const locale of ['zh', 'en', 'ja'] as const) {
+    for (const id of ['2026-11-17-clearer-request-errors', '2026-11-17-faster-pages-and-accessibility']) {
+      const entry = getProductUpdates(locale).find((item) => item.id === id);
+      assert.ok(entry);
+      assert.equal(entry.date, '2026-11-17');
+      assert.equal(entry.showPopup, false);
+      assert.equal(shouldShowProductUpdatePopup(entry), false);
+    }
+  }
+});
+
 test('lighter critique waiting record is the latest update in every locale without a popup', () => {
   for (const locale of ['zh', 'en', 'ja'] as const) {
     const latest = getLatestProductUpdate(locale);

@@ -8,6 +8,14 @@
     "docPath": "docs/changelog/CHANGELOG.md#2026-11-18-lighter-critique-waiting"
   },
   {
+    "id": "2026-11-17-clearer-request-errors",
+    "date": "2026-11-17",
+    "showPopup": false,
+    "title": "Clearer errors for invalid requests",
+    "summary": "PicSpeak now returns a validation error for oversized activity data and identifies malformed photo links or sign-in tokens as invalid.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-11-17-clearer-request-errors"
+  },
+  {
     "id": "2026-11-17-faster-pages-and-accessibility",
     "date": "2026-11-17",
     "showPopup": false,

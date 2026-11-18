@@ -12,11 +12,17 @@ const payload: ReviewCreateRequest = {
 };
 
 test('review response-loss retries and simultaneous preparations preserve key and exact body', async () => {
-  const [first, repeated] = await Promise.all([
+  const prepared = await Promise.all([
     prepareReviewRequest('retry-owner', payload), prepareReviewRequest('retry-owner', payload),
   ]);
-  assert.equal(first.isRetry, false);
+  // Both calls await crypto.subtle.digest() before registering, and digests
+  // can finish in either order, so assert the outcome rather than the order.
+  const originals = prepared.filter((request) => !request.isRetry);
+  assert.equal(originals.length, 1, 'exactly one simultaneous preparation owns the new request');
+  const first = originals[0];
+  const repeated = prepared.find((request) => request !== first)!;
   assert.equal(repeated.isRetry, true);
+  assert.equal(repeated.payload.idempotency_key, first.payload.idempotency_key);
   assert.deepEqual(repeated.payload, first.payload);
   assert.deepEqual((await prepareReviewRequest('retry-owner', { ...payload, locale: 'ja' })).payload, first.payload);
   completeReviewRequest(first);
