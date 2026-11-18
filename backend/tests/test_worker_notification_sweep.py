@@ -95,6 +95,8 @@ class WorkerNotificationSweepTests(unittest.TestCase):
             patch('app.services.worker.process_review_task', side_effect=process_review),
             patch('app.services.worker.process_pending_notifications', side_effect=process_pending),
             patch('app.services.worker.cleanup_expired_notifications', return_value=0),
+            patch('app.services.worker.expire_review_tasks'),
+            patch('app.services.worker.expire_image_generation_tasks'),
         ):
             worker.start()
             try:

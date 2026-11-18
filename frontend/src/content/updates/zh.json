@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-18-lighter-critique-waiting",
+    "date": "2026-11-18",
+    "showPopup": false,
+    "title": "等待点评时减少对其他操作的影响",
+    "summary": "长时间打开点评等待页时，进度更新占用的服务资源更少。点评和生图等待期间也减少了重复检查，降低对其他页面操作的影响。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-11-18-lighter-critique-waiting"
+  },
+  {
     "id": "2026-11-17-faster-pages-and-accessibility",
     "date": "2026-11-17",
     "showPopup": false,

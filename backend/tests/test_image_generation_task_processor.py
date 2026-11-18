@@ -243,17 +243,17 @@ class ImageGenerationTaskProcessorTests(unittest.TestCase):
             request_payload={},
         )
         db = MagicMock()
-        completed_query = MagicMock()
-        completed_query.join.return_value.filter.return_value.all.return_value = []
-        stalled_query = MagicMock()
-        stalled_query.filter.return_value.all.return_value = [task]
+        tasks = MagicMock()
+        tasks.filter.return_value.with_for_update.return_value.all.return_value = [task]
         owner_query = MagicMock()
         owner_query.filter.return_value.first.return_value = None
-        db.query.side_effect = [completed_query, stalled_query, owner_query]
+        db.query.side_effect = [tasks, owner_query]
 
         with unittest.mock.patch('app.services.image_generation_task_processor.settings') as mocked_settings, unittest.mock.patch(
             'app.services.image_generation_task_processor._reconcile_pending_generation_request_events'
-        ), unittest.mock.patch('app.services.image_generation_task_processor._reconcile_pending_generation_terminal_events'):
+        ), unittest.mock.patch('app.services.image_generation_task_processor._reconcile_pending_generation_terminal_events'), patch(
+            'app.services.image_generation_task_processor._reconcile_completed_generation_tasks'
+        ):
             mocked_settings.image_generation_task_stale_timeout_seconds = 600
             mocked_settings.image_generation_timeout_seconds = 180
             mocked_settings.review_retry_base_delay_seconds = 10
@@ -290,18 +290,17 @@ class ImageGenerationTaskProcessorTests(unittest.TestCase):
             request_payload={},
         )
         db = MagicMock()
-        completed_query = MagicMock()
-        completed_query.join.return_value.filter.return_value.all.return_value = []
-        stalled_query = MagicMock()
-        stalled_query.filter.return_value.all.return_value = [task]
+        tasks = MagicMock()
+        tasks.filter.return_value.with_for_update.return_value.all.return_value = [task]
         owner_query = MagicMock()
         owner_query.filter.return_value.first.return_value = SimpleNamespace(id=20, public_id='usr_owner', plan='pro')
-        db.query.side_effect = [completed_query, stalled_query, owner_query]
+        db.query.side_effect = [tasks, owner_query]
 
         with (
             unittest.mock.patch('app.services.image_generation_task_processor.settings') as mocked_settings,
             unittest.mock.patch('app.services.image_generation_task_processor._reconcile_pending_generation_request_events'),
             unittest.mock.patch('app.services.image_generation_task_processor._reconcile_pending_generation_terminal_events'),
+            patch('app.services.image_generation_task_processor._reconcile_completed_generation_tasks'),
             unittest.mock.patch('app.services.image_generation_task_processor.release_generation_credit_reservation') as release_reservation,
             unittest.mock.patch('app.services.image_generation_task_processor.deliver_generation_terminal_event') as deliver_event,
             unittest.mock.patch('app.services.image_generation_task_processor.record_generation_terminal') as record_notification,

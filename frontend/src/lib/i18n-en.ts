@@ -297,8 +297,8 @@ export const enTranslations = {
     pro_offer_label: '',
     pro_offer_highlight: 'Pro',
     updates_label: 'Updates',
-    updates_hint_home: "Faster page loads and easier-to-use controls",
-    updates_hint_latest: "Faster page loads and easier-to-use controls",
+    updates_hint_home: "Less overhead while you wait for a critique",
+    updates_hint_latest: "Less overhead while you wait for a critique",
     contact_label: 'Contact',
     contact_headline: 'Get in Touch',
 

@@ -8,9 +8,9 @@ from concurrent.futures import Future, ThreadPoolExecutor, wait
 from app.core.config import settings
 from app.services.audit import cleanup_expired_request_logs
 from app.services.guest_cleanup import cleanup_stale_guest_users
-from app.services.image_generation_task_processor import claim_next_pending_image_generation_task, process_image_generation_task
+from app.services.image_generation_task_processor import claim_next_pending_image_generation_task, expire_image_generation_tasks, process_image_generation_task
 from app.services.notification_processor import cleanup_expired_notifications, process_pending_notifications
-from app.services.review_task_processor import claim_next_pending_review_task, process_review_task
+from app.services.review_task_processor import claim_next_pending_review_task, expire_review_tasks, process_review_task
 
 
 logger = logging.getLogger(__name__)
@@ -22,11 +22,13 @@ class ReviewWorker:
         self._threads = []
         self._maintenance_lock = threading.Lock()
         self._notification_lock = threading.Lock()
+        self._task_sweep_lock = threading.Lock()
         self._notification_stop_event = threading.Event()
         self._notification_thread: threading.Thread | None = None
         self._next_guest_cleanup_at = 0.0
         self._next_request_log_cleanup_at = 0.0
         self._next_notification_sweep_at = 0.0
+        self._next_task_sweep_at = 0.0
         self.worker_name = worker_name or settings.review_worker_name
         # Dedicated thread pool for image generation tasks (blocking I/O, up to 180s).
         # Keeps the worker main loop unblocked so review tasks can still be claimed.
@@ -71,6 +73,7 @@ class ReviewWorker:
 
     def _loop(self) -> None:
         idle_sleep_seconds = max(int(settings.review_worker_idle_sleep_ms), 50) / 1000
+        idle_delay = idle_sleep_seconds
         while self._running:
             task = None
             task_kind = ''
@@ -92,9 +95,11 @@ class ReviewWorker:
                     db.close()
 
                 if task is None:
-                    time.sleep(idle_sleep_seconds)
+                    time.sleep(idle_delay)
+                    idle_delay = min(idle_delay * 2, max(idle_sleep_seconds, 2.0))
                     continue
 
+                idle_delay = idle_sleep_seconds
                 if task_kind == 'generation':
                     logger.info('Review worker submitting image generation task %s to thread pool', task.public_id)
                     _task_public_id = task.public_id
@@ -123,6 +128,7 @@ class ReviewWorker:
     def _notification_maintenance_loop(self) -> None:
         while self._running and not self._notification_stop_event.is_set():
             try:
+                self._run_task_sweep_if_due()
                 self._run_notification_sweep_if_due()
             finally:
                 now = time.monotonic()
@@ -130,6 +136,32 @@ class ReviewWorker:
                 if self._next_notification_sweep_at > now:
                     wait_seconds = min(max(self._next_notification_sweep_at - now, 0.05), 1.0)
                 self._notification_stop_event.wait(wait_seconds)
+
+    def _run_task_sweep_if_due(self) -> None:
+        if time.monotonic() < self._next_task_sweep_at:
+            return
+        if not self._task_sweep_lock.acquire(blocking=False):
+            return
+        try:
+            now = time.monotonic()
+            if now < self._next_task_sweep_at:
+                return
+            self._next_task_sweep_at = now + 10
+
+            from app.db.session import SessionLocal
+
+            for sweep in (expire_review_tasks, expire_image_generation_tasks):
+                db = SessionLocal()
+                try:
+                    sweep(db)
+                except Exception:
+                    logger.exception('Failed to run task maintenance')
+                finally:
+                    db.close()
+        except Exception:
+            logger.exception('Failed to open or close task maintenance session')
+        finally:
+            self._task_sweep_lock.release()
 
     def _prune_done_gen_futures(self) -> None:
         """Remove completed generation futures and log any exceptions."""

@@ -19,6 +19,7 @@ from starlette.requests import Request
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND_ROOT))
 
+from app.api.routers.tasks import _load_task_snapshot
 from app.core.errors import ApiHTTPException
 from app.core.config import settings
 from app.db.models import (
@@ -535,6 +536,27 @@ class ReviewReliabilityPostgresTests(unittest.TestCase):
             task = db.query(ReviewTask).filter_by(public_id=public_id).one()
             self.assertEqual(task.status, TaskStatus.EXPIRED)
             self._assert_one_personal_slot_returned(db, public_id, key, network)
+
+    def test_status_reads_leave_expiry_to_maintenance_and_delivery_only_recovers_its_task(self):
+        first, second = self._task(), self._task()
+        with self.Session() as db:
+            db.query(ReviewTask).filter(ReviewTask.public_id.in_([first, second])).update(
+                {ReviewTask.expire_at: datetime.now(timezone.utc) - timedelta(minutes=1)},
+                synchronize_session=False,
+            )
+            db.commit()
+            task, _, _ = _load_task_snapshot(db, task_id=first, owner_user_id=self.user_id)
+            self.assertEqual(task.status, TaskStatus.PENDING)
+            self.assertFalse(_claim_task(db, task.id, 'late-worker'))
+
+        with patch('app.services.review_task_processor.SessionLocal', self.Session):
+            result = process_review_task(first, worker_name='cloud-tasks')
+        self.assertEqual(result, {'result': 'noop', 'status': 'EXPIRED'})
+        with self.Session() as db:
+            remaining = db.query(ReviewTask).filter_by(public_id=second).one()
+            self.assertEqual(remaining.status, TaskStatus.PENDING)
+            expire_review_tasks(db)
+            self.assertEqual(remaining.status, TaskStatus.EXPIRED)
 
     def test_pro_soft_threshold_tracks_successful_modes_and_pairing_but_never_blocks_admission(self):
         at = datetime(2026, 11, 30, 23, 59, tzinfo=timezone.utc)

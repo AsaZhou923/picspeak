@@ -10,7 +10,7 @@ from uuid import uuid4
 
 from PIL import Image, ImageOps, UnidentifiedImageError
 from sqlalchemy import case, func, text
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Query, Session
 
 from app.api.deps import new_public_id
 from app.core.config import settings
@@ -145,15 +145,18 @@ def _generation_retry_delay_seconds(attempt_count: int) -> int:
     return min(base * (2 ** max(attempt_count - 1, 0)), max_delay)
 
 
-def expire_image_generation_tasks(db: Session) -> None:
-    _reconcile_pending_generation_request_events(db)
-    _reconcile_pending_generation_terminal_events(db)
-    _reconcile_completed_generation_tasks(db)
+def expire_image_generation_tasks(db: Session, *, task_public_id: str | None = None) -> None:
+    tasks = db.query(ImageGenerationTask)
+    if task_public_id is None:
+        _reconcile_pending_generation_request_events(db)
+        _reconcile_pending_generation_terminal_events(db)
+    else:
+        tasks = tasks.filter(ImageGenerationTask.public_id == task_public_id)
+    _reconcile_completed_generation_tasks(db, tasks)
     now = datetime.now(timezone.utc)
     stale_cutoff = now - timedelta(seconds=_generation_task_stale_timeout_seconds())
     stalled_tasks = (
-        db.query(ImageGenerationTask)
-        .filter(
+        tasks.filter(
             ImageGenerationTask.status == TaskStatus.RUNNING,
             ImageGenerationTask.finished_at.is_(None),
             (
@@ -165,6 +168,7 @@ def expire_image_generation_tasks(db: Session) -> None:
                 )
             ),
         )
+        .with_for_update(skip_locked=True)
         .all()
     )
     if not stalled_tasks:
@@ -203,15 +207,16 @@ def expire_image_generation_tasks(db: Session) -> None:
     _record_terminal_generation_events_after_state_commit(db, terminal_events)
 
 
-def _reconcile_completed_generation_tasks(db: Session) -> None:
+def _reconcile_completed_generation_tasks(db: Session, tasks: Query) -> None:
     now = datetime.now(timezone.utc)
     completed_pairs = (
-        db.query(ImageGenerationTask, GeneratedImage)
+        tasks.add_entity(GeneratedImage)
         .join(GeneratedImage, GeneratedImage.task_id == ImageGenerationTask.id)
         .filter(
             ImageGenerationTask.status.in_([TaskStatus.PENDING, TaskStatus.RUNNING]),
             GeneratedImage.deleted_at.is_(None),
         )
+        .with_for_update(of=ImageGenerationTask)
         .all()
     )
     if not completed_pairs:
@@ -330,7 +335,6 @@ def _claim_generation_task(db: Session, task_id: int, claim_token: str) -> bool:
 
 
 def claim_next_pending_image_generation_task(db: Session, *, worker_name: str) -> ImageGenerationTask | None:
-    expire_image_generation_tasks(db)
     now = datetime.now(timezone.utc)
 
     candidate = (
@@ -365,7 +369,7 @@ def process_image_generation_task(
         # Cloud Task retries can arrive after a prior invocation died while
         # holding a lease. Requeue genuinely stale work before evaluating the
         # current invocation's token; fresh overlapping invocations remain no-ops.
-        expire_image_generation_tasks(db)
+        expire_image_generation_tasks(db, task_public_id=task_public_id)
         task = db.query(ImageGenerationTask).filter(ImageGenerationTask.public_id == task_public_id).first()
         if task is None:
             return {'result': 'missing'}
