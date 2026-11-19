@@ -139,7 +139,7 @@ PicSpeak 在 Build Week 之前已经存在。活动期间，单张点评扩展�
 
 ## 📝 更新记录
 
-最新条目：[等待点评时减少对其他操作的影响](docs/changelog/CHANGELOG.md#2026-11-18-lighter-critique-waiting)。更早的条目见[完整 Changelog](docs/changelog/CHANGELOG.md)。
+最新条目：[使用限制更稳定，文章阅读数更可信](docs/changelog/CHANGELOG.md#2026-11-19-steadier-limits-and-view-counts)。更早的条目见[完整 Changelog](docs/changelog/CHANGELOG.md)。
 
 ## 🤝 参与贡献
 

@@ -88,6 +88,15 @@ test('blog content bundles keep the same slug order across locales', () => {
   }
 });
 
+test('the backend view-count slug list matches the published posts', () => {
+  // POST /blog/{slug}/views rejects slugs outside this list; update it whenever a post is added or renamed.
+  const backendSlugsPath = path.join(TEST_DIR, '..', '..', 'backend', 'app', 'services', 'blog_post_slugs.json');
+  const backendSlugs = JSON.parse(readFileSync(backendSlugsPath, 'utf8')) as string[];
+  const publishedSlugs = [...new Set(LOCALES.flatMap((locale) => readBundle(locale).posts.map((post) => post.slug)))].sort();
+
+  assert.deepEqual(backendSlugs, publishedSlugs);
+});
+
 test('the two refreshed guides expose their update date in every locale', () => {
   const refreshedSlugs = [
     'ai-photo-critique-daily-practice',

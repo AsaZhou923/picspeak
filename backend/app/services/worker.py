@@ -7,6 +7,7 @@ from concurrent.futures import Future, ThreadPoolExecutor, wait
 
 from app.core.config import settings
 from app.services.audit import cleanup_expired_request_logs
+from app.services.guard import cleanup_expired_idempotency_keys, cleanup_expired_rate_limit_counters
 from app.services.guest_cleanup import cleanup_stale_guest_users
 from app.services.image_generation_task_processor import claim_next_pending_image_generation_task, expire_image_generation_tasks, process_image_generation_task
 from app.services.notification_processor import cleanup_expired_notifications, process_pending_notifications
@@ -27,6 +28,7 @@ class ReviewWorker:
         self._notification_thread: threading.Thread | None = None
         self._next_guest_cleanup_at = 0.0
         self._next_request_log_cleanup_at = 0.0
+        self._next_limit_record_cleanup_at = 0.0
         self._next_notification_sweep_at = 0.0
         self._next_task_sweep_at = 0.0
         self.worker_name = worker_name or settings.review_worker_name
@@ -80,6 +82,7 @@ class ReviewWorker:
             try:
                 self._run_guest_cleanup_if_due()
                 self._run_request_log_cleanup_if_due()
+                self._run_limit_record_cleanup_if_due()
                 self._prune_done_gen_futures()
 
                 from app.db.session import SessionLocal
@@ -260,6 +263,39 @@ class ReviewWorker:
                 logger.info('Deleted %s expired API request log(s)', deleted_count)
         except Exception:
             logger.exception('Failed to clean up expired API request logs')
+        finally:
+            self._maintenance_lock.release()
+
+    def _run_limit_record_cleanup_if_due(self) -> None:
+        now = time.monotonic()
+        if now < self._next_limit_record_cleanup_at:
+            return
+        if not self._maintenance_lock.acquire(blocking=False):
+            return
+
+        try:
+            now = time.monotonic()
+            if now < self._next_limit_record_cleanup_at:
+                return
+            self._next_limit_record_cleanup_at = now + 60
+
+            from app.db.session import SessionLocal
+
+            db = SessionLocal()
+            try:
+                counters_deleted = cleanup_expired_rate_limit_counters(db)
+                idempotency_deleted = cleanup_expired_idempotency_keys(db)
+            finally:
+                db.close()
+
+            if counters_deleted or idempotency_deleted:
+                logger.info(
+                    'Deleted %s expired rate-limit counter(s) and %s expired idempotency record(s)',
+                    counters_deleted,
+                    idempotency_deleted,
+                )
+        except Exception:
+            logger.exception('Failed to clean up expired rate-limit counters and idempotency records')
         finally:
             self._maintenance_lock.release()
 

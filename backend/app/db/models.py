@@ -819,6 +819,7 @@ class RateLimitCounter(Base):
     __table_args__ = (
         UniqueConstraint('scope', 'scope_key', 'endpoint', 'window_start', 'window_seconds', name='uq_rate_limit_window'),
         Index('idx_rate_limit_scope_window', 'scope', 'scope_key', 'window_start'),
+        Index('idx_rate_limit_window_start', 'window_start'),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)

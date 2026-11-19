@@ -44,6 +44,7 @@ class Settings(BaseSettings):
     upload_presign_rate_limit_per_minute: int = 30
     analytics_event_rate_limit_per_minute: int = 120
     auth_exchange_rate_limit_per_minute: int = 60
+    blog_view_rate_limit_per_minute: int = 30
 
     rate_limit_per_minute: int = 10
     ip_rate_limit_per_minute: int = 30

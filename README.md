@@ -139,7 +139,7 @@ The event version used GPT-5.6 Terra. The current runtime uses GPT-6 Sol (Flash)
 
 ## 📝 Changelog
 
-The latest entry is [less overhead while you wait for a critique](docs/changelog/CHANGELOG.md#2026-11-18-lighter-critique-waiting). See the [full changelog](docs/changelog/CHANGELOG.md) for older entries.
+The latest entry is [steadier usage limits and more reliable read counts](docs/changelog/CHANGELOG.md#2026-11-19-steadier-limits-and-view-counts). See the [full changelog](docs/changelog/CHANGELOG.md) for older entries.
 
 ## 🤝 Contributing
 

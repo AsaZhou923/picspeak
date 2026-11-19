@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-19-steadier-limits-and-view-counts",
+    "date": "2026-11-19",
+    "showPopup": false,
+    "title": "Steadier usage limits and more reliable read counts",
+    "summary": "Guest usage limits now apply the same way on every page, and the critique waiting page checks progress less often when live updates are unavailable. Article read counts now count each network once per day and ignore addresses that are not published articles. Expired temporary records are now cleaned up automatically.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-11-19-steadier-limits-and-view-counts"
+  },
+  {
     "id": "2026-11-18-lighter-critique-waiting",
     "date": "2026-11-18",
     "showPopup": false,

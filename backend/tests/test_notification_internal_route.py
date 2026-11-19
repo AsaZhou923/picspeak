@@ -51,6 +51,10 @@ def _is_local_test_database(url: str) -> bool:
     )
 
 
+def _notification_counts(body: dict) -> dict:
+    return {key: body[key] for key in ('processed', 'failed', 'expired_deleted', 'request_logs_deleted')}
+
+
 @unittest.skipUnless(_is_local_test_database(TEST_DATABASE_URL), 'requires local disposable PostgreSQL via PICSPEAK_TEST_DATABASE_URL')
 class NotificationInternalRoutePostgresTests(unittest.TestCase):
     @classmethod
@@ -222,9 +226,13 @@ class NotificationInternalRoutePostgresTests(unittest.TestCase):
 
         self.assertEqual(first.status_code, 200)
         self.assertEqual(first.headers['cache-control'], 'private, no-store')
-        self.assertEqual(first.json(), {'processed': 1, 'failed': 0, 'expired_deleted': 0, 'request_logs_deleted': 0})
+        self.assertEqual(_notification_counts(first.json()), {'processed': 1, 'failed': 0, 'expired_deleted': 0, 'request_logs_deleted': 0})
         self.assertEqual(second.status_code, 200)
-        self.assertEqual(second.json(), {'processed': 0, 'failed': 0, 'expired_deleted': 0, 'request_logs_deleted': 0})
+        self.assertEqual(_notification_counts(second.json()), {'processed': 0, 'failed': 0, 'expired_deleted': 0, 'request_logs_deleted': 0})
+        # The shared test database may hold other tests' expired limit records.
+        for body in (first.json(), second.json()):
+            self.assertIsInstance(body['rate_limit_counters_deleted'], int)
+            self.assertIsInstance(body['idempotency_keys_deleted'], int)
         self.db.expire_all()
         delivered = self.db.get(NotificationEvent, event.id)
         self.assertEqual(delivered.status, 'delivered')

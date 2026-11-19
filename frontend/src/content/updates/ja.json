@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-19-steadier-limits-and-view-counts",
+    "date": "2026-11-19",
+    "showPopup": false,
+    "title": "利用制限の安定化と閲覧数の信頼性向上",
+    "summary": "ゲストの利用制限がすべてのページで同じように適用されるようになり、リアルタイム更新が使えないときは講評の待機ページが進捗を確認する頻度を下げました。記事の閲覧数は同じネットワークから1日1回だけ数え、公開されていない記事のアドレスは無視します。期限切れの一時的な記録も自動で削除されるようになりました。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-11-19-steadier-limits-and-view-counts"
+  },
+  {
     "id": "2026-11-18-lighter-critique-waiting",
     "date": "2026-11-18",
     "showPopup": false,

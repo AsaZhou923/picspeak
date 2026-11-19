@@ -62,18 +62,18 @@ def _extract_bearer_token(authorization: str | None) -> str:
     return token
 
 
-def _touch_user_login(user: User, db: Session) -> None:
+def _touch_user_login(user: User, db: Session) -> bool:
     now = datetime.now(timezone.utc)
     last_login = user.last_login_at
     if last_login is not None and last_login.tzinfo is None:
         last_login = last_login.replace(tzinfo=timezone.utc)
     if last_login is not None and now - last_login < LOGIN_TOUCH_INTERVAL:
-        return
+        return False
 
     user.last_login_at = now
     db.add(user)
-    # Defer transaction commit to the endpoint flow to avoid commit during dependency resolution.
     db.flush()
+    return True
 
 
 def _fetch_user_by_token(token: str, db: Session) -> User:
@@ -163,13 +163,19 @@ def get_current_actor(
     elif guest_cookie_token:
         token = guest_cookie_token
 
+    # Rate-limit hits, a new guest and login/plan refreshes are committed here
+    # rather than left to the endpoint: read-only routes never commit, and
+    # get_db rolls back whatever is still pending when the request ends.
     if token:
         user = _fetch_user_by_token(token, db)
+        previous_plan = user.plan
         sync_user_billing_plan(db, user)
         set_current_user_public_id(request, user.public_id)
         actor = CurrentActor(user)
         enforce_guest_api_rate_limit(db, actor, endpoint, guest_rate_limit_scope_key(request, user))
-        _touch_user_login(user, db)
+        touched = _touch_user_login(user, db)
+        if actor.plan == UserPlan.guest or touched or user.plan != previous_plan:
+            db.commit()
         return actor
 
     enforce_guest_creation_rate_limit(db, guest_rate_limit_scope_key(request), guest_network_scope_key(request))
@@ -177,8 +183,12 @@ def get_current_actor(
     set_current_user_public_id(request, user.public_id)
     token = issue_guest_token(user)
     bind_guest_token(response, token)
+    # The guest is committed even if the endpoint then fails; error handlers
+    # re-bind this token so a retry reuses the guest instead of minting another.
+    request.state.issued_guest_token = token
     actor = CurrentActor(user)
     enforce_guest_api_rate_limit(db, actor, endpoint, guest_rate_limit_scope_key(request, user))
+    db.commit()
     return actor
 
 

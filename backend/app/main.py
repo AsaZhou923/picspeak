@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from sqlalchemy.exc import IntegrityError
 
+from app.api.deps import bind_guest_token
 from app.api.request_state import get_current_user_public_id
 from app.api.router import router, webhook_router
 from app.core.config import settings
@@ -68,11 +69,25 @@ app.include_router(router)
 app.include_router(webhook_router)
 
 
-def _error_response(*, status_code: int, request_id: str | None, code: str, message: str, extra: dict | None = None) -> JSONResponse:
-    payload: dict[str, object] = {'error': {'code': code, 'message': message, 'request_id': request_id}}
+def _error_response(
+    request: Request,
+    *,
+    status_code: int,
+    code: str,
+    message: str,
+    extra: dict | None = None,
+) -> JSONResponse:
+    payload: dict[str, object] = {
+        'error': {'code': code, 'message': message, 'request_id': getattr(request.state, 'request_id', None)}
+    }
     if extra:
         payload['error']['extra'] = extra
-    return JSONResponse(status_code=status_code, content=payload)
+    response = JSONResponse(status_code=status_code, content=payload)
+    # An error response replaces the one the actor dependency set the new guest's cookie on.
+    issued_guest_token = getattr(request.state, 'issued_guest_token', None)
+    if issued_guest_token:
+        bind_guest_token(response, issued_guest_token)
+    return response
 
 
 def _log_error_response(
@@ -114,8 +129,8 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     code, message, extra = normalize_http_error(exc.status_code, exc.detail)
     _log_error_response(request, status_code=exc.status_code, code=code, message=message, extra=extra)
     response = _error_response(
+        request,
         status_code=exc.status_code,
-        request_id=getattr(request.state, 'request_id', None),
         code=code,
         message=message,
         extra=extra,
@@ -151,8 +166,8 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         extra={'fields': fields},
     )
     return _error_response(
+        request,
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        request_id=getattr(request.state, 'request_id', None),
         code='VALIDATION_ERROR',
         message='Request validation failed',
         extra={'fields': fields},
@@ -169,8 +184,8 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
         exc=exc,
     )
     return _error_response(
+        request,
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        request_id=getattr(request.state, 'request_id', None),
         code='INTERNAL_ERROR',
         message='Internal server error',
     )

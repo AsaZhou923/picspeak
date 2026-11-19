@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-19-steadier-limits-and-view-counts",
+    "date": "2026-11-19",
+    "showPopup": false,
+    "title": "使用限制更稳定，文章阅读数更可信",
+    "summary": "游客的使用限制现在在所有页面上一致生效；实时更新不可用时，点评等待页会降低进度查询频率。文章阅读数现在同一网络每天只计一次，并忽略不存在的文章地址。过期的临时记录会被自动清理。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-11-19-steadier-limits-and-view-counts"
+  },
+  {
     "id": "2026-11-18-lighter-critique-waiting",
     "date": "2026-11-18",
     "showPopup": false,

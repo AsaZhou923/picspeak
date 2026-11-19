@@ -6,7 +6,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import TYPE_CHECKING
 
 from fastapi import Request
-from sqlalchemy import case, func, update
+from sqlalchemy import case, func, literal_column, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -659,6 +659,50 @@ def save_idempotency_record(
     db.add(record)
 
 
+# Paid generation keys stay unique after their replay TTL so a late retry
+# recovers the original task instead of billing again (see routers/generations.py).
+RETAINED_IDEMPOTENCY_ENDPOINTS = ('/generations', '/generations/reuse')
+# Expired windows are kept this long after they close before cleanup removes them.
+RATE_LIMIT_COUNTER_RETENTION = timedelta(days=1)
+LIMIT_RECORD_CLEANUP_BATCH_SIZE = 1000
+
+
+def _cleanup_chunk(limit: int | None) -> int:
+    return min(max(int(limit or LIMIT_RECORD_CLEANUP_BATCH_SIZE), 1), 10000)
+
+
+def cleanup_expired_rate_limit_counters(db: Session, *, limit: int | None = None, now: datetime | None = None) -> int:
+    """Delete one bounded chunk of counters whose window closed over a day ago."""
+    cutoff = (now or utc_now()) - RATE_LIMIT_COUNTER_RETENTION
+    window_end = RateLimitCounter.window_start + literal_column("interval '1 second'") * RateLimitCounter.window_seconds
+    ids = (
+        select(RateLimitCounter.id)
+        # A window cannot have closed before it started; this bound keeps the scan on the window_start index.
+        .where(RateLimitCounter.window_start < cutoff, window_end < cutoff)
+        .order_by(RateLimitCounter.window_start, RateLimitCounter.id)
+        .limit(_cleanup_chunk(limit))
+    )
+    deleted = db.query(RateLimitCounter).filter(RateLimitCounter.id.in_(ids)).delete(synchronize_session=False)
+    db.commit()
+    return int(deleted or 0)
+
+
+def cleanup_expired_idempotency_keys(db: Session, *, limit: int | None = None, now: datetime | None = None) -> int:
+    """Delete one bounded chunk of expired replay records, keeping paid generation keys."""
+    ids = (
+        select(IdempotencyKey.id)
+        .where(
+            IdempotencyKey.expire_at < (now or utc_now()),
+            IdempotencyKey.endpoint.notin_(RETAINED_IDEMPOTENCY_ENDPOINTS),
+        )
+        .order_by(IdempotencyKey.expire_at, IdempotencyKey.id)
+        .limit(_cleanup_chunk(limit))
+    )
+    deleted = db.query(IdempotencyKey).filter(IdempotencyKey.id.in_(ids)).delete(synchronize_session=False)
+    db.commit()
+    return int(deleted or 0)
+
+
 def enforce_minute_rate_limit(db: Session, *, scope: str, scope_key: str, endpoint: str, limit: int) -> dict:
     """Per-minute limit for an endpoint keyed by user or client network. 0 disables."""
     if limit <= 0:
@@ -673,6 +717,24 @@ def enforce_minute_rate_limit(db: Session, *, scope: str, scope_key: str, endpoi
         window_start=minute_window_start(now),
         window_seconds=60,
     )
+
+
+def claim_daily_marker(db: Session, *, scope: str, scope_key: str, endpoint: str, now: datetime | None = None) -> bool:
+    """Record one event per key and UTC day; False when today's marker already exists."""
+    stmt = (
+        insert(RateLimitCounter)
+        .values(
+            scope=scope,
+            scope_key=scope_key,
+            endpoint=endpoint,
+            window_start=day_window_start(now or utc_now()),
+            window_seconds=24 * 3600,
+            hit_count=1,
+        )
+        .on_conflict_do_nothing(constraint='uq_rate_limit_window')
+        .returning(RateLimitCounter.id)
+    )
+    return db.execute(stmt).scalar_one_or_none() is not None
 
 
 def request_rate_limit_scope_key(request: Request, user: User | None = None) -> str | None:
