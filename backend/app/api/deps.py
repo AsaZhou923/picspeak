@@ -183,6 +183,9 @@ def get_current_actor(
     set_current_user_public_id(request, user.public_id)
     token = issue_guest_token(user)
     bind_guest_token(response, token)
+    # The guest is committed even if the endpoint then fails; error handlers
+    # re-bind this token so a retry reuses the guest instead of minting another.
+    request.state.issued_guest_token = token
     actor = CurrentActor(user)
     enforce_guest_api_rate_limit(db, actor, endpoint, guest_rate_limit_scope_key(request, user))
     db.commit()

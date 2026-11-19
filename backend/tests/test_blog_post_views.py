@@ -100,6 +100,27 @@ class BlogPostViewRouteTests(unittest.TestCase):
         db.execute.assert_not_called()
         db.commit.assert_called_once()
 
+    def test_caller_without_a_network_reads_the_total_without_incrementing(self) -> None:
+        db = MagicMock()
+        db.query.return_value.filter.return_value.scalar.return_value = 8
+
+        payload, rate_limit, marker = self._increment('five-photo-composition-checks', db, network_key=None)
+
+        self.assertEqual(payload.view_count, 8)
+        rate_limit.assert_not_called()
+        marker.assert_not_called()
+        db.execute.assert_not_called()
+
+    def test_whitespace_slug_is_rejected_as_invalid(self) -> None:
+        db = MagicMock()
+
+        with self.assertRaises(HTTPException) as raised:
+            self._increment('   ', db)
+
+        self.assertEqual(raised.exception.status_code, 400)
+        self.assertEqual(raised.exception.detail['code'], 'BLOG_POST_SLUG_INVALID')
+        db.execute.assert_not_called()
+
     def test_published_slugs_cover_frontend_posts(self) -> None:
         self.assertIn('five-photo-composition-checks', PUBLISHED_BLOG_POST_SLUGS)
         self.assertTrue(all(BLOG_POST_SLUG_RE.fullmatch(slug) for slug in PUBLISHED_BLOG_POST_SLUGS))

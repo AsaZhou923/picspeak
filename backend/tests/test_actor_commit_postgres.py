@@ -8,7 +8,7 @@ from unittest.mock import patch
 from uuid import uuid4
 
 import pytest
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, delete
 from sqlalchemy.engine import make_url
@@ -18,10 +18,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.api.deps import GUEST_TOKEN_COOKIE, CurrentActor, get_current_actor  # noqa: E402
 from app.core.config import settings  # noqa: E402
+from app.core.errors import api_error  # noqa: E402
 from app.core.security import create_access_token  # noqa: E402
 from app.db.models import RateLimitCounter, User, UserPlan, UserStatus  # noqa: E402
 from app.db.session import get_db  # noqa: E402
 from app.main import http_exception_handler  # noqa: E402
+from app.services.guard import guest_rate_limit_scope_key  # noqa: E402
 
 DATABASE_URL = os.getenv('PICSPEAK_TEST_DATABASE_URL', '').strip()
 
@@ -63,6 +65,11 @@ def harness():
         created_public_ids.append(actor.user.public_id)
         return {'user': actor.user.public_id, 'item': item_id}
 
+    @app.get('/api/v1/probe-missing')
+    def failing_probe(actor: CurrentActor = Depends(get_current_actor)):
+        created_public_ids.append(actor.user.public_id)
+        raise api_error(404, 'PROBE_NOT_FOUND', 'Nothing here')
+
     app.dependency_overrides[get_db] = real_get_db
     client = TestClient(app, headers={'X-Device-Id': device_id})
     try:
@@ -71,10 +78,16 @@ def harness():
         cleanup = Session()
         try:
             public_ids = set(created_public_ids)
+            # Counter keys are hashed; rebuild the ones this fixture's requests produced.
+            scope_request = Request({
+                'type': 'http', 'headers': [(b'x-device-id', device_id.encode())], 'client': ('testclient', 50000),
+            })
+            users = cleanup.query(User).filter(User.public_id.in_(public_ids)).all() if public_ids else []
+            scope_keys = {guest_rate_limit_scope_key(scope_request)}
+            scope_keys.update(guest_rate_limit_scope_key(scope_request, user) for user in users)
+            cleanup.execute(delete(RateLimitCounter).where(RateLimitCounter.scope_key.in_(scope_keys)))
             if public_ids:
                 cleanup.execute(delete(User).where(User.public_id.in_(public_ids)))
-            cleanup.execute(delete(RateLimitCounter).where(RateLimitCounter.endpoint == '/api/v1/probe/{item_id}'))
-            cleanup.execute(delete(RateLimitCounter).where(RateLimitCounter.scope_key.like(f'%{device_id}%')))
             cleanup.commit()
         finally:
             cleanup.close()
@@ -112,6 +125,21 @@ def test_new_guest_from_a_read_only_route_is_persisted(harness):
     second = client.get('/api/v1/probe/b')
     assert second.status_code == 200
     assert second.json()['user'] == guest_id
+
+
+def test_guest_created_by_a_failing_request_still_receives_its_token(harness):
+    client, _, created_public_ids = harness
+
+    failed = client.get('/api/v1/probe-missing')
+    assert failed.status_code == 404
+    assert failed.json()['error']['code'] == 'PROBE_NOT_FOUND'
+    assert failed.headers.get('X-Guest-Access-Token')
+    assert client.cookies.get(GUEST_TOKEN_COOKIE)
+
+    retried = client.get('/api/v1/probe/a')
+    assert retried.status_code == 200
+    assert retried.json()['user'] == created_public_ids[0]
+    assert 'X-Guest-Access-Token' not in retried.headers
 
 
 def test_guest_rate_limit_counts_read_only_requests_per_route_template(harness):

@@ -70,7 +70,10 @@ def increment_blog_post_view(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    normalized_slug = _normalize_blog_post_view_slugs([slug])[0]
+    normalized_slugs = _normalize_blog_post_view_slugs([slug])
+    if not normalized_slugs:
+        raise api_error(status.HTTP_400_BAD_REQUEST, 'BLOG_POST_SLUG_INVALID', 'Invalid blog post slug')
+    normalized_slug = normalized_slugs[0]
     if normalized_slug not in PUBLISHED_BLOG_POST_SLUGS:
         raise api_error(status.HTTP_404_NOT_FOUND, 'BLOG_POST_NOT_FOUND', 'Blog post not found')
 
@@ -83,11 +86,14 @@ def increment_blog_post_view(
             endpoint='blog_view',
             limit=settings.blog_view_rate_limit_per_minute,
         )
-        # A network counts once per post and UTC day; repeat visits read the current total.
-        if not claim_daily_marker(db, scope='blog_view_day', scope_key=network_key, endpoint=normalized_slug):
-            view_count = db.query(BlogPostView.view_count).filter(BlogPostView.slug == normalized_slug).scalar()
-            db.commit()
-            return BlogPostViewIncrementResponse(slug=normalized_slug, view_count=int(view_count or 0))
+    # A network counts once per post and UTC day; repeat visits, and callers
+    # without a usable network to limit or deduplicate, read the current total.
+    if network_key is None or not claim_daily_marker(
+        db, scope='blog_view_day', scope_key=network_key, endpoint=normalized_slug,
+    ):
+        view_count = db.query(BlogPostView.view_count).filter(BlogPostView.slug == normalized_slug).scalar()
+        db.commit()
+        return BlogPostViewIncrementResponse(slug=normalized_slug, view_count=int(view_count or 0))
 
     stmt = (
         insert(BlogPostView)
