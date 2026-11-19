@@ -54,19 +54,29 @@ test('November 17 updates keep their no-popup maintenance entries in every local
   }
 });
 
-test('lighter critique waiting record is the latest update in every locale without a popup', () => {
+test('steadier limits record is the latest update in every locale without a popup', () => {
   for (const locale of ['zh', 'en', 'ja'] as const) {
     const latest = getLatestProductUpdate(locale);
     assert.ok(latest);
-    assert.equal(latest.id, '2026-11-18-lighter-critique-waiting');
-    assert.equal(latest.date, '2026-11-18');
+    assert.equal(latest.id, '2026-11-19-steadier-limits-and-view-counts');
+    assert.equal(latest.date, '2026-11-19');
     assert.doesNotMatch(latest.title + latest.summary, /准备中|尚未发布|upcoming|not yet released|準備中|まだ公開/i);
     assert.equal(latest.showPopup, false);
     assert.equal(shouldShowProductUpdatePopup(latest), false);
     assert.equal(latest.docPath, `docs/changelog/CHANGELOG.md#${latest.id}`);
   }
-  assert.equal(getLatestProductUpdateDate('zh'), '2026-11-18');
-  assert.equal(getLatestProductUpdateDate(), '2026-11-18');
+  assert.equal(getLatestProductUpdateDate('zh'), '2026-11-19');
+  assert.equal(getLatestProductUpdateDate(), '2026-11-19');
+});
+
+test('lighter critique waiting record stays in every locale without a popup', () => {
+  for (const locale of ['zh', 'en', 'ja'] as const) {
+    const entry = getProductUpdates(locale).find((item) => item.id === '2026-11-18-lighter-critique-waiting');
+    assert.ok(entry);
+    assert.equal(entry.date, '2026-11-18');
+    assert.equal(entry.showPopup, false);
+    assert.equal(shouldShowProductUpdatePopup(entry), false);
+  }
 });
 
 test('navigation and display fixes record stays in every locale without a popup', () => {

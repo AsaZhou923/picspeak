@@ -85,8 +85,8 @@ export const zhTranslations = {
   pro_offer_label: '',
   pro_offer_highlight: 'Pro',
   updates_label: '更新记录',
-  updates_hint_home: "等待点评时减少对其他操作的影响",
-  updates_hint_latest: "等待点评时减少对其他操作的影响",
+  updates_hint_home: "使用限制更稳定，文章阅读数更可信",
+  updates_hint_latest: "使用限制更稳定，文章阅读数更可信",
   contact_label: '联系',
   contact_headline: '联系我',
 
