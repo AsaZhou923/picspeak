@@ -12,7 +12,11 @@ import { formatTaskError, formatUserFacingError } from '@/lib/error-utils';
 import { WaitingBlogWindow } from '@/components/blog/WaitingBlogWindow';
 import { logClientError } from '@/lib/client-log';
 
-const POLL_INTERVAL = 1000;
+// Polling only runs while the task WebSocket is down. Each poll counts against the
+// guest per-route limit (60/min), so stay well below it.
+const POLL_INTERVAL = 2000;
+// Polls before a task without a fresh heartbeat or scheduled retry is reported as timed out.
+const POLL_TIMEOUT_COUNT = 30;
 const HEARTBEAT_STALE_MS = 3 * 60 * 1000;
 const INITIAL_TASK_LOOKUP_GRACE_MS = 5000;
 const WAIT_NOTES = [
@@ -137,7 +141,7 @@ export default function TaskPage() {
 
       if (finalRef.current) return;
 
-      if (pollCount.current >= 60 && !shouldContinueWaiting(data)) {
+      if (pollCount.current >= POLL_TIMEOUT_COUNT && !shouldContinueWaiting(data)) {
         setError(translationRef.current('task_timeout_error'));
         return;
       }

@@ -28,6 +28,7 @@ from app.schemas import (
     NotificationUnreadCountResponse,
 )
 from app.services.audit import cleanup_expired_request_logs
+from app.services.guard import cleanup_expired_idempotency_keys, cleanup_expired_rate_limit_counters
 from app.services.image_generation_task_processor import expire_image_generation_tasks
 from app.services.notification_access import render_notification
 from app.services.notification_events import database_now, read_preferences, update_preferences
@@ -386,4 +387,12 @@ def process_notifications(
     db.commit()
     # This per-minute scheduler call is the production maintenance heartbeat.
     request_logs_deleted = cleanup_expired_request_logs(db)
-    return {**processed, 'expired_deleted': expired_deleted, 'request_logs_deleted': request_logs_deleted}
+    rate_limit_counters_deleted = cleanup_expired_rate_limit_counters(db)
+    idempotency_keys_deleted = cleanup_expired_idempotency_keys(db)
+    return {
+        **processed,
+        'expired_deleted': expired_deleted,
+        'request_logs_deleted': request_logs_deleted,
+        'rate_limit_counters_deleted': rate_limit_counters_deleted,
+        'idempotency_keys_deleted': idempotency_keys_deleted,
+    }
