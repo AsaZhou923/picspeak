@@ -49,7 +49,7 @@
 
 ## 🚀 快速开始
 
-**依赖：** Python 3.11+、Node.js 22 LTS、PostgreSQL 14+、S3 兼容存储，以及一个 OpenAI API Key。
+**依赖：** Python 3.11+、Node.js 24 LTS、PostgreSQL 14+、S3 兼容存储，以及一个 OpenAI API Key。
 
 ```bash
 git clone https://github.com/AsaZhou923/picspeak.git && cd picspeak
