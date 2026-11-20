@@ -5,7 +5,7 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 import os
-from fastapi import HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from fastapi.testclient import TestClient
 from pathlib import Path
 from types import SimpleNamespace
@@ -173,8 +173,10 @@ class PublicGalleryRouteTests(unittest.TestCase):
                 'created_at': row_review.gallery_added_at,
             },
         ):
+            response = Response()
             payload = list_public_gallery(
                 request=request,
+                response=response,
                 limit=12,
                 cursor=None,
                 created_from=None,
@@ -187,6 +189,8 @@ class PublicGalleryRouteTests(unittest.TestCase):
             )
 
         self.assertEqual(payload.total_count, 19)
+        self.assertEqual(response.headers['cache-control'], 'public, max-age=30, s-maxage=60')
+        self.assertEqual(response.headers['vary'], 'Authorization')
         self.assertEqual(len(payload.items), 1)
         self.assertEqual(payload.items[0].like_count, 7)
         self.assertTrue(payload.items[0].liked_by_viewer)
@@ -219,6 +223,7 @@ class PublicGalleryRouteTests(unittest.TestCase):
         with patch('app.api.routers.gallery._apply_review_history_filters_gallery', side_effect=lambda query, **kwargs: query) as apply_filters:
             payload = list_public_gallery(
                 request=request,
+                response=Response(),
                 limit=12,
                 cursor=None,
                 created_from=created_from,
@@ -244,6 +249,7 @@ class PublicGalleryRouteTests(unittest.TestCase):
         with self.assertRaises(HTTPException) as ctx:
             list_public_gallery(
                 request=SimpleNamespace(),
+                response=Response(),
                 limit=12,
                 cursor=None,
                 created_from=None,
@@ -496,8 +502,9 @@ class OptionalGalleryViewerTests(unittest.TestCase):
              patch('app.api.routers.gallery._gallery_viewer_likes', return_value=set()) as viewer_likes, \
              patch('app.api.routers.gallery._gallery_recommendation_map', return_value={}), \
              patch('app.api.routers.gallery._public_gallery_item', side_effect=build_item):
+            response = Response()
             payload = list_public_gallery(
-                request=SimpleNamespace(), limit=12, cursor=None, created_from=None, created_to=None,
+                request=SimpleNamespace(), response=response, limit=12, cursor=None, created_from=None, created_to=None,
                 min_score=None, max_score=None, image_type=None,
                 authorization='Bearer forged.token.value', db=db,
             )
@@ -505,3 +512,77 @@ class OptionalGalleryViewerTests(unittest.TestCase):
         self.assertEqual(len(payload.items), 1)
         self.assertFalse(payload.items[0].liked_by_viewer)
         self.assertIsNone(viewer_likes.call_args.args[2], 'forged token is treated as anonymous')
+        self.assertEqual(response.headers['cache-control'], 'private, no-store')
+        self.assertEqual(response.headers['vary'], 'Authorization')
+
+
+class PublicGalleryListCacheHeaderTests(unittest.TestCase):
+    """Issue #101: anonymous gallery list responses are publicly cached; viewer responses stay private."""
+
+    def _client(self, db: MagicMock) -> TestClient:
+        from app.api.routers import gallery as gallery_router
+
+        probe = FastAPI()
+        probe.include_router(gallery_router.router)
+        probe.dependency_overrides[gallery_router.get_db] = lambda: db
+        return TestClient(probe)
+
+    def _mock_db(self) -> tuple[MagicMock, SimpleNamespace]:
+        db = MagicMock()
+        count_query = MagicMock()
+        count_query.filter.return_value = count_query
+        count_query.scalar.return_value = 1
+        row_review = SimpleNamespace(id=101, gallery_added_at=datetime(2026, 3, 21, 12, 0, tzinfo=timezone.utc))
+        list_query = MagicMock()
+        for name in ('join', 'filter', 'order_by', 'limit'):
+            getattr(list_query, name).return_value = list_query
+        list_query.all.return_value = [(row_review, object(), object(), 8.8)]
+        db.query.side_effect = [count_query, list_query]
+        return db, row_review
+
+    def _build_item(self, row_review: SimpleNamespace):
+        base = {
+            'review_id': 'rev_1', 'photo_id': 'pho_1', 'photo_url': None, 'photo_thumbnail_url': None,
+            'mode': 'pro', 'image_type': 'street', 'final_score': 8.5, 'score_version': 'score-v8-style-relative',
+            'summary': 'summary', 'owner_username': 'tester', 'owner_avatar_url': None, 'like_count': 2,
+            'recommended': False, 'score_percentile': None,
+            'gallery_added_at': row_review.gallery_added_at, 'created_at': row_review.gallery_added_at,
+        }
+
+        def build(*_args, **kwargs):
+            return {**base, 'liked_by_viewer': kwargs['liked_by_viewer']}
+
+        return build
+
+    def test_anonymous_gallery_list_is_publicly_cacheable_without_minting_guest(self) -> None:
+        db, row_review = self._mock_db()
+        with patch('app.api.deps.create_guest_user') as create_guest, \
+             patch('app.api.routers.gallery._gallery_like_counts', return_value={101: 2}), \
+             patch('app.api.routers.gallery._gallery_viewer_likes', return_value=set()), \
+             patch('app.api.routers.gallery._gallery_recommendation_map', return_value={}), \
+             patch('app.api.routers.gallery._public_gallery_item', side_effect=self._build_item(row_review)), \
+             patch('app.api.routers.gallery._owner_profile_url', return_value=None):
+            response = self._client(db).get('/gallery', headers={'Cookie': 'ps_guest_token=ignored-cookie'})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers['cache-control'], 'public, max-age=30, s-maxage=60')
+        self.assertEqual(response.headers['vary'], 'Authorization')
+        self.assertNotIn('set-cookie', {key.lower() for key in response.headers})
+        create_guest.assert_not_called()
+        self.assertFalse(response.json()['items'][0]['liked_by_viewer'])
+
+    def test_authenticated_gallery_list_is_private_no_store(self) -> None:
+        db, row_review = self._mock_db()
+        viewer = SimpleNamespace(id=77)
+        with patch('app.api.routers.gallery._optional_gallery_viewer', return_value=viewer), \
+             patch('app.api.routers.gallery._gallery_like_counts', return_value={101: 2}), \
+             patch('app.api.routers.gallery._gallery_viewer_likes', return_value={101}), \
+             patch('app.api.routers.gallery._gallery_recommendation_map', return_value={}), \
+             patch('app.api.routers.gallery._public_gallery_item', side_effect=self._build_item(row_review)), \
+             patch('app.api.routers.gallery._owner_profile_url', return_value=None):
+            response = self._client(db).get('/gallery', headers={'Authorization': 'Bearer valid-token'})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers['cache-control'], 'private, no-store')
+        self.assertEqual(response.headers['vary'], 'Authorization')
+        self.assertTrue(response.json()['items'][0]['liked_by_viewer'])
