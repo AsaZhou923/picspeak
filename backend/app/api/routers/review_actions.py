@@ -48,12 +48,17 @@ def enable_review_share(
     db: Session = Depends(get_db),
     actor: CurrentActor = Depends(get_current_actor),
 ):
-    _lock_review_owner(db, actor.user.id)
     review = _find_review_owned(db, review_id, actor.user.id)
     # Serialise with retention purges: a purge either sees this public channel or
     # finishes first. Sharing a critique whose original is gone stays allowed.
+    # The photo lock precedes the owner lock to follow the global order (tasks,
+    # photos, then users) that guest sign-in migration also takes.
     admit_photo_use(db, review.photo_id, require_ready=False)
+    _lock_review_owner(db, actor.user.id)
     _reload_live_review(db, review)
+    if review.owner_user_id != actor.user.id:
+        # A guest sign-in moved this critique while the request waited.
+        raise api_error(status.HTTP_404_NOT_FOUND, 'REVIEW_NOT_FOUND', 'Review not found')
     if not review.share_token:
         review.share_token = _generate_review_share_token(db)
     _sync_review_public_flag(review)

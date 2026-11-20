@@ -16,14 +16,16 @@ from fastapi import APIRouter, Depends, FastAPI, HTTPException
 from fastapi.testclient import TestClient
 from sqlalchemy import and_, create_engine, text
 from sqlalchemy.dialects import postgresql
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session, sessionmaker
+from starlette.requests import Request
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 from app.api.deps import CurrentActor, get_current_actor, get_db, issue_guest_token  # noqa: E402
-from app.api.routers import gallery, photos, profiles, review_create, review_queries  # noqa: E402
+from app.api.routers import gallery, photos, profiles, review_actions, review_create, review_queries  # noqa: E402
 from app.api.routers.auth_support import (  # noqa: E402
     _cleanup_deleted_user_feature_state,
     _handle_clerk_user_deleted,
@@ -32,6 +34,7 @@ from app.api.routers.auth_support import (  # noqa: E402
 from app.api.routers.gallery_support import _public_gallery_filters  # noqa: E402
 from app.db.models import (  # noqa: E402
     Base,
+    RateLimitCounter,
     Photo,
     PhotoStatus,
     PracticeAttempt,
@@ -50,10 +53,10 @@ from app.db.models import (  # noqa: E402
     UserStatus,
 )
 from app.schemas import AuthClerkExchangeRequest, GuestReviewMigrateRequest, ReviewCreateRequest  # noqa: E402
-from app.services.ai import AIReviewResponse, notify_ai_provider_call  # noqa: E402
+from app.services.ai import AIReviewError, AIReviewResponse, notify_ai_provider_call  # noqa: E402
 from app.services.gallery_scoreboard import _owner_profile_url  # noqa: E402
 from app.services.object_retention import collect_photo_facts, decide_photo  # noqa: E402
-from app.services.review_task_processor import _claim_task, _process_task  # noqa: E402
+from app.services.review_task_processor import _claim_task, _process_task, process_review_task  # noqa: E402
 
 TEST_DATABASE_URL = os.getenv('PICSPEAK_TEST_DATABASE_URL', '').strip()
 
@@ -957,6 +960,264 @@ class AccountLifecycleConcurrencyPostgresTests(unittest.TestCase):
             self.assertEqual(review.owner_user_id, target_id)
             self.assertEqual(usage.user_id, guest_id)
             self.assertEqual(db.get(User, guest_id).status, UserStatus.deleted)
+
+    def _guest_request(self) -> Request:
+        return Request({
+            'type': 'http', 'method': 'POST', 'path': '/api/v1/reviews', 'headers': [], 'scheme': 'http',
+            'server': ('testserver', 80), 'client': (f'203.0.113.{uuid4().int % 200 + 1}', 4321),
+        })
+
+    def _admit_guest_task(self, guest_id: int, photo_public_id: str) -> str:
+        """Create an async guest task through real guest admission."""
+        with self.Session() as db:
+            actor = CurrentActor(db.get(User, guest_id))
+            payload = ReviewCreateRequest.model_validate({
+                'photo_id': photo_public_id, 'mode': 'flash', 'async': True, 'locale': 'en',
+            })
+            with patch('app.api.routers.review_create.settings.cloud_tasks_enabled', False):
+                response = review_create._create_review(payload, self._guest_request(), db, actor)
+        return response['task_id']
+
+    def _run_worker(self, task_public_id: str, provider) -> dict:
+        with (
+            patch('app.services.review_task_processor.SessionLocal', self.Session),
+            patch('app.services.review_call_costs.SessionLocal', self.Session),
+            patch('app.services.review_task_processor.settings.cloud_tasks_enabled', False),
+            patch('app.services.review_task_processor.get_object_read_url', return_value='https://img.test/q.jpg'),
+            patch('app.services.review_task_processor.canonical_score_cache_lease', return_value=nullcontext(None)),
+            patch('app.services.review_task_processor.run_ai_review', side_effect=provider),
+            patch('app.services.review_task_processor.record_review_terminal'),
+        ):
+            return process_review_task(task_public_id, worker_name='worker-q')
+
+    def _successful_provider(self, *args, **kwargs):
+        notify_ai_provider_call(
+            stage='writer', outcome='succeeded', model_name='gpt-6-sol',
+            usage={'input_tokens': 120, 'output_tokens': 60},
+        )
+        return self._fake_ai_response()
+
+    def _guest_and_target(self, *, target_daily_used: int = 0):
+        with self.Session() as db:
+            guest = self._make_user(db, plan=UserPlan.guest)
+            target = self._make_user(db, plan=UserPlan.free)
+            target.daily_quota_used = target_daily_used
+            target.daily_quota_date = datetime.now(timezone.utc).date()
+            photo = self._make_photo(db, guest, uuid4().hex[:8])
+            db.commit()
+            return guest.id, target.id, photo.public_id, issue_guest_token(guest)
+
+    def _assert_admitted_guest_charged(self, task_public_id: str, guest_id: int, target_id: int, *, target_daily_used: int = 0):
+        with self.Session() as db:
+            task = db.query(ReviewTask).filter(ReviewTask.public_id == task_public_id).one()
+            self.assertEqual(task.status, TaskStatus.SUCCEEDED)
+            self.assertEqual(task.owner_user_id, target_id)
+            self.assertEqual(task.request_payload['_admitted_user_id'], guest_id)
+            review = db.query(Review).filter(Review.task_id == task.id).one()
+            self.assertEqual(review.owner_user_id, target_id)
+            usage = db.query(UsageLedger).filter(UsageLedger.task_id == task.id).one()
+            self.assertEqual(usage.user_id, guest_id)
+            costs = db.query(ReviewCallCost).filter(ReviewCallCost.task_id == task.id).all()
+            self.assertTrue(costs)
+            self.assertTrue(all(row.owner_user_id == target_id for row in costs))
+            self.assertEqual(db.get(User, guest_id).status, UserStatus.deleted)
+            self.assertEqual(db.get(User, guest_id).daily_quota_used, 1)
+            self.assertEqual(db.get(User, target_id).daily_quota_used, target_daily_used)
+            self.assertEqual(db.query(UsageLedger).filter(UsageLedger.user_id == target_id).count(), 0)
+            return task
+
+    def test_task_migrated_while_pending_charges_admitting_guest(self) -> None:
+        guest_id, target_id, photo_public_id, guest_token = self._guest_and_target()
+        task_public_id = self._admit_guest_task(guest_id, photo_public_id)
+        self._migrate_in_new_session(target_id, guest_token)
+
+        self.assertEqual(self._run_worker(task_public_id, self._successful_provider)['result'], 'processed')
+        self._assert_admitted_guest_charged(task_public_id, guest_id, target_id)
+
+    def test_task_migrated_between_retries_charges_admitting_guest(self) -> None:
+        guest_id, target_id, photo_public_id, guest_token = self._guest_and_target()
+        task_public_id = self._admit_guest_task(guest_id, photo_public_id)
+        attempts: list[int] = []
+
+        def provider(*args, **kwargs):
+            attempts.append(1)
+            if len(attempts) == 1:
+                notify_ai_provider_call(stage='writer', outcome='failed', model_name='gpt-6-sol')
+                raise AIReviewError('writer timed out', stage='writing')
+            return self._successful_provider()
+
+        self._run_worker(task_public_id, provider)
+        with self.Session() as db:
+            task = db.query(ReviewTask).filter(ReviewTask.public_id == task_public_id).one()
+            self.assertEqual(task.status, TaskStatus.PENDING)
+        self._migrate_in_new_session(target_id, guest_token)
+        with self.Session() as db:
+            db.query(ReviewTask).filter(ReviewTask.public_id == task_public_id).update({'next_attempt_at': None})
+            db.commit()
+
+        self.assertEqual(self._run_worker(task_public_id, provider)['result'], 'processed')
+        self.assertEqual(len(attempts), 2)
+        task = self._assert_admitted_guest_charged(task_public_id, guest_id, target_id)
+        with self.Session() as db:
+            call_keys = sorted(row.call_key for row in db.query(ReviewCallCost).filter(ReviewCallCost.task_id == task.id))
+        self.assertEqual(call_keys, ['attempt:1:writer', 'attempt:2:writer'])
+
+    def test_pending_task_moved_to_target_at_daily_limit_still_completes(self) -> None:
+        full = review_create.settings.free_review_limit_per_day
+        guest_id, target_id, photo_public_id, guest_token = self._guest_and_target(target_daily_used=full)
+        task_public_id = self._admit_guest_task(guest_id, photo_public_id)
+        self._migrate_in_new_session(target_id, guest_token)
+
+        self.assertEqual(self._run_worker(task_public_id, self._successful_provider)['result'], 'processed')
+        self._assert_admitted_guest_charged(task_public_id, guest_id, target_id, target_daily_used=full)
+
+    def test_sync_owner_mismatch_returns_personal_guest_counters(self) -> None:
+        guest_id, target_id, photo_public_id, guest_token = self._guest_and_target()
+        real_admission = review_create.enforce_guest_review_limits
+
+        def admit_then_migrate(*args, **kwargs):
+            limits = real_admission(*args, **kwargs)
+            self._migrate_in_new_session(target_id, guest_token)
+            return limits
+
+        request = self._guest_request()
+        with self.Session() as sync_db:
+            actor = CurrentActor(sync_db.get(User, guest_id))
+            payload, _ = self._sync_request(photo_public_id)
+            with (
+                patch('app.api.routers.review_create.enforce_guest_review_limits', side_effect=admit_then_migrate),
+                patch('app.api.routers.review_create.run_ai_review') as provider,
+            ):
+                with self.assertRaises(HTTPException) as raised:
+                    review_create._create_review(payload, request, sync_db, actor)
+            provider.assert_not_called()
+        self.assertEqual((raised.exception.status_code, raised.exception.detail['code']), (409, 'PHOTO_OWNER_MISMATCH'))
+
+        with self.Session() as db:
+            guest = db.get(User, guest_id)
+            quota_key = review_create.guest_quota_scope_key(request, guest)
+            network_key = review_create.guest_network_scope_key(request)
+            counters = {
+                (row.scope, row.scope_key): row.hit_count
+                for row in db.query(RateLimitCounter).filter(RateLimitCounter.scope_key.in_([quota_key, network_key]))
+            }
+        self.assertEqual(counters[('guest_review_daily', quota_key)], 0)
+        self.assertEqual(counters[('guest_review_monthly', quota_key)], 0)
+        # Network admission budgets stay spent.
+        self.assertEqual(counters[('guest_review_network_daily', network_key)], 1)
+
+    def _wait_for_lock_waiter(self) -> None:
+        for _ in range(100):
+            with self.engine.connect() as connection:
+                waiting = connection.execute(text(
+                    "SELECT count(*) FROM pg_stat_activity "
+                    "WHERE datname = current_database() AND wait_event_type = 'Lock'"
+                )).scalar_one()
+            if waiting:
+                return
+            threading.Event().wait(0.05)
+        self.fail('request never waited on the held row lock')
+
+    def _row_is_unlocked(self, table: str, row_id: int) -> bool:
+        with self.engine.connect() as connection:
+            try:
+                connection.execute(text(f'SELECT id FROM {table} WHERE id = :id FOR NO KEY UPDATE NOWAIT'), {'id': row_id})
+            except OperationalError:
+                return False
+            finally:
+                connection.rollback()
+        return True
+
+    def test_paired_retake_admission_locks_photos_in_ascending_id_order(self) -> None:
+        with self.Session() as db:
+            user = self._make_user(db, plan=UserPlan.free)
+            source_photo = self._make_photo(db, user, uuid4().hex[:8])
+            new_photo = self._make_photo(db, user, uuid4().hex[:8])
+            source_review = Review(
+                public_id=f'rev_src_{uuid4().hex[:8]}', photo_id=source_photo.id, owner_user_id=user.id,
+                mode=ReviewMode.flash, status=ReviewStatus.SUCCEEDED, image_type='default',
+                schema_version='2.0', result_json={'scores': {}}, final_score=Decimal('7.00'),
+            )
+            db.add(source_review)
+            db.commit()
+            user_id, source_photo_id, new_photo_id = user.id, source_photo.id, new_photo.id
+            new_photo_public_id, source_review_public_id = new_photo.public_id, source_review.public_id
+        self.assertLess(source_photo_id, new_photo_id)
+
+        outcome: list[object] = []
+
+        def create_paired_task():
+            try:
+                with self.Session() as db:
+                    actor = CurrentActor(db.get(User, user_id))
+                    payload = ReviewCreateRequest.model_validate({
+                        'photo_id': new_photo_public_id, 'mode': 'flash', 'async': True, 'locale': 'en',
+                        'analysis_type': 'retake_compare', 'source_review_id': source_review_public_id,
+                    })
+                    with patch('app.api.routers.review_create.settings.cloud_tasks_enabled', False):
+                        outcome.append(review_create._create_review(payload, self._guest_request(), db, actor))
+            except BaseException as exc:  # pragma: no cover - surfaced below
+                outcome.append(exc)
+
+        # Hold the lower-id source photo the way a guest sign-in migration does.
+        with self.engine.connect() as blocker:
+            blocker.execute(text('SELECT id FROM photos WHERE id = :id FOR NO KEY UPDATE'), {'id': source_photo_id})
+            thread = threading.Thread(target=create_paired_task)
+            thread.start()
+            self._wait_for_lock_waiter()
+            # Waiting on the source photo, the request must not hold the higher-id photo yet.
+            self.assertTrue(self._row_is_unlocked('photos', new_photo_id))
+            blocker.rollback()
+        thread.join(timeout=15)
+
+        self.assertEqual(len(outcome), 1)
+        self.assertIsInstance(outcome[0], dict)
+        self.assertIn('task_id', outcome[0])
+
+    def test_share_enable_locks_photo_before_owner_and_rechecks_migrated_owner(self) -> None:
+        with self.Session() as db:
+            guest = self._make_user(db, plan=UserPlan.guest)
+            target = self._make_user(db, plan=UserPlan.free)
+            photo = self._make_photo(db, guest, uuid4().hex[:8])
+            review = Review(
+                public_id=f'rev_shr_{uuid4().hex[:8]}', photo_id=photo.id, owner_user_id=guest.id,
+                mode=ReviewMode.flash, status=ReviewStatus.SUCCEEDED, image_type='default',
+                schema_version='2.0', result_json={'scores': {}}, final_score=Decimal('7.00'),
+            )
+            db.add(review)
+            db.commit()
+            guest_id, target_id, photo_id = guest.id, target.id, photo.id
+            review_id, review_public_id = review.id, review.public_id
+
+        outcome: list[object] = []
+
+        def enable_share():
+            try:
+                with self.Session() as db:
+                    actor = CurrentActor(db.get(User, guest_id))
+                    outcome.append(review_actions.enable_review_share(review_public_id, SimpleNamespace(), db, actor))
+            except BaseException as exc:
+                outcome.append(exc)
+
+        with self.engine.connect() as migration:
+            migration.execute(text('SELECT id FROM photos WHERE id = :id FOR NO KEY UPDATE'), {'id': photo_id})
+            thread = threading.Thread(target=enable_share)
+            thread.start()
+            self._wait_for_lock_waiter()
+            # Waiting on the photo, the handler must not hold the guest row migration locks next.
+            self.assertTrue(self._row_is_unlocked('users', guest_id))
+            migration.execute(text('SELECT id FROM users WHERE id = :id FOR NO KEY UPDATE'), {'id': guest_id})
+            migration.execute(text('UPDATE photos SET owner_user_id = :t WHERE id = :id'), {'t': target_id, 'id': photo_id})
+            migration.execute(text('UPDATE reviews SET owner_user_id = :t WHERE id = :id'), {'t': target_id, 'id': review_id})
+            migration.execute(text("UPDATE users SET status = 'deleted' WHERE id = :id"), {'id': guest_id})
+            migration.commit()
+        thread.join(timeout=15)
+
+        self.assertEqual(len(outcome), 1)
+        self.assertIsInstance(outcome[0], HTTPException)
+        self.assertEqual((outcome[0].status_code, outcome[0].detail['code']), (404, 'REVIEW_NOT_FOUND'))
+        with self.Session() as db:
+            self.assertIsNone(db.get(Review, review_id).share_token)
 
     def test_concurrent_duplicate_migrations_serialize_and_never_double_report(self) -> None:
         for strict in (True, False):

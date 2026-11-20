@@ -351,6 +351,9 @@ def _process_clerk_webhook_event(db: Session, event: ClerkWebhookEvent) -> tuple
 def lock_guest_for_transfer(db: Session, guest_user_id: int, *, expected_status: UserStatus) -> User | None:
     """Lock a guest's tasks, then photos, then the guest row for an ownership transfer.
 
+    This is the global row-lock order for ownership-sensitive writes: review
+    tasks, then photos in ascending id, then users.
+
     Worker completion locks its task FOR UPDATE before it inserts rows that
     reference the photo and user and updates the admitting user's quota. A
     synchronous review holds its photo FOR SHARE from admission until it inserts
