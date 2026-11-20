@@ -4,11 +4,11 @@ import json
 import hashlib
 import logging
 import sys
+import tempfile
 import time
 import warnings
 from datetime import datetime, timedelta, timezone
 from typing import Any
-from io import BytesIO
 
 from botocore.exceptions import BotoCoreError, ClientError
 from PIL import Image, UnidentifiedImageError
@@ -51,6 +51,8 @@ UPLOAD_METRIC_KEYS = (
 )
 UPLOAD_CONFIRM_TOKEN_PURPOSE = 'upload_confirm'
 UPLOAD_OBJECT_EXTENSIONS = {'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp'}
+UPLOAD_MAX_PIXELS = 50_000_000
+UPLOAD_VERIFY_SPOOL_BYTES = 2 * 1024 * 1024
 # Verification failures that prove the stored bytes can never be confirmed.
 # Missing objects, transient storage errors and concurrent changes keep the object.
 REJECTED_UPLOAD_ERROR_CODES = {
@@ -92,52 +94,64 @@ def _verify_uploaded_object_or_discard(db: Session, token: dict) -> tuple[str, i
 
 def _verify_uploaded_object(token: dict) -> tuple[str, int, int]:
     """Verify storage bytes before trusting an upload claim or its cache key."""
-    try:
-        storage = get_object_storage_client()
-        head = storage.head_object(Bucket=token['bucket'], Key=token['object_key'])
-        size = head['ContentLength']
-        if size <= 0 or size > settings.max_upload_bytes:
-            raise api_error(400, 'FILE_TOO_LARGE', 'Uploaded file exceeds the size limit')
-        if size != token['size_bytes'] or head.get('ContentType') != token['content_type']:
-            raise api_error(400, 'UPLOAD_CONTENT_MISMATCH', 'Uploaded file does not match the upload request')
-        result = storage.get_object(Bucket=token['bucket'], Key=token['object_key'], IfMatch=head['ETag'])
-        body = result['Body']
-        data = bytearray()
-        digest = hashlib.sha256()
+    with tempfile.SpooledTemporaryFile(max_size=UPLOAD_VERIFY_SPOOL_BYTES) as spool:
         try:
-            while chunk := body.read(64 * 1024):
-                data.extend(chunk)
-                if len(data) > size:
-                    raise api_error(400, 'UPLOAD_CONTENT_MISMATCH', 'Uploaded file size changed')
-                digest.update(chunk)
-        finally:
-            body.close()
-        if len(data) != size:
-            raise api_error(400, 'UPLOAD_CONTENT_MISMATCH', 'Uploaded file is incomplete')
-    except ClientError as exc:
-        code = str(exc.response.get('Error', {}).get('Code', ''))
-        if code in {'404', 'NoSuchKey', 'NotFound'}:
-            raise api_error(400, 'UPLOAD_NOT_FOUND', 'Upload the photo before confirming it') from exc
-        if code in {'412', 'PreconditionFailed'}:
-            raise api_error(409, 'UPLOAD_CONTENT_MISMATCH', 'Uploaded file changed during verification') from exc
-        raise api_error(503, 'UPLOAD_VERIFICATION_FAILED', 'Upload verification is temporarily unavailable') from exc
-    except BotoCoreError as exc:
-        raise api_error(503, 'UPLOAD_VERIFICATION_FAILED', 'Upload verification is temporarily unavailable') from exc
-    checksum = digest.hexdigest()
-    if token.get('sha256') and checksum != str(token['sha256']).lower():
-        raise api_error(400, 'UPLOAD_CHECKSUM_MISMATCH', 'Uploaded file checksum does not match')
-    try:
-        with warnings.catch_warnings():
-            warnings.simplefilter('error', Image.DecompressionBombWarning)
-            with Image.open(BytesIO(data)) as image:
-                if Image.MIME.get(image.format) != token['content_type']:
-                    raise api_error(400, 'UPLOAD_CONTENT_MISMATCH', 'Uploaded file is not the requested image format')
-                width, height = image.size
-                image.verify()
-            with Image.open(BytesIO(data)) as image:
-                image.load()
-    except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError, Image.DecompressionBombWarning) as exc:
-        raise api_error(400, 'UPLOAD_IMAGE_INVALID', 'Uploaded file is not a valid supported image') from exc
+            storage = get_object_storage_client()
+            head = storage.head_object(Bucket=token['bucket'], Key=token['object_key'])
+            size = head['ContentLength']
+            if size <= 0 or size > settings.max_upload_bytes:
+                raise api_error(400, 'FILE_TOO_LARGE', 'Uploaded file exceeds the size limit')
+            if size != token['size_bytes'] or head.get('ContentType') != token['content_type']:
+                raise api_error(400, 'UPLOAD_CONTENT_MISMATCH', 'Uploaded file does not match the upload request')
+            result = storage.get_object(Bucket=token['bucket'], Key=token['object_key'], IfMatch=head['ETag'])
+            body = result['Body']
+            bytes_read = 0
+            digest = hashlib.sha256()
+            try:
+                while chunk := body.read(64 * 1024):
+                    bytes_read += len(chunk)
+                    if bytes_read > size:
+                        raise api_error(400, 'UPLOAD_CONTENT_MISMATCH', 'Uploaded file size changed')
+                    digest.update(chunk)
+                    spool.write(chunk)
+            finally:
+                body.close()
+            if bytes_read != size:
+                raise api_error(400, 'UPLOAD_CONTENT_MISMATCH', 'Uploaded file is incomplete')
+        except ClientError as exc:
+            code = str(exc.response.get('Error', {}).get('Code', ''))
+            if code in {'404', 'NoSuchKey', 'NotFound'}:
+                raise api_error(400, 'UPLOAD_NOT_FOUND', 'Upload the photo before confirming it') from exc
+            if code in {'412', 'PreconditionFailed'}:
+                raise api_error(409, 'UPLOAD_CONTENT_MISMATCH', 'Uploaded file changed during verification') from exc
+            raise api_error(503, 'UPLOAD_VERIFICATION_FAILED', 'Upload verification is temporarily unavailable') from exc
+        except BotoCoreError as exc:
+            raise api_error(503, 'UPLOAD_VERIFICATION_FAILED', 'Upload verification is temporarily unavailable') from exc
+        checksum = digest.hexdigest()
+        if token.get('sha256') and checksum != str(token['sha256']).lower():
+            raise api_error(400, 'UPLOAD_CHECKSUM_MISMATCH', 'Uploaded file checksum does not match')
+        spool.seek(0)
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter('error', Image.DecompressionBombWarning)
+                with Image.open(spool) as image:
+                    image_format = image.format
+                    if Image.MIME.get(image_format) != token['content_type']:
+                        raise api_error(400, 'UPLOAD_CONTENT_MISMATCH', 'Uploaded file is not the requested image format')
+                    width, height = image.size
+                    if width <= 0 or height <= 0 or width * height > UPLOAD_MAX_PIXELS:
+                        raise api_error(400, 'UPLOAD_IMAGE_INVALID', 'Uploaded file is not a valid supported image')
+                    image.verify()
+                spool.seek(0)
+                with Image.open(spool) as image:
+                    if image_format == 'JPEG':
+                        # Pillow's JpegImageFile.verify() is a no-op; draft('RGB', (1, 1))
+                        # validates the full entropy stream at 1/8 scale (1/64th pixels)
+                        # so truncated JPEGs are rejected without decoding the full bitmap.
+                        image.draft('RGB', (1, 1))
+                    image.load()
+        except (UnidentifiedImageError, OSError, SyntaxError, ValueError, Image.DecompressionBombError, Image.DecompressionBombWarning) as exc:
+            raise api_error(400, 'UPLOAD_IMAGE_INVALID', 'Uploaded file is not a valid supported image') from exc
     return checksum, width, height
 
 

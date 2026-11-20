@@ -56,9 +56,14 @@ from .gallery_support import (
 router = APIRouter(prefix='/gallery', tags=['gallery'])
 
 
+PUBLIC_GALLERY_LIST_CACHE_CONTROL = 'public, max-age=30, s-maxage=60'
+PUBLIC_GALLERY_DETAIL_CACHE_CONTROL = 'public, max-age=60'
+
+
 @router.get('', response_model=GalleryListResponse)
 def list_public_gallery(
   request: Request,
+  response: Response,
   limit: int = Query(default=24, ge=1, le=60),
   cursor: str | None = Query(default=None),
   created_from: datetime | None = Query(default=None),
@@ -75,7 +80,8 @@ def list_public_gallery(
   if min_score is not None and max_score is not None and min_score > max_score:
     raise api_error(status.HTTP_400_BAD_REQUEST, 'GALLERY_FILTER_INVALID', 'min_score cannot be greater than max_score')
 
-  viewer = _optional_gallery_viewer(authorization, db)
+  normalized_authorization = authorization.strip() if isinstance(authorization, str) else ''
+  viewer = _optional_gallery_viewer(normalized_authorization or None, db)
   gallery_filters = _public_gallery_filters()
   cursor_val = None
   cursor_dt = None
@@ -178,6 +184,11 @@ def list_public_gallery(
       rank_reference_at=rank_reference_at,
     )
 
+  if normalized_authorization:
+    response.headers['Cache-Control'] = 'private, no-store'
+  else:
+    response.headers['Cache-Control'] = PUBLIC_GALLERY_LIST_CACHE_CONTROL
+  response.headers['Vary'] = 'Authorization, Origin'
   return GalleryListResponse(items=items, total_count=total_count, next_cursor=next_cursor)
 
 
@@ -283,9 +294,6 @@ def unlike_public_gallery_review(
 
   like_count = _gallery_like_count(db, review.id)
   return GalleryLikeResponse(review_id=review.public_id, like_count=like_count, liked_by_viewer=False)
-
-
-PUBLIC_GALLERY_DETAIL_CACHE_CONTROL = 'public, max-age=60'
 
 
 def _decode_sitemap_cursor(cursor: str | None) -> int | None:

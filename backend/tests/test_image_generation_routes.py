@@ -4,10 +4,13 @@ import sys
 import unittest
 from contextlib import contextmanager
 from datetime import datetime, timezone
+from io import BytesIO
 from pathlib import Path
 from types import SimpleNamespace
+from urllib.parse import parse_qs, urlsplit
 from unittest.mock import MagicMock, patch
 
+from botocore.exceptions import ClientError
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
@@ -17,13 +20,21 @@ if str(BACKEND_ROOT) not in sys.path:
 
 from app.api.deps import get_current_actor  # noqa: E402
 from app.api.routers.generations import (  # noqa: E402
+    GENERATION_IMAGE_CACHE_CONTROL,
+    GENERATION_IMAGE_STABLE_WINDOW_SECONDS,
+    GENERATION_IMAGE_TOKEN_PURPOSE,
+    GENERATION_IMAGE_TTL_SECONDS,
+    _build_generated_image_url,
     _generation_item_payload,
+    _iter_storage_body,
     _mark_generation_dispatch_failed,
     _record_generation_event,
     download_generation,
+    get_generation_image,
     get_generation_task_status,
     reuse_generation,
 )
+from app.core.security import sign_payload  # noqa: E402
 from app.db.models import TaskStatus, User, UserPlan, UserStatus  # noqa: E402
 from app.db.session import get_db  # noqa: E402
 from app.main import app  # noqa: E402
@@ -352,21 +363,210 @@ class ImageGenerationRoutesTests(unittest.TestCase):
             metadata_json={'user_prompt': 'next shoot reference'},
         )
 
-        with patch(
-            'app.api.routers.generations._build_storage_photo_url',
-            return_value='https://signed.example.com/generated/gen_source.webp',
-        ) as build_storage_url:
-            payload = _generation_item_payload(db, image)
+        request = SimpleNamespace(
+            base_url='http://internal/',
+            headers={'host': 'internal', 'x-forwarded-host': 'api.picspeak.art', 'x-forwarded-proto': 'https'},
+            url_for=lambda _route_name, generation_id: f'http://internal/api/v1/generations/{generation_id}/image',
+        )
+
+        with patch('app.api.routers.generations._build_storage_photo_url') as build_storage_url:
+            payload = _generation_item_payload(db, image, request=request, owner_public_id='usr_generation')
 
         self.assertEqual(payload.source_photo_id, 'pho_source')
         self.assertEqual(payload.source_review_id, 'rev_source')
         self.assertEqual(payload.prompt, 'next shoot reference')
-        self.assertEqual(payload.image_url, 'https://signed.example.com/generated/gen_source.webp')
-        build_storage_url.assert_called_once_with(
-            'generated/user_usr/2026/04/gen_source.webp',
-            bucket='generated',
-            expires_in=900,
+        parsed = urlsplit(payload.image_url)
+        self.assertEqual(f'{parsed.scheme}://{parsed.netloc}{parsed.path}', 'https://api.picspeak.art/api/v1/generations/gen_source/image')
+        self.assertIn('generation_token', parse_qs(parsed.query))
+        build_storage_url.assert_not_called()
+
+    def test_generated_image_proxy_url_stays_stable_across_calls_in_window(self) -> None:
+        self.assertEqual(GENERATION_IMAGE_TTL_SECONDS, 24 * 3600)
+        self.assertEqual(GENERATION_IMAGE_STABLE_WINDOW_SECONDS, 24 * 3600)
+        self.assertEqual(GENERATION_IMAGE_CACHE_CONTROL, 'private, max-age=3600, stale-while-revalidate=86400')
+        request = SimpleNamespace(
+            base_url='https://api.picspeak.art/',
+            headers={'host': 'api.picspeak.art'},
+            url_for=lambda _route_name, generation_id: f'https://api.picspeak.art/api/v1/generations/{generation_id}/image',
         )
+        image = SimpleNamespace(public_id='gen_stable', object_bucket='generated', object_key='generated/user_u/gen_stable.webp')
+        window = GENERATION_IMAGE_STABLE_WINDOW_SECONDS
+
+        with patch('app.api.routers.generations.time.time', return_value=window * 100 + 60):
+            first = _build_generated_image_url(image, request=request, owner_public_id='usr_owner')
+        with patch('app.api.routers.generations.time.time', return_value=window * 100 + 3600 * 12):
+            second = _build_generated_image_url(image, request=request, owner_public_id='usr_owner')
+        with patch('app.api.routers.generations.time.time', return_value=window * 101 + 60):
+            next_window = _build_generated_image_url(image, request=request, owner_public_id='usr_owner')
+
+        self.assertEqual(first, second)
+        self.assertNotEqual(first, next_window)
+
+    def test_generation_image_proxy_enforces_byte_limit_while_streaming_unknown_length(self) -> None:
+        now = datetime(2026, 11, 1, 12, 0, tzinfo=timezone.utc)
+        image = SimpleNamespace(
+            public_id='gen_stream_cap',
+            object_bucket='generated',
+            object_key='generated/user_usr_owner/2026/11/gen_stream_cap.webp',
+            content_type='image/webp',
+            deleted_at=None,
+            object_purged_at=None,
+            created_at=now,
+            updated_at=now,
+        )
+        db = MagicMock()
+        db.query.return_value.join.return_value.filter.return_value.first.return_value = image
+        token = sign_payload({'generation_id': 'gen_stream_cap', 'uid': 'usr_owner'}, ttl_seconds=3600, purpose=GENERATION_IMAGE_TOKEN_PURPOSE)
+
+        closed = False
+        read_chunks = 0
+
+        class ChunkedBody:
+            def iter_chunks(self, chunk_size: int = 64 * 1024):
+                nonlocal read_chunks
+                for chunk in (b'12345678', b'abcdefgh', b'never-read'):
+                    read_chunks += 1
+                    yield chunk
+
+            def close(self):
+                nonlocal closed
+                closed = True
+
+        storage = MagicMock()
+        storage.get_object.return_value = {
+            'ContentType': 'image/webp',
+            'Body': ChunkedBody(),
+        }
+
+        with (
+            patch('app.api.routers.generations.get_object_storage_client', return_value=storage),
+            patch('app.api.routers.generations.settings.image_generation_download_max_bytes', 10),
+        ):
+            import asyncio
+
+            response = get_generation_image('gen_stream_cap', generation_token=token, if_none_match=None, db=db)
+            emitted: list[bytes] = []
+
+            async def drain() -> None:
+                async for chunk in response.body_iterator:
+                    emitted.append(chunk)
+
+            with self.assertRaises(HTTPException) as raised:
+                asyncio.run(drain())
+
+        self.assertEqual(raised.exception.status_code, 413)
+        self.assertEqual(raised.exception.detail['code'], 'GENERATION_IMAGE_TOO_LARGE')
+        self.assertEqual(emitted, [b'12345678'])
+        self.assertEqual(read_chunks, 2)
+        self.assertTrue(closed)
+
+        # Also verify file-like body without iter_chunks stops and closes at limit.
+        raw_body = BytesIO(b'x' * 25)
+        with self.assertRaises(HTTPException) as raw_raised:
+            list(_iter_storage_body(raw_body, max_bytes=10))
+        self.assertEqual(raw_raised.exception.status_code, 413)
+        self.assertTrue(raw_body.closed)
+
+    def test_generation_image_proxy_serves_private_cached_image_and_304(self) -> None:
+        now = datetime(2026, 11, 1, 12, 0, tzinfo=timezone.utc)
+        image = SimpleNamespace(
+            public_id='gen_proxy_1',
+            object_bucket='generated',
+            object_key='generated/user_usr_owner/2026/11/gen_proxy_1.webp',
+            content_type='image/webp',
+            deleted_at=None,
+            object_purged_at=None,
+            created_at=now,
+            updated_at=now,
+        )
+        db = MagicMock()
+        db.query.return_value.join.return_value.filter.return_value.first.return_value = image
+        storage = MagicMock()
+        storage.get_object.return_value = {
+            'ContentLength': 11,
+            'ContentType': 'image/webp',
+            'Body': BytesIO(b'webp-binary'),
+        }
+        token = sign_payload({'generation_id': 'gen_proxy_1', 'uid': 'usr_owner'}, ttl_seconds=3600, purpose=GENERATION_IMAGE_TOKEN_PURPOSE)
+
+        def override_db():
+            yield db
+
+        app.dependency_overrides[get_db] = override_db
+        with patch('app.api.routers.generations.get_object_storage_client', return_value=storage), self._client() as client:
+            first = client.get('/api/v1/generations/gen_proxy_1/image', params={'generation_token': token})
+            etag = first.headers['etag']
+            second = client.get(
+                '/api/v1/generations/gen_proxy_1/image',
+                params={'generation_token': token},
+                headers={'If-None-Match': etag},
+            )
+
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(first.content, b'webp-binary')
+        self.assertEqual(first.headers['cache-control'], GENERATION_IMAGE_CACHE_CONTROL)
+        self.assertEqual(first.headers['x-content-type-options'], 'nosniff')
+        self.assertEqual(first.headers['content-length'], '11')
+        self.assertEqual(second.status_code, 304)
+        self.assertEqual(second.headers['etag'], etag)
+        self.assertEqual(second.headers['cache-control'], GENERATION_IMAGE_CACHE_CONTROL)
+        storage.get_object.assert_called_once_with(Bucket='generated', Key='generated/user_usr_owner/2026/11/gen_proxy_1.webp')
+
+    def test_generation_image_proxy_enforces_owner_deleted_purged_and_missing_states(self) -> None:
+        now = datetime(2026, 11, 1, 12, 0, tzinfo=timezone.utc)
+        base = dict(
+            public_id='gen_acl',
+            object_bucket='generated',
+            object_key='generated/user_usr_owner/2026/11/gen_acl.webp',
+            content_type='image/webp',
+            deleted_at=None,
+            object_purged_at=None,
+            created_at=now,
+            updated_at=now,
+        )
+        valid_token = sign_payload({'generation_id': 'gen_acl', 'uid': 'usr_owner'}, ttl_seconds=3600, purpose=GENERATION_IMAGE_TOKEN_PURPOSE)
+        other_gen_token = sign_payload({'generation_id': 'gen_other', 'uid': 'usr_owner'}, ttl_seconds=3600, purpose=GENERATION_IMAGE_TOKEN_PURPOSE)
+
+        # Wrong generation_id in token -> 403
+        with self.assertRaises(HTTPException) as wrong_gen:
+            get_generation_image('gen_acl', generation_token=other_gen_token, if_none_match=None, db=MagicMock())
+        self.assertEqual(wrong_gen.exception.status_code, 403)
+        self.assertEqual(wrong_gen.exception.detail['code'], 'GENERATION_TOKEN_INVALID')
+
+        # Not owned / missing -> 404
+        db_missing = MagicMock()
+        db_missing.query.return_value.join.return_value.filter.return_value.first.return_value = None
+        with self.assertRaises(HTTPException) as not_found:
+            get_generation_image('gen_acl', generation_token=valid_token, if_none_match=None, db=db_missing)
+        self.assertEqual(not_found.exception.status_code, 404)
+        self.assertEqual(not_found.exception.detail['code'], 'GENERATION_NOT_FOUND')
+
+        # Soft-deleted -> 404
+        db_deleted = MagicMock()
+        db_deleted.query.return_value.join.return_value.filter.return_value.first.return_value = SimpleNamespace(**{**base, 'deleted_at': now})
+        with self.assertRaises(HTTPException) as deleted:
+            get_generation_image('gen_acl', generation_token=valid_token, if_none_match=None, db=db_deleted)
+        self.assertEqual(deleted.exception.status_code, 404)
+        self.assertEqual(deleted.exception.detail['code'], 'GENERATION_NOT_FOUND')
+
+        # Purged -> 410
+        db_purged = MagicMock()
+        db_purged.query.return_value.join.return_value.filter.return_value.first.return_value = SimpleNamespace(**{**base, 'deleted_at': now, 'object_purged_at': now})
+        with self.assertRaises(HTTPException) as purged:
+            get_generation_image('gen_acl', generation_token=valid_token, if_none_match=None, db=db_purged)
+        self.assertEqual(purged.exception.status_code, 410)
+        self.assertEqual(purged.exception.detail['code'], 'GENERATION_IMAGE_EXPIRED')
+
+        # Missing object in storage -> 410
+        db_live = MagicMock()
+        db_live.query.return_value.join.return_value.filter.return_value.first.return_value = SimpleNamespace(**base)
+        storage = MagicMock()
+        storage.get_object.side_effect = ClientError({'Error': {'Code': 'NoSuchKey'}}, 'GetObject')
+        with patch('app.api.routers.generations.get_object_storage_client', return_value=storage):
+            with self.assertRaises(HTTPException) as missing_obj:
+                get_generation_image('gen_acl', generation_token=valid_token, if_none_match=None, db=db_live)
+        self.assertEqual(missing_obj.exception.status_code, 410)
+        self.assertEqual(missing_obj.exception.detail['code'], 'GENERATION_IMAGE_EXPIRED')
 
     def test_generation_task_status_read_does_not_commit(self) -> None:
         db = MagicMock()

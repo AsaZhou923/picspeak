@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import ipaddress
+import logging
 import time
 from io import BytesIO
 from typing import Any, Literal
@@ -24,6 +25,7 @@ from app.services.review_visibility import (
 )
 
 router = APIRouter(prefix='/photos', tags=['photos'])
+logger = logging.getLogger(__name__)
 
 ALLOWED_CONTENT_TYPES = {'image/jpeg', 'image/png', 'image/webp'}
 PHOTO_PROXY_TOKEN_PURPOSE = 'photo_proxy'
@@ -31,15 +33,33 @@ PHOTO_PROXY_TTL_SECONDS = 600
 PHOTO_THUMBNAIL_SIZE = 128
 PHOTO_THUMBNAIL_MAX_SIZE = 512
 PHOTO_THUMBNAIL_TTL_SECONDS = 24 * 3600
-PHOTO_THUMBNAIL_STABLE_WINDOW_SECONDS = 3600
+PHOTO_THUMBNAIL_STABLE_WINDOW_SECONDS = PHOTO_THUMBNAIL_TTL_SECONDS
 PHOTO_THUMBNAIL_CACHE_CONTROL = 'private, max-age=86400, stale-while-revalidate=604800'
 GALLERY_THUMBNAIL_CACHE_CONTROL = 'public, max-age=31536000, immutable'
 PUBLIC_GALLERY_THUMBNAIL_CACHE_CONTROL = 'public, max-age=60, must-revalidate'
+PRIVATE_THUMBNAIL_PREFIX = 'thumbnails/'
 IMAGE_RESAMPLING = getattr(Image, 'Resampling', Image).LANCZOS
 
 
 def _gallery_thumbnail_object_key(photo: Photo, *, size: int = PHOTO_THUMBNAIL_MAX_SIZE) -> str:
     return f'gallery-thumbnails/{photo.public_id}/{size}.webp'
+
+
+def _private_thumbnail_object_key(photo: Photo, *, size: int = PHOTO_THUMBNAIL_SIZE) -> str:
+    return f'{PRIVATE_THUMBNAIL_PREFIX}{photo.public_id}/{size}.webp'
+
+
+def _etag_matches(if_none_match: str | None, etag: str) -> bool:
+    if not isinstance(if_none_match, str) or not if_none_match:
+        return False
+    normalized_target = etag.strip().removeprefix('W/').strip('"')
+    for candidate in if_none_match.split(','):
+        token = candidate.strip()
+        if token == '*':
+            return True
+        if token.removeprefix('W/').strip('"') == normalized_target:
+            return True
+    return False
 
 
 def _request_origin(request: Request) -> tuple[str, str]:
@@ -126,7 +146,11 @@ def _find_photo_from_token(db: Session, photo_id: str, photo_token: str, size: i
     photo = (
         db.query(Photo)
         .join(User, User.id == Photo.owner_user_id)
-        .filter(Photo.public_id == photo_id, User.public_id == owner_public_id.strip())
+        .filter(
+            Photo.public_id == photo_id,
+            User.public_id == owner_public_id.strip(),
+            User.status == UserStatus.active,
+        )
         .first()
     )
     if photo is None:
@@ -180,6 +204,32 @@ def _get_photo_object(photo: Photo) -> tuple[Any, bytes]:
         body.close()
 
 
+def _is_storage_not_found(exc: Exception) -> bool:
+    response = getattr(exc, 'response', None) or {}
+    code = str(response.get('Error', {}).get('Code', ''))
+    return code in {'404', 'NoSuchKey', 'NotFound'}
+
+
+def _read_stored_thumbnail_bytes(bucket: str, object_key: str) -> tuple[dict[str, Any], bytes] | None:
+    try:
+        storage = get_object_storage_client()
+        result = storage.get_object(Bucket=bucket, Key=object_key)
+    except Exception as exc:  # noqa: BLE001 - fall back to regenerating thumbnail
+        if _is_storage_not_found(exc):
+            return None
+        logger.warning('Failed to read stored thumbnail %s from bucket %s; regenerating', object_key, bucket, exc_info=True)
+        return None
+
+    body = result['Body']
+    try:
+        return result, body.read()
+    except Exception:  # noqa: BLE001 - fall back to regenerating thumbnail
+        logger.warning('Failed to read stored thumbnail body %s from bucket %s; regenerating', object_key, bucket, exc_info=True)
+        return None
+    finally:
+        body.close()
+
+
 def _get_storage_object_bytes(bucket: str, object_key: str) -> tuple[dict[str, Any], bytes]:
     try:
         storage = get_object_storage_client()
@@ -205,13 +255,14 @@ def _strip_photo_metadata(photo: Photo, source_bytes: bytes) -> bytes:
 def _build_thumbnail_bytes(source_bytes: bytes, size: int) -> tuple[bytes, str]:
     try:
         with Image.open(BytesIO(source_bytes)) as image:
+            image.draft('RGB', (size, size))
             image = ImageOps.exif_transpose(image)
             image.thumbnail((size, size), IMAGE_RESAMPLING)
             if image.mode not in {'RGB', 'RGBA', 'L'}:
                 image = image.convert('RGBA' if 'A' in image.mode else 'RGB')
 
             output = BytesIO()
-            image.save(output, format='WEBP', quality=82, method=6)
+            image.save(output, format='WEBP', quality=82, method=4)
             return output.getvalue(), 'image/webp'
     except UnidentifiedImageError:
         return source_bytes, 'application/octet-stream'
@@ -261,19 +312,18 @@ def get_public_gallery_thumbnail(
         'ETag': etag,
         'X-Content-Type-Options': 'nosniff',
     }
-    if if_none_match == etag:
+    if _etag_matches(if_none_match, etag):
         return Response(status_code=status.HTTP_304_NOT_MODIFIED, headers=headers)
 
-    try:
-        result, content = _get_storage_object_bytes(photo.bucket, thumbnail_key)
+    stored = _read_stored_thumbnail_bytes(photo.bucket, thumbnail_key)
+    if stored is not None:
+        result, content = stored
         media_type = str(
             result.get('ContentType')
             or 'image/webp'
         )
         headers['Content-Length'] = str(len(content))
         return Response(content=content, media_type=media_type, headers=headers)
-    except Exception:
-        pass
 
     _, source_bytes = _get_photo_object(photo)
     thumbnail_bytes, media_type = _build_thumbnail_bytes(source_bytes, PHOTO_THUMBNAIL_MAX_SIZE)
@@ -321,12 +371,31 @@ def get_photo_thumbnail(
         'X-Content-Type-Options': 'nosniff',
     }
 
-    if if_none_match == etag:
+    if _etag_matches(if_none_match, etag):
         return Response(status_code=status.HTTP_304_NOT_MODIFIED, headers=headers)
+
+    thumbnail_key = _private_thumbnail_object_key(photo, size=size)
+    stored = _read_stored_thumbnail_bytes(photo.bucket, thumbnail_key)
+    if stored is not None:
+        result, content = stored
+        media_type = str(result.get('ContentType') or 'image/webp')
+        headers['Content-Length'] = str(len(content))
+        return Response(content=content, media_type=media_type, headers=headers)
 
     _, source_bytes = _get_photo_object(photo)
     thumbnail_bytes, media_type = _build_thumbnail_bytes(source_bytes, size)
-    if media_type == 'application/octet-stream':
+    if media_type == 'image/webp' and thumbnail_bytes:
+        try:
+            get_object_storage_client().put_object(
+                Bucket=photo.bucket,
+                Key=thumbnail_key,
+                Body=thumbnail_bytes,
+                ContentType='image/webp',
+                CacheControl=PHOTO_THUMBNAIL_CACHE_CONTROL,
+            )
+        except Exception:  # noqa: BLE001 - persisting is best-effort
+            logger.warning('Failed to persist private thumbnail %s for photo %s', thumbnail_key, photo.public_id, exc_info=True)
+    elif media_type == 'application/octet-stream':
         thumbnail_bytes = _strip_photo_metadata(photo, thumbnail_bytes)
         media_type = photo.content_type
 

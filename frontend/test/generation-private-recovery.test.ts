@@ -15,7 +15,13 @@ const baseModules = {
   '@/features/generations/generation-page-copy': { QUALITY_COPY_KEYS: { low: { label: 'low' }, medium: { label: 'medium' }, high: { label: 'high' } } },
   '@/lib/locale': { localeToIntlLocale: () => 'en-US' },
 };
-const item = (id: string) => ({ generation_id: id, prompt: `private-${id}`, image_url: `https://example.test/${id}.webp`, created_at: '2026-10-20T00:00:00Z', metadata: {} });
+const item = (id: string) => ({
+  generation_id: id,
+  prompt: `private-${id}`,
+  image_url: `https://api.picspeak.art/api/v1/generations/${id}/image?generation_token=stable-token`,
+  created_at: '2026-10-20T00:00:00Z',
+  metadata: {},
+});
 
 function historyHarness(api: (token: string, query: { cursor?: string }) => Promise<any>) {
   const authState = createAuthOwnerState('owner');
@@ -65,6 +71,8 @@ test('first-page failure has a working inline retry and never claims the collect
   button(app, 'app_error_retry').props.onClick(); await settle(); app.render();
   assert.equal(cards(app).length, 1);
   assert.equal(calls, 2);
+  const imageNode = app.nodes((node) => node.type === 'Image')[0];
+  assert.equal(imageNode?.props.src, 'https://api.picspeak.art/api/v1/generations/recovered/image?generation_token=stable-token');
 });
 
 test('identity switch removes history immediately and ignores an old-owner late page', async () => {

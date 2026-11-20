@@ -17,7 +17,7 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-from app.api.routers.uploads import UPLOAD_CONFIRM_TOKEN_PURPOSE, confirm_photo_upload
+from app.api.routers.uploads import UPLOAD_CONFIRM_TOKEN_PURPOSE, UPLOAD_MAX_PIXELS, confirm_photo_upload
 from app.core.security import sign_payload
 from app.db.models import PhotoStatus
 from app.schemas import PhotoCreateRequest
@@ -239,6 +239,104 @@ class UploadRoutesTests(unittest.TestCase):
             self._confirm()
         self.assertEqual(raised.exception.status_code, 503)
         self.assertEqual(raised.exception.detail['code'], 'UPLOAD_VERIFICATION_FAILED')
+
+    def test_excessive_pixel_dimensions_are_rejected_with_existing_error_code(self) -> None:
+        self.assertEqual(UPLOAD_MAX_PIXELS, 50_000_000)
+        with patch('app.api.routers.uploads.UPLOAD_MAX_PIXELS', 500_000):
+            with self.assertRaises(HTTPException) as raised:
+                self._confirm()
+        self.assertEqual(raised.exception.status_code, 400)
+        self.assertEqual(raised.exception.detail['code'], 'UPLOAD_IMAGE_INVALID')
+
+    def test_png_and_webp_decode_and_reject_truncation_and_decoder_errors(self) -> None:
+        for fmt, content_type, ext in (('PNG', 'image/png', '.png'), ('WEBP', 'image/webp', '.webp')):
+            buf = BytesIO()
+            Image.new('RGB', (320, 240), (10, 20, 30)).save(buf, format=fmt)
+            raw = buf.getvalue()
+            sha = hashlib.sha256(raw).hexdigest()
+            token = sign_payload(
+                {
+                    'upload_id': f'upl_{fmt.lower()}',
+                    'uid': 'usr_upload_owner',
+                    'bucket': 'photos',
+                    'object_key': f'user_usr_upload_owner/2026/05/obj_{fmt.lower()}{ext}',
+                    'content_type': content_type,
+                    'size_bytes': len(raw),
+                    'sha256': sha,
+                },
+                ttl_seconds=600,
+                purpose=UPLOAD_CONFIRM_TOKEN_PURPOSE,
+            )
+            with self.subTest(fmt=fmt, case='valid'):
+                self.storage.head_object.return_value = {'ContentLength': len(raw), 'ContentType': content_type, 'ETag': 'etag-1'}
+                self.storage.get_object.return_value = {'Body': BytesIO(raw)}
+                load_calls = 0
+                orig_load = Image.Image.load
+
+                def spy_load(self_img):
+                    nonlocal load_calls
+                    load_calls += 1
+                    return orig_load(self_img)
+
+                with patch.object(Image.Image, 'load', spy_load):
+                    _response, db = self._confirm(token)
+                photo = db.add.call_args.args[0]
+                self.assertEqual((photo.width, photo.height), (320, 240))
+                self.assertEqual(photo.checksum_sha256, sha)
+                self.assertGreaterEqual(load_calls, 1)
+
+            with self.subTest(fmt=fmt, case='decoder_failure_after_verify'):
+                self.storage.head_object.return_value = {'ContentLength': len(raw), 'ContentType': content_type, 'ETag': 'etag-decode'}
+                self.storage.get_object.return_value = {'Body': BytesIO(raw)}
+                with patch.object(Image.Image, 'load', side_effect=OSError('corrupt pixel stream')):
+                    with self.assertRaises(HTTPException) as raised:
+                        self._confirm(token)
+                self.assertEqual(raised.exception.status_code, 400)
+                self.assertEqual(raised.exception.detail['code'], 'UPLOAD_IMAGE_INVALID')
+
+            with self.subTest(fmt=fmt, case='truncated'):
+                truncated = raw[:-5]
+                trunc_token = sign_payload(
+                    {
+                        'upload_id': f'upl_{fmt.lower()}_trunc',
+                        'uid': 'usr_upload_owner',
+                        'bucket': 'photos',
+                        'object_key': f'user_usr_upload_owner/2026/05/obj_{fmt.lower()}_t{ext}',
+                        'content_type': content_type,
+                        'size_bytes': len(truncated),
+                        'sha256': None,
+                    },
+                    ttl_seconds=600,
+                    purpose=UPLOAD_CONFIRM_TOKEN_PURPOSE,
+                )
+                self.storage.head_object.return_value = {'ContentLength': len(truncated), 'ContentType': content_type, 'ETag': 'etag-2'}
+                self.storage.get_object.return_value = {'Body': BytesIO(truncated)}
+                with self.assertRaises(HTTPException) as raised:
+                    self._confirm(trunc_token)
+                self.assertEqual(raised.exception.status_code, 400)
+                self.assertEqual(raised.exception.detail['code'], 'UPLOAD_IMAGE_INVALID')
+
+    def test_jpeg_confirm_uses_draft_scaled_validation(self) -> None:
+        draft_calls: list[tuple] = []
+        real_open = Image.open
+
+        def wrapped_open(fp):
+            img = real_open(fp)
+            orig_draft = img.draft
+
+            def spy_draft(mode, size):
+                draft_calls.append((mode, size))
+                return orig_draft(mode, size)
+
+            img.draft = spy_draft
+            return img
+
+        with patch('app.api.routers.uploads.Image.open', side_effect=wrapped_open):
+            _response, db = self._confirm()
+
+        photo = db.add.call_args.args[0]
+        self.assertEqual((photo.width, photo.height), (1024, 768))
+        self.assertEqual(draft_calls, [('RGB', (1, 1))])
 
 
 if __name__ == '__main__':
