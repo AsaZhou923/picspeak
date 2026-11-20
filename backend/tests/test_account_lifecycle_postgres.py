@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import os
 import sys
+import threading
 import unittest
+from contextlib import nullcontext
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
@@ -10,7 +12,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, FastAPI
+from fastapi import APIRouter, Depends, FastAPI, HTTPException
 from fastapi.testclient import TestClient
 from sqlalchemy import and_, create_engine, text
 from sqlalchemy.dialects import postgresql
@@ -21,7 +23,7 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 from app.api.deps import CurrentActor, get_current_actor, get_db, issue_guest_token  # noqa: E402
-from app.api.routers import gallery, photos, profiles, review_queries  # noqa: E402
+from app.api.routers import gallery, photos, profiles, review_create, review_queries  # noqa: E402
 from app.api.routers.auth_support import (  # noqa: E402
     _cleanup_deleted_user_feature_state,
     _handle_clerk_user_deleted,
@@ -37,17 +39,21 @@ from app.db.models import (  # noqa: E402
     PracticeSceneGroup,
     PracticeSession,
     Review,
+    ReviewCallCost,
     ReviewMode,
     ReviewStatus,
     ReviewTask,
     TaskStatus,
+    UsageLedger,
     User,
     UserPlan,
     UserStatus,
 )
-from app.schemas import AuthClerkExchangeRequest, GuestReviewMigrateRequest  # noqa: E402
+from app.schemas import AuthClerkExchangeRequest, GuestReviewMigrateRequest, ReviewCreateRequest  # noqa: E402
+from app.services.ai import AIReviewResponse, notify_ai_provider_call  # noqa: E402
 from app.services.gallery_scoreboard import _owner_profile_url  # noqa: E402
 from app.services.object_retention import collect_photo_facts, decide_photo  # noqa: E402
+from app.services.review_task_processor import _claim_task, _process_task  # noqa: E402
 
 TEST_DATABASE_URL = os.getenv('PICSPEAK_TEST_DATABASE_URL', '').strip()
 
@@ -62,8 +68,17 @@ class _FakeQuery:
     def order_by(self, *args, **kwargs):
         return self
 
+    def with_for_update(self, *args, **kwargs):
+        return self
+
+    def populate_existing(self):
+        return self
+
     def limit(self, *args, **kwargs):
         raise AssertionError('migration must not apply .limit() to guest records')
+
+    def first(self):
+        return self.rows[0] if self.rows else None
 
     def all(self):
         return self.rows
@@ -85,6 +100,7 @@ class AccountLifecycleUnitTests(unittest.TestCase):
         ]
 
         rows = {
+            User: [guest],
             Review: reviews_list,
             Photo: photos_list,
             ReviewTask: tasks_list,
@@ -221,7 +237,7 @@ class AccountLifecyclePostgresTests(unittest.TestCase):
         self.schema = 'lifecycle_' + uuid4().hex
         self.connection.execute(text(f'CREATE SCHEMA "{self.schema}"'))
         self.connection.execute(text(f'SET LOCAL search_path TO "{self.schema}", public'))
-        Base.metadata.create_all(self.connection)
+        Base.metadata.create_all(self.connection, checkfirst=False)
         self.Session = sessionmaker(
             bind=self.connection,
             autoflush=False,
@@ -575,6 +591,303 @@ class AccountLifecyclePostgresTests(unittest.TestCase):
                 share_token=share_token,
                 public_photo_url=public_photo_url,
             )
+
+
+@unittest.skipUnless(TEST_DATABASE_URL, 'requires disposable PostgreSQL via PICSPEAK_TEST_DATABASE_URL')
+class AccountLifecycleConcurrencyPostgresTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.schema = 'lcconc_' + uuid4().hex
+        self.admin = create_engine(TEST_DATABASE_URL, pool_pre_ping=True)
+        with self.admin.begin() as connection:
+            connection.execute(text(f'CREATE SCHEMA "{self.schema}"'))
+        self.engine = create_engine(
+            TEST_DATABASE_URL,
+            pool_pre_ping=True,
+            connect_args={'options': f'-csearch_path={self.schema},public'},
+        )
+        Base.metadata.create_all(self.engine, checkfirst=False)
+        self.Session = sessionmaker(bind=self.engine, autoflush=False, autocommit=False, expire_on_commit=False)
+
+    def tearDown(self) -> None:
+        self.engine.dispose()
+        with self.admin.begin() as connection:
+            connection.execute(text(f'DROP SCHEMA "{self.schema}" CASCADE'))
+        self.admin.dispose()
+
+    def _make_user(self, db: Session, *, plan: UserPlan) -> User:
+        suffix = uuid4().hex[:10]
+        user = User(
+            public_id=f'{"gst" if plan == UserPlan.guest else "usr"}_cc_{suffix}',
+            email=f'cc_{suffix}@example.test',
+            username=f'cc_{suffix}',
+            plan=plan,
+            daily_quota_total=5,
+            daily_quota_used=0,
+            status=UserStatus.active,
+        )
+        db.add(user)
+        db.flush()
+        return user
+
+    def _make_photo(self, db: Session, owner: User, suffix: str) -> Photo:
+        photo = Photo(
+            public_id=f'pho_cc_{suffix}',
+            owner_user_id=owner.id,
+            upload_id=f'upl_cc_{suffix}',
+            bucket='test-bucket',
+            object_key=f'user_{owner.public_id}/2026/11/obj_{suffix}.jpg',
+            content_type='image/jpeg',
+            size_bytes=512,
+            status=PhotoStatus.READY,
+            exif_data={},
+            client_meta={},
+        )
+        db.add(photo)
+        db.flush()
+        return photo
+
+    def _fake_ai_response(self) -> AIReviewResponse:
+        result = SimpleNamespace(
+            final_score=7.6,
+            model_dump=lambda: {
+                'scores': {'composition': 8, 'lighting': 7, 'color': 8, 'impact': 7, 'technical': 8},
+                'advantage': 'Clear framing.',
+                'critique': 'Shadows are slightly flat.',
+                'suggestions': 'Raise contrast slightly.',
+            },
+        )
+        return AIReviewResponse(
+            result=result,
+            model_name='gpt-6-sol',
+            model_version='gpt-6-sol-test',
+            prompt_version='photo-review-v9-gpt6-image-led',
+            scorer_model_name='gpt-6-sol',
+            scorer_model_version='gpt-6-sol-test',
+            writer_model_name='gpt-6-sol',
+            writer_model_version='gpt-6-sol-test',
+            score_prompt_version='photo-score-v9-applicability',
+            input_tokens=120,
+            output_tokens=60,
+            cost_usd=Decimal('0.002000'),
+            cost_rate_version='test-rate-v1',
+            latency_ms=100,
+        )
+
+    def test_worker_claim_then_migrate_then_finish_lands_all_rows_on_target(self) -> None:
+        with self.Session() as db:
+            guest = self._make_user(db, plan=UserPlan.guest)
+            target = self._make_user(db, plan=UserPlan.free)
+            photo = self._make_photo(db, guest, uuid4().hex[:8])
+            task = ReviewTask(
+                public_id=f'tsk_cc_{uuid4().hex[:8]}',
+                photo_id=photo.id,
+                owner_user_id=guest.id,
+                mode=ReviewMode.flash,
+                status=TaskStatus.PENDING,
+                request_payload={'locale': 'en', 'image_type': 'default', 'analysis_type': 'single'},
+            )
+            db.add(task)
+            db.commit()
+            guest_token = issue_guest_token(guest)
+            task_id = task.id
+            photo_id = photo.id
+            guest_id = guest.id
+            target_id = target.id
+
+        claim_token = f'worker-cc:{uuid4().hex}'
+        with self.Session() as db:
+            self.assertTrue(_claim_task(db, task_id, claim_token))
+
+        ai_entered = threading.Event()
+        migration_done = threading.Event()
+        worker_error: list[BaseException] = []
+
+        def fake_run_ai_review(*args, **kwargs):
+            notify_ai_provider_call(
+                stage='writer',
+                outcome='succeeded',
+                model_name='gpt-6-sol',
+                usage={'input_tokens': 120, 'output_tokens': 60},
+            )
+            ai_entered.set()
+            assert migration_done.wait(timeout=10), 'migration did not finish in time'
+            return self._fake_ai_response()
+
+        def run_worker():
+            with self.Session() as worker_db:
+                try:
+                    loaded_task = worker_db.get(ReviewTask, task_id)
+                    with (
+                        patch('app.services.review_task_processor.get_object_read_url', return_value='https://img.test/a.jpg'),
+                        patch('app.services.review_task_processor.canonical_score_cache_lease', return_value=nullcontext(None)),
+                        patch('app.services.review_task_processor.run_ai_review', side_effect=fake_run_ai_review),
+                        patch('app.services.review_task_processor.record_review_terminal'),
+                        patch('app.services.review_call_costs.SessionLocal', self.Session),
+                    ):
+                        _process_task(worker_db, loaded_task, claim_token=claim_token)
+                except BaseException as exc:  # pragma: no cover - surfaced below
+                    worker_error.append(exc)
+
+        worker_thread = threading.Thread(target=run_worker)
+        worker_thread.start()
+        self.assertTrue(ai_entered.wait(timeout=10))
+
+        # Run guest sign-in migration in a separate committed transaction while AI call is in flight.
+        with self.Session() as migrate_db:
+            target_row = migrate_db.get(User, target_id)
+            migrated_reviews, migrated_photos = _migrate_guest_records(
+                db=migrate_db,
+                target_user=target_row,
+                guest_token=guest_token,
+                recent_limit=20,
+                strict=True,
+            )
+            migrate_db.commit()
+        self.assertEqual((migrated_reviews, migrated_photos), (0, 1))
+        migration_done.set()
+
+        worker_thread.join(timeout=15)
+        self.assertEqual(worker_error, [])
+
+        with self.Session() as db:
+            final_task = db.get(ReviewTask, task_id)
+            final_photo = db.get(Photo, photo_id)
+            final_review = db.query(Review).filter(Review.task_id == task_id).one()
+            final_usage = db.query(UsageLedger).filter(UsageLedger.task_id == task_id).one()
+            final_costs = db.query(ReviewCallCost).filter(ReviewCallCost.task_id == task_id).all()
+
+            self.assertEqual(final_task.status, TaskStatus.SUCCEEDED)
+            self.assertEqual(final_task.owner_user_id, target_id)
+            self.assertEqual(final_photo.owner_user_id, target_id)
+            self.assertEqual(final_review.owner_user_id, target_id)
+            self.assertEqual(final_usage.user_id, target_id)
+            self.assertGreaterEqual(len(final_costs), 1)
+            self.assertTrue(all(row.owner_user_id == target_id for row in final_costs))
+            self.assertEqual(db.get(User, guest_id).status, UserStatus.deleted)
+
+    def test_sync_review_interleaved_with_guest_migration_lands_on_target(self) -> None:
+        with self.Session() as db:
+            guest = self._make_user(db, plan=UserPlan.guest)
+            target = self._make_user(db, plan=UserPlan.free)
+            photo = self._make_photo(db, guest, uuid4().hex[:8])
+            db.commit()
+            guest_token = issue_guest_token(guest)
+            photo_public_id = photo.public_id
+            photo_id = photo.id
+            guest_id = guest.id
+            target_id = target.id
+
+        def fake_run_ai_review(*args, **kwargs):
+            # Simulate migration completing in a separate transaction during the provider call.
+            # Commit the outer read transaction's lock first only if needed — here we test
+            # the case where migration completes before the final admit_photo_use lock.
+            return self._fake_ai_response()
+
+        with self.Session() as sync_db:
+            guest_row = sync_db.get(User, guest_id)
+            actor = CurrentActor(guest_row)
+            payload = ReviewCreateRequest.model_validate({
+                'photo_id': photo_public_id,
+                'mode': 'flash',
+                'async': False,
+                'locale': 'en',
+            })
+            request = SimpleNamespace(headers={}, client=SimpleNamespace(host='127.0.0.1'))
+
+            def run_ai_and_migrate(*args, **kwargs):
+                # Release any read lock from the pre-call check so another transaction can migrate.
+                sync_db.rollback()
+                with self.Session() as migrate_db:
+                    _migrate_guest_records(
+                        db=migrate_db,
+                        target_user=migrate_db.get(User, target_id),
+                        guest_token=guest_token,
+                        recent_limit=20,
+                        strict=True,
+                    )
+                    migrate_db.commit()
+                return self._fake_ai_response()
+
+            with (
+                patch('app.api.routers.review_create.enforce_guest_review_limits', return_value={}),
+                patch('app.api.routers.review_create.get_object_read_url', return_value='https://img.test/s.jpg'),
+                patch('app.api.routers.review_create.canonical_score_cache_lease', return_value=nullcontext(None)),
+                patch('app.api.routers.review_create.run_ai_review', side_effect=run_ai_and_migrate),
+                patch('app.api.routers.review_create._attach_billing_info'),
+            ):
+                response = review_create._create_review(payload, request, sync_db, actor)
+
+        with self.Session() as db:
+            review = db.query(Review).filter(Review.public_id == response['review_id']).one()
+            usage = db.query(UsageLedger).filter(UsageLedger.review_id == review.id).one()
+            self.assertEqual(db.get(Photo, photo_id).owner_user_id, target_id)
+            self.assertEqual(review.owner_user_id, target_id)
+            self.assertEqual(usage.user_id, target_id)
+
+    def test_concurrent_duplicate_migrations_serialize_and_never_double_report(self) -> None:
+        for strict in (True, False):
+            with self.subTest(strict=strict):
+                with self.Session() as db:
+                    guest = self._make_user(db, plan=UserPlan.guest)
+                    target = self._make_user(db, plan=UserPlan.free)
+                    for idx in range(5):
+                        photo = self._make_photo(db, guest, f'{strict}_{idx}_{uuid4().hex[:6]}')
+                        db.add(Review(
+                            public_id=f'rev_dup_{idx}_{uuid4().hex[:6]}',
+                            photo_id=photo.id,
+                            owner_user_id=guest.id,
+                            mode=ReviewMode.flash,
+                            status=ReviewStatus.SUCCEEDED,
+                            image_type='default',
+                            schema_version='2.0',
+                            result_json={'scores': {}},
+                            final_score=Decimal('7.00'),
+                        ))
+                    db.commit()
+                    guest_token = issue_guest_token(guest)
+                    target_id = target.id
+
+                barrier = threading.Barrier(2)
+                outcomes: list[tuple[str, object]] = []
+                lock = threading.Lock()
+
+                def worker():
+                    with self.Session() as session:
+                        target_row = session.get(User, target_id)
+                        barrier.wait(timeout=10)
+                        try:
+                            counts = _migrate_guest_records(
+                                db=session,
+                                target_user=target_row,
+                                guest_token=guest_token,
+                                recent_limit=20,
+                                strict=strict,
+                            )
+                            session.commit()
+                            entry = ('ok', counts)
+                        except HTTPException as exc:
+                            session.rollback()
+                            entry = ('http_error', (exc.status_code, exc.detail['code']))
+                        with lock:
+                            outcomes.append(entry)
+
+                threads = [threading.Thread(target=worker) for _ in range(2)]
+                for t in threads:
+                    t.start()
+                for t in threads:
+                    t.join(timeout=15)
+
+                self.assertEqual(len(outcomes), 2)
+                if strict:
+                    self.assertCountEqual(
+                        outcomes,
+                        [('ok', (5, 5)), ('http_error', (400, 'GUEST_TOKEN_INVALID'))],
+                    )
+                else:
+                    self.assertCountEqual(
+                        outcomes,
+                        [('ok', (5, 5)), ('ok', (0, 0))],
+                    )
 
 
 if __name__ == '__main__':

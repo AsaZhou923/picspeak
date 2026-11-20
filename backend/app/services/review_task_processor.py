@@ -67,6 +67,43 @@ def _ensure_review_claim(db: Session, task: ReviewTask, claim_token: str | None)
         raise ReviewTaskLeaseLost('Review task lease changed')
 
 
+def _lock_task_for_write(db: Session, task: ReviewTask, claim_token: str | None) -> ReviewTask:
+    """Lock the ReviewTask row FOR UPDATE and reload its current owner.
+
+    Serializes the worker's final write against guest sign-in migration so the
+    created Review, UsageLedger, and ReviewCallCost rows always land on the
+    task's final owner.
+    """
+    with db.no_autoflush:
+        query = db.query(ReviewTask).filter(ReviewTask.id == task.id)
+        if claim_token is not None:
+            query = query.filter(
+                ReviewTask.status == TaskStatus.RUNNING,
+                ReviewTask.claimed_by == claim_token,
+            )
+        locked = query.with_for_update().populate_existing().first()
+    if locked is None:
+        if claim_token is not None:
+            raise ReviewTaskLeaseLost('Review task lease changed')
+        return task
+    return locked if isinstance(locked, ReviewTask) else task
+
+
+def _refresh_task_owner_and_photo(
+    db: Session,
+    task: ReviewTask,
+    owner: User,
+    photo: Photo,
+) -> tuple[User, Photo]:
+    fresh_owner = db.query(User).filter(User.id == task.owner_user_id).populate_existing().first()
+    if isinstance(fresh_owner, User):
+        owner = fresh_owner
+    fresh_photo = db.query(Photo).filter(Photo.id == task.photo_id).populate_existing().first()
+    if isinstance(fresh_photo, Photo):
+        photo = fresh_photo
+    return owner, photo
+
+
 _PUBLIC_TASK_ERROR_MESSAGES: dict[str, tuple[str, str]] = {
     'REVIEW_NOT_APPLICABLE': (
         'This image is not suitable for photography scoring. Upload a photograph instead.',
@@ -661,12 +698,22 @@ def _process_task(db: Session, task: ReviewTask, *, claim_token: str | None = No
     cost_owner_user_id = int(task.owner_user_id)
     cost_attempt_count = int(task.attempt_count or 0)
     provider_calls: list[AIProviderCallUsage] = []
+    costs_persisted = False
     try:
         with observe_ai_provider_calls(provider_calls.append):
             if analysis_type == 'retake_compare':
                 if practice_context is not None:
                     source_row = (practice_context.source_review, practice_context.source_photo)
                 else:
+                    if isinstance(task, ReviewTask):
+                        refreshed_task = (
+                            db.query(ReviewTask)
+                            .filter(ReviewTask.id == task.id)
+                            .populate_existing()
+                            .first()
+                        )
+                        if isinstance(refreshed_task, ReviewTask):
+                            task = refreshed_task
                     source_review_id = (task.request_payload or {}).get('source_review_internal_id')
                     source_row = (
                         db.query(Review, Photo)
@@ -760,28 +807,68 @@ def _process_task(db: Session, task: ReviewTask, *, claim_token: str | None = No
                         canonical_score=canonical_score,
                         on_canonical_score=save_score_checkpoint,
                     )
+        try:
+            task = _lock_task_for_write(db, task, claim_token)
+        except ReviewTaskLeaseLost:
+            db.rollback()
+            persist_observed_provider_call_costs(
+                task_id=cost_task_id,
+                owner_user_id=cost_owner_user_id,
+                attempt_count=cost_attempt_count,
+                calls=provider_calls,
+                failed=False,
+            )
+            costs_persisted = True
+            raise
+        owner, photo = _refresh_task_owner_and_photo(db, task, owner, photo)
+        cost_owner_user_id = int(task.owner_user_id)
         persist_observed_provider_call_costs(
             task_id=cost_task_id,
             owner_user_id=cost_owner_user_id,
             attempt_count=cost_attempt_count,
             calls=provider_calls,
             failed=False,
+            db=db,
         )
-        _ensure_review_claim(db, task, claim_token)
+        costs_persisted = True
+        if isinstance(photo, Photo) and photo.owner_user_id != task.owner_user_id:
+            _handle_failure(
+                db,
+                task,
+                error_code='PHOTO_OWNER_MISMATCH',
+                error_message='Photo owner does not match task owner',
+                retryable=False,
+            )
+            return
     except AIReviewError as exc:
         error_code = {
             'applicability': 'REVIEW_NOT_APPLICABLE',
             'scoring': 'AI_SCORING_FAILED',
             'writing': 'AI_WRITING_FAILED',
         }.get(exc.stage, 'AI_CALL_FAILED')
+        try:
+            task = _lock_task_for_write(db, task, claim_token)
+        except ReviewTaskLeaseLost:
+            db.rollback()
+            persist_observed_provider_call_costs(
+                task_id=cost_task_id,
+                owner_user_id=cost_owner_user_id,
+                attempt_count=cost_attempt_count,
+                calls=provider_calls,
+                failed=exc.stage != 'applicability',
+            )
+            costs_persisted = True
+            raise
+        cost_owner_user_id = int(task.owner_user_id)
         persist_observed_provider_call_costs(
             task_id=cost_task_id,
             owner_user_id=cost_owner_user_id,
             attempt_count=cost_attempt_count,
             calls=provider_calls,
             failed=exc.stage != 'applicability',
+            db=db,
         )
-        _ensure_review_claim(db, task, claim_token)
+        costs_persisted = True
         logger.warning('AI review failed for task %s at %s stage: %s', task.public_id, exc.stage or 'unknown', exc)
         _handle_failure(
             db, task, error_code=error_code, error_message=str(exc),
@@ -789,13 +876,14 @@ def _process_task(db: Session, task: ReviewTask, *, claim_token: str | None = No
         )
         return
     except Exception:
-        persist_observed_provider_call_costs(
-            task_id=cost_task_id,
-            owner_user_id=cost_owner_user_id,
-            attempt_count=cost_attempt_count,
-            calls=provider_calls,
-            failed=None,
-        )
+        if not costs_persisted:
+            persist_observed_provider_call_costs(
+                task_id=cost_task_id,
+                owner_user_id=cost_owner_user_id,
+                attempt_count=cost_attempt_count,
+                calls=provider_calls,
+                failed=None,
+            )
         raise
 
     clear_task_canonical_score_checkpoint(task)
