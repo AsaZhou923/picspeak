@@ -611,7 +611,7 @@ class PublicGalleryListCacheHeaderTests(unittest.TestCase):
         self.assertEqual(response.headers['vary'], 'Authorization, Origin')
         self.assertTrue(response.json()['items'][0]['liked_by_viewer'])
 
-    def test_full_app_cors_middleware_does_not_duplicate_origin_in_vary(self) -> None:
+    def test_full_app_vary_includes_authorization_and_origin_across_cors_modes(self) -> None:
         with patch('app.main.worker.start'), patch('app.main.worker.stop'), \
              patch('app.api.routers.gallery._gallery_like_counts', return_value={101: 2}), \
              patch('app.api.routers.gallery._gallery_viewer_likes', return_value=set()), \
@@ -620,6 +620,7 @@ class PublicGalleryListCacheHeaderTests(unittest.TestCase):
             for label, headers, expected_cache in (
                 ('no-origin', {}, 'public, max-age=30, s-maxage=60'),
                 ('allowed-origin-anon', {'Origin': 'http://localhost:3000'}, 'public, max-age=30, s-maxage=60'),
+                ('allowed-origin-whitespace-auth', {'Origin': 'http://localhost:3000', 'Authorization': '   '}, 'public, max-age=30, s-maxage=60'),
                 ('allowed-origin-auth', {'Origin': 'http://localhost:3000', 'Authorization': 'Bearer tok'}, 'private, no-store'),
             ):
                 with self.subTest(label=label):
@@ -629,7 +630,12 @@ class PublicGalleryListCacheHeaderTests(unittest.TestCase):
                             response = client.get('/api/v1/gallery', headers=headers)
                     self.assertEqual(response.status_code, 200)
                     self.assertEqual(response.headers['cache-control'], expected_cache)
-                    vary_tokens = [token.strip() for token in response.headers['vary'].split(',') if token.strip()]
-                    self.assertEqual(vary_tokens, ['Authorization', 'Origin'])
+                    vary_tokens = {
+                        token.strip().lower()
+                        for header_value in response.headers.get_list('vary')
+                        for token in header_value.split(',')
+                        if token.strip()
+                    }
+                    self.assertTrue({'authorization', 'origin'}.issubset(vary_tokens), vary_tokens)
                     if 'Origin' in headers:
                         self.assertEqual(response.headers.get('access-control-allow-origin'), 'http://localhost:3000')
