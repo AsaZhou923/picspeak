@@ -1,10 +1,12 @@
 import { Dispatch, SetStateAction, useCallback, useEffect, useState } from 'react';
-import { createReviewShare, exportReview, updateReviewMeta } from '@/lib/api';
+import { createReviewShare, deleteReview, exportReview, updateReviewMeta } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { ReviewGetResponse } from '@/lib/types';
 import { useI18n } from '@/lib/i18n';
 import { formatUserFacingError } from '@/lib/error-utils';
+import { evictPhotoPreviewCache } from '@/lib/photo-preview-cache';
 import { trackProductEvent } from '@/lib/product-analytics';
+import { evictReviewThumbnailCache } from '@/lib/review-thumbnail-cache';
 import {
   getExportSummaryCopy,
   getFavoriteActionCopy,
@@ -16,11 +18,13 @@ import { buildReviewExportMarkdown, mergeReviewMeta, ReviewActionBusy } from './
 export function useReviewActions({
   review,
   setReview,
+  onDeleted,
 }: {
   review: ReviewGetResponse | null;
   setReview: Dispatch<SetStateAction<ReviewGetResponse | null>>;
+  onDeleted?: (deletedReview: ReviewGetResponse) => void;
 }) {
-  const { ensureToken, token } = useAuth();
+  const { ensureToken, captureAuthOwner, token, userInfo } = useAuth();
   const { t, locale } = useI18n();
   const actionCopy = getReviewActionCopy(locale);
   const favoriteCopy = getFavoriteActionCopy(locale);
@@ -29,6 +33,8 @@ export function useReviewActions({
 
   const [linkCopied, setLinkCopied] = useState(false);
   const [galleryConfirmOpen, setGalleryConfirmOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
   const [actionBusy, setActionBusy] = useState<ReviewActionBusy>(null);
   const [actionFeedback, setActionFeedback] = useState('');
   const [actionError, setActionError] = useState('');
@@ -36,6 +42,8 @@ export function useReviewActions({
   useEffect(() => {
     setActionFeedback('');
     setActionError('');
+    setDeleteError('');
+    setDeleteConfirmOpen(false);
     setLinkCopied(false);
   }, [locale, review?.review_id]);
 
@@ -169,10 +177,46 @@ export function useReviewActions({
     }
   }, [review, actionBusy, favoriteCopy, ensureToken, setReview, t]);
 
+  const handleDeleteOpen = useCallback(() => {
+    if (!review || actionBusy || !review.viewer_is_owner) return;
+    setDeleteError('');
+    setDeleteConfirmOpen(true);
+  }, [review, actionBusy]);
+
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!review || actionBusy || !review.viewer_is_owner) return;
+    const isOwnerCurrent = captureAuthOwner(userInfo?.user_id ?? null);
+    setActionBusy('delete');
+    setDeleteError('');
+    setActionError('');
+    setActionFeedback('');
+    try {
+      const tok = await ensureToken();
+      if (!isOwnerCurrent()) return;
+      await deleteReview(review.review_id, tok);
+      void evictReviewThumbnailCache(review.photo_id);
+      void evictPhotoPreviewCache(review.photo_id);
+      if (!isOwnerCurrent()) return;
+      setDeleteConfirmOpen(false);
+      onDeleted?.(review);
+    } catch (err) {
+      if (isOwnerCurrent()) {
+        setDeleteError(formatUserFacingError(t, err, t('delete_review_error')));
+      }
+    } finally {
+      if (isOwnerCurrent()) {
+        setActionBusy(null);
+      }
+    }
+  }, [review, actionBusy, captureAuthOwner, userInfo?.user_id, ensureToken, onDeleted, t]);
+
   return {
     linkCopied,
     galleryConfirmOpen,
     setGalleryConfirmOpen,
+    deleteConfirmOpen,
+    setDeleteConfirmOpen,
+    deleteError,
     actionBusy,
     actionFeedback,
     actionError,
@@ -183,5 +227,7 @@ export function useReviewActions({
     handleBackendShareLink,
     handleBackendExportSummary,
     handleFavoriteToggle,
+    handleDeleteOpen,
+    handleDeleteConfirm,
   };
 }

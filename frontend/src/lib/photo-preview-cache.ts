@@ -113,6 +113,14 @@ export async function refreshUploadedPhotoPreviewSrc(photoId: string): Promise<s
   return rememberObjectUrl(photoId, cachedBlob);
 }
 
+export async function evictPhotoPreviewCache(photoId: string): Promise<void> {
+  if (!photoId) return;
+  forgetObjectUrl(photoId);
+  const cache = await openPhotoPreviewCache();
+  if (!cache) return;
+  await cache.delete(getCacheRequest(photoId));
+}
+
 export async function clearPhotoPreviewCache(): Promise<void> {
   objectUrlCache.forEach((objectUrl) => {
     URL.revokeObjectURL(objectUrl);

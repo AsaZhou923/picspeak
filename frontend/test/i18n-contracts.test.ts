@@ -185,3 +185,47 @@ test('score feedback labels are complete and preserve the direction of the AI sc
   assert.match(zhTranslations.score_feedback_hint, /AI 给分过高/);
   assert.match(zhTranslations.score_feedback_private, /不会直接调整/);
 });
+
+test('self-service deletion copy explains irreversibility, 24-hour file removal, and offline public links in every locale', async () => {
+  const deleteKeys = [
+    'delete_cancel',
+    'delete_review_action',
+    'delete_review_action_short',
+    'delete_review_dialog_label',
+    'delete_review_dialog_title',
+    'delete_review_dialog_body',
+    'delete_review_consequence_irreversible',
+    'delete_review_consequence_original',
+    'delete_review_consequence_public',
+    'delete_review_confirm',
+    'delete_review_busy',
+    'delete_review_done',
+    'delete_review_error',
+    'delete_generation_action',
+    'delete_generation_action_short',
+    'delete_generation_dialog_label',
+    'delete_generation_dialog_title',
+    'delete_generation_dialog_body',
+    'delete_generation_consequence_irreversible',
+    'delete_generation_consequence_file',
+    'delete_generation_confirm',
+    'delete_generation_busy',
+    'delete_generation_done',
+    'delete_generation_error',
+  ] as const;
+
+  for (const dictionary of [enTranslations, zhTranslations, jaTranslations]) {
+    for (const key of deleteKeys) {
+      assert.ok(dictionary[key].trim(), key);
+    }
+    assert.match(dictionary.delete_review_consequence_original, /24/);
+    assert.match(dictionary.delete_generation_consequence_file, /24/);
+    assert.match(dictionary.delete_review_consequence_irreversible, /cannot be restored|不可恢复|復元できません/);
+    assert.match(dictionary.delete_review_consequence_public, /gallery|长廊|ギャラリー/i);
+  }
+
+  const legalSource = await readFile(new URL('../src/components/marketing/LegalPageContent.tsx', import.meta.url), 'utf8');
+  assert.match(legalSource, /delete your critiques and generated images directly from their own/i);
+  assert.match(legalSource, /你可以直接在点评或生成图页面自行删除对应内容/);
+  assert.match(legalSource, /講評や生成画像は、それぞれのページからご自身で削除できます/);
+});

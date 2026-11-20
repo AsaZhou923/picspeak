@@ -226,6 +226,32 @@ export async function getReviewThumbnailSrc(
   return loadPromise;
 }
 
+export async function evictReviewThumbnailCache(photoId: string): Promise<void> {
+  if (!photoId) return;
+  const prefix = `${photoId}:`;
+  objectUrlCache.forEach((objectUrl, key) => {
+    if (key.startsWith(prefix)) {
+      URL.revokeObjectURL(objectUrl);
+      objectUrlCache.delete(key);
+    }
+  });
+  pendingLoads.forEach((_promise, key) => {
+    if (key.startsWith(prefix)) {
+      pendingLoads.delete(key);
+    }
+  });
+
+  const cache = await openThumbnailCache();
+  if (!cache) return;
+  const encodedPrefix = `${CACHE_PATH}${encodeURIComponent(photoId)}`;
+  const requests = await cache.keys();
+  await Promise.all(
+    requests
+      .filter((req) => new URL(req.url).pathname === encodedPrefix)
+      .map((req) => cache.delete(req))
+  );
+}
+
 export async function clearReviewThumbnailCache(): Promise<void> {
   objectUrlCache.forEach((objectUrl) => {
     URL.revokeObjectURL(objectUrl);

@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { AlertCircle, ChevronRight, RefreshCw } from 'lucide-react';
-import { getMyGenerations } from '@/lib/api';
+import { AlertCircle, ChevronRight, RefreshCw, Trash2 } from 'lucide-react';
+import { deleteGeneration, getMyGenerations } from '@/lib/api';
+import { DeleteConfirmDialog } from '@/components/ui/DeleteConfirmDialog';
 import { useAuth } from '@/lib/auth-context';
 import { GeneratedImageItem } from '@/lib/types';
 import { useI18n, type Locale } from '@/lib/i18n';
@@ -21,37 +22,57 @@ function formatDate(value: string, locale: Locale) {
   });
 }
 
-function GenerationCard({ item }: { item: GeneratedImageItem }) {
+function GenerationCard({
+  item,
+  onDelete,
+  deleteBusy,
+}: {
+  item: GeneratedImageItem;
+  onDelete: (item: GeneratedImageItem) => void;
+  deleteBusy: boolean;
+}) {
   const { t, locale } = useI18n();
 
   return (
-    <Link
-      href={`/generations/${item.generation_id}`}
-      className="ui-panel group grid gap-4 p-3 transition-colors hover:border-gold/40 hover:shadow-level-2 sm:grid-cols-[112px_minmax(0,1fr)_24px]"
-    >
-      <div className="relative aspect-square overflow-hidden rounded-control bg-void">
-        <Image
-          src={item.image_url}
-          alt={item.prompt}
-          fill
-          sizes="112px"
-          className="object-cover transition-transform duration-500 group-hover:scale-105"
-        />
-      </div>
-      <div className="min-w-0 py-1">
-        <div className="mb-2 flex flex-wrap items-center gap-2">
-          <span className="rounded-full border border-gold/30 bg-gold/10 px-2 py-0.5 text-[11px] text-gold">{t('generation_ai_badge')}</span>
-          <span className="rounded-full border border-border px-2 py-0.5 text-[11px] text-ink-muted">{item.quality}</span>
-          <span className="rounded-full border border-border px-2 py-0.5 text-[11px] text-ink-muted">{formatGenerationOutputSpec(item.quality, item.size)}</span>
-          <span className="rounded-full border border-border px-2 py-0.5 text-[11px] text-ink-muted">
-            {item.credits_charged} {t('generation_credits_unit')}
-          </span>
+    <div className="ui-panel flex items-center gap-3 p-3 transition-colors hover:border-gold/40 hover:shadow-level-2">
+      <Link
+        href={`/generations/${item.generation_id}`}
+        className="group grid min-w-0 flex-1 gap-4 sm:grid-cols-[112px_minmax(0,1fr)_24px]"
+      >
+        <div className="relative aspect-square overflow-hidden rounded-control bg-void">
+          <Image
+            src={item.image_url}
+            alt={item.prompt}
+            fill
+            sizes="112px"
+            className="object-cover transition-transform duration-500 group-hover:scale-105"
+          />
         </div>
-        <p className="line-clamp-2 text-sm leading-6 text-ink">{item.prompt}</p>
-        <p className="mt-2 font-mono text-xs text-ink-subtle">{formatDate(item.created_at, locale)}</p>
-      </div>
-      <ChevronRight size={16} className="hidden self-center text-ink-subtle transition-colors group-hover:text-gold sm:block" />
-    </Link>
+        <div className="min-w-0 py-1">
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <span className="rounded-full border border-gold/30 bg-gold/10 px-2 py-0.5 text-[11px] text-gold">{t('generation_ai_badge')}</span>
+            <span className="rounded-full border border-border px-2 py-0.5 text-[11px] text-ink-muted">{item.quality}</span>
+            <span className="rounded-full border border-border px-2 py-0.5 text-[11px] text-ink-muted">{formatGenerationOutputSpec(item.quality, item.size)}</span>
+            <span className="rounded-full border border-border px-2 py-0.5 text-[11px] text-ink-muted">
+              {item.credits_charged} {t('generation_credits_unit')}
+            </span>
+          </div>
+          <p className="line-clamp-2 text-sm leading-6 text-ink">{item.prompt}</p>
+          <p className="mt-2 font-mono text-xs text-ink-subtle">{formatDate(item.created_at, locale)}</p>
+        </div>
+        <ChevronRight size={16} aria-hidden="true" className="hidden self-center text-ink-subtle transition-colors group-hover:text-gold sm:block" />
+      </Link>
+      <button
+        type="button"
+        onClick={() => onDelete(item)}
+        disabled={deleteBusy}
+        aria-label={t('delete_generation_action')}
+        className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-full border border-rust/30 px-3 text-xs font-medium text-rust transition-colors hover:border-rust hover:bg-rust/10 disabled:opacity-50"
+      >
+        <Trash2 size={14} aria-hidden="true" />
+        <span className="hidden sm:inline">{t('delete_generation_action_short')}</span>
+      </button>
+    </div>
   );
 }
 
@@ -70,8 +91,19 @@ function GenerationHistory() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [moreError, setMoreError] = useState<unknown>(null);
+  const [deleteTarget, setDeleteTarget] = useState<GeneratedImageItem | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+  const [deleteFeedback, setDeleteFeedback] = useState('');
   const requestRef = useRef(0);
   const pendingRef = useRef(false);
+  const deleteRef = useRef(false);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   const fetchPage = useCallback(async (nextCursor?: string) => {
     if (pendingRef.current) return;
@@ -115,8 +147,58 @@ function GenerationHistory() {
     if (cursor) void fetchPage(cursor);
   };
 
+  const handleConfirmDelete = async () => {
+    const target = deleteTarget;
+    if (!target || deleteRef.current) return;
+    deleteRef.current = true;
+    const isOwnerCurrent = captureAuthOwner(userInfo?.user_id ?? null);
+    const isCurrent = () => mountedRef.current && isOwnerCurrent();
+    setDeleteBusy(true);
+    setDeleteError('');
+    setDeleteFeedback('');
+    try {
+      const token = await ensureToken();
+      if (!isCurrent()) return;
+      await deleteGeneration(target.generation_id, token);
+      if (!isCurrent()) return;
+      setItems((prev) => prev.filter((entry) => entry.generation_id !== target.generation_id));
+      setDeleteTarget(null);
+      setDeleteFeedback(t('delete_generation_done'));
+    } catch (err) {
+      if (isCurrent()) {
+        setDeleteError(formatUserFacingError(t, err, t('delete_generation_error')));
+      }
+    } finally {
+      deleteRef.current = false;
+      if (mountedRef.current) setDeleteBusy(false);
+    }
+  };
+
   return (
     <div className="min-h-screen">
+      {deleteTarget && (
+        <DeleteConfirmDialog
+          label={t('delete_generation_dialog_label')}
+          title={t('delete_generation_dialog_title')}
+          body={t('delete_generation_dialog_body')}
+          consequences={[
+            t('delete_generation_consequence_irreversible'),
+            t('delete_generation_consequence_file'),
+          ]}
+          cancelLabel={t('delete_cancel')}
+          confirmLabel={t('delete_generation_confirm')}
+          busyLabel={t('delete_generation_busy')}
+          busy={deleteBusy}
+          error={deleteError}
+          onClose={() => {
+            if (!deleteBusy) {
+              setDeleteTarget(null);
+              setDeleteError('');
+            }
+          }}
+          onConfirm={() => void handleConfirmDelete()}
+        />
+      )}
       <div className="mx-auto max-w-task px-6 py-12">
         <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -127,6 +209,12 @@ function GenerationHistory() {
             {t('generation_history_new')}
           </Link>
         </div>
+
+        {deleteFeedback && (
+          <div role="status" className="mb-5 rounded-control border border-sage/25 bg-sage/5 px-4 py-3 text-sm text-sage">
+            {deleteFeedback}
+          </div>
+        )}
 
         {loading ? (
           <div className="space-y-3">
@@ -152,7 +240,16 @@ function GenerationHistory() {
           <>
             <div className="space-y-3">
               {items.map((item) => (
-                <GenerationCard key={item.generation_id} item={item} />
+                <GenerationCard
+                  key={item.generation_id}
+                  item={item}
+                  deleteBusy={deleteBusy}
+                  onDelete={(target) => {
+                    setDeleteError('');
+                    setDeleteFeedback('');
+                    setDeleteTarget(target);
+                  }}
+                />
               ))}
             </div>
             {cursor && (

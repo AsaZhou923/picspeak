@@ -80,6 +80,7 @@ const LEGAL_COPY: Record<LegalPageKind, Record<Locale, LegalCopy>> = {
           title: 'Retention and choices',
           body: [
             'Retention depends on the workflow and plan. Guest results are designed for short-lived use, Free history may be limited, and Pro history may be retained so long as the account remains active and the feature is available.',
+            'You can delete your critiques and generated images directly from their own detail or history pages.',
             'You can contact us to request access, correction, deletion, or account help. Some records may be retained when needed for security, fraud prevention, legal, accounting, or dispute-resolution reasons.',
           ],
         },
@@ -151,6 +152,7 @@ const LEGAL_COPY: Record<LegalPageKind, Record<Locale, LegalCopy>> = {
           title: '保留时间与选择',
           body: [
             '保留时间取决于使用流程和套餐。游客结果面向短期使用，Free 历史可能受时间限制，Pro 历史可能在账号仍有效且功能可用时持续保留。',
+            '你可以直接在点评或生成图页面自行删除对应内容。',
             '你可以联系我们提出访问、更正、删除或账号处理请求。出于安全、防欺诈、法律、会计或争议处理需要，部分记录可能需要继续保留。',
           ],
         },
@@ -222,6 +224,7 @@ const LEGAL_COPY: Record<LegalPageKind, Record<Locale, LegalCopy>> = {
           title: '保存期間と選択肢',
           body: [
             '保存期間はワークフローとプランによって異なります。ゲスト結果は短期利用向け、Free 履歴は期間制限があり、Pro 履歴はアカウントが有効で機能が提供されている間保持されることがあります。',
+            '講評や生成画像は、それぞれのページからご自身で削除できます。',
             'アクセス、修正、削除、アカウントに関する依頼はメールで連絡できます。安全、不正防止、法令、会計、紛争対応のために一部記録を保持する場合があります。',
           ],
         },

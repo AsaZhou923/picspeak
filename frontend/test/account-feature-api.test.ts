@@ -10,9 +10,11 @@ function moduleUrl(source: string): string {
 }
 const typesUrl = moduleUrl(await readFile(new URL('../src/lib/types.ts', import.meta.url), 'utf8'));
 const downloadUrl = moduleUrl(await readFile(new URL('../src/lib/generation-download.ts', import.meta.url), 'utf8'));
+const galleryNavUrl = moduleUrl(await readFile(new URL('../src/lib/gallery-navigation.ts', import.meta.url), 'utf8'));
 const source = (await readFile(new URL('../src/lib/api.ts', import.meta.url), 'utf8'))
   .replaceAll("'./types'", JSON.stringify(typesUrl))
-  .replaceAll("'./generation-download'", JSON.stringify(downloadUrl));
+  .replaceAll("'./generation-download'", JSON.stringify(downloadUrl))
+  .replaceAll("'./gallery-navigation'", JSON.stringify(galleryNavUrl));
 const api = await import(moduleUrl(source));
 
 test('feedback requests bind the displayed score and personal record versions and support cancellation', async (t) => {
@@ -78,4 +80,29 @@ test('401 on account features never invokes the guest recovery handler or create
   assert.equal(recoveryCalls, 0);
   assert.equal(requestCalls, 2);
   api.registerUnauthorizedHandler(null);
+});
+
+test('deleteReview and deleteGeneration call DELETE endpoints, accept 204, and list reads bypass HTTP cache', async (t) => {
+  const calls: Array<{ url: URL; options: RequestInit }> = [];
+  t.mock.method(globalThis, 'fetch', async (input: string, options: RequestInit) => {
+    calls.push({ url: new URL(input), options });
+    if (options.method === 'DELETE') {
+      return new Response(null, { status: 204 });
+    }
+    return new Response(JSON.stringify({ items: [], next_cursor: null }), {
+      headers: { 'Content-Type': 'application/json' },
+    });
+  });
+
+  await api.deleteReview('rev/1', 'owner-token');
+  await api.deleteGeneration('gen/1', 'owner-token');
+  await api.getMyReviews('owner-token');
+  await api.getMyGenerations('owner-token');
+
+  assert.equal(calls[0].options.method, 'DELETE');
+  assert.ok(calls[0].url.pathname.endsWith('/reviews/rev%2F1'));
+  assert.equal(calls[1].options.method, 'DELETE');
+  assert.ok(calls[1].url.pathname.endsWith('/generations/gen%2F1'));
+  assert.equal(calls[2].options.cache, 'no-store');
+  assert.equal(calls[3].options.cache, 'no-store');
 });

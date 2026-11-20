@@ -25,9 +25,11 @@ import {
 import { useReviewDetail } from '@/features/reviews/hooks/useReviewDetail';
 import { useReviewPhoto } from '@/features/reviews/hooks/useReviewPhoto';
 import { useReviewActions } from '@/features/reviews/hooks/useReviewActions';
+import { resolvePostDeleteReviewHref } from '@/features/reviews/hooks/reviewActionSupport';
 import { useReviewUsage } from '@/features/reviews/hooks/useReviewUsage';
 import { CritiqueSection } from '@/features/reviews/components/CritiqueSection';
 import { GalleryConfirmDialog } from '@/features/reviews/components/GalleryConfirmDialog';
+import { DeleteConfirmDialog } from '@/components/ui/DeleteConfirmDialog';
 import {
   ReviewMetadataPanel,
   ReviewPhotoPanel,
@@ -171,11 +173,23 @@ export default function ReviewPage() {
     zoomOpen, setZoomOpen, zoomMounted, setZoomMounted,
   } = useReviewPhoto({ review, setReview, initialPhotoUrl });
   const {
-    galleryConfirmOpen, setGalleryConfirmOpen, actionBusy, actionFeedback, actionError,
+    galleryConfirmOpen, setGalleryConfirmOpen,
+    deleteConfirmOpen, setDeleteConfirmOpen, deleteError,
+    actionBusy, actionFeedback, actionError,
     galleryActionCopy, favoriteCopy,
     handleGalleryToggle, submitGalleryToggle,
     handleFavoriteToggle,
-  } = useReviewActions({ review, setReview });
+    handleDeleteOpen, handleDeleteConfirm,
+  } = useReviewActions({
+    review,
+    setReview,
+    onDeleted: () => {
+      const targetHref = resolvePostDeleteReviewHref(backHref, userInfo?.plan);
+      if (typeof router.replace === 'function') router.replace(targetHref);
+      else router.push(targetHref);
+      router.refresh?.();
+    },
+  });
   const { usage, usageError } = useReviewUsage();
 
   function handleDimClick(dimKey: string) {
@@ -432,6 +446,26 @@ export default function ReviewPage() {
         />
       )}
 
+      {showOwnerActions && deleteConfirmOpen && (
+        <DeleteConfirmDialog
+          label={t('delete_review_dialog_label')}
+          title={t('delete_review_dialog_title')}
+          body={t('delete_review_dialog_body')}
+          consequences={[
+            t('delete_review_consequence_irreversible'),
+            t('delete_review_consequence_original'),
+            t('delete_review_consequence_public'),
+          ]}
+          cancelLabel={t('delete_cancel')}
+          confirmLabel={t('delete_review_confirm')}
+          busyLabel={t('delete_review_busy')}
+          busy={actionBusy === 'delete'}
+          error={deleteError}
+          onClose={() => setDeleteConfirmOpen(false)}
+          onConfirm={() => void handleDeleteConfirm()}
+        />
+      )}
+
       <div
         ref={recheckExposureRef}
         className={`mx-auto max-w-workspace px-5 sm:px-6 ${isDemoReview ? 'py-6 sm:py-8' : 'py-10 sm:py-12'}`}
@@ -530,6 +564,7 @@ export default function ReviewPage() {
                   onFavoriteToggle={handleFavoriteToggle}
                   onShareLink={handleOpenSharing}
                   onExportSummary={handleOpenExportTools}
+                  onDeleteReview={handleDeleteOpen}
                   t={t}
                 />
                 {actionError && (
