@@ -23,7 +23,7 @@ from app.api.deps import CurrentActor, get_current_actor, get_db
 from app.api.routers import generations
 from app.db.models import (
     GeneratedImage, GenerationCreditReservation, IdempotencyKey, ImageGenerationTask,
-    User, UserPlan, UserStatus,
+    Photo, PhotoStatus, Review, ReviewMode, ReviewStatus, User, UserPlan, UserStatus,
 )
 
 
@@ -32,15 +32,27 @@ class GenerationReuseIdempotencyTests(unittest.TestCase):
     assert_state = create_tests.GenerationCreateIdempotencyTests.assert_state
     assert_conflict = create_tests.GenerationCreateIdempotencyTests.assert_conflict
 
-    def seed_image(self, public_id='gen_reusable', owner_id=1):
+    def seed_image(self, public_id='gen_reusable', owner_id=1, source_photo_id=None, source_review_id=None):
         with self.Session() as db:
             db.add(GeneratedImage(
                 public_id=public_id, owner_user_id=owner_id, object_bucket='test', object_key=public_id,
                 intent='photo_inspiration', generation_mode='general', prompt='private reusable source prompt',
                 model_name='gpt-image-2', model_snapshot='original-model', quality='low', size='1024x1024',
                 output_format='webp', credits_charged=1, metadata_json={'locale': 'en', 'style': 'realistic'},
+                source_photo_id=source_photo_id, source_review_id=source_review_id,
             ))
             db.commit()
+
+    def seed_photo(self, *, owner_id=1, status=PhotoStatus.READY):
+        with self.Session() as db:
+            photo = Photo(
+                public_id='pho_' + uuid4().hex, owner_user_id=owner_id, upload_id=uuid4().hex,
+                bucket='test', object_key=uuid4().hex, content_type='image/jpeg', size_bytes=512,
+                status=status, exif_data={}, client_meta={},
+            )
+            db.add(photo)
+            db.commit()
+            return photo.id
 
     def post(self, source='gen_reusable', key='reuse-key', query=''):
         return self.client.post(f'/api/v1/generations/{source}/reuse{query}', headers={'Idempotency-Key': key} if key else {})
@@ -53,6 +65,69 @@ class GenerationReuseIdempotencyTests(unittest.TestCase):
         self.assertEqual(retry.status_code, 200, retry.text)
         self.assertEqual(first.json(), retry.json())
         self.assert_state(1)
+
+    def test_new_reuse_rejects_nonready_or_missing_reference_without_task_or_hold(self):
+        for state in PhotoStatus:
+            if state == PhotoStatus.READY:
+                continue
+            with self.subTest(state=state):
+                photo_id = self.seed_photo(status=state)
+                public_id = 'gen_' + uuid4().hex
+                self.seed_image(public_id, source_photo_id=photo_id)
+                for key in (uuid4().hex, None):
+                    response = self.post(source=public_id, key=key)
+                    expected = (410, 'PHOTO_ORIGINAL_EXPIRED') if state in (PhotoStatus.PURGING, PhotoStatus.PURGED) else (400, 'PHOTO_NOT_READY')
+                    self.assertEqual((response.status_code, response.json()['detail']['code']), expected)
+        self.seed_image('gen_missing', source_photo_id=999999)
+        response = self.post(source='gen_missing')
+        self.assertEqual((response.status_code, response.json()['detail']['code']), (400, 'PHOTO_NOT_READY'))
+        self.assert_state(0)
+        self.enqueue.assert_not_called()
+
+    def test_completed_keyed_reference_replay_survives_purge_but_new_reuse_is_rejected(self):
+        photo_id = self.seed_photo()
+        self.seed_image(source_photo_id=photo_id)
+        first = self.post()
+        self.assertEqual(first.status_code, 200, first.text)
+        with self.Session() as db:
+            task = db.query(ImageGenerationTask).one()
+            task.status = generations.TaskStatus.SUCCEEDED
+            db.get(Photo, photo_id).status = PhotoStatus.PURGED
+            db.commit()
+        self.assertEqual(self.post().json(), first.json())
+        self.assert_conflict(self.post(query='?analytics_source=history'))
+        for key in ('new-reference-key', None):
+            response = self.post(key=key)
+            self.assertEqual((response.status_code, response.json()['detail']['code']), (410, 'PHOTO_ORIGINAL_EXPIRED'))
+        with self.Session() as db:
+            self.assertEqual(db.query(ImageGenerationTask).count(), 1)
+            self.assertEqual(db.query(GenerationCreditReservation).count(), 1)
+        self.assertEqual(self.enqueue.call_count, 1)
+
+    def test_reuse_rejects_foreign_photo_and_deleted_or_foreign_linked_review(self):
+        foreign_photo_id = self.seed_photo(owner_id=2)
+        self.seed_image('gen_foreign_photo', source_photo_id=foreign_photo_id)
+        response = self.post(source='gen_foreign_photo')
+        self.assertEqual((response.status_code, response.json()['detail']['code']), (404, 'SOURCE_PHOTO_NOT_FOUND'))
+        photo_id = self.seed_photo()
+        for deleted, owner_id in ((True, 1), (False, 2)):
+            with self.subTest(deleted=deleted, owner_id=owner_id):
+                with self.Session() as db:
+                    review = Review(
+                        public_id='rev_' + uuid4().hex, photo_id=photo_id, owner_user_id=owner_id,
+                        mode=ReviewMode.flash, status=ReviewStatus.SUCCEEDED, image_type='default',
+                        schema_version='2.0', result_json={}, final_score=7,
+                        deleted_at=datetime.now(timezone.utc) if deleted else None,
+                    )
+                    db.add(review)
+                    db.commit()
+                    review_id = review.id
+                public_id = 'gen_' + uuid4().hex
+                self.seed_image(public_id, source_photo_id=photo_id, source_review_id=review_id)
+                response = self.post(source=public_id)
+                self.assertEqual((response.status_code, response.json()['detail']['code']), (404, 'SOURCE_REVIEW_NOT_FOUND'))
+        self.assert_state(0)
+        self.enqueue.assert_not_called()
 
     def test_new_key_or_legacy_missing_key_is_an_intentional_repeat(self):
         self.seed_image()

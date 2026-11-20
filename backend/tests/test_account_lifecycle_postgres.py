@@ -34,6 +34,9 @@ from app.api.routers.auth_support import (  # noqa: E402
 from app.api.routers.gallery_support import _public_gallery_filters  # noqa: E402
 from app.db.models import (  # noqa: E402
     Base,
+    GeneratedImage,
+    GenerationCreditReservation,
+    ImageGenerationTask,
     RateLimitCounter,
     Photo,
     PhotoStatus,
@@ -1365,6 +1368,60 @@ class AccountLifecycleConcurrencyPostgresTests(unittest.TestCase):
         self.assertEqual(len(outcome), 1)
         self.assertIsInstance(outcome[0], HTTPException)
         self.assertEqual((outcome[0].status_code, outcome[0].detail['code']), (410, 'PHOTO_ORIGINAL_EXPIRED'))
+
+    def test_generation_reuse_waits_on_photo_before_owner_and_rejects_completed_purge(self) -> None:
+        for keyed in (False, True):
+            with self.subTest(keyed=keyed):
+                with self.Session() as db:
+                    user = self._make_user(db, plan=UserPlan.pro)
+                    photo = self._make_photo(db, user, uuid4().hex[:8])
+                    image = GeneratedImage(
+                        public_id='gen_' + uuid4().hex, owner_user_id=user.id, source_photo_id=photo.id,
+                        object_bucket='test', object_key=uuid4().hex, intent='photo_inspiration',
+                        generation_mode='general', prompt='A landscape photo', model_name='gpt-image-2',
+                        quality='low', size='1024x1024', output_format='webp', credits_charged=3, metadata_json={},
+                    )
+                    db.add(image)
+                    db.commit()
+                    user_id, photo_id, generation_id = user.id, photo.id, image.public_id
+
+                outcome: list[object] = []
+
+                def reuse():
+                    try:
+                        with self.Session() as db:
+                            actor = CurrentActor(db.get(User, user_id))
+                            request = Request({
+                                'type': 'http', 'method': 'POST', 'path': '/', 'query_string': b'',
+                                'headers': [(b'idempotency-key', b'reuse-lock-test')] if keyed else [],
+                            })
+                            with (
+                                patch.object(generations.settings, 'cloud_tasks_enabled', False),
+                                patch.object(generations, 'deliver_generation_request_event'),
+                            ):
+                                outcome.append(generations.reuse_generation(generation_id, request, db, actor))
+                    except BaseException as exc:
+                        outcome.append(exc)
+
+                with self.engine.connect() as purge:
+                    purge.execute(text('SELECT id FROM photos WHERE id = :id FOR UPDATE'), {'id': photo_id})
+                    thread = threading.Thread(target=reuse)
+                    thread.start()
+                    try:
+                        self._wait_for_lock_waiter()
+                        self.assertTrue(self._row_is_unlocked('users', user_id))
+                        purge.execute(text("UPDATE photos SET status = 'PURGED' WHERE id = :id"), {'id': photo_id})
+                        purge.commit()
+                    finally:
+                        purge.rollback()
+                        thread.join(timeout=15)
+                self.assertFalse(thread.is_alive())
+                self.assertEqual(len(outcome), 1)
+                self.assertIsInstance(outcome[0], HTTPException)
+                self.assertEqual((outcome[0].status_code, outcome[0].detail['code']), (410, 'PHOTO_ORIGINAL_EXPIRED'))
+                with self.Session() as db:
+                    self.assertEqual(db.query(ImageGenerationTask).count(), 0)
+                    self.assertEqual(db.query(GenerationCreditReservation).count(), 0)
 
     def test_concurrent_duplicate_migrations_serialize_and_never_double_report(self) -> None:
         for strict in (True, False):
