@@ -7,7 +7,7 @@ from fastapi import Request
 from sqlalchemy import Float, cast, func, select
 from sqlalchemy.orm import Session
 
-from app.db.models import Photo, Review, ReviewLike, User
+from app.db.models import Photo, Review, ReviewLike, User, UserStatus
 from app.gallery_scoreboard_schemas import (
     GalleryNeighborItem,
     GalleryNeighborsResponse,
@@ -56,6 +56,8 @@ def _scoreboard_item_from_public(item: PublicGalleryItem) -> GalleryScoreboardIt
 
 
 def _owner_profile_url(owner: User) -> str | None:
+    if getattr(owner, 'status', UserStatus.active) != UserStatus.active:
+        return None
     if not bool(getattr(owner, 'public_profile_enabled', False)):
         return None
     public_profile_id = (getattr(owner, 'public_profile_id', None) or '').strip()
@@ -84,6 +86,8 @@ def build_gallery_scoreboard(
             partition_by=(Review.owner_user_id, Review.photo_id),
             order_by=(Review.gallery_added_at.desc(), Review.id.desc()),
         ).label('photo_rank'),
+    ).join(
+        User, User.id == Review.owner_user_id,
     ).where(
         *_public_gallery_filters(),
         Review.gallery_added_at >= window_start,

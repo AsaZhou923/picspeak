@@ -126,16 +126,12 @@ def decide_photo(facts: PhotoFacts, *, now: datetime, grace_until: datetime | No
         # Every critique of this photo was deleted by its owner.
         expires_at = _utc(facts.latest_deleted_review_at or created_at) + DELETED_REVIEW_GRACE
         reason = 'reviews_deleted'
-    elif owner.plan == UserPlan.guest:
-        if owner.status == UserStatus.deleted:
-            # Guest accounts are marked deleted after a sign-up migration that may have
-            # skipped records (GitHub issue #55). Keep them until that is resolved.
-            return Decision(False, 'guest_migration_pending')
-        activity = _max(created_at, _utc(facts.latest_active_review_at))
-        expires_at, reason = activity + timedelta(days=GUEST_ORIGINAL_DAYS), 'guest_expired'
     elif owner.status == UserStatus.deleted:
         deleted_at = _utc(owner.updated_at) or created_at
         expires_at, reason = deleted_at + timedelta(days=DELETED_ACCOUNT_DAYS), 'account_deleted'
+    elif owner.plan == UserPlan.guest:
+        activity = _max(created_at, _utc(facts.latest_active_review_at))
+        expires_at, reason = activity + timedelta(days=GUEST_ORIGINAL_DAYS), 'guest_expired'
     elif owner.pro_active:
         return Decision(False, 'pro_active')
     else:
@@ -215,12 +211,16 @@ def collect_photo_facts(db: Session, photos: list[Photo], *, now: datetime) -> d
             and isinstance((item.result_json or {}).get('_history_retention'), dict)
             and item.result_json['_history_retention'].get('policy_version') == 'free-private-history-v1'
         )]
+        owner_facts = owners[photo.owner_user_id]
         facts[photo.id] = PhotoFacts(
             status=photo.status,
             created_at=_utc(photo.created_at),
-            owner=owners[photo.owner_user_id],
+            owner=owner_facts,
             has_live_task=photo.id in live,
-            has_public_review=any(review_is_public(item) for item in active),
+            has_public_review=(
+                owner_facts.status != UserStatus.deleted
+                and any(review_is_public(item) for item in active)
+            ),
             review_count=len(items),
             active_review_count=len(active),
             # Policy tombstones preserve the original expiry clock. They must

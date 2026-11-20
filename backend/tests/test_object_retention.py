@@ -108,9 +108,32 @@ def test_guest_originals_expire_after_seven_days(days, purge):
     assert decision.purge is purge
 
 
-def test_migrated_guest_records_wait_for_the_migration_fix():
-    decision = decide_photo(facts(owner=owner(plan=UserPlan.guest, status=UserStatus.deleted)), now=NOW)
-    assert (decision.purge, decision.reason) == (False, 'guest_migration_pending')
+@pytest.mark.parametrize('days,purge,reason', [
+    (6, False, 'within_retention'),
+    (8, True, 'account_deleted'),
+])
+def test_deleted_guest_follows_deleted_account_retention_after_migration_fix(days, purge, reason):
+    decision = decide_photo(
+        facts(
+            owner=owner(plan=UserPlan.guest, status=UserStatus.deleted, updated_at=NOW - timedelta(days=days)),
+            created_at=NOW - timedelta(days=40),
+        ),
+        now=NOW,
+    )
+    assert (decision.purge, decision.reason) == (purge, reason)
+
+
+def test_deleted_guest_honours_grace_until():
+    grace = NOW + timedelta(days=5)
+    decision = decide_photo(
+        facts(
+            owner=owner(plan=UserPlan.guest, status=UserStatus.deleted, updated_at=NOW - timedelta(days=10)),
+            created_at=NOW - timedelta(days=40),
+        ),
+        now=NOW,
+        grace_until=grace,
+    )
+    assert (decision.purge, decision.reason, decision.expires_at) == (False, 'within_retention', grace)
 
 
 def test_deleted_critiques_release_the_original_after_a_day_even_for_pro():

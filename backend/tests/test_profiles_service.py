@@ -54,7 +54,7 @@ class ProfileServiceTests(unittest.TestCase):
 
     def test_disabled_profile_settings_do_not_return_public_id(self) -> None:
         db = MagicMock()
-        db.query.return_value.join.return_value.filter.return_value.scalar.return_value = 5
+        db.query.return_value.join.return_value.join.return_value.filter.return_value.scalar.return_value = 5
         user = SimpleNamespace(
             id=123,
             public_profile_id='upp_existing',

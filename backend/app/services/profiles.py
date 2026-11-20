@@ -45,6 +45,7 @@ def _gallery_review_count(db: Session, user: User) -> int:
     return int(
         db.query(func.count(Review.id))
         .join(Photo, Photo.id == Review.photo_id)
+        .join(User, User.id == Review.owner_user_id)
         .filter(*_public_profile_filters(user))
         .scalar()
         or 0
@@ -56,6 +57,7 @@ def _gallery_total_like_count(db: Session, user: User) -> int:
         db.query(func.count(ReviewLike.id))
         .join(Review, Review.id == ReviewLike.review_id)
         .join(Photo, Photo.id == Review.photo_id)
+        .join(User, User.id == Review.owner_user_id)
         .filter(*_public_profile_filters(user))
         .scalar()
         or 0
@@ -178,6 +180,7 @@ def get_public_profile(
     query = (
         db.query(Review, Photo)
         .join(Photo, Photo.id == Review.photo_id)
+        .join(User, User.id == Review.owner_user_id)
         .filter(*_public_profile_filters(user))
         .order_by(Review.gallery_added_at.desc(), Review.id.desc())
     )

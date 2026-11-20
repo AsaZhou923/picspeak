@@ -169,11 +169,16 @@ def _gallery_like_count(db: Session, review_id: int) -> int:
 
 
 def _public_gallery_filters() -> tuple[Any, ...]:
+  """Approved, visible Gallery critiques owned by an active account.
+
+  Callers must join the review owner (``User`` on ``User.id == Review.owner_user_id``).
+  """
   return (
     Review.deleted_at.is_(None),
     Review.status == ReviewStatus.SUCCEEDED,
     Review.gallery_visible == True,  # noqa: E712
     Review.gallery_audit_status == GALLERY_AUDIT_APPROVED,
+    User.status == UserStatus.active,
   )
 
 
@@ -190,12 +195,16 @@ def _indexable_gallery_filters() -> tuple[Any, ...]:
   return (
     *_public_gallery_filters(),
     Photo.status == PhotoStatus.READY,
-    User.status == UserStatus.active,
   )
 
 
 def _find_public_gallery_review(db: Session, review_public_id: str) -> Review:
-  review = db.query(Review).filter(Review.public_id == review_public_id, *_public_gallery_filters()).first()
+  review = (
+    db.query(Review)
+    .join(User, User.id == Review.owner_user_id)
+    .filter(Review.public_id == review_public_id, *_public_gallery_filters())
+    .first()
+  )
   if review is None:
     raise api_error(status.HTTP_404_NOT_FOUND, 'REVIEW_NOT_FOUND', 'Review not found')
   return review
@@ -232,6 +241,7 @@ def _gallery_recommendation_map(db: Session, review_ids: list[int]) -> dict[int,
       func.percent_rank().over(order_by=Review.final_score).label('global_percent_rank'),
       func.percent_rank().over(partition_by=Review.image_type, order_by=Review.final_score).label('type_percent_rank'),
     )
+    .join(User, User.id == Review.owner_user_id)
     .filter(*_public_gallery_filters())
     .subquery()
   )

@@ -85,6 +85,7 @@ class PublicGalleryRouteTests(unittest.TestCase):
         )
         ranked_reviews.c.review_id.in_.return_value = object()
         ranking_query = MagicMock()
+        ranking_query.join.return_value = ranking_query
         ranking_query.filter.return_value = ranking_query
         ranking_query.subquery.return_value = ranked_reviews
         result_query = MagicMock()
@@ -127,6 +128,7 @@ class PublicGalleryRouteTests(unittest.TestCase):
         db = MagicMock()
 
         count_query = MagicMock()
+        count_query.join.return_value = count_query
         count_query.filter.return_value = count_query
         count_query.scalar.return_value = 19
 
@@ -206,6 +208,7 @@ class PublicGalleryRouteTests(unittest.TestCase):
         db = MagicMock()
 
         count_query = MagicMock()
+        count_query.join.return_value = count_query
         count_query.filter.return_value = count_query
         count_query.scalar.return_value = 0
 

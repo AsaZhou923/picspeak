@@ -10,7 +10,8 @@ from urllib.parse import quote, urlsplit, urlunsplit
 
 from fastapi import APIRouter, Depends, Header, Query, Request, Response, status
 from PIL import Image, ImageOps, UnidentifiedImageError
-from sqlalchemy.orm import Session
+from sqlalchemy import exists
+from sqlalchemy.orm import Session, aliased
 
 from app.api.deps import get_db
 from app.core.errors import api_error
@@ -276,6 +277,7 @@ def _find_photo_owned(db: Session, photo_public_id: str, owner_user_id: int) -> 
 
 
 def _find_public_gallery_photo(db: Session, review_public_id: str) -> tuple[Photo, Review]:
+    review_author = aliased(User)
     row = (
         db.query(Photo, Review)
         .join(Review, Review.photo_id == Photo.id)
@@ -288,6 +290,10 @@ def _find_public_gallery_photo(db: Session, review_public_id: str) -> tuple[Phot
             Review.gallery_audit_status == 'approved',
             Photo.status == PhotoStatus.READY,
             User.status == UserStatus.active,
+            exists().where(
+                review_author.id == Review.owner_user_id,
+                review_author.status == UserStatus.active,
+            ),
         )
         .first()
     )
