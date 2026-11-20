@@ -23,8 +23,10 @@ from app.api.routers.generations import (  # noqa: E402
     GENERATION_IMAGE_CACHE_CONTROL,
     GENERATION_IMAGE_STABLE_WINDOW_SECONDS,
     GENERATION_IMAGE_TOKEN_PURPOSE,
+    GENERATION_IMAGE_TTL_SECONDS,
     _build_generated_image_url,
     _generation_item_payload,
+    _iter_storage_body,
     _mark_generation_dispatch_failed,
     _record_generation_event,
     download_generation,
@@ -379,6 +381,9 @@ class ImageGenerationRoutesTests(unittest.TestCase):
         build_storage_url.assert_not_called()
 
     def test_generated_image_proxy_url_stays_stable_across_calls_in_window(self) -> None:
+        self.assertEqual(GENERATION_IMAGE_TTL_SECONDS, 24 * 3600)
+        self.assertEqual(GENERATION_IMAGE_STABLE_WINDOW_SECONDS, 24 * 3600)
+        self.assertEqual(GENERATION_IMAGE_CACHE_CONTROL, 'private, max-age=3600, stale-while-revalidate=86400')
         request = SimpleNamespace(
             base_url='https://api.picspeak.art/',
             headers={'host': 'api.picspeak.art'},
@@ -396,6 +401,71 @@ class ImageGenerationRoutesTests(unittest.TestCase):
 
         self.assertEqual(first, second)
         self.assertNotEqual(first, next_window)
+
+    def test_generation_image_proxy_enforces_byte_limit_while_streaming_unknown_length(self) -> None:
+        now = datetime(2026, 11, 1, 12, 0, tzinfo=timezone.utc)
+        image = SimpleNamespace(
+            public_id='gen_stream_cap',
+            object_bucket='generated',
+            object_key='generated/user_usr_owner/2026/11/gen_stream_cap.webp',
+            content_type='image/webp',
+            deleted_at=None,
+            object_purged_at=None,
+            created_at=now,
+            updated_at=now,
+        )
+        db = MagicMock()
+        db.query.return_value.join.return_value.filter.return_value.first.return_value = image
+        token = sign_payload({'generation_id': 'gen_stream_cap', 'uid': 'usr_owner'}, ttl_seconds=3600, purpose=GENERATION_IMAGE_TOKEN_PURPOSE)
+
+        closed = False
+        read_chunks = 0
+
+        class ChunkedBody:
+            def iter_chunks(self, chunk_size: int = 64 * 1024):
+                nonlocal read_chunks
+                for chunk in (b'12345678', b'abcdefgh', b'never-read'):
+                    read_chunks += 1
+                    yield chunk
+
+            def close(self):
+                nonlocal closed
+                closed = True
+
+        storage = MagicMock()
+        storage.get_object.return_value = {
+            'ContentType': 'image/webp',
+            'Body': ChunkedBody(),
+        }
+
+        with (
+            patch('app.api.routers.generations.get_object_storage_client', return_value=storage),
+            patch('app.api.routers.generations.settings.image_generation_download_max_bytes', 10),
+        ):
+            import asyncio
+
+            response = get_generation_image('gen_stream_cap', generation_token=token, if_none_match=None, db=db)
+            emitted: list[bytes] = []
+
+            async def drain() -> None:
+                async for chunk in response.body_iterator:
+                    emitted.append(chunk)
+
+            with self.assertRaises(HTTPException) as raised:
+                asyncio.run(drain())
+
+        self.assertEqual(raised.exception.status_code, 413)
+        self.assertEqual(raised.exception.detail['code'], 'GENERATION_IMAGE_TOO_LARGE')
+        self.assertEqual(emitted, [b'12345678'])
+        self.assertEqual(read_chunks, 2)
+        self.assertTrue(closed)
+
+        # Also verify file-like body without iter_chunks stops and closes at limit.
+        raw_body = BytesIO(b'x' * 25)
+        with self.assertRaises(HTTPException) as raw_raised:
+            list(_iter_storage_body(raw_body, max_bytes=10))
+        self.assertEqual(raw_raised.exception.status_code, 413)
+        self.assertTrue(raw_body.closed)
 
     def test_generation_image_proxy_serves_private_cached_image_and_304(self) -> None:
         now = datetime(2026, 11, 1, 12, 0, tzinfo=timezone.utc)

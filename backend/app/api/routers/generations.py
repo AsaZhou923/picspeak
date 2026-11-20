@@ -63,9 +63,9 @@ router = APIRouter(tags=['generations'])
 logger = logging.getLogger(__name__)
 
 GENERATION_IMAGE_TOKEN_PURPOSE = 'generation_image_proxy'
-GENERATION_IMAGE_TTL_SECONDS = 7 * 24 * 3600
-GENERATION_IMAGE_STABLE_WINDOW_SECONDS = 7 * 24 * 3600
-GENERATION_IMAGE_CACHE_CONTROL = 'private, max-age=86400, stale-while-revalidate=604800'
+GENERATION_IMAGE_TTL_SECONDS = 24 * 3600
+GENERATION_IMAGE_STABLE_WINDOW_SECONDS = GENERATION_IMAGE_TTL_SECONDS
+GENERATION_IMAGE_CACHE_CONTROL = 'private, max-age=3600, stale-while-revalidate=86400'
 
 
 def _encode_generation_cursor(image: GeneratedImage) -> str:
@@ -433,7 +433,7 @@ def get_generation_image(
     if content_length is not None:
         headers['Content-Length'] = str(content_length)
     return StreamingResponse(
-        _iter_storage_body(storage_response['Body']),
+        _iter_storage_body(storage_response['Body'], max_bytes=max_bytes),
         media_type=content_type,
         headers=headers,
     )
@@ -741,12 +741,39 @@ def _find_generation_from_token(db: Session, generation_id: str, generation_toke
     return image
 
 
-def _iter_storage_body(body: Any, chunk_size: int = 64 * 1024):
+def _iter_storage_body(body: Any, *, max_bytes: int | None = None, chunk_size: int = 64 * 1024):
+    effective_chunk_size = chunk_size
+    if max_bytes is not None and max_bytes >= 0:
+        effective_chunk_size = min(chunk_size, max_bytes + 1)
+    bytes_streamed = 0
     try:
         if hasattr(body, 'iter_chunks'):
-            yield from body.iter_chunks(chunk_size=chunk_size)
+            try:
+                chunks = body.iter_chunks(chunk_size=effective_chunk_size)
+            except TypeError:
+                chunks = body.iter_chunks()
+            for chunk in chunks:
+                if not chunk:
+                    continue
+                bytes_streamed += len(chunk)
+                if max_bytes is not None and bytes_streamed > max_bytes:
+                    raise api_error(
+                        status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                        'GENERATION_IMAGE_TOO_LARGE',
+                        'Generated image exceeds the size limit',
+                        max_bytes=max_bytes,
+                    )
+                yield chunk
         else:
-            while chunk := body.read(chunk_size):
+            while chunk := body.read(effective_chunk_size):
+                bytes_streamed += len(chunk)
+                if max_bytes is not None and bytes_streamed > max_bytes:
+                    raise api_error(
+                        status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                        'GENERATION_IMAGE_TOO_LARGE',
+                        'Generated image exceeds the size limit',
+                        max_bytes=max_bytes,
+                    )
                 yield chunk
     finally:
         close = getattr(body, 'close', None)
