@@ -1,5 +1,31 @@
 [
   {
+    "id": "2026-11-20-easier-management-and-reliable-sign-in",
+    "date": "2026-11-20",
+    "showPopup": false,
+    "title": "作品管理更方便，登录与浏览更稳定",
+    "summary": "自行管理已保存的作品、登录时接续游客作品，同时减少图片重复加载和请求日志中的个人信息。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-11-20-easier-management-and-reliable-sign-in",
+    "sections": [
+      {
+        "title": "作品管理与登录",
+        "items": [
+          "可以在详情页和历史记录中删除点评及生成图，确认窗口会说明对公开链接和文件保留的影响。",
+          "游客登录后，照片、点评和进行中的任务会完整转入账号，已受理的点评沿用提交时的额度。",
+          "登录服务加载失败时，更快显示游客入口。"
+        ]
+      },
+      {
+        "title": "浏览与隐私",
+        "items": [
+          "长廊和历史图片减少重复加载。",
+          "删除账号后，作品退出长廊和公开分享。",
+          "新请求日志跳过提示词、笔记等提交正文，并截断 IP 地址。"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-11-19-steadier-limits-and-view-counts",
     "date": "2026-11-19",
     "showPopup": false,

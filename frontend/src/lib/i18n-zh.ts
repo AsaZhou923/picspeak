@@ -85,8 +85,8 @@ export const zhTranslations = {
   pro_offer_label: '',
   pro_offer_highlight: 'Pro',
   updates_label: '更新记录',
-  updates_hint_home: "使用限制更稳定，文章阅读数更可信",
-  updates_hint_latest: "使用限制更稳定，文章阅读数更可信",
+  updates_hint_home: "作品管理更方便，登录与浏览更稳定",
+  updates_hint_latest: "作品管理更方便，登录与浏览更稳定",
   contact_label: '联系',
   contact_headline: '联系我',
 
