@@ -20,9 +20,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import CurrentActor, get_current_actor, get_db, new_public_id
 from app.api.routers.photos import (
     ALLOWED_CONTENT_TYPES,
-    PHOTO_THUMBNAIL_SIZE,
     _build_photo_proxy_url,
-    _find_photo_owned,
 )
 from app.core.config import settings
 from app.core.errors import ApiHTTPException, api_error

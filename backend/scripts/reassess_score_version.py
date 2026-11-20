@@ -16,7 +16,7 @@ from typing import Any, Callable, Iterator
 from contextlib import contextmanager
 
 from sqlalchemy import text
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:

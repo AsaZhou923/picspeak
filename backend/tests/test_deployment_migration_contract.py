@@ -64,12 +64,12 @@ class DeploymentMigrationContractTests(unittest.TestCase):
         self.assertIn(f'--update-env-vars {expected} ^', script)
 
     def test_ci_runs_real_postgres_migration_cycles(self) -> None:
-        for workflow_name in ('ci.yml', 'pr-ci.yml'):
-            workflow = (REPO_ROOT / '.github' / 'workflows' / workflow_name).read_text(encoding='utf-8')
-            self.assertIn('image: postgres:17-alpine', workflow)
-            self.assertIn('python scripts/ensure_runtime_schema.py', workflow)
-            self.assertIn('python -m alembic downgrade 20260523_0003', workflow)
-            self.assertIn('python -m alembic upgrade head', workflow)
+        workflow = (REPO_ROOT / '.github' / 'workflows' / 'ci.yml').read_text(encoding='utf-8')
+        self.assertFalse((REPO_ROOT / '.github' / 'workflows' / 'pr-ci.yml').exists())
+        self.assertIn('image: postgres:17-alpine', workflow)
+        self.assertIn('python scripts/ensure_runtime_schema.py', workflow)
+        self.assertIn('python -m alembic downgrade 20260523_0003', workflow)
+        self.assertIn('python -m alembic upgrade head', workflow)
 
 
 if __name__ == '__main__':

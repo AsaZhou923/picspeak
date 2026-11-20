@@ -20,7 +20,7 @@ from app.api.routers.photos import (
 )
 from app.core.config import settings
 from app.core.errors import api_error
-from app.db.models import Photo, PhotoStatus, Review, ReviewMode, ReviewStatus, User, UserPlan
+from app.db.models import Photo, PhotoStatus, Review, ReviewStatus, User, UserPlan
 from app.schemas import (
     REVIEW_SCHEMA_VERSION,
     ReviewCreateRequest,

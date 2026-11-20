@@ -16,7 +16,6 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
 from app.services.notification_events import database_now
 from app.services.object_storage import get_object_storage_client
 from app.services.review_history_retention import (

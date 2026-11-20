@@ -328,7 +328,6 @@ class Settings(BaseSettings):
                 'Set APP_ENV=production and strong secrets for deployed environments.'
             )
         if not is_dev:
-            secret = self.app_secret.strip()
             if insecure_app_secret:
                 raise ValueError(
                     'APP_SECRET must be set to a cryptographically random value of at least 32 characters outside dev mode. '

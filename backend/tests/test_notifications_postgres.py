@@ -443,25 +443,31 @@ class NotificationPostgresConcurrencyTests(unittest.TestCase):
             stale_session = self.Session()
             stale_user = stale_session.get(User, fixture['owner_id'])
             if suffix == 'credit':
-                call = lambda session=stale_session, user=stale_user: notification_events.record_credit_confirmed(
-                    session, user, grant_id='ledger_stale', credits=30
-                )
+                def call(session=stale_session, user=stale_user):
+                    return notification_events.record_credit_confirmed(
+                        session, user, grant_id='ledger_stale', credits=30
+                    )
             elif suffix == 'subscription':
-                call = lambda session=stale_session, user=stale_user: notification_events.record_subscription_changed(
-                    session, user, subscription_id='sub_stale', status='active', version='v1'
-                )
+                def call(session=stale_session, user=stale_user):
+                    return notification_events.record_subscription_changed(
+                        session, user, subscription_id='sub_stale', status='active', version='v1'
+                    )
             elif suffix == 'review':
                 task_id = fixture['task_id']
                 review_id = fixture['review_id']
-                call = lambda session=stale_session, task_id=task_id, review_id=review_id: notification_events.record_review_terminal(
-                    session, session.get(ReviewTask, task_id), session.get(Review, review_id)
-                )
+
+                def call(session=stale_session, task_id=task_id, review_id=review_id):
+                    return notification_events.record_review_terminal(
+                        session, session.get(ReviewTask, task_id), session.get(Review, review_id)
+                    )
             else:
                 task_id = fixture['task_id']
                 image_id = fixture['image_id']
-                call = lambda session=stale_session, task_id=task_id, image_id=image_id: notification_events.record_generation_terminal(
-                    session, session.get(ImageGenerationTask, task_id), session.get(GeneratedImage, image_id)
-                )
+
+                def call(session=stale_session, task_id=task_id, image_id=image_id):
+                    return notification_events.record_generation_terminal(
+                        session, session.get(ImageGenerationTask, task_id), session.get(GeneratedImage, image_id)
+                    )
             cases.append((suffix, fixture['clerk_user_id'], stale_session, call))
 
         try:

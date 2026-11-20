@@ -36,7 +36,6 @@ from app.services.image_generation_task_processor import (  # noqa: E402
     stage_generation_request_event,
     stage_generation_terminal_event,
     _serialize_generation_task_status,
-    claim_next_pending_image_generation_task,
     make_generation_task,
 )
 

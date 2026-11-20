@@ -49,7 +49,7 @@ English | [简体中文](README.zh-CN.md)
 
 ## 🚀 Quick start
 
-**Requirements:** Python 3.11+, Node.js 20+, PostgreSQL 14+, S3-compatible storage, and an OpenAI API key.
+**Requirements:** Python 3.11+, Node.js 24 LTS, PostgreSQL 14+, S3-compatible storage, and an OpenAI API key.
 
 ```bash
 git clone https://github.com/AsaZhou923/picspeak.git && cd picspeak

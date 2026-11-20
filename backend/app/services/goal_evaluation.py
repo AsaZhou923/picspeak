@@ -4,7 +4,7 @@ import math
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from statistics import median
-from typing import Any, Literal
+from typing import Any
 
 
 PASS = 'PASS'

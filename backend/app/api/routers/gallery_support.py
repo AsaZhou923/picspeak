@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import HTTPException, Request, status
-from sqlalchemy import Float, cast, func, literal
+from sqlalchemy import func, literal
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_user_from_token
