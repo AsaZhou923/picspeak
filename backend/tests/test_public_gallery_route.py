@@ -190,7 +190,7 @@ class PublicGalleryRouteTests(unittest.TestCase):
 
         self.assertEqual(payload.total_count, 19)
         self.assertEqual(response.headers['cache-control'], 'public, max-age=30, s-maxage=60')
-        self.assertEqual(response.headers['vary'], 'Authorization')
+        self.assertEqual(response.headers['vary'], 'Authorization, Origin')
         self.assertEqual(len(payload.items), 1)
         self.assertEqual(payload.items[0].like_count, 7)
         self.assertTrue(payload.items[0].liked_by_viewer)
@@ -513,11 +513,14 @@ class OptionalGalleryViewerTests(unittest.TestCase):
         self.assertFalse(payload.items[0].liked_by_viewer)
         self.assertIsNone(viewer_likes.call_args.args[2], 'forged token is treated as anonymous')
         self.assertEqual(response.headers['cache-control'], 'private, no-store')
-        self.assertEqual(response.headers['vary'], 'Authorization')
+        self.assertEqual(response.headers['vary'], 'Authorization, Origin')
 
 
 class PublicGalleryListCacheHeaderTests(unittest.TestCase):
     """Issue #101: anonymous gallery list responses are publicly cached; viewer responses stay private."""
+
+    def tearDown(self) -> None:
+        app.dependency_overrides.clear()
 
     def _client(self, db: MagicMock) -> TestClient:
         from app.api.routers import gallery as gallery_router
@@ -526,6 +529,13 @@ class PublicGalleryListCacheHeaderTests(unittest.TestCase):
         probe.include_router(gallery_router.router)
         probe.dependency_overrides[gallery_router.get_db] = lambda: db
         return TestClient(probe)
+
+    def _full_app_client(self, db: MagicMock) -> TestClient:
+        def override_db():
+            yield db
+
+        app.dependency_overrides[get_db] = override_db
+        return TestClient(app)
 
     def _mock_db(self) -> tuple[MagicMock, SimpleNamespace]:
         db = MagicMock()
@@ -566,9 +576,23 @@ class PublicGalleryListCacheHeaderTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers['cache-control'], 'public, max-age=30, s-maxage=60')
-        self.assertEqual(response.headers['vary'], 'Authorization')
+        self.assertEqual(response.headers['vary'], 'Authorization, Origin')
         self.assertNotIn('set-cookie', {key.lower() for key in response.headers})
         create_guest.assert_not_called()
+        self.assertFalse(response.json()['items'][0]['liked_by_viewer'])
+
+    def test_whitespace_only_authorization_is_treated_as_anonymous(self) -> None:
+        db, row_review = self._mock_db()
+        with patch('app.api.routers.gallery._gallery_like_counts', return_value={101: 2}), \
+             patch('app.api.routers.gallery._gallery_viewer_likes', return_value=set()), \
+             patch('app.api.routers.gallery._gallery_recommendation_map', return_value={}), \
+             patch('app.api.routers.gallery._public_gallery_item', side_effect=self._build_item(row_review)), \
+             patch('app.api.routers.gallery._owner_profile_url', return_value=None):
+            response = self._client(db).get('/gallery', headers={'Authorization': '   '})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers['cache-control'], 'public, max-age=30, s-maxage=60')
+        self.assertEqual(response.headers['vary'], 'Authorization, Origin')
         self.assertFalse(response.json()['items'][0]['liked_by_viewer'])
 
     def test_authenticated_gallery_list_is_private_no_store(self) -> None:
@@ -584,5 +608,28 @@ class PublicGalleryListCacheHeaderTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers['cache-control'], 'private, no-store')
-        self.assertEqual(response.headers['vary'], 'Authorization')
+        self.assertEqual(response.headers['vary'], 'Authorization, Origin')
         self.assertTrue(response.json()['items'][0]['liked_by_viewer'])
+
+    def test_full_app_cors_middleware_does_not_duplicate_origin_in_vary(self) -> None:
+        with patch('app.main.worker.start'), patch('app.main.worker.stop'), \
+             patch('app.api.routers.gallery._gallery_like_counts', return_value={101: 2}), \
+             patch('app.api.routers.gallery._gallery_viewer_likes', return_value=set()), \
+             patch('app.api.routers.gallery._gallery_recommendation_map', return_value={}), \
+             patch('app.api.routers.gallery._owner_profile_url', return_value=None):
+            for label, headers, expected_cache in (
+                ('no-origin', {}, 'public, max-age=30, s-maxage=60'),
+                ('allowed-origin-anon', {'Origin': 'http://localhost:3000'}, 'public, max-age=30, s-maxage=60'),
+                ('allowed-origin-auth', {'Origin': 'http://localhost:3000', 'Authorization': 'Bearer tok'}, 'private, no-store'),
+            ):
+                with self.subTest(label=label):
+                    db, row_review = self._mock_db()
+                    with patch('app.api.routers.gallery._public_gallery_item', side_effect=self._build_item(row_review)):
+                        with self._full_app_client(db) as client:
+                            response = client.get('/api/v1/gallery', headers=headers)
+                    self.assertEqual(response.status_code, 200)
+                    self.assertEqual(response.headers['cache-control'], expected_cache)
+                    vary_tokens = [token.strip() for token in response.headers['vary'].split(',') if token.strip()]
+                    self.assertEqual(vary_tokens, ['Authorization', 'Origin'])
+                    if 'Origin' in headers:
+                        self.assertEqual(response.headers.get('access-control-allow-origin'), 'http://localhost:3000')

@@ -80,7 +80,8 @@ def list_public_gallery(
   if min_score is not None and max_score is not None and min_score > max_score:
     raise api_error(status.HTTP_400_BAD_REQUEST, 'GALLERY_FILTER_INVALID', 'min_score cannot be greater than max_score')
 
-  viewer = _optional_gallery_viewer(authorization, db)
+  normalized_authorization = authorization.strip() if isinstance(authorization, str) else ''
+  viewer = _optional_gallery_viewer(normalized_authorization or None, db)
   gallery_filters = _public_gallery_filters()
   cursor_val = None
   cursor_dt = None
@@ -183,11 +184,11 @@ def list_public_gallery(
       rank_reference_at=rank_reference_at,
     )
 
-  if authorization:
+  if normalized_authorization:
     response.headers['Cache-Control'] = 'private, no-store'
   else:
     response.headers['Cache-Control'] = PUBLIC_GALLERY_LIST_CACHE_CONTROL
-  response.headers['Vary'] = 'Authorization'
+  response.headers['Vary'] = 'Authorization, Origin'
   return GalleryListResponse(items=items, total_count=total_count, next_cursor=next_cursor)
 
 

@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from sqlalchemy.exc import IntegrityError
+from starlette.datastructures import MutableHeaders
 
 from app.api.deps import bind_guest_token
 from app.api.request_state import get_current_user_public_id
@@ -44,6 +45,34 @@ async def lifespan(app: FastAPI):
         worker.stop()
 
 
+class _DeduplicateVaryMiddleware:
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope['type'] != 'http':
+            await self.app(scope, receive, send)
+            return
+
+        async def send_with_dedup_vary(message):
+            if message['type'] == 'http.response.start':
+                headers = MutableHeaders(scope=message)
+                vary = headers.get('vary')
+                if vary and ',' in vary:
+                    seen: set[str] = set()
+                    unique: list[str] = []
+                    for token in vary.split(','):
+                        cleaned = token.strip()
+                        lowered = cleaned.lower()
+                        if cleaned and lowered not in seen:
+                            seen.add(lowered)
+                            unique.append(cleaned)
+                    headers['vary'] = ', '.join(unique)
+            await send(message)
+
+        await self.app(scope, receive, send_with_dedup_vary)
+
+
 app = FastAPI(title='PicSpeak Backend', version='1.0.0', lifespan=lifespan)
 app.add_middleware(RequestBodyLimitMiddleware, max_body_bytes=settings.max_request_body_bytes)
 app.add_middleware(
@@ -65,6 +94,7 @@ app.add_middleware(
     ],
     expose_headers=['X-Request-Id', 'X-Guest-Access-Token', 'Content-Disposition', 'Retry-After'],
 )
+app.add_middleware(_DeduplicateVaryMiddleware)
 app.include_router(router)
 app.include_router(webhook_router)
 
