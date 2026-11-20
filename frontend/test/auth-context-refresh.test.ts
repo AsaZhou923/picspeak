@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import ts from 'typescript';
 import { deferred, settle } from './helpers/component-harness.ts';
+import * as clerkFallback from '../src/lib/clerk-fallback.ts';
 import type { AuthToken } from '../src/lib/types.ts';
 
 const jwt = (id: string, exp = 200) => `header.${Buffer.from(JSON.stringify({ sub: id, exp })).toString('base64url')}.signature`;
@@ -30,6 +31,8 @@ function authHarness(initial: AuthToken | null = owner(), signedIn = true, initi
   const session = new Map<string, string>(initial ? [['ps_token', JSON.stringify(initial)]] : []);
   const storage = (map: Map<string, string>) => ({ getItem: (key: string) => map.get(key) ?? null, setItem: (key: string, val: string) => map.set(key, val), removeItem: (key: string) => map.delete(key) });
   const statusListeners = new Set<(status: string) => void>();
+  const windowListeners = new Map<string, Set<(event: any) => void>>();
+  const scheduledDelays: number[] = [];
   const clerkInstance = {
     status: options.clerkStatus ?? (options.loaded === false ? 'loading' : 'ready'),
     on(event: string, handler: (status: string) => void, opt?: { notify?: boolean }) { if (event === 'status') { statusListeners.add(handler); if (opt?.notify) handler(clerkInstance.status); } },
@@ -48,7 +51,24 @@ function authHarness(initial: AuthToken | null = owner(), signedIn = true, initi
   }).outputText;
   vm.runInNewContext(compiled, {
     exports, atob, document: { get cookie() { return options.cookie ?? ''; }, set cookie(_value: string) { /* writes only expire ps_token */ } }, Date: class extends Date { static now() { return now; } },
-    window: { sessionStorage: storage(session), localStorage: storage(new Map()), setTimeout: (fn: () => void, delay: number) => setTimeout(fn, delay === 8000 ? options.clerkLoadTimeoutMs ?? delay : options.waitTimeoutMs ?? delay), clearTimeout },
+    window: {
+      sessionStorage: storage(session),
+      localStorage: storage(new Map()),
+      addEventListener(type: string, handler: (event: any) => void) {
+        const set = windowListeners.get(type) ?? new Set();
+        set.add(handler);
+        windowListeners.set(type, set);
+      },
+      removeEventListener(type: string, handler: (event: any) => void) {
+        windowListeners.get(type)?.delete(handler);
+      },
+      setTimeout: (fn: () => void, delay: number) => {
+        scheduledDelays.push(delay);
+        const isClerkLoadDelay = delay === clerkFallback.CLERK_LOAD_TIMEOUT_MS || delay === clerkFallback.CLERK_SIGNED_OUT_LOAD_TIMEOUT_MS;
+        return setTimeout(fn, isClerkLoadDelay ? options.clerkLoadTimeoutMs ?? delay : options.waitTimeoutMs ?? delay);
+      },
+      clearTimeout,
+    },
     require(name: string) {
       if (name === 'react/jsx-runtime') return { jsx: (type: unknown, props: any) => ({ type, props }) };
       if (name === 'react') return {
@@ -68,6 +88,7 @@ function authHarness(initial: AuthToken | null = owner(), signedIn = true, initi
         },
       };
       if (name === '@clerk/nextjs') return { useAuth: () => clerk, useClerk: () => clerkInstance };
+      if (name === './clerk-fallback') return clerkFallback;
       if (name === './api') return {
         authClerkExchange: (token: string) => { exchangeCalls++; return exchange(token); },
         authGuest: () => { guestCalls++; return createGuest(); },
@@ -94,7 +115,10 @@ function authHarness(initial: AuthToken | null = owner(), signedIn = true, initi
   };
   render();
   return {
-    render, snapshots, session, clerk, clerkInstance,
+    render, snapshots, session, clerk, clerkInstance, scheduledDelays,
+    dispatchWindowEvent(type: string, event: any) {
+      windowListeners.get(type)?.forEach((listener) => listener(event));
+    },
     get value() { return value; }, get cacheClears() { return cacheClears; }, get exchangeCalls() { return exchangeCalls; }, get guestCalls() { return guestCalls; },
     expire() { now = 201_000; },
     exchange(fn: typeof exchange) { exchange = fn; }, createGuest(fn: typeof createGuest) { createGuest = fn; },
@@ -374,4 +398,55 @@ test('Clerk loading after a fallback resumes the normal signed-in exchange', asy
   assert.equal(app.exchangeCalls, 1);
   assert.equal(app.value.userInfo?.user_id, 'owner'); assert.equal(app.value.isLoading, false);
   app.unmount();
+});
+
+test('signed-out browsers use a short Clerk load timeout while signed-in browsers keep 8s', () => {
+  const signedOut = authHarness(null, false, undefined, { loaded: false, cookie: '__client_uat=0' });
+  assert.ok(signedOut.scheduledDelays.includes(clerkFallback.CLERK_SIGNED_OUT_LOAD_TIMEOUT_MS));
+  assert.ok(!signedOut.scheduledDelays.includes(clerkFallback.CLERK_LOAD_TIMEOUT_MS));
+  signedOut.unmount();
+
+  const signedIn = authHarness(null, false, undefined, { loaded: false, cookie: clerkSessionCookie('clerk-owner') });
+  assert.ok(signedIn.scheduledDelays.includes(clerkFallback.CLERK_LOAD_TIMEOUT_MS));
+  signedIn.unmount();
+});
+
+test('Clerk script error event triggers immediate guest fallback for signed-out visitors without waiting for timeout', async () => {
+  const app = authHarness(null, false, undefined, { loaded: false, cookie: '', clerkLoadTimeoutMs: 60_000 });
+  assert.equal(app.value.isLoading, true);
+  app.dispatchWindowEvent('error', {
+    target: {
+      tagName: 'SCRIPT',
+      hasAttribute: (name: string) => name === 'data-clerk-js-script',
+    },
+  });
+  app.render();
+  assert.equal(app.value.isLoading, false);
+  assert.equal(await app.value.ensureToken(), jwt('guest'));
+  assert.equal(app.guestCalls, 1);
+  app.unmount();
+});
+
+test('Clerk script error event or failed_to_load_clerk_js rejection immediately yields AUTH_UNAVAILABLE for signed-in browsers without guest downgrade', async () => {
+  for (const mode of ['script-error', 'unhandledrejection'] as const) {
+    const app = authHarness(null, false, undefined, { loaded: false, cookie: clerkSessionCookie('clerk-owner'), clerkLoadTimeoutMs: 60_000 });
+    assert.equal(app.value.isLoading, true);
+    if (mode === 'script-error') {
+      app.dispatchWindowEvent('error', {
+        target: {
+          tagName: 'SCRIPT',
+          hasAttribute: (name: string) => name === 'data-clerk-js-script',
+        },
+      });
+    } else {
+      app.dispatchWindowEvent('unhandledrejection', {
+        reason: { code: 'failed_to_load_clerk_js', message: 'Failed to load Clerk JS' },
+      });
+    }
+    app.render();
+    assert.equal(app.value.isLoading, false);
+    await assert.rejects(app.value.ensureToken(), { code: 'AUTH_UNAVAILABLE' });
+    assert.equal(app.guestCalls, 0);
+    app.unmount();
+  }
 });

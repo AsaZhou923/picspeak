@@ -55,7 +55,7 @@ function loadAuthAdapter(auth: { token: string | null; userInfo: AuthToken | nul
         ...(hydrated ? { useSyncExternalStore: (_subscribe: unknown, getSnapshot: () => unknown) => getSnapshot() } : {}),
       };
       if (specifier === 'react/jsx-runtime') return jsxRuntime;
-      assert.ok(['@clerk/nextjs', './api', './photo-preview-cache', './product-analytics', './review-thumbnail-cache'].includes(specifier), `unexpected auth dependency ${specifier}`);
+      assert.ok(['@clerk/nextjs', './api', './clerk-fallback', './photo-preview-cache', './product-analytics', './review-thumbnail-cache'].includes(specifier), `unexpected auth dependency ${specifier}`);
       return {};
     },
   });

@@ -31,7 +31,7 @@ function loadAuth(react: Record<string, any>) {
     require(name: string) {
       if (name === 'react') return react;
       if (name === 'react/jsx-runtime') return jsxRuntime;
-      if (['@clerk/nextjs', './api', './photo-preview-cache', './product-analytics', './review-thumbnail-cache'].includes(name)) return {};
+      if (['@clerk/nextjs', './api', './clerk-fallback', './photo-preview-cache', './product-analytics', './review-thumbnail-cache'].includes(name)) return {};
       throw Error(`Unexpected dependency ${name}`);
     },
   });
