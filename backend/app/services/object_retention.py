@@ -55,6 +55,8 @@ STUCK_PURGING_AGE = timedelta(hours=1)
 LIVE_TASK_STATUSES = (TaskStatus.PENDING, TaskStatus.RUNNING)
 PURGEABLE_PHOTO_STATUSES = (PhotoStatus.READY, PhotoStatus.UPLOADING, PhotoStatus.REJECTED)
 GALLERY_THUMBNAIL_PREFIX = 'gallery-thumbnails/'
+PRIVATE_THUMBNAIL_PREFIX = 'thumbnails/'
+THUMBNAIL_PREFIXES = (GALLERY_THUMBNAIL_PREFIX, PRIVATE_THUMBNAIL_PREFIX)
 REFERENCE_INPUT_PREFIX = 'generated/reference-inputs/'
 GENERATED_OUTPUT_PREFIX = 'generated/user_'
 UPLOAD_PREFIX = 'user_'
@@ -314,12 +316,13 @@ def _finish_purge(db: Session, storage: Any, photo: Photo, *, now: datetime, rea
     db.add(photo)
     db.commit()
     # Thumbnails are derived copies; one that fails to delete is left to the orphan_thumbnail scan.
-    try:
-        for item in _list_keys(storage, photo.bucket, f'{GALLERY_THUMBNAIL_PREFIX}{photo.public_id}/'):
-            storage.delete_object(Bucket=photo.bucket, Key=item['Key'])
-            removed += int(item.get('Size') or 0)
-    except Exception:  # noqa: BLE001
-        logger.warning('Failed to delete gallery thumbnails for photo %s', photo.public_id, exc_info=True)
+    for prefix in THUMBNAIL_PREFIXES:
+        try:
+            for item in _list_keys(storage, photo.bucket, f'{prefix}{photo.public_id}/'):
+                storage.delete_object(Bucket=photo.bucket, Key=item['Key'])
+                removed += int(item.get('Size') or 0)
+        except Exception:  # noqa: BLE001
+            logger.warning('Failed to delete thumbnails under %s for photo %s', prefix, photo.public_id, exc_info=True)
     return PurgeOutcome('purged' if existed else 'already_missing', reason, removed)
 
 
@@ -497,8 +500,9 @@ def classify_object(db: Session, bucket: str, key: str, *, now: datetime) -> str
     """Return the deletion category of an unreferenced object, or None to keep it."""
     if key.startswith(UPLOAD_PREFIX):
         return None if _photo_key_is_live(db, bucket, key) else 'orphan_upload'
-    if key.startswith(GALLERY_THUMBNAIL_PREFIX):
-        return 'orphan_thumbnail' if _thumbnail_is_orphan(db, _first_segment(key, GALLERY_THUMBNAIL_PREFIX)) else None
+    for prefix in THUMBNAIL_PREFIXES:
+        if key.startswith(prefix):
+            return 'orphan_thumbnail' if _thumbnail_is_orphan(db, _first_segment(key, prefix)) else None
     if key.startswith(REFERENCE_INPUT_PREFIX):
         task_id = _first_segment(key, REFERENCE_INPUT_PREFIX)
         return 'reference_input' if _reference_input_is_done(db, task_id, now=now) else None

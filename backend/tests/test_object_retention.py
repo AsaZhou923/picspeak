@@ -41,7 +41,16 @@ from app.db.models import (  # noqa: E402
     UserStatus,
 )
 from app.services import guest_cleanup  # noqa: E402
-from app.services.object_retention import OwnerFacts, PhotoFacts, admit_photo_use, decide_photo, purge_photo_original  # noqa: E402
+from app.services.object_retention import (  # noqa: E402
+    OwnerFacts,
+    PhotoFacts,
+    _finish_purge,
+    admit_photo_use,
+    classify_object,
+    decide_photo,
+    purge_photo_original,
+    scan_inventory,
+)
 
 DATABASE_URL = os.getenv('PICSPEAK_TEST_DATABASE_URL', '').strip()
 NOW = datetime(2026, 10, 25, 12, 0, tzinfo=timezone.utc)
@@ -157,6 +166,74 @@ def test_lifecycle_merge_keeps_foreign_rules_and_replaces_managed_ones():
     assert merged[0] == foreign
     assert merged[1:] == list(configure_r2_lifecycle.MANAGED_RULES)
     assert not any(rule.get('Filter', {}).get('Prefix', '').startswith('user_') for rule in merged)
+
+
+def test_private_thumbnail_prefix_classified_and_deleted_with_original():
+    from unittest.mock import MagicMock
+
+    statuses = {
+        'pho_live': PhotoStatus.READY,
+        'pho_purged': PhotoStatus.PURGED,
+    }
+
+    def make_db():
+        db = MagicMock()
+
+        def query_side_effect(*_args):
+            q = MagicMock()
+
+            def filter_side_effect(*conditions):
+                sub = MagicMock()
+                matched = None
+                for cond in conditions:
+                    right = getattr(cond, 'right', None)
+                    val = getattr(right, 'value', None)
+                    if isinstance(val, str) and val in statuses:
+                        matched = statuses[val]
+                sub.scalar.return_value = matched
+                return sub
+
+            q.filter.side_effect = filter_side_effect
+            return q
+
+        db.query.side_effect = query_side_effect
+        return db
+
+    db = make_db()
+    assert classify_object(db, 'bucket', 'thumbnails/pho_live/128.webp', now=NOW) is None
+    assert classify_object(db, 'bucket', 'thumbnails/pho_purged/128.webp', now=NOW) == 'orphan_thumbnail'
+    assert classify_object(db, 'bucket', 'thumbnails/pho_missing/128.webp', now=NOW) == 'orphan_thumbnail'
+
+    storage = FakeStorage(NOW)
+    storage.put('thumbnails/pho_live/128.webp', size=40)
+    storage.put('thumbnails/pho_missing/128.webp', size=55)
+    storage.put('gallery-thumbnails/pho_missing/512.webp', size=90)
+    storage.put('backups/keep.sql', size=10)
+    report = scan_inventory(db, storage, 'bucket', now=NOW)
+    assert {item.key for item in report.candidates} == {
+        'thumbnails/pho_missing/128.webp',
+        'gallery-thumbnails/pho_missing/512.webp',
+    }
+    assert all(item.category == 'orphan_thumbnail' for item in report.candidates)
+    assert dict(report.unknown_prefix) == {'backups': 1}
+
+    purge_storage = FakeStorage(NOW)
+    purge_storage.put('gallery-thumbnails/pho_target/512.webp', size=80)
+    purge_storage.put('thumbnails/pho_target/128.webp', size=30)
+    purge_storage.put('thumbnails/pho_other/128.webp', size=30)
+    photo = SimpleNamespace(
+        public_id='pho_target',
+        bucket='bucket',
+        status=PhotoStatus.PURGING,
+        original_purge_reason=None,
+        original_purged_at=None,
+    )
+    outcome = _finish_purge(MagicMock(), purge_storage, photo, now=NOW, reason='free_expired', removed=100, existed=True)
+    assert outcome.status == 'purged'
+    assert outcome.bytes_removed == 210
+    assert 'gallery-thumbnails/pho_target/512.webp' not in purge_storage.objects
+    assert 'thumbnails/pho_target/128.webp' not in purge_storage.objects
+    assert 'thumbnails/pho_other/128.webp' in purge_storage.objects
 
 
 class MissingObject(Exception):
@@ -304,7 +381,9 @@ def test_execute_purges_only_unprotected_originals(harness):
     harness.live_task(busy)
     harness.review(pro_photo)
     thumbnail = f'gallery-thumbnails/{expired.public_id}/512.webp'
+    private_thumbnail = f'thumbnails/{expired.public_id}/128.webp'
     harness.storage.put(thumbnail)
+    harness.storage.put(private_thumbnail)
 
     report = harness.run(execute=True, category=['photo_original'])
 
@@ -316,6 +395,7 @@ def test_execute_purges_only_unprotected_originals(harness):
         assert photo.object_key in harness.storage.objects
     assert expired.object_key not in harness.storage.objects
     assert thumbnail not in harness.storage.objects
+    assert private_thumbnail not in harness.storage.objects
     with harness.Session() as db:
         purged = db.get(Photo, expired.id)
         assert purged.original_purge_reason == 'free_expired'
@@ -487,20 +567,23 @@ def test_inventory_removes_only_old_unreferenced_objects(harness):
     harness.storage.put(f'user_{user.public_id}/2026/10/obj_fresh.jpg', age=timedelta(hours=2))
     harness.storage.put('gallery-thumbnails/pho_missing/512.webp')
     harness.storage.put(f'gallery-thumbnails/{live.public_id}/512.webp')
+    harness.storage.put('thumbnails/pho_missing/128.webp')
+    harness.storage.put(f'thumbnails/{live.public_id}/128.webp')
     harness.storage.put('generated/reference-inputs/gen_gone/pho_x.jpg')
     harness.storage.put('generated/user_x/2026/09/gim_orphan.webp')
     harness.storage.put('backups/keep-me.sql')
 
     dry = harness.run(category=['orphan_upload', 'orphan_thumbnail', 'reference_input', 'orphan_generated'])
     assert {name: value['count'] for name, value in dry['inventory']['candidates'].items()} == {
-        'orphan_generated': 1, 'orphan_thumbnail': 1, 'orphan_upload': 1, 'reference_input': 1,
+        'orphan_generated': 1, 'orphan_thumbnail': 2, 'orphan_upload': 1, 'reference_input': 1,
     }
     assert dry['inventory']['unknown_prefixes'] == {'backups': 1}
 
     harness.run(execute=True, category=['orphan_upload', 'orphan_thumbnail', 'reference_input', 'orphan_generated'])
     assert set(harness.storage.objects) == {
         live.object_key, f'user_{user.public_id}/2026/10/obj_fresh.jpg',
-        f'gallery-thumbnails/{live.public_id}/512.webp', 'backups/keep-me.sql',
+        f'gallery-thumbnails/{live.public_id}/512.webp',
+        f'thumbnails/{live.public_id}/128.webp', 'backups/keep-me.sql',
     }
 
 
