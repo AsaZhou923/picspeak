@@ -25,7 +25,7 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 from app.api.deps import CurrentActor, get_current_actor, get_db, issue_guest_token  # noqa: E402
-from app.api.routers import gallery, photos, profiles, review_actions, review_create, review_queries  # noqa: E402
+from app.api.routers import gallery, generations, photos, profiles, review_actions, review_create, review_queries  # noqa: E402
 from app.api.routers.auth_support import (  # noqa: E402
     _cleanup_deleted_user_feature_state,
     _handle_clerk_user_deleted,
@@ -52,7 +52,13 @@ from app.db.models import (  # noqa: E402
     UserPlan,
     UserStatus,
 )
-from app.schemas import AuthClerkExchangeRequest, GuestReviewMigrateRequest, ReviewCreateRequest  # noqa: E402
+from app.schemas import (  # noqa: E402
+    AuthClerkExchangeRequest,
+    GenerationCreateRequest,
+    GuestReviewMigrateRequest,
+    ReviewCreateRequest,
+    ReviewMetaUpdateRequest,
+)
 from app.services.ai import AIReviewError, AIReviewResponse, notify_ai_provider_call  # noqa: E402
 from app.services.gallery_scoreboard import _owner_profile_url  # noqa: E402
 from app.services.object_retention import collect_photo_facts, decide_photo  # noqa: E402
@@ -1218,6 +1224,147 @@ class AccountLifecycleConcurrencyPostgresTests(unittest.TestCase):
         self.assertEqual((outcome[0].status_code, outcome[0].detail['code']), (404, 'REVIEW_NOT_FOUND'))
         with self.Session() as db:
             self.assertIsNone(db.get(Review, review_id).share_token)
+
+    def test_gallery_publish_locks_photo_before_owner_and_rechecks_deleted_review(self) -> None:
+        with self.Session() as db:
+            user = self._make_user(db, plan=UserPlan.free)
+            photo = self._make_photo(db, user, uuid4().hex[:8])
+            review = Review(
+                public_id=f'rev_gal_{uuid4().hex[:8]}', photo_id=photo.id, owner_user_id=user.id,
+                mode=ReviewMode.flash, status=ReviewStatus.SUCCEEDED, image_type='default',
+                schema_version='2.0', result_json={'scores': {}}, final_score=Decimal('7.00'),
+            )
+            db.add(review)
+            db.commit()
+            user_id, photo_id, review_id = user.id, photo.id, review.id
+            review_public_id = review.public_id
+
+        outcome: list[object] = []
+
+        def publish():
+            try:
+                with self.Session() as db:
+                    actor = CurrentActor(db.get(User, user_id))
+                    outcome.append(review_actions.update_review_meta(
+                        review_public_id, ReviewMetaUpdateRequest(gallery_visible=True), db, actor,
+                    ))
+            except BaseException as exc:
+                outcome.append(exc)
+
+        with patch('app.api.routers.review_actions.run_content_audit', side_effect=RuntimeError('unexpected audit')) as audit:
+            with self.engine.connect() as blocker:
+                blocker.execute(text('SELECT id FROM photos WHERE id = :id FOR NO KEY UPDATE'), {'id': photo_id})
+                thread = threading.Thread(target=publish)
+                thread.start()
+                try:
+                    self._wait_for_lock_waiter()
+                    self.assertTrue(self._row_is_unlocked('users', user_id))
+                    blocker.execute(text('UPDATE reviews SET deleted_at = now() WHERE id = :id'), {'id': review_id})
+                    blocker.commit()
+                finally:
+                    blocker.rollback()
+                    thread.join(timeout=15)
+            audit.assert_not_called()
+        self.assertFalse(thread.is_alive())
+        self.assertEqual(len(outcome), 1)
+        self.assertIsInstance(outcome[0], HTTPException)
+        self.assertEqual((outcome[0].status_code, outcome[0].detail['code']), (404, 'REVIEW_NOT_FOUND'))
+        with self.Session() as db:
+            self.assertFalse(db.get(Review, review_id).gallery_visible)
+
+    def test_gallery_publish_takes_photo_write_lock_before_waiting_on_owner(self) -> None:
+        with self.Session() as db:
+            user = self._make_user(db, plan=UserPlan.free)
+            photo = self._make_photo(db, user, uuid4().hex[:8])
+            review = Review(
+                public_id=f'rev_gal_{uuid4().hex[:8]}', photo_id=photo.id, owner_user_id=user.id,
+                mode=ReviewMode.flash, status=ReviewStatus.SUCCEEDED, image_type='default',
+                schema_version='2.0', result_json={'scores': {}}, final_score=Decimal('7.00'),
+            )
+            db.add(review)
+            db.commit()
+            user_id, photo_id, review_id = user.id, photo.id, review.id
+            review_public_id = review.public_id
+
+        outcome: list[object] = []
+
+        def publish():
+            try:
+                with self.Session() as db:
+                    actor = CurrentActor(db.get(User, user_id))
+                    outcome.append(review_actions.update_review_meta(
+                        review_public_id, ReviewMetaUpdateRequest(gallery_visible=True), db, actor,
+                    ))
+            except BaseException as exc:
+                outcome.append(exc)
+
+        def thumbnail(photo):
+            photo.client_meta = {'gallery_thumbnail_key': 'gallery-thumbnails/test.webp'}
+
+        with (
+            patch('app.api.routers.review_actions.run_content_audit', return_value=SimpleNamespace(safe=True)),
+            patch('app.api.routers.review_actions.get_object_read_url', return_value='https://storage.test/photo'),
+            patch('app.api.routers.review_actions._ensure_gallery_thumbnail', side_effect=thumbnail),
+        ):
+            with self.engine.connect() as blocker:
+                blocker.execute(text('SELECT id FROM users WHERE id = :id FOR UPDATE'), {'id': user_id})
+                thread = threading.Thread(target=publish)
+                thread.start()
+                try:
+                    self._wait_for_lock_waiter()
+                    # A concurrent share request must wait at the photo, before it can
+                    # hold the owner lock needed by publication's thumbnail write.
+                    with self.engine.connect() as probe:
+                        with self.assertRaises(OperationalError) as raised:
+                            probe.execute(text('SELECT id FROM photos WHERE id = :id FOR SHARE NOWAIT'), {'id': photo_id})
+                        self.assertEqual(raised.exception.orig.pgcode, '55P03')
+                        probe.rollback()
+                finally:
+                    blocker.rollback()
+                    thread.join(timeout=15)
+        self.assertFalse(thread.is_alive())
+        self.assertEqual(len(outcome), 1)
+        self.assertNotIsInstance(outcome[0], BaseException)
+        with self.Session() as db:
+            self.assertTrue(db.get(Review, review_id).gallery_visible)
+            self.assertEqual(db.get(Photo, photo_id).client_meta['gallery_thumbnail_key'], 'gallery-thumbnails/test.webp')
+
+    def test_generation_reference_locks_photo_before_owner(self) -> None:
+        with self.Session() as db:
+            user = self._make_user(db, plan=UserPlan.free)
+            photo = self._make_photo(db, user, uuid4().hex[:8])
+            db.commit()
+            user_id, photo_id, photo_public_id = user.id, photo.id, photo.public_id
+
+        outcome: list[object] = []
+
+        def generate():
+            try:
+                with self.Session() as db:
+                    actor = CurrentActor(db.get(User, user_id))
+                    outcome.append(generations.create_generation(
+                        GenerationCreateRequest(prompt='A landscape photo', quality='low', source_photo_id=photo_public_id),
+                        self._guest_request(), db, actor,
+                    ))
+            except BaseException as exc:
+                outcome.append(exc)
+
+        with self.engine.connect() as blocker:
+            blocker.execute(text('SELECT id FROM photos WHERE id = :id FOR NO KEY UPDATE'), {'id': photo_id})
+            thread = threading.Thread(target=generate)
+            thread.start()
+            try:
+                self._wait_for_lock_waiter()
+                self.assertTrue(self._row_is_unlocked('users', user_id))
+                blocker.execute(text("UPDATE photos SET status = 'PURGED' WHERE id = :id"), {'id': photo_id})
+                blocker.commit()
+            finally:
+                blocker.rollback()
+                thread.join(timeout=15)
+        self.assertFalse(thread.is_alive())
+        self.assertEqual(len(outcome), 1)
+        self.assertIsInstance(outcome[0], HTTPException)
+        self.assertEqual((outcome[0].status_code, outcome[0].detail['code']), (410, 'PHOTO_ORIGINAL_EXPIRED'))
 
     def test_concurrent_duplicate_migrations_serialize_and_never_double_report(self) -> None:
         for strict in (True, False):

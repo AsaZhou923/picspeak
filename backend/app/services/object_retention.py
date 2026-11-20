@@ -298,14 +298,23 @@ class PurgeOutcome:
     bytes_removed: int = 0
 
 
-def admit_photo_use(db: Session, photo_id: int, *, require_ready: bool = True) -> Photo | None:
-    """Lock a photo row in share mode until the caller's transaction ends.
+def admit_photo_use(
+    db: Session, photo_id: int, *, require_ready: bool = True, write: bool = False,
+) -> Photo | None:
+    """Lock a photo row until the caller's transaction ends.
 
     Purges take FOR UPDATE while deciding and committing PURGING. A task, share
     link or gallery listing registered under this lock is therefore either seen by
     the purge decision or sees the photo already leaving READY.
+
+    ``write`` takes FOR NO KEY UPDATE instead, for callers that will update the
+    photo row: upgrading a share lock later could wait on another share holder
+    that is itself queued behind this caller's next lock. Photo locks precede
+    user locks (global order: review tasks, photos by ascending id, users).
     """
-    photo = db.query(Photo).filter(Photo.id == photo_id).with_for_update(read=True).populate_existing().first()
+    query = db.query(Photo).filter(Photo.id == photo_id)
+    query = query.with_for_update(key_share=True) if write else query.with_for_update(read=True)
+    photo = query.populate_existing().first()
     if require_ready and (photo is None or photo.status != PhotoStatus.READY):
         if photo is not None and photo.status in (PhotoStatus.PURGING, PhotoStatus.PURGED):
             raise api_error(410, 'PHOTO_ORIGINAL_EXPIRED', 'The stored original was removed under the retention policy')

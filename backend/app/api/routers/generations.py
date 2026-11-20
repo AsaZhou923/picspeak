@@ -130,9 +130,6 @@ def create_generation(
     if actor.plan == UserPlan.guest:
         raise api_error(status.HTTP_403_FORBIDDEN, 'GENERATION_LOGIN_REQUIRED', 'Sign in before generating images')
 
-    # Entitlement changes and content cleanup take this owner lock before photos.
-    db.query(User).filter(User.id == actor.user.id).with_for_update().populate_existing().one()
-
     quality = normalize_generation_quality(payload.quality)
     size = normalize_generation_size(payload.size)
     source_photo_internal_id: int | None = None
@@ -157,6 +154,14 @@ def create_generation(
     elif payload.source_photo_id:
         source_photo = _find_source_photo(db, payload.source_photo_id, actor.user.id)
         source_photo_internal_id = source_photo.id
+
+    # Global row-lock order: photos, then users (see lock_guest_for_transfer), as in
+    # share-link enabling and Gallery publication. The reference photo's READY check
+    # stays below so idempotent replays still answer. Entitlement changes and content
+    # cleanup hold this owner lock and only skip-lock photos, so they never wait here.
+    if source_photo_internal_id is not None:
+        admit_photo_use(db, source_photo_internal_id, require_ready=False)
+    db.query(User).filter(User.id == actor.user.id).with_for_update().populate_existing().one()
 
     idempotency_key = payload.idempotency_key or request.headers.get('Idempotency-Key')
     payload_dump = json.dumps(

@@ -269,6 +269,7 @@ class GalleryThumbnailFlowTests(unittest.TestCase):
 
         review = SimpleNamespace(
             photo_id=5,
+            owner_user_id=7,
             deleted_at=None,
             favorite=False,
             gallery_visible=False,

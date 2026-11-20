@@ -134,21 +134,23 @@ def update_review_meta(
     db: Session = Depends(get_db),
     actor: CurrentActor = Depends(get_current_actor),
 ):
-    _lock_review_owner(db, actor.user.id)
     review = _find_review_owned(db, review_id, actor.user.id)
-    photo = db.query(Photo).filter(Photo.id == review.photo_id).first()
+    if payload.gallery_visible and actor.plan == UserPlan.guest:
+        raise api_error(status.HTTP_403_FORBIDDEN, 'GALLERY_LOGIN_REQUIRED', 'Please sign in before submitting to the gallery')
+    photo = None
+    if payload.gallery_visible:
+        # The audit and thumbnail need the original; hold it against retention purges.
+        # The photo lock precedes the owner lock (global order: tasks, photos, users),
+        # and is write-mode because the thumbnail below updates the photo row.
+        photo = admit_photo_use(db, review.photo_id, write=True)
+    _lock_review_owner(db, actor.user.id)
+    _reload_live_review(db, review)
+    if review.owner_user_id != actor.user.id:
+        raise api_error(status.HTTP_404_NOT_FOUND, 'REVIEW_NOT_FOUND', 'Review not found')
     if payload.favorite is not None:
         review.favorite = bool(payload.favorite)
     if payload.gallery_visible is not None:
-        if payload.gallery_visible and actor.plan == UserPlan.guest:
-            raise api_error(status.HTTP_403_FORBIDDEN, 'GALLERY_LOGIN_REQUIRED', 'Please sign in before submitting to the gallery')
-
         if payload.gallery_visible:
-            if photo is None:
-                raise api_error(status.HTTP_404_NOT_FOUND, 'PHOTO_NOT_FOUND', 'Photo not found')
-            # The audit and thumbnail need the original; hold it against retention purges.
-            photo = admit_photo_use(db, photo.id)
-            _reload_live_review(db, review)
             try:
                 audit_result = run_content_audit(get_object_read_url(photo.object_key, bucket=photo.bucket))
             except ContentAuditError as exc:
