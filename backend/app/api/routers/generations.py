@@ -1,19 +1,25 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
+import time
 from datetime import datetime, timezone
+from typing import Any
+from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, Request, status
+from botocore.exceptions import ClientError
+from fastapi import APIRouter, Depends, Header, Query, Request, Response, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 from app.api.deps import CurrentActor, get_current_actor, get_db
-from app.api.routers.photos import _build_storage_photo_url
+from app.api.routers.photos import _build_storage_photo_url, _etag_matches, _request_url_for
 from app.core.config import settings
 from app.core.errors import api_error
-from app.db.models import GeneratedImage, IdempotencyKey, ImageGenerationTask, Photo, PhotoStatus, Review, TaskStatus, User, UserPlan
+from app.core.security import sign_payload_with_exp, verify_payload
+from app.db.models import GeneratedImage, IdempotencyKey, ImageGenerationTask, Photo, PhotoStatus, Review, TaskStatus, User, UserPlan, UserStatus
 from app.schemas import (
     GeneratedImageDetailResponse,
     GeneratedImageHistoryResponse,
@@ -55,6 +61,11 @@ from app.services.task_dispatcher import TaskDispatchError, enqueue_image_genera
 
 router = APIRouter(tags=['generations'])
 logger = logging.getLogger(__name__)
+
+GENERATION_IMAGE_TOKEN_PURPOSE = 'generation_image_proxy'
+GENERATION_IMAGE_TTL_SECONDS = 7 * 24 * 3600
+GENERATION_IMAGE_STABLE_WINDOW_SECONDS = 7 * 24 * 3600
+GENERATION_IMAGE_CACHE_CONTROL = 'private, max-age=86400, stale-while-revalidate=604800'
 
 
 def _encode_generation_cursor(image: GeneratedImage) -> str:
@@ -305,6 +316,7 @@ def get_generation_task_status(
 @router.get('/generations/{generation_id}', response_model=GeneratedImageDetailResponse)
 def get_generation(
     generation_id: str,
+    request: Request,
     db: Session = Depends(get_db),
     actor: CurrentActor = Depends(get_current_actor),
 ):
@@ -316,11 +328,12 @@ def get_generation(
         page_path=f'/generations/{generation_id}',
         metadata={'generation_id': generation_id, 'generation_mode': image.generation_mode},
     )
-    return _generation_detail_payload(db, image)
+    return _generation_detail_payload(db, image, request=request, owner_public_id=actor.user.public_id)
 
 
 @router.get('/me/generations', response_model=GeneratedImageHistoryResponse)
 def list_my_generations(
+    request: Request,
     cursor: str | None = None,
     limit: int = 20,
     db: Session = Depends(get_db),
@@ -359,9 +372,71 @@ def list_my_generations(
     items = rows[:page_size]
     related_public_ids = _generation_related_public_ids(db, items)
     return {
-        'items': [_generation_item_payload(db, image, related_public_ids=related_public_ids) for image in items],
+        'items': [
+            _generation_item_payload(
+                db,
+                image,
+                request=request,
+                owner_public_id=actor.user.public_id,
+                related_public_ids=related_public_ids,
+            )
+            for image in items
+        ],
         'next_cursor': _encode_generation_cursor(items[-1]) if has_more and items else None,
     }
+
+
+@router.get('/generations/{generation_id}/image', name='get_generation_image')
+def get_generation_image(
+    generation_id: str,
+    generation_token: str = Query(..., min_length=1),
+    if_none_match: str | None = Header(default=None, alias='If-None-Match'),
+    db: Session = Depends(get_db),
+):
+    image = _find_generation_from_token(db, generation_id, generation_token)
+    version_ts = getattr(image, 'updated_at', None) or getattr(image, 'created_at', None)
+    version_marker = version_ts.isoformat() if version_ts is not None else ''
+    etag = f'"{hashlib.sha1(f"{image.public_id}:{image.object_key}:{version_marker}".encode("utf-8")).hexdigest()}"'
+    headers = {
+        'Cache-Control': GENERATION_IMAGE_CACHE_CONTROL,
+        'ETag': etag,
+        'X-Content-Type-Options': 'nosniff',
+    }
+    if _etag_matches(if_none_match, etag):
+        return Response(status_code=status.HTTP_304_NOT_MODIFIED, headers=headers)
+
+    try:
+        storage_response = get_object_storage_client().get_object(Bucket=image.object_bucket, Key=image.object_key)
+    except ClientError as exc:
+        code = str(exc.response.get('Error', {}).get('Code', ''))
+        if code in {'404', 'NoSuchKey', 'NotFound'}:
+            raise api_error(status.HTTP_410_GONE, 'GENERATION_IMAGE_EXPIRED', 'Generated image is no longer available') from exc
+        raise api_error(status.HTTP_502_BAD_GATEWAY, 'GENERATION_IMAGE_FETCH_FAILED', 'Generated image could not be loaded') from exc
+    except Exception as exc:
+        raise api_error(status.HTTP_502_BAD_GATEWAY, 'GENERATION_IMAGE_FETCH_FAILED', 'Generated image could not be loaded') from exc
+
+    content_length = _response_content_length(storage_response)
+    max_bytes = settings.image_generation_download_max_bytes
+    if content_length is not None and content_length > max_bytes:
+        close = getattr(storage_response.get('Body'), 'close', None)
+        if callable(close):
+            close()
+        raise api_error(
+            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            'GENERATION_IMAGE_TOO_LARGE',
+            'Generated image exceeds the size limit',
+            max_bytes=max_bytes,
+            content_length=content_length,
+        )
+
+    content_type = str(storage_response.get('ContentType') or image.content_type or 'image/webp')
+    if content_length is not None:
+        headers['Content-Length'] = str(content_length)
+    return StreamingResponse(
+        _iter_storage_body(storage_response['Body']),
+        media_type=content_type,
+        headers=headers,
+    )
 
 
 @router.delete('/generations/{generation_id}', status_code=status.HTTP_204_NO_CONTENT)
@@ -638,7 +713,65 @@ def _find_source_photo(db: Session, photo_id: str, owner_user_id: int) -> Photo:
     return photo
 
 
-def _build_generated_image_url(image: GeneratedImage) -> str:
+def _find_generation_from_token(db: Session, generation_id: str, generation_token: str) -> GeneratedImage:
+    token_payload = verify_payload(generation_token, expected_purpose=GENERATION_IMAGE_TOKEN_PURPOSE)
+    if token_payload.get('generation_id') != generation_id:
+        raise api_error(status.HTTP_403_FORBIDDEN, 'GENERATION_TOKEN_INVALID', 'Invalid generation token')
+
+    owner_public_id = token_payload.get('uid')
+    if not isinstance(owner_public_id, str) or not owner_public_id.strip():
+        raise api_error(status.HTTP_403_FORBIDDEN, 'GENERATION_TOKEN_INVALID', 'Invalid generation token')
+
+    image = (
+        db.query(GeneratedImage)
+        .join(User, User.id == GeneratedImage.owner_user_id)
+        .filter(
+            GeneratedImage.public_id == generation_id,
+            User.public_id == owner_public_id.strip(),
+            User.status == UserStatus.active,
+        )
+        .first()
+    )
+    if image is None:
+        raise api_error(status.HTTP_404_NOT_FOUND, 'GENERATION_NOT_FOUND', 'Generated image not found')
+    if image.object_purged_at is not None:
+        raise api_error(status.HTTP_410_GONE, 'GENERATION_IMAGE_EXPIRED', 'Generated image was removed under the retention policy')
+    if image.deleted_at is not None:
+        raise api_error(status.HTTP_404_NOT_FOUND, 'GENERATION_NOT_FOUND', 'Generated image not found')
+    return image
+
+
+def _iter_storage_body(body: Any, chunk_size: int = 64 * 1024):
+    try:
+        if hasattr(body, 'iter_chunks'):
+            yield from body.iter_chunks(chunk_size=chunk_size)
+        else:
+            while chunk := body.read(chunk_size):
+                yield chunk
+    finally:
+        close = getattr(body, 'close', None)
+        if callable(close):
+            close()
+
+
+def _build_generated_image_url(
+    image: GeneratedImage,
+    *,
+    request: Request | None = None,
+    owner_public_id: str | None = None,
+) -> str:
+    if request is not None and owner_public_id:
+        rounded_exp = (
+            (int(time.time()) + GENERATION_IMAGE_TTL_SECONDS + GENERATION_IMAGE_STABLE_WINDOW_SECONDS - 1)
+            // GENERATION_IMAGE_STABLE_WINDOW_SECONDS
+        ) * GENERATION_IMAGE_STABLE_WINDOW_SECONDS
+        generation_token = sign_payload_with_exp(
+            {'generation_id': image.public_id, 'uid': owner_public_id},
+            rounded_exp,
+            purpose=GENERATION_IMAGE_TOKEN_PURPOSE,
+        )
+        base_url = _request_url_for(request, 'get_generation_image', generation_id=image.public_id)
+        return f'{base_url}?generation_token={quote(generation_token)}'
     return _build_storage_photo_url(image.object_key, bucket=image.object_bucket, expires_in=900)
 
 
@@ -665,6 +798,8 @@ def _generation_item_payload(
     db: Session,
     image: GeneratedImage,
     *,
+    request: Request | None = None,
+    owner_public_id: str | None = None,
     related_public_ids: dict[str, dict[int, str]] | None = None,
 ) -> GeneratedImageItem:
     metadata = dict(image.metadata_json or {})
@@ -672,7 +807,7 @@ def _generation_item_payload(
     return GeneratedImageItem(
         generation_id=image.public_id,
         task_id=_related_public_id(db, ImageGenerationTask, getattr(image, 'task_id', None), related_public_ids.get('tasks')),
-        image_url=_build_generated_image_url(image),
+        image_url=_build_generated_image_url(image, request=request, owner_public_id=owner_public_id),
         generation_mode=image.generation_mode,
         intent=image.intent,
         prompt=str(metadata.get('user_prompt') or image.prompt),
@@ -690,8 +825,14 @@ def _generation_item_payload(
     )
 
 
-def _generation_detail_payload(db: Session, image: GeneratedImage) -> GeneratedImageDetailResponse:
-    item = _generation_item_payload(db, image)
+def _generation_detail_payload(
+    db: Session,
+    image: GeneratedImage,
+    *,
+    request: Request | None = None,
+    owner_public_id: str | None = None,
+) -> GeneratedImageDetailResponse:
+    item = _generation_item_payload(db, image, request=request, owner_public_id=owner_public_id)
     return GeneratedImageDetailResponse(
         **item.model_dump(),
         cost_usd=float(image.cost_usd) if image.cost_usd is not None else None,

@@ -51,10 +51,17 @@ test('the hosts that serve optimized images in production stay allowed', async (
   });
   const hosts = hostnames(patterns);
 
-  // Homepage demo photo, Clerk avatars, signed generated-image URLs, photo proxy.
+  // Homepage demo photo, Clerk avatars, signed generated-image URLs, photo and generation proxies.
   for (const expected of ['www.picspeak.art', 'img.clerk.com', '**.r2.cloudflarestorage.com', 'api.picspeak.art']) {
     assert.ok(hosts.includes(expected), `${expected} should be an allowed image host`);
   }
+
+  const apiPattern = patterns.find((pattern) => pattern.protocol === 'https' && pattern.hostname === 'api.picspeak.art') as
+    | (RemotePattern & { search?: string; pathname?: string })
+    | undefined;
+  assert.ok(apiPattern, 'API host pattern should be present');
+  assert.equal(apiPattern.search, undefined, 'API host pattern must allow query tokens such as generation_token');
+  assert.equal(apiPattern.pathname, undefined, 'API host pattern must allow /api/v1/generations/*/image');
 });
 
 test('a custom demo image host is allowed without opening other hosts', async () => {
