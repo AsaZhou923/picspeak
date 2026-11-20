@@ -18,7 +18,6 @@ from app.api.routers import notifications as notification_api
 from app.db.base import Base
 from app.db.models import (
     Notification,
-    NotificationPreference,
     Photo,
     PhotoStatus,
     Review,

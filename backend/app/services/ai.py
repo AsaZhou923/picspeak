@@ -19,7 +19,7 @@ from app.services.ai_prompts import (
     SCORE_PROMPT_VERSION,
     SCORE_VERSION,
     SCORER_PREPROCESS_VERSION,
-    _prompt_for_mode_v3,
+    _prompt_for_mode_v3,  # noqa: F401
     _score_audit_prompt,
     _score_prompt,
     _writing_prompt,

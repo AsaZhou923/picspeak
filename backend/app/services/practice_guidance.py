@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import CurrentActor, new_public_id
 from app.core.config import settings
 from app.core.errors import api_error
-from app.db.models import Photo, PracticeAttempt, PracticeSceneGroup, PracticeSession, ProductAnalyticsEvent, Review, ReviewTask
+from app.db.models import PracticeAttempt, PracticeSceneGroup, PracticeSession, ProductAnalyticsEvent, Review
 from app.practice_schemas import (
     PracticeGuidanceCoverage,
     PracticeGuidanceEvidence,

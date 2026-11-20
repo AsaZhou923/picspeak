@@ -435,7 +435,7 @@ class ScoreFeedbackApiTests(unittest.TestCase):
         with self.Session() as db:
             review = db.get(Review, 1)
             snapshot = db.query(ReviewScoreSnapshot).one()
-            feedback = db.query(ReviewScoreFeedback).filter(ReviewScoreFeedback.public_id == current['feedback_id']).one()
+            db.query(ReviewScoreFeedback).filter(ReviewScoreFeedback.public_id == current['feedback_id']).one()
             old_snapshot = ReviewScoreSnapshot(
                 public_id='rss_historical',
                 review_id=review.id,

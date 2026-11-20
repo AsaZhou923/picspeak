@@ -4,7 +4,6 @@ from sqlalchemy.exc import IllegalStateChangeError
 from sqlalchemy.orm import sessionmaker
 
 from app.core.config import settings
-from app.db.base import Base
 
 
 _engine_kwargs = {'pool_pre_ping': True}

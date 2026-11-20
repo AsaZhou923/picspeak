@@ -986,16 +986,9 @@ class PracticeMetricsPostgresTests(unittest.TestCase):
     def test_loader_uses_review_cohorts_windowed_loops_and_raw_call_costs(self) -> None:
         from app.db.models import (
             ImageGenerationTask,
-            Photo,
-            PhotoStatus,
-            PracticeAttempt,
             PracticeSession,
             ProductAnalyticsEvent,
-            Review,
             ReviewCallCost,
-            ReviewMode,
-            ReviewStatus,
-            ReviewTask,
             TaskStatus,
         )
 

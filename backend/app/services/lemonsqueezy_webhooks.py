@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.errors import ApiHTTPException, api_error
 from app.core.security import verify_payload
-from app.db.models import BillingSubscription, BillingWebhookEvent, UsageLedger, User, UserPlan
+from app.db.models import BillingSubscription, BillingWebhookEvent, UsageLedger, User
 from app.services.billing_access import current_period_ends_at, subscription_grants_pro_access, sync_user_billing_plan
 from app.services.generation_credit_reservations import PURCHASED_BALANCE_VERSION, generation_credit_balance_snapshot
 from app.services.lemonsqueezy import (

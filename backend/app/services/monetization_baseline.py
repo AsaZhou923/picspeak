@@ -60,10 +60,14 @@ def build_monetization_baseline(
     missing = [name for name in DATASETS if not isinstance(data.get(name), list)]
     if missing:
         raise ValueError('Missing datasets: ' + ', '.join(missing))
-    in_window = lambda value: start <= utc(value) < end
+    def in_window(value: Any) -> bool:
+        return start <= utc(value) < end
+
     users = {str(row['id']): row for row in data['users']}
     public_users = {str(row['public_id']): row for row in users.values()}
-    group = lambda row: 'guest' if row.get('plan') == 'guest' else 'registered'
+
+    def group(row: dict[str, Any]) -> str:
+        return 'guest' if row.get('plan') == 'guest' else 'registered'
     new_users = Counter(group(row) for row in users.values() if in_window(row['created_at']))
     successful = {
         str(row['public_id']): row for row in data['reviews']

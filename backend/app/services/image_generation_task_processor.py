@@ -33,7 +33,6 @@ from app.services.generation_credit_reservations import (
     count_monthly_generation_credit_holds as _count_monthly_generation_credit_holds,
     count_monthly_generation_credits as _count_monthly_generation_credits,
     ensure_generation_credits_available as _ensure_generation_credits_available,
-    monthly_generation_credit_limit_for_plan,
     release_generation_credit_reservation,
     require_held_generation_credit_reservation,
 )

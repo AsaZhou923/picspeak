@@ -58,7 +58,7 @@ def _mask_sensitive_text(text: str) -> str:
     for key in SENSITIVE_JSON_FIELDS:
         masked = re.sub(
             rf'("{key}"\s*:\s*")([^"\\]*(?:\\.[^"\\]*)*)(")',
-            rf'\1***\3',
+            r'\1***\3',
             masked,
             flags=re.IGNORECASE,
         )
@@ -70,7 +70,7 @@ def _mask_form_encoded_text(text: str) -> str:
     for key in SENSITIVE_JSON_FIELDS:
         masked = re.sub(
             rf'((?:^|[?&]){re.escape(key)}=)([^&]*)',
-            rf'\1***',
+            r'\1***',
             masked,
             flags=re.IGNORECASE,
         )
@@ -86,7 +86,7 @@ def mask_capability_url_text(text: str) -> str:
             rf'((?:^|[?&]|%3[fF]|%26|\\u0026|\\u003[fF]|&amp;){re.escape(key)}(?:=|%3[dD]|\\u003[dD]))'
             r'.*?'
             r'(?=$|[&\s"\'<>]|%26|\\u0026|&amp;)',
-            rf'\1***',
+            r'\1***',
             masked,
             flags=re.IGNORECASE,
         )

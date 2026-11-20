@@ -5,14 +5,14 @@ These functions do not commit. Public API routes should not call them directly.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 import hashlib
 import json
 import re
 from pathlib import Path
 from uuid import uuid4
 
-from sqlalchemy import func, select, text
+from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
 from app.core.config import settings

@@ -40,7 +40,7 @@ from .auth_support import (
     _process_clerk_webhook_event,
     _serialize_auth_response,
     _sync_clerk_user,
-    _clerk_identity_from_webhook_user,
+    _clerk_identity_from_webhook_user,  # noqa: F401
 )
 
 router = APIRouter(prefix='/auth', tags=['auth'])

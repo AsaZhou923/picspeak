@@ -1,7 +1,6 @@
 """Optional real PostgreSQL migration, locking and rate-limit regression tests."""
 from __future__ import annotations
 
-import os
 import sys
 import threading
 import unittest
