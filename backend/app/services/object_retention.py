@@ -126,12 +126,17 @@ def decide_photo(facts: PhotoFacts, *, now: datetime, grace_until: datetime | No
         # Every critique of this photo was deleted by its owner.
         expires_at = _utc(facts.latest_deleted_review_at or created_at) + DELETED_REVIEW_GRACE
         reason = 'reviews_deleted'
+    elif owner.plan == UserPlan.guest:
+        if owner.status == UserStatus.deleted:
+            # Guests marked deleted by the pre-#55 migration may still own originals
+            # belonging to a registered account. Hold them until reconciled via
+            # scripts/reconcile_guest_migrations.py; newly migrated guests own nothing.
+            return Decision(False, 'guest_migration_pending')
+        activity = _max(created_at, _utc(facts.latest_active_review_at))
+        expires_at, reason = activity + timedelta(days=GUEST_ORIGINAL_DAYS), 'guest_expired'
     elif owner.status == UserStatus.deleted:
         deleted_at = _utc(owner.updated_at) or created_at
         expires_at, reason = deleted_at + timedelta(days=DELETED_ACCOUNT_DAYS), 'account_deleted'
-    elif owner.plan == UserPlan.guest:
-        activity = _max(created_at, _utc(facts.latest_active_review_at))
-        expires_at, reason = activity + timedelta(days=GUEST_ORIGINAL_DAYS), 'guest_expired'
     elif owner.pro_active:
         return Decision(False, 'pro_active')
     else:
