@@ -24,7 +24,6 @@ from app.api.routers.photos import (  # noqa: E402
     PHOTO_THUMBNAIL_TTL_SECONDS,
     _build_photo_proxy_url,
     _build_thumbnail_bytes,
-    _find_photo_from_token,
     _private_thumbnail_object_key,
     get_photo_image,
     get_photo_thumbnail,
