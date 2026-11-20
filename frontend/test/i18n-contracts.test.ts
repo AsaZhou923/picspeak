@@ -218,10 +218,23 @@ test('self-service deletion copy explains irreversibility, 24-hour file removal,
     for (const key of deleteKeys) {
       assert.ok(dictionary[key].trim(), key);
     }
+    assert.match(dictionary.delete_review_dialog_body, /immediately|立即|すぐに/);
+    assert.match(dictionary.delete_generation_dialog_body, /immediately|立即|すぐに/);
     assert.match(dictionary.delete_review_consequence_original, /24/);
+    assert.match(dictionary.delete_review_consequence_original, /normally|通常/);
+    assert.doesNotMatch(
+      dictionary.delete_review_consequence_original,
+      /will be permanently removed after 24 hours|将在 24 小时后被永久清除|24 時間後に完全に削除されます/,
+    );
     assert.match(dictionary.delete_generation_consequence_file, /24/);
+    assert.match(dictionary.delete_generation_consequence_file, /normally|通常/);
+    assert.doesNotMatch(
+      dictionary.delete_generation_consequence_file,
+      /will be permanently removed after 24 hours|将在 24 小时后被永久清除|24 時間後に完全に削除されます/,
+    );
     assert.match(dictionary.delete_review_consequence_irreversible, /cannot be restored|不可恢复|復元できません/);
     assert.match(dictionary.delete_review_consequence_public, /gallery|长廊|ギャラリー/i);
+    assert.match(dictionary.delete_review_consequence_public, /minute|1 分钟|1 分/);
   }
 
   const legalSource = await readFile(new URL('../src/components/marketing/LegalPageContent.tsx', import.meta.url), 'utf8');
