@@ -142,14 +142,14 @@ def _verify_uploaded_object(token: dict) -> tuple[str, int, int]:
                     if width <= 0 or height <= 0 or width * height > UPLOAD_MAX_PIXELS:
                         raise api_error(400, 'UPLOAD_IMAGE_INVALID', 'Uploaded file is not a valid supported image')
                     image.verify()
-                if image_format == 'JPEG':
-                    # Pillow's JpegImageFile.verify() is a no-op; draft('RGB', (1, 1))
-                    # validates the full entropy stream at 1/8 scale (1/64th pixels)
-                    # so truncated JPEGs are rejected without decoding the full bitmap.
-                    spool.seek(0)
-                    with Image.open(spool) as image:
+                spool.seek(0)
+                with Image.open(spool) as image:
+                    if image_format == 'JPEG':
+                        # Pillow's JpegImageFile.verify() is a no-op; draft('RGB', (1, 1))
+                        # validates the full entropy stream at 1/8 scale (1/64th pixels)
+                        # so truncated JPEGs are rejected without decoding the full bitmap.
                         image.draft('RGB', (1, 1))
-                        image.load()
+                    image.load()
         except (UnidentifiedImageError, OSError, SyntaxError, ValueError, Image.DecompressionBombError, Image.DecompressionBombWarning) as exc:
             raise api_error(400, 'UPLOAD_IMAGE_INVALID', 'Uploaded file is not a valid supported image') from exc
     return checksum, width, height

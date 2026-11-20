@@ -146,7 +146,11 @@ def _find_photo_from_token(db: Session, photo_id: str, photo_token: str, size: i
     photo = (
         db.query(Photo)
         .join(User, User.id == Photo.owner_user_id)
-        .filter(Photo.public_id == photo_id, User.public_id == owner_public_id.strip())
+        .filter(
+            Photo.public_id == photo_id,
+            User.public_id == owner_public_id.strip(),
+            User.status == UserStatus.active,
+        )
         .first()
     )
     if photo is None:
@@ -196,6 +200,32 @@ def _get_photo_object(photo: Photo) -> tuple[Any, bytes]:
     body = result['Body']
     try:
         return body, body.read()
+    finally:
+        body.close()
+
+
+def _is_storage_not_found(exc: Exception) -> bool:
+    response = getattr(exc, 'response', None) or {}
+    code = str(response.get('Error', {}).get('Code', ''))
+    return code in {'404', 'NoSuchKey', 'NotFound'}
+
+
+def _read_stored_thumbnail_bytes(bucket: str, object_key: str) -> tuple[dict[str, Any], bytes] | None:
+    try:
+        storage = get_object_storage_client()
+        result = storage.get_object(Bucket=bucket, Key=object_key)
+    except Exception as exc:  # noqa: BLE001 - fall back to regenerating thumbnail
+        if _is_storage_not_found(exc):
+            return None
+        logger.warning('Failed to read stored thumbnail %s from bucket %s; regenerating', object_key, bucket, exc_info=True)
+        return None
+
+    body = result['Body']
+    try:
+        return result, body.read()
+    except Exception:  # noqa: BLE001 - fall back to regenerating thumbnail
+        logger.warning('Failed to read stored thumbnail body %s from bucket %s; regenerating', object_key, bucket, exc_info=True)
+        return None
     finally:
         body.close()
 
@@ -285,16 +315,15 @@ def get_public_gallery_thumbnail(
     if _etag_matches(if_none_match, etag):
         return Response(status_code=status.HTTP_304_NOT_MODIFIED, headers=headers)
 
-    try:
-        result, content = _get_storage_object_bytes(photo.bucket, thumbnail_key)
+    stored = _read_stored_thumbnail_bytes(photo.bucket, thumbnail_key)
+    if stored is not None:
+        result, content = stored
         media_type = str(
             result.get('ContentType')
             or 'image/webp'
         )
         headers['Content-Length'] = str(len(content))
         return Response(content=content, media_type=media_type, headers=headers)
-    except Exception:
-        pass
 
     _, source_bytes = _get_photo_object(photo)
     thumbnail_bytes, media_type = _build_thumbnail_bytes(source_bytes, PHOTO_THUMBNAIL_MAX_SIZE)
@@ -346,13 +375,12 @@ def get_photo_thumbnail(
         return Response(status_code=status.HTTP_304_NOT_MODIFIED, headers=headers)
 
     thumbnail_key = _private_thumbnail_object_key(photo, size=size)
-    try:
-        result, content = _get_storage_object_bytes(photo.bucket, thumbnail_key)
+    stored = _read_stored_thumbnail_bytes(photo.bucket, thumbnail_key)
+    if stored is not None:
+        result, content = stored
         media_type = str(result.get('ContentType') or 'image/webp')
         headers['Content-Length'] = str(len(content))
         return Response(content=content, media_type=media_type, headers=headers)
-    except Exception:
-        pass
 
     _, source_bytes = _get_photo_object(photo)
     thumbnail_bytes, media_type = _build_thumbnail_bytes(source_bytes, size)

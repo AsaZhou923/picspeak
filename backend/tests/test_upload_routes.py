@@ -248,7 +248,7 @@ class UploadRoutesTests(unittest.TestCase):
         self.assertEqual(raised.exception.status_code, 400)
         self.assertEqual(raised.exception.detail['code'], 'UPLOAD_IMAGE_INVALID')
 
-    def test_png_and_webp_verify_without_full_pixel_decode_and_reject_truncation(self) -> None:
+    def test_png_and_webp_decode_and_reject_truncation_and_decoder_errors(self) -> None:
         for fmt, content_type, ext in (('PNG', 'image/png', '.png'), ('WEBP', 'image/webp', '.webp')):
             buf = BytesIO()
             Image.new('RGB', (320, 240), (10, 20, 30)).save(buf, format=fmt)
@@ -270,11 +270,29 @@ class UploadRoutesTests(unittest.TestCase):
             with self.subTest(fmt=fmt, case='valid'):
                 self.storage.head_object.return_value = {'ContentLength': len(raw), 'ContentType': content_type, 'ETag': 'etag-1'}
                 self.storage.get_object.return_value = {'Body': BytesIO(raw)}
-                with patch.object(Image.Image, 'load', side_effect=AssertionError('full load should not run for PNG/WEBP')):
+                load_calls = 0
+                orig_load = Image.Image.load
+
+                def spy_load(self_img):
+                    nonlocal load_calls
+                    load_calls += 1
+                    return orig_load(self_img)
+
+                with patch.object(Image.Image, 'load', spy_load):
                     _response, db = self._confirm(token)
                 photo = db.add.call_args.args[0]
                 self.assertEqual((photo.width, photo.height), (320, 240))
                 self.assertEqual(photo.checksum_sha256, sha)
+                self.assertGreaterEqual(load_calls, 1)
+
+            with self.subTest(fmt=fmt, case='decoder_failure_after_verify'):
+                self.storage.head_object.return_value = {'ContentLength': len(raw), 'ContentType': content_type, 'ETag': 'etag-decode'}
+                self.storage.get_object.return_value = {'Body': BytesIO(raw)}
+                with patch.object(Image.Image, 'load', side_effect=OSError('corrupt pixel stream')):
+                    with self.assertRaises(HTTPException) as raised:
+                        self._confirm(token)
+                self.assertEqual(raised.exception.status_code, 400)
+                self.assertEqual(raised.exception.detail['code'], 'UPLOAD_IMAGE_INVALID')
 
             with self.subTest(fmt=fmt, case='truncated'):
                 truncated = raw[:-5]

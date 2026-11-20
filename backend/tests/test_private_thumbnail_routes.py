@@ -9,6 +9,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from botocore.exceptions import ClientError
+from fastapi import HTTPException
 from PIL import Image
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
@@ -16,15 +17,19 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 from app.api.routers.photos import (  # noqa: E402
+    PHOTO_PROXY_TOKEN_PURPOSE,
     PHOTO_THUMBNAIL_CACHE_CONTROL,
     PHOTO_THUMBNAIL_SIZE,
     PHOTO_THUMBNAIL_STABLE_WINDOW_SECONDS,
     PHOTO_THUMBNAIL_TTL_SECONDS,
     _build_photo_proxy_url,
     _build_thumbnail_bytes,
+    _find_photo_from_token,
     _private_thumbnail_object_key,
+    get_photo_image,
     get_photo_thumbnail,
 )
+from app.core.security import sign_payload  # noqa: E402
 
 
 def _jpeg_bytes(*, size: tuple[int, int] = (400, 200), orientation: int | None = None) -> bytes:
@@ -104,12 +109,14 @@ class PrivateThumbnailTests(unittest.TestCase):
             patch('app.api.routers.photos._find_photo_from_token', return_value=photo),
             patch('app.api.routers.photos.get_object_storage_client', return_value=storage),
             patch('app.api.routers.photos._get_photo_object', return_value=(None, _jpeg_bytes())) as fetch_original,
+            patch('app.api.routers.photos.logger.warning') as log_warning,
         ):
             response = get_photo_thumbnail('pho_miss', photo_token='tok', size=128, if_none_match=None, db=MagicMock())
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.media_type, 'image/webp')
         fetch_original.assert_called_once_with(photo)
+        log_warning.assert_not_called()
         storage.put_object.assert_called_once_with(
             Bucket='photos',
             Key=_private_thumbnail_object_key(photo, size=128),
@@ -117,6 +124,57 @@ class PrivateThumbnailTests(unittest.TestCase):
             ContentType='image/webp',
             CacheControl=PHOTO_THUMBNAIL_CACHE_CONTROL,
         )
+
+    def test_get_photo_thumbnail_logs_warning_and_regenerates_on_unexpected_storage_error(self) -> None:
+        now = datetime(2026, 11, 1, 12, 0, tzinfo=timezone.utc)
+        photo = SimpleNamespace(
+            public_id='pho_err',
+            bucket='photos',
+            object_key='user_usr_1/2026/11/orig.jpg',
+            content_type='image/jpeg',
+            updated_at=now,
+        )
+        storage = MagicMock()
+        storage.get_object.side_effect = ClientError({'Error': {'Code': 'InternalError'}}, 'GetObject')
+
+        with (
+            patch('app.api.routers.photos._find_photo_from_token', return_value=photo),
+            patch('app.api.routers.photos.get_object_storage_client', return_value=storage),
+            patch('app.api.routers.photos._get_photo_object', return_value=(None, _jpeg_bytes())) as fetch_original,
+            patch('app.api.routers.photos.logger.warning') as log_warning,
+        ):
+            response = get_photo_thumbnail('pho_err', photo_token='tok', size=128, if_none_match=None, db=MagicMock())
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.media_type, 'image/webp')
+        fetch_original.assert_called_once_with(photo)
+        log_warning.assert_called_once()
+        self.assertIn('Failed to read stored thumbnail', log_warning.call_args.args[0])
+
+    def test_private_photo_lookup_requires_active_owner(self) -> None:
+        db = MagicMock()
+        query = db.query.return_value
+        query.join.return_value = query
+        query.filter.return_value = query
+        query.first.return_value = None
+
+        orig_token = sign_payload({'photo_id': 'pho_del', 'uid': 'usr_deleted'}, ttl_seconds=600, purpose=PHOTO_PROXY_TOKEN_PURPOSE)
+        thumb_token = sign_payload({'photo_id': 'pho_del', 'uid': 'usr_deleted', 'size': 128}, ttl_seconds=600, purpose=PHOTO_PROXY_TOKEN_PURPOSE)
+
+        with self.assertRaises(HTTPException) as orig_err:
+            get_photo_image('pho_del', photo_token=orig_token, db=db)
+        self.assertEqual(orig_err.exception.status_code, 404)
+        self.assertEqual(orig_err.exception.detail['code'], 'PHOTO_NOT_FOUND')
+
+        with self.assertRaises(HTTPException) as thumb_err:
+            get_photo_thumbnail('pho_del', photo_token=thumb_token, size=128, if_none_match=None, db=db)
+        self.assertEqual(thumb_err.exception.status_code, 404)
+        self.assertEqual(thumb_err.exception.detail['code'], 'PHOTO_NOT_FOUND')
+
+        where_sql = ' '.join(str(condition).lower() for condition in query.filter.call_args.args)
+        self.assertIn('photos.public_id', where_sql)
+        self.assertIn('users.public_id', where_sql)
+        self.assertIn('users.status', where_sql)
 
     def test_get_photo_thumbnail_still_serves_when_persist_put_fails(self) -> None:
         now = datetime(2026, 11, 1, 12, 0, tzinfo=timezone.utc)
