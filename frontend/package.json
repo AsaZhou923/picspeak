@@ -13,6 +13,7 @@
     "build": "next build",
     "build:clean": "npm run clean && next build",
     "start": "next start",
+    "postinstall": "node scripts/patch-next-font-loader.mjs",
     "test": "node scripts/run-node-tests.mjs",
     "test:production-blog": "node --test --test-concurrency=1 test/blog-routing.production.test.mjs",
     "indexnow:submit": "node scripts/submit-indexnow.mjs",
