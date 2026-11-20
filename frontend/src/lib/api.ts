@@ -327,14 +327,17 @@ export async function getUsage(token: string, options: UsageOptions = {}): Promi
 
   const usagePromise = request<UsageResponse>('/me/usage', {
     token,
+    cache: 'no-store',
     unauthorizedRecovery: 'guest',
   })
     .then((data) => {
-      usageCache = {
-        token,
-        expiresAt: Date.now() + USAGE_CACHE_TTL_MS,
-        data,
-      };
+      if (usageCache?.promise === usagePromise && usageCache.token === token) {
+        usageCache = {
+          token,
+          expiresAt: Date.now() + USAGE_CACHE_TTL_MS,
+          data,
+        };
+      }
       return data;
     })
     .catch((error) => {
