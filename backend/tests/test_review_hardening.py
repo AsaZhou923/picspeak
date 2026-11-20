@@ -96,22 +96,28 @@ class ReviewHardeningTests(unittest.TestCase):
         self.assertTrue(_should_skip_audit('/api/v1/photos/pho_123/image'))
         self.assertFalse(_should_skip_audit('/api/v1/reviews'))
 
-    def test_audit_body_capture_rejects_large_or_binary_requests(self) -> None:
+    def test_audit_body_capture_rejects_default_large_or_binary_requests(self) -> None:
         self.assertFalse(
-            _should_capture_audit_body(
-                _request(headers={'content-length': str(8 * 1024), 'content-type': 'application/json'})
-            )
-        )
-        self.assertFalse(
-            _should_capture_audit_body(
-                _request(headers={'content-length': '512', 'content-type': 'multipart/form-data; boundary=x'})
-            )
-        )
-        self.assertTrue(
             _should_capture_audit_body(
                 _request(headers={'content-length': '512', 'content-type': 'application/json'})
             )
         )
+        with patch('app.main._AUDIT_BODY_ALLOW_PATHS', frozenset({'/api/v1/reviews'})):
+            self.assertFalse(
+                _should_capture_audit_body(
+                    _request(headers={'content-length': str(8 * 1024), 'content-type': 'application/json'})
+                )
+            )
+            self.assertFalse(
+                _should_capture_audit_body(
+                    _request(headers={'content-length': '512', 'content-type': 'multipart/form-data; boundary=x'})
+                )
+            )
+            self.assertTrue(
+                _should_capture_audit_body(
+                    _request(headers={'content-length': '512', 'content-type': 'application/json'})
+                )
+            )
 
     def test_worker_shutdown_drains_completed_generation_futures(self) -> None:
         worker = ReviewWorker(worker_name='test-worker')

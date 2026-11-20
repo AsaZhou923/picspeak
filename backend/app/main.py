@@ -203,10 +203,16 @@ _AUDIT_SKIP_PATHS = {
 _AUDIT_SKIP_PREFIXES = ('/api/v1/photos/',)
 _AUDIT_BODY_CAPTURE_LIMIT_BYTES = 4 * 1024
 _AUDIT_BINARY_CONTENT_TYPES = ('application/octet-stream', 'multipart/form-data')
-# Audited without request bodies: their bodies are redeemable codes.
-_AUDIT_BODY_SKIP_PATHS = {
+# Request bodies are NOT persisted by default so user free text (prompts,
+# notes, tags, feedback, analytics metadata) never lands in api_request_logs.
+# Only explicitly allowlisted paths that carry no user free text or secrets
+# may opt in to bounded body capture for debugging.
+_AUDIT_BODY_ALLOW_PATHS: frozenset[str] = frozenset()
+# Defense-in-depth denylist for secret-bearing paths; always rejected even if
+# accidentally added to _AUDIT_BODY_ALLOW_PATHS.
+_AUDIT_BODY_SKIP_PATHS = frozenset({
     '/api/v1/billing/activation-code/redeem',
-}
+})
 
 
 def _should_skip_audit(path: str) -> bool:
@@ -214,7 +220,8 @@ def _should_skip_audit(path: str) -> bool:
 
 
 def _should_capture_audit_body(request: Request) -> bool:
-    if request.url.path in _AUDIT_BODY_SKIP_PATHS:
+    path = request.url.path
+    if path in _AUDIT_BODY_SKIP_PATHS or path not in _AUDIT_BODY_ALLOW_PATHS:
         return False
     content_type = request.headers.get('content-type', '').split(';', 1)[0].strip().lower()
     if content_type in _AUDIT_BINARY_CONTENT_TYPES:
