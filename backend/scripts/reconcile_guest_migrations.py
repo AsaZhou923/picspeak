@@ -13,7 +13,12 @@ the script inspects only trustworthy relational/storage evidence:
 
 Stranded rows are moved only when every evidence source agrees on a single active,
 registered (non-guest) destination account. Anything ambiguous, ineligible, or
-lacking evidence is reported and left untouched.
+lacking evidence is reported and left untouched. UsageLedger rows are evidence
+only: usage stays with the account whose quota admitted the request.
+
+Guests are scanned in internal id order. The report's ``last_scanned_guest_id``
+can be passed back as --after-guest-id so unresolved guests do not hold later
+candidates out of a --max-guests batch.
 """
 from __future__ import annotations
 
@@ -35,7 +40,7 @@ from sqlalchemy import create_engine, exists, func, or_, text  # noqa: E402
 from sqlalchemy.engine import make_url  # noqa: E402
 from sqlalchemy.orm import Session, aliased  # noqa: E402
 
-from app.api.routers.auth_support import transfer_guest_user_records  # noqa: E402
+from app.api.routers.auth_support import lock_guest_for_transfer, transfer_guest_user_records  # noqa: E402
 from app.db.models import (  # noqa: E402
     Photo,
     PracticeAttempt,
@@ -69,6 +74,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--database-url', required=True, help='Explicit PostgreSQL URL, never printed')
     parser.add_argument('--max-guests', type=int, default=200, help='Maximum deleted guests examined (1..1000)')
+    parser.add_argument(
+        '--after-guest-id', type=int, default=0,
+        help="Only examine guests with a larger internal id; pass the previous report's last_scanned_guest_id",
+    )
     parser.add_argument('--execute', action='store_true', help='Transfer uniquely resolved stranded records')
     return parser
 
@@ -78,6 +87,8 @@ def validate(args: argparse.Namespace) -> None:
         raise ValueError('PostgreSQL is required')
     if not 1 <= int(args.max_guests) <= 1000:
         raise ValueError('--max-guests must be between 1 and 1000')
+    if int(args.after_guest_id) < 0:
+        raise ValueError('--after-guest-id must not be negative')
     if args.execute and os.getenv(EXECUTE_ENV_FLAG) != '1':
         raise ValueError(f'--execute requires {EXECUTE_ENV_FLAG}=1')
 
@@ -102,7 +113,7 @@ def _stranded_counts(db: Session, guest_id: int) -> dict[str, int]:
     }
 
 
-def _deleted_guests_with_stranded_records(db: Session, *, max_guests: int) -> list[User]:
+def _deleted_guests_with_stranded_records(db: Session, *, max_guests: int, after_guest_id: int = 0) -> list[User]:
     has_stranded = or_(
         exists().where(Photo.owner_user_id == User.id),
         exists().where(Review.owner_user_id == User.id),
@@ -117,6 +128,7 @@ def _deleted_guests_with_stranded_records(db: Session, *, max_guests: int) -> li
         .filter(
             User.plan == UserPlan.guest,
             User.status == UserStatus.deleted,
+            User.id > after_guest_id,
             has_stranded,
         )
         .order_by(User.id.asc())
@@ -398,7 +410,9 @@ def run(args: argparse.Namespace, *, engine) -> dict[str, Any]:
         db.execute(text('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY'))
         try:
             read_only = db.execute(text('SHOW transaction_read_only')).scalar_one()
-            guests = _deleted_guests_with_stranded_records(db, max_guests=int(args.max_guests))
+            guests = _deleted_guests_with_stranded_records(
+                db, max_guests=int(args.max_guests), after_guest_id=int(args.after_guest_id),
+            )
             for guest in guests:
                 plans.append(evaluate_guest_reconciliation(db, guest))
         finally:
@@ -410,6 +424,8 @@ def run(args: argparse.Namespace, *, engine) -> dict[str, Any]:
         'generated_at': now.isoformat(),
         'transaction_read_only': read_only,
         'scanned_guests': len(plans),
+        'after_guest_id': int(args.after_guest_id),
+        'last_scanned_guest_id': plans[-1].guest_id if plans else None,
         'status_counts': dict(status_counts),
         'guests': [
             {
@@ -434,17 +450,7 @@ def run(args: argparse.Namespace, *, engine) -> dict[str, Any]:
             executed_outcomes[f'skipped_{plan.status}'] += 1
             continue
         with Session(engine, expire_on_commit=False) as db:
-            guest = (
-                db.query(User)
-                .filter(
-                    User.id == plan.guest_id,
-                    User.plan == UserPlan.guest,
-                    User.status == UserStatus.deleted,
-                )
-                .with_for_update()
-                .populate_existing()
-                .first()
-            )
+            guest = lock_guest_for_transfer(db, plan.guest_id, expected_status=UserStatus.deleted)
             if guest is None:
                 db.rollback()
                 executed_outcomes['skipped_missing_guest'] += 1

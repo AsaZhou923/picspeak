@@ -41,6 +41,7 @@ def _args(**overrides):
     values = {
         'database_url': 'postgresql://postgres:postgres@127.0.0.1:5432/picspeak_test',
         'max_guests': 200,
+        'after_guest_id': 0,
         'execute': False,
     }
     values.update(overrides)
@@ -55,6 +56,8 @@ def test_cli_validation_requires_explicit_postgres_url_and_execute_env_gate(monk
         reconcile_guest_migrations.validate(_args(database_url='sqlite:///tmp.db'))
     with pytest.raises(ValueError, match='max-guests'):
         reconcile_guest_migrations.validate(_args(max_guests=0))
+    with pytest.raises(ValueError):
+        reconcile_guest_migrations.validate(_args(after_guest_id=-1))
     reconcile_guest_migrations.validate(_args(execute=False))
     with pytest.raises(ValueError, match=reconcile_guest_migrations.EXECUTE_ENV_FLAG):
         reconcile_guest_migrations.validate(_args(execute=True))
@@ -233,6 +236,10 @@ def test_legacy_deleted_guest_is_held_by_retention_and_reconciled_by_script(pg_e
             .count()
         )
         assert mismatched == 0
+        # Usage stays with the guest whose quota admitted each request.
+        assert db.query(UsageLedger).filter(UsageLedger.user_id == guest.id).count() == 25
+        assert db.query(UsageLedger).filter(UsageLedger.user_id == target.id).count() == 0
+    assert 'usage_ledger' not in exec_report['executed']['transferred']
 
     # 4. Idempotent repeat finds nothing left to reconcile.
     repeat_report = reconcile_guest_migrations.run(_args(execute=True), engine=pg_engine)
@@ -302,3 +309,56 @@ def test_reconcile_leaves_ambiguous_no_evidence_and_ineligible_targets_untouched
         assert db.get(Photo, amb_photo.id).owner_user_id == amb_guest.id
         assert db.get(Photo, orphan_photo.id).owner_user_id == orphan_guest.id
         assert db.get(Photo, inelig_photo.id).owner_user_id == inelig_guest.id
+
+
+def test_after_guest_id_cursor_moves_past_unresolved_guests(pg_engine):
+    SessionLocal = sessionmaker(bind=pg_engine, expire_on_commit=False)
+    with SessionLocal() as db:
+        # The first guest in id order has no evidence and can never be resolved.
+        orphan_guest = _seed_user(db, plan=UserPlan.guest, status=UserStatus.deleted, suffix='cur_o')
+        db.add(Photo(
+            public_id='pho_cur_o', owner_user_id=orphan_guest.id, upload_id='upl_cur_o',
+            bucket='bucket', object_key=f'user_{orphan_guest.public_id}/2026/11/o.jpg',
+            content_type='image/jpeg', size_bytes=100, status=PhotoStatus.READY,
+        ))
+        later_guest = _seed_user(db, plan=UserPlan.guest, status=UserStatus.deleted, suffix='cur_g')
+        target = _seed_user(db, plan=UserPlan.free, status=UserStatus.active, suffix='cur_t')
+        stranded = Photo(
+            public_id='pho_cur_g', owner_user_id=later_guest.id, upload_id='upl_cur_g',
+            bucket='bucket', object_key=f'user_{later_guest.public_id}/2026/11/g.jpg',
+            content_type='image/jpeg', size_bytes=100, status=PhotoStatus.READY,
+        )
+        migrated = Photo(
+            public_id='pho_cur_m', owner_user_id=target.id, upload_id='upl_cur_m',
+            bucket='bucket', object_key=f'user_{later_guest.public_id}/2026/11/m.jpg',
+            content_type='image/jpeg', size_bytes=100, status=PhotoStatus.READY,
+        )
+        db.add_all([stranded, migrated])
+        db.commit()
+        assert orphan_guest.id < later_guest.id
+
+    # Without the cursor, a batch of one keeps returning the unresolved guest.
+    for _ in range(2):
+        report = reconcile_guest_migrations.run(_args(execute=True, max_guests=1), engine=pg_engine)
+        assert [entry['guest_public_id'] for entry in report['guests']] == [orphan_guest.public_id]
+        assert report['executed']['outcomes'] == {'skipped_no_evidence': 1}
+        assert report['last_scanned_guest_id'] == orphan_guest.id
+
+    report = reconcile_guest_migrations.run(
+        _args(execute=True, max_guests=1, after_guest_id=report['last_scanned_guest_id']),
+        engine=pg_engine,
+    )
+    assert report['after_guest_id'] == orphan_guest.id
+    assert [entry['guest_public_id'] for entry in report['guests']] == [later_guest.public_id]
+    assert report['executed']['outcomes'] == {'reconciled': 1}
+    assert report['last_scanned_guest_id'] == later_guest.id
+
+    with SessionLocal() as db:
+        assert db.get(Photo, stranded.id).owner_user_id == target.id
+
+    report = reconcile_guest_migrations.run(
+        _args(max_guests=1, after_guest_id=report['last_scanned_guest_id']),
+        engine=pg_engine,
+    )
+    assert report['scanned_guests'] == 0
+    assert report['last_scanned_guest_id'] is None
