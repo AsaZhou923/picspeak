@@ -139,7 +139,7 @@ PicSpeak 在 Build Week 之前已经存在。活动期间，单张点评扩展�
 
 ## 📝 更新记录
 
-最新条目：[使用限制更稳定，文章阅读数更可信](docs/changelog/CHANGELOG.md#2026-11-19-steadier-limits-and-view-counts)。更早的条目见[完整 Changelog](docs/changelog/CHANGELOG.md)。
+最新条目：[作品管理更方便，登录与浏览更稳定](docs/changelog/CHANGELOG.md#2026-11-20-easier-management-and-reliable-sign-in)。更早的条目见[完整 Changelog](docs/changelog/CHANGELOG.md)。
 
 ## 🤝 参与贡献
 

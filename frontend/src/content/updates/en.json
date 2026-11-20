@@ -1,5 +1,31 @@
 [
   {
+    "id": "2026-11-20-easier-management-and-reliable-sign-in",
+    "date": "2026-11-20",
+    "showPopup": false,
+    "title": "Easier photo management and more reliable sign-in",
+    "summary": "Manage saved work yourself, keep guest work when signing in, and browse with fewer repeat downloads and less personal information in request logs.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-11-20-easier-management-and-reliable-sign-in",
+    "sections": [
+      {
+        "title": "Managing work and signing in",
+        "items": [
+          "Delete critiques and generated images from detail or history pages, with confirmation explaining the effect on public links and stored files.",
+          "Signing in transfers all guest photos, critiques, and ongoing tasks to your account. Accepted critiques use the quota reserved when submitted.",
+          "When the sign-in service fails to load, the guest entry appears sooner."
+        ]
+      },
+      {
+        "title": "Browsing and privacy",
+        "items": [
+          "Gallery and history images need fewer repeat downloads.",
+          "Deleting an account withdraws its works from the Gallery and public sharing.",
+          "New request logs exclude submitted text such as prompts and notes and shorten IP addresses."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-11-19-steadier-limits-and-view-counts",
     "date": "2026-11-19",
     "showPopup": false,
