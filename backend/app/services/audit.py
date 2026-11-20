@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from ipaddress import IPv6Address, ip_address, ip_network
+import json
 import re
+from typing import Any, Iterable
 from urllib.parse import parse_qsl, urlencode
 from uuid import uuid4
 
@@ -15,7 +18,7 @@ from app.db.models import ApiRequestLog
 MAX_LOG_BODY_CHARS = 4000
 
 
-SENSITIVE_JSON_FIELDS = {
+SENSITIVE_SECRET_FIELDS = frozenset({
     'password',
     'token',
     'access_token',
@@ -28,7 +31,30 @@ SENSITIVE_JSON_FIELDS = {
     'secret',
     'authorization',
     'grant_token',
-}
+    'activation_code',
+})
+
+SENSITIVE_USER_CONTENT_FIELDS = frozenset({
+    'prompt',
+    'revised_prompt',
+    'note',
+    'notes',
+    'tags',
+    'feedback',
+    'comment',
+    'comments',
+    'metadata',
+    'metadata_json',
+    'text',
+    'reason',
+    'description',
+    'goal',
+    'goal_snapshot',
+    'success_criteria',
+    'message',
+})
+
+SENSITIVE_JSON_FIELDS = set(SENSITIVE_SECRET_FIELDS | SENSITIVE_USER_CONTENT_FIELDS)
 
 SENSITIVE_QUERY_FIELDS = {
     'access_token',
@@ -52,12 +78,12 @@ CAPABILITY_QUERY_FIELDS = frozenset({
 })
 
 
-def _mask_sensitive_text(text: str) -> str:
+def _mask_sensitive_text(text: str, *, fields: Iterable[str] = SENSITIVE_JSON_FIELDS) -> str:
     # Lightweight masking for JSON-like request payloads persisted in audit logs.
     masked = text
-    for key in SENSITIVE_JSON_FIELDS:
+    for key in fields:
         masked = re.sub(
-            rf'("{key}"\s*:\s*")([^"\\]*(?:\\.[^"\\]*)*)(")',
+            rf'("{re.escape(key)}"\s*:\s*")([^"\\]*(?:\\.[^"\\]*)*)(")',
             r'\1***\3',
             masked,
             flags=re.IGNORECASE,
@@ -65,9 +91,9 @@ def _mask_sensitive_text(text: str) -> str:
     return masked
 
 
-def _mask_form_encoded_text(text: str) -> str:
+def _mask_form_encoded_text(text: str, *, fields: Iterable[str] = SENSITIVE_JSON_FIELDS) -> str:
     masked = text
-    for key in SENSITIVE_JSON_FIELDS:
+    for key in fields:
         masked = re.sub(
             rf'((?:^|[?&]){re.escape(key)}=)([^&]*)',
             r'\1***',
@@ -77,10 +103,24 @@ def _mask_form_encoded_text(text: str) -> str:
     return masked
 
 
+def _redact_json_value(value: Any, *, fields: frozenset[str]) -> Any:
+    if isinstance(value, dict):
+        redacted: dict[Any, Any] = {}
+        for key, item in value.items():
+            if isinstance(key, str) and key.strip().lower() in fields:
+                redacted[key] = '***'
+            else:
+                redacted[key] = _redact_json_value(item, fields=fields)
+        return redacted
+    if isinstance(value, list):
+        return [_redact_json_value(item, fields=fields) for item in value]
+    return value
+
+
 def mask_capability_url_text(text: str) -> str:
     """Mask query values that grant image/object access in provider echoes."""
-    masked = _mask_sensitive_text(str(text))
-    masked = _mask_form_encoded_text(masked)
+    masked = _mask_sensitive_text(str(text), fields=SENSITIVE_SECRET_FIELDS)
+    masked = _mask_form_encoded_text(masked, fields=SENSITIVE_SECRET_FIELDS)
     for key in CAPABILITY_QUERY_FIELDS:
         masked = re.sub(
             rf'((?:^|[?&]|%3[fF]|%26|\\u0026|\\u003[fF]|&amp;){re.escape(key)}(?:=|%3[dD]|\\u003[dD]))'
@@ -108,6 +148,23 @@ def _safe_query_string(query_string: str | None) -> str | None:
     return urlencode(sanitized, doseq=True)
 
 
+def _truncate_client_ip(client_ip: str | None) -> str | None:
+    """Coarsen client IPs for audit storage: IPv4 to /24, IPv6 to /48."""
+    if not client_ip:
+        return None
+    candidate = client_ip.strip()
+    if not candidate:
+        return None
+    try:
+        address = ip_address(candidate)
+    except ValueError:
+        return None
+    if isinstance(address, IPv6Address):
+        if address.ipv4_mapped is not None:
+            return str(ip_network(f'{address.ipv4_mapped}/24', strict=False))
+        return str(ip_network(f'{address}/48', strict=False))
+    return str(ip_network(f'{address}/24', strict=False))
+
 
 def _safe_text_from_body(body: bytes) -> str | None:
     if not body:
@@ -119,6 +176,20 @@ def _safe_text_from_body(body: bytes) -> str | None:
     content = content.strip()
     if not content:
         return None
+    redact_fields = frozenset(key.lower() for key in SENSITIVE_JSON_FIELDS)
+    try:
+        parsed = json.loads(content)
+    except ValueError:
+        pass
+    else:
+        if isinstance(parsed, (dict, list)):
+            content = json.dumps(
+                _redact_json_value(parsed, fields=redact_fields),
+                ensure_ascii=False,
+                separators=(',', ':'),
+            )
+    content = _mask_sensitive_text(content, fields=SENSITIVE_JSON_FIELDS)
+    content = _mask_form_encoded_text(content, fields=SENSITIVE_JSON_FIELDS)
     content = mask_capability_url_text(content)
     if len(content) > MAX_LOG_BODY_CHARS:
         return content[:MAX_LOG_BODY_CHARS] + '...<truncated>'
@@ -146,7 +217,7 @@ def log_api_request(
         path=path,
         query_string=_safe_query_string(query_string),
         endpoint=endpoint,
-        client_ip=client_ip,
+        client_ip=_truncate_client_ip(client_ip),
         user_public_id=user_public_id,
         user_agent=user_agent,
         request_body=_safe_text_from_body(request_body),

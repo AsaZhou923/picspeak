@@ -14,7 +14,7 @@ from pydantic import ValidationError
 from app.api.deps import CurrentActor, get_current_actor, get_db, new_public_id
 from app.api.routers.photos import _find_photo_owned
 from app.core.config import settings
-from app.core.errors import api_error
+from app.core.errors import ApiHTTPException, api_error
 from app.db.models import (
     PhotoStatus,
     Photo,
@@ -97,6 +97,34 @@ def _replay_review_response(db: Session, actor: CurrentActor, stored_response: d
     if isinstance(result, dict):
         response['result'] = _review_result_payload(result, None)
     return response
+
+
+def _admit_actor_photo(db: Session, photo_id: int, actor_user_id: int):
+    """Lock the request photo for use and confirm the actor still owns it.
+
+    A guest sign-in migration that committed after this request authenticated
+    has moved the photo; fail closed instead of writing rows for the retired guest.
+    """
+    photo = admit_photo_use(db, photo_id)
+    if photo is None or photo.owner_user_id != actor_user_id:
+        raise api_error(status.HTTP_409_CONFLICT, 'PHOTO_OWNER_MISMATCH', 'Photo ownership changed during review creation')
+    return photo
+
+
+def _admit_review_photos(db: Session, photo_id: int, source_photo_id: int | None, actor_user_id: int):
+    """Admit the request photo and an optional retake source photo.
+
+    Global row-lock order is review tasks, then photos in ascending id, then
+    users (see ``lock_guest_for_transfer``). Both share-mode admissions follow
+    it so a paired request cannot deadlock against a guest sign-in migration.
+    """
+    photo = None
+    for admitted_id in sorted({photo_id, source_photo_id} - {None}):
+        if admitted_id == photo_id:
+            photo = _admit_actor_photo(db, photo_id, actor_user_id)
+        else:
+            admit_photo_use(db, admitted_id)
+    return photo
 
 
 def _review_request_hash_payload(db: Session, actor: CurrentActor, payload: ReviewCreateRequest) -> dict:
@@ -262,14 +290,17 @@ def _create_review(payload: ReviewCreateRequest, request: Request, db: Session, 
     if payload.async_mode:
         # Keep the photos locked until the task commits so a retention purge
         # cannot remove an original this task depends on.
-        admit_photo_use(db, photo.id)
+        _admit_review_photos(
+            db, photo.id, source_review.photo_id if source_review is not None else None, actor.user.id,
+        )
         if source_review is not None:
-            admit_photo_use(db, source_review.photo_id)
             db.refresh(source_review)
             if review_access_status(source_review, review_history_cutoff(actor.plan)) != ACCESS_AVAILABLE:
                 raise api_error(status.HTTP_404_NOT_FOUND, 'REVIEW_NOT_FOUND', 'Review not found')
         task_payload = payload.model_dump(by_alias=True)
         task_payload['_request_hash'] = request_hash
+        # Quota stays with the admitting user even if a guest sign-in moves the task.
+        task_payload['_admitted_user_id'] = actor.user.id
         if source_review is not None:
             task_payload['source_review_internal_id'] = source_review.id
         if guest_scope_key:
@@ -397,12 +428,22 @@ def _create_review(payload: ReviewCreateRequest, request: Request, db: Session, 
         return response
 
     with synchronous_review_quota(db, actor.user, mode=mode_enum) as quota_reservation:
-        photo = admit_photo_use(db, photo.id)
-        if source_review is not None:
-            admit_photo_use(db, source_review.photo_id)
-            db.refresh(source_review)
-            if review_access_status(source_review, review_history_cutoff(actor.plan)) != ACCESS_AVAILABLE:
-                raise api_error(status.HTTP_404_NOT_FOUND, 'REVIEW_NOT_FOUND', 'Review not found')
+        try:
+            photo = _admit_review_photos(
+                db, photo.id, source_review.photo_id if source_review is not None else None, actor.user.id,
+            )
+            if source_review is not None:
+                db.refresh(source_review)
+                if review_access_status(source_review, review_history_cutoff(actor.plan)) != ACCESS_AVAILABLE:
+                    raise api_error(status.HTTP_404_NOT_FOUND, 'REVIEW_NOT_FOUND', 'Review not found')
+        except ApiHTTPException:
+            # Admission committed the guest's personal counters; nothing was sent
+            # to the provider, so give them back. Network and minute limits stay spent.
+            if guest_reservations:
+                db.rollback()
+                release_guest_review_reservations(db, guest_reservations)
+                db.commit()
+            raise
         image_url = get_object_read_url(photo.object_key, bucket=photo.bucket)
         try:
             if payload.analysis_type == 'retake_compare':

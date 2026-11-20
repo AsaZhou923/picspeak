@@ -130,9 +130,6 @@ def create_generation(
     if actor.plan == UserPlan.guest:
         raise api_error(status.HTTP_403_FORBIDDEN, 'GENERATION_LOGIN_REQUIRED', 'Sign in before generating images')
 
-    # Entitlement changes and content cleanup take this owner lock before photos.
-    db.query(User).filter(User.id == actor.user.id).with_for_update().populate_existing().one()
-
     quality = normalize_generation_quality(payload.quality)
     size = normalize_generation_size(payload.size)
     source_photo_internal_id: int | None = None
@@ -157,6 +154,14 @@ def create_generation(
     elif payload.source_photo_id:
         source_photo = _find_source_photo(db, payload.source_photo_id, actor.user.id)
         source_photo_internal_id = source_photo.id
+
+    # Global row-lock order: photos, then users (see lock_guest_for_transfer), as in
+    # share-link enabling and Gallery publication. The reference photo's READY check
+    # stays below so idempotent replays still answer. Entitlement changes and content
+    # cleanup hold this owner lock and only skip-lock photos, so they never wait here.
+    if source_photo_internal_id is not None:
+        admit_photo_use(db, source_photo_internal_id, require_ready=False)
+    db.query(User).filter(User.id == actor.user.id).with_for_update().populate_existing().one()
 
     idempotency_key = payload.idempotency_key or request.headers.get('Idempotency-Key')
     payload_dump = json.dumps(
@@ -505,10 +510,13 @@ def reuse_generation(
     if actor.plan == UserPlan.guest:
         raise api_error(status.HTTP_403_FORBIDDEN, 'GENERATION_LOGIN_REQUIRED', 'Sign in before generating images')
     idempotency_key = request.headers.get('Idempotency-Key')
-    if idempotency_key:
-        # Serialize replay admission with credit reservations for this owner. A
-        # concurrent retry must see the first committed key before creating a task.
-        db.query(User).filter(User.id == actor.user.id).with_for_update().one()
+    image = _find_generation_owned(db, generation_id, actor.user.id)
+    if image.source_photo_id is not None:
+        # Take the photo before the owner, matching creation and public admission.
+        # A completed keyed replay can still answer after its reference expires.
+        admit_photo_use(db, image.source_photo_id, require_ready=False)
+    # Serialize replay admission and credit reservations, including unkeyed reuse.
+    db.query(User).filter(User.id == actor.user.id).with_for_update().populate_existing().one()
     image = _find_generation_owned(db, generation_id, actor.user.id)
     payload = dict(image.metadata_json or {})
     request_payload = {
@@ -545,6 +553,19 @@ def reuse_generation(
 
     if actor.plan == UserPlan.free and image.quality != 'low':
         raise api_error(status.HTTP_403_FORBIDDEN, 'GENERATION_QUALITY_FORBIDDEN', 'Free users can only generate low quality images')
+
+    if image.source_photo_id is not None:
+        photo = admit_photo_use(db, image.source_photo_id)
+        if photo.owner_user_id != actor.user.id:
+            raise api_error(status.HTTP_404_NOT_FOUND, 'SOURCE_PHOTO_NOT_FOUND', 'Source photo not found')
+    if image.source_review_id is not None:
+        source_review = db.query(Review).filter(
+            Review.id == image.source_review_id,
+            Review.owner_user_id == actor.user.id,
+            Review.deleted_at.is_(None),
+        ).first()
+        if source_review is None:
+            raise api_error(status.HTTP_404_NOT_FOUND, 'SOURCE_REVIEW_NOT_FOUND', 'Source review not found')
 
     credits_reserved = estimate_image_generation_credits(
         quality=image.quality,

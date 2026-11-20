@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, exists, or_
 
 from fastapi import APIRouter, Depends, Query, Request, status
 from fastapi.responses import RedirectResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 from app.api.deps import CurrentActor, get_current_actor, get_db
 from app.api.routers.gallery import GALLERY_AUDIT_NONE
@@ -45,6 +45,14 @@ def _prefers_html_response(request: Request) -> bool:
     return 'text/html' in accept and 'application/json' not in accept
 
 
+def _active_review_author_filter():
+    review_author = aliased(User)
+    return exists().where(
+        review_author.id == Review.owner_user_id,
+        review_author.status == UserStatus.active,
+    )
+
+
 @router.get('/reviews/{review_id}', response_model=ReviewGetResponse)
 def get_review(
     review_id: str,
@@ -62,8 +70,11 @@ def get_review(
             or_(
                 Review.owner_user_id == actor.user.id,
                 and_(
-                    public_review_filter(), Review.status == ReviewStatus.SUCCEEDED,
-                    Photo.status == PhotoStatus.READY, User.status == UserStatus.active,
+                    public_review_filter(),
+                    Review.status == ReviewStatus.SUCCEEDED,
+                    Photo.status == PhotoStatus.READY,
+                    User.status == UserStatus.active,
+                    _active_review_author_filter(),
                 ),
             ),
         )
@@ -154,6 +165,7 @@ def get_public_review(
             Review.status == ReviewStatus.SUCCEEDED,
             Photo.status == PhotoStatus.READY,
             User.status == UserStatus.active,
+            _active_review_author_filter(),
         )
         .first()
     )

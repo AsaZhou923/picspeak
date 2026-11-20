@@ -108,8 +108,14 @@ def test_guest_originals_expire_after_seven_days(days, purge):
     assert decision.purge is purge
 
 
-def test_migrated_guest_records_wait_for_the_migration_fix():
-    decision = decide_photo(facts(owner=owner(plan=UserPlan.guest, status=UserStatus.deleted)), now=NOW)
+def test_deleted_guest_is_held_until_legacy_migration_reconciliation():
+    decision = decide_photo(
+        facts(
+            owner=owner(plan=UserPlan.guest, status=UserStatus.deleted, updated_at=NOW - timedelta(days=30)),
+            created_at=NOW - timedelta(days=40),
+        ),
+        now=NOW,
+    )
     assert (decision.purge, decision.reason) == (False, 'guest_migration_pending')
 
 

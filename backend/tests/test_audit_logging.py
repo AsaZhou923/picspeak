@@ -3,16 +3,38 @@ from __future__ import annotations
 import sys
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from fastapi.testclient import TestClient
+from starlette.requests import Request
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-from app.main import app
-from app.services.audit import MAX_LOG_BODY_CHARS, _safe_query_string, _safe_text_from_body, mask_capability_url_text
+from app.main import _should_capture_audit_body, app
+from app.services.audit import (
+    MAX_LOG_BODY_CHARS,
+    _safe_query_string,
+    _safe_text_from_body,
+    _truncate_client_ip,
+    log_api_request,
+    mask_capability_url_text,
+)
+
+
+def _json_request(path: str, *, method: str = 'POST', content_length: int = 128) -> Request:
+    return Request(
+        {
+            'type': 'http',
+            'method': method,
+            'path': path,
+            'headers': [
+                (b'content-type', b'application/json'),
+                (b'content-length', str(content_length).encode('ascii')),
+            ],
+        }
+    )
 
 
 class AuditLoggingTests(unittest.TestCase):
@@ -60,6 +82,116 @@ class AuditLoggingTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         schedule_audit_task.assert_not_called()
+
+    def test_request_bodies_are_not_captured_by_default(self) -> None:
+        for path in (
+            '/api/v1/generations',
+            '/api/v1/reviews/rev_123/meta',
+            '/api/v1/practice/sessions',
+            '/api/v1/reviews/rev_123/score-feedback',
+            '/api/v1/analytics/events',
+            '/api/v1/billing/activation-code/redeem',
+        ):
+            self.assertFalse(_should_capture_audit_body(_json_request(path)), msg=path)
+
+    def test_allowlisted_path_captures_bounded_body_but_skip_path_stays_blocked(self) -> None:
+        with patch(
+            'app.main._AUDIT_BODY_ALLOW_PATHS',
+            frozenset({'/api/v1/debug/ping', '/api/v1/billing/activation-code/redeem'}),
+        ):
+            self.assertTrue(_should_capture_audit_body(_json_request('/api/v1/debug/ping')))
+            self.assertFalse(_should_capture_audit_body(_json_request('/api/v1/billing/activation-code/redeem')))
+            self.assertFalse(_should_capture_audit_body(_json_request('/api/v1/generations')))
+
+    def test_middleware_persists_empty_body_for_non_allowlisted_post(self) -> None:
+        with (
+            patch('app.main._persist_audit_log') as persist_audit_log,
+            patch('app.main.worker.start'),
+            patch('app.main.worker.stop'),
+        ):
+            with TestClient(app) as client:
+                client.post(
+                    '/api/v1/analytics/events',
+                    json={'event_name': 'test', 'metadata': {'secret_note': 'do not log'}},
+                )
+
+        persist_audit_log.assert_called_once()
+        self.assertEqual(persist_audit_log.call_args.kwargs['request_body'], b'')
+
+    def test_middleware_persists_body_only_for_allowlisted_path(self) -> None:
+        with (
+            patch('app.main._AUDIT_BODY_ALLOW_PATHS', frozenset({'/api/v1/analytics/events'})),
+            patch('app.main._persist_audit_log') as persist_audit_log,
+            patch('app.main.worker.start'),
+            patch('app.main.worker.stop'),
+        ):
+            with TestClient(app) as client:
+                client.post(
+                    '/api/v1/analytics/events',
+                    json={'event_name': 'test', 'metadata': {'secret_note': 'do not log'}},
+                )
+
+        persist_audit_log.assert_called_once()
+        self.assertIn(b'"event_name"', persist_audit_log.call_args.kwargs['request_body'])
+
+    def test_safe_text_from_body_redacts_user_free_text_and_nested_fields(self) -> None:
+        body = (
+            b'{"mode":"flash","prompt":"golden hour portrait","note":"private note",'
+            b'"notes":"more notes","tags":["family","tokyo"],"feedback":"too high",'
+            b'"comment":"private comment","metadata":{"page":"/reviews/1","extra":"secret"},'
+            b'"text":"free text","activation_code":"PSCN-1234"}'
+        )
+
+        sanitized = _safe_text_from_body(body)
+
+        self.assertIsNotNone(sanitized)
+        assert sanitized is not None
+        for leaked in (
+            'golden hour portrait',
+            'private note',
+            'more notes',
+            'family',
+            'tokyo',
+            'too high',
+            'private comment',
+            '/reviews/1',
+            'free text',
+            'PSCN-1234',
+        ):
+            self.assertNotIn(leaked, sanitized)
+        self.assertIn('"mode":"flash"', sanitized)
+
+    def test_capability_url_masking_preserves_provider_error_messages(self) -> None:
+        provider_error = '{"error":{"message":"Rate limit exceeded","token":"secret-tok"}}'
+        masked = mask_capability_url_text(provider_error)
+        self.assertIn('Rate limit exceeded', masked)
+        self.assertNotIn('secret-tok', masked)
+
+    def test_truncate_client_ip_and_log_api_request_coarsen_addresses(self) -> None:
+        self.assertEqual(_truncate_client_ip('203.0.113.42'), '203.0.113.0/24')
+        self.assertEqual(_truncate_client_ip('::ffff:203.0.113.42'), '203.0.113.0/24')
+        self.assertEqual(_truncate_client_ip('2001:db8:85a3:1234:5678::9'), '2001:db8:85a3::/48')
+        self.assertIsNone(_truncate_client_ip('testclient'))
+        self.assertIsNone(_truncate_client_ip(None))
+
+        db = MagicMock()
+        log_api_request(
+            db,
+            request_id='req_1',
+            method='POST',
+            path='/api/v1/generations',
+            query_string=None,
+            endpoint='/api/v1/generations',
+            client_ip='198.51.100.77',
+            user_public_id='usr_1',
+            user_agent='agent',
+            request_body=b'',
+            status_code=200,
+            duration_ms=12,
+        )
+        record = db.add.call_args.args[0]
+        self.assertEqual(record.client_ip, '198.51.100.0/24')
+        self.assertIsNone(record.request_body)
 
 
 if __name__ == '__main__':

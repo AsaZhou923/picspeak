@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal
 from typing import Literal
 
@@ -223,9 +223,19 @@ def persist_observed_provider_call_costs(
         call_key = review_call_key(task=task_identity, stage=call.stage, sequence=call.sequence)
         db = SessionLocal()
         try:
+            # Cost rows follow their task, so take the owner from the task row at
+            # insert time. The key-share lock is the one the foreign key check
+            # takes anyway; it waits out a guest sign-in migration that holds the
+            # task FOR UPDATE, so the owner read here is the one the row commits with.
+            current_owner_user_id = (
+                db.query(ReviewTask.owner_user_id)
+                .filter(ReviewTask.id == task_id)
+                .with_for_update(read=True, key_share=True)
+                .scalar()
+            )
             record_review_call_cost(
                 db,
-                task=task_identity,
+                task=replace(task_identity, owner_user_id=current_owner_user_id or owner_user_id),
                 stage=call.stage,
                 outcome=outcome,
                 model_name=call.model_name,

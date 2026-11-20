@@ -82,6 +82,10 @@ class ReviewTaskProcessorTests(unittest.TestCase):
         def query(model):
             result = MagicMock()
             result.filter.return_value.first.return_value = photo if model is Photo else owner if model is User else None
+            if model is ReviewTask.owner_user_id:
+                result.filter.return_value.with_for_update.return_value.scalar.return_value = task.owner_user_id
+            elif model is Photo.owner_user_id:
+                result.filter.return_value.scalar.return_value = task.owner_user_id
             return result
         db.query.side_effect = query
         result = SimpleNamespace(

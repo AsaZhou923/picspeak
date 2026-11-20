@@ -109,7 +109,11 @@ def list_public_gallery(
   else:
     primary_expr = _gallery_rank_score_expr(reference_now=rank_reference_at).label('gallery_primary_val')
 
-  count_query = db.query(func.count(Review.id)).filter(*gallery_filters)
+  count_query = (
+    db.query(func.count(Review.id))
+    .join(User, User.id == Review.owner_user_id)
+    .filter(*gallery_filters)
+  )
   count_query = _apply_review_history_filters_gallery(
     count_query,
     date_field=Review.gallery_added_at,

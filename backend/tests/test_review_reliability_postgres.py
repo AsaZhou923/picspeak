@@ -30,7 +30,10 @@ from app.services.guard import (
     enforce_guest_review_limits, guest_usage_snapshot, increment_quota,
     enforce_pro_review_soft_rate_limit, release_task_guest_review_quota, user_usage_snapshot,
 )
-from app.services.ai import AIReviewError, AIReviewResponse, notify_ai_provider_call
+from app.services.ai import (
+    AIReviewError, AIReviewResponse, CanonicalScore, notify_ai_provider_call, openai_review_profile_for_mode,
+)
+from app.services.ai_prompts import SCORE_PROMPT_VERSION, SCORE_VERSION, SCORER_PREPROCESS_VERSION
 from app.services.review_quota_reservations import (
     reserve_review_quota, consume_review_quota, release_review_quota,
     synchronous_review_quota,
@@ -38,6 +41,8 @@ from app.services.review_quota_reservations import (
 from app.services.review_task_processor import (
     process_review_task, expire_review_tasks, _claim_task, _ensure_review_claim, ReviewTaskLeaseLost,
 )
+
+from scoring_fixtures import LOW_SCORES, score_evidence_fixture
 
 DATABASE_URL = os.getenv('PICSPEAK_TEST_DATABASE_URL', '')
 
@@ -391,6 +396,130 @@ class ReviewReliabilityPostgresTests(unittest.TestCase):
             self.assertEqual(records[0].call_key, 'attempt:1:writer')
             self.assertEqual(records[0].outcome, 'failed')
             self.assertEqual(records[0].input_tokens, 80)
+
+    def _pro_task(self):
+        with self.Session() as db:
+            db.query(User).filter_by(id=self.user_id).update({'plan': UserPlan.pro})
+            task = ReviewTask(public_id='tsk_reliability_' + uuid4().hex, owner_user_id=self.user_id,
+                              photo_id=self.photo_id, mode=ReviewMode.pro, status=TaskStatus.PENDING,
+                              request_payload={'locale': 'en', 'image_type': 'default', 'analysis_type': 'single'},
+                              expire_at=datetime.now(timezone.utc) + timedelta(minutes=30))
+            db.add(task)
+            db.commit()
+            return task.public_id
+
+    def test_writer_retry_reuses_scorer_checkpoint_without_second_scoring_call(self):
+        public_id = self._pro_task()
+        profile = openai_review_profile_for_mode('pro')
+        score = CanonicalScore(
+            scores={'composition': 7, 'lighting': 6, 'color': 6, 'impact': 5, 'technical': 6},
+            score_evidence=score_evidence_fixture(LOW_SCORES),
+            final_score=6.0,
+            model_name=profile.scorer_model_name,
+            model_version=profile.scorer_model_name,
+            score_prompt_version=SCORE_PROMPT_VERSION,
+            score_version=SCORE_VERSION,
+            preprocess_version=SCORER_PREPROCESS_VERSION,
+            scorer_reasoning_effort=profile.scorer_reasoning_effort,
+            input_tokens=100,
+            output_tokens=20,
+            latency_ms=1000,
+        )
+        response = AIReviewResponse(
+            result=SimpleNamespace(final_score=6.0, model_dump=lambda: {'scores': {}, 'final_score': 6.0}),
+            model_name=profile.writer_model_name, model_version='fixture', prompt_version='fixture',
+        )
+        scoring_calls = []
+        writer_attempts = []
+
+        def provider(*_args, canonical_score=None, on_canonical_score=None, **_kwargs):
+            if canonical_score is None:
+                scoring_calls.append(1)
+                notify_ai_provider_call(
+                    stage='scorer', outcome='succeeded', model_name=score.model_name,
+                    usage={'input_tokens': 100, 'output_tokens': 20}, sequence='initial',
+                )
+                on_canonical_score(score)
+            writer_attempts.append(1)
+            if len(writer_attempts) == 1:
+                notify_ai_provider_call(stage='writer', outcome='failed', model_name=profile.writer_model_name)
+                raise AIReviewError('writer timed out', stage='writing')
+            notify_ai_provider_call(
+                stage='writer', outcome='succeeded', model_name=profile.writer_model_name,
+                usage={'input_tokens': 200, 'output_tokens': 40},
+            )
+            return response
+
+        with (
+            patch('app.services.review_task_processor.SessionLocal', self.Session),
+            patch('app.services.review_task_processor.canonical_score_cache_lease', return_value=nullcontext(None)),
+            patch('app.services.review_call_costs.SessionLocal', self.Session),
+            patch('app.services.review_task_processor.settings.cloud_tasks_enabled', False),
+            patch('app.services.review_task_processor.run_ai_review', side_effect=provider),
+        ):
+            process_review_task(public_id, worker_name='worker')
+            with self.Session() as db:
+                task = db.query(ReviewTask).filter_by(public_id=public_id).one()
+                self.assertEqual(task.status, TaskStatus.PENDING)
+                self.assertIn('_canonical_score_checkpoint', task.request_payload)
+                task.next_attempt_at = None
+                db.commit()
+            process_review_task(public_id, worker_name='worker')
+
+        self.assertEqual(len(scoring_calls), 1)
+        self.assertEqual(len(writer_attempts), 2)
+        with self.Session() as db:
+            task = db.query(ReviewTask).filter_by(public_id=public_id).one()
+            self.assertEqual(task.status, TaskStatus.SUCCEEDED)
+            self.assertNotIn('_canonical_score_checkpoint', task.request_payload)
+            self.assertEqual(db.query(Review).filter_by(task_id=task.id).count(), 1)
+            self.assertEqual(db.query(UsageLedger).filter_by(task_id=task.id).count(), 1)
+            costs = db.query(ReviewCallCost).filter_by(task_id=task.id).order_by(ReviewCallCost.id).all()
+            self.assertEqual(
+                [(row.call_key, row.outcome) for row in costs],
+                [('attempt:1:scorer:initial', 'succeeded'), ('attempt:1:writer', 'failed'), ('attempt:2:writer', 'succeeded')],
+            )
+
+    def test_quota_settlement_rollback_keeps_one_provider_cost_row(self):
+        public_id = self._pro_task()
+        response = AIReviewResponse(
+            result=SimpleNamespace(final_score=7.0, model_dump=lambda: {'scores': {}, 'final_score': 7.0}),
+            model_name='fixture', model_version='fixture', prompt_version='fixture',
+        )
+
+        def provider(*_args, **_kwargs):
+            notify_ai_provider_call(
+                stage='writer', outcome='succeeded', model_name='gpt-6.1-sol',
+                usage={'input_tokens': 100, 'output_tokens': 20},
+            )
+            # The task's quota reservation expires while the provider runs, so
+            # the final settlement fails and rolls the whole transaction back.
+            with self.Session() as fresh:
+                task_id = fresh.query(ReviewTask.id).filter_by(public_id=public_id).scalar()
+                fresh.query(ReviewQuotaReservation).filter_by(task_id=task_id).update({
+                    'expires_at': datetime.now(timezone.utc) - timedelta(minutes=1),
+                })
+                fresh.commit()
+            return response
+
+        with (
+            patch('app.services.review_task_processor.SessionLocal', self.Session),
+            patch('app.services.review_task_processor.canonical_score_cache_lease', return_value=nullcontext(None)),
+            patch('app.services.review_call_costs.SessionLocal', self.Session),
+            patch('app.services.review_task_processor.settings.cloud_tasks_enabled', False),
+            patch('app.services.review_task_processor.run_ai_review', side_effect=provider),
+        ):
+            result = process_review_task(public_id, worker_name='worker')
+
+        self.assertEqual(result['result'], 'failed')
+        with self.Session() as db:
+            task = db.query(ReviewTask).filter_by(public_id=public_id).one()
+            self.assertEqual(task.status, TaskStatus.PENDING)
+            self.assertEqual(db.query(Review).filter_by(task_id=task.id).count(), 0)
+            self.assertEqual(db.query(UsageLedger).filter_by(task_id=task.id).count(), 0)
+            costs = db.query(ReviewCallCost).filter_by(task_id=task.id).all()
+            self.assertEqual([(row.call_key, row.outcome, row.owner_user_id) for row in costs],
+                             [('attempt:1:writer', 'succeeded', self.user_id)])
 
     def test_single_guest_daily_slot_is_admitted_once_under_concurrency(self):
         now = datetime(2026, 11, 1, 12, tzinfo=timezone.utc)

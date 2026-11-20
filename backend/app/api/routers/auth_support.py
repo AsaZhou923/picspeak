@@ -18,8 +18,10 @@ from app.db.models import (
     Photo,
     PracticeAttempt,
     PracticeFeedback,
+    PracticeSceneGroup,
     PracticeSession,
     Review,
+    ReviewCallCost,
     ReviewScoreFeedback,
     ReviewScoreSnapshot,
     ReviewTask,
@@ -261,6 +263,17 @@ def _cleanup_deleted_user_feature_state(db: Session, user: User) -> None:
         )
     ]
     if owned_review_ids:
+        db.query(Review).filter(Review.id.in_(owned_review_ids)).update(
+            {
+                Review.is_public: False,
+                Review.share_token: None,
+                Review.gallery_visible: False,
+                Review.gallery_audit_status: 'none',
+                Review.gallery_added_at: None,
+                Review.gallery_rejected_reason: None,
+            },
+            synchronize_session=False,
+        )
         owned_snapshot_ids = [
             snapshot_id
             for (snapshot_id,) in (
@@ -321,6 +334,7 @@ def _handle_clerk_user_deleted(db: Session, user_payload: dict[str, Any]) -> tup
     )
     _cleanup_deleted_user_feature_state(db, user)
     user.status = UserStatus.deleted
+    user.public_profile_enabled = False
     db.add(user)
     db.flush()
     return 'deleted', user.public_id
@@ -334,74 +348,73 @@ def _process_clerk_webhook_event(db: Session, event: ClerkWebhookEvent) -> tuple
     return 'ignored_event_type', None
 
 
-def _migrate_guest_records(
-    *,
+def lock_guest_for_transfer(db: Session, guest_user_id: int, *, expected_status: UserStatus) -> User | None:
+    """Lock a guest's tasks, then photos, then the guest row for an ownership transfer.
+
+    This is the global row-lock order for ownership-sensitive writes: review
+    tasks, then photos in ascending id, then users.
+
+    Worker completion locks its task FOR UPDATE before it inserts rows that
+    reference the photo and user and updates the admitting user's quota. A
+    synchronous review holds its photo FOR SHARE from admission until it inserts
+    the review and updates the user. Taking tasks, photos and the user in that
+    order means each of them waits for a transfer at its first lock and never
+    holds a lock the transfer still needs. Photo and user locks are NO KEY UPDATE
+    so foreign-key inserts (KEY SHARE) are not blocked. Returns None when the
+    guest no longer has ``expected_status``, e.g. a concurrent sign-in already
+    retired it.
+    """
+    db.query(ReviewTask.id).filter(ReviewTask.owner_user_id == guest_user_id).order_by(
+        ReviewTask.id.asc()
+    ).with_for_update().all()
+    db.query(Photo.id).filter(Photo.owner_user_id == guest_user_id).order_by(
+        Photo.id.asc()
+    ).with_for_update(key_share=True).all()
+    return (
+        db.query(User)
+        .filter(User.id == guest_user_id, User.plan == UserPlan.guest, User.status == expected_status)
+        .with_for_update(key_share=True)
+        .populate_existing()
+        .first()
+    )
+
+
+def transfer_guest_user_records(
     db: Session,
+    *,
+    guest_user: User,
     target_user: User,
-    guest_token: str | None,
-    recent_limit: int,
-    strict: bool,
-) -> tuple[int, int]:
-    if not guest_token:
-        if strict:
-            raise api_error(status.HTTP_400_BAD_REQUEST, 'GUEST_TOKEN_MISSING', 'Guest token is required')
-        return 0, 0
+    mark_guest_deleted: bool = True,
+) -> dict[str, int]:
+    """Transfer all content records owned by ``guest_user`` to ``target_user``.
 
-    try:
-        guest_user = get_user_from_token(guest_token, db)
-    except HTTPException:
-        if strict:
-            raise api_error(status.HTTP_400_BAD_REQUEST, 'GUEST_TOKEN_INVALID', 'Provided token is invalid')
-        return 0, 0
-
-    if guest_user.plan != UserPlan.guest:
-        if strict:
-            raise api_error(status.HTTP_400_BAD_REQUEST, 'GUEST_TOKEN_INVALID', 'Provided token does not belong to a guest account')
-        return 0, 0
-
-    if guest_user.id == target_user.id:
-        return 0, 0
-
+    Callers must first take the locks of ``lock_guest_for_transfer``. Usage
+    ledger rows stay with the user whose quota admitted the request.
+    """
+    guest_photos = (
+        db.query(Photo)
+        .filter(Photo.owner_user_id == guest_user.id)
+        .order_by(Photo.id.asc())
+        .populate_existing()
+        .all()
+    )
+    guest_tasks = (
+        db.query(ReviewTask)
+        .filter(ReviewTask.owner_user_id == guest_user.id)
+        .order_by(ReviewTask.id.asc())
+        .populate_existing()
+        .all()
+    )
     guest_reviews = (
         db.query(Review)
         .filter(Review.owner_user_id == guest_user.id)
         .order_by(Review.created_at.desc(), Review.id.desc())
-        .limit(recent_limit)
         .all()
     )
-    guest_photos = (
-        db.query(Photo)
-        .filter(Photo.owner_user_id == guest_user.id)
-        .order_by(Photo.created_at.desc(), Photo.id.desc())
-        .limit(recent_limit)
-        .all()
-    )
-    guest_tasks = db.query(ReviewTask).filter(ReviewTask.owner_user_id == guest_user.id).all()
     guest_sessions = db.query(PracticeSession).filter(PracticeSession.owner_user_id == guest_user.id).all()
+    guest_scene_groups = db.query(PracticeSceneGroup).filter(PracticeSceneGroup.owner_user_id == guest_user.id).all()
     guest_attempts = db.query(PracticeAttempt).filter(PracticeAttempt.owner_user_id == guest_user.id).all()
     guest_feedback = db.query(PracticeFeedback).filter(PracticeFeedback.owner_user_id == guest_user.id).all()
-
-    practice_review_ids = {session.source_review_id for session in guest_sessions}
-    practice_photo_ids = {session.source_photo_id for session in guest_sessions}
-    practice_task_ids = {attempt.task_id for attempt in guest_attempts}
-    for attempt in guest_attempts:
-        practice_review_ids.add(attempt.source_review_id)
-        if attempt.review_id:
-            practice_review_ids.add(attempt.review_id)
-        practice_photo_ids.add(attempt.photo_id)
-
-    if practice_review_ids:
-        for review in db.query(Review).filter(Review.id.in_(practice_review_ids), Review.owner_user_id == guest_user.id).all():
-            if review not in guest_reviews:
-                guest_reviews.append(review)
-    if practice_photo_ids:
-        for photo in db.query(Photo).filter(Photo.id.in_(practice_photo_ids), Photo.owner_user_id == guest_user.id).all():
-            if photo not in guest_photos:
-                guest_photos.append(photo)
-    if practice_task_ids:
-        for task in db.query(ReviewTask).filter(ReviewTask.id.in_(practice_task_ids), ReviewTask.owner_user_id == guest_user.id).all():
-            if task not in guest_tasks:
-                guest_tasks.append(task)
 
     guest_idempotency_records = db.query(IdempotencyKey).filter(IdempotencyKey.user_id == guest_user.id).all()
     target_idempotency_keys = {
@@ -437,39 +450,52 @@ def _migrate_guest_records(
             db.add(photo)
             migrated_photos += 1
 
+    migrated_tasks = 0
     for task in guest_tasks:
         if task.owner_user_id != target_user.id:
             if task.idempotency_key and task.idempotency_key in target_task_idempotency_keys:
                 task.idempotency_key = None
             task.owner_user_id = target_user.id
             db.add(task)
+            migrated_tasks += 1
 
-    # Cost facts follow their task across guest-to-account ownership changes.
-    from app.db.models import ReviewCallCost
-    migrated_task_ids = [task.id for task in guest_tasks]
-    if migrated_task_ids:
-        for call in db.query(ReviewCallCost).filter(
-            ReviewCallCost.task_id.in_(migrated_task_ids), ReviewCallCost.owner_user_id == guest_user.id,
-        ).all():
+    # Cost facts follow their task/owner across guest-to-account ownership changes.
+    migrated_call_costs = 0
+    for call in db.query(ReviewCallCost).filter(ReviewCallCost.owner_user_id == guest_user.id).all():
+        if call.owner_user_id != target_user.id:
             call.owner_user_id = target_user.id
             db.add(call)
+            migrated_call_costs += 1
 
+    migrated_sessions = 0
     for session in guest_sessions:
         if session.owner_user_id != target_user.id:
             if session.idempotency_key and session.idempotency_key in target_session_idempotency_keys:
                 session.idempotency_key = None
             session.owner_user_id = target_user.id
             db.add(session)
+            migrated_sessions += 1
 
+    migrated_scene_groups = 0
+    for scene_group in guest_scene_groups:
+        if scene_group.owner_user_id != target_user.id:
+            scene_group.owner_user_id = target_user.id
+            db.add(scene_group)
+            migrated_scene_groups += 1
+
+    migrated_attempts = 0
     for attempt in guest_attempts:
         if attempt.owner_user_id != target_user.id:
             attempt.owner_user_id = target_user.id
             db.add(attempt)
+            migrated_attempts += 1
 
+    migrated_feedback = 0
     for feedback in guest_feedback:
         if feedback.owner_user_id != target_user.id:
             feedback.owner_user_id = target_user.id
             db.add(feedback)
+            migrated_feedback += 1
 
     for record in guest_idempotency_records:
         if (record.endpoint, record.idempotency_key) in target_idempotency_keys:
@@ -478,9 +504,76 @@ def _migrate_guest_records(
             record.user_id = target_user.id
             db.add(record)
 
-    if migrated_reviews or migrated_photos or guest_sessions or guest_attempts or guest_feedback:
+    if mark_guest_deleted and (
+        migrated_reviews
+        or migrated_photos
+        or migrated_tasks
+        or migrated_sessions
+        or migrated_scene_groups
+        or migrated_attempts
+        or migrated_feedback
+    ):
         guest_user.status = UserStatus.deleted
         db.add(guest_user)
-        db.flush()
 
-    return migrated_reviews, migrated_photos
+    db.flush()
+    return {
+        'reviews': migrated_reviews,
+        'photos': migrated_photos,
+        'tasks': migrated_tasks,
+        'call_costs': migrated_call_costs,
+        'practice_sessions': migrated_sessions,
+        'practice_scene_groups': migrated_scene_groups,
+        'practice_attempts': migrated_attempts,
+        'practice_feedback': migrated_feedback,
+    }
+
+
+def _migrate_guest_records(
+    *,
+    db: Session,
+    target_user: User,
+    guest_token: str | None,
+    recent_limit: int,
+    strict: bool,
+) -> tuple[int, int]:
+    if not guest_token:
+        if strict:
+            raise api_error(status.HTTP_400_BAD_REQUEST, 'GUEST_TOKEN_MISSING', 'Guest token is required')
+        return 0, 0
+
+    try:
+        guest_user = get_user_from_token(guest_token, db)
+    except HTTPException:
+        if strict:
+            raise api_error(status.HTTP_400_BAD_REQUEST, 'GUEST_TOKEN_INVALID', 'Provided token is invalid')
+        return 0, 0
+
+    if guest_user.plan != UserPlan.guest:
+        if strict:
+            raise api_error(status.HTTP_400_BAD_REQUEST, 'GUEST_TOKEN_INVALID', 'Provided token does not belong to a guest account')
+        return 0, 0
+
+    if guest_user.id == target_user.id:
+        return 0, 0
+
+    # A concurrent sign-in for the same guest waits on these locks and then sees
+    # the guest already retired, so a transfer is never reported twice.
+    locked_guest = lock_guest_for_transfer(db, guest_user.id, expected_status=UserStatus.active)
+    if locked_guest is None:
+        if strict:
+            raise api_error(status.HTTP_400_BAD_REQUEST, 'GUEST_TOKEN_INVALID', 'Provided token is invalid')
+        return 0, 0
+
+    # `recent_limit` is kept in request schemas and this signature for backward
+    # compatibility, but migration always moves every guest record so nothing is
+    # stranded or left with mismatched review/photo/task ownership.
+    _ = recent_limit
+
+    counts = transfer_guest_user_records(
+        db,
+        guest_user=locked_guest,
+        target_user=target_user,
+        mark_guest_deleted=True,
+    )
+    return counts['reviews'], counts['photos']

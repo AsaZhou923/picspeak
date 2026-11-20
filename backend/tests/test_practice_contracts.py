@@ -19,7 +19,7 @@ from app.api.routers.auth_support import _migrate_guest_records
 from app.api.routers.practice import get_practice_config
 from app.api.routers.review_create import _matches_request_hash, _review_request_hash_payload, create_review
 from app.api.routers.review_support import _review_result_payload
-from app.db.models import PhotoStatus, PracticeAttempt, PracticeFeedback, PracticeSession, Review, ReviewTask, TaskStatus, UserPlan, UserStatus
+from app.db.models import PhotoStatus, PracticeAttempt, PracticeFeedback, PracticeSession, Review, ReviewTask, TaskStatus, User, UserPlan, UserStatus
 from app.goal_assessment import GOAL_ASSESSMENT_VERSION, GoalAssessmentContext
 from app.practice_schemas import PracticeSessionCreateRequest
 from app.schemas import ReviewCreateRequest
@@ -37,8 +37,17 @@ class _FakeQuery:
     def order_by(self, *args, **kwargs):
         return self
 
+    def with_for_update(self, *args, **kwargs):
+        return self
+
+    def populate_existing(self):
+        return self
+
     def limit(self, *args, **kwargs):
         return self
+
+    def first(self):
+        return self.rows[0] if self.rows else None
 
     def all(self):
         return self.rows
@@ -192,6 +201,7 @@ class PracticeContractTests(unittest.TestCase):
 
         with patch('app.api.routers.review_create._find_photo_owned', return_value=SimpleNamespace(id=1, status=PhotoStatus.READY)), patch(
             'app.api.routers.review_create.admit_photo_use',
+            return_value=SimpleNamespace(id=1, status=PhotoStatus.READY, owner_user_id=7),
         ), patch(
             'app.api.routers.review_create.get_idempotency_record',
             side_effect=[None, stale_record],
@@ -234,6 +244,7 @@ class PracticeContractTests(unittest.TestCase):
         db.query.side_effect = query
         with patch('app.api.routers.review_create._find_photo_owned', return_value=SimpleNamespace(id=1, status=PhotoStatus.READY)), patch(
             'app.api.routers.review_create.admit_photo_use',
+            return_value=SimpleNamespace(id=1, status=PhotoStatus.READY, owner_user_id=7),
         ), patch(
             'app.api.routers.review_create.get_idempotency_record',
             side_effect=[None, None],
@@ -270,6 +281,7 @@ class PracticeContractTests(unittest.TestCase):
         attempt = SimpleNamespace(id=501, owner_user_id=10, source_review_id=101, review_id=None, photo_id=201, task_id=301)
         feedback = SimpleNamespace(owner_user_id=10)
         rows = {
+            User: [guest],
             Review: [review],
             PracticeSession: [session],
             PracticeAttempt: [attempt],

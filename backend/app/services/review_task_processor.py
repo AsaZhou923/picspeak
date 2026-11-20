@@ -67,6 +67,15 @@ def _ensure_review_claim(db: Session, task: ReviewTask, claim_token: str | None)
         raise ReviewTaskLeaseLost('Review task lease changed')
 
 
+def _admitted_user_id(task: ReviewTask) -> int:
+    """The user whose quota admitted the task, stable across sign-in migration and retries.
+
+    Tasks created before the field existed fall back to their current owner.
+    """
+    admitted = (task.request_payload or {}).get('_admitted_user_id')
+    return admitted if type(admitted) is int else int(task.owner_user_id)
+
+
 _PUBLIC_TASK_ERROR_MESSAGES: dict[str, tuple[str, str]] = {
     'REVIEW_NOT_APPLICABLE': (
         'This image is not suitable for photography scoring. Upload a photograph instead.',
@@ -601,10 +610,12 @@ def _process_task(db: Session, task: ReviewTask, *, claim_token: str | None = No
         _handle_failure(db, task, error_code='PHOTO_ORIGINAL_EXPIRED', error_message='The stored original was removed', retryable=False)
         return
 
-    # Fetch owner and enforce quota BEFORE calling the AI, so we don't burn tokens
-    # on a request that would be rejected anyway.
-    owner = db.query(User).filter(User.id == task.owner_user_id).first()
-    if owner is None:
+    # Fetch the admitting user and enforce quota BEFORE calling the AI, so we don't
+    # burn tokens on a request that would be rejected anyway. Quota, usage and the
+    # daily count stay with that user even after a guest sign-in moved the task;
+    # a retired guest still completes against the admission it already paid.
+    admitted_user = db.query(User).filter(User.id == _admitted_user_id(task)).first()
+    if admitted_user is None:
         _handle_failure(db, task, error_code='USER_NOT_FOUND', error_message='Task owner not found', retryable=False)
         return
 
@@ -625,10 +636,10 @@ def _process_task(db: Session, task: ReviewTask, *, claim_token: str | None = No
 
     quota_reservation = None
     _ensure_review_claim(db, task, claim_token)
-    if owner.plan != UserPlan.guest:
+    if admitted_user.plan != UserPlan.guest:
         try:
             quota_reservation = reserve_review_quota(
-                db, owner, task=task,
+                db, admitted_user, task=task,
                 mode=task.mode if isinstance(task.mode, ReviewMode) else ReviewMode(task.mode),
             )
         except ApiHTTPException as exc:
@@ -798,6 +809,25 @@ def _process_task(db: Session, task: ReviewTask, *, claim_token: str | None = No
         )
         raise
 
+    # Guest sign-in migration can move this task while the provider runs. The
+    # review follows the task's current owner, read under the task row lock;
+    # usage stays with the user whose quota admitted the request. Column reads
+    # leave the in-session checkpoint and payload untouched.
+    db.flush()
+    review_owner_user_id = (
+        db.query(ReviewTask.owner_user_id).filter(ReviewTask.id == task.id).with_for_update().scalar()
+    )
+    photo_owner_user_id = db.query(Photo.owner_user_id).filter(Photo.id == task.photo_id).scalar()
+    if photo_owner_user_id != review_owner_user_id:
+        _handle_failure(
+            db,
+            task,
+            error_code='PHOTO_OWNER_MISMATCH',
+            error_message='Photo owner does not match task owner',
+            retryable=False,
+        )
+        return
+
     clear_task_canonical_score_checkpoint(task)
 
     result_payload = _normalize_review_result_payload(
@@ -831,7 +861,7 @@ def _process_task(db: Session, task: ReviewTask, *, claim_token: str | None = No
         public_id=new_public_id('rev'),
         task_id=task.id,
         photo_id=task.photo_id,
-        owner_user_id=task.owner_user_id,
+        owner_user_id=review_owner_user_id,
         source_review_id=(
             practice_context.source_review.id if practice_context is not None
             else (task.request_payload or {}).get('source_review_internal_id')
@@ -855,7 +885,7 @@ def _process_task(db: Session, task: ReviewTask, *, claim_token: str | None = No
     db.flush()
 
     ledger = UsageLedger(
-        user_id=task.owner_user_id,
+        user_id=admitted_user.id,
         review_id=review.id,
         task_id=task.id,
         usage_type='review_request',
@@ -872,14 +902,14 @@ def _process_task(db: Session, task: ReviewTask, *, claim_token: str | None = No
     )
     db.add(ledger)
     consume_review_quota(db, quota_reservation)
-    increment_quota(db, owner, **({'bill_date': quota_reservation.bill_date} if quota_reservation is not None else {}))
+    increment_quota(db, admitted_user, **({'bill_date': quota_reservation.bill_date} if quota_reservation is not None else {}))
     db.flush()
     task_payload = task.request_payload or {}
-    guest_scope_key = task_payload.get('_guest_scope_key') if owner.plan == UserPlan.guest else None
+    guest_scope_key = task_payload.get('_guest_scope_key') if admitted_user.plan == UserPlan.guest else None
     usage = (
         guest_usage_snapshot(db, guest_scope_key, network_scope_key=task_payload.get('_guest_network_scope_key'))
         if guest_scope_key
-        else user_usage_snapshot(db, owner)
+        else user_usage_snapshot(db, admitted_user)
     )
     # Keep the persisted JSON value intact so SQLAlchemy detects this update.
     result_payload = deepcopy(result_payload)
