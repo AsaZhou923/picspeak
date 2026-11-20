@@ -51,7 +51,7 @@ export function DeleteConfirmDialog({
       <div className="absolute inset-0 bg-void/95" />
       <div
         ref={dialogRef}
-        className="relative w-full max-w-lg overflow-hidden rounded-[24px] border border-border bg-surface p-6 shadow-level-3 animate-fade-in"
+        className="relative flex max-h-[calc(100dvh-2rem)] w-full max-w-lg flex-col overflow-hidden rounded-[24px] border border-border bg-surface p-6 shadow-level-3 animate-fade-in"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -69,7 +69,7 @@ export function DeleteConfirmDialog({
           <X size={14} aria-hidden="true" />
         </button>
 
-        <div className="mb-5 pr-10">
+        <div className="shrink-0 pr-10">
           <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-rust/25 bg-rust/10 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.2em] text-rust">
             <AlertTriangle size={12} aria-hidden="true" />
             {label}
@@ -77,7 +77,11 @@ export function DeleteConfirmDialog({
           <h2 id={titleId} className="font-display text-3xl text-ink">
             {title}
           </h2>
-          <p id={descId} className="mt-3 text-sm leading-7 text-ink-muted">
+        </div>
+
+        {/* Only the explanation scrolls, so the title and actions stay reachable on short viewports. */}
+        <div className="mt-3 min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          <p id={descId} className="text-sm leading-7 text-ink-muted">
             {body}
           </p>
           {consequences.length > 0 && (
@@ -90,17 +94,18 @@ export function DeleteConfirmDialog({
               ))}
             </ul>
           )}
-          {error && (
-            <p
-              role="alert"
-              className="mt-4 rounded-control border border-rust/30 bg-rust/10 px-3.5 py-2.5 text-sm text-rust"
-            >
-              {error}
-            </p>
-          )}
         </div>
 
-        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        {error && (
+          <p
+            role="alert"
+            className="mt-4 shrink-0 rounded-control border border-rust/30 bg-rust/10 px-3.5 py-2.5 text-sm text-rust"
+          >
+            {error}
+          </p>
+        )}
+
+        <div className="mt-5 flex shrink-0 flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <button
             ref={cancelButtonRef}
             type="button"

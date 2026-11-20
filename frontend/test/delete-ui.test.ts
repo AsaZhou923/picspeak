@@ -89,6 +89,51 @@ test('DeleteConfirmDialog exposes accessible dialog semantics and blocks dismiss
   app.unmount();
 });
 
+test('DeleteConfirmDialog fits short viewports by scrolling only the explanation', () => {
+  const app = componentHarness(new URL('../src/components/ui/DeleteConfirmDialog.tsx', import.meta.url), {
+    'lucide-react': {},
+    '@/lib/hooks/useModalFocusTrap': {
+      useModalFocusTrap: () => ({ current: null }),
+    },
+  });
+
+  app.render({
+    label: 'Delete critique',
+    title: 'Delete this critique?',
+    body: 'Irreversible action.',
+    consequences: ['Cannot be restored.', 'Removed after 24 hours.'],
+    cancelLabel: 'Cancel',
+    confirmLabel: 'Confirm delete',
+    busyLabel: 'Deleting…',
+    busy: false,
+    error: 'Failed to delete',
+    onClose: () => {},
+    onConfirm: () => {},
+  }, 'DeleteConfirmDialog');
+
+  const classes = (node: { props?: { className?: unknown } }) => String(node.props?.className ?? '').split(/\s+/);
+  const dialog = app.nodes((node) => node.props?.role === 'dialog')[0];
+  assert.ok(classes(dialog).includes('max-h-[calc(100dvh-2rem)]'), 'dialog must be capped to the dynamic viewport height');
+  assert.ok(classes(dialog).includes('flex') && classes(dialog).includes('flex-col'));
+
+  const scrollRegions = app.nodes((node) => node.type === 'div' && classes(node).includes('overflow-y-auto'));
+  assert.equal(scrollRegions.length, 1);
+  const scrollRegion = JSON.stringify(scrollRegions[0]);
+  assert.ok(classes(scrollRegions[0]).includes('min-h-0') && classes(scrollRegions[0]).includes('flex-1'));
+  assert.match(scrollRegion, /Irreversible action/);
+  assert.match(scrollRegion, /Cannot be restored/);
+  assert.doesNotMatch(scrollRegion, /Delete this critique\?/, 'title stays outside the scroll region');
+  assert.doesNotMatch(scrollRegion, /Confirm delete|Failed to delete/, 'actions and errors stay outside the scroll region');
+
+  const actions = app.nodes((node) => node.type === 'div'
+    && classes(node).includes('shrink-0')
+    && JSON.stringify(node.props.children).includes('Confirm delete'));
+  assert.equal(actions.length, 1, 'action row must not shrink out of view');
+  const alert = app.nodes((node) => node.props?.role === 'alert')[0];
+  assert.ok(classes(alert).includes('shrink-0'));
+  app.unmount();
+});
+
 test('ReviewActionBar renders Delete critique only for owner views and never on public/non-owner surfaces', async () => {
   const app = componentHarness(new URL('../src/features/reviews/components/ReviewActionBar.tsx', import.meta.url), {
     'next/link': { default: 'Link' },
