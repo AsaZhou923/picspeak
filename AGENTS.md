@@ -69,7 +69,7 @@ Authorized gallery maintenance on 2026-10-06 first reassessed 22 remaining appro
 ```bash
 python -m venv .venv
 .\.venv\Scripts\activate
-pip install -r backend/requirements.txt
+pip install -r backend/requirements-dev.txt
 ```
 
 ### Backend runtime
@@ -103,6 +103,7 @@ python scripts/configure_r2_lifecycle.py  # dry-run; --execute needs PICSPEAK_R2
 ```bash
 .\.venv\Scripts\python.exe -m pytest backend/tests
 .\.venv\Scripts\python.exe -m pytest backend/tests/test_image_generation_routes.py
+.\.venv\Scripts\python.exe -m ruff check backend
 ```
 
 ### Frontend setup and runtime
@@ -113,6 +114,7 @@ npm install
 npm run dev
 npm run dev:clean
 npm run build
+npm run build:clean
 npm run start
 ```
 

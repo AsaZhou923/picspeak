@@ -303,10 +303,16 @@ const nextConfig = {
   async redirects() {
     return canonicalRedirects;
   },
-  webpack: (config) => {
-    config.cache = {
-      type: 'memory',
-    };
+  webpack: (config, { dev }) => {
+    // Webpack's filesystem pack cache can hit intermittent rename/lock errors
+    // during local Windows `next dev` runs. Restrict the memory-cache fallback
+    // to local Windows development so CI, Vercel, and production builds keep
+    // Next.js's persistent `.next/cache`.
+    if (dev && process.platform === 'win32' && !process.env.CI && !process.env.VERCEL) {
+      config.cache = {
+        type: 'memory',
+      };
+    }
 
     return config;
   },
