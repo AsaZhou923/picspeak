@@ -201,6 +201,7 @@ class PracticeContractTests(unittest.TestCase):
 
         with patch('app.api.routers.review_create._find_photo_owned', return_value=SimpleNamespace(id=1, status=PhotoStatus.READY)), patch(
             'app.api.routers.review_create.admit_photo_use',
+            return_value=SimpleNamespace(id=1, status=PhotoStatus.READY, owner_user_id=7),
         ), patch(
             'app.api.routers.review_create.get_idempotency_record',
             side_effect=[None, stale_record],
@@ -243,6 +244,7 @@ class PracticeContractTests(unittest.TestCase):
         db.query.side_effect = query
         with patch('app.api.routers.review_create._find_photo_owned', return_value=SimpleNamespace(id=1, status=PhotoStatus.READY)), patch(
             'app.api.routers.review_create.admit_photo_use',
+            return_value=SimpleNamespace(id=1, status=PhotoStatus.READY, owner_user_id=7),
         ), patch(
             'app.api.routers.review_create.get_idempotency_record',
             side_effect=[None, None],

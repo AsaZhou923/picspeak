@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal
 from typing import Literal
 
@@ -206,20 +206,6 @@ def record_observed_provider_call_costs(
     return records
 
 
-def _current_task_owner_user_id(db: Session, task_id: int, fallback_owner_user_id: int) -> int:
-    try:
-        row = db.query(ReviewTask.owner_user_id).filter(ReviewTask.id == task_id).first()
-    except Exception:  # noqa: BLE001
-        return fallback_owner_user_id
-    if row is None:
-        return fallback_owner_user_id
-    try:
-        candidate = row[0]
-    except (TypeError, IndexError):
-        return fallback_owner_user_id
-    return candidate if isinstance(candidate, int) else fallback_owner_user_id
-
-
 def persist_observed_provider_call_costs(
     *,
     task_id: int,
@@ -227,18 +213,29 @@ def persist_observed_provider_call_costs(
     attempt_count: int,
     calls: list[AIProviderCallUsage],
     failed: bool | None,
-    db: Session | None = None,
 ) -> None:
-    if db is not None:
-        task_identity = _TaskCostIdentity(
-            id=task_id,
-            owner_user_id=owner_user_id,
-            attempt_count=attempt_count,
-        )
-        for call, outcome in _resolved_observed_outcomes(calls, failed=failed):
+    task_identity = _TaskCostIdentity(
+        id=task_id,
+        owner_user_id=owner_user_id,
+        attempt_count=attempt_count,
+    )
+    for call, outcome in _resolved_observed_outcomes(calls, failed=failed):
+        call_key = review_call_key(task=task_identity, stage=call.stage, sequence=call.sequence)
+        db = SessionLocal()
+        try:
+            # Cost rows follow their task, so take the owner from the task row at
+            # insert time. The key-share lock is the one the foreign key check
+            # takes anyway; it waits out a guest sign-in migration that holds the
+            # task FOR UPDATE, so the owner read here is the one the row commits with.
+            current_owner_user_id = (
+                db.query(ReviewTask.owner_user_id)
+                .filter(ReviewTask.id == task_id)
+                .with_for_update(read=True, key_share=True)
+                .scalar()
+            )
             record_review_call_cost(
                 db,
-                task=task_identity,
+                task=replace(task_identity, owner_user_id=current_owner_user_id or owner_user_id),
                 stage=call.stage,
                 outcome=outcome,
                 model_name=call.model_name,
@@ -248,41 +245,17 @@ def persist_observed_provider_call_costs(
                 cost_rate_version=call.cost_rate_version,
                 sequence=call.sequence,
             )
-        return
-
-    for call, outcome in _resolved_observed_outcomes(calls, failed=failed):
-        session = SessionLocal()
-        try:
-            effective_owner_id = _current_task_owner_user_id(session, task_id, owner_user_id)
-            task_identity = _TaskCostIdentity(
-                id=task_id,
-                owner_user_id=effective_owner_id,
-                attempt_count=attempt_count,
-            )
-            call_key = review_call_key(task=task_identity, stage=call.stage, sequence=call.sequence)
-            record_review_call_cost(
-                session,
-                task=task_identity,
-                stage=call.stage,
-                outcome=outcome,
-                model_name=call.model_name,
-                input_tokens=call.input_tokens,
-                output_tokens=call.output_tokens,
-                cost_usd=call.cost_usd,
-                cost_rate_version=call.cost_rate_version,
-                sequence=call.sequence,
-            )
-            session.commit()
+            db.commit()
         except IntegrityError as exc:
-            session.rollback()
+            db.rollback()
             if not _is_review_call_cost_duplicate_error(exc):
                 raise
             existing = (
-                session.query(ReviewCallCost.id)
+                db.query(ReviewCallCost.id)
                 .filter(ReviewCallCost.task_id == task_id, ReviewCallCost.call_key == call_key)
                 .first()
             )
             if existing is None:
                 raise
         finally:
-            session.close()
+            db.close()

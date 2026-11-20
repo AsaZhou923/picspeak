@@ -760,12 +760,150 @@ class AccountLifecycleConcurrencyPostgresTests(unittest.TestCase):
             self.assertEqual(final_task.owner_user_id, target_id)
             self.assertEqual(final_photo.owner_user_id, target_id)
             self.assertEqual(final_review.owner_user_id, target_id)
-            self.assertEqual(final_usage.user_id, target_id)
+            # Usage stays with the guest whose quota admitted the request.
+            self.assertEqual(final_usage.user_id, guest_id)
             self.assertGreaterEqual(len(final_costs), 1)
             self.assertTrue(all(row.owner_user_id == target_id for row in final_costs))
             self.assertEqual(db.get(User, guest_id).status, UserStatus.deleted)
 
-    def test_sync_review_interleaved_with_guest_migration_lands_on_target(self) -> None:
+    def test_worker_finish_then_waiting_migration_lands_same_rows_on_target(self) -> None:
+        with self.Session() as db:
+            guest = self._make_user(db, plan=UserPlan.guest)
+            target = self._make_user(db, plan=UserPlan.free)
+            photo = self._make_photo(db, guest, uuid4().hex[:8])
+            task = ReviewTask(
+                public_id=f'tsk_cc_{uuid4().hex[:8]}',
+                photo_id=photo.id,
+                owner_user_id=guest.id,
+                mode=ReviewMode.flash,
+                status=TaskStatus.PENDING,
+                request_payload={'locale': 'en', 'image_type': 'default', 'analysis_type': 'single'},
+            )
+            db.add(task)
+            db.commit()
+            guest_token = issue_guest_token(guest)
+            task_id = task.id
+            photo_id = photo.id
+            guest_id = guest.id
+            target_id = target.id
+
+        claim_token = f'worker-cc:{uuid4().hex}'
+        with self.Session() as db:
+            self.assertTrue(_claim_task(db, task_id, claim_token))
+
+        migration_done = threading.Event()
+        migration_error: list[BaseException] = []
+        blocked_while_worker_held_task: list[bool] = []
+
+        def fake_run_ai_review(*args, **kwargs):
+            notify_ai_provider_call(
+                stage='writer',
+                outcome='succeeded',
+                model_name='gpt-6-sol',
+                usage={'input_tokens': 120, 'output_tokens': 60},
+            )
+            return self._fake_ai_response()
+
+        def run_migration():
+            try:
+                self._migrate_in_new_session(target_id, guest_token)
+            except BaseException as exc:  # pragma: no cover - surfaced below
+                migration_error.append(exc)
+            finally:
+                migration_done.set()
+
+        migration_thread = threading.Thread(target=run_migration)
+
+        def start_migration_before_commit(*args, **kwargs):
+            # The worker holds the task lock and has written its review, usage and
+            # guest quota update; migration must wait for it instead of deadlocking.
+            migration_thread.start()
+            blocked_while_worker_held_task.append(not migration_done.wait(timeout=1))
+
+        with self.Session() as worker_db:
+            loaded_task = worker_db.get(ReviewTask, task_id)
+            with (
+                patch('app.services.review_task_processor.get_object_read_url', return_value='https://img.test/a.jpg'),
+                patch('app.services.review_task_processor.canonical_score_cache_lease', return_value=nullcontext(None)),
+                patch('app.services.review_task_processor.run_ai_review', side_effect=fake_run_ai_review),
+                patch('app.services.review_task_processor.record_review_terminal', side_effect=start_migration_before_commit),
+                patch('app.services.review_call_costs.SessionLocal', self.Session),
+            ):
+                _process_task(worker_db, loaded_task, claim_token=claim_token)
+
+        migration_thread.join(timeout=15)
+        self.assertEqual(migration_error, [])
+        self.assertEqual(blocked_while_worker_held_task, [True])
+
+        # Same final rows as the migrate-first order above.
+        with self.Session() as db:
+            final_task = db.get(ReviewTask, task_id)
+            final_review = db.query(Review).filter(Review.task_id == task_id).one()
+            final_usage = db.query(UsageLedger).filter(UsageLedger.task_id == task_id).one()
+            final_costs = db.query(ReviewCallCost).filter(ReviewCallCost.task_id == task_id).all()
+            self.assertEqual(final_task.status, TaskStatus.SUCCEEDED)
+            self.assertEqual(final_task.owner_user_id, target_id)
+            self.assertEqual(db.get(Photo, photo_id).owner_user_id, target_id)
+            self.assertEqual(final_review.owner_user_id, target_id)
+            self.assertEqual(final_usage.user_id, guest_id)
+            self.assertEqual(len(final_costs), 1)
+            self.assertEqual(final_costs[0].owner_user_id, target_id)
+            self.assertEqual(db.get(User, guest_id).status, UserStatus.deleted)
+            self.assertEqual(db.get(User, target_id).daily_quota_used, 0)
+
+    def _sync_request(self, photo_public_id: str):
+        payload = ReviewCreateRequest.model_validate({
+            'photo_id': photo_public_id,
+            'mode': 'flash',
+            'async': False,
+            'locale': 'en',
+        })
+        request = SimpleNamespace(headers={}, client=SimpleNamespace(host='127.0.0.1'))
+        return payload, request
+
+    def _migrate_in_new_session(self, target_id: int, guest_token: str) -> None:
+        with self.Session() as migrate_db:
+            _migrate_guest_records(
+                db=migrate_db,
+                target_user=migrate_db.get(User, target_id),
+                guest_token=guest_token,
+                recent_limit=20,
+                strict=True,
+            )
+            migrate_db.commit()
+
+    def test_sync_review_after_committed_migration_fails_closed_before_provider_call(self) -> None:
+        with self.Session() as db:
+            guest = self._make_user(db, plan=UserPlan.guest)
+            target = self._make_user(db, plan=UserPlan.free)
+            photo = self._make_photo(db, guest, uuid4().hex[:8])
+            db.commit()
+            guest_token = issue_guest_token(guest)
+            photo_public_id = photo.public_id
+            guest_id = guest.id
+            target_id = target.id
+
+        def migrate_after_authentication(*args, **kwargs):
+            self._migrate_in_new_session(target_id, guest_token)
+            return {}
+
+        with self.Session() as sync_db:
+            actor = CurrentActor(sync_db.get(User, guest_id))
+            payload, request = self._sync_request(photo_public_id)
+            with (
+                patch('app.api.routers.review_create.enforce_guest_review_limits', side_effect=migrate_after_authentication),
+                patch('app.api.routers.review_create.run_ai_review') as provider,
+            ):
+                with self.assertRaises(HTTPException) as raised:
+                    review_create._create_review(payload, request, sync_db, actor)
+            provider.assert_not_called()
+        self.assertEqual((raised.exception.status_code, raised.exception.detail['code']), (409, 'PHOTO_OWNER_MISMATCH'))
+
+        with self.Session() as db:
+            self.assertEqual(db.query(Review).filter(Review.owner_user_id.in_([guest_id, target_id])).count(), 0)
+            self.assertEqual(db.query(UsageLedger).filter(UsageLedger.user_id.in_([guest_id, target_id])).count(), 0)
+
+    def test_sync_review_holding_photo_lock_makes_migration_wait_then_moves_review(self) -> None:
         with self.Session() as db:
             guest = self._make_user(db, plan=UserPlan.guest)
             target = self._make_user(db, plan=UserPlan.free)
@@ -777,52 +915,48 @@ class AccountLifecycleConcurrencyPostgresTests(unittest.TestCase):
             guest_id = guest.id
             target_id = target.id
 
-        def fake_run_ai_review(*args, **kwargs):
-            # Simulate migration completing in a separate transaction during the provider call.
-            # Commit the outer read transaction's lock first only if needed — here we test
-            # the case where migration completes before the final admit_photo_use lock.
+        migration_done = threading.Event()
+        migration_error: list[BaseException] = []
+        blocked_during_provider_call: list[bool] = []
+
+        def run_migration():
+            try:
+                self._migrate_in_new_session(target_id, guest_token)
+            except BaseException as exc:  # pragma: no cover - surfaced below
+                migration_error.append(exc)
+            finally:
+                migration_done.set()
+
+        migration_thread = threading.Thread(target=run_migration)
+
+        def provider_call_with_concurrent_migration(*args, **kwargs):
+            migration_thread.start()
+            blocked_during_provider_call.append(not migration_done.wait(timeout=1))
             return self._fake_ai_response()
 
         with self.Session() as sync_db:
-            guest_row = sync_db.get(User, guest_id)
-            actor = CurrentActor(guest_row)
-            payload = ReviewCreateRequest.model_validate({
-                'photo_id': photo_public_id,
-                'mode': 'flash',
-                'async': False,
-                'locale': 'en',
-            })
-            request = SimpleNamespace(headers={}, client=SimpleNamespace(host='127.0.0.1'))
-
-            def run_ai_and_migrate(*args, **kwargs):
-                # Release any read lock from the pre-call check so another transaction can migrate.
-                sync_db.rollback()
-                with self.Session() as migrate_db:
-                    _migrate_guest_records(
-                        db=migrate_db,
-                        target_user=migrate_db.get(User, target_id),
-                        guest_token=guest_token,
-                        recent_limit=20,
-                        strict=True,
-                    )
-                    migrate_db.commit()
-                return self._fake_ai_response()
-
+            actor = CurrentActor(sync_db.get(User, guest_id))
+            payload, request = self._sync_request(photo_public_id)
             with (
                 patch('app.api.routers.review_create.enforce_guest_review_limits', return_value={}),
                 patch('app.api.routers.review_create.get_object_read_url', return_value='https://img.test/s.jpg'),
                 patch('app.api.routers.review_create.canonical_score_cache_lease', return_value=nullcontext(None)),
-                patch('app.api.routers.review_create.run_ai_review', side_effect=run_ai_and_migrate),
+                patch('app.api.routers.review_create.run_ai_review', side_effect=provider_call_with_concurrent_migration),
                 patch('app.api.routers.review_create._attach_billing_info'),
             ):
                 response = review_create._create_review(payload, request, sync_db, actor)
+
+        migration_thread.join(timeout=15)
+        self.assertEqual(migration_error, [])
+        self.assertEqual(blocked_during_provider_call, [True])
 
         with self.Session() as db:
             review = db.query(Review).filter(Review.public_id == response['review_id']).one()
             usage = db.query(UsageLedger).filter(UsageLedger.review_id == review.id).one()
             self.assertEqual(db.get(Photo, photo_id).owner_user_id, target_id)
             self.assertEqual(review.owner_user_id, target_id)
-            self.assertEqual(usage.user_id, target_id)
+            self.assertEqual(usage.user_id, guest_id)
+            self.assertEqual(db.get(User, guest_id).status, UserStatus.deleted)
 
     def test_concurrent_duplicate_migrations_serialize_and_never_double_report(self) -> None:
         for strict in (True, False):

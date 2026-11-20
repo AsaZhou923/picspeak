@@ -29,8 +29,14 @@ class _Query:
     def filter(self, *args):
         return self
 
+    def with_for_update(self, **kwargs):
+        return self
+
     def first(self):
         return self._existing
+
+    def scalar(self):
+        return None
 
 
 def _db(existing=None):

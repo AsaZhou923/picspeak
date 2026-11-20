@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import HTTPException, status
-from sqlalchemy import func, or_
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_user_from_token, new_public_id, quota_for_plan
@@ -25,7 +25,6 @@ from app.db.models import (
     ReviewScoreFeedback,
     ReviewScoreSnapshot,
     ReviewTask,
-    UsageLedger,
     User,
     UserPlan,
     UserStatus,
@@ -349,6 +348,34 @@ def _process_clerk_webhook_event(db: Session, event: ClerkWebhookEvent) -> tuple
     return 'ignored_event_type', None
 
 
+def lock_guest_for_transfer(db: Session, guest_user_id: int, *, expected_status: UserStatus) -> User | None:
+    """Lock a guest's tasks, then photos, then the guest row for an ownership transfer.
+
+    Worker completion locks its task FOR UPDATE before it inserts rows that
+    reference the photo and user and updates the admitting user's quota. A
+    synchronous review holds its photo FOR SHARE from admission until it inserts
+    the review and updates the user. Taking tasks, photos and the user in that
+    order means each of them waits for a transfer at its first lock and never
+    holds a lock the transfer still needs. Photo and user locks are NO KEY UPDATE
+    so foreign-key inserts (KEY SHARE) are not blocked. Returns None when the
+    guest no longer has ``expected_status``, e.g. a concurrent sign-in already
+    retired it.
+    """
+    db.query(ReviewTask.id).filter(ReviewTask.owner_user_id == guest_user_id).order_by(
+        ReviewTask.id.asc()
+    ).with_for_update().all()
+    db.query(Photo.id).filter(Photo.owner_user_id == guest_user_id).order_by(
+        Photo.id.asc()
+    ).with_for_update(key_share=True).all()
+    return (
+        db.query(User)
+        .filter(User.id == guest_user_id, User.plan == UserPlan.guest, User.status == expected_status)
+        .with_for_update(key_share=True)
+        .populate_existing()
+        .first()
+    )
+
+
 def transfer_guest_user_records(
     db: Session,
     *,
@@ -358,17 +385,13 @@ def transfer_guest_user_records(
 ) -> dict[str, int]:
     """Transfer all content records owned by ``guest_user`` to ``target_user``.
 
-    Callers should hold a ``FOR UPDATE`` lock on ``guest_user`` before calling.
-    Lock order is ``User (guest) -> Photo (ORDER BY id) -> ReviewTask (ORDER BY id)``
-    so concurrent synchronous reviews (which lock Photo FOR SHARE) and async
-    workers (which lock ReviewTask FOR UPDATE) serialize without deadlocking and
-    never leave a review, task, photo, usage entry or cost row split across owners.
+    Callers must first take the locks of ``lock_guest_for_transfer``. Usage
+    ledger rows stay with the user whose quota admitted the request.
     """
     guest_photos = (
         db.query(Photo)
         .filter(Photo.owner_user_id == guest_user.id)
         .order_by(Photo.id.asc())
-        .with_for_update()
         .populate_existing()
         .all()
     )
@@ -376,7 +399,6 @@ def transfer_guest_user_records(
         db.query(ReviewTask)
         .filter(ReviewTask.owner_user_id == guest_user.id)
         .order_by(ReviewTask.id.asc())
-        .with_for_update()
         .populate_existing()
         .all()
     )
@@ -442,27 +464,6 @@ def transfer_guest_user_records(
             db.add(call)
             migrated_call_costs += 1
 
-    # Keep UsageLedger rows aligned with migrated reviews/tasks so either ordering
-    # of worker completion vs migration ends with identical final ownership.
-    migrated_review_ids = [review.id for review in guest_reviews]
-    migrated_task_ids = [task.id for task in guest_tasks]
-    usage_filters = []
-    if migrated_review_ids:
-        usage_filters.append(UsageLedger.review_id.in_(migrated_review_ids))
-    if migrated_task_ids:
-        usage_filters.append(UsageLedger.task_id.in_(migrated_task_ids))
-    migrated_usage = 0
-    if usage_filters:
-        for entry in (
-            db.query(UsageLedger)
-            .filter(UsageLedger.user_id == guest_user.id, or_(*usage_filters))
-            .all()
-        ):
-            if entry.user_id != target_user.id:
-                entry.user_id = target_user.id
-                db.add(entry)
-                migrated_usage += 1
-
     migrated_sessions = 0
     for session in guest_sessions:
         if session.owner_user_id != target_user.id:
@@ -518,7 +519,6 @@ def transfer_guest_user_records(
         'photos': migrated_photos,
         'tasks': migrated_tasks,
         'call_costs': migrated_call_costs,
-        'usage_ledger': migrated_usage,
         'practice_sessions': migrated_sessions,
         'practice_scene_groups': migrated_scene_groups,
         'practice_attempts': migrated_attempts,
@@ -554,16 +554,10 @@ def _migrate_guest_records(
     if guest_user.id == target_user.id:
         return 0, 0
 
-    # Serialize concurrent sign-in/migration attempts on the guest account row so
-    # a duplicate call sees the already-deleted guest and never double-reports.
-    locked_guest = (
-        db.query(User)
-        .filter(User.id == guest_user.id)
-        .with_for_update()
-        .populate_existing()
-        .first()
-    )
-    if locked_guest is None or locked_guest.plan != UserPlan.guest or locked_guest.status != UserStatus.active:
+    # A concurrent sign-in for the same guest waits on these locks and then sees
+    # the guest already retired, so a transfer is never reported twice.
+    locked_guest = lock_guest_for_transfer(db, guest_user.id, expected_status=UserStatus.active)
+    if locked_guest is None:
         if strict:
             raise api_error(status.HTTP_400_BAD_REQUEST, 'GUEST_TOKEN_INVALID', 'Provided token is invalid')
         return 0, 0

@@ -26,7 +26,6 @@ from app.db.models import (
     ReviewTask,
     TaskStatus,
     UsageLedger,
-    User,
     UserPlan,
 )
 from app.schemas import ReviewCreateAsyncResponse, ReviewCreateRequest, ReviewCreateSyncResponse
@@ -98,6 +97,18 @@ def _replay_review_response(db: Session, actor: CurrentActor, stored_response: d
     if isinstance(result, dict):
         response['result'] = _review_result_payload(result, None)
     return response
+
+
+def _admit_actor_photo(db: Session, photo_id: int, actor_user_id: int):
+    """Lock the request photo for use and confirm the actor still owns it.
+
+    A guest sign-in migration that committed after this request authenticated
+    has moved the photo; fail closed instead of writing rows for the retired guest.
+    """
+    photo = admit_photo_use(db, photo_id)
+    if photo is None or photo.owner_user_id != actor_user_id:
+        raise api_error(status.HTTP_409_CONFLICT, 'PHOTO_OWNER_MISMATCH', 'Photo ownership changed during review creation')
+    return photo
 
 
 def _review_request_hash_payload(db: Session, actor: CurrentActor, payload: ReviewCreateRequest) -> dict:
@@ -261,19 +272,12 @@ def _create_review(payload: ReviewCreateRequest, request: Request, db: Session, 
         enforce_user_quota(db, actor.user, mode=mode_enum)
 
     if payload.async_mode:
-        # Keep the photos locked until the task commits so a retention purge or
-        # concurrent guest sign-in migration cannot change ownership mid-write.
-        admitted_photo = admit_photo_use(db, photo.id)
-        if isinstance(admitted_photo, Photo):
-            photo = admitted_photo
-        effective_owner_id = photo.owner_user_id if isinstance(photo, Photo) else actor.user.id
+        # Keep the photos locked until the task commits so a retention purge
+        # cannot remove an original this task depends on.
+        _admit_actor_photo(db, photo.id, actor.user.id)
         if source_review is not None:
-            admitted_source_photo = admit_photo_use(db, source_review.photo_id)
+            admit_photo_use(db, source_review.photo_id)
             db.refresh(source_review)
-            if isinstance(admitted_source_photo, Photo) and admitted_source_photo.owner_user_id != effective_owner_id:
-                raise api_error(status.HTTP_409_CONFLICT, 'PHOTO_OWNER_MISMATCH', 'Photo ownership changed during review creation')
-            if source_review.owner_user_id != effective_owner_id:
-                raise api_error(status.HTTP_409_CONFLICT, 'REVIEW_OWNER_MISMATCH', 'Source review ownership changed during review creation')
             if review_access_status(source_review, review_history_cutoff(actor.plan)) != ACCESS_AVAILABLE:
                 raise api_error(status.HTTP_404_NOT_FOUND, 'REVIEW_NOT_FOUND', 'Review not found')
         task_payload = payload.model_dump(by_alias=True)
@@ -289,7 +293,7 @@ def _create_review(payload: ReviewCreateRequest, request: Request, db: Session, 
         task = ReviewTask(
             public_id=new_public_id('tsk'),
             photo_id=photo.id,
-            owner_user_id=effective_owner_id,
+            owner_user_id=actor.user.id,
             mode=mode_enum,
             status=TaskStatus.PENDING,
             idempotency_key=idempotency_key,
@@ -336,7 +340,7 @@ def _create_review(payload: ReviewCreateRequest, request: Request, db: Session, 
             if idempotency_key:
                 save_idempotency_record(
                     db,
-                    user_id=effective_owner_id,
+                    user_id=actor.user.id,
                     endpoint='/reviews',
                     key=idempotency_key,
                     request_hash=request_hash,
@@ -405,7 +409,7 @@ def _create_review(payload: ReviewCreateRequest, request: Request, db: Session, 
         return response
 
     with synchronous_review_quota(db, actor.user, mode=mode_enum) as quota_reservation:
-        photo = admit_photo_use(db, photo.id)
+        photo = _admit_actor_photo(db, photo.id, actor.user.id)
         if source_review is not None:
             admit_photo_use(db, source_review.photo_id)
             db.refresh(source_review)
@@ -481,31 +485,16 @@ def _create_review(payload: ReviewCreateRequest, request: Request, db: Session, 
         result_payload['image_type'] = payload.image_type
         if ai_response.cost_rate_version:
             result_payload.setdefault('billing_info', {})['cost_rate_version'] = ai_response.cost_rate_version
-        # The provider read the original during this request; lock and reload
-        # the photo row to serialize against both retention purges and concurrent
-        # guest sign-in migrations so the review and usage ledger land on the
-        # photo's final owner.
-        admitted_photo = admit_photo_use(db, photo.id)
-        if isinstance(admitted_photo, Photo):
-            photo = admitted_photo
-        effective_owner_id = photo.owner_user_id if isinstance(photo, Photo) else actor.user.id
+        # The provider read the original during this request; refuse to record a
+        # review if a retention purge removed it meanwhile.
+        admit_photo_use(db, photo.id)
         if source_review is not None:
-            admitted_source_photo = admit_photo_use(db, source_review.photo_id)
-            db.refresh(source_review)
-            if isinstance(admitted_source_photo, Photo) and admitted_source_photo.owner_user_id != effective_owner_id:
-                raise api_error(status.HTTP_409_CONFLICT, 'PHOTO_OWNER_MISMATCH', 'Photo ownership changed during review')
-            if source_review.owner_user_id != effective_owner_id:
-                raise api_error(status.HTTP_409_CONFLICT, 'REVIEW_OWNER_MISMATCH', 'Source review ownership changed during review')
-        effective_owner = actor.user
-        if effective_owner_id != actor.user.id:
-            refreshed_owner = db.query(User).filter(User.id == effective_owner_id).populate_existing().first()
-            if isinstance(refreshed_owner, User):
-                effective_owner = refreshed_owner
+            admit_photo_use(db, source_review.photo_id)
         review = Review(
             public_id=new_public_id('rev'),
             task_id=None,
             photo_id=photo.id,
-            owner_user_id=effective_owner_id,
+            owner_user_id=actor.user.id,
             source_review_id=source_review.id if source_review is not None else None,
             mode=mode_enum,
             status=ReviewStatus.SUCCEEDED,
@@ -526,7 +515,7 @@ def _create_review(payload: ReviewCreateRequest, request: Request, db: Session, 
         db.flush()
         db.add(
             UsageLedger(
-                user_id=effective_owner_id,
+                user_id=actor.user.id,
                 review_id=review.id,
                 task_id=None,
                 usage_type='review_request',
@@ -543,16 +532,16 @@ def _create_review(payload: ReviewCreateRequest, request: Request, db: Session, 
             )
         )
         consume_review_quota(db, quota_reservation)
-        increment_quota(db, effective_owner, **({'bill_date': quota_reservation.bill_date} if quota_reservation is not None else {}))
+        increment_quota(db, actor.user, **({'bill_date': quota_reservation.bill_date} if quota_reservation is not None else {}))
         db.flush()
         result_payload = deepcopy(result_payload)
         _attach_billing_info(
             result_payload,
             db=db,
-            user=effective_owner,
+            user=actor.user,
             charged=True,
-            guest_scope_key=guest_scope_key if effective_owner.plan == UserPlan.guest else None,
-            guest_network_scope_key=guest_network_key if effective_owner.plan == UserPlan.guest else None,
+            guest_scope_key=guest_scope_key,
+            guest_network_scope_key=guest_network_key,
         )
         review.result_json = result_payload
         db.add(review)
@@ -561,7 +550,7 @@ def _create_review(payload: ReviewCreateRequest, request: Request, db: Session, 
             if idempotency_key:
                 save_idempotency_record(
                     db,
-                    user_id=effective_owner_id,
+                    user_id=actor.user.id,
                     endpoint='/reviews',
                     key=idempotency_key,
                     request_hash=request_hash,
