@@ -60,6 +60,7 @@ import {
   UsageResponse,
 } from './types';
 import { generationDownloadFilename } from './generation-download';
+import { clearGalleryRestoreState } from './gallery-navigation';
 import type { ScoreFeedback, ScoreFeedbackPutRequest, ScoreFeedbackResponse } from './score-feedback';
 
 function resolveApiBase(): string {
@@ -326,14 +327,17 @@ export async function getUsage(token: string, options: UsageOptions = {}): Promi
 
   const usagePromise = request<UsageResponse>('/me/usage', {
     token,
+    cache: 'no-store',
     unauthorizedRecovery: 'guest',
   })
     .then((data) => {
-      usageCache = {
-        token,
-        expiresAt: Date.now() + USAGE_CACHE_TTL_MS,
-        data,
-      };
+      if (usageCache?.promise === usagePromise && usageCache.token === token) {
+        usageCache = {
+          token,
+          expiresAt: Date.now() + USAGE_CACHE_TTL_MS,
+          data,
+        };
+      }
       return data;
     })
     .catch((error) => {
@@ -671,7 +675,7 @@ export async function getMyGenerations(
 ): Promise<GeneratedImageHistoryResponse> {
   const params = new URLSearchParams({ limit: String(query.limit ?? 20) });
   if (query.cursor) params.set('cursor', query.cursor);
-  return request<GeneratedImageHistoryResponse>(`/me/generations?${params.toString()}`, { token });
+  return request<GeneratedImageHistoryResponse>(`/me/generations?${params.toString()}`, { token, cache: 'no-store' });
 }
 
 export async function reuseGeneration(
@@ -690,10 +694,11 @@ export async function reuseGeneration(
 }
 
 export async function deleteGeneration(generationId: string, token: string): Promise<void> {
-  return request<void>(`/generations/${generationId}`, {
+  await request<void>(`/generations/${encodeURIComponent(generationId)}`, {
     method: 'DELETE',
     token,
   });
+  clearUsageCache(token);
 }
 
 export async function downloadGeneration(
@@ -722,6 +727,15 @@ export function buildTaskWebSocketUrl(taskId: string): string {
 
 export async function getReview(reviewId: string, token: string, signal?: AbortSignal): Promise<ReviewGetResponse> {
   return request<ReviewGetResponse>(`/reviews/${reviewId}`, { token, signal, cache: 'no-store' });
+}
+
+export async function deleteReview(reviewId: string, token: string): Promise<void> {
+  await request<void>(`/reviews/${encodeURIComponent(reviewId)}`, {
+    method: 'DELETE',
+    token,
+  });
+  clearUsageCache(token);
+  clearGalleryRestoreState();
 }
 
 export function getScoreFeedback(reviewId: string, revision: string, token: string, signal?: AbortSignal): Promise<ScoreFeedbackResponse> {
@@ -762,7 +776,7 @@ export async function getMyReviews(
   if (typeof query.max_score === 'number') params.set('max_score', String(query.max_score));
   if (query.image_type) params.set('image_type', query.image_type);
   if (query.favorite_only) params.set('favorite_only', 'true');
-  return request<ReviewHistoryResponse>(`/me/reviews?${params.toString()}`, { token, signal });
+  return request<ReviewHistoryResponse>(`/me/reviews?${params.toString()}`, { token, signal, cache: 'no-store' });
 }
 
 export async function getBlogViewCounts(slugs: string[]): Promise<Record<string, number>> {

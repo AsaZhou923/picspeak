@@ -2,7 +2,7 @@
 
 import { useRef } from 'react';
 import Link from 'next/link';
-import { ArrowUpRight, CalendarDays, ChevronRight, Minus, Target, TrendingDown, TrendingUp } from 'lucide-react';
+import { ArrowUpRight, CalendarDays, ChevronRight, Minus, Target, Trash2, TrendingDown, TrendingUp } from 'lucide-react';
 import { ModeBadge, StatusBadge } from '@/components/ui/Badge';
 import CachedThumbnail from '@/components/ui/CachedThumbnail';
 import { SkeletonBlock } from '@/components/ui/LoadingSpinner';
@@ -98,7 +98,15 @@ export function DateFilterField({
   );
 }
 
-export function ReviewCard({ item }: { item: ReviewHistoryItem }) {
+export function ReviewCard({
+  item,
+  onDelete,
+  deleteBusy = false,
+}: {
+  item: ReviewHistoryItem;
+  onDelete?: (item: ReviewHistoryItem) => void;
+  deleteBusy?: boolean;
+}) {
   const { locale, t } = useI18n();
   const copy = getHistoryCopy(locale);
   const date = new Date(item.created_at).toLocaleString(getHistoryIntlLocale(locale), {
@@ -109,12 +117,8 @@ export function ReviewCard({ item }: { item: ReviewHistoryItem }) {
     minute: '2-digit',
   });
 
-  return (
-    <Link
-      href={`/reviews/${item.review_id}?back=/account/reviews`}
-      prefetch={false}
-      className="group flex items-center gap-4 rounded-lg border border-border-subtle bg-raised px-4 py-3 transition-all hover:border-gold/40 hover:bg-raised/80"
-    >
+  const linkContent = (
+    <>
       <CachedThumbnail
         photoId={item.photo_id}
         photoUrl={item.photo_thumbnail_url ?? item.photo_url}
@@ -154,9 +158,44 @@ export function ReviewCard({ item }: { item: ReviewHistoryItem }) {
 
       <ChevronRight
         size={16}
+        aria-hidden="true"
         className="shrink-0 text-ink-subtle transition-colors group-hover:text-gold"
       />
-    </Link>
+    </>
+  );
+
+  if (!onDelete) {
+    return (
+      <Link
+        href={`/reviews/${item.review_id}?back=/account/reviews`}
+        prefetch={false}
+        className="group flex items-center gap-4 rounded-lg border border-border-subtle bg-raised px-4 py-3 transition-all hover:border-gold/40 hover:bg-raised/80"
+      >
+        {linkContent}
+      </Link>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2 rounded-lg border border-border-subtle bg-raised px-4 py-3 transition-all hover:border-gold/40 hover:bg-raised/80">
+      <Link
+        href={`/reviews/${item.review_id}?back=/account/reviews`}
+        prefetch={false}
+        className="group flex min-w-0 flex-1 items-center gap-4"
+      >
+        {linkContent}
+      </Link>
+      <button
+        type="button"
+        onClick={() => onDelete(item)}
+        disabled={deleteBusy}
+        aria-label={t('delete_review_action')}
+        className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-full border border-rust/30 px-3 text-xs font-medium text-rust transition-colors hover:border-rust hover:bg-rust/10 disabled:opacity-50"
+      >
+        <Trash2 size={14} aria-hidden="true" />
+        <span className="hidden sm:inline">{t('delete_review_action_short')}</span>
+      </button>
+    </div>
   );
 }
 

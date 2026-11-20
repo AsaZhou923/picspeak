@@ -5,6 +5,16 @@ const CACHE_PATH = '/__cache__/photo-previews/';
 const CACHE_TTL_MS = 1000 * 60 * 60 * 12;
 
 const objectUrlCache = new Map<string, string>();
+const photoEvictionEpochs = new Map<string, number>();
+let clearAllEpoch = 0;
+
+function getPhotoEvictionEpoch(photoId: string): number {
+  return photoEvictionEpochs.get(photoId) ?? 0;
+}
+
+function isPhotoEpochCurrent(photoId: string, clearSnap: number, photoSnap: number): boolean {
+  return clearAllEpoch === clearSnap && getPhotoEvictionEpoch(photoId) === photoSnap;
+}
 
 function getCacheRequest(photoId: string): Request {
   return new Request(`${window.location.origin}${CACHE_PATH}${encodeURIComponent(photoId)}`);
@@ -64,8 +74,10 @@ export async function cacheUploadedPhotoPreview(photoId: string, blob: Blob): Pr
     return;
   }
 
+  const clearSnap = clearAllEpoch;
+  const photoSnap = getPhotoEvictionEpoch(photoId);
   const cache = await openPhotoPreviewCache();
-  if (!cache) {
+  if (!cache || !isPhotoEpochCurrent(photoId, clearSnap, photoSnap)) {
     return;
   }
 
@@ -78,6 +90,9 @@ export async function cacheUploadedPhotoPreview(photoId: string, blob: Blob): Pr
       },
     })
   );
+  if (!isPhotoEpochCurrent(photoId, clearSnap, photoSnap)) {
+    await cache.delete(getCacheRequest(photoId));
+  }
 }
 
 export async function getUploadedPhotoPreviewSrc(photoId: string): Promise<string | null> {
@@ -85,13 +100,15 @@ export async function getUploadedPhotoPreviewSrc(photoId: string): Promise<strin
     return null;
   }
 
+  const clearSnap = clearAllEpoch;
+  const photoSnap = getPhotoEvictionEpoch(photoId);
   const memoryUrl = objectUrlCache.get(photoId);
   if (memoryUrl) {
     return memoryUrl;
   }
 
   const cachedBlob = await readCachedBlob(photoId);
-  if (!cachedBlob) {
+  if (!cachedBlob || !isPhotoEpochCurrent(photoId, clearSnap, photoSnap)) {
     return null;
   }
 
@@ -103,17 +120,29 @@ export async function refreshUploadedPhotoPreviewSrc(photoId: string): Promise<s
     return null;
   }
 
+  const clearSnap = clearAllEpoch;
+  const photoSnap = getPhotoEvictionEpoch(photoId);
   forgetObjectUrl(photoId);
 
   const cachedBlob = await readCachedBlob(photoId);
-  if (!cachedBlob) {
+  if (!cachedBlob || !isPhotoEpochCurrent(photoId, clearSnap, photoSnap)) {
     return null;
   }
 
   return rememberObjectUrl(photoId, cachedBlob);
 }
 
+export async function evictPhotoPreviewCache(photoId: string): Promise<void> {
+  if (!photoId) return;
+  photoEvictionEpochs.set(photoId, getPhotoEvictionEpoch(photoId) + 1);
+  forgetObjectUrl(photoId);
+  const cache = await openPhotoPreviewCache();
+  if (!cache) return;
+  await cache.delete(getCacheRequest(photoId));
+}
+
 export async function clearPhotoPreviewCache(): Promise<void> {
+  clearAllEpoch += 1;
   objectUrlCache.forEach((objectUrl) => {
     URL.revokeObjectURL(objectUrl);
   });

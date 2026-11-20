@@ -3,7 +3,14 @@ import { localeToIntlLocale } from '@/lib/locale';
 import { ReviewExportResponse, ReviewGetResponse, ReviewMetaResponse } from '@/lib/types';
 import { getImageTypeLabelForLocale } from '@/lib/review-page-copy';
 
-export type ReviewActionBusy = 'share' | 'export' | 'replay' | 'favorite' | 'gallery' | null;
+export type ReviewActionBusy = 'share' | 'export' | 'replay' | 'favorite' | 'gallery' | 'delete' | null;
+
+export function resolvePostDeleteReviewHref(backHref: string, plan?: string | null): string {
+  if (backHref === '/account/favorites') return '/account/favorites';
+  if (backHref === '/account/reviews') return '/account/reviews';
+  if (plan === 'guest') return '/workspace';
+  return '/account/reviews';
+}
 
 type ExportSummaryCopy = {
   title: string;

@@ -9,6 +9,7 @@ const baseModules = {
   'next/image': { default: 'Image' }, 'next/link': { default: 'Link' },
   '@/features/generations/generation-request': generationRequest,
   'lucide-react': {}, '@/lib/i18n': { useI18n: () => ({ t, locale: 'en' }) },
+  '@/components/ui/DeleteConfirmDialog': { DeleteConfirmDialog: 'DeleteConfirmDialog' },
   '@/lib/error-utils': { formatUserFacingError: () => 'localized-error' },
   '@/features/generations/generation-config': { formatGenerationOutputSpec: () => 'output', formatGenerationModelName: (name: string) => name },
   '@/features/generations/generation-page-copy': { QUALITY_COPY_KEYS: { low: { label: 'low' }, medium: { label: 'medium' }, high: { label: 'high' } } },

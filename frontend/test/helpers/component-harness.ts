@@ -31,8 +31,10 @@ export function componentHarness(source: URL, modules: Record<string, any>, glob
     window: { setTimeout: () => 0, location: { search: '' }, requestAnimationFrame: (fn: () => void) => fn() },
     ...globals,
     require(name: string) {
-      if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx };
+      if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx, Fragment: 'Fragment' };
       if (name === 'react') return {
+        memo: (fn: any) => fn,
+        useId: () => memo(() => `id-${frame.cursor}`, []),
         useState(initial: any) {
           const target = frame;
           const index = target.cursor++;

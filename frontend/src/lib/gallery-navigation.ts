@@ -144,3 +144,12 @@ export function saveGalleryRestoreState(
   };
   writeStore(store);
 }
+
+export function clearGalleryRestoreState(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.sessionStorage.removeItem(GALLERY_RESTORE_STORAGE_KEY);
+  } catch {
+    // Ignore restricted storage access.
+  }
+}

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Download, Heart, History, Images, Loader2, Share2 } from 'lucide-react';
+import { Download, Heart, History, Images, Loader2, Share2, Trash2 } from 'lucide-react';
 import { memo } from 'react';
 import { SignInButton } from '@clerk/nextjs';
 import { ReviewGetResponse } from '@/lib/types';
@@ -19,6 +19,7 @@ interface ReviewActionBarProps {
   onFavoriteToggle: () => void;
   onShareLink: () => void;
   onExportSummary: () => void;
+  onDeleteReview?: () => void;
   t: Translator;
 }
 
@@ -35,6 +36,7 @@ export const ReviewActionBar = memo(function ReviewActionBar({
   onFavoriteToggle,
   onShareLink,
   onExportSummary,
+  onDeleteReview,
   t,
 }: ReviewActionBarProps) {
   const galleryState = getGalleryState(review);
@@ -112,6 +114,18 @@ export const ReviewActionBar = memo(function ReviewActionBar({
             <Download size={15} aria-hidden="true" />
             {exportLabel ?? t('review_export_summary')}
           </button>
+          {onDeleteReview && (
+            <button
+              type="button"
+              onClick={onDeleteReview}
+              disabled={actionBusy !== null}
+              aria-busy={actionBusy === 'delete'}
+              className="ui-action-secondary border-rust/35 px-3.5 py-2 text-sm text-rust hover:border-rust hover:bg-rust/10 disabled:opacity-60"
+            >
+              <Trash2 size={15} aria-hidden="true" />
+              {t('delete_review_action')}
+            </button>
+          )}
           </div>
         </>
       )}

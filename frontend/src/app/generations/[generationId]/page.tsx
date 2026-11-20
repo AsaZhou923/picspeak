@@ -4,8 +4,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, CheckCircle2, Copy, Download, ImageIcon, RefreshCw, RotateCcw } from 'lucide-react';
-import { downloadGeneration, getGeneration, reuseGeneration } from '@/lib/api';
+import { ArrowLeft, CheckCircle2, Copy, Download, ImageIcon, RefreshCw, RotateCcw, Trash2 } from 'lucide-react';
+import { deleteGeneration, downloadGeneration, getGeneration, reuseGeneration } from '@/lib/api';
+import { DeleteConfirmDialog } from '@/components/ui/DeleteConfirmDialog';
 import { useAuth } from '@/lib/auth-context';
 import { GeneratedImageDetailResponse } from '@/lib/types';
 import { useI18n } from '@/lib/i18n';
@@ -31,6 +32,7 @@ function GenerationDetail({ generationId }: { generationId: string }) {
   const activeRef = useRef(true);
   const reuseRef = useRef(false);
   const downloadRef = useRef(false);
+  const deleteRef = useRef(false);
   useEffect(() => {
     activeRef.current = true;
     return () => { activeRef.current = false; };
@@ -42,6 +44,9 @@ function GenerationDetail({ generationId }: { generationId: string }) {
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
   const [downloadBusy, setDownloadBusy] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
   const [imageFailed, setImageFailed] = useState(false);
 
   useEffect(() => {
@@ -200,6 +205,36 @@ function GenerationDetail({ generationId }: { generationId: string }) {
     router.push(`/workspace?${params.toString()}`);
   }, [generation, generationId, locale, router]);
 
+  const handleConfirmDelete = useCallback(async () => {
+    if (!generation || deleteRef.current) return;
+    deleteRef.current = true;
+    let deleted = false;
+    const isOwnerCurrent = captureAuthOwner(userInfo?.user_id ?? null);
+    const isCurrent = () => activeRef.current && isOwnerCurrent();
+    setDeleteBusy(true);
+    setDeleteError('');
+    try {
+      const token = await ensureToken();
+      if (!isCurrent()) return;
+      await deleteGeneration(generation.generation_id, token);
+      if (!isCurrent()) return;
+      deleted = true;
+      setDeleteConfirmOpen(false);
+      if (typeof router.replace === 'function') router.replace('/account/generations');
+      else router.push('/account/generations');
+      router.refresh?.();
+    } catch (err) {
+      if (isCurrent()) {
+        setDeleteError(formatUserFacingError(t, err, t('delete_generation_error')));
+      }
+    } finally {
+      if (!deleted) {
+        deleteRef.current = false;
+        if (activeRef.current) setDeleteBusy(false);
+      }
+    }
+  }, [captureAuthOwner, ensureToken, generation, router, t, userInfo?.user_id]);
+
   if (loading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center px-4 py-12 text-center sm:px-6">
@@ -246,6 +281,29 @@ function GenerationDetail({ generationId }: { generationId: string }) {
 
   return (
     <div className="min-h-screen">
+      {deleteConfirmOpen && (
+        <DeleteConfirmDialog
+          label={t('delete_generation_dialog_label')}
+          title={t('delete_generation_dialog_title')}
+          body={t('delete_generation_dialog_body')}
+          consequences={[
+            t('delete_generation_consequence_irreversible'),
+            t('delete_generation_consequence_file'),
+          ]}
+          cancelLabel={t('delete_cancel')}
+          confirmLabel={t('delete_generation_confirm')}
+          busyLabel={t('delete_generation_busy')}
+          busy={deleteBusy}
+          error={deleteError}
+          onClose={() => {
+            if (!deleteBusy) {
+              setDeleteConfirmOpen(false);
+              setDeleteError('');
+            }
+          }}
+          onConfirm={() => void handleConfirmDelete()}
+        />
+      )}
       <div className="mx-auto max-w-workspace px-4 py-8 sm:px-6 sm:py-12">
         <header className="mb-7 flex flex-col gap-5 border-b border-border-subtle pb-6 sm:flex-row sm:items-end sm:justify-between">
           <div>
@@ -389,6 +447,21 @@ function GenerationDetail({ generationId }: { generationId: string }) {
                 <Copy size={15} aria-hidden="true" />
                 {copied ? t('generation_detail_copied_prompt') : t('generation_detail_copy_prompt')}
               </button>
+              <div className="border-t border-border-subtle pt-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDeleteError('');
+                    setDeleteConfirmOpen(true);
+                  }}
+                  disabled={deleteBusy || busy || downloadBusy}
+                  aria-busy={deleteBusy}
+                  className="ui-action-secondary w-full border-rust/35 px-5 text-sm text-rust hover:border-rust hover:bg-rust/10 disabled:pointer-events-none disabled:opacity-50"
+                >
+                  <Trash2 size={15} aria-hidden="true" />
+                  {t('delete_generation_action')}
+                </button>
+              </div>
               {error && <p role="alert" className="rounded-control border border-rust/30 bg-rust/10 px-3 py-2 text-sm text-rust">{error}</p>}
             </div>
           </aside>

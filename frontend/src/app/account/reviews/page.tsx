@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { AlertCircle, ChevronRight, RefreshCw, Repeat2, SlidersHorizontal } from 'lucide-react';
 import {
+  deleteReview,
   getPracticeLegacyComparisons,
   getPracticeSession,
   getPracticeSessions,
@@ -12,6 +13,9 @@ import {
   isAbortError,
   updatePracticeSession,
 } from '@/lib/api';
+import { evictPhotoPreviewCache } from '@/lib/photo-preview-cache';
+import { evictReviewThumbnailCache } from '@/lib/review-thumbnail-cache';
+import { DeleteConfirmDialog } from '@/components/ui/DeleteConfirmDialog';
 import { useAuth } from '@/lib/auth-context';
 import {
   ImageType,
@@ -248,6 +252,10 @@ function ReviewHistorySession() {
   const [visibilityBusy, setVisibilityBusy] = useState(false);
   const [visibilityStatus, setVisibilityStatus] = useState('');
   const [galleryConfirmReviewId, setGalleryConfirmReviewId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ReviewHistoryItem | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+  const [deleteFeedback, setDeleteFeedback] = useState('');
   const practiceListRequestRef = useRef(0);
   const practiceListAbortRef = useRef<AbortController | null>(null);
   const practiceSummaryRequestRef = useRef(0);
@@ -450,6 +458,10 @@ function ReviewHistorySession() {
     setOrganizationStatus('');
     setVisibilityStatus('');
     setGalleryConfirmReviewId(null);
+    setDeleteTarget(null);
+    setDeleteBusy(false);
+    setDeleteError('');
+    setDeleteFeedback('');
     setItems([]);
     setCursor(null);
     setHasMore(false);
@@ -798,6 +810,35 @@ function ReviewHistorySession() {
     }
   };
 
+  const handleConfirmDeleteReview = async () => {
+    const signal = reviewListAbortRef.current?.signal;
+    const target = deleteTarget;
+    if (!signal || signal.aborted || !target || deleteBusy) return;
+    setDeleteBusy(true);
+    setDeleteError('');
+    setDeleteFeedback('');
+    try {
+      const token = await ensureToken();
+      if (signal.aborted) return;
+      await deleteReview(target.review_id, token);
+      void evictReviewThumbnailCache(target.photo_id);
+      void evictPhotoPreviewCache(target.photo_id);
+      if (signal.aborted) return;
+      setItems((prev) => prev.filter((entry) => entry.review_id !== target.review_id));
+      if (selectedReviewIdRef.current === target.review_id) {
+        setReviewVisibility(null);
+        setSelectedReviewId(null);
+      }
+      setDeleteTarget(null);
+      setDeleteFeedback(t('delete_review_done'));
+    } catch (err) {
+      if (signal.aborted || isAbortError(err)) return;
+      setDeleteError(formatUserFacingError(t, err, t('delete_review_error')));
+    } finally {
+      if (!signal.aborted) setDeleteBusy(false);
+    }
+  };
+
   const handlePracticeLoadMore = async () => {
     if (!practiceCursor || practiceLoadingMore) return;
     practiceListAbortRef.current?.abort();
@@ -918,6 +959,31 @@ function ReviewHistorySession() {
           onConfirm={() => void handleAddGallery(galleryConfirmReviewId)}
           actionBusy={visibilityBusy ? 'gallery' : null}
           galleryActionCopy={galleryActionCopy}
+        />
+      )}
+
+      {deleteTarget && (
+        <DeleteConfirmDialog
+          label={t('delete_review_dialog_label')}
+          title={t('delete_review_dialog_title')}
+          body={t('delete_review_dialog_body')}
+          consequences={[
+            t('delete_review_consequence_irreversible'),
+            t('delete_review_consequence_original'),
+            t('delete_review_consequence_public'),
+          ]}
+          cancelLabel={t('delete_cancel')}
+          confirmLabel={t('delete_review_confirm')}
+          busyLabel={t('delete_review_busy')}
+          busy={deleteBusy}
+          error={deleteError}
+          onClose={() => {
+            if (!deleteBusy) {
+              setDeleteTarget(null);
+              setDeleteError('');
+            }
+          }}
+          onConfirm={() => void handleConfirmDeleteReview()}
         />
       )}
 
@@ -1080,6 +1146,12 @@ function ReviewHistorySession() {
               </details>
             </section>
 
+            {deleteFeedback && (
+              <div role="status" className="mb-4 rounded-control border border-sage/25 bg-sage/5 px-4 py-3 text-sm text-sage">
+                {deleteFeedback}
+              </div>
+            )}
+
             {loading ? (
               <ReviewHistorySkeletonList />
             ) : error ? (
@@ -1102,7 +1174,16 @@ function ReviewHistorySession() {
               <>
                 <div className="space-y-3">
                   {items.map((item) => (
-                    <ReviewCard key={item.review_id} item={item} />
+                    <ReviewCard
+                      key={item.review_id}
+                      item={item}
+                      deleteBusy={deleteBusy}
+                      onDelete={(target) => {
+                        setDeleteError('');
+                        setDeleteFeedback('');
+                        setDeleteTarget(target);
+                      }}
+                    />
                   ))}
                 </div>
 

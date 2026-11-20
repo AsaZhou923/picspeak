@@ -308,6 +308,28 @@ h3 {
     transform: translateY(-2px);
   }
 
+  .ui-action-destructive {
+    display: inline-flex;
+    min-height: 2.75rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 999px;
+    background: rgb(var(--color-rust));
+    color: rgb(var(--color-action-ink));
+    font-weight: 600;
+    transition: opacity 180ms ease, transform 180ms ease;
+  }
+
+  .ui-action-destructive:hover {
+    opacity: 0.92;
+    transform: translateY(-2px);
+  }
+
+  .ui-action-destructive:active {
+    transform: translateY(0) scale(0.98);
+  }
+
   /* A slip of photo paper: stays light on any background. */
   .ui-paper {
     --color-ink: 28 24 20;

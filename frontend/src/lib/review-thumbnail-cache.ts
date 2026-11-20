@@ -10,8 +10,18 @@ const MAX_CONCURRENT_LOADS = 4;
 
 const objectUrlCache = new Map<string, string>();
 const pendingLoads = new Map<string, Promise<string | null>>();
+const photoEvictionEpochs = new Map<string, number>();
 const taskQueue: Array<() => void> = [];
 let activeLoads = 0;
+let clearAllEpoch = 0;
+
+function getPhotoEvictionEpoch(photoId: string): number {
+  return photoEvictionEpochs.get(photoId) ?? 0;
+}
+
+function isPhotoEpochCurrent(photoId: string, clearSnap: number, photoSnap: number): boolean {
+  return clearAllEpoch === clearSnap && getPhotoEvictionEpoch(photoId) === photoSnap;
+}
 
 function getEntryKey(photoId: string, size: number): string {
   return `${photoId}:${size}`;
@@ -174,12 +184,19 @@ export async function getReviewThumbnailSrc(
   sourceIsThumbnail = false
 ): Promise<string | null> {
   const entryKey = getEntryKey(photoId, size);
+  const clearSnap = clearAllEpoch;
+  const photoSnap = getPhotoEvictionEpoch(photoId);
+  const isCurrent = () => isPhotoEpochCurrent(photoId, clearSnap, photoSnap);
+
   const memoryUrl = objectUrlCache.get(entryKey);
   if (memoryUrl) {
     return memoryUrl;
   }
 
   const cachedBlob = await readCachedBlob(photoId, size);
+  if (!isCurrent()) {
+    return null;
+  }
   if (cachedBlob) {
     return rememberObjectUrl(entryKey, cachedBlob);
   }
@@ -190,7 +207,14 @@ export async function getReviewThumbnailSrc(
   }
 
   const loadPromise = runWithQueue(async () => {
+    if (!isCurrent()) {
+      return null;
+    }
+
     const warmBlob = await readCachedBlob(photoId, size);
+    if (!isCurrent()) {
+      return null;
+    }
     if (warmBlob) {
       return rememberObjectUrl(entryKey, warmBlob);
     }
@@ -199,18 +223,37 @@ export async function getReviewThumbnailSrc(
       credentials: 'include',
       mode: 'cors',
     });
+    if (!isCurrent()) {
+      return null;
+    }
     if (!response.ok) {
       throw new Error(`thumbnail request failed: ${response.status}`);
     }
 
     const sourceBlob = await response.blob();
+    if (!isCurrent()) {
+      return null;
+    }
     const thumbnailBlob = sourceIsThumbnail
       ? sourceBlob
       : await createThumbnailBlob(sourceBlob, size);
+    if (!isCurrent()) {
+      return null;
+    }
     await persistCachedBlob(photoId, size, thumbnailBlob);
+    if (!isCurrent()) {
+      const cache = await openThumbnailCache();
+      if (cache) {
+        await cache.delete(getCacheRequest(photoId, size));
+      }
+      return null;
+    }
     return rememberObjectUrl(entryKey, thumbnailBlob);
   })
     .catch((error: unknown) => {
+      if (!isCurrent()) {
+        return null;
+      }
       logClientWarning('Review thumbnail load failed', {
         photoId,
         size,
@@ -219,14 +262,44 @@ export async function getReviewThumbnailSrc(
       return null;
     })
     .finally(() => {
-      pendingLoads.delete(entryKey);
+      if (pendingLoads.get(entryKey) === loadPromise) {
+        pendingLoads.delete(entryKey);
+      }
     });
 
   pendingLoads.set(entryKey, loadPromise);
   return loadPromise;
 }
 
+export async function evictReviewThumbnailCache(photoId: string): Promise<void> {
+  if (!photoId) return;
+  photoEvictionEpochs.set(photoId, getPhotoEvictionEpoch(photoId) + 1);
+  const prefix = `${photoId}:`;
+  objectUrlCache.forEach((objectUrl, key) => {
+    if (key.startsWith(prefix)) {
+      URL.revokeObjectURL(objectUrl);
+      objectUrlCache.delete(key);
+    }
+  });
+  pendingLoads.forEach((_promise, key) => {
+    if (key.startsWith(prefix)) {
+      pendingLoads.delete(key);
+    }
+  });
+
+  const cache = await openThumbnailCache();
+  if (!cache) return;
+  const encodedPrefix = `${CACHE_PATH}${encodeURIComponent(photoId)}`;
+  const requests = await cache.keys();
+  await Promise.all(
+    requests
+      .filter((req) => new URL(req.url).pathname === encodedPrefix)
+      .map((req) => cache.delete(req))
+  );
+}
+
 export async function clearReviewThumbnailCache(): Promise<void> {
+  clearAllEpoch += 1;
   objectUrlCache.forEach((objectUrl) => {
     URL.revokeObjectURL(objectUrl);
   });

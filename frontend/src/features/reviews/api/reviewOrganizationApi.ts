@@ -96,7 +96,7 @@ export async function getOrganizedMyReviews(
   query: OrganizedReviewHistoryQuery = {},
   signal?: AbortSignal,
 ): Promise<ReviewHistoryResponse> {
-  return request<ReviewHistoryResponse>(buildOrganizedReviewHistoryPath(query), { token, signal });
+  return request<ReviewHistoryResponse>(buildOrganizedReviewHistoryPath(query), { token, signal, cache: 'no-store' });
 }
 
 export async function updateOrganizedReviewMeta(
