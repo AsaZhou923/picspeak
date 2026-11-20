@@ -39,7 +39,7 @@ const LEGAL_COPY: Record<LegalPageKind, Record<Locale, LegalCopy>> = {
       intro:
         'How PicSpeak handles photos, prompts, generation records, account data, payments, analytics, and support requests.',
       updatedLabel: 'Last updated',
-      updatedAt: 'November 13, 2026',
+      updatedAt: 'November 20, 2026',
       summaryTitle: 'At a glance',
       summaryItems: [
         'Uploaded photos and prompts are used to provide the critique or AI reference you request.',
@@ -81,6 +81,7 @@ const LEGAL_COPY: Record<LegalPageKind, Record<Locale, LegalCopy>> = {
           body: [
             'Retention depends on the workflow and plan. Guest results are designed for short-lived use, Free history may be limited, and Pro history may be retained so long as the account remains active and the feature is available.',
             'You can delete your critiques and generated images directly from their own detail or history pages.',
+            'API request logs retain technical metadata (request path, status code, timing, user agent, account identifier, and a coarsened IP prefix) for 30 days by default and do not store request bodies.',
             'You can contact us to request access, correction, deletion, or account help. Some records may be retained when needed for security, fraud prevention, legal, accounting, or dispute-resolution reasons.',
           ],
         },
@@ -111,7 +112,7 @@ const LEGAL_COPY: Record<LegalPageKind, Record<Locale, LegalCopy>> = {
       intro:
         '说明 PicSpeak 在你使用 AI 摄影点评、AI Create、账号、支付、分析和客服功能时如何处理相关数据。',
       updatedLabel: '最后更新',
-      updatedAt: '2026 年 11 月 13 日',
+      updatedAt: '2026 年 11 月 20 日',
       summaryTitle: '快速了解',
       summaryItems: [
         '你上传的照片和输入的提示词会用于完成你发起的 AI 点评或 AI 参考图生成请求。',
@@ -153,6 +154,7 @@ const LEGAL_COPY: Record<LegalPageKind, Record<Locale, LegalCopy>> = {
           body: [
             '保留时间取决于使用流程和套餐。游客结果面向短期使用，Free 历史可能受时间限制，Pro 历史可能在账号仍有效且功能可用时持续保留。',
             '你可以直接在点评或生成图页面自行删除对应内容。',
+            'API 请求日志默认保留 30 天的技术元数据（请求路径、状态码、耗时、User-Agent、账号标识以及截断后的 IP 前缀），不保存请求正文。',
             '你可以联系我们提出访问、更正、删除或账号处理请求。出于安全、防欺诈、法律、会计或争议处理需要，部分记录可能需要继续保留。',
           ],
         },
@@ -183,7 +185,7 @@ const LEGAL_COPY: Record<LegalPageKind, Record<Locale, LegalCopy>> = {
       intro:
         'PicSpeak が AI 写真講評、AI Create、アカウント、決済、分析、サポート機能で扱うデータについて説明します。',
       updatedLabel: '最終更新',
-      updatedAt: '2026年11月13日',
+      updatedAt: '2026年11月20日',
       summaryTitle: '要点',
       summaryItems: [
         'アップロードした写真と prompt は、依頼した講評または AI 参考画像の生成に使われます。',
@@ -225,6 +227,7 @@ const LEGAL_COPY: Record<LegalPageKind, Record<Locale, LegalCopy>> = {
           body: [
             '保存期間はワークフローとプランによって異なります。ゲスト結果は短期利用向け、Free 履歴は期間制限があり、Pro 履歴はアカウントが有効で機能が提供されている間保持されることがあります。',
             '講評や生成画像は、それぞれのページからご自身で削除できます。',
+            'API リクエストログは、技術的なメタデータ（リクエストパス、ステータスコード、処理時間、User-Agent、アカウント識別子、粗粒化した IP プレフィックス）を標準で 30 日間保持し、リクエスト本文は保存しません。',
             'アクセス、修正、削除、アカウントに関する依頼はメールで連絡できます。安全、不正防止、法令、会計、紛争対応のために一部記録を保持する場合があります。',
           ],
         },

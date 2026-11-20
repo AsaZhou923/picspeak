@@ -181,6 +181,9 @@ test('gallery submission copy discloses search indexing in every locale', () => 
   assert.match(legal, /Share-link pages are not submitted for indexing/);
   assert.match(legal, /分享链接页面不会提交给搜索引擎/);
   assert.match(legal, /共有リンクのページは検索エンジンに送信されません/);
+  assert.match(legal, /30 days by default and do not store request bodies/);
+  assert.match(legal, /默认保留 30 天的技术元数据.*不保存请求正文/);
+  assert.match(legal, /標準で 30 日間保持し、リクエスト本文は保存しません/);
 });
 
 test('public critique dimensions use the same names, format and colours as the owner view', () => {
