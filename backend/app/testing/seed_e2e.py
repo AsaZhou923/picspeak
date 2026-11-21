@@ -9,8 +9,10 @@ from pathlib import Path
 from typing import Any
 
 from botocore.exceptions import ClientError
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 
-from app.core.config import settings
+from app.core.config import is_local_database_url, settings
 from app.core.security import create_access_token
 from app.db.models import (
     Photo,
@@ -51,6 +53,42 @@ E2E_USER_USERNAME = 'e2e_photographer'
 E2E_GALLERY_PHOTO_PUBLIC_ID = 'pho_e2e_gallery01'
 E2E_GALLERY_REVIEW_PUBLIC_ID = 'rev_e2e_gallery01'
 E2E_GALLERY_SCORE = 8.4
+E2E_DB_MARKER_TABLE = '_picspeak_e2e_disposable_marker'
+E2E_DB_MARKER_VALUE = 'picspeak-e2e-smoke'
+
+
+def _assert_disposable_e2e_database(db) -> None:
+    """Refuse to seed unless the connected DB is local and carries the runner's disposable marker."""
+    assert_e2e_fake_ai_allowed()
+    bind = db.get_bind()
+    bind_url = getattr(bind, 'url', None)
+    if bind_url is not None and not is_local_database_url(bind_url.render_as_string(hide_password=False)):
+        raise RuntimeError(
+            'Refusing to seed E2E fixtures: bound database engine does not target SQLite or a loopback host'
+        )
+    try:
+        marker_row = db.execute(
+            text(f'SELECT marker FROM {E2E_DB_MARKER_TABLE} WHERE marker = :marker LIMIT 1'),
+            {'marker': E2E_DB_MARKER_VALUE},
+        ).first()
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise RuntimeError(
+            f'Refusing to seed E2E fixtures: missing disposable database marker table {E2E_DB_MARKER_TABLE}. '
+            'Run via scripts/run_e2e_smoke.mjs against a disposable E2E database.'
+        ) from exc
+    if marker_row is None:
+        raise RuntimeError(
+            f'Refusing to seed E2E fixtures: disposable database marker {E2E_DB_MARKER_VALUE!r} not found.'
+        )
+
+
+def _issue_e2e_registered_jwt(user: User) -> str:
+    assert_e2e_fake_ai_allowed()
+    return create_access_token(
+        {'sub': user.public_id, 'plan': user.plan.value},
+        ttl_seconds=3600,
+    )
 
 
 def ensure_storage_bucket() -> None:
@@ -102,14 +140,19 @@ def _upload_seeded_gallery_assets() -> tuple[str, str, bytes]:
 
 def seed_e2e_fixtures(*, reset_guest_limits: bool = False) -> dict[str, Any]:
     assert_e2e_fake_ai_allowed()
-    ensure_storage_bucket()
-    original_key, thumbnail_key, original_bytes = _upload_seeded_gallery_assets()
 
     now = datetime.now(timezone.utc)
     db = SessionLocal()
     try:
+        _assert_disposable_e2e_database(db)
+        ensure_storage_bucket()
+        original_key, thumbnail_key, original_bytes = _upload_seeded_gallery_assets()
+
         if reset_guest_limits:
-            db.query(RateLimitCounter).delete(synchronize_session=False)
+            # Scoped strictly to guest rate-limit/quota counters inside the marked disposable DB.
+            db.query(RateLimitCounter).filter(
+                RateLimitCounter.scope.like('guest_%')
+            ).delete(synchronize_session=False)
 
         user = db.query(User).filter(User.public_id == E2E_USER_PUBLIC_ID).first()
         if user is None:
@@ -271,10 +314,7 @@ def seed_e2e_fixtures(*, reset_guest_limits: bool = False) -> dict[str, Any]:
 
         db.commit()
 
-        access_token = create_access_token(
-            {'sub': user.public_id, 'plan': user.plan.value},
-            ttl_seconds=3600,
-        )
+        access_token = _issue_e2e_registered_jwt(user)
         return {
             'registered_user': {
                 'access_token': access_token,
