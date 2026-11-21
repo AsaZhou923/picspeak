@@ -1,16 +1,21 @@
+import os
 import sys
 import unittest
 from io import BytesIO
 from pathlib import Path
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 from PIL import Image
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-from app.core.config import Settings, settings
+from app.core.config import Settings, is_local_database_url, settings
+from app.db.models import UserPlan
 from app.services.ai import (
     _run_canonical_scoring,
     _run_openai_review,
@@ -24,6 +29,7 @@ from app.testing.fakes import (
     FakeImageGenerationClient,
     assert_e2e_fake_ai_allowed,
 )
+from app.testing.seed_e2e import _issue_e2e_registered_jwt, seed_e2e_fixtures
 
 
 class E2EFakeGuardTestCase(unittest.TestCase):
@@ -63,13 +69,67 @@ class E2EFakeGuardTestCase(unittest.TestCase):
             'postgresql+psycopg2://postgres:postgres@10.0.0.12:5432/picspeak',
             'postgresql+psycopg2://postgres:postgres@localhost.evil.example:5432/picspeak',
             'postgresql+psycopg2://localhost:secret@prod-db.example.com:5432/picspeak',
+            'postgresql+psycopg2://postgres:postgres@/picspeak',
             'postgresql+psycopg2://postgres:postgres@/picspeak?host=/cloudsql/proj:region:inst',
             'postgresql+psycopg2://postgres:postgres@127.0.0.1:5432/picspeak?host=prod-db.internal',
             'postgresql+psycopg2://postgres:postgres@127.0.0.1:5432/picspeak?host=127.0.0.1,prod-db.internal',
+            'postgresql+psycopg2://postgres:postgres@localhost:5432/picspeak?hostaddr=10.0.0.5',
+            'postgresql+psycopg2://postgres:postgres@localhost:5432/picspeak?hostaddr=127.0.0.1,10.0.0.5',
+            'postgresql+psycopg2://postgres:postgres@127.0.0.1:5432/picspeak?service=prod',
+            'postgresql+psycopg2://postgres:postgres@127.0.0.1:5432/picspeak?servicefile=/etc/pg_service.conf',
             '',
         ):
             with self.subTest(database_url=db_url), self.assertRaises(ValueError):
                 self._settings(app_env='dev', database_url=db_url, e2e_fake_ai_enabled=True)
+
+    def test_locality_guard_rejects_non_loopback_pg_env_overrides(self) -> None:
+        local_pg = 'postgresql+psycopg2://postgres:postgres@127.0.0.1:5432/picspeak_e2e'
+        self.assertTrue(is_local_database_url(local_pg, environ={}))
+        self.assertTrue(is_local_database_url(local_pg, environ={'PGHOST': '127.0.0.1', 'PGHOSTADDR': '127.0.0.1'}))
+        self.assertTrue(
+            is_local_database_url(
+                'postgresql+psycopg2://postgres:postgres@localhost:5432/picspeak_e2e?hostaddr=127.0.0.1',
+                environ={},
+            )
+        )
+
+        for bad_env in (
+            {'PGHOST': 'prod-db.internal'},
+            {'PGHOST': '127.0.0.1,prod-db.internal'},
+            {'PGHOST': '/cloudsql/proj:region:inst'},
+            {'PGHOSTADDR': '10.0.0.5'},
+            {'PGHOSTADDR': '127.0.0.1,10.0.0.5'},
+            {'PGSERVICE': 'prod'},
+            {'PGSERVICEFILE': '/tmp/pg_service.conf'},
+        ):
+            with self.subTest(env=bad_env):
+                self.assertFalse(is_local_database_url(local_pg, environ=bad_env))
+                with patch.dict(os.environ, bad_env, clear=False):
+                    with self.assertRaises(ValueError):
+                        self._settings(app_env='dev', database_url=local_pg, e2e_fake_ai_enabled=True)
+                    with (
+                        patch.object(settings, 'app_env', 'dev'),
+                        patch.object(settings, 'e2e_fake_ai_enabled', True),
+                        patch.object(settings, 'database_url', local_pg),
+                    ):
+                        with self.assertRaises(RuntimeError):
+                            assert_e2e_fake_ai_allowed()
+                        with self.assertRaises(RuntimeError):
+                            _issue_e2e_registered_jwt(SimpleNamespace(public_id='usr_test', plan=UserPlan.free))
+
+    def test_seed_e2e_refuses_without_disposable_database_marker(self) -> None:
+        memory_engine = create_engine('sqlite:///:memory:')
+        memory_session = sessionmaker(bind=memory_engine, autoflush=False, autocommit=False)
+        with (
+            patch.object(settings, 'app_env', 'dev'),
+            patch.object(settings, 'e2e_fake_ai_enabled', True),
+            patch.object(settings, 'database_url', 'sqlite:///:memory:'),
+            patch('app.testing.seed_e2e.SessionLocal', memory_session),
+            patch('app.testing.seed_e2e.ensure_storage_bucket', MagicMock()) as ensure_bucket,
+        ):
+            with self.assertRaisesRegex(RuntimeError, '_picspeak_e2e_disposable_marker'):
+                seed_e2e_fixtures(reset_guest_limits=True)
+            ensure_bucket.assert_not_called()
 
     def test_runtime_guard_refuses_when_app_env_is_production(self) -> None:
         with (
@@ -89,6 +149,8 @@ class E2EFakeGuardTestCase(unittest.TestCase):
             'postgresql+psycopg2://postgres:postgres@prod-db.internal:5432/picspeak',
             'postgresql+psycopg2://postgres:postgres@/picspeak?host=/cloudsql/proj:region:inst',
             'postgresql+psycopg2://postgres:postgres@127.0.0.1:5432/picspeak?host=prod-db.internal',
+            'postgresql+psycopg2://postgres:postgres@localhost:5432/picspeak?hostaddr=10.0.0.5',
+            'postgresql+psycopg2://postgres:postgres@127.0.0.1:5432/picspeak?service=prod',
         ):
             with (
                 self.subTest(database_url=db_url),
@@ -102,6 +164,10 @@ class E2EFakeGuardTestCase(unittest.TestCase):
                     run_ai_review('flash', image_url='http://127.0.0.1:9000/test.jpg', review_model='gpt-6-sol')
                 with self.assertRaises(RuntimeError):
                     FakeImageGenerationClient()
+                with self.assertRaises(RuntimeError):
+                    seed_e2e_fixtures()
+                with self.assertRaises(RuntimeError):
+                    _issue_e2e_registered_jwt(SimpleNamespace(public_id='usr_test', plan=UserPlan.free))
 
     def test_runtime_guard_refuses_when_flag_is_false(self) -> None:
         with (

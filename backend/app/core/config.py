@@ -1,4 +1,6 @@
 import json
+import os
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -10,10 +12,33 @@ from sqlalchemy.exc import ArgumentError
 REPO_ROOT = Path(__file__).resolve().parents[3]
 BACKEND_ROOT = REPO_ROOT / 'backend'
 _LOOPBACK_DB_HOSTS = frozenset({'localhost', '127.0.0.1', '::1'})
+_LOOPBACK_DB_ADDRS = frozenset({'127.0.0.1', '::1'})
 
 
-def is_local_database_url(database_url: str) -> bool:
-    """Return True only when database_url targets SQLite or a loopback host."""
+def _parse_libpq_host_values(raw_values: list[str]) -> list[str] | None:
+    hosts: list[str] = []
+    for raw in raw_values:
+        text = str(raw or '')
+        parts = text.split(',')
+        if any(not part.strip() for part in parts):
+            return None
+        for part in parts:
+            hosts.append(part.strip().strip('[]').lower())
+    return hosts or None
+
+
+def is_local_database_url(
+    database_url: str,
+    *,
+    environ: Mapping[str, str] | None = None,
+) -> bool:
+    """Return True only when the effective DB destination is SQLite or loopback.
+
+    In addition to the URL authority host, checks libpq query parameters
+    (``host``, ``hostaddr``, ``service``, ``servicefile``) and environment
+    overrides (``PGHOST``, ``PGHOSTADDR``, ``PGSERVICE``, ``PGSERVICEFILE``)
+    so a local-looking URL cannot be silently redirected to a remote server.
+    """
     raw = str(database_url or '').strip()
     if not raw:
         return False
@@ -26,22 +51,57 @@ def is_local_database_url(database_url: str) -> bool:
     if backend == 'sqlite':
         return True
 
-    # libpq allows ?host=... (including comma-separated hosts or Unix socket
-    # paths such as /cloudsql/...) to override the URL host; reject unless every
-    # host entry is strictly loopback.
-    query_host = parsed.query.get('host')
-    if query_host is not None:
-        raw_entries = query_host if isinstance(query_host, (list, tuple)) else [query_host]
-        hosts = [
-            part.strip().strip('[]').lower()
-            for entry in raw_entries
-            for part in str(entry).split(',')
-            if part.strip()
-        ]
-        return bool(hosts) and all(host in _LOOPBACK_DB_HOSTS for host in hosts)
+    env = os.environ if environ is None else environ
+    for service_env in ('PGSERVICE', 'PGSERVICEFILE'):
+        if str(env.get(service_env) or '').strip():
+            return False
 
-    host = (parsed.host or '').strip().strip('[]').lower()
-    return host in _LOOPBACK_DB_HOSTS
+    raw_pghost = env.get('PGHOST')
+    if raw_pghost is not None and str(raw_pghost).strip():
+        env_hosts = _parse_libpq_host_values([str(raw_pghost)])
+        if not env_hosts or not all(host in _LOOPBACK_DB_HOSTS for host in env_hosts):
+            return False
+
+    raw_pghostaddr = env.get('PGHOSTADDR')
+    if raw_pghostaddr is not None and str(raw_pghostaddr).strip():
+        env_addrs = _parse_libpq_host_values([str(raw_pghostaddr)])
+        if not env_addrs or not all(addr in _LOOPBACK_DB_ADDRS for addr in env_addrs):
+            return False
+
+    lowered_query: dict[str, list[str]] = {}
+    for key, value in parsed.query.items():
+        lower_key = str(key).strip().lower()
+        entries = list(value) if isinstance(value, (list, tuple)) else [value]
+        lowered_query.setdefault(lower_key, []).extend(str(item) for item in entries)
+
+    if any(
+        str(val).strip()
+        for key in ('service', 'servicefile')
+        for val in lowered_query.get(key, [])
+    ):
+        return False
+
+    has_explicit_target = False
+
+    if parsed.host is not None and str(parsed.host).strip():
+        has_explicit_target = True
+        authority_host = str(parsed.host).strip().strip('[]').lower()
+        if authority_host not in _LOOPBACK_DB_HOSTS:
+            return False
+
+    if 'host' in lowered_query:
+        has_explicit_target = True
+        query_hosts = _parse_libpq_host_values(lowered_query['host'])
+        if not query_hosts or not all(host in _LOOPBACK_DB_HOSTS for host in query_hosts):
+            return False
+
+    if 'hostaddr' in lowered_query:
+        has_explicit_target = True
+        query_addrs = _parse_libpq_host_values(lowered_query['hostaddr'])
+        if not query_addrs or not all(addr in _LOOPBACK_DB_ADDRS for addr in query_addrs):
+            return False
+
+    return has_explicit_target
 
 
 class Settings(BaseSettings):
