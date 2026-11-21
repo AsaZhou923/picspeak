@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-11-21-pages-work-when-sign-in-is-blocked",
+    "date": "2026-11-21",
+    "showPopup": false,
+    "title": "登录服务受阻时照常浏览，安全与发布更可靠",
+    "summary": "登录服务连不上时页面依然可以打开，字体改由 PicSpeak 自己提供，同时加强隐私与安全保护，让每次更新上线更稳。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-11-21-pages-work-when-sign-in-is-blocked",
+    "sections": [
+      {
+        "title": "浏览体验",
+        "items": [
+          "登录服务无法连接时（例如被内容拦截插件屏蔽），已登录访客仍能打开页面，并看到“登录暂时不可用”提示和重试按钮，不再出现加载失败的页面。",
+          "网页字体全部由 PicSpeak 自己保存和提供，发布时不再依赖外部字体服务。"
+        ]
+      },
+      {
+        "title": "安全与稳定",
+        "items": [
+          "收紧网页安全策略；浏览器出错时通过 PicSpeak 自己的通道记录，并去掉链接里的敏感参数。",
+          "接口出错时只显示通用提示，不再带出内部错误细节。",
+          "只有正式主线版本才能上线，并增加服务就绪检查和后台任务排队监控，问题能更早被发现。"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-11-20-easier-management-and-reliable-sign-in",
     "date": "2026-11-20",
     "showPopup": false,

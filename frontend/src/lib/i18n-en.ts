@@ -297,8 +297,8 @@ export const enTranslations = {
     pro_offer_label: '',
     pro_offer_highlight: 'Pro',
     updates_label: 'Updates',
-    updates_hint_home: "Easier photo management and more reliable sign-in",
-    updates_hint_latest: "Easier photo management and more reliable sign-in",
+    updates_hint_home: "Pages keep working when sign-in is blocked",
+    updates_hint_latest: "Pages keep working when sign-in is blocked",
     contact_label: 'Contact',
     contact_headline: 'Get in Touch',
 

@@ -1,5 +1,30 @@
 [
   {
+    "id": "2026-11-21-pages-work-when-sign-in-is-blocked",
+    "date": "2026-11-21",
+    "showPopup": false,
+    "title": "Pages keep working when sign-in is blocked",
+    "summary": "Pages now open even when the sign-in service can't be reached, fonts come from PicSpeak itself, and privacy, security and release checks are stronger.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-11-21-pages-work-when-sign-in-is-blocked",
+    "sections": [
+      {
+        "title": "Browsing",
+        "items": [
+          "If the sign-in service can't be reached, for example because a content blocker stops it, signed-in visitors still see the page with a \"sign-in temporarily unavailable\" notice and a retry button instead of a failed page.",
+          "All web fonts are stored and served by PicSpeak, so releases no longer depend on an outside font service."
+        ]
+      },
+      {
+        "title": "Security and reliability",
+        "items": [
+          "A tighter browser security policy, with browser errors reported through PicSpeak's own channel and sensitive link parameters removed.",
+          "When a request fails, you see a plain message rather than internal error details.",
+          "Only the main release version can go live, and new readiness and task-backlog checks help us spot problems sooner."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-11-20-easier-management-and-reliable-sign-in",
     "date": "2026-11-20",
     "showPopup": false,
