@@ -4,9 +4,44 @@ from typing import Annotated, Any
 
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+from sqlalchemy.engine.url import make_url
+from sqlalchemy.exc import ArgumentError
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 BACKEND_ROOT = REPO_ROOT / 'backend'
+_LOOPBACK_DB_HOSTS = frozenset({'localhost', '127.0.0.1', '::1'})
+
+
+def is_local_database_url(database_url: str) -> bool:
+    """Return True only when database_url targets SQLite or a loopback host."""
+    raw = str(database_url or '').strip()
+    if not raw:
+        return False
+    try:
+        parsed = make_url(raw)
+    except (ArgumentError, ValueError):
+        return False
+
+    backend = (parsed.drivername or '').split('+', 1)[0].strip().lower()
+    if backend == 'sqlite':
+        return True
+
+    # libpq allows ?host=... (including comma-separated hosts or Unix socket
+    # paths such as /cloudsql/...) to override the URL host; reject unless every
+    # host entry is strictly loopback.
+    query_host = parsed.query.get('host')
+    if query_host is not None:
+        raw_entries = query_host if isinstance(query_host, (list, tuple)) else [query_host]
+        hosts = [
+            part.strip().strip('[]').lower()
+            for entry in raw_entries
+            for part in str(entry).split(',')
+            if part.strip()
+        ]
+        return bool(hosts) and all(host in _LOOPBACK_DB_HOSTS for host in hosts)
+
+    host = (parsed.host or '').strip().strip('[]').lower()
+    return host in _LOOPBACK_DB_HOSTS
 
 
 class Settings(BaseSettings):
@@ -322,8 +357,14 @@ class Settings(BaseSettings):
         normalized_env = self.app_env.strip().lower()
         is_dev = normalized_env == 'dev'
 
-        if self.e2e_fake_ai_enabled and normalized_env in {'production', 'prod'}:
-            raise ValueError('E2E_FAKE_AI_ENABLED cannot be enabled when APP_ENV=production')
+        if self.e2e_fake_ai_enabled:
+            if normalized_env in {'production', 'prod'}:
+                raise ValueError('E2E_FAKE_AI_ENABLED cannot be enabled when APP_ENV=production')
+            if not is_local_database_url(self.database_url):
+                raise ValueError(
+                    'E2E_FAKE_AI_ENABLED requires DATABASE_URL to use SQLite or a loopback host '
+                    '(localhost, 127.0.0.1, ::1)'
+                )
 
         # Validate app_secret strength in non-dev environments.
         _insecure_app_secrets = {'', 'change-me', 'picspeakt123'}

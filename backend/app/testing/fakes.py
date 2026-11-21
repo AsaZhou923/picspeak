@@ -5,7 +5,7 @@ from typing import Any, Callable
 
 from PIL import Image, ImageDraw
 
-from app.core.config import settings
+from app.core.config import is_local_database_url, settings
 from app.schemas import ReviewResult
 from app.services.ai import (
     AIReviewResponse,
@@ -36,12 +36,18 @@ E2E_FAKE_FINAL_SCORE: float = 7.8
 
 
 def assert_e2e_fake_ai_allowed() -> None:
-    """Refuse to run E2E fakes in production or when explicitly disabled."""
+    """Refuse to run E2E fakes in production, against non-local DBs, or when disabled."""
     normalized_env = str(getattr(settings, 'app_env', '') or '').strip().lower()
     if normalized_env in _FORBIDDEN_ENVIRONMENTS:
         raise RuntimeError('E2E fake AI clients cannot be used when APP_ENV=production')
     if not bool(getattr(settings, 'e2e_fake_ai_enabled', False)):
         raise RuntimeError('E2E fake AI clients require E2E_FAKE_AI_ENABLED=true')
+    database_url = str(getattr(settings, 'database_url', '') or '')
+    if not is_local_database_url(database_url):
+        raise RuntimeError(
+            'E2E fake AI clients require DATABASE_URL to use SQLite or a loopback host '
+            '(localhost, 127.0.0.1, ::1)'
+        )
 
 
 def fake_score_evidence() -> dict[str, Any]:
