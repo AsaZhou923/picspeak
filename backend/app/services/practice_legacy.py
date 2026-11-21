@@ -87,11 +87,11 @@ def list_legacy_retake_comparisons(
             Review.source_review_id.isnot(None),
             func.jsonb_typeof(comparison) == 'object',
             or_(
-                ~Review.result_json.op('?')('goal_assessment'),
+                ~Review.result_json.has_key('goal_assessment'),
                 func.jsonb_typeof(top_goal_assessment) == 'null',
             ),
             or_(
-                ~comparison.op('?')('goal_assessment'),
+                ~comparison.has_key('goal_assessment'),
                 func.jsonb_typeof(nested_goal_assessment) == 'null',
             ),
             PracticeAttempt.id.is_(None),
