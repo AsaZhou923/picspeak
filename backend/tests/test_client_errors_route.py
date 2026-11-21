@@ -102,10 +102,21 @@ class ClientErrorsRouteTests(unittest.TestCase):
                 }
             },
         )
+        # Key fields survive plain (non-JSON) log formatting inside the message itself.
+        message = record.getMessage()
+        prefix = 'Client error reported '
+        self.assertTrue(message.startswith(prefix))
+        summary = json.loads(message[len(prefix):])
+        self.assertEqual(summary['kind'], 'error')
+        self.assertEqual(summary['url'], 'https://www.picspeak.art/share/[redacted]?mode=flash')
+        self.assertEqual(summary['release'], 'sha-abc1234')
+        self.assertEqual(summary['message'], getattr(record, 'error_message', None))
+        self.assertIn('[redacted]', summary['stack'])
+
         all_logged = ' '.join(
             str(getattr(record, attr, ''))
             for attr in ('error_message', 'stack', 'url', 'source', 'referrer')
-        )
+        ) + ' ' + message
         for secret in (
             'shr_source_secret',
             'src_code',
@@ -448,6 +459,52 @@ class ClientErrorsRouteTests(unittest.TestCase):
         self.assertEqual(too_large.json()['error']['code'], 'REQUEST_TOO_LARGE')
         self.assertEqual(invalid_kind.status_code, 422)
         self.assertEqual(missing_msg.status_code, 422)
+
+    def test_expected_csp_traffic_cannot_exhaust_js_error_budget(self) -> None:
+        expected_inline = {
+            'csp-report': {
+                'document-uri': 'https://www.picspeak.art/en',
+                'effective-directive': 'script-src-elem',
+                'blocked-uri': 'inline',
+                'disposition': 'report',
+            }
+        }
+        long_stack = 'Error: boom\n' + '\n'.join(f'    at frame{i} (https://www.picspeak.art/app.js:{i}:1)' for i in range(200))
+        with (
+            patch.dict(os.environ, {}, clear=False),
+            patch('app.main._schedule_audit_task'),
+            patch('app.main.worker.start'),
+            patch('app.main.worker.stop'),
+            self.assertLogs('app.api.routers.client_errors', level='WARNING') as captured,
+        ):
+            os.environ.pop('CLIENT_ERROR_RATE_LIMIT_PER_MINUTE', None)
+            with TestClient(app) as client:
+                csp_statuses = [
+                    client.post(
+                        '/api/v1/client-errors',
+                        headers={'Content-Type': 'application/csp-report'},
+                        content=json.dumps(expected_inline),
+                    ).status_code
+                    for _ in range(30)
+                ]
+                csp_over_budget = client.post(
+                    '/api/v1/client-errors',
+                    headers={'Content-Type': 'application/csp-report'},
+                    content=json.dumps(expected_inline),
+                )
+                js_error = client.post(
+                    '/api/v1/client-errors',
+                    json={'kind': 'error', 'message': 'after csp burst', 'stack': long_stack},
+                )
+
+        self.assertEqual(csp_statuses, [202] * 30)
+        self.assertEqual(get_dropped_expected_csp_count(), 30)
+        self.assertEqual(csp_over_budget.status_code, 429)
+        self.assertEqual(js_error.status_code, 202)
+        self.assertEqual(len(captured.records), 1)
+        summary = json.loads(captured.records[0].getMessage().removeprefix('Client error reported '))
+        self.assertEqual(summary['message'], 'after csp burst')
+        self.assertLessEqual(len(summary['stack']), client_errors.LOG_MESSAGE_STACK_CHARS + len('...<truncated>'))
 
     def test_rate_limits_per_ip_without_db_and_allows_cors_preflight(self) -> None:
         with (

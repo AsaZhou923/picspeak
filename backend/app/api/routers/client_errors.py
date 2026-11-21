@@ -36,6 +36,8 @@ ALLOWED_CONTENT_TYPES = frozenset({
     'application/reports+json',
     'text/plain',
 })
+CSP_REPORT_CONTENT_TYPES = frozenset({'application/csp-report', 'application/reports+json'})
+LOG_MESSAGE_STACK_CHARS = 1000
 # Known-expected Report-Only violations emitted by Next.js inline hydration scripts.
 EXPECTED_INLINE_SCRIPT_DIRECTIVES = frozenset({'script-src', 'script-src-elem'})
 CANONICAL_OWN_HOSTS = frozenset({'www.picspeak.art', 'picspeak.art'})
@@ -500,22 +502,26 @@ def _parse_payload(raw_data: Any, *, content_type: str, fallback_ua: str | None)
 
 @router.post('/client-errors', status_code=status.HTTP_202_ACCEPTED)
 async def report_client_error(request: Request) -> dict[str, str]:
-    rate_key = client_network_from_request(request) or client_ip_from_request(request) or 'unknown'
-    retry_after = _rate_limiter.check(rate_key, limit=_rate_limit_per_minute())
-    if retry_after is not None:
-        raise ApiHTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            code='RATE_LIMIT_EXCEEDED',
-            message='Too many client error reports',
-            headers={'Retry-After': str(retry_after)},
-        )
-
     raw_content_type = request.headers.get('content-type', '').split(';', 1)[0].strip().lower()
     if raw_content_type and raw_content_type not in ALLOWED_CONTENT_TYPES:
         raise api_error(
             status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
             'UNSUPPORTED_MEDIA_TYPE',
             'Unsupported report content type',
+        )
+
+    # Browsers deliver CSP reports with their own content types, so CSP traffic
+    # (including dropped expected report-only inline reports) is limited in a
+    # separate per-IP bucket and can never exhaust the JS error budget.
+    bucket = 'csp' if raw_content_type in CSP_REPORT_CONTENT_TYPES else 'js'
+    network_key = client_network_from_request(request) or client_ip_from_request(request) or 'unknown'
+    retry_after = _rate_limiter.check(f'{bucket}:{network_key}', limit=_rate_limit_per_minute())
+    if retry_after is not None:
+        raise ApiHTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            code='RATE_LIMIT_EXCEEDED',
+            message='Too many client error reports',
+            headers={'Retry-After': str(retry_after)},
         )
 
     raw_body = await _read_bounded_body(request)
@@ -582,8 +588,30 @@ async def report_client_error(request: Request) -> dict[str, str]:
     if normalized['report_count'] > 1:
         log_payload['report_count'] = normalized['report_count']
 
+    # Plain uvicorn logging drops `extra`, so the sanitized key fields also go
+    # into the message as compact JSON; `extra` stays for structured formatters.
+    summary: dict[str, Any] = {
+        'kind': normalized['kind'],
+        'source': normalized['source'],
+        'message': normalized['error_message'],
+        'url': normalized['url'],
+        'release': normalized['release'],
+    }
+    if normalized['stack']:
+        summary['stack'] = _truncate_text(normalized['stack'], max_length=LOG_MESSAGE_STACK_CHARS)
+    if normalized['csp']:
+        summary['csp'] = {
+            key: normalized['csp'][key]
+            for key in ('effective_directive', 'blocked_uri', 'disposition', 'source_file')
+            if key in normalized['csp']
+        }
+    compact_summary = json.dumps(summary, ensure_ascii=False, separators=(',', ':'))
+
     if normalized['kind'] == 'csp':
-        logger.info('Client CSP report received', extra=log_payload)
+        # INFO keeps CSP out of error alerting; until the structured logging
+        # change raises this logger's level, the default WARNING root level may
+        # still filter these records in production.
+        logger.info('Client CSP report received %s', compact_summary, extra=log_payload)
     else:
-        logger.warning('Client error reported', extra=log_payload)
+        logger.warning('Client error reported %s', compact_summary, extra=log_payload)
     return {'status': 'accepted'}
