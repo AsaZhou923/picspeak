@@ -9,6 +9,7 @@ import { useAuth } from '@/lib/auth-context';
 import { GenerationTaskStatusResponse } from '@/lib/types';
 import { useI18n } from '@/lib/i18n';
 import { formatTaskError, formatUserFacingError } from '@/lib/error-utils';
+import { reportClientError } from '@/lib/client-error-reporter';
 import { trackProductEvent } from '@/lib/product-analytics';
 import { WaitingBlogWindow } from '@/components/blog/WaitingBlogWindow';
 import { useCreditPackCheckout } from '@/lib/hooks/useCreditPackCheckout';
@@ -97,6 +98,7 @@ export default function GenerationTaskPage() {
         }
       } catch (err) {
         if (!cancelled && !isAbortError(err)) {
+          reportClientError(err, { source: 'task_polling', sampleRate: 1 });
           setError(formatUserFacingError(t, err, t('generation_task_fetch_error')));
           timerRef.current = setTimeout(poll, POLL_INTERVAL * 2);
         }

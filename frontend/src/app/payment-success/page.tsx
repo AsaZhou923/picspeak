@@ -9,6 +9,7 @@ import { UsageResponse } from '@/lib/types';
 import { SkeletonBlock } from '@/components/ui/LoadingSpinner';
 import { useI18n } from '@/lib/i18n';
 import { formatUserFacingError } from '@/lib/error-utils';
+import { reportClientError } from '@/lib/client-error-reporter';
 import { consumeCheckoutReturnPath } from '@/lib/checkout-return';
 
 export default function PaymentSuccessPage() {
@@ -52,6 +53,7 @@ export default function PaymentSuccessPage() {
         if (cancelled) {
           return;
         }
+        reportClientError(err, { source: 'payment_return', sampleRate: 1 });
         setUsage(null);
         setLoading(false);
         setError(formatUserFacingError(t, err, t('payment_success_error')));

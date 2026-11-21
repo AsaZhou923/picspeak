@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import { createPresign, putObjectStorage, confirmPhoto } from '@/lib/api';
+import { reportClientError } from '@/lib/client-error-reporter';
 import { useAuth } from '@/lib/auth-context';
 import { useI18n } from '@/lib/i18n';
 import { ApiException, PhotoCreateResponse } from '@/lib/types';
@@ -126,9 +127,11 @@ export function useUploadFlow({ fetchUsage }: { fetchUsage: () => void }) {
           } else if (err.status === 402 || err.code === 'QUOTA_EXCEEDED') {
             setErrMessage(formatUserFacingError(t, err, t('err_quota')));
           } else {
+            reportClientError(err, { source: 'upload', sampleRate: 1 });
             setErrMessage(formatUserFacingError(t, err, t('err_upload')));
           }
         } else {
+          reportClientError(err, { source: 'upload', sampleRate: 1 });
           setErrMessage(formatUserFacingError(t, err, t('err_upload')));
         }
       }

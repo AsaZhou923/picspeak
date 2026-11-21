@@ -1,0 +1,236 @@
+from __future__ import annotations
+
+import json
+import logging
+import os
+import sys
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+from fastapi.testclient import TestClient
+
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+if str(BACKEND_ROOT) not in sys.path:
+    sys.path.insert(0, str(BACKEND_ROOT))
+
+from app.api.routers.client_errors import (
+    MAX_CLIENT_ERROR_BODY_BYTES,
+    reset_client_error_rate_limiter,
+)
+from app.main import _should_capture_audit_body, app
+from starlette.requests import Request
+
+
+class ClientErrorsRouteTests(unittest.TestCase):
+    def setUp(self) -> None:
+        reset_client_error_rate_limiter()
+
+    def tearDown(self) -> None:
+        reset_client_error_rate_limiter()
+
+    def test_accepts_browser_error_and_logs_one_structured_warning_without_db_or_guest(self) -> None:
+        with (
+            patch('app.main._schedule_audit_task') as schedule_audit_task,
+            patch('app.main.SessionLocal', side_effect=AssertionError('must not touch DB')),
+            patch('app.main.worker.start'),
+            patch('app.main.worker.stop'),
+            self.assertLogs('app.api.routers.client_errors', level='WARNING') as captured,
+        ):
+            with TestClient(app) as client:
+                response = client.post(
+                    '/api/v1/client-errors',
+                    headers={
+                        'Origin': 'http://localhost:3000',
+                        'User-Agent': 'Mozilla/5.0 TestBrowser',
+                    },
+                    json={
+                        'kind': 'error',
+                        'source': 'upload',
+                        'message': 'Upload failed for https://r2.example/a.jpg?X-Amz-Signature=supersecret&token=tok123',
+                        'stack': 'Error: fail\n    at upload (https://www.picspeak.art/app.js?photo_token=secretphoto:1:2)',
+                        'url': 'https://user:pass@www.picspeak.art/workspace?mode=flash&token=secret1&photo_token=secret2&generation_token=secret3#frag',
+                        'user_agent': 'CustomUA/1.0',
+                        'release': 'sha-abc1234',
+                    },
+                )
+
+        self.assertEqual(response.status_code, 202)
+        self.assertEqual(response.json(), {'status': 'accepted'})
+        self.assertEqual(response.headers.get('access-control-allow-origin'), 'http://localhost:3000')
+        self.assertIsNone(response.headers.get('set-cookie'))
+        self.assertIsNone(response.headers.get('x-guest-access-token'))
+        schedule_audit_task.assert_not_called()
+
+        self.assertEqual(len(captured.records), 1)
+        record = captured.records[0]
+        self.assertEqual(record.levelno, logging.WARNING)
+        self.assertEqual(getattr(record, 'event', None), 'client_error_reported')
+        self.assertEqual(getattr(record, 'kind', None), 'error')
+        self.assertEqual(getattr(record, 'source', None), 'upload')
+        self.assertEqual(getattr(record, 'release', None), 'sha-abc1234')
+        self.assertEqual(getattr(record, 'user_agent', None), 'CustomUA/1.0')
+        self.assertEqual(getattr(record, 'url', None), 'https://www.picspeak.art/workspace?mode=flash')
+        self.assertEqual(
+            getattr(record, 'serviceContext', None),
+            {'service': 'picspeak-frontend', 'version': 'sha-abc1234'},
+        )
+        self.assertEqual(
+            getattr(record, 'context', None),
+            {'httpRequest': {'url': 'https://www.picspeak.art/workspace?mode=flash', 'userAgent': 'CustomUA/1.0'}},
+        )
+        for secret in ('supersecret', 'tok123', 'secretphoto', 'secret1', 'secret2', 'secret3', 'user:pass', '#frag'):
+            self.assertNotIn(secret, str(getattr(record, 'error_message', '')))
+            self.assertNotIn(secret, str(getattr(record, 'stack', '')))
+            self.assertNotIn(secret, str(getattr(record, 'url', '')))
+
+    def test_accepts_legacy_csp_report_content_type(self) -> None:
+        payload = {
+            'csp-report': {
+                'document-uri': 'https://www.picspeak.art/workspace?photo_token=secret&mode=pro',
+                'violated-directive': 'script-src-elem',
+                'effective-directive': 'script-src-elem',
+                'blocked-uri': 'https://evil.example/script.js?token=leak',
+                'disposition': 'report',
+                'source-file': 'https://www.picspeak.art/_next/static/app.js',
+                'line-number': 12,
+                'column-number': 34,
+            }
+        }
+        with (
+            patch('app.main._schedule_audit_task') as schedule_audit_task,
+            patch('app.main.worker.start'),
+            patch('app.main.worker.stop'),
+            self.assertLogs('app.api.routers.client_errors', level='WARNING') as captured,
+        ):
+            with TestClient(app) as client:
+                response = client.post(
+                    '/api/v1/client-errors',
+                    headers={'Content-Type': 'application/csp-report', 'User-Agent': 'Browser/1.0'},
+                    content=json.dumps(payload),
+                )
+
+        self.assertEqual(response.status_code, 202)
+        schedule_audit_task.assert_not_called()
+        self.assertEqual(len(captured.records), 1)
+        record = captured.records[0]
+        self.assertEqual(getattr(record, 'kind', None), 'csp')
+        self.assertEqual(getattr(record, 'source', None), 'csp_report')
+        self.assertEqual(getattr(record, 'url', None), 'https://www.picspeak.art/workspace?mode=pro')
+        csp_details = getattr(record, 'csp', {})
+        self.assertEqual(csp_details.get('effective_directive'), 'script-src-elem')
+        self.assertEqual(csp_details.get('blocked_uri'), 'https://evil.example/script.js')
+        self.assertEqual(csp_details.get('disposition'), 'report')
+        self.assertNotIn('secret', str(csp_details))
+        self.assertNotIn('leak', str(csp_details))
+
+    def test_accepts_reporting_api_v1_reports_json_batch_as_one_warning(self) -> None:
+        batch = [
+            {
+                'type': 'csp-violation',
+                'url': 'https://www.picspeak.art/gallery?generation_token=secret_gen',
+                'user_agent': 'Chrome/130',
+                'body': {
+                    'documentURL': 'https://www.picspeak.art/gallery?generation_token=secret_gen',
+                    'effectiveDirective': 'script-src',
+                    'blockedURL': 'inline',
+                    'disposition': 'report',
+                },
+            },
+            {
+                'type': 'csp-violation',
+                'url': 'https://www.picspeak.art/gallery',
+                'body': {
+                    'documentURL': 'https://www.picspeak.art/gallery',
+                    'effectiveDirective': 'connect-src',
+                    'blockedURL': 'https://tracker.example/beacon',
+                    'disposition': 'report',
+                },
+            },
+        ]
+        with (
+            patch('app.main._schedule_audit_task'),
+            patch('app.main.worker.start'),
+            patch('app.main.worker.stop'),
+            self.assertLogs('app.api.routers.client_errors', level='WARNING') as captured,
+        ):
+            with TestClient(app) as client:
+                response = client.post(
+                    '/api/v1/client-errors',
+                    headers={'Content-Type': 'application/reports+json'},
+                    content=json.dumps(batch),
+                )
+
+        self.assertEqual(response.status_code, 202)
+        self.assertEqual(len(captured.records), 1)
+        record = captured.records[0]
+        self.assertEqual(getattr(record, 'kind', None), 'csp')
+        self.assertEqual(getattr(record, 'source', None), 'reporting_api')
+        self.assertEqual(getattr(record, 'report_count', None), 2)
+        self.assertEqual(getattr(record, 'url', None), 'https://www.picspeak.art/gallery')
+        self.assertNotIn('secret_gen', str(getattr(record, 'url', '')))
+
+    def test_rejects_oversized_payload_and_invalid_kind(self) -> None:
+        oversized = json.dumps({'kind': 'error', 'message': 'x' * (MAX_CLIENT_ERROR_BODY_BYTES + 128)})
+        with patch('app.main.worker.start'), patch('app.main.worker.stop'):
+            with TestClient(app) as client:
+                too_large = client.post(
+                    '/api/v1/client-errors',
+                    headers={'Content-Type': 'application/json'},
+                    content=oversized,
+                )
+                invalid_kind = client.post(
+                    '/api/v1/client-errors',
+                    json={'kind': 'invalid_kind', 'message': 'boom'},
+                )
+                missing_msg = client.post(
+                    '/api/v1/client-errors',
+                    json={'kind': 'unhandledrejection', 'message': '   '},
+                )
+
+        self.assertEqual(too_large.status_code, 413)
+        self.assertEqual(too_large.json()['error']['code'], 'REQUEST_TOO_LARGE')
+        self.assertEqual(invalid_kind.status_code, 422)
+        self.assertEqual(missing_msg.status_code, 422)
+
+    def test_rate_limits_per_ip_without_db_and_allows_cors_preflight(self) -> None:
+        with (
+            patch.dict(os.environ, {'CLIENT_ERROR_RATE_LIMIT_PER_MINUTE': '2'}),
+            patch('app.main.worker.start'),
+            patch('app.main.worker.stop'),
+        ):
+            with TestClient(app) as client:
+                preflight = client.options(
+                    '/api/v1/client-errors',
+                    headers={
+                        'Origin': 'http://localhost:3000',
+                        'Access-Control-Request-Method': 'POST',
+                        'Access-Control-Request-Headers': 'Content-Type',
+                    },
+                )
+                self.assertEqual(preflight.status_code, 200)
+                self.assertEqual(preflight.headers.get('access-control-allow-origin'), 'http://localhost:3000')
+
+                first = client.post('/api/v1/client-errors', json={'kind': 'error', 'message': 'one'})
+                second = client.post('/api/v1/client-errors', json={'kind': 'unhandledrejection', 'message': 'two'})
+                third = client.post('/api/v1/client-errors', json={'kind': 'error', 'message': 'three'})
+
+        self.assertEqual(first.status_code, 202)
+        self.assertEqual(second.status_code, 202)
+        self.assertEqual(third.status_code, 429)
+        self.assertEqual(third.json()['error']['code'], 'RATE_LIMIT_EXCEEDED')
+        self.assertTrue(int(third.headers.get('retry-after', '0')) >= 1)
+
+    def test_excluded_from_audit_body_even_if_allowlisted(self) -> None:
+        req = Request({
+            'type': 'http',
+            'method': 'POST',
+            'path': '/api/v1/client-errors',
+            'headers': [(b'content-type', b'application/json'), (b'content-length', b'64')],
+        })
+        with patch('app.main._AUDIT_BODY_ALLOW_PATHS', frozenset({'/api/v1/client-errors'})):
+            self.assertFalse(_should_capture_audit_body(req))
+
+
+if __name__ == '__main__':
+    unittest.main()

@@ -10,6 +10,7 @@ import { useI18n } from '@/lib/i18n';
 import { ApiException, TaskErrorPayload, TaskStatusResponse, TaskStreamMessage } from '@/lib/types';
 import { formatTaskError, formatUserFacingError } from '@/lib/error-utils';
 import { WaitingBlogWindow } from '@/components/blog/WaitingBlogWindow';
+import { reportClientError } from '@/lib/client-error-reporter';
 import { logClientError } from '@/lib/client-log';
 
 // Polling only runs while the task WebSocket is down. Each poll counts against the
@@ -142,6 +143,7 @@ export default function TaskPage() {
       if (finalRef.current) return;
 
       if (pollCount.current >= POLL_TIMEOUT_COUNT && !shouldContinueWaiting(data)) {
+        reportClientError(new Error('Task polling timed out'), { source: 'task_polling', sampleRate: 1 });
         setError(translationRef.current('task_timeout_error'));
         return;
       }
@@ -149,6 +151,7 @@ export default function TaskPage() {
       if (!isCurrent() || finalRef.current || isAbortError(err)) {
         return;
       }
+      reportClientError(err, { source: 'task_polling', sampleRate: 1 });
       if (err instanceof ApiException) {
         if (err.code === 'TASK_NOT_FOUND') {
           const withinGraceWindow = Date.now() - pageStartedAtRef.current < INITIAL_TASK_LOOKUP_GRACE_MS;
@@ -260,6 +263,7 @@ export default function TaskPage() {
       } catch (err) {
         if (!cancelled) {
           logClientError('Failed to connect task websocket', err, { taskId });
+          reportClientError(err, { source: 'task_polling', sampleRate: 1 });
           void poll(lifecycle);
         }
       }
