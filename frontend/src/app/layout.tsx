@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { headers } from 'next/headers';
 import localFont from 'next/font/local';
+import '../fonts/latin-extended.css';
 import '../fonts/noto-serif-cjk.css';
 import './globals.css';
 import SiteChrome from '@/components/layout/SiteChrome';
@@ -12,8 +13,9 @@ import { HOME_LANGUAGE_ALTERNATES, OPEN_GRAPH_LOCALES } from '@/lib/seo';
 import { siteConfig } from '@/lib/site';
 
 // Self-hosted Latin body and monospace variable fonts (OFL licenses in src/fonts/).
-// Noto Serif SC/JP display serif unicode-range slices are loaded via
-// ../fonts/noto-serif-cjk.css from public/fonts/ so browsers fetch only needed slices.
+// Non-Latin subsets for DM Sans / JetBrains Mono live in ../fonts/latin-extended.css,
+// and Noto Serif SC/JP unicode-range slices live in ../fonts/noto-serif-cjk.css, so
+// browsers only download non-primary subsets when needed while DM Sans latin preloads.
 const dmSans = localFont({
   src: '../fonts/dm-sans-latin.woff2',
   weight: '400 600',
@@ -23,6 +25,7 @@ const dmSans = localFont({
   preload: true,
   adjustFontFallback: 'Arial',
   declarations: [
+    { prop: 'font-family', value: "'DM Sans'" },
     {
       prop: 'unicode-range',
       value:
@@ -40,6 +43,7 @@ const jetbrainsMono = localFont({
   preload: false,
   adjustFontFallback: 'Arial',
   declarations: [
+    { prop: 'font-family', value: "'JetBrains Mono'" },
     {
       prop: 'unicode-range',
       value:

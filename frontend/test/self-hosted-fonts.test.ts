@@ -6,12 +6,16 @@ import { fileURLToPath } from 'node:url';
 import {
   CJK_STYLESHEET_PATH,
   FONT_SOURCES,
+  LATIN_EXTENDED_STYLESHEET_PATH,
   assertValidWoff2,
   collapseSlicesByUrl,
   extractGoogleFontVersion,
+  fetchValidatedSlices,
   parseGoogleFontCss,
   renderCjkStylesheet,
+  renderLatinExtendedStylesheet,
 } from '../scripts/fetch-fonts.mjs';
+import { hasKnownAppPath, isPublicFontLicensePath } from '../src/lib/app-route-roots.ts';
 
 const TEST_DIR = path.dirname(fileURLToPath(import.meta.url));
 const FRONTEND_DIR = path.resolve(TEST_DIR, '..');
@@ -21,24 +25,27 @@ function readText(filePath: string): string {
   return readFileSync(filePath, 'utf8');
 }
 
-test('layout.tsx self-hosts Latin fonts with next/font/local and imports CJK font stylesheet', () => {
+test('layout.tsx self-hosts Latin fonts with next/font/local and imports extended & CJK stylesheets', () => {
   const layout = readText(path.join(FRONTEND_DIR, 'src', 'app', 'layout.tsx'));
 
   assert.match(layout, /import localFont from ['"]next\/font\/local['"]/);
   assert.doesNotMatch(layout, /next\/font\/google/);
+  assert.match(layout, /import ['"]\.\.\/fonts\/latin-extended\.css['"]/);
   assert.match(layout, /import ['"]\.\.\/fonts\/noto-serif-cjk\.css['"]/);
 
   assert.match(layout, /src:\s*['"]\.\.\/fonts\/dm-sans-latin\.woff2['"]/);
   assert.match(layout, /variable:\s*['"]--font-sans-latin['"]/);
+  assert.match(layout, /prop:\s*['"]font-family['"],\s*value:\s*["']'DM Sans'["']/);
   assert.match(layout, /preload:\s*true/);
 
   assert.match(layout, /src:\s*['"]\.\.\/fonts\/jetbrains-mono-latin\.woff2['"]/);
   assert.match(layout, /variable:\s*['"]--font-mono-latin['"]/);
+  assert.match(layout, /prop:\s*['"]font-family['"],\s*value:\s*["']'JetBrains Mono'["']/);
   assert.match(layout, /preload:\s*false/);
   assert.match(layout, /display:\s*['"]swap['"]/);
 });
 
-test('all self-hosted Latin WOFF2 files and OFL licenses exist and are valid', () => {
+test('all self-hosted Latin WOFF2 files, extended subsets, and OFL licenses exist and are valid', () => {
   for (const source of [FONT_SOURCES.dmSans, FONT_SOURCES.jetbrainsMono]) {
     assert.ok(existsSync(source.outputFile), `${source.family} WOFF2 must exist at ${source.outputFile}`);
     const buffer = readFileSync(source.outputFile);
@@ -46,6 +53,31 @@ test('all self-hosted Latin WOFF2 files and OFL licenses exist and are valid', (
 
     assert.ok(existsSync(source.licenseFile), `${source.family} OFL license must exist`);
     assert.match(readText(source.licenseFile), /SIL OPEN FONT LICENSE/);
+
+    assert.ok(existsSync(source.publicLicenseFile), `${source.family} public OFL license must exist`);
+    assert.match(readText(source.publicLicenseFile), /SIL OPEN FONT LICENSE/);
+  }
+
+  assert.ok(existsSync(LATIN_EXTENDED_STYLESHEET_PATH), 'latin-extended.css must exist');
+  const extCss = readText(LATIN_EXTENDED_STYLESHEET_PATH);
+  assert.doesNotMatch(extCss, /fonts\.googleapis\.com|fonts\.gstatic\.com/);
+  assert.match(extCss, /font-family:\s*'DM Sans';/);
+  assert.match(extCss, /font-family:\s*'JetBrains Mono';/);
+  assert.match(extCss, /\/fonts\/dm-sans\/v\d+\/latin-ext-[0-9a-f]{8}\.woff2/);
+  for (const subset of ['cyrillic-ext', 'cyrillic', 'greek', 'vietnamese', 'latin-ext']) {
+    assert.match(
+      extCss,
+      new RegExp(`/fonts/jetbrains-mono/v\\d+/${subset}-[0-9a-f]{8}\\.woff2`),
+      `Expected JetBrains Mono ${subset} subset in latin-extended.css`,
+    );
+  }
+
+  const extUrls = [...extCss.matchAll(/url\('(\/fonts\/[^']+\.woff2)'\)/g)].map((match) => match[1]);
+  assert.equal(extUrls.length, 6, 'Expected 1 DM Sans + 5 JetBrains Mono extended subset WOFF2 files');
+  for (const publicUrl of extUrls) {
+    const filePath = path.join(FRONTEND_DIR, 'public', publicUrl.slice(1));
+    assert.ok(existsSync(filePath), `Missing extended subset font ${filePath}`);
+    assertValidWoff2(readFileSync(filePath), publicUrl);
   }
 });
 
@@ -92,7 +124,34 @@ test('no next/font/google workaround hooks, fixtures, or CI mocks remain', () =>
   );
 });
 
-test('CSP allows same-origin fonts without Google hosts and CJK font paths are immutably cached', async () => {
+test('middleware and route-root guard narrowly allow only the four public font OFL license paths', () => {
+  const middleware = readText(path.join(FRONTEND_DIR, 'src', 'middleware.ts'));
+  assert.match(middleware, /isPublicFontLicensePath\(pathname\)/);
+
+  for (const allowed of [
+    '/fonts/dm-sans/OFL.txt',
+    '/fonts/jetbrains-mono/OFL.txt',
+    '/fonts/noto-serif-sc/OFL.txt',
+    '/fonts/noto-serif-jp/OFL.txt',
+  ]) {
+    assert.equal(isPublicFontLicensePath(allowed), true, allowed);
+    assert.equal(hasKnownAppPath(allowed), true, allowed);
+  }
+
+  for (const rejected of [
+    '/fonts/unknown-font/OFL.txt',
+    '/fonts/noto-serif-sc/other.txt',
+    '/fonts/noto-serif-sc/v36/OFL.txt',
+    '/fonts/OFL.txt',
+    '/OFL.txt',
+    '/random.txt',
+  ]) {
+    assert.equal(isPublicFontLicensePath(rejected), false, rejected);
+    assert.equal(hasKnownAppPath(rejected), false, rejected);
+  }
+});
+
+test('CSP allows same-origin fonts without Google hosts and versioned font paths are immutably cached', async () => {
   const nextConfigModule = await import(`../next.config.mjs?self-hosted-fonts=${Date.now()}`);
   const routes = (await nextConfigModule.default.headers()) as Array<{
     source: string;
@@ -107,16 +166,18 @@ test('CSP allows same-origin fonts without Google hosts and CJK font paths are i
   assert.doesNotMatch(csp, /fonts\.gstatic\.com|fonts\.googleapis\.com/);
 
   const fontCacheRoute = routes.find(
-    (route) => route.source === '/fonts/:family(noto-serif-sc|noto-serif-jp)/:path*',
+    (route) =>
+      route.source ===
+      '/fonts/:family(dm-sans|jetbrains-mono|noto-serif-sc|noto-serif-jp)/:version(v\\d+)/:path*',
   );
-  assert.ok(fontCacheRoute, 'Expected immutable cache headers for versioned CJK font paths');
+  assert.ok(fontCacheRoute, 'Expected immutable cache headers for versioned self-hosted font paths');
   assert.equal(
     fontCacheRoute.headers.find((header) => header.key === 'Cache-Control')?.value,
     'public, max-age=31536000, immutable',
   );
 });
 
-test('fetch-fonts.mjs parses Google CSS2, collapses duplicate variable weights, and renders CJK CSS', () => {
+test('fetch-fonts.mjs parses Google CSS2, collapses duplicate variable weights, and renders stylesheets', () => {
   const sampleCss = [
     '/* [0] */',
     '@font-face {',
@@ -124,7 +185,7 @@ test('fetch-fonts.mjs parses Google CSS2, collapses duplicate variable weights, 
     '  font-style: normal;',
     '  font-weight: 600;',
     '  font-display: swap;',
-    '  src: url(https://fonts.gstatic.com/s/notoserifsc/v36/slice.0.woff2) format(\'woff2\');',
+    "  src: url(https://fonts.gstatic.com/s/notoserifsc/v36/slice.0.woff2) format('woff2');",
     '  unicode-range: U+4E00-4E05;',
     '}',
     '/* [0] */',
@@ -133,7 +194,7 @@ test('fetch-fonts.mjs parses Google CSS2, collapses duplicate variable weights, 
     '  font-style: normal;',
     '  font-weight: 900;',
     '  font-display: swap;',
-    '  src: url(https://fonts.gstatic.com/s/notoserifsc/v36/slice.0.woff2) format(\'woff2\');',
+    "  src: url(https://fonts.gstatic.com/s/notoserifsc/v36/slice.0.woff2) format('woff2');",
     '  unicode-range: U+4E00-4E05;',
     '}',
   ].join('\n');
@@ -144,8 +205,12 @@ test('fetch-fonts.mjs parses Google CSS2, collapses duplicate variable weights, 
   const slices = collapseSlicesByUrl(entries, ['600', '900']);
   assert.equal(slices.length, 1);
   assert.equal(extractGoogleFontVersion(slices[0].url), 'v36');
+  assert.equal(
+    extractGoogleFontVersion('https://fonts.gstatic.com/l/font?kit=abc&skey=def&v=v34'),
+    null,
+  );
 
-  const rendered = renderCjkStylesheet([
+  const renderedCjk = renderCjkStylesheet([
     {
       ...FONT_SOURCES.notoSerifSc,
       version: 'v36',
@@ -158,9 +223,103 @@ test('fetch-fonts.mjs parses Google CSS2, collapses duplicate variable weights, 
     },
   ]);
 
-  assert.match(rendered, /font-weight: 600 900;/);
-  assert.match(rendered, /font-display: swap;/);
-  assert.match(rendered, /src: url\('\/fonts\/noto-serif-sc\/v36\/000-deadbeef\.woff2'\) format\('woff2'\);/);
-  assert.match(rendered, /unicode-range: U\+4E00-4E05;/);
-  assert.match(rendered, /--font-serif-sc: 'Noto Serif SC', 'Noto Serif SC Fallback';/);
+  assert.match(renderedCjk, /font-weight: 600 900;/);
+  assert.match(renderedCjk, /font-display: swap;/);
+  assert.match(
+    renderedCjk,
+    /src: url\('\/fonts\/noto-serif-sc\/v36\/000-deadbeef\.woff2'\) format\('woff2'\);/,
+  );
+  assert.match(renderedCjk, /unicode-range: U\+4E00-4E05;/);
+  assert.match(renderedCjk, /--font-serif-sc: 'Noto Serif SC', 'Noto Serif SC Fallback';/);
+
+  const renderedExt = renderLatinExtendedStylesheet([
+    {
+      ...FONT_SOURCES.dmSans,
+      version: 'v17',
+      extendedSlices: [
+        {
+          subset: 'latin-ext',
+          style: 'normal',
+          publicUrl: '/fonts/dm-sans/v17/latin-ext-12345678.woff2',
+          unicodeRange: 'U+0100-02BA',
+        },
+      ],
+    },
+  ]);
+
+  assert.match(renderedExt, /font-family: 'DM Sans';/);
+  assert.match(renderedExt, /font-weight: 400 600;/);
+  assert.match(
+    renderedExt,
+    /src: url\('\/fonts\/dm-sans\/v17\/latin-ext-12345678\.woff2'\) format\('woff2'\);/,
+  );
+  assert.match(renderedExt, /unicode-range: U\+0100-02BA;/);
+});
+
+test('fetchValidatedSlices retries with backoff on unexpected URL shape and includes received URL on exhaustion', async () => {
+  const unexpectedUrl = 'https://fonts.gstatic.com/l/font?kit=abc123&skey=def456&v=v34';
+  const expectedUrl = 'https://fonts.gstatic.com/s/notoserifjp/v34/slice.0.woff2';
+  const makeCss = (url: string) =>
+    [
+      '@font-face {',
+      "  font-family: 'Noto Serif JP';",
+      '  font-style: normal;',
+      '  font-weight: 600;',
+      '  font-display: swap;',
+      `  src: url(${url}) format('woff2');`,
+      '  unicode-range: U+3040-309F;',
+      '}',
+      '@font-face {',
+      "  font-family: 'Noto Serif JP';",
+      '  font-style: normal;',
+      '  font-weight: 900;',
+      '  font-display: swap;',
+      `  src: url(${url}) format('woff2');`,
+      '  unicode-range: U+3040-309F;',
+      '}',
+    ].join('\n');
+
+  // Case 1: transient extensionless URL on first hit, valid URL on second hit.
+  let calls = 0;
+  const delays: number[] = [];
+  const recovered = await fetchValidatedSlices(FONT_SOURCES.notoSerifJp, {
+    attempts: 3,
+    baseDelayMs: 100,
+    fetchImpl: async () => {
+      calls += 1;
+      const body = calls === 1 ? makeCss(unexpectedUrl) : makeCss(expectedUrl);
+      return new Response(body, { status: 200 });
+    },
+    sleepImpl: async (ms: number) => {
+      delays.push(ms);
+    },
+  });
+  assert.equal(calls, 2);
+  assert.deepEqual(delays, [100]);
+  assert.equal(recovered.version, 'v34');
+  assert.equal(recovered.slices.length, 1);
+
+  // Case 2: persistent unexpected URL shape fails with the received URL in the error message.
+  const failDelays: number[] = [];
+  await assert.rejects(
+    () =>
+      fetchValidatedSlices(FONT_SOURCES.notoSerifJp, {
+        attempts: 3,
+        baseDelayMs: 50,
+        fetchImpl: async () => new Response(makeCss(unexpectedUrl), { status: 200 }),
+        sleepImpl: async (ms: number) => {
+          failDelays.push(ms);
+        },
+      }),
+    (error: unknown) => {
+      assert.ok(error instanceof Error);
+      assert.match(error.message, /Unexpected font URL shape for Noto Serif JP/);
+      assert.ok(
+        error.message.includes(unexpectedUrl),
+        `Expected error to include received URL, got: ${error.message}`,
+      );
+      return true;
+    },
+  );
+  assert.deepEqual(failDelays, [50, 100]);
 });

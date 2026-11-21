@@ -530,4 +530,39 @@ test('production HTML preserves font CSS variables, marks DM Sans for preload, a
   assert.match(sliceResponse.headers.get('cache-control') ?? '', /immutable/i);
   const bytes = Buffer.from(await sliceResponse.arrayBuffer());
   assert.equal(bytes.toString('ascii', 0, 4), 'wOF2');
+
+  // Extended Latin & Cyrillic subsets for DM Sans and JetBrains Mono are served immutably.
+  for (const pattern of [
+    /\/fonts\/dm-sans\/v\d+\/latin-ext-[^'")\s]+\.woff2/,
+    /\/fonts\/jetbrains-mono\/v\d+\/latin-ext-[^'")\s]+\.woff2/,
+    /\/fonts\/jetbrains-mono\/v\d+\/cyrillic-[^'")\s]+\.woff2/,
+  ]) {
+    const extMatch = combinedCss.match(pattern);
+    assert.ok(extMatch, `Expected extended font URL matching ${pattern} in production CSS`);
+    const extResponse = await fetch(`${baseUrl}${extMatch[0]}`);
+    assert.equal(extResponse.status, 200, extMatch[0]);
+    assert.match(extResponse.headers.get('cache-control') ?? '', /immutable/i, extMatch[0]);
+    assert.equal(
+      Buffer.from(await extResponse.arrayBuffer()).toString('ascii', 0, 4),
+      'wOF2',
+      extMatch[0],
+    );
+  }
+
+  // Public font OFL license texts are accessible, while arbitrary .txt files under /fonts/ still 404.
+  for (const licensePath of [
+    '/fonts/dm-sans/OFL.txt',
+    '/fonts/jetbrains-mono/OFL.txt',
+    '/fonts/noto-serif-sc/OFL.txt',
+    '/fonts/noto-serif-jp/OFL.txt',
+  ]) {
+    const licenseResponse = await fetch(`${baseUrl}${licensePath}`);
+    assert.equal(licenseResponse.status, 200, licensePath);
+    assert.match(await licenseResponse.text(), /SIL OPEN FONT LICENSE/, licensePath);
+  }
+
+  for (const disallowedPath of ['/fonts/noto-serif-sc/not-a-license.txt', '/fonts/unknown/OFL.txt']) {
+    const disallowedResponse = await fetch(`${baseUrl}${disallowedPath}`);
+    assert.equal(disallowedResponse.status, 404, disallowedPath);
+  }
 });

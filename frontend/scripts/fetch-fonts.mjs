@@ -16,25 +16,39 @@ export const GOOGLE_FONTS_LICENSE_COMMIT = '06bfe0d62a98375cb09c942fa18e68bd32cf
 
 const WOFF2_SIGNATURE = 'wOF2';
 const DOWNLOAD_CONCURRENCY = 12;
+const DEFAULT_CSS_RETRY_ATTEMPTS = 4;
+const DEFAULT_CSS_BACKOFF_MS = 500;
 
 export const FONT_SOURCES = {
   dmSans: {
     family: 'DM Sans',
+    slug: 'dm-sans',
     cssUrl: 'https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&display=swap',
     pinnedVersion: 'v17',
-    subset: 'latin',
+    primarySubset: 'latin',
+    weightRange: '400 600',
+    expectedWeights: ['400', '500', '600'],
     outputFile: path.join(FRONTEND_DIR, 'src', 'fonts', 'dm-sans-latin.woff2'),
+    extendedOutputDir: path.join(FRONTEND_DIR, 'public', 'fonts', 'dm-sans'),
+    extendedPublicBasePath: '/fonts/dm-sans',
     licenseUrl: `https://raw.githubusercontent.com/google/fonts/${GOOGLE_FONTS_LICENSE_COMMIT}/ofl/dmsans/OFL.txt`,
     licenseFile: path.join(FRONTEND_DIR, 'src', 'fonts', 'DM-SANS-OFL.txt'),
+    publicLicenseFile: path.join(FRONTEND_DIR, 'public', 'fonts', 'dm-sans', 'OFL.txt'),
   },
   jetbrainsMono: {
     family: 'JetBrains Mono',
+    slug: 'jetbrains-mono',
     cssUrl: 'https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap',
     pinnedVersion: 'v24',
-    subset: 'latin',
+    primarySubset: 'latin',
+    weightRange: '400 500',
+    expectedWeights: ['400', '500'],
     outputFile: path.join(FRONTEND_DIR, 'src', 'fonts', 'jetbrains-mono-latin.woff2'),
+    extendedOutputDir: path.join(FRONTEND_DIR, 'public', 'fonts', 'jetbrains-mono'),
+    extendedPublicBasePath: '/fonts/jetbrains-mono',
     licenseUrl: `https://raw.githubusercontent.com/google/fonts/${GOOGLE_FONTS_LICENSE_COMMIT}/ofl/jetbrainsmono/OFL.txt`,
     licenseFile: path.join(FRONTEND_DIR, 'src', 'fonts', 'JETBRAINS-MONO-OFL.txt'),
+    publicLicenseFile: path.join(FRONTEND_DIR, 'public', 'fonts', 'jetbrains-mono', 'OFL.txt'),
   },
   notoSerifSc: {
     family: 'Noto Serif SC',
@@ -80,6 +94,12 @@ export const FONT_SOURCES = {
   },
 };
 
+export const LATIN_EXTENDED_STYLESHEET_PATH = path.join(
+  FRONTEND_DIR,
+  'src',
+  'fonts',
+  'latin-extended.css',
+);
 export const CJK_STYLESHEET_PATH = path.join(FRONTEND_DIR, 'src', 'fonts', 'noto-serif-cjk.css');
 
 /**
@@ -112,10 +132,12 @@ export function parseGoogleFontCss(css) {
 }
 
 /**
- * Extract the Google Fonts release version segment (e.g. `v36`) from a font URL.
+ * Extract the Google Fonts release version segment (e.g. `v36`) from a static
+ * `/s/<family>/vN/<file>.woff2` font URL. Returns null for unexpected URL shapes
+ * such as extensionless `/l/font?kit=...` responses.
  */
 export function extractGoogleFontVersion(fontUrl) {
-  const match = fontUrl.match(/\/s\/[^/]+\/(v\d+)\//);
+  const match = fontUrl.match(/\/s\/[^/]+\/(v\d+)\/[^/?#]+\.woff2(?:$|\?)/i);
   return match?.[1] ?? null;
 }
 
@@ -172,6 +194,56 @@ export function assertValidWoff2(buffer, label) {
   if (buffer.byteLength < 64 || buffer.toString('ascii', 0, 4) !== WOFF2_SIGNATURE) {
     throw new Error(`${label} is not a valid WOFF2 font file (size=${buffer.byteLength}).`);
   }
+}
+
+export function sanitizeSubsetSlug(label, index) {
+  const slug = (label ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return slug || `subset-${String(index).padStart(2, '0')}`;
+}
+
+export function renderLatinExtendedStylesheet(families) {
+  const header = [
+    '/*',
+    ' * Self-hosted non-Latin unicode-range subsets for DM Sans & JetBrains Mono.',
+    ' * Primary `latin` subsets are loaded via next/font/local in src/app/layout.tsx',
+    ' * (DM Sans preloaded; JetBrains Mono deferred). These companion @font-face rules',
+    ' * share the same font-family names so extended-Latin, Cyrillic, Greek and Vietnamese',
+    ' * glyphs load on demand without preloading or falling back to Arial.',
+    ' * Regenerate via `node scripts/fetch-fonts.mjs` (not executed during `next build`).',
+    ' *',
+    ...families.map(
+      (family) =>
+        ` * - ${family.family}: ${family.version} (${family.extendedSlices.map((slice) => slice.subset).join(', ')}, weights ${family.weightRange})`,
+    ),
+    ' * Licenses: public/fonts/dm-sans/OFL.txt and public/fonts/jetbrains-mono/OFL.txt',
+    ' */',
+    '',
+  ].join('\n');
+
+  const blocks = [];
+  for (const family of families) {
+    for (const slice of family.extendedSlices) {
+      const lines = [
+        `/* ${family.family} (${slice.subset}) */`,
+        '@font-face {',
+        `  font-family: '${family.family}';`,
+        `  font-style: ${slice.style};`,
+        `  font-weight: ${family.weightRange};`,
+        '  font-display: swap;',
+        `  src: url('${slice.publicUrl}') format('woff2');`,
+      ];
+      if (slice.unicodeRange) {
+        lines.push(`  unicode-range: ${slice.unicodeRange};`);
+      }
+      lines.push('}');
+      blocks.push(lines.join('\n'));
+    }
+  }
+
+  return `${header}\n${blocks.join('\n\n')}\n`;
 }
 
 export function renderCjkStylesheet(families) {
@@ -238,11 +310,19 @@ export function renderCjkStylesheet(families) {
   return `${header}\n${sections.join('\n\n')}`;
 }
 
-async function fetchWithRetry(url, init = {}, attempts = 3) {
+async function defaultSleep(ms) {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchWithRetry(
+  url,
+  init = {},
+  { attempts = 3, baseDelayMs = 400, fetchImpl = fetch, sleepImpl = defaultSleep } = {},
+) {
   let lastError;
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
-      const response = await fetch(url, init);
+      const response = await fetchImpl(url, init);
       if (!response.ok) {
         throw new Error(`HTTP ${response.status} fetching ${url}`);
       }
@@ -250,10 +330,96 @@ async function fetchWithRetry(url, init = {}, attempts = 3) {
     } catch (error) {
       lastError = error;
       if (attempt < attempts) {
-        await new Promise((resolve) => setTimeout(resolve, attempt * 400));
+        await sleepImpl(attempt * baseDelayMs);
       }
     }
   }
+  throw lastError;
+}
+
+/**
+ * Fetch Google Fonts CSS2 and validate that every font URL uses the expected
+ * versioned `/s/<family>/vN/<file>.woff2` URL shape. Google Fonts intermittently
+ * serves extensionless `/l/font?...` URLs on first hit, so retry the CSS request
+ * with exponential backoff before failing with the received URL(s) in the error.
+ */
+export async function fetchValidatedSlices(
+  source,
+  {
+    allowVersionDrift = false,
+    attempts = DEFAULT_CSS_RETRY_ATTEMPTS,
+    baseDelayMs = DEFAULT_CSS_BACKOFF_MS,
+    fetchImpl = fetch,
+    sleepImpl = defaultSleep,
+    onRetry = null,
+  } = {},
+) {
+  let lastError;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      const response = await fetchImpl(source.cssUrl, {
+        headers: { 'User-Agent': FETCH_USER_AGENT },
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status} fetching ${source.cssUrl}`);
+      }
+      const css = await response.text();
+      const entries = parseGoogleFontCss(css);
+      const slices = collapseSlicesByUrl(entries, source.expectedWeights);
+
+      const unexpectedUrls = slices
+        .map((slice) => slice.url)
+        .filter((url) => extractGoogleFontVersion(url) === null);
+      if (unexpectedUrls.length > 0) {
+        const samples = unexpectedUrls.slice(0, 3).join(', ');
+        const error = new Error(
+          `Unexpected font URL shape for ${source.family} ` +
+            `(expected /s/<family>/vN/<file>.woff2): received ${samples}`,
+        );
+        error.retryable = true;
+        throw error;
+      }
+
+      const versions = [...new Set(slices.map((slice) => extractGoogleFontVersion(slice.url)))];
+      if (versions.length !== 1 || !versions[0]) {
+        const samples = slices
+          .slice(0, 3)
+          .map((slice) => slice.url)
+          .join(', ');
+        const error = new Error(
+          `Unexpected version set for ${source.family}: [${versions.join(', ')}] ` +
+            `(received URLs: ${samples})`,
+        );
+        error.retryable = true;
+        throw error;
+      }
+
+      const version = versions[0];
+      if (!allowVersionDrift && version !== source.pinnedVersion) {
+        const error = new Error(
+          `${source.family} upstream version changed (${version} !== pinned ${source.pinnedVersion}, ` +
+            `sample URL: ${slices[0].url}). Re-run with --update-versions after verifying the update.`,
+        );
+        error.retryable = false;
+        throw error;
+      }
+
+      return { version, slices };
+    } catch (error) {
+      lastError = error;
+      const shouldRetry = error?.retryable !== false && attempt < attempts;
+      if (!shouldRetry) {
+        throw error;
+      }
+      const delayMs = baseDelayMs * 2 ** (attempt - 1);
+      if (onRetry) {
+        onRetry({ attempt, attempts, delayMs, error });
+      }
+      await sleepImpl(delayMs);
+    }
+  }
+
   throw lastError;
 }
 
@@ -275,7 +441,7 @@ async function mapWithConcurrency(items, concurrency, worker) {
   return results;
 }
 
-async function downloadLicense(url, targetPath) {
+async function downloadLicenseText(url) {
   const response = await fetchWithRetry(url, {
     headers: { 'User-Agent': FETCH_USER_AGENT },
   });
@@ -283,74 +449,94 @@ async function downloadLicense(url, targetPath) {
   if (!text.includes('SIL OPEN FONT LICENSE')) {
     throw new Error(`Unexpected license content from ${url}`);
   }
+  return text;
+}
+
+function writeLicense(targetPath, text) {
   mkdirSync(path.dirname(targetPath), { recursive: true });
   writeFileSync(targetPath, text, 'utf8');
 }
 
-async function fetchLatinFont(source, { allowVersionDrift }) {
-  const cssResponse = await fetchWithRetry(source.cssUrl, {
-    headers: { 'User-Agent': FETCH_USER_AGENT },
+async function fetchLatinAndExtendedFont(source, { allowVersionDrift }) {
+  const { version, slices } = await fetchValidatedSlices(source, {
+    allowVersionDrift,
+    onRetry: ({ attempt, attempts, delayMs, error }) => {
+      console.warn(
+        `[fetch-fonts] ${source.family} CSS attempt ${attempt}/${attempts} failed (${error.message}); retrying in ${delayMs}ms...`,
+      );
+    },
   });
-  const css = await cssResponse.text();
-  const entries = parseGoogleFontCss(css);
-  const latinEntries = entries.filter((entry) => entry.comment === source.subset);
-  if (latinEntries.length === 0) {
-    throw new Error(`No /* ${source.subset} */ subset found for ${source.family}.`);
-  }
 
-  const uniqueUrls = [...new Set(latinEntries.map((entry) => entry.url))];
-  if (uniqueUrls.length !== 1) {
+  const primarySlice = slices.find((slice) => slice.comment === source.primarySubset);
+  if (!primarySlice) {
     throw new Error(
-      `Expected 1 variable WOFF2 URL for ${source.family} (${source.subset}); found ${uniqueUrls.length}.`,
+      `No /* ${source.primarySubset} */ subset found for ${source.family} (found: ${slices.map((s) => s.comment).join(', ')})`,
     );
   }
+  const extendedSourceSlices = slices.filter((slice) => slice.comment !== source.primarySubset);
 
-  const fontUrl = uniqueUrls[0];
-  const version = extractGoogleFontVersion(fontUrl);
-  if (!allowVersionDrift && version !== source.pinnedVersion) {
-    throw new Error(
-      `${source.family} upstream version changed (${version} !== pinned ${source.pinnedVersion}). ` +
-        'Re-run with --update-versions after verifying the update.',
-    );
-  }
-
-  const fontResponse = await fetchWithRetry(fontUrl, {
+  const primaryResponse = await fetchWithRetry(primarySlice.url, {
     headers: { 'User-Agent': FETCH_USER_AGENT },
   });
-  const buffer = Buffer.from(await fontResponse.arrayBuffer());
-  assertValidWoff2(buffer, source.family);
+  const primaryBuffer = Buffer.from(await primaryResponse.arrayBuffer());
+  assertValidWoff2(primaryBuffer, `${source.family} (${source.primarySubset})`);
 
   mkdirSync(path.dirname(source.outputFile), { recursive: true });
-  writeFileSync(source.outputFile, buffer);
-  await downloadLicense(source.licenseUrl, source.licenseFile);
+  writeFileSync(source.outputFile, primaryBuffer);
 
+  rmSync(source.extendedOutputDir, { recursive: true, force: true });
+  const versionDir = path.join(source.extendedOutputDir, version);
+  mkdirSync(versionDir, { recursive: true });
+
+  const extendedSlices = await mapWithConcurrency(
+    extendedSourceSlices,
+    DOWNLOAD_CONCURRENCY,
+    async (slice, index) => {
+      const response = await fetchWithRetry(slice.url, {
+        headers: { 'User-Agent': FETCH_USER_AGENT },
+      });
+      const buffer = Buffer.from(await response.arrayBuffer());
+      const subset = sanitizeSubsetSlug(slice.comment, index);
+      assertValidWoff2(buffer, `${source.family} (${subset})`);
+
+      const hash = createHash('sha256').update(buffer).digest('hex').slice(0, 8);
+      const filename = `${subset}-${hash}.woff2`;
+      writeFileSync(path.join(versionDir, filename), buffer);
+
+      return {
+        ...slice,
+        subset,
+        filename,
+        bytes: buffer.byteLength,
+        publicUrl: `${source.extendedPublicBasePath}/${version}/${filename}`,
+      };
+    },
+  );
+
+  const licenseText = await downloadLicenseText(source.licenseUrl);
+  writeLicense(source.licenseFile, licenseText);
+  writeLicense(source.publicLicenseFile, licenseText);
+
+  const extendedBytes = extendedSlices.reduce((sum, slice) => sum + slice.bytes, 0);
   return {
-    family: source.family,
+    ...source,
     version,
-    bytes: buffer.byteLength,
-    unicodeRange: latinEntries[0].unicodeRange,
+    primaryBytes: primaryBuffer.byteLength,
+    extendedSlices,
+    extendedBytes,
+    primaryUnicodeRange: primarySlice.unicodeRange,
   };
 }
 
 async function fetchCjkFont(source, { allowVersionDrift }) {
-  const cssResponse = await fetchWithRetry(source.cssUrl, {
-    headers: { 'User-Agent': FETCH_USER_AGENT },
+  const { version, slices } = await fetchValidatedSlices(source, {
+    allowVersionDrift,
+    onRetry: ({ attempt, attempts, delayMs, error }) => {
+      console.warn(
+        `[fetch-fonts] ${source.family} CSS attempt ${attempt}/${attempts} failed (${error.message}); retrying in ${delayMs}ms...`,
+      );
+    },
   });
-  const css = await cssResponse.text();
-  const entries = parseGoogleFontCss(css);
-  const slices = collapseSlicesByUrl(entries, source.expectedWeights);
-
-  const versions = [...new Set(slices.map((slice) => extractGoogleFontVersion(slice.url)))];
-  if (versions.length !== 1 || !versions[0]) {
-    throw new Error(`Unexpected version set for ${source.family}: ${versions.join(', ')}`);
-  }
-  const version = versions[0];
-  if (!allowVersionDrift && version !== source.pinnedVersion) {
-    throw new Error(
-      `${source.family} upstream version changed (${version} !== pinned ${source.pinnedVersion}). ` +
-        'Re-run with --update-versions after verifying the update.',
-    );
-  }
 
   rmSync(source.outputDir, { recursive: true, force: true });
   const versionDir = path.join(source.outputDir, version);
@@ -379,7 +565,8 @@ async function fetchCjkFont(source, { allowVersionDrift }) {
     },
   );
 
-  await downloadLicense(source.licenseUrl, source.licenseFile);
+  const licenseText = await downloadLicenseText(source.licenseUrl);
+  writeLicense(source.licenseFile, licenseText);
 
   const totalBytes = downloadedSlices.reduce((sum, slice) => sum + slice.bytes, 0);
   return {
@@ -393,12 +580,23 @@ async function fetchCjkFont(source, { allowVersionDrift }) {
 async function main() {
   const allowVersionDrift = process.argv.includes('--update-versions');
 
-  const dmSans = await fetchLatinFont(FONT_SOURCES.dmSans, { allowVersionDrift });
-  console.log(`Fetched ${dmSans.family} (${dmSans.version}, latin): ${dmSans.bytes} bytes`);
-
-  const jetbrainsMono = await fetchLatinFont(FONT_SOURCES.jetbrainsMono, { allowVersionDrift });
+  const dmSans = await fetchLatinAndExtendedFont(FONT_SOURCES.dmSans, { allowVersionDrift });
   console.log(
-    `Fetched ${jetbrainsMono.family} (${jetbrainsMono.version}, latin): ${jetbrainsMono.bytes} bytes`,
+    `Fetched ${dmSans.family} (${dmSans.version}): latin ${dmSans.primaryBytes} bytes + ${dmSans.extendedSlices.length} extended subset(s) ${dmSans.extendedBytes} bytes`,
+  );
+
+  const jetbrainsMono = await fetchLatinAndExtendedFont(FONT_SOURCES.jetbrainsMono, {
+    allowVersionDrift,
+  });
+  console.log(
+    `Fetched ${jetbrainsMono.family} (${jetbrainsMono.version}): latin ${jetbrainsMono.primaryBytes} bytes + ${jetbrainsMono.extendedSlices.length} extended subset(s) ${jetbrainsMono.extendedBytes} bytes`,
+  );
+
+  const latinExtendedCss = renderLatinExtendedStylesheet([dmSans, jetbrainsMono]);
+  mkdirSync(path.dirname(LATIN_EXTENDED_STYLESHEET_PATH), { recursive: true });
+  writeFileSync(LATIN_EXTENDED_STYLESHEET_PATH, latinExtendedCss, 'utf8');
+  console.log(
+    `Wrote ${LATIN_EXTENDED_STYLESHEET_PATH} (${Buffer.byteLength(latinExtendedCss)} bytes)`,
   );
 
   const notoSerifSc = await fetchCjkFont(FONT_SOURCES.notoSerifSc, { allowVersionDrift });

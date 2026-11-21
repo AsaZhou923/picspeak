@@ -142,7 +142,21 @@ function isKnownBlogPath(segments: string[]): boolean {
   return segments.length === 2 || (segments.length === 3 && segments[2] === 'opengraph-image');
 }
 
+/** Public self-hosted font license texts served from `public/fonts/`. */
+export const PUBLIC_FONT_LICENSE_PATHS = new Set([
+  '/fonts/dm-sans/OFL.txt',
+  '/fonts/jetbrains-mono/OFL.txt',
+  '/fonts/noto-serif-sc/OFL.txt',
+  '/fonts/noto-serif-jp/OFL.txt',
+]);
+
+export function isPublicFontLicensePath(pathname: string): boolean {
+  return PUBLIC_FONT_LICENSE_PATHS.has(pathname);
+}
+
 export function hasKnownAppPath(pathname: string): boolean {
+  if (isPublicFontLicensePath(pathname)) return true;
+
   const segments = pathname.split('/').filter(Boolean);
   const routeRoot = segments[0];
   if (!routeRoot) return true;

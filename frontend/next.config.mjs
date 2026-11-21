@@ -283,7 +283,7 @@ const nextConfig = {
         headers: [...securityHeaders, ...seoResponseHeaders],
       },
       {
-        source: '/fonts/:family(noto-serif-sc|noto-serif-jp)/:path*',
+        source: '/fonts/:family(dm-sans|jetbrains-mono|noto-serif-sc|noto-serif-jp)/:version(v\\d+)/:path*',
         headers: immutableFontHeaders,
       },
       ...cacheablePublicPageSources.map((source) => ({
