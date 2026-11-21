@@ -187,6 +187,8 @@ class Settings(BaseSettings):
     image_generation_enable_streaming: bool = False
     image_generation_free_monthly_credits: int = 3
     image_generation_pro_monthly_credits: int = 199
+    # Test-only E2E fake AI / image generation switch. Forbidden when APP_ENV=production.
+    e2e_fake_ai_enabled: bool = False
 
     def _local_dev_only(self) -> bool:
         local_origins = {'localhost', '127.0.0.1', '::1'}
@@ -317,7 +319,11 @@ class Settings(BaseSettings):
 
     @model_validator(mode='after')
     def validate_oauth_secret(self) -> 'Settings':
-        is_dev = self.app_env.strip().lower() == 'dev'
+        normalized_env = self.app_env.strip().lower()
+        is_dev = normalized_env == 'dev'
+
+        if self.e2e_fake_ai_enabled and normalized_env in {'production', 'prod'}:
+            raise ValueError('E2E_FAKE_AI_ENABLED cannot be enabled when APP_ENV=production')
 
         # Validate app_secret strength in non-dev environments.
         _insecure_app_secrets = {'', 'change-me', 'picspeakt123'}
