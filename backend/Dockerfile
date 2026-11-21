@@ -19,7 +19,9 @@ WORKDIR /app
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends libpq5 \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --system --gid 10001 app \
+    && useradd --system --uid 10001 --gid app --home-dir /nonexistent --no-create-home --shell /usr/sbin/nologin app
 
 COPY requirements.txt .
 COPY --from=builder /wheels /wheels
@@ -29,7 +31,11 @@ RUN pip install --no-cache-dir --no-index --find-links=/wheels -r requirements.t
 COPY app ./app
 COPY alembic ./alembic
 COPY alembic.ini ./alembic.ini
-COPY scripts/ensure_runtime_schema.py ./scripts/ensure_runtime_schema.py
+COPY scripts ./scripts
+
+# Run unprivileged; /app stays read-only to UID 10001 while standard Debian
+# sticky directories (/tmp, /var/tmp, /run/lock) remain writable for tempfiles.
+USER 10001:10001
 
 EXPOSE 8080
 

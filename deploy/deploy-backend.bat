@@ -13,7 +13,7 @@ set MIGRATION_JOB=picspeak-db-migrate
 set DATABASE_SECRET=picspeak-supabase-database-url
 set RUNTIME_SERVICE_ACCOUNT=781338217290-compute@developer.gserviceaccount.com
 
-cd /d "E:\Project Code\PicSpeak\backend"
+cd /d "%~dp0..\backend"
 
 if errorlevel 1 (
   echo [ERROR] Backend directory not found.
@@ -22,6 +22,42 @@ if errorlevel 1 (
 
 for /f %%i in ('git status --porcelain') do (
   echo [ERROR] Refusing to deploy from a dirty working tree. Commit or stash changes first.
+  exit /b 1
+)
+
+set "PYTHON_CMD="
+if exist "..\.venv\Scripts\python.exe" (
+  set "PYTHON_CMD=..\.venv\Scripts\python.exe"
+) else (
+  where python >nul 2>&1
+  if not errorlevel 1 (
+    set "PYTHON_CMD=python"
+  ) else (
+    where py >nul 2>&1
+    if not errorlevel 1 (
+      set "PYTHON_CMD=py -3"
+    )
+  )
+)
+
+if not defined PYTHON_CMD (
+  echo [ERROR] Python 3 is required to render deploy\cloud-run-env.yaml.
+  exit /b 1
+)
+
+rem Validate exit code first (for /f discards command exit codes), then capture
+rem stdout directly with relative paths so spaces in parent folders or temp-file
+rem collisions across concurrent runs cannot occur.
+%PYTHON_CMD% ..\deploy\render-cloud-run-env.py ..\deploy\cloud-run-env.yaml >nul
+if errorlevel 1 (
+  echo [ERROR] Failed to render Cloud Run environment overrides from deploy\cloud-run-env.yaml.
+  exit /b 1
+)
+
+set "UPDATE_ENV_VARS="
+for /f "usebackq delims=" %%i in (`%PYTHON_CMD% ..\deploy\render-cloud-run-env.py ..\deploy\cloud-run-env.yaml`) do set "UPDATE_ENV_VARS=%%i"
+if not defined UPDATE_ENV_VARS (
+  echo [ERROR] Rendered Cloud Run environment overrides are empty.
   exit /b 1
 )
 
@@ -87,7 +123,7 @@ gcloud run deploy %SERVICE_NAME% ^
   --region %REGION% ^
   --platform managed ^
   --allow-unauthenticated ^
-  --update-env-vars OPENAI_SCORE_MODEL=gpt-6-sol,OPENAI_REVIEW_MODEL=gpt-6-sol,RETAKE_ANALYSIS_MODEL=gpt-6.1-sol,OPENAI_SCORE_REASONING_EFFORT=low,OPENAI_REVIEW_REASONING_EFFORT=low,RETAKE_ANALYSIS_REASONING_EFFORT=high,OPENAI_PRO_MODEL=gpt-6.1-sol,OPENAI_PRO_REASONING_EFFORT=high,NOTIFICATIONS_READ_ENABLED=true,NOTIFICATIONS_EVENT_CAPTURE_ENABLED=true,NOTIFICATIONS_WORKER_ENABLED=true,LEMONSQUEEZY_CHECKOUT_TEST_MODE=false,LEMONSQUEEZY_WEBHOOK_TEST_MODE=false,LEMONSQUEEZY_PRO_ONE_TIME_CHECKOUT_URL=https://picspeak.lemonsqueezy.com/checkout/buy/c2fbdd32-49e0-4dd6-9924-4d85d5e27522,LEMONSQUEEZY_PRO_ONE_TIME_VARIANT_ID=1445229,GUEST_REVIEW_LIMIT_PER_DAY=1,PRO_REVIEW_SOFT_LIMIT_PER_MONTH=150,PRO_REVIEW_SOFT_LIMIT_RATE_PER_MINUTE=2 ^
+  "--update-env-vars=%UPDATE_ENV_VARS%" ^
   --port 8080
 
 if errorlevel 1 (
