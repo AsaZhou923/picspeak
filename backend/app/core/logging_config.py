@@ -9,7 +9,7 @@ import sys
 from typing import Any, Iterator
 
 from app.core.config import settings
-from app.services.audit import mask_capability_url_text
+from app.services.audit import mask_capability_path, mask_capability_url_text
 
 SERVICE_NAME = 'picspeak-api'
 ERROR_REPORTING_TYPE = 'type.googleapis.com/google.devtools.clouderrorreporting.v1beta1.ReportedErrorEvent'
@@ -27,7 +27,6 @@ _WORKER_LOG_CONTEXT_VARS: dict[str, ContextVar[str | None]] = {
     'owner_public_id': ContextVar('picspeak_owner_public_id', default=None),
 }
 
-_CAPABILITY_PATH_RE = re.compile(r'(/(?:public/reviews|share)/)([^/?#\s"\'<>]+)', re.IGNORECASE)
 _AMZ_QUERY_PARAM_RE = re.compile(
     r'((?:^|[?&]|%3[fF]|%26|\\u0026|\\u003[fF]|&amp;)x-amz-[a-z0-9_-]+(?:=|%3[dD]|\\u003[dD]))'
     r'.*?'
@@ -75,11 +74,6 @@ _SEVERITY_BY_LEVEL = {
     logging.ERROR: 'ERROR',
     logging.CRITICAL: 'CRITICAL',
 }
-
-
-def mask_capability_path(path: str) -> str:
-    """Mask capability-bearing path segments such as /public/reviews/{share_token}."""
-    return _CAPABILITY_PATH_RE.sub(r'\1***', path)
 
 
 def mask_capability_log_text(text: str) -> str:
