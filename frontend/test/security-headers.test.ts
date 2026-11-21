@@ -17,15 +17,112 @@ async function loadNextConfig(suffix = 'default') {
   };
 }
 
-async function loadCsp(suffix?: string): Promise<string> {
+async function loadSecurityHeaders(suffix?: string): Promise<Map<string, string>> {
   const nextConfig = await loadNextConfig(suffix);
   const routes = await nextConfig.headers();
-  return (
-    routes
-      .flatMap((route) => route.headers)
-      .find((header) => header.key === 'Content-Security-Policy')?.value ?? ''
-  );
+  const globalRoute = routes.find((route) => route.source === '/:path*');
+  return new Map(globalRoute?.headers.map((header) => [header.key, header.value]) ?? []);
 }
+
+async function loadCsp(suffix?: string): Promise<string> {
+  return (await loadSecurityHeaders(suffix)).get('Content-Security-Policy') ?? '';
+}
+
+test('CSP omits unsafe-eval in production and includes it only outside production', async () => {
+  const env = process.env as Record<string, string | undefined>;
+  const originalNodeEnv = env.NODE_ENV;
+  const originalApiUrl = env.NEXT_PUBLIC_API_URL;
+  env.NEXT_PUBLIC_API_URL = 'https://api.picspeak.art';
+
+  try {
+    env.NODE_ENV = 'production';
+    const prodHeaders = await loadSecurityHeaders('prod-script-src');
+    const prodCsp = prodHeaders.get('Content-Security-Policy') ?? '';
+    const prodScriptSrc = prodCsp.match(/(?:^|; )script-src ([^;]+)/)?.[1] ?? '';
+
+    assert.doesNotMatch(prodScriptSrc, /'unsafe-eval'/);
+    assert.match(prodScriptSrc, /'unsafe-inline'/);
+
+    env.NODE_ENV = 'development';
+    const devHeaders = await loadSecurityHeaders('dev-script-src');
+    const devCsp = devHeaders.get('Content-Security-Policy') ?? '';
+    const devScriptSrc = devCsp.match(/(?:^|; )script-src ([^;]+)/)?.[1] ?? '';
+
+    assert.match(devScriptSrc, /'unsafe-eval'/);
+  } finally {
+    if (originalNodeEnv === undefined) delete env.NODE_ENV;
+    else env.NODE_ENV = originalNodeEnv;
+    if (originalApiUrl === undefined) delete env.NEXT_PUBLIC_API_URL;
+    else env.NEXT_PUBLIC_API_URL = originalApiUrl;
+  }
+});
+
+test('CSP tightens connect-src to explicit API, Clerk, Turnstile, Vercel, and R2 origins without wildcard https:', async () => {
+  const env = process.env as Record<string, string | undefined>;
+  const originalNodeEnv = env.NODE_ENV;
+  const originalApiUrl = env.NEXT_PUBLIC_API_URL;
+  env.NODE_ENV = 'production';
+  env.NEXT_PUBLIC_API_URL = 'https://api.picspeak.art';
+
+  try {
+    const csp = await loadCsp('tightened-connect-src');
+    const connectSrc = csp.match(/(?:^|; )connect-src ([^;]+)/)?.[1] ?? '';
+    const tokens = connectSrc.split(/\s+/);
+
+    assert.ok(!tokens.includes('https:'), 'connect-src must not allow arbitrary https: origins');
+    assert.ok(!tokens.includes('http://localhost:8000'), 'production connect-src omits localhost');
+    for (const expected of [
+      "'self'",
+      'https://api.picspeak.art',
+      'wss://api.picspeak.art',
+      'https://*.clerk.accounts.dev',
+      'https://*.clerk.com',
+      'https://clerk.picspeak.art',
+      'https://challenges.cloudflare.com',
+      'https://vitals.vercel-insights.com',
+      'https://va.vercel-scripts.com',
+      'https://*.r2.cloudflarestorage.com',
+    ]) {
+      assert.ok(tokens.includes(expected), `connect-src should include ${expected}`);
+    }
+  } finally {
+    if (originalNodeEnv === undefined) delete env.NODE_ENV;
+    else env.NODE_ENV = originalNodeEnv;
+    if (originalApiUrl === undefined) delete env.NEXT_PUBLIC_API_URL;
+    else env.NEXT_PUBLIC_API_URL = originalApiUrl;
+  }
+});
+
+test('CSP Report-Only strips unsafe-inline from script-src and reports to /api/v1/client-errors', async () => {
+  const env = process.env as Record<string, string | undefined>;
+  const originalNodeEnv = env.NODE_ENV;
+  const originalApiUrl = env.NEXT_PUBLIC_API_URL;
+  env.NODE_ENV = 'production';
+  env.NEXT_PUBLIC_API_URL = 'https://api.picspeak.art';
+
+  try {
+    const headers = await loadSecurityHeaders('report-only');
+    const enforced = headers.get('Content-Security-Policy') ?? '';
+    const reportOnly = headers.get('Content-Security-Policy-Report-Only') ?? '';
+    const reportingEndpoints = headers.get('Reporting-Endpoints') ?? '';
+
+    assert.ok(reportOnly.length > 0);
+    const reportOnlyScriptSrc = reportOnly.match(/(?:^|; )script-src ([^;]+)/)?.[1] ?? '';
+    assert.doesNotMatch(reportOnlyScriptSrc, /'unsafe-inline'/);
+    assert.doesNotMatch(reportOnlyScriptSrc, /'unsafe-eval'/);
+    assert.match(reportOnlyScriptSrc, /'self'/);
+    assert.match(reportOnlyScriptSrc, /https:\/\/clerk\.picspeak\.art/);
+    assert.match(reportOnly, /(?:^|; )report-uri https:\/\/api\.picspeak\.art\/api\/v1\/client-errors(?:;|$)/);
+    assert.match(reportOnly, /(?:^|; )report-to csp-endpoint(?:;|$)/);
+    assert.equal(reportingEndpoints, 'csp-endpoint="https://api.picspeak.art/api/v1/client-errors"');
+    assert.doesNotMatch(enforced, /report-uri/);
+  } finally {
+    if (originalNodeEnv === undefined) delete env.NODE_ENV;
+    else env.NODE_ENV = originalNodeEnv;
+    if (originalApiUrl === undefined) delete env.NEXT_PUBLIC_API_URL;
+    else env.NEXT_PUBLIC_API_URL = originalApiUrl;
+  }
+});
 
 test('CSP allows Clerk modal workers without wildcard worker sources', async () => {
   const csp = await loadCsp();
