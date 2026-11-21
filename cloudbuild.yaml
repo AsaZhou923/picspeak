@@ -68,15 +68,27 @@ steps:
       - --wait
       - --quiet
 
+  - id: RenderEnv
+    name: python:3.11-slim
+    entrypoint: bash
+    waitFor:
+      - '-'
+    args:
+      - -ceu
+      - |
+        python deploy/render-cloud-run-env.py deploy/cloud-run-env.yaml > /workspace/cloud-run-env.rendered
+        test -s /workspace/cloud-run-env.rendered
+
   - id: Deploy
     name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
     entrypoint: bash
     waitFor:
       - Migrate
+      - RenderEnv
     args:
       - -ceu
       - |
-        UPDATE_ENV_VARS="$$(python3 deploy/render-cloud-run-env.py deploy/cloud-run-env.yaml)"
+        UPDATE_ENV_VARS="$$(cat /workspace/cloud-run-env.rendered)"
         test -n "$$UPDATE_ENV_VARS"
         gcloud run services update "$_SERVICE_NAME" \
           "--image=$_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA" \

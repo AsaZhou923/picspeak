@@ -63,6 +63,7 @@ class DeploymentMigrationContractTests(unittest.TestCase):
             config.index('id: Build'),
             config.index('id: Push'),
             config.index('id: Migrate'),
+            config.index('id: RenderEnv'),
             config.index('id: Deploy'),
         ]
         self.assertEqual(ordered_steps, sorted(ordered_steps))
@@ -72,7 +73,10 @@ class DeploymentMigrationContractTests(unittest.TestCase):
         self.assertRegex(config, re.compile(r'id: Migrate.*?jobs\s+- deploy', re.DOTALL))
         self.assertRegex(config, re.compile(r'id: Migrate.*?--execute-now.*?--wait', re.DOTALL))
         self.assertRegex(config, re.compile(r'id: Migrate.*?--wait', re.DOTALL))
-        self.assertRegex(config, re.compile(r'id: Deploy.*?waitFor:\s+- Migrate', re.DOTALL))
+        self.assertRegex(
+            config,
+            re.compile(r'id: Deploy.*?waitFor:\s+- Migrate\s+- RenderEnv', re.DOTALL),
+        )
 
     def test_manual_backend_deploy_uses_the_same_migration_gate_and_relative_path(self) -> None:
         script = (REPO_ROOT / 'deploy' / 'deploy-backend.bat').read_text(encoding='utf-8')
@@ -99,16 +103,33 @@ class DeploymentMigrationContractTests(unittest.TestCase):
         # and keep --update-env-vars semantics (never --env-vars-file, which replaces all vars).
         self.assertNotIn('--env-vars-file', config)
         self.assertNotIn('--env-vars-file', script)
-        self.assertIn('deploy/render-cloud-run-env.py deploy/cloud-run-env.yaml', config)
-        self.assertIn('"--update-env-vars=$$UPDATE_ENV_VARS"', config)
+
+        render_section = config[config.index('id: RenderEnv') : config.index('id: Deploy')]
+        deploy_section = config[config.index('id: Deploy') : config.index('images:')]
+
+        self.assertIn('name: python:3.11-slim', render_section)
+        self.assertIn(
+            'python deploy/render-cloud-run-env.py deploy/cloud-run-env.yaml > /workspace/cloud-run-env.rendered',
+            render_section,
+        )
+        self.assertIn('name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim', deploy_section)
+        self.assertIn('UPDATE_ENV_VARS="$$(cat /workspace/cloud-run-env.rendered)"', deploy_section)
+        self.assertIn('test -n "$$UPDATE_ENV_VARS"', deploy_section)
+        self.assertIn('"--update-env-vars=$$UPDATE_ENV_VARS"', deploy_section)
+        self.assertNotIn('python', deploy_section)
+
         self.assertIn('render-cloud-run-env.py', script)
         self.assertIn('cloud-run-env.yaml', script)
         self.assertIn('"--update-env-vars=%UPDATE_ENV_VARS%" ^', script)
         self.assertNotIn('OPENAI_SCORE_MODEL=', config)
         self.assertNotIn('OPENAI_SCORE_MODEL=', script)
 
-        # Verify both in-process parsing and CLI output match the exact deployed fixture.
-        self.assertEqual(renderer.load_and_render(ENV_FILE), EXPECTED_PRODUCTION_UPDATE_ENV_VARS)
+        # Verify both in-process parsing and CLI output match the exact deployed fixture
+        # without any trailing/embedded newline or CR issues.
+        rendered = renderer.load_and_render(ENV_FILE)
+        self.assertEqual(rendered, EXPECTED_PRODUCTION_UPDATE_ENV_VARS)
+        self.assertNotIn('\n', rendered)
+        self.assertNotIn('\r', rendered)
         completed = subprocess.run(
             [sys.executable, str(ENV_RENDERER), str(ENV_FILE)],
             capture_output=True,
@@ -117,7 +138,9 @@ class DeploymentMigrationContractTests(unittest.TestCase):
             check=False,
         )
         self.assertEqual(completed.returncode, 0, completed.stderr)
-        self.assertEqual(completed.stdout.strip(), EXPECTED_PRODUCTION_UPDATE_ENV_VARS)
+        self.assertEqual(completed.stdout.rstrip('\n'), EXPECTED_PRODUCTION_UPDATE_ENV_VARS)
+        self.assertNotIn('\r', completed.stdout)
+        self.assertNotIn('\n', completed.stdout.rstrip('\n'))
 
     def test_env_renderer_handles_special_values_and_rejects_malformed_input(self) -> None:
         renderer = _load_env_renderer_module()
