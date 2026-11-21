@@ -82,9 +82,5 @@ jobs:
         run: npm run test
       - name: Build
         run: npm run build
-        env:
-          NEXT_FONT_GOOGLE_MOCKED_RESPONSES: ${{ github.workspace }}/frontend/test/fixtures/google-fonts-mocked-responses.cjs
       - name: Production Blog routing regression
         run: npm run test:production-blog
-        env:
-          NEXT_FONT_GOOGLE_MOCKED_RESPONSES: ${{ github.workspace }}/frontend/test/fixtures/google-fonts-mocked-responses.cjs

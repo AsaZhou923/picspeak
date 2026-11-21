@@ -472,3 +472,62 @@ test('AI discovery text remains crawlable while canonical HTML owns search index
     assert.match(response.headers.get('x-robots-tag') ?? '', /noindex, follow/i, pathName);
   }
 });
+
+test('production HTML preserves font CSS variables, marks DM Sans for preload, and serves self-hosted fonts', async () => {
+  const response = await fetch(`${baseUrl}/en`);
+  assert.equal(response.status, 200);
+  const html = await response.text();
+
+  // No external Google Fonts URLs appear in HTML or bundled CSS, and <html> carries
+  // next/font/local variable classes.
+  assert.doesNotMatch(html, /fonts\.googleapis\.com|fonts\.gstatic\.com/i);
+  assert.match(html, /<html[^>]+class="[^"]*__variable_[^"]+"/i);
+
+  const stylesheetPaths = [
+    ...html.matchAll(/<link[^>]+rel="stylesheet"[^>]+href="(\/_next\/static\/css\/[^"]+\.css)"/gi),
+  ].map((match) => match[1]);
+  assert.ok(stylesheetPaths.length > 0, 'Expected production stylesheet link in /en HTML');
+
+  let combinedCss = '';
+  for (const cssPath of stylesheetPaths) {
+    const cssResponse = await fetch(`${baseUrl}${cssPath}`);
+    assert.equal(cssResponse.status, 200, cssPath);
+    combinedCss += await cssResponse.text();
+  }
+
+  for (const variableName of [
+    '--font-serif-sc',
+    '--font-serif-jp',
+    '--font-sans-latin',
+    '--font-mono-latin',
+    '--font-display',
+    '--font-body',
+    '--font-mono',
+  ]) {
+    assert.ok(combinedCss.includes(variableName), `Expected ${variableName} in production CSS`);
+  }
+  assert.doesNotMatch(combinedCss, /fonts\.googleapis\.com|fonts\.gstatic\.com/i);
+
+  // DM Sans must be emitted with Next.js's preload (`.p`) and size-adjust (`-s`) suffix.
+  const preloadedLatinMatch = combinedCss.match(/\/_next\/static\/media\/[^'")\s]+-s\.p\.woff2/);
+  assert.ok(preloadedLatinMatch, 'Expected preloaded DM Sans -s.p.woff2 in production CSS');
+  if (process.platform !== 'win32') {
+    assert.ok(
+      html.includes(preloadedLatinMatch[0]),
+      `Expected /en HTML to preload ${preloadedLatinMatch[0]}`,
+    );
+  }
+
+  const latinResponse = await fetch(`${baseUrl}${preloadedLatinMatch[0]}`);
+  assert.equal(latinResponse.status, 200);
+  assert.match(latinResponse.headers.get('cache-control') ?? '', /immutable/i);
+  assert.equal(Buffer.from(await latinResponse.arrayBuffer()).toString('ascii', 0, 4), 'wOF2');
+
+  const cjkSliceMatch = combinedCss.match(/\/fonts\/noto-serif-sc\/v\d+\/[^'")\s]+\.woff2/);
+  assert.ok(cjkSliceMatch, 'Expected self-hosted Noto Serif SC slice URL in production CSS');
+  const sliceResponse = await fetch(`${baseUrl}${cjkSliceMatch[0]}`);
+  assert.equal(sliceResponse.status, 200);
+  assert.match(sliceResponse.headers.get('cache-control') ?? '', /immutable/i);
+  const bytes = Buffer.from(await sliceResponse.arrayBuffer());
+  assert.equal(bytes.toString('ascii', 0, 4), 'wOF2');
+});
