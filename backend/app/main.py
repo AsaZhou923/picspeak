@@ -19,6 +19,8 @@ from app.core.errors import normalize_http_error
 from app.core.logging_config import (
     bind_request_log_context,
     configure_logging,
+    mark_exception_reported,
+    mask_capability_path,
     reset_request_log_context,
 )
 from app.core.network import client_ip_from_request
@@ -109,7 +111,7 @@ def _log_error_response(
     log_payload = {
         'request_id': getattr(request.state, 'request_id', None),
         'http_method': request.method,
-        'request_path': request.url.path,
+        'request_path': mask_capability_path(request.url.path),
         'status_code': status_code,
         'error_code': code,
         'error_message': message,
@@ -184,6 +186,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
+    mark_exception_reported(exc)
     _log_error_response(
         request,
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

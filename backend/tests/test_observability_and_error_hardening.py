@@ -768,71 +768,210 @@ class StructuredErrorReportingTests(unittest.TestCase):
         self.assertNotIn('@type', parsed)
 
     def test_configure_logging_is_idempotent_and_preserves_uvicorn_logs_in_both_modes(self) -> None:
+        from uvicorn.logging import AccessFormatter, DefaultFormatter
+
         root_logger = logging.getLogger()
         original_handlers = list(root_logger.handlers)
         uvicorn_logger = logging.getLogger('uvicorn')
         uvicorn_access_logger = logging.getLogger('uvicorn.access')
         uvicorn_error_logger = logging.getLogger('uvicorn.error')
-        orig_uvicorn = (list(uvicorn_logger.handlers), uvicorn_logger.propagate, uvicorn_logger.level)
-        orig_access = (list(uvicorn_access_logger.handlers), uvicorn_access_logger.propagate, uvicorn_access_logger.level)
-        orig_error = (list(uvicorn_error_logger.handlers), uvicorn_error_logger.propagate, uvicorn_error_logger.level)
+        orig_uvicorn = (list(uvicorn_logger.handlers), list(uvicorn_logger.filters), uvicorn_logger.propagate, uvicorn_logger.level)
+        orig_access = (list(uvicorn_access_logger.handlers), list(uvicorn_access_logger.filters), uvicorn_access_logger.propagate, uvicorn_access_logger.level)
+        orig_error = (list(uvicorn_error_logger.handlers), list(uvicorn_error_logger.filters), uvicorn_error_logger.propagate, uvicorn_error_logger.level)
+
+        independent_stream = StringIO()
+        independent_handler = logging.StreamHandler(independent_stream)
+        root_logger.addHandler(independent_handler)
 
         try:
-            for json_mode in (False, True):
-                with self.subTest(json_mode=json_mode):
-                    # Seed a stray plain StreamHandler as basicConfig or reload would.
-                    root_logger.addHandler(logging.StreamHandler(StringIO()))
+            # Configure uvicorn loggers as stock Uvicorn LOGGING_CONFIG does.
+            uv_err_stream = StringIO()
+            uv_acc_stream = StringIO()
+            uv_default_handler = logging.StreamHandler(uv_err_stream)
+            uv_default_handler.setFormatter(DefaultFormatter('%(levelprefix)s %(message)s', use_colors=False))
+            uv_access_handler = logging.StreamHandler(uv_acc_stream)
+            uv_access_handler.setFormatter(AccessFormatter('%(levelprefix)s %(client_addr)s - "%(request_line)s" %(status_code)s', use_colors=False))
 
-                    stream = StringIO()
-                    configure_logging(json_logs=json_mode, stream=stream)
-                    configure_logging(json_logs=json_mode, stream=stream)
-                    handler = configure_logging(json_logs=json_mode, stream=stream)
+            uvicorn_logger.handlers = [uv_default_handler]
+            uvicorn_logger.propagate = False
+            uvicorn_logger.setLevel(logging.INFO)
+            uvicorn_error_logger.handlers = []
+            uvicorn_error_logger.propagate = True
+            uvicorn_error_logger.setLevel(logging.INFO)
+            uvicorn_access_logger.handlers = [uv_access_handler]
+            uvicorn_access_logger.propagate = False
+            uvicorn_access_logger.setLevel(logging.INFO)
 
-                    managed = [h for h in root_logger.handlers if getattr(h, '_picspeak_managed', False)]
-                    plain_stream = [h for h in root_logger.handlers if type(h) is logging.StreamHandler]
-                    self.assertEqual(len(managed), 1)
-                    self.assertEqual(len(plain_stream), 1)
-                    self.assertIs(managed[0], handler)
+            # 1) Text mode: repeated configure_logging keeps 1 managed handler, preserves independent handler & uvicorn handlers.
+            dev_stream = StringIO()
+            configure_logging(json_logs=False, stream=dev_stream)
+            configure_logging(json_logs=False, stream=dev_stream)
+            dev_handler = configure_logging(json_logs=False, stream=dev_stream)
 
-                    logging.getLogger('app.idempotency_probe').info('single-line-check')
-                    lines = [line for line in stream.getvalue().splitlines() if 'single-line-check' in line]
-                    self.assertEqual(len(lines), 1)
+            managed = [h for h in root_logger.handlers if getattr(h, '_picspeak_managed', False)]
+            self.assertEqual(len(managed), 1)
+            self.assertIs(managed[0], dev_handler)
+            self.assertIn(independent_handler, root_logger.handlers)
 
-                    # Case 1: uvicorn configured with its own non-propagating handlers (standard uvicorn LOGGING_CONFIG).
-                    uv_err_stream = StringIO()
-                    uv_acc_stream = StringIO()
-                    uvicorn_logger.handlers = [logging.StreamHandler(uv_err_stream)]
-                    uvicorn_logger.propagate = False
-                    uvicorn_logger.setLevel(logging.INFO)
-                    uvicorn_error_logger.handlers = []
-                    uvicorn_error_logger.propagate = True
-                    uvicorn_error_logger.setLevel(logging.INFO)
-                    uvicorn_access_logger.handlers = [logging.StreamHandler(uv_acc_stream)]
-                    uvicorn_access_logger.propagate = False
-                    uvicorn_access_logger.setLevel(logging.INFO)
+            logging.getLogger('app.idempotency_probe').info('single-line-dev')
+            self.assertEqual(len([line for line in dev_stream.getvalue().splitlines() if 'single-line-dev' in line]), 1)
+            self.assertIn('single-line-dev', independent_stream.getvalue())
 
-                    # Re-running configure_logging (e.g. worker_main/main import or reload) must not silence uvicorn.
-                    configure_logging(json_logs=json_mode, stream=stream)
-                    uvicorn_error_logger.info('uvicorn-error-visible')
-                    uvicorn_access_logger.info('uvicorn-access-visible')
-                    self.assertIn('uvicorn-error-visible', uv_err_stream.getvalue())
-                    self.assertIn('uvicorn-access-visible', uv_acc_stream.getvalue())
+            uvicorn_error_logger.info('uvicorn-error-dev')
+            uvicorn_access_logger.info(
+                '%s - "%s %s HTTP/%s" %d',
+                '127.0.0.1:1234',
+                'GET',
+                '/api/v1/public/reviews/SECRET_SHARE_DEV?photo_token=SECRET_PHOTO_DEV&X-Amz-Signature=SECRET_SIG_DEV',
+                '1.1',
+                200,
+            )
+            self.assertIn('uvicorn-error-dev', uv_err_stream.getvalue())
+            self.assertIn('/api/v1/public/reviews/***', uv_acc_stream.getvalue())
+            self.assertNotIn('SECRET_SHARE_DEV', uv_acc_stream.getvalue())
+            self.assertNotIn('SECRET_PHOTO_DEV', uv_acc_stream.getvalue())
+            self.assertNotIn('SECRET_SIG_DEV', uv_acc_stream.getvalue())
 
-                    # Case 2: uvicorn propagating to root (custom log config without dedicated handlers).
-                    uvicorn_logger.handlers = []
-                    uvicorn_logger.propagate = True
-                    uvicorn_access_logger.handlers = []
-                    uvicorn_access_logger.propagate = True
-                    uvicorn_error_logger.info('uvicorn-error-propagated')
-                    uvicorn_access_logger.info('uvicorn-access-propagated')
-                    output = stream.getvalue()
-                    self.assertIn('uvicorn-error-propagated', output)
-                    self.assertIn('uvicorn-access-propagated', output)
+            # 2) JSON mode: independent handler still survives; uvicorn routes through the single JSON handler (no plain-text mix).
+            json_stream = StringIO()
+            configure_logging(json_logs=True, stream=json_stream)
+            configure_logging(json_logs=True, stream=json_stream)
+            json_handler = configure_logging(json_logs=True, stream=json_stream)
+
+            managed = [h for h in root_logger.handlers if getattr(h, '_picspeak_managed', False)]
+            self.assertEqual(len(managed), 1)
+            self.assertIs(managed[0], json_handler)
+            self.assertIn(independent_handler, root_logger.handlers)
+
+            uv_err_before = len(uv_err_stream.getvalue())
+            uv_acc_before = len(uv_acc_stream.getvalue())
+
+            uvicorn_error_logger.info('uvicorn-error-json')
+            uvicorn_access_logger.info(
+                '%s - "%s %s HTTP/%s" %d',
+                '127.0.0.1:5678',
+                'GET',
+                '/api/v1/generations/gen_1/image?generation_token=SECRET_GEN_JSON&signature=SECRET_SIG2&token=SECRET_TOK&share_token=SECRET_SH&X-Amz-Credential=SECRET_CRED',
+                '1.1',
+                200,
+            )
+            # Plain-text uvicorn handlers received nothing new in JSON mode.
+            self.assertEqual(len(uv_err_stream.getvalue()), uv_err_before)
+            self.assertEqual(len(uv_acc_stream.getvalue()), uv_acc_before)
+
+            json_lines = [line for line in json_stream.getvalue().splitlines() if line.strip()]
+            parsed_lines = [json.loads(line) for line in json_lines]
+            self.assertTrue(any(e['logger'] == 'uvicorn.error' and 'uvicorn-error-json' in e['message'] for e in parsed_lines))
+            access_entries = [e for e in parsed_lines if e['logger'] == 'uvicorn.access']
+            self.assertEqual(len(access_entries), 1)
+            self.assertEqual(access_entries[0]['serviceContext'], {'service': SERVICE_NAME})
+            for secret in ('SECRET_GEN_JSON', 'SECRET_SIG2', 'SECRET_TOK', 'SECRET_SH', 'SECRET_CRED'):
+                self.assertNotIn(secret, json_stream.getvalue())
+
+            # 3) Switching back to text mode restores uvicorn's handlers.
+            configure_logging(json_logs=False, stream=dev_stream)
+            self.assertIn(uv_access_handler, uvicorn_access_logger.handlers)
+            self.assertIn(uv_default_handler, uvicorn_logger.handlers)
         finally:
             root_logger.handlers = original_handlers
-            uvicorn_logger.handlers, uvicorn_logger.propagate, uvicorn_logger.level = orig_uvicorn
-            uvicorn_access_logger.handlers, uvicorn_access_logger.propagate, uvicorn_access_logger.level = orig_access
-            uvicorn_error_logger.handlers, uvicorn_error_logger.propagate, uvicorn_error_logger.level = orig_error
+            uvicorn_logger.handlers, uvicorn_logger.filters, uvicorn_logger.propagate, uvicorn_logger.level = orig_uvicorn
+            uvicorn_access_logger.handlers, uvicorn_access_logger.filters, uvicorn_access_logger.propagate, uvicorn_access_logger.level = orig_access
+            uvicorn_error_logger.handlers, uvicorn_error_logger.filters, uvicorn_error_logger.propagate, uvicorn_error_logger.level = orig_error
+
+    def test_capability_masking_covers_request_path_url_extras_and_exceptions(self) -> None:
+        from app.core.logging_config import CapabilityMaskingFilter
+
+        secrets = (
+            'TOK_SHARE_999',
+            'TOK_PHOTO_888',
+            'TOK_GEN_777',
+            'TOK_AMZ_666',
+            'TOK_SIG_555',
+            'TOK_GENERIC_444',
+        )
+        for json_mode in (False, True):
+            with self.subTest(json_mode=json_mode):
+                stream = StringIO()
+                handler = configure_logging(json_logs=json_mode, stream=stream)
+                try:
+                    tokens = bind_request_log_context(
+                        request_id='req_mask_1',
+                        request_path=f'/api/v1/public/reviews/{secrets[0]}',
+                    )
+                    try:
+                        try:
+                            raise RuntimeError(
+                                f'fetch failed https://r2.example/x?photo_token={secrets[1]}'
+                                f'&generation_token={secrets[2]}&X-Amz-Security-Token={secrets[3]}'
+                                f'&signature={secrets[4]}&token={secrets[5]}'
+                            )
+                        except RuntimeError:
+                            logging.getLogger('app.mask_probe').exception(
+                                'failed on /share/%s',
+                                secrets[0],
+                                extra={'url': f'/api/v1/public/reviews/{secrets[0]}?photo_token={secrets[1]}'},
+                            )
+                    finally:
+                        reset_request_log_context(tokens)
+                finally:
+                    logging.getLogger().removeHandler(handler)
+
+                rendered = stream.getvalue()
+                self.assertTrue(rendered.strip())
+                for secret in secrets:
+                    self.assertNotIn(secret, rendered)
+                self.assertIn('/share/***', rendered)
+                if json_mode:
+                    entry = json.loads(rendered.strip().splitlines()[-1])
+                    self.assertEqual(entry['request_path'], '/api/v1/public/reviews/***')
+                    self.assertEqual(entry['url'], '/api/v1/public/reviews/***?photo_token=***')
+
+        # Direct filter check on url and request_path attributes
+        flt = CapabilityMaskingFilter()
+        rec = logging.LogRecord('app.test', logging.INFO, __file__, 1, 'ok', (), None)
+        rec.request_path = '/api/v1/public/reviews/SECRET_SHARE_DIRECT'
+        rec.url = 'https://example.com/share/SECRET_SHARE_DIRECT?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Signature=SECRET_AMZ'
+        flt.filter(rec)
+        self.assertEqual(rec.request_path, '/api/v1/public/reviews/***')
+        self.assertNotIn('SECRET_SHARE_DIRECT', rec.url)
+        self.assertNotIn('SECRET_AMZ', rec.url)
+
+    def test_duplicate_uvicorn_asgi_exception_is_suppressed_and_fallback_omits_error_reporting_type(self) -> None:
+        from app.core.logging_config import mark_exception_reported
+
+        stream = StringIO()
+        handler = configure_logging(json_logs=True, stream=stream)
+        try:
+            # 1) Marked exception (as done by unhandled_exception_handler) is suppressed on uvicorn.error.
+            try:
+                raise RuntimeError('already-reported-boom')
+            except RuntimeError as exc:
+                mark_exception_reported(exc)
+                logging.getLogger('uvicorn.error').error('Exception in ASGI application\n', exc_info=exc)
+
+            self.assertEqual(stream.getvalue().strip(), '')
+
+            # 2) Belt-and-suspenders: if an unmarked uvicorn ASGI error somehow reaches CloudLoggingJsonFormatter,
+            #    it still formats as JSON at ERROR without @type ReportedErrorEvent.
+            formatter = CloudLoggingJsonFormatter()
+            try:
+                raise RuntimeError('unmarked-uvicorn-boom')
+            except RuntimeError as exc:
+                record = logging.LogRecord(
+                    'uvicorn.error',
+                    logging.ERROR,
+                    __file__,
+                    1,
+                    'Exception in ASGI application\n',
+                    (),
+                    (type(exc), exc, exc.__traceback__),
+                )
+            parsed = json.loads(formatter.format(record))
+            self.assertEqual(parsed['severity'], 'ERROR')
+            self.assertNotIn('@type', parsed)
+            self.assertIn('unmarked-uvicorn-boom', parsed['message'])
+        finally:
+            logging.getLogger().removeHandler(handler)
 
 
 class WorkerVisibilityTests(unittest.TestCase):

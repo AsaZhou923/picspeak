@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+from collections import deque
 from contextvars import ContextVar, Token
 import json
 import logging
+import re
 import sys
+import threading
 from typing import Any
 
 from app.core.config import settings
+from app.services.audit import mask_capability_url_text
 
 SERVICE_NAME = 'picspeak-api'
 ERROR_REPORTING_TYPE = 'type.googleapis.com/google.devtools.clouderrorreporting.v1beta1.ReportedErrorEvent'
@@ -14,6 +18,19 @@ ERROR_REPORTING_TYPE = 'type.googleapis.com/google.devtools.clouderrorreporting.
 _request_id_var: ContextVar[str | None] = ContextVar('picspeak_request_id', default=None)
 _user_public_id_var: ContextVar[str | None] = ContextVar('picspeak_user_public_id', default=None)
 _request_path_var: ContextVar[str | None] = ContextVar('picspeak_request_path', default=None)
+
+_CAPABILITY_PATH_RE = re.compile(r'(/(?:public/reviews|share)/)([^/?#\s"\'<>]+)', re.IGNORECASE)
+_AMZ_QUERY_PARAM_RE = re.compile(
+    r'((?:^|[?&]|%3[fF]|%26|\\u0026|\\u003[fF]|&amp;)x-amz-[a-z0-9_-]+(?:=|%3[dD]|\\u003[dD]))'
+    r'.*?'
+    r'(?=$|[&\s"\'<>]|%26|\\u0026|&amp;)',
+    re.IGNORECASE,
+)
+
+_reported_exc_lock = threading.Lock()
+_reported_exc_ids: deque[int] = deque(maxlen=256)
+
+_saved_uvicorn_handlers: dict[str, tuple[list[logging.Handler], bool]] = {}
 
 _STANDARD_LOG_RECORD_ATTRS = frozenset({
     'args',
@@ -55,15 +72,79 @@ _SEVERITY_BY_LEVEL = {
 }
 
 
+def mask_capability_path(path: str) -> str:
+    """Mask capability-bearing path segments such as /public/reviews/{share_token}."""
+    return _CAPABILITY_PATH_RE.sub(r'\1***', path)
+
+
+def mask_capability_log_text(text: str) -> str:
+    """Mask capability query params (including X-Amz-*) and share-token path segments."""
+    masked = mask_capability_url_text(text)
+    masked = _AMZ_QUERY_PARAM_RE.sub(r'\1***', masked)
+    masked = mask_capability_path(masked)
+    return masked
+
+
+def _mask_log_value(value: Any) -> Any:
+    if isinstance(value, str):
+        return mask_capability_log_text(value)
+    if isinstance(value, tuple):
+        return tuple(_mask_log_value(item) for item in value)
+    if isinstance(value, list):
+        return [_mask_log_value(item) for item in value]
+    if isinstance(value, dict):
+        return {k: _mask_log_value(v) for k, v in value.items()}
+    return value
+
+
+def mark_exception_reported(exc: BaseException) -> None:
+    """Mark an exception as already reported by the app's exception handler."""
+    try:
+        setattr(exc, '_picspeak_error_reported', True)
+    except Exception:
+        pass
+    with _reported_exc_lock:
+        _reported_exc_ids.append(id(exc))
+
+
+def is_exception_reported(exc: BaseException | None) -> bool:
+    """Return True if exc (or a wrapped cause/context/sub-exception) was already reported."""
+    if exc is None:
+        return False
+    seen: set[int] = set()
+    stack: list[BaseException] = [exc]
+    with _reported_exc_lock:
+        reported_ids = set(_reported_exc_ids)
+    while stack:
+        current = stack.pop()
+        obj_id = id(current)
+        if obj_id in seen:
+            continue
+        seen.add(obj_id)
+        if getattr(current, '_picspeak_error_reported', False) or obj_id in reported_ids:
+            return True
+        if current.__cause__ is not None:
+            stack.append(current.__cause__)
+        if current.__context__ is not None:
+            stack.append(current.__context__)
+        sub_exceptions = getattr(current, 'exceptions', None)
+        if isinstance(sub_exceptions, (tuple, list)):
+            for sub in sub_exceptions:
+                if isinstance(sub, BaseException):
+                    stack.append(sub)
+    return False
+
+
 def bind_request_log_context(
     *,
     request_id: str | None,
     request_path: str | None,
     user_public_id: str | None = None,
 ) -> tuple[Token[str | None], Token[str | None], Token[str | None]]:
+    safe_path = mask_capability_path(request_path) if isinstance(request_path, str) else request_path
     return (
         _request_id_var.set(request_id),
-        _request_path_var.set(request_path),
+        _request_path_var.set(safe_path),
         _user_public_id_var.set(user_public_id),
     )
 
@@ -103,6 +184,8 @@ def _cloud_severity(levelno: int) -> str:
 class RequestContextFilter(logging.Filter):
     """Attach active request context fields to every LogRecord."""
 
+    _picspeak_managed = True
+
     def filter(self, record: logging.LogRecord) -> bool:
         if not getattr(record, 'request_id', None):
             record.request_id = _request_id_var.get()
@@ -110,6 +193,53 @@ class RequestContextFilter(logging.Filter):
             record.user_public_id = _user_public_id_var.get()
         if not getattr(record, 'request_path', None):
             record.request_path = _request_path_var.get()
+        return True
+
+
+class CapabilityMaskingFilter(logging.Filter):
+    """Mask capability tokens in query strings, share paths, args, and extra fields."""
+
+    _picspeak_managed = True
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        # Preserve uvicorn.access 5-tuple args so AccessFormatter can unpack them.
+        if (
+            record.name == 'uvicorn.access'
+            and isinstance(record.args, tuple)
+            and len(record.args) == 5
+        ):
+            record.args = _mask_log_value(record.args)
+        elif record.args:
+            try:
+                formatted = record.getMessage()
+            except Exception:
+                formatted = str(record.msg)
+            record.msg = mask_capability_log_text(formatted)
+            record.args = ()
+        elif isinstance(record.msg, str):
+            record.msg = mask_capability_log_text(record.msg)
+
+        for attr in ('request_path', 'url'):
+            val = getattr(record, attr, None)
+            if isinstance(val, str):
+                setattr(record, attr, mask_capability_log_text(val))
+        for key in list(record.__dict__.keys()):
+            if key in _STANDARD_LOG_RECORD_ATTRS or key.startswith('_') or key in {'request_path', 'url'}:
+                continue
+            val = record.__dict__[key]
+            if isinstance(val, (str, dict, list, tuple)):
+                record.__dict__[key] = _mask_log_value(val)
+        return True
+
+
+class DuplicateReportedExceptionFilter(logging.Filter):
+    """Suppress duplicate uvicorn ASGI tracebacks for exceptions already reported by FastAPI."""
+
+    _picspeak_managed = True
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if record.name == 'uvicorn.error' and record.exc_info and is_exception_reported(record.exc_info[1]):
+            return False
         return True
 
 
@@ -126,10 +256,12 @@ class CloudLoggingJsonFormatter(logging.Formatter):
             stack_text = self.formatStack(record.stack_info)
             if stack_text:
                 message = f'{message}\n{stack_text}' if message else stack_text
+        message = mask_capability_log_text(message)
 
         request_id = getattr(record, 'request_id', None) or _request_id_var.get()
         user_public_id = getattr(record, 'user_public_id', None) or _user_public_id_var.get()
-        request_path = getattr(record, 'request_path', None) or _request_path_var.get()
+        raw_path = getattr(record, 'request_path', None) or _request_path_var.get()
+        request_path = mask_capability_log_text(raw_path) if isinstance(raw_path, str) else raw_path
 
         payload: dict[str, Any] = {
             'severity': _cloud_severity(record.levelno),
@@ -148,10 +280,16 @@ class CloudLoggingJsonFormatter(logging.Formatter):
             if key in _STANDARD_LOG_RECORD_ATTRS or key.startswith('_') or key in payload:
                 continue
             if value is not None:
-                payload[key] = value
+                payload[key] = _mask_log_value(value)
 
-        should_report_error = record.levelno >= logging.ERROR and (
-            bool(record.exc_info) or bool(getattr(record, 'report_error', False))
+        is_uvicorn_asgi_dup = (
+            record.name == 'uvicorn.error'
+            and 'Exception in ASGI application' in message
+        )
+        should_report_error = (
+            record.levelno >= logging.ERROR
+            and (bool(record.exc_info) or bool(getattr(record, 'report_error', False)))
+            and not is_uvicorn_asgi_dup
         )
         if should_report_error:
             payload['@type'] = ERROR_REPORTING_TYPE
@@ -191,23 +329,67 @@ class DevTextFormatter(logging.Formatter):
             stack_text = self.formatStack(record.stack_info)
             if stack_text:
                 base = f'{base}\n{stack_text}'
-        return base
+        return mask_capability_log_text(base)
+
+
+def _is_uvicorn_default_handler(handler: logging.Handler) -> bool:
+    formatter = getattr(handler, 'formatter', None)
+    module = getattr(type(formatter), '__module__', '') if formatter is not None else ''
+    return module.startswith('uvicorn.')
+
+
+def _attach_managed_filter(target: logging.Logger | logging.Handler, flt: logging.Filter) -> None:
+    for existing in list(target.filters):
+        if getattr(existing, '_picspeak_managed', False) and type(existing) is type(flt):
+            target.removeFilter(existing)
+    target.addFilter(flt)
+
+
+def _configure_uvicorn_loggers(*, use_json: bool) -> None:
+    mask_filter = CapabilityMaskingFilter()
+    dup_filter = DuplicateReportedExceptionFilter()
+
+    for name in ('uvicorn', 'uvicorn.error', 'uvicorn.access'):
+        uv_logger = logging.getLogger(name)
+        _attach_managed_filter(uv_logger, mask_filter)
+        if name == 'uvicorn.error':
+            _attach_managed_filter(uv_logger, dup_filter)
+
+        if use_json:
+            uvicorn_handlers = [h for h in uv_logger.handlers if _is_uvicorn_default_handler(h)]
+            if uvicorn_handlers:
+                if name not in _saved_uvicorn_handlers:
+                    _saved_uvicorn_handlers[name] = (list(uvicorn_handlers), uv_logger.propagate)
+                for h in uvicorn_handlers:
+                    uv_logger.removeHandler(h)
+            if name in _saved_uvicorn_handlers or not uv_logger.handlers:
+                uv_logger.propagate = True
+        elif name in _saved_uvicorn_handlers:
+            saved_handlers, saved_propagate = _saved_uvicorn_handlers.pop(name)
+            for h in saved_handlers:
+                if h not in uv_logger.handlers:
+                    uv_logger.addHandler(h)
+            uv_logger.propagate = saved_propagate
 
 
 def configure_logging(*, json_logs: bool | None = None, stream: Any | None = None) -> logging.Handler:
-    """Configure root logging for either Cloud Logging JSON or local readable text."""
+    """Configure root and uvicorn logging without removing handlers installed by others."""
     use_json = settings.use_structured_json_logs if json_logs is None else bool(json_logs)
     root_logger = logging.getLogger()
 
     for existing in list(root_logger.handlers):
-        if getattr(existing, '_picspeak_managed', False) or type(existing) is logging.StreamHandler:
+        if getattr(existing, '_picspeak_managed', False):
             root_logger.removeHandler(existing)
 
     handler = logging.StreamHandler(stream or sys.stdout)
     handler._picspeak_managed = True  # type: ignore[attr-defined]
     handler.addFilter(RequestContextFilter())
+    handler.addFilter(CapabilityMaskingFilter())
+    handler.addFilter(DuplicateReportedExceptionFilter())
     handler.setFormatter(CloudLoggingJsonFormatter() if use_json else DevTextFormatter())
     root_logger.addHandler(handler)
     if root_logger.level == logging.NOTSET or root_logger.level > logging.INFO:
         root_logger.setLevel(logging.INFO)
+
+    _configure_uvicorn_loggers(use_json=use_json)
     return handler
