@@ -419,8 +419,9 @@ def _create_review(payload: ReviewCreateRequest, request: Request, db: Session, 
                     failed_task.progress = 100
                     failed_task.finished_at = datetime.now(timezone.utc)
                     failed_task.error_code = 'TASK_DISPATCH_FAILED'
-                    failed_task.error_message = str(exc)[:500]
+                    failed_task.error_message = 'Failed to enqueue async review task'
                     db.add(failed_task)
+                    # record_task_event copies failed_task.error_code onto the event.
                     record_task_event(db, failed_task, event_type='TASK_DISPATCH_FAILED', message=failed_task.error_message)
                     record_review_terminal(db, failed_task)
                     db.commit()

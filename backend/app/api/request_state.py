@@ -2,9 +2,12 @@ from __future__ import annotations
 
 from fastapi import Request
 
+from app.core.logging_config import set_request_log_user
+
 
 def set_current_user_public_id(request: Request, public_id: str) -> None:
     request.state.current_user_public_id = public_id
+    set_request_log_user(public_id)
 
 
 def get_current_user_public_id(request: Request) -> str | None:

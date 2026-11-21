@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -29,6 +30,8 @@ from app.services.lemonsqueezy import (
 )
 from app.services.notification_events import record_credit_confirmed, record_subscription_changed
 from app.services.product_analytics import record_product_event
+
+logger = logging.getLogger(__name__)
 
 HANDLED_LEMONSQUEEZY_EVENTS = {
     'order_created',
@@ -201,10 +204,11 @@ async def verify_lemonsqueezy_webhook(request: Request) -> LemonSqueezyWebhookEv
     try:
         secret = webhook_signing_secret()
     except LemonSqueezyConfigurationError as exc:
+        logger.warning('Billing webhook is not configured', exc_info=True)
         raise api_error(
             status.HTTP_500_INTERNAL_SERVER_ERROR,
             'LEMONSQUEEZY_NOT_CONFIGURED',
-            str(exc),
+            'Billing webhook is not configured',
         ) from exc
 
     if not _compare_signature(raw_body, signature, secret):
@@ -981,9 +985,11 @@ def _process_subscription_payment(db: Session, event: LemonSqueezyWebhookEvent, 
         try:
             subscription, resolved_user = _sync_subscription_from_api(db, subscription_id, resolved_user)
         except LemonSqueezyConfigurationError as exc:
-            raise api_error(status.HTTP_500_INTERNAL_SERVER_ERROR, 'LEMONSQUEEZY_NOT_CONFIGURED', str(exc)) from exc
+            logger.warning('Billing provider is not configured during webhook sync', exc_info=True)
+            raise api_error(status.HTTP_500_INTERNAL_SERVER_ERROR, 'LEMONSQUEEZY_NOT_CONFIGURED', 'Billing webhook is not configured') from exc
         except LemonSqueezyAPIError as exc:
-            raise api_error(status.HTTP_502_BAD_GATEWAY, 'LEMONSQUEEZY_API_FAILED', str(exc)) from exc
+            logger.warning('Billing provider request failed during webhook sync', exc_info=True)
+            raise api_error(status.HTTP_502_BAD_GATEWAY, 'LEMONSQUEEZY_API_FAILED', 'Billing provider request failed') from exc
 
     if resolved_user is None:
         return 'ignored_user_not_found', None

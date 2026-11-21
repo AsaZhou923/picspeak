@@ -63,6 +63,9 @@ SENSITIVE_QUERY_FIELDS = {
     'guest_token',
     'session_token',
     'photo_token',
+    'generation_token',
+    'share_token',
+    'signature',
     'code',
     'token',
     'state',
@@ -76,6 +79,14 @@ CAPABILITY_QUERY_FIELDS = frozenset({
     'x-goog-signature',
     'x-goog-credential',
 })
+
+# Path segments that are themselves capabilities, e.g. /public/reviews/{share_token}.
+_CAPABILITY_PATH_RE = re.compile(r'(/(?:public/reviews|share)/)([^/?#\s"\'<>]+)', re.IGNORECASE)
+
+
+def mask_capability_path(path: str) -> str:
+    """Mask capability-bearing path segments such as /public/reviews/{share_token}."""
+    return _CAPABILITY_PATH_RE.sub(r'\1***', path)
 
 
 def _mask_sensitive_text(text: str, *, fields: Iterable[str] = SENSITIVE_JSON_FIELDS) -> str:
@@ -214,9 +225,9 @@ def log_api_request(
     record = ApiRequestLog(
         request_id=request_id or f'req_{uuid4().hex[:16]}',
         method=method,
-        path=path,
+        path=mask_capability_path(path),
         query_string=_safe_query_string(query_string),
-        endpoint=endpoint,
+        endpoint=mask_capability_path(endpoint) if endpoint else endpoint,
         client_ip=_truncate_client_ip(client_ip),
         user_public_id=user_public_id,
         user_agent=user_agent,

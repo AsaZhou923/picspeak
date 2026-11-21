@@ -36,7 +36,7 @@ def _serialize_task_status(task: ReviewTask, review: Review | None = None) -> di
         retryable = _is_retryable_task_error(task)
         error = {
             'code': task.error_code,
-            'message': public_task_error_message(task.error_code, retryable=retryable, fallback=task.error_message),
+            'message': public_task_error_message(task.error_code, retryable=retryable),
             'retryable': retryable,
             'timeout': task.error_code in {'TASK_EXPIRED', 'TASK_STALLED'},
             'failure_stage': review_task_failure_stage(task.error_code),

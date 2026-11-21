@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import logging
 
 from fastapi import APIRouter, Depends, Request, Response, status
 from sqlalchemy.orm import Session
@@ -29,6 +30,7 @@ from .review_support import (
 )
 
 router = APIRouter(tags=['reviews'])
+logger = logging.getLogger(__name__)
 
 
 def _lock_review_owner(db: Session, user_id: int) -> None:
@@ -154,7 +156,8 @@ def update_review_meta(
             try:
                 audit_result = run_content_audit(get_object_read_url(photo.object_key, bucket=photo.bucket))
             except ContentAuditError as exc:
-                raise api_error(status.HTTP_502_BAD_GATEWAY, 'IMAGE_AUDIT_FAILED', f'Image content audit failed: {exc}') from exc
+                logger.warning('Image content audit failed for review %s', review.public_id, exc_info=True)
+                raise api_error(status.HTTP_502_BAD_GATEWAY, 'IMAGE_AUDIT_FAILED', 'Image content audit failed') from exc
 
             review.favorite = True
             review.gallery_visible = True

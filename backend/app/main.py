@@ -1,6 +1,8 @@
 import asyncio
+from concurrent.futures import Future
 from contextlib import asynccontextmanager
 import logging
+import threading
 import time
 from uuid import uuid4
 
@@ -8,6 +10,7 @@ from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
+from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import bind_guest_token
@@ -15,12 +18,20 @@ from app.api.request_state import get_current_user_public_id
 from app.api.router import router, webhook_router
 from app.core.config import settings
 from app.core.errors import normalize_http_error
+from app.core.logging_config import (
+    bind_request_log_context,
+    configure_logging,
+    mark_exception_reported,
+    mask_capability_path,
+    reset_request_log_context,
+)
 from app.core.network import client_ip_from_request
 from app.core.request_limits import RequestBodyLimitMiddleware
-from app.db.session import SessionLocal
+from app.db.session import SessionLocal, readiness_engine
 from app.services.audit import log_api_request
 from app.services.worker import worker
 
+configure_logging()
 logger = logging.getLogger(__name__)
 _AUDIT_TASKS: set[asyncio.Task[object]] = set()
 _AUDIT_TASK_DRAIN_TIMEOUT_SECONDS = 5.0
@@ -102,7 +113,7 @@ def _log_error_response(
     log_payload = {
         'request_id': getattr(request.state, 'request_id', None),
         'http_method': request.method,
-        'request_path': request.url.path,
+        'request_path': mask_capability_path(request.url.path),
         'status_code': status_code,
         'error_code': code,
         'error_message': message,
@@ -113,6 +124,7 @@ def _log_error_response(
         log_payload['extra'] = extra
 
     if exc is not None:
+        log_payload['event'] = 'unhandled_api_exception'
         logger.error(
             'Unhandled API exception',
             extra=log_payload,
@@ -176,6 +188,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
+    mark_exception_reported(exc)
     _log_error_response(
         request,
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -194,6 +207,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 # Paths excluded from audit logging (high-frequency / non-business endpoints).
 _AUDIT_SKIP_PATHS = {
     '/healthz',
+    '/readyz',
     '/docs',
     '/openapi.json',
     '/redoc',
@@ -321,6 +335,10 @@ async def request_audit_middleware(request: Request, call_next):
     started_at = time.perf_counter()
     request_id = f'req_{uuid4().hex}'
     request.state.request_id = request_id
+    log_context_tokens = bind_request_log_context(
+        request_id=request_id,
+        request_path=request.url.path,
+    )
     request_body = b''
     skip_audit = _should_skip_audit(request.url.path)
 
@@ -343,6 +361,7 @@ async def request_audit_middleware(request: Request, call_next):
             response.headers['Cache-Control'] = 'private, no-store'
         return response
     finally:
+        reset_request_log_context(log_context_tokens)
         # Skip audit for non-business endpoints.
         if not skip_audit:
             duration_ms = int((time.perf_counter() - started_at) * 1000)
@@ -366,6 +385,101 @@ async def request_audit_middleware(request: Request, call_next):
             )
 
 
+_READYZ_CACHE_TTL_SECONDS = 1.0
+_readyz_state_lock = threading.Lock()
+# At most one probe runs per process; concurrent callers await its result.
+_readyz_probe: Future[bool] | None = None
+_readyz_last_ok: bool | None = None
+_readyz_last_checked_monotonic: float | None = None
+
+
+def _reset_readiness_state() -> None:
+    global _readyz_probe, _readyz_last_ok, _readyz_last_checked_monotonic
+    with _readyz_state_lock:
+        _readyz_probe = None
+        _readyz_last_ok = None
+        _readyz_last_checked_monotonic = None
+
+
+def _check_database_readiness(timeout_seconds: float) -> None:
+    timeout_ms = max(int(timeout_seconds * 1000), 100)
+    with readiness_engine.begin() as conn:
+        if conn.dialect.name == 'postgresql':
+            conn.execute(text("SELECT set_config('statement_timeout', :timeout_ms, true)"), {'timeout_ms': str(timeout_ms)})
+        conn.execute(text('SELECT 1')).scalar()
+
+
+def _run_readiness_probe(probe: Future[bool], timeout_seconds: float) -> None:
+    global _readyz_last_ok, _readyz_last_checked_monotonic
+    probe.set_running_or_notify_cancel()
+    ok = False
+    try:
+        _check_database_readiness(timeout_seconds)
+        ok = True
+    except Exception:
+        logger.warning('Database readiness check failed', exc_info=True)
+    finally:
+        # Publish the cached result and resolve waiters atomically, so a waiter
+        # that times out concurrently cannot overwrite a fresher result.
+        with _readyz_state_lock:
+            _readyz_last_ok = ok
+            _readyz_last_checked_monotonic = time.monotonic()
+            probe.set_result(ok)
+
+
 @app.get('/healthz')
 def healthz():
+    return {'status': 'ok'}
+
+
+@app.get('/readyz')
+async def readyz():
+    global _readyz_probe, _readyz_last_ok, _readyz_last_checked_monotonic
+
+    timeout_seconds = max(float(settings.readyz_db_timeout_seconds), 0.1)
+    now = time.monotonic()
+    with _readyz_state_lock:
+        cache_fresh = (
+            _readyz_last_ok is not None
+            and _readyz_last_checked_monotonic is not None
+            and (now - _readyz_last_checked_monotonic) <= _READYZ_CACHE_TTL_SECONDS
+        )
+        if cache_fresh:
+            ok: bool | None = _readyz_last_ok
+            probe = None
+        else:
+            ok = None
+            probe = _readyz_probe
+            if probe is None or probe.done():
+                probe = Future()
+                _readyz_probe = probe
+                threading.Thread(
+                    target=_run_readiness_probe,
+                    args=(probe, timeout_seconds),
+                    name='readyz-probe',
+                    daemon=True,
+                ).start()
+
+    if probe is not None:
+        try:
+            # shield: a caller's timeout must not cancel the probe other callers share.
+            ok = await asyncio.wait_for(asyncio.shield(asyncio.wrap_future(probe)), timeout=timeout_seconds)
+        except asyncio.TimeoutError:
+            with _readyz_state_lock:
+                timed_out = not probe.done()
+                if timed_out:
+                    _readyz_last_ok = False
+                    _readyz_last_checked_monotonic = time.monotonic()
+                    ok = False
+                else:
+                    # The probe resolved right at the deadline; report its result.
+                    ok = probe.result()
+            if timed_out:
+                logger.warning('Database readiness check timed out after %.2fs', timeout_seconds)
+
+    if not ok:
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={'status': 'unavailable'},
+        )
     return {'status': 'ok'}

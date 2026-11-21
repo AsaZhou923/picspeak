@@ -14,6 +14,7 @@ from pydantic import ValidationError
 from app.api.deps import new_public_id
 from app.core.config import settings
 from app.core.errors import ApiHTTPException
+from app.core.logging_config import worker_log_context
 from app.db.models import Photo, PhotoStatus, Review, ReviewMode, ReviewStatus, ReviewTask, TaskStatus, UsageLedger, User, UserPlan
 from app.db.session import SessionLocal
 from app.services.ai import (
@@ -41,6 +42,7 @@ from app.services.review_score_cache import (
     load_task_canonical_score_checkpoint,
 )
 from app.services.task_events import record_task_event
+from app.services.worker_health import task_owner_public_id
 from app.services.review_quota_reservations import (
     reserve_review_quota, consume_review_quota, release_task_review_quota,
 )
@@ -97,7 +99,75 @@ _PUBLIC_TASK_ERROR_MESSAGES: dict[str, tuple[str, str]] = {
         'Review task failed unexpectedly; retry scheduled',
         'Review task could not be completed',
     ),
+    'TASK_DISPATCH_FAILED': (
+        'Failed to enqueue async review task',
+        'Failed to enqueue async review task',
+    ),
+    'TASK_EXPIRED': (
+        'Task expired before completion',
+        'Task expired before completion',
+    ),
+    'TASK_STALLED': (
+        'Task heartbeat stalled; retry scheduled',
+        'Task heartbeat stalled and max retries were exhausted',
+    ),
+    'PHOTO_NOT_FOUND': (
+        'Photo record not found for task',
+        'Photo record not found for task',
+    ),
+    'PHOTO_ORIGINAL_EXPIRED': (
+        'The stored original was removed',
+        'The stored original was removed',
+    ),
+    'PHOTO_OWNER_MISMATCH': (
+        'Photo owner does not match task owner',
+        'Photo owner does not match task owner',
+    ),
+    'USER_NOT_FOUND': (
+        'Task owner not found',
+        'Task owner not found',
+    ),
+    'PRACTICE_GOAL_INVALID': (
+        'The saved practice goal is invalid',
+        'The saved practice goal is invalid',
+    ),
+    'QUOTA_EXCEEDED': (
+        'Plan quota exceeded',
+        'Plan quota exceeded',
+    ),
+    'RETAKE_SOURCE_NOT_FOUND': (
+        'Source review or original photo not found for retake comparison',
+        'Source review or original photo not found for retake comparison',
+    ),
+    'RETAKE_SOURCE_NOT_READY': (
+        'Source review or original photo is not ready for retake comparison',
+        'Source review or original photo is not ready for retake comparison',
+    ),
 }
+
+_GENERIC_TASK_ERROR_MESSAGES = (
+    'Review task failed; retry scheduled',
+    'Review task could not be completed',
+)
+
+_PUBLIC_TASK_LIFECYCLE_EVENT_MESSAGES: dict[str, str] = {
+    'TASK_CREATED': 'Task created',
+    'TASK_QUEUED': 'Task queued',
+    'TASK_CLAIMED': 'Task claimed',
+    'TASK_STARTED': 'Task started',
+    'TASK_PROGRESS': 'Task in progress',
+    'REVIEW_CREATED': 'Review succeeded',
+    'completed': 'Review succeeded',
+}
+
+_ERROR_TASK_EVENT_TYPES = frozenset({
+    'TASK_FAILED',
+    'TASK_RETRY_SCHEDULED',
+    'TASK_DEAD_LETTER',
+    'TASK_DISPATCH_FAILED',
+    'TASK_EXPIRED',
+    'TASK_STALLED',
+})
 
 
 def review_task_failure_stage(error_code: str | None) -> str:
@@ -153,14 +223,28 @@ def public_task_error_message(
     error_code: str | None,
     *,
     retryable: bool,
-    fallback: str | None = None,
-) -> str | None:
-    if not error_code:
-        return fallback
-    mapped = _PUBLIC_TASK_ERROR_MESSAGES.get(error_code)
-    if not mapped:
-        return fallback
-    return mapped[0] if retryable else mapped[1]
+) -> str:
+    # Never forward stored diagnostic error_message text to clients.
+    mapped = _PUBLIC_TASK_ERROR_MESSAGES.get(str(error_code or ''))
+    if mapped is not None:
+        return mapped[0] if retryable else mapped[1]
+    return _GENERIC_TASK_ERROR_MESSAGES[0] if retryable else _GENERIC_TASK_ERROR_MESSAGES[1]
+
+
+def public_task_event_message(
+    event_type: str | None,
+    error_code: str | None,
+    *,
+    retryable: bool,
+    task_error_code: str | None = None,
+) -> str:
+    if error_code:
+        return public_task_error_message(error_code, retryable=retryable)
+    if event_type in _PUBLIC_TASK_ERROR_MESSAGES:
+        return public_task_error_message(event_type, retryable=retryable)
+    if event_type in _ERROR_TASK_EVENT_TYPES:
+        return public_task_error_message(task_error_code or event_type, retryable=retryable)
+    return _PUBLIC_TASK_LIFECYCLE_EVENT_MESSAGES.get(str(event_type or ''), 'Task updated')
 
 
 def _review_task_stale_timeout_seconds() -> int:
@@ -391,32 +475,42 @@ def process_review_task(task_public_id: str, *, worker_name: str, claim_token: s
                 return {'result': 'noop', 'status': task.status.value, 'reason': 'lease_mismatch'}
         else:
             return {'result': 'noop', 'status': task.status.value}
-        try:
-            _process_task(db, task, claim_token=claim_token)
-        except ReviewTaskLeaseLost:
-            db.rollback()
-            return {'result': 'noop', 'reason': 'lease_mismatch'}
-        except Exception as exc:
-            logger.exception('Unhandled review task error for task %s', task_public_id)
-            db.rollback()
-            fresh_task = db.query(ReviewTask).filter(ReviewTask.id == task.id).first()
-            if fresh_task is None:
-                return {'result': 'missing'}
-            if fresh_task.status == TaskStatus.RUNNING and fresh_task.claimed_by == claim_token:
-                try:
-                    _ensure_review_claim(db, fresh_task, claim_token)
-                except ReviewTaskLeaseLost:
-                    db.rollback()
-                    return {'result': 'noop', 'reason': 'lease_mismatch'}
-                _handle_failure(
-                    db,
-                    fresh_task,
-                    error_code='TASK_PROCESSING_FAILED',
-                    error_message=f'Unexpected worker error: {exc}',
-                    retryable=True,
+        with worker_log_context(
+            worker_name=worker_name,
+            task_public_id=task_public_id,
+            task_kind='review',
+            owner_public_id=task_owner_public_id(db, task.owner_user_id),
+        ):
+            try:
+                _process_task(db, task, claim_token=claim_token)
+            except ReviewTaskLeaseLost:
+                db.rollback()
+                return {'result': 'noop', 'reason': 'lease_mismatch'}
+            except Exception as exc:
+                logger.exception(
+                    'Unhandled review task error for task %s',
+                    task_public_id,
+                    extra={'event': 'review_task_unhandled_exception'},
                 )
-                return {'result': 'failed', 'status': fresh_task.status.value}
-            return {'result': 'noop', 'status': fresh_task.status.value}
+                db.rollback()
+                fresh_task = db.query(ReviewTask).filter(ReviewTask.id == task.id).first()
+                if fresh_task is None:
+                    return {'result': 'missing'}
+                if fresh_task.status == TaskStatus.RUNNING and fresh_task.claimed_by == claim_token:
+                    try:
+                        _ensure_review_claim(db, fresh_task, claim_token)
+                    except ReviewTaskLeaseLost:
+                        db.rollback()
+                        return {'result': 'noop', 'reason': 'lease_mismatch'}
+                    _handle_failure(
+                        db,
+                        fresh_task,
+                        error_code='TASK_PROCESSING_FAILED',
+                        error_message=f'Unexpected worker error: {exc}',
+                        retryable=True,
+                    )
+                    return {'result': 'failed', 'status': fresh_task.status.value}
+                return {'result': 'noop', 'status': fresh_task.status.value}
         return {'result': 'processed', 'status': task.status.value}
     finally:
         db.close()
@@ -558,11 +652,7 @@ def _schedule_retry(db: Session, task: ReviewTask, *, error_code: str, error_mes
 
 def _handle_failure(db: Session, task: ReviewTask, *, error_code: str, error_message: str, retryable: bool) -> None:
     retry_scheduled = retryable and task.attempt_count < task.max_attempts
-    public_error = public_task_error_message(
-        error_code,
-        retryable=retry_scheduled,
-        fallback=error_message[:500],
-    )
+    public_error = public_task_error_message(error_code, retryable=retry_scheduled)
     if public_error != error_message[:500]:
         logger.warning(
             'Review task %s failed with internal detail hidden from clients: %s',
@@ -570,7 +660,7 @@ def _handle_failure(db: Session, task: ReviewTask, *, error_code: str, error_mes
             error_message,
         )
     if retry_scheduled:
-        _schedule_retry(db, task, error_code=error_code, error_message=public_error or 'Task retry scheduled')
+        _schedule_retry(db, task, error_code=error_code, error_message=public_error)
         return
     if retryable:
         _complete_task(
@@ -578,7 +668,7 @@ def _handle_failure(db: Session, task: ReviewTask, *, error_code: str, error_mes
             task,
             status=TaskStatus.DEAD_LETTER,
             error_code=error_code,
-            error_message=public_task_error_message(error_code, retryable=False, fallback=public_error or error_message[:500]),
+            error_message=public_task_error_message(error_code, retryable=False),
             dead_letter=True,
         )
         return
@@ -587,7 +677,7 @@ def _handle_failure(db: Session, task: ReviewTask, *, error_code: str, error_mes
         task,
         status=TaskStatus.FAILED,
         error_code=error_code,
-        error_message=public_task_error_message(error_code, retryable=False, fallback=public_error or error_message[:500]),
+        error_message=public_task_error_message(error_code, retryable=False),
     )
 
 

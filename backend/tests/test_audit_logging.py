@@ -193,6 +193,63 @@ class AuditLoggingTests(unittest.TestCase):
         self.assertEqual(record.client_ip, '198.51.100.0/24')
         self.assertIsNone(record.request_body)
 
+    def test_persisted_audit_row_masks_share_token_path_and_capability_query(self) -> None:
+        from app.db.session import get_db
+
+        share_token = 'SECRET_SHARE_TOKEN_123'
+        db = MagicMock()
+        db.query.return_value.join.return_value.join.return_value.filter.return_value.first.return_value = None
+
+        def _override_db():
+            yield db
+
+        app.dependency_overrides[get_db] = _override_db
+        try:
+            with (
+                patch('app.main._persist_audit_log') as persist_audit_log,
+                patch('app.main.worker.start'),
+                patch('app.main.worker.stop'),
+            ):
+                with TestClient(app) as client:
+                    response = client.get(f'/api/v1/public/reviews/{share_token}?photo_token=SECRET_PHOTO_456&page=2')
+        finally:
+            app.dependency_overrides.pop(get_db, None)
+
+        self.assertEqual(response.status_code, 404)
+        persist_audit_log.assert_called_once()
+        captured = persist_audit_log.call_args.kwargs
+        # The middleware hands over the concrete URL; masking happens before the row is built.
+        self.assertIn(share_token, captured['path'])
+
+        audit_db = MagicMock()
+        log_api_request(audit_db, **captured)
+        record = audit_db.add.call_args.args[0]
+        self.assertEqual(record.path, '/api/v1/public/reviews/***')
+        self.assertEqual(record.endpoint, '/api/v1/public/reviews/***')
+        self.assertEqual(record.query_string, 'photo_token=%2A%2A%2A&page=2')
+        for column in (record.path, record.endpoint, record.query_string):
+            self.assertNotIn(share_token, column)
+            self.assertNotIn('SECRET_PHOTO_456', column)
+
+        # Ordinary paths and a missing endpoint are stored unchanged.
+        log_api_request(
+            audit_db,
+            request_id='req_plain',
+            method='GET',
+            path='/api/v1/reviews/rev_1',
+            query_string=None,
+            endpoint=None,
+            client_ip=None,
+            user_public_id=None,
+            user_agent=None,
+            request_body=b'',
+            status_code=200,
+            duration_ms=1,
+        )
+        plain = audit_db.add.call_args.args[0]
+        self.assertEqual(plain.path, '/api/v1/reviews/rev_1')
+        self.assertIsNone(plain.endpoint)
+
 
 if __name__ == '__main__':
     unittest.main()

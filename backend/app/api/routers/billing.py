@@ -286,9 +286,11 @@ def create_billing_checkout(
     try:
         checkout = create_checkout_for_user(actor.user, locale=payload.locale)
     except LemonSqueezyConfigurationError as exc:
-        raise api_error(status.HTTP_503_SERVICE_UNAVAILABLE, 'LEMONSQUEEZY_NOT_CONFIGURED', str(exc)) from exc
+        logger.warning('Billing checkout is not configured', exc_info=True)
+        raise api_error(status.HTTP_503_SERVICE_UNAVAILABLE, 'LEMONSQUEEZY_NOT_CONFIGURED', 'Billing checkout is not configured') from exc
     except LemonSqueezyAPIError as exc:
-        raise api_error(status.HTTP_502_BAD_GATEWAY, 'LEMONSQUEEZY_API_FAILED', str(exc)) from exc
+        logger.warning('Billing provider checkout request failed', exc_info=True)
+        raise api_error(status.HTTP_502_BAD_GATEWAY, 'LEMONSQUEEZY_API_FAILED', 'Billing provider request failed') from exc
     record_product_event(
         db,
         event_name='checkout_started',
@@ -338,7 +340,8 @@ def create_image_credit_pack_checkout(
                 locale=payload.locale,
             )
         except LemonSqueezyConfigurationError as exc:
-            raise api_error(status.HTTP_503_SERVICE_UNAVAILABLE, 'LEMONSQUEEZY_NOT_CONFIGURED', str(exc)) from exc
+            logger.warning('Credit pack checkout is not configured', exc_info=True)
+            raise api_error(status.HTTP_503_SERVICE_UNAVAILABLE, 'LEMONSQUEEZY_NOT_CONFIGURED', 'Credit pack checkout is not configured') from exc
         checkout_url = checkout.checkout_url
         checkout_id = checkout.checkout_id
         response_status = 'created'

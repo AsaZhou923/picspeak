@@ -22,6 +22,7 @@ from app.db.models import (
     Review,
     ReviewStatus,
     ReviewTask,
+    TaskStatus,
     User,
 )
 from app.practice_schemas import (
@@ -154,7 +155,13 @@ def _attempt_summary(
     )
     task_error = None
     if task and task.error_code:
-        task_error = {'code': task.error_code, 'message': task.error_message}
+        from app.services.review_task_processor import public_task_error_message
+
+        retryable = task.status == TaskStatus.PENDING and task.next_attempt_at is not None
+        task_error = {
+            'code': task.error_code,
+            'message': public_task_error_message(task.error_code, retryable=retryable),
+        }
     return PracticeAttemptSummary(
         attempt_id=attempt.public_id,
         task_id=access.task_public_id,

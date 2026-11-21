@@ -272,7 +272,8 @@ def create_upload_presign(
             HttpMethod='PUT',
         )
     except Exception as exc:
-        raise api_error(status.HTTP_500_INTERNAL_SERVER_ERROR, 'UPLOAD_PRESIGN_FAILED', f'Failed to generate upload presign URL: {exc}') from exc
+        logger.exception('Failed to generate upload presign URL for object %s', object_key)
+        raise api_error(status.HTTP_500_INTERNAL_SERVER_ERROR, 'UPLOAD_PRESIGN_FAILED', 'Failed to generate upload presign URL') from exc
 
     db.commit()
 

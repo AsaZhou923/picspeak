@@ -196,7 +196,8 @@ def _get_photo_object(photo: Photo) -> tuple[Any, bytes]:
         storage = get_object_storage_client()
         result = storage.get_object(Bucket=photo.bucket, Key=photo.object_key)
     except Exception as exc:
-        raise api_error(status.HTTP_502_BAD_GATEWAY, 'PHOTO_FETCH_FAILED', f'Failed to fetch photo: {exc}') from exc
+        logger.exception('Failed to fetch photo object %s from bucket %s', photo.object_key, photo.bucket)
+        raise api_error(status.HTTP_502_BAD_GATEWAY, 'PHOTO_FETCH_FAILED', 'Failed to fetch photo') from exc
 
     body = result['Body']
     try:
@@ -236,7 +237,8 @@ def _get_storage_object_bytes(bucket: str, object_key: str) -> tuple[dict[str, A
         storage = get_object_storage_client()
         result = storage.get_object(Bucket=bucket, Key=object_key)
     except Exception as exc:
-        raise api_error(status.HTTP_502_BAD_GATEWAY, 'PHOTO_FETCH_FAILED', f'Failed to fetch photo: {exc}') from exc
+        logger.exception('Failed to fetch storage object %s from bucket %s', object_key, bucket)
+        raise api_error(status.HTTP_502_BAD_GATEWAY, 'PHOTO_FETCH_FAILED', 'Failed to fetch photo') from exc
 
     body = result['Body']
     try:

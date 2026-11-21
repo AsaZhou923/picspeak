@@ -1,6 +1,7 @@
 ﻿from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import logging
 from uuid import uuid4
 
 from fastapi import Cookie, Depends, Header, Request, Response, status
@@ -20,6 +21,8 @@ from app.services.guard import (
     guest_network_scope_key,
     guest_rate_limit_scope_key,
 )
+
+logger = logging.getLogger(__name__)
 
 GUEST_TOKEN_COOKIE = 'ps_guest_token'
 GUEST_TOKEN_TTL_SECONDS = 14 * 24 * 3600
@@ -79,7 +82,8 @@ def _fetch_user_by_token(token: str, db: Session) -> User:
     try:
         claims = validate_access_token(token)
     except JWTValidationError as exc:
-        raise api_error(status.HTTP_401_UNAUTHORIZED, 'AUTH_TOKEN_INVALID', f'Invalid access token: {exc}') from exc
+        logger.warning('Access token validation failed', exc_info=True)
+        raise api_error(status.HTTP_401_UNAUTHORIZED, 'AUTH_TOKEN_INVALID', 'Invalid access token') from exc
 
     subject = claims.get('sub')
     if not isinstance(subject, str) or not subject.strip():
