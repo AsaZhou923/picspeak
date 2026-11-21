@@ -3,6 +3,7 @@ import { planLabel, planColor } from '@/lib/auth-context';
 import { UsageResponse } from '@/lib/types';
 import Badge from '@/components/ui/Badge';
 import { type Translator } from '@/lib/i18n';
+import AuthUnavailableNotice from '@/components/auth/AuthUnavailableNotice';
 import ClerkSignInTrigger from '@/components/auth/ClerkSignInTrigger';
 import ProMonthlyUsageNotice from '@/components/billing/ProMonthlyUsageNotice';
 
@@ -30,15 +31,6 @@ export function QuotaBanner({
   signInReturnPath = '/workspace',
 }: QuotaBannerProps) {
   const isAuthUnavailable = usageError && usageErrorCode === 'AUTH_UNAVAILABLE';
-  const handleAuthRetry = () => {
-    if (onAuthRetry) {
-      onAuthRetry();
-      return;
-    }
-    if (typeof window !== 'undefined') {
-      window.location.reload();
-    }
-  };
 
   return (
     <div className="mt-5 space-y-2">
@@ -73,18 +65,7 @@ export function QuotaBanner({
         </div>
       )}
       {usage && <ProMonthlyUsageNotice usage={usage} t={t} />}
-      {isAuthUnavailable && (
-        <div role="alert" className="max-w-xl space-y-3 rounded-control border border-rust/25 bg-rust/10 px-4 py-3 text-sm text-rust">
-          <p className="leading-6">{t('err_auth_unavailable_body')}</p>
-          <button
-            type="button"
-            onClick={handleAuthRetry}
-            className="min-h-11 rounded-sm border border-border bg-surface/80 px-4 text-xs font-medium text-ink transition-colors hover:border-ink-muted"
-          >
-            {t('app_error_retry')}
-          </button>
-        </div>
-      )}
+      {isAuthUnavailable && <AuthUnavailableNotice t={t} onRetry={onAuthRetry} className="max-w-xl" />}
       {usageError && !isAuthUnavailable && (
         <p className="text-xs text-ink-subtle">
           {`${t('usage_error')} ${t('support_contact_prompt')}`}

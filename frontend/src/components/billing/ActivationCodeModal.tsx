@@ -3,6 +3,7 @@
 import { X } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import AuthUnavailableNotice from '@/components/auth/AuthUnavailableNotice';
 import ClerkSignInTrigger from '@/components/auth/ClerkSignInTrigger';
 import { useAuth } from '@/lib/auth-context';
 import { redeemActivationCode } from '@/lib/api';
@@ -39,7 +40,7 @@ export default function ActivationCodeModal({
   onRedeemed,
 }: ActivationCodeModalProps) {
   const { t, locale } = useI18n();
-  const { ensureToken, userInfo, syncPlan } = useAuth();
+  const { ensureToken, userInfo, syncPlan, authUnavailable } = useAuth();
   const [mounted, setMounted] = useState(false);
   const [code, setCode] = useState('');
   const [message, setMessage] = useState('');
@@ -123,7 +124,9 @@ export default function ActivationCodeModal({
           </p>
         </div>
 
-        {requiresSignIn ? (
+        {requiresSignIn && authUnavailable ? (
+          <AuthUnavailableNotice t={t} className="mt-8" />
+        ) : requiresSignIn ? (
           <div className="mt-8 space-y-5">
             <p className="rounded-control border border-gold/20 bg-gold/10 px-4 py-3 text-sm leading-7 text-ink">
               {t('activation_code_signin_hint')}

@@ -2,6 +2,7 @@
 
 import { ArrowRight } from 'lucide-react';
 import { useState } from 'react';
+import AuthUnavailableNotice from '@/components/auth/AuthUnavailableNotice';
 import ClerkSignInTrigger from '@/components/auth/ClerkSignInTrigger';
 import ActivationCodeModal from '@/components/billing/ActivationCodeModal';
 import { useAuth } from '@/lib/auth-context';
@@ -10,7 +11,7 @@ import { CN_PRO_CHECKOUT_TIP, startProCheckout } from '@/lib/pro-checkout';
 
 export default function HomeCheckoutButton() {
   const { t, locale } = useI18n();
-  const { ensureToken, isLoading, userInfo } = useAuth();
+  const { ensureToken, isLoading, userInfo, authUnavailable } = useAuth();
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [activationOpen, setActivationOpen] = useState(false);
   const requiresSignIn = !userInfo || userInfo.plan === 'guest';
@@ -38,6 +39,8 @@ export default function HomeCheckoutButton() {
         >
           {t('generation_auth_loading_cta')}
         </button>
+      ) : requiresSignIn && authUnavailable ? (
+        <AuthUnavailableNotice t={t} />
       ) : requiresSignIn ? (
         <ClerkSignInTrigger
           fallbackRedirectUrl="/account/usage"

@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AlertCircle, ChevronRight, Info, Star, X, Heart } from 'lucide-react';
+import AuthUnavailableNotice from '@/components/auth/AuthUnavailableNotice';
 import ClerkSignInTrigger from '@/components/auth/ClerkSignInTrigger';
 import ProPromoCard from '@/components/marketing/ProPromoCard';
 import { getPublicGallery, likeGalleryReview, unlikeGalleryReview } from '@/lib/api';
@@ -55,7 +56,7 @@ function GalleryPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { t, locale } = useI18n();
-  const { token, userInfo, ensureToken, isLoading: authLoading } = useAuth();
+  const { token, userInfo, ensureToken, isLoading: authLoading, authUnavailable } = useAuth();
   
   const pendingRestoreRef = useRef<GalleryRestoreState | null>(null);
   const pagesRef = useRef<GalleryUxItem[][]>([]);
@@ -72,6 +73,7 @@ function GalleryPageContent() {
   const [paging, setPaging] = useState(false);
   const [error, setError] = useState('');
   const [actionError, setActionError] = useState('');
+  const [authOutageNoticeOpen, setAuthOutageNoticeOpen] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
   const [likeBusyId, setLikeBusyId] = useState<string | null>(null);
   const [preferences, setPreferences] = useState<GalleryPreferences>(() => sanitizeGalleryPreferences(null));
@@ -371,9 +373,15 @@ function GalleryPageContent() {
       if (likeBusyId || authLoading) return;
       setActionError('');
       if (!userInfo || userInfo.plan === 'guest') {
+        // A signed-in browser that cannot reach Clerk must not be offered guest sign-in.
+        if (authUnavailable) {
+          setAuthOutageNoticeOpen(true);
+          return;
+        }
         setGuestLikePromptOpen(true);
         return;
       }
+      setAuthOutageNoticeOpen(false);
       setLikeBusyId(item.review_id);
       try {
         const authToken = await ensureToken();
@@ -391,7 +399,7 @@ function GalleryPageContent() {
         setLikeBusyId(null);
       }
     },
-    [authLoading, ensureToken, likeBusyId, patchGalleryItem, t, userInfo]
+    [authLoading, authUnavailable, ensureToken, likeBusyId, patchGalleryItem, t, userInfo]
   );
 
   const items = pages[pageIndex] ?? [];
@@ -466,6 +474,7 @@ function GalleryPageContent() {
             {error || actionError}
           </div>
         )}
+        {authOutageNoticeOpen && authUnavailable && <AuthUnavailableNotice t={t} className="mt-6" />}
 
         {loading ? (
           <section className={`mt-4 grid gap-4 ${galleryGridClassName(preferences.columns)}`}>

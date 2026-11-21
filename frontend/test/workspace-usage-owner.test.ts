@@ -137,6 +137,9 @@ test('QuotaBanner shows localized AUTH_UNAVAILABLE message and retry button inst
       '@/lib/auth-context': toUrl('export const planLabel = (plan) => plan; export const planColor = () => "";'),
       '@/components/ui/Badge': toUrl('export default function Badge({ children }) { return children; }'),
       '@/components/auth/ClerkSignInTrigger': toUrl('export default function ClerkSignInTrigger() { return null; }'),
+      '@/components/auth/AuthUnavailableNotice': toUrl(
+        await readFile(new URL('../src/components/auth/AuthUnavailableNotice.tsx', import.meta.url), 'utf8'),
+      ),
       '@/components/billing/ProMonthlyUsageNotice': toUrl('export default function ProMonthlyUsageNotice() { return null; }'),
     }),
   );

@@ -33,6 +33,8 @@ interface AuthState {
   token: string | null;
   userInfo: AuthToken | null;
   isLoading: boolean;
+  /** A signed-in browser cannot reach Clerk; auth-required actions must offer a retry, not a guest sign-in prompt. */
+  authUnavailable: boolean;
   login: (tokenData: AuthToken) => void;
   logout: () => void;
   ensureToken: () => Promise<string>;
@@ -175,6 +177,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // become a guest.
   const clerkFailed = !isClerkLoaded && (clerkStatus === 'error' || clerkScriptFailed || clerkLoadTimedOut);
   const clerkFallbackRef = useRef<ClerkSessionHint | null>(null);
+  const [authUnavailable, setAuthUnavailable] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const [userInfo, setUserInfo] = useState<AuthToken | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -424,6 +427,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!clerkFailed) {
       clerkFallbackRef.current = null;
+      setAuthUnavailable(false);
       return;
     }
     const hint = readClerkSessionHint();
@@ -437,6 +441,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       previousAuth,
       isPersistedMatchingClerkSession: isMatchingClerkSession(parsed, hint.clerkUserId),
     });
+    setAuthUnavailable(action === 'auth_unavailable');
     if (action === 'logout') {
       logout();
       return;
@@ -590,7 +595,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const visibleUserInfo = currentAuthRef.current?.user_id === userInfo?.user_id ? userInfo : null;
 
   return (
-    <AuthContext.Provider value={{ token: visibleUserInfo ? token : null, userInfo: visibleUserInfo, isLoading, login, logout, ensureToken, captureAuthOwner, syncPlan }}>
+    <AuthContext.Provider value={{ token: visibleUserInfo ? token : null, userInfo: visibleUserInfo, isLoading, authUnavailable, login, logout, ensureToken, captureAuthOwner, syncPlan }}>
       {children}
     </AuthContext.Provider>
   );
@@ -602,7 +607,7 @@ export function useAuth(): AuthState {
   // consumer's server snapshot, without delaying later client-only navigation.
   const hydrated = useSyncExternalStore(subscribeToHydration, getClientHydrationSnapshot, getServerHydrationSnapshot);
   if (!ctx) throw new Error('useAuth must be used within AuthProvider');
-  return hydrated ? ctx : { ...ctx, token: null, userInfo: null, isLoading: true };
+  return hydrated ? ctx : { ...ctx, token: null, userInfo: null, isLoading: true, authUnavailable: false };
 }
 
 export function planLabel(plan: string): string {
