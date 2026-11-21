@@ -9,6 +9,8 @@ import ProMonthlyUsageNotice from '@/components/billing/ProMonthlyUsageNotice';
 interface QuotaBannerProps {
   usage: UsageResponse | null;
   usageError: boolean;
+  usageErrorCode?: string | null;
+  onAuthRetry?: () => void;
   remainingQuota: number | null;
   totalQuota: number | null;
   reviewMode: 'flash' | 'pro';
@@ -16,7 +18,28 @@ interface QuotaBannerProps {
   signInReturnPath?: string;
 }
 
-export function QuotaBanner({ usage, usageError, remainingQuota, totalQuota, reviewMode, t, signInReturnPath = '/workspace' }: QuotaBannerProps) {
+export function QuotaBanner({
+  usage,
+  usageError,
+  usageErrorCode = null,
+  onAuthRetry,
+  remainingQuota,
+  totalQuota,
+  reviewMode,
+  t,
+  signInReturnPath = '/workspace',
+}: QuotaBannerProps) {
+  const isAuthUnavailable = usageError && usageErrorCode === 'AUTH_UNAVAILABLE';
+  const handleAuthRetry = () => {
+    if (onAuthRetry) {
+      onAuthRetry();
+      return;
+    }
+    if (typeof window !== 'undefined') {
+      window.location.reload();
+    }
+  };
+
   return (
     <div className="mt-5 space-y-2">
       {usage && (
@@ -50,7 +73,19 @@ export function QuotaBanner({ usage, usageError, remainingQuota, totalQuota, rev
         </div>
       )}
       {usage && <ProMonthlyUsageNotice usage={usage} t={t} />}
-      {usageError && (
+      {isAuthUnavailable && (
+        <div role="alert" className="max-w-xl space-y-3 rounded-control border border-rust/25 bg-rust/10 px-4 py-3 text-sm text-rust">
+          <p className="leading-6">{t('err_auth_unavailable_body')}</p>
+          <button
+            type="button"
+            onClick={handleAuthRetry}
+            className="min-h-11 rounded-sm border border-border bg-surface/80 px-4 text-xs font-medium text-ink transition-colors hover:border-ink-muted"
+          >
+            {t('app_error_retry')}
+          </button>
+        </div>
+      )}
+      {usageError && !isAuthUnavailable && (
         <p className="text-xs text-ink-subtle">
           {`${t('usage_error')} ${t('support_contact_prompt')}`}
         </p>

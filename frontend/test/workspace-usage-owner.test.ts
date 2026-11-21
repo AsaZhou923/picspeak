@@ -74,3 +74,104 @@ test('initial Guest token creation can finish the first usage request', async ()
   assert.equal(view.currentPlan, 'guest');
   app.unmount();
 });
+
+test('usage hook exposes AUTH_UNAVAILABLE without falling back to guest when Clerk is unreachable (#108)', async () => {
+  let getUsageCalled = false;
+  const ensureToken = async () => {
+    throw Object.assign(new Error('Sign-in service is unavailable'), {
+      name: 'ApiException',
+      status: 503,
+      code: 'AUTH_UNAVAILABLE',
+    });
+  };
+  const captureAuthOwner = () => () => true;
+  const syncPlan = () => {};
+  const app = componentHarness(new URL('../src/features/workspace/hooks/useWorkspaceUsage.ts', import.meta.url), {
+    '@/lib/auth-context': { useAuth: () => ({ userInfo: null, ensureToken, captureAuthOwner, isLoading: false, syncPlan }) },
+    '@/lib/api': {
+      getUsage: async () => {
+        getUsageCalled = true;
+        return snapshot('guest');
+      },
+      isAbortError: () => false,
+    },
+    '@/lib/client-log': { logClientError() {} },
+  });
+  app.render('flash', 'useWorkspaceUsage');
+  await settle();
+  const view: any = app.render('flash', 'useWorkspaceUsage');
+  assert.equal(getUsageCalled, false);
+  assert.equal(view.usage, null);
+  assert.equal(view.usageError, true);
+  assert.equal(view.usageErrorCode, 'AUTH_UNAVAILABLE');
+  app.unmount();
+});
+
+test('QuotaBanner shows localized AUTH_UNAVAILABLE message and retry button instead of quota load error (#108)', async () => {
+  const { enTranslations } = await import('../src/lib/i18n-en.ts');
+  const { zhTranslations } = await import('../src/lib/i18n-zh.ts');
+  const { jaTranslations } = await import('../src/lib/i18n-ja.ts');
+  const { renderToStaticMarkup } = await import('react-dom/server');
+  const { createElement } = await import('react');
+  const { readFile } = await import('node:fs/promises');
+  const { createRequire } = await import('node:module');
+  const { pathToFileURL } = await import('node:url');
+  const ts = (await import('typescript')).default;
+  const req = createRequire(import.meta.url);
+  const toUrl = (src: string, imports: Record<string, string> = {}) => {
+    let code = ts.transpileModule(src, {
+      compilerOptions: { jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
+    }).outputText;
+    for (const [spec, url] of Object.entries({
+      'react/jsx-runtime': pathToFileURL(req.resolve('react/jsx-runtime')).href,
+      ...imports,
+    })) {
+      code = code.replaceAll(`from '${spec}'`, `from ${JSON.stringify(url)}`).replaceAll(`from "${spec}"`, `from ${JSON.stringify(url)}`);
+    }
+    return `data:text/javascript;base64,${Buffer.from(code).toString('base64')}`;
+  };
+
+  const { QuotaBanner } = await import(
+    toUrl(await readFile(new URL('../src/features/workspace/components/QuotaBanner.tsx', import.meta.url), 'utf8'), {
+      'lucide-react': toUrl('export const Info = () => null;'),
+      '@/lib/auth-context': toUrl('export const planLabel = (plan) => plan; export const planColor = () => "";'),
+      '@/components/ui/Badge': toUrl('export default function Badge({ children }) { return children; }'),
+      '@/components/auth/ClerkSignInTrigger': toUrl('export default function ClerkSignInTrigger() { return null; }'),
+      '@/components/billing/ProMonthlyUsageNotice': toUrl('export default function ProMonthlyUsageNotice() { return null; }'),
+    }),
+  );
+
+  for (const dictionary of [enTranslations, zhTranslations, jaTranslations]) {
+    const t = (key: keyof typeof enTranslations) => dictionary[key];
+    const outageHtml = renderToStaticMarkup(
+      createElement(QuotaBanner, {
+        usage: null,
+        usageError: true,
+        usageErrorCode: 'AUTH_UNAVAILABLE',
+        remainingQuota: null,
+        totalQuota: null,
+        reviewMode: 'flash',
+        t,
+      }),
+    );
+    assert.ok(outageHtml.includes('role="alert"'));
+    assert.ok(outageHtml.includes(dictionary.err_auth_unavailable_body));
+    assert.ok(outageHtml.includes(`<button`), 'AUTH_UNAVAILABLE banner must render a retry button');
+    assert.ok(outageHtml.includes(dictionary.app_error_retry));
+    assert.ok(!outageHtml.includes(dictionary.usage_error), 'must not show generic quota load error');
+
+    const genericErrorHtml = renderToStaticMarkup(
+      createElement(QuotaBanner, {
+        usage: null,
+        usageError: true,
+        usageErrorCode: 'INTERNAL_ERROR',
+        remainingQuota: null,
+        totalQuota: null,
+        reviewMode: 'flash',
+        t,
+      }),
+    );
+    assert.ok(genericErrorHtml.includes(dictionary.usage_error));
+    assert.ok(!genericErrorHtml.includes(dictionary.err_auth_unavailable_body));
+  }
+});

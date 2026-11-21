@@ -242,3 +242,13 @@ test('self-service deletion copy explains irreversibility, 24-hour file removal,
   assert.match(legalSource, /你可以直接在点评或生成图页面自行删除对应内容/);
   assert.match(legalSource, /講評や生成画像は、それぞれのページからご自身で削除できます/);
 });
+
+test('auth outage copy and retry action are localized across en/zh/ja (#108)', () => {
+  for (const dictionary of [enTranslations, zhTranslations, jaTranslations]) {
+    const translate = (key: keyof typeof enTranslations) => dictionary[key];
+    assert.equal(localizedErrorMessage(translate, 'AUTH_UNAVAILABLE'), dictionary.err_auth_unavailable_body);
+    assert.ok(dictionary.err_auth_unavailable_body.trim().length > 0);
+    assert.ok(dictionary.app_error_retry.trim().length > 0);
+    assert.notEqual(dictionary.err_auth_unavailable_body, dictionary.usage_error);
+  }
+});
