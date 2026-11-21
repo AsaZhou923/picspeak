@@ -160,14 +160,14 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     fields = _validation_error_fields(exc)
     _log_error_response(
         request,
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         code='VALIDATION_ERROR',
         message='Request validation failed',
         extra={'fields': fields},
     )
     return _error_response(
         request,
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         code='VALIDATION_ERROR',
         message='Request validation failed',
         extra={'fields': fields},
