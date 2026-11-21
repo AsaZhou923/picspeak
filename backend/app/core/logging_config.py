@@ -200,9 +200,7 @@ def configure_logging(*, json_logs: bool | None = None, stream: Any | None = Non
     root_logger = logging.getLogger()
 
     for existing in list(root_logger.handlers):
-        if getattr(existing, '_picspeak_managed', False):
-            root_logger.removeHandler(existing)
-        elif use_json and type(existing) is logging.StreamHandler:
+        if getattr(existing, '_picspeak_managed', False) or type(existing) is logging.StreamHandler:
             root_logger.removeHandler(existing)
 
     handler = logging.StreamHandler(stream or sys.stdout)

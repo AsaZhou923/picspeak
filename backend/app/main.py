@@ -26,7 +26,6 @@ from app.core.request_limits import RequestBodyLimitMiddleware
 from app.db.session import SessionLocal, engine
 from app.services.audit import log_api_request
 from app.services.worker import worker
-from app.services.worker_health import maybe_warn_stale_pending_tasks, oldest_pending_task_ages_seconds
 
 configure_logging()
 logger = logging.getLogger(__name__)
@@ -389,36 +388,6 @@ def _check_database_readiness(timeout_seconds: float) -> None:
         conn.execute(text('SELECT 1')).scalar()
 
 
-def _collect_readiness_diagnostics() -> dict[str, object]:
-    worker_info = worker.heartbeat_snapshot(include_error_text=False)
-    oldest_review_seconds: float | None = None
-    oldest_generation_seconds: float | None = None
-    db = SessionLocal()
-    try:
-        ages = oldest_pending_task_ages_seconds(db)
-        oldest_review_seconds = ages['oldest_pending_review_seconds']
-        oldest_generation_seconds = ages['oldest_pending_generation_seconds']
-    except Exception:
-        logger.warning('Failed to read pending task backlog ages for readiness probe', exc_info=True)
-    finally:
-        db.close()
-
-    try:
-        maybe_warn_stale_pending_tasks(
-            oldest_pending_review_seconds=oldest_review_seconds,
-            oldest_pending_generation_seconds=oldest_generation_seconds,
-            worker_heartbeat_stale=bool(worker_info.get('heartbeat_stale')),
-        )
-    except Exception:
-        logger.warning('Failed to evaluate pending task backlog alert', exc_info=True)
-
-    return {
-        'oldest_pending_review_seconds': oldest_review_seconds,
-        'oldest_pending_generation_seconds': oldest_generation_seconds,
-        'worker': worker_info,
-    }
-
-
 @app.get('/healthz')
 def healthz():
     return {'status': 'ok'}
@@ -439,17 +408,4 @@ async def readyz():
             content={'status': 'unavailable'},
         )
 
-    try:
-        diagnostics = await asyncio.wait_for(
-            asyncio.to_thread(_collect_readiness_diagnostics),
-            timeout=timeout_seconds,
-        )
-    except Exception:
-        logger.warning('Readiness diagnostics collection failed', exc_info=True)
-        diagnostics = {
-            'oldest_pending_review_seconds': None,
-            'oldest_pending_generation_seconds': None,
-            'worker': worker.heartbeat_snapshot(include_error_text=False),
-        }
-
-    return {'status': 'ok', **diagnostics}
+    return {'status': 'ok'}

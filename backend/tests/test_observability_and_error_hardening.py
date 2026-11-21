@@ -325,41 +325,23 @@ class ReadinessProbeTests(unittest.TestCase):
     def tearDown(self) -> None:
         reset_pending_task_alert_cooldown()
 
-    def test_readyz_returns_ok_with_informational_worker_and_pending_fields_and_skips_audit(self) -> None:
+    def test_readyz_returns_minimal_ok_without_backlog_queries_and_skips_audit(self) -> None:
         with (
             patch('app.main._schedule_audit_task') as schedule_audit,
             patch('app.main.worker.start'),
             patch('app.main.worker.stop'),
             patch('app.main._check_database_readiness') as check_db,
-            patch(
-                'app.main._collect_readiness_diagnostics',
-                return_value={
-                    'oldest_pending_review_seconds': 12.5,
-                    'oldest_pending_generation_seconds': None,
-                    'worker': {
-                        'enabled': True,
-                        'running': True,
-                        'alive_threads': 2,
-                        'heartbeat_stale': False,
-                        'last_loop_at': '2026-11-21T05:00:00+00:00',
-                        'last_loop_age_seconds': 0.5,
-                        'has_error': False,
-                        'last_error_at': None,
-                    },
-                },
-            ),
+            patch('app.main.SessionLocal') as session_local,
+            patch('app.main.worker.heartbeat_snapshot') as heartbeat_snapshot,
         ):
             with TestClient(app) as client:
                 response = client.get('/readyz')
 
         self.assertEqual(response.status_code, 200)
-        body = response.json()
-        self.assertEqual(body['status'], 'ok')
-        self.assertEqual(body['oldest_pending_review_seconds'], 12.5)
-        self.assertIsNone(body['oldest_pending_generation_seconds'])
-        self.assertFalse(body['worker']['heartbeat_stale'])
-        self.assertNotIn('last_error', body['worker'])
+        self.assertEqual(response.json(), {'status': 'ok'})
         check_db.assert_called_once()
+        session_local.assert_not_called()
+        heartbeat_snapshot.assert_not_called()
         schedule_audit.assert_not_called()
 
     def test_readyz_returns_503_unavailable_without_exception_text_on_db_error(self) -> None:
@@ -399,34 +381,20 @@ class ReadinessProbeTests(unittest.TestCase):
         self.assertEqual(response.json(), {'status': 'unavailable'})
         self.assertLess(elapsed, 0.45)
 
-    def test_readyz_never_fails_when_diagnostics_fail_or_worker_is_stale(self) -> None:
+    def test_healthz_stays_lightweight_without_touching_db(self) -> None:
         with (
+            patch('app.main._schedule_audit_task') as schedule_audit,
             patch('app.main.worker.start'),
             patch('app.main.worker.stop'),
-            patch('app.main._check_database_readiness'),
-            patch('app.main._collect_readiness_diagnostics', side_effect=RuntimeError('stats boom')),
-            patch(
-                'app.main.worker.heartbeat_snapshot',
-                return_value={
-                    'enabled': True,
-                    'running': True,
-                    'alive_threads': 0,
-                    'heartbeat_stale': True,
-                    'last_loop_at': None,
-                    'last_loop_age_seconds': 999.0,
-                    'has_error': True,
-                    'last_error_at': '2026-11-21T05:00:00+00:00',
-                },
-            ),
+            patch('app.main._check_database_readiness') as check_db,
         ):
             with TestClient(app) as client:
-                response = client.get('/readyz')
+                response = client.get('/healthz')
 
         self.assertEqual(response.status_code, 200)
-        body = response.json()
-        self.assertEqual(body['status'], 'ok')
-        self.assertTrue(body['worker']['heartbeat_stale'])
-        self.assertNotIn('stats boom', response.text)
+        self.assertEqual(response.json(), {'status': 'ok'})
+        check_db.assert_not_called()
+        schedule_audit.assert_not_called()
 
     def test_check_database_readiness_sets_postgres_statement_timeout(self) -> None:
         executed: list[tuple[str, object]] = []
@@ -626,6 +594,73 @@ class StructuredErrorReportingTests(unittest.TestCase):
         self.assertEqual(parsed['serviceContext'], {'service': SERVICE_NAME})
         self.assertNotIn('@type', parsed)
 
+    def test_configure_logging_is_idempotent_and_preserves_uvicorn_logs_in_both_modes(self) -> None:
+        root_logger = logging.getLogger()
+        original_handlers = list(root_logger.handlers)
+        uvicorn_logger = logging.getLogger('uvicorn')
+        uvicorn_access_logger = logging.getLogger('uvicorn.access')
+        uvicorn_error_logger = logging.getLogger('uvicorn.error')
+        orig_uvicorn = (list(uvicorn_logger.handlers), uvicorn_logger.propagate, uvicorn_logger.level)
+        orig_access = (list(uvicorn_access_logger.handlers), uvicorn_access_logger.propagate, uvicorn_access_logger.level)
+        orig_error = (list(uvicorn_error_logger.handlers), uvicorn_error_logger.propagate, uvicorn_error_logger.level)
+
+        try:
+            for json_mode in (False, True):
+                with self.subTest(json_mode=json_mode):
+                    # Seed a stray plain StreamHandler as basicConfig or reload would.
+                    root_logger.addHandler(logging.StreamHandler(StringIO()))
+
+                    stream = StringIO()
+                    configure_logging(json_logs=json_mode, stream=stream)
+                    configure_logging(json_logs=json_mode, stream=stream)
+                    handler = configure_logging(json_logs=json_mode, stream=stream)
+
+                    managed = [h for h in root_logger.handlers if getattr(h, '_picspeak_managed', False)]
+                    plain_stream = [h for h in root_logger.handlers if type(h) is logging.StreamHandler]
+                    self.assertEqual(len(managed), 1)
+                    self.assertEqual(len(plain_stream), 1)
+                    self.assertIs(managed[0], handler)
+
+                    logging.getLogger('app.idempotency_probe').info('single-line-check')
+                    lines = [line for line in stream.getvalue().splitlines() if 'single-line-check' in line]
+                    self.assertEqual(len(lines), 1)
+
+                    # Case 1: uvicorn configured with its own non-propagating handlers (standard uvicorn LOGGING_CONFIG).
+                    uv_err_stream = StringIO()
+                    uv_acc_stream = StringIO()
+                    uvicorn_logger.handlers = [logging.StreamHandler(uv_err_stream)]
+                    uvicorn_logger.propagate = False
+                    uvicorn_logger.setLevel(logging.INFO)
+                    uvicorn_error_logger.handlers = []
+                    uvicorn_error_logger.propagate = True
+                    uvicorn_error_logger.setLevel(logging.INFO)
+                    uvicorn_access_logger.handlers = [logging.StreamHandler(uv_acc_stream)]
+                    uvicorn_access_logger.propagate = False
+                    uvicorn_access_logger.setLevel(logging.INFO)
+
+                    # Re-running configure_logging (e.g. worker_main/main import or reload) must not silence uvicorn.
+                    configure_logging(json_logs=json_mode, stream=stream)
+                    uvicorn_error_logger.info('uvicorn-error-visible')
+                    uvicorn_access_logger.info('uvicorn-access-visible')
+                    self.assertIn('uvicorn-error-visible', uv_err_stream.getvalue())
+                    self.assertIn('uvicorn-access-visible', uv_acc_stream.getvalue())
+
+                    # Case 2: uvicorn propagating to root (custom log config without dedicated handlers).
+                    uvicorn_logger.handlers = []
+                    uvicorn_logger.propagate = True
+                    uvicorn_access_logger.handlers = []
+                    uvicorn_access_logger.propagate = True
+                    uvicorn_error_logger.info('uvicorn-error-propagated')
+                    uvicorn_access_logger.info('uvicorn-access-propagated')
+                    output = stream.getvalue()
+                    self.assertIn('uvicorn-error-propagated', output)
+                    self.assertIn('uvicorn-access-propagated', output)
+        finally:
+            root_logger.handlers = original_handlers
+            uvicorn_logger.handlers, uvicorn_logger.propagate, uvicorn_logger.level = orig_uvicorn
+            uvicorn_access_logger.handlers, uvicorn_access_logger.propagate, uvicorn_access_logger.level = orig_access
+            uvicorn_error_logger.handlers, uvicorn_error_logger.propagate, uvicorn_error_logger.level = orig_error
+
 
 class WorkerVisibilityTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -740,6 +775,47 @@ class WorkerVisibilityTests(unittest.TestCase):
         self.assertEqual(backlog_warnings[0]['oldest_pending_review_seconds'], 900.0)
         self.assertEqual(backlog_warnings[0]['oldest_pending_generation_seconds'], 720.0)
         self.assertEqual(backlog_warnings[1]['worker_heartbeat_stale'], True)
+
+    def test_worker_maintenance_backlog_check_emits_rate_limited_warning(self) -> None:
+        worker = ReviewWorker(worker_name='maint-backlog-worker')
+        self.addCleanup(worker._gen_executor.shutdown, False, cancel_futures=True)
+        worker.record_heartbeat(now_monotonic=1000.0)
+
+        stream = StringIO()
+        handler = configure_logging(json_logs=True, stream=stream)
+        db = MagicMock()
+        clock = [1000.0]
+        try:
+            with (
+                patch('app.db.session.SessionLocal', return_value=db),
+                patch(
+                    'app.services.worker.oldest_pending_task_ages_seconds',
+                    return_value={
+                        'oldest_pending_review_seconds': 750.0,
+                        'oldest_pending_generation_seconds': None,
+                    },
+                ),
+                patch('app.services.worker_health.settings.worker_pending_task_alert_threshold_seconds', 600),
+                patch('time.monotonic', side_effect=lambda: clock[0]),
+            ):
+                worker._run_pending_backlog_check_if_due()
+                # 100s later: maintenance check runs again, but warning cooldown (600s) suppresses duplicate warning.
+                clock[0] = 1100.0
+                worker._run_pending_backlog_check_if_due()
+                # 700s after first warning: cooldown elapsed, second warning fires.
+                clock[0] = 1700.0
+                worker._run_pending_backlog_check_if_due()
+        finally:
+            logging.getLogger().removeHandler(handler)
+
+        self.assertEqual(db.close.call_count, 3)
+        entries = [json.loads(line) for line in stream.getvalue().splitlines() if line.strip()]
+        warnings = [e for e in entries if e.get('event') == 'pending_task_backlog_stale']
+        self.assertEqual(len(warnings), 2)
+        self.assertEqual(warnings[0]['severity'], 'WARNING')
+        self.assertEqual(warnings[0]['serviceContext'], {'service': SERVICE_NAME})
+        self.assertEqual(warnings[0]['oldest_pending_review_seconds'], 750.0)
+        self.assertEqual(warnings[1]['worker_heartbeat_stale'], True)
 
     def test_operational_health_snapshot_and_markdown_include_pending_ages_and_worker_state(self) -> None:
         now = datetime(2026, 11, 21, 12, 0, tzinfo=timezone.utc)
