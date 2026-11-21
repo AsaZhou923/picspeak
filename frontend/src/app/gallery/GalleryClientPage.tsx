@@ -4,10 +4,12 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AlertCircle, ChevronRight, Info, Star, X, Heart } from 'lucide-react';
+import AuthUnavailableNotice from '@/components/auth/AuthUnavailableNotice';
 import ClerkSignInTrigger from '@/components/auth/ClerkSignInTrigger';
 import ProPromoCard from '@/components/marketing/ProPromoCard';
 import { getPublicGallery, likeGalleryReview, unlikeGalleryReview } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { resolveAuthGate } from '@/lib/auth-gate';
 import { formatUserFacingError } from '@/lib/error-utils';
 import {
   buildGalleryRestoreKey,
@@ -55,7 +57,7 @@ function GalleryPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { t, locale } = useI18n();
-  const { token, userInfo, ensureToken, isLoading: authLoading } = useAuth();
+  const { token, userInfo, ensureToken, isLoading: authLoading, authUnavailable } = useAuth();
   
   const pendingRestoreRef = useRef<GalleryRestoreState | null>(null);
   const pagesRef = useRef<GalleryUxItem[][]>([]);
@@ -72,6 +74,7 @@ function GalleryPageContent() {
   const [paging, setPaging] = useState(false);
   const [error, setError] = useState('');
   const [actionError, setActionError] = useState('');
+  const [authOutageNoticeOpen, setAuthOutageNoticeOpen] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
   const [likeBusyId, setLikeBusyId] = useState<string | null>(null);
   const [preferences, setPreferences] = useState<GalleryPreferences>(() => sanitizeGalleryPreferences(null));
@@ -368,12 +371,19 @@ function GalleryPageContent() {
 
   const handleLikeToggle = useCallback(
     async (item: GalleryUxItem) => {
-      if (likeBusyId || authLoading) return;
+      const authGate = resolveAuthGate({ isLoading: authLoading, userInfo, authUnavailable });
+      // Undetermined auth must not flash the guest prompt at a signed-in browser.
+      if (likeBusyId || authGate === 'loading') return;
       setActionError('');
-      if (!userInfo || userInfo.plan === 'guest') {
+      if (authGate === 'unavailable') {
+        setAuthOutageNoticeOpen(true);
+        return;
+      }
+      if (authGate === 'sign_in') {
         setGuestLikePromptOpen(true);
         return;
       }
+      setAuthOutageNoticeOpen(false);
       setLikeBusyId(item.review_id);
       try {
         const authToken = await ensureToken();
@@ -391,7 +401,7 @@ function GalleryPageContent() {
         setLikeBusyId(null);
       }
     },
-    [authLoading, ensureToken, likeBusyId, patchGalleryItem, t, userInfo]
+    [authLoading, authUnavailable, ensureToken, likeBusyId, patchGalleryItem, t, userInfo]
   );
 
   const items = pages[pageIndex] ?? [];
@@ -466,6 +476,7 @@ function GalleryPageContent() {
             {error || actionError}
           </div>
         )}
+        {authOutageNoticeOpen && authUnavailable && <AuthUnavailableNotice t={t} className="mt-6" />}
 
         {loading ? (
           <section className={`mt-4 grid gap-4 ${galleryGridClassName(preferences.columns)}`}>

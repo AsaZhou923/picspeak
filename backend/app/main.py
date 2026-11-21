@@ -199,6 +199,7 @@ _AUDIT_SKIP_PATHS = {
     '/redoc',
     '/api/v1/uploads/presign',
     '/api/v1/photos',
+    '/api/v1/client-errors',
 }
 _AUDIT_SKIP_PREFIXES = ('/api/v1/photos/',)
 _AUDIT_BODY_CAPTURE_LIMIT_BYTES = 4 * 1024
@@ -212,6 +213,7 @@ _AUDIT_BODY_ALLOW_PATHS: frozenset[str] = frozenset()
 # accidentally added to _AUDIT_BODY_ALLOW_PATHS.
 _AUDIT_BODY_SKIP_PATHS = frozenset({
     '/api/v1/billing/activation-code/redeem',
+    '/api/v1/client-errors',
 })
 
 

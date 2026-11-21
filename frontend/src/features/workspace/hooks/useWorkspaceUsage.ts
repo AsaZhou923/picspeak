@@ -30,6 +30,7 @@ export function useWorkspaceUsage(reviewMode: 'flash' | 'pro') {
   const { userInfo, ensureToken, isLoading: authLoading, syncPlan, captureAuthOwner } = useAuth();
   const [usage, setUsage] = useState<UsageResponse | null>(null);
   const [usageError, setUsageError] = useState(false);
+  const [usageErrorCode, setUsageErrorCode] = useState<string | null>(null);
 
   const currentPlan = (userInfo?.plan ?? usage?.plan ?? 'guest') as 'guest' | 'free' | 'pro';
   const isGuest = currentPlan === 'guest';
@@ -40,6 +41,7 @@ export function useWorkspaceUsage(reviewMode: 'flash' | 'pro') {
     if (!isOwnerCurrent()) return null;
     try {
       setUsageError(false);
+      setUsageErrorCode(null);
       const tok = await ensureToken();
       if (!isOwnerCurrent() || options.signal?.aborted) return null;
       const data = await getUsage(tok, { force: options.force, signal: options.signal });
@@ -50,7 +52,12 @@ export function useWorkspaceUsage(reviewMode: 'flash' | 'pro') {
     } catch (err) {
       if (isAbortError(err) || !isOwnerCurrent() || options.signal?.aborted) return null;
       logClientError('Failed to fetch usage in workspace', err);
+      const code =
+        typeof err === 'object' && err !== null && typeof (err as { code?: unknown }).code === 'string'
+          ? (err as { code: string }).code
+          : null;
       setUsageError(true);
+      setUsageErrorCode(code);
       return null;
     }
   }, [ensureToken, syncPlan, captureAuthOwner, userInfo?.user_id]);
@@ -59,11 +66,13 @@ export function useWorkspaceUsage(reviewMode: 'flash' | 'pro') {
     if (authLoading) return;
     const controller = new AbortController();
     setUsage(null);
+    setUsageError(false);
+    setUsageErrorCode(null);
     void fetchUsage({ signal: controller.signal });
     return () => {
       controller.abort();
     };
   }, [authLoading, userInfo?.access_token, fetchUsage]);
 
-  return { usage, usageError, fetchUsage, currentPlan, isGuest, remainingQuota, totalQuota };
+  return { usage, usageError, usageErrorCode, fetchUsage, currentPlan, isGuest, remainingQuota, totalQuota };
 }

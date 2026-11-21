@@ -3,12 +3,15 @@ import { planLabel, planColor } from '@/lib/auth-context';
 import { UsageResponse } from '@/lib/types';
 import Badge from '@/components/ui/Badge';
 import { type Translator } from '@/lib/i18n';
+import AuthUnavailableNotice from '@/components/auth/AuthUnavailableNotice';
 import ClerkSignInTrigger from '@/components/auth/ClerkSignInTrigger';
 import ProMonthlyUsageNotice from '@/components/billing/ProMonthlyUsageNotice';
 
 interface QuotaBannerProps {
   usage: UsageResponse | null;
   usageError: boolean;
+  usageErrorCode?: string | null;
+  onAuthRetry?: () => void;
   remainingQuota: number | null;
   totalQuota: number | null;
   reviewMode: 'flash' | 'pro';
@@ -16,7 +19,19 @@ interface QuotaBannerProps {
   signInReturnPath?: string;
 }
 
-export function QuotaBanner({ usage, usageError, remainingQuota, totalQuota, reviewMode, t, signInReturnPath = '/workspace' }: QuotaBannerProps) {
+export function QuotaBanner({
+  usage,
+  usageError,
+  usageErrorCode = null,
+  onAuthRetry,
+  remainingQuota,
+  totalQuota,
+  reviewMode,
+  t,
+  signInReturnPath = '/workspace',
+}: QuotaBannerProps) {
+  const isAuthUnavailable = usageError && usageErrorCode === 'AUTH_UNAVAILABLE';
+
   return (
     <div className="mt-5 space-y-2">
       {usage && (
@@ -50,7 +65,8 @@ export function QuotaBanner({ usage, usageError, remainingQuota, totalQuota, rev
         </div>
       )}
       {usage && <ProMonthlyUsageNotice usage={usage} t={t} />}
-      {usageError && (
+      {isAuthUnavailable && <AuthUnavailableNotice t={t} onRetry={onAuthRetry} className="max-w-xl" />}
+      {usageError && !isAuthUnavailable && (
         <p className="text-xs text-ink-subtle">
           {`${t('usage_error')} ${t('support_contact_prompt')}`}
         </p>

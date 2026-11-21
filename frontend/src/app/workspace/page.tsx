@@ -195,7 +195,7 @@ function WorkspacePageContent() {
   const [sessionSourceLoading, setSessionSourceLoading] = useState(false);
   const [sessionSourceError, setSessionSourceError] = useState(false);
 
-  const { usage, usageError, fetchUsage, currentPlan, isGuest, remainingQuota, totalQuota } =
+  const { usage, usageError, usageErrorCode, fetchUsage, currentPlan, isGuest, remainingQuota, totalQuota } =
     useWorkspaceUsage(reviewMode);
 
   const {
@@ -873,6 +873,7 @@ function WorkspacePageContent() {
           <QuotaBanner
             usage={usage}
             usageError={usageError}
+            usageErrorCode={usageErrorCode}
             remainingQuota={remainingQuota}
             totalQuota={totalQuota}
             reviewMode={reviewMode}

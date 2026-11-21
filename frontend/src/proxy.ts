@@ -1,4 +1,4 @@
-import { clerkMiddleware } from '@clerk/nextjs/server';
+import type { NextFetchEvent, NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
 import {
@@ -9,7 +9,6 @@ import {
 } from '@/lib/locale';
 import { hasKnownAppPath } from '@/lib/app-route-roots';
 import { lookupPublicProfile } from '@/features/profile/public-profile-metadata';
-import { siteConfig } from '@/lib/site';
 
 const NOT_FOUND_COPY: Record<SupportedLocale, { title: string; heading: string; body: string; cta: string }> = {
   zh: {
@@ -81,66 +80,58 @@ function unknownRouteResponse(locale: SupportedLocale): NextResponse {
   );
 }
 
-const productionOrigin = new URL(siteConfig.url).origin;
-const productionWwwOrigin = productionOrigin.includes('://www.')
-  ? productionOrigin
-  : productionOrigin.replace('://', '://www.');
-
-const developmentOrigins =
-  process.env.NODE_ENV === 'production'
-    ? []
-    : ['http://localhost:3000', 'http://127.0.0.1:3000'];
-
-const authorizedParties = Array.from(new Set([...developmentOrigins, productionOrigin, productionWwwOrigin]));
-
-export default clerkMiddleware(
-  async (_auth, request) => {
-    const cookieLocale = request.cookies.get(LOCALE_COOKIE_NAME)?.value;
-    const locale = resolveRequestLocale(
-      request.nextUrl.pathname,
-      cookieLocale,
-      request.headers.get('accept-language'),
-    );
-    const hasExplicitLocalePath = Boolean(request.nextUrl.pathname.match(/^\/(zh|en|ja)(?:\/|$)/));
-    if (!hasKnownAppPath(request.nextUrl.pathname) || await isMissingPublicProfile(request)) {
-      return unknownRouteResponse(locale ?? 'en');
-    }
-
-    const requestHeaders = new Headers(request.headers);
-    requestHeaders.delete('x-picspeak-locale');
-
-    const blogRedirectPath = getLocalizedBlogRedirectPath(
-      request.nextUrl.pathname,
-      locale ?? 'en',
-    );
-
-    if (blogRedirectPath) {
-      const redirectUrl = request.nextUrl.clone();
-      redirectUrl.pathname = blogRedirectPath;
-      const response = NextResponse.redirect(redirectUrl, 307);
-      response.headers.set('Cache-Control', 'private, no-store, max-age=0, must-revalidate');
-      response.headers.set('Vary', 'Cookie, Accept-Language');
-      return response;
-    }
-
-    if (locale) {
-      requestHeaders.set('x-picspeak-locale', locale);
-    }
-    const response = NextResponse.next({
-      request: {
-        headers: requestHeaders,
-      },
-    });
-    if (locale && !hasExplicitLocalePath) {
-      response.headers.set('Cache-Control', 'private, no-store, max-age=0, must-revalidate');
-      response.headers.set('Vary', 'Cookie, Accept-Language');
-    }
-    return response;
-  },
-  {
-    authorizedParties,
+/**
+ * PicSpeak authenticates exclusively on the client via ClerkProvider + AuthProvider
+ * exchanging Clerk JWTs with the FastAPI backend; no Next.js server route calls
+ * Clerk server `auth()`. Running `clerkMiddleware()` here causes cold navigations
+ * with a non-zero `__client_uat` cookie to 307-redirect into Clerk's
+ * `/v1/client/handshake` before any page can render, breaking the client-side
+ * `AUTH_UNAVAILABLE` fallback when Clerk's Frontend API is unreachable (#108).
+ */
+export default async function proxy(request: NextRequest, _event?: NextFetchEvent): Promise<NextResponse> {
+  void _event;
+  const cookieLocale = request.cookies.get(LOCALE_COOKIE_NAME)?.value;
+  const locale = resolveRequestLocale(
+    request.nextUrl.pathname,
+    cookieLocale,
+    request.headers.get('accept-language'),
+  );
+  const hasExplicitLocalePath = Boolean(request.nextUrl.pathname.match(/^\/(zh|en|ja)(?:\/|$)/));
+  if (!hasKnownAppPath(request.nextUrl.pathname) || await isMissingPublicProfile(request)) {
+    return unknownRouteResponse(locale ?? 'en');
   }
-);
+
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.delete('x-picspeak-locale');
+
+  const blogRedirectPath = getLocalizedBlogRedirectPath(
+    request.nextUrl.pathname,
+    locale ?? 'en',
+  );
+
+  if (blogRedirectPath) {
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = blogRedirectPath;
+    const response = NextResponse.redirect(redirectUrl, 307);
+    response.headers.set('Cache-Control', 'private, no-store, max-age=0, must-revalidate');
+    response.headers.set('Vary', 'Cookie, Accept-Language');
+    return response;
+  }
+
+  if (locale) {
+    requestHeaders.set('x-picspeak-locale', locale);
+  }
+  const response = NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  });
+  if (locale && !hasExplicitLocalePath) {
+    response.headers.set('Cache-Control', 'private, no-store, max-age=0, must-revalidate');
+    response.headers.set('Vary', 'Cookie, Accept-Language');
+  }
+  return response;
+}
 
 export const config = {
   matcher: [

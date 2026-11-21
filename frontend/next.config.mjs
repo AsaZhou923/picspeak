@@ -15,6 +15,7 @@ const staticImageRemotePatterns = [
 ];
 
 const IMAGE_HOSTNAME_PATTERN = /^(\*{1,2}\.)?[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/;
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
 function addRemotePattern(patterns, nextPattern) {
   const exists = patterns.some(
@@ -75,13 +76,13 @@ function buildRemotePatterns() {
 }
 
 function appendUniqueSource(sources, source) {
-  if (!sources.includes(source)) {
+  if (source && !sources.includes(source)) {
     sources.push(source);
   }
 }
 
 function buildWebSocketConnectSources() {
-  const sources = ['ws://localhost:8000', 'ws://127.0.0.1:8000'];
+  const sources = IS_PRODUCTION ? [] : ['ws://localhost:8000', 'ws://127.0.0.1:8000'];
   const rawApiUrl = process.env.NEXT_PUBLIC_API_URL;
 
   if (!rawApiUrl) {
@@ -105,7 +106,7 @@ function buildWebSocketConnectSources() {
 }
 
 function buildApiSources() {
-  const sources = ['http://localhost:8000', 'http://127.0.0.1:8000'];
+  const sources = IS_PRODUCTION ? [] : ['http://localhost:8000', 'http://127.0.0.1:8000'];
   const rawApiUrl = process.env.NEXT_PUBLIC_API_URL;
 
   if (!rawApiUrl) {
@@ -124,31 +125,153 @@ function buildApiSources() {
   return sources;
 }
 
+function buildClientErrorReportUrl() {
+  const rawApiUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
+  const candidate = rawApiUrl || (IS_PRODUCTION ? '' : 'http://localhost:8000');
+  if (!candidate) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(candidate);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return null;
+    }
+    const basePath = parsed.pathname.replace(/\/$/, '');
+    const apiPath = basePath.endsWith('/api/v1')
+      ? basePath
+      : basePath.endsWith('/api')
+        ? `${basePath}/v1`
+        : `${basePath}/api/v1`;
+    return `${parsed.origin}${apiPath}/client-errors`.replace(/([^:]\/)\/+/g, '$1');
+  } catch {
+    return null;
+  }
+}
+
+function buildObjectStorageAndSiteConnectSources() {
+  // Presigned PUT upload URLs are generated on the backend from OBJECT_S3_ENDPOINT
+  // (runtime-only Cloudflare R2 config not exposed to the frontend build), so keep
+  // a narrow R2 wildcard rather than reopening connect-src to all https:.
+  const sources = ['https://*.r2.cloudflarestorage.com'];
+
+  for (const rawUrl of [
+    process.env.NEXT_PUBLIC_SITE_URL,
+    process.env.NEXT_PUBLIC_DEMO_IMAGE_URL,
+  ]) {
+    if (!rawUrl) {
+      continue;
+    }
+    try {
+      const parsed = new URL(rawUrl);
+      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+        appendUniqueSource(sources, parsed.origin);
+      }
+    } catch {
+      // Ignore invalid env values.
+    }
+  }
+
+  for (const rawHost of (process.env.IMAGE_REMOTE_HOSTS ?? '').split(',')) {
+    const hostname = rawHost.trim().toLowerCase();
+    if (IMAGE_HOSTNAME_PATTERN.test(hostname)) {
+      const cspHost = hostname.startsWith('**.') ? `*.${hostname.slice(3)}` : hostname;
+      appendUniqueSource(sources, `https://${cspHost}`);
+    }
+  }
+
+  return sources;
+}
+
+const clerkScriptSources = [
+  'https://*.clerk.accounts.dev',
+  'https://*.clerk.com',
+  'https://clerk.picspeak.art',
+];
+
+const clerkConnectSources = [
+  ...clerkScriptSources,
+  'https://clerk-telemetry.com',
+  'https://*.clerk-telemetry.com',
+  'https://img.clerk.com',
+];
+
+const turnstileSources = ['https://challenges.cloudflare.com'];
+const vercelScriptSources = ['https://va.vercel-scripts.com'];
+const vercelConnectSources = [
+  'https://vitals.vercel-insights.com',
+  'https://va.vercel-scripts.com',
+];
+
+const apiSources = buildApiSources();
 const connectSources = [
   "'self'",
-  'https:',
-  ...buildApiSources(),
+  'blob:',
+  ...apiSources,
   ...buildWebSocketConnectSources(),
+  ...clerkConnectSources,
+  ...turnstileSources,
+  ...vercelConnectSources,
+  ...buildObjectStorageAndSiteConnectSources(),
 ].join(' ');
+
+const devEvalSource = IS_PRODUCTION ? [] : ["'unsafe-eval'"];
+const enforcedScriptSources = [
+  "'self'",
+  "'unsafe-inline'",
+  ...devEvalSource,
+  ...clerkScriptSources,
+  ...turnstileSources,
+  ...vercelScriptSources,
+].join(' ');
+
+const reportOnlyScriptSources = [
+  "'self'",
+  ...devEvalSource,
+  ...clerkScriptSources,
+  ...turnstileSources,
+  ...vercelScriptSources,
+].join(' ');
+
+const imgSrcDirective = ["'self'", 'data:', 'blob:', 'https:', ...apiSources].join(' ');
+const clientErrorReportUrl = buildClientErrorReportUrl();
+
+function buildCspDirectives({ scriptSrc, includeReporting }) {
+  const directives = [
+    "default-src 'self'",
+    "base-uri 'self'",
+    "object-src 'none'",
+    "frame-ancestors 'none'",
+    `img-src ${imgSrcDirective}`,
+    "font-src 'self' data:",
+    "style-src 'self' 'unsafe-inline'",
+    `script-src ${scriptSrc}`,
+    "worker-src 'self' blob:",
+    `connect-src ${connectSources}`,
+    "frame-src 'self' https://*.clerk.accounts.dev https://*.clerk.com https://clerk.picspeak.art https://challenges.cloudflare.com",
+    "form-action 'self'",
+  ];
+
+  if (includeReporting && clientErrorReportUrl) {
+    directives.push(`report-uri ${clientErrorReportUrl}`);
+    directives.push('report-to csp-endpoint');
+  }
+
+  return directives.join('; ');
+}
 
 const securityHeaders = [
   {
     key: 'Content-Security-Policy',
-    value: [
-      "default-src 'self'",
-      "base-uri 'self'",
-      "object-src 'none'",
-      "frame-ancestors 'none'",
-      `img-src 'self' data: blob: https: ${buildApiSources().join(' ')}`,
-      "font-src 'self' data:",
-      "style-src 'self' 'unsafe-inline'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.clerk.accounts.dev https://*.clerk.com https://clerk.picspeak.art https://challenges.cloudflare.com",
-      "worker-src 'self' blob:",
-      `connect-src ${connectSources}`,
-      "frame-src 'self' https://*.clerk.accounts.dev https://*.clerk.com https://clerk.picspeak.art https://challenges.cloudflare.com",
-      "form-action 'self'",
-    ].join('; '),
+    value: buildCspDirectives({ scriptSrc: enforcedScriptSources, includeReporting: false }),
   },
+  {
+    key: 'Content-Security-Policy-Report-Only',
+    value: buildCspDirectives({ scriptSrc: reportOnlyScriptSources, includeReporting: true }),
+  },
+  ...(clientErrorReportUrl
+    ? [{ key: 'Reporting-Endpoints', value: `csp-endpoint="${clientErrorReportUrl}"` }]
+    : []),
   { key: 'X-Frame-Options', value: 'DENY' },
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },

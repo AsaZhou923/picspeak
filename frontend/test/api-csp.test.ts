@@ -10,12 +10,19 @@ test('configured API origin is allowed for requests and photo proxy images witho
     const headers = await config.headers();
     const csp = headers.flatMap((route: { headers: { key: string; value: string }[] }) => route.headers)
       .find((header: { key: string; value: string }) => header.key === 'Content-Security-Policy')?.value;
+    const reportOnly = headers.flatMap((route: { headers: { key: string; value: string }[] }) => route.headers)
+      .find((header: { key: string; value: string }) => header.key === 'Content-Security-Policy-Report-Only')?.value;
+    const reportingEndpoints = headers.flatMap((route: { headers: { key: string; value: string }[] }) => route.headers)
+      .find((header: { key: string; value: string }) => header.key === 'Reporting-Endpoints')?.value;
     assert.ok(csp);
+    assert.ok(reportOnly);
     for (const directive of ['connect-src', 'img-src']) {
       const value = csp.split('; ').find((part: string) => part.startsWith(`${directive} `));
       assert.ok(value?.split(' ').includes('http://127.0.0.1:58000'));
     }
-    assert.doesNotMatch(csp, /password|secret|hidden|user:/);
+    assert.match(reportOnly, /report-uri http:\/\/127\.0\.0\.1:58000\/api\/v1\/client-errors/);
+    assert.equal(reportingEndpoints, 'csp-endpoint="http://127.0.0.1:58000/api/v1/client-errors"');
+    assert.doesNotMatch(`${csp} ${reportOnly} ${reportingEndpoints ?? ''}`, /password|secret|hidden|user:/);
   } finally {
     if (previous === undefined) delete process.env.NEXT_PUBLIC_API_URL;
     else process.env.NEXT_PUBLIC_API_URL = previous;
@@ -31,8 +38,11 @@ test('unsupported API protocols do not enter the request or image CSP', async ()
     const headers = await config.headers();
     const csp = headers.flatMap((route: { headers: { key: string; value: string }[] }) => route.headers)
       .find((header: { key: string; value: string }) => header.key === 'Content-Security-Policy')?.value;
+    const reportOnly = headers.flatMap((route: { headers: { key: string; value: string }[] }) => route.headers)
+      .find((header: { key: string; value: string }) => header.key === 'Content-Security-Policy-Report-Only')?.value;
     assert.ok(csp);
-    assert.doesNotMatch(csp, /file:|private-api/);
+    assert.ok(reportOnly);
+    assert.doesNotMatch(`${csp} ${reportOnly}`, /file:|private-api/);
   } finally {
     if (previous === undefined) delete process.env.NEXT_PUBLIC_API_URL;
     else process.env.NEXT_PUBLIC_API_URL = previous;

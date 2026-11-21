@@ -30,6 +30,7 @@ const { QuotaBanner } = await import(moduleUrl(await readFile(new URL('../src/fe
   '@/lib/auth-context': moduleUrl('export const planLabel = (plan) => plan; export const planColor = () => "";'),
   '@/components/ui/Badge': moduleUrl('export default function Badge({children}) { return children; }'),
   '@/components/auth/ClerkSignInTrigger': moduleUrl('export default function ClerkSignInTrigger({children,fallbackRedirectUrl}) { return <button data-sign-in={fallbackRedirectUrl}>{children}</button>; }'),
+  '@/components/auth/AuthUnavailableNotice': moduleUrl(await readFile(new URL('../src/components/auth/AuthUnavailableNotice.tsx', import.meta.url), 'utf8')),
   '@/components/billing/ProMonthlyUsageNotice': noticeUrl,
 }));
 
