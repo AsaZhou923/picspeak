@@ -24,6 +24,12 @@ class Settings(BaseSettings):
     )
 
     app_env: str = 'dev'
+    # Structured JSON stdout logs for Cloud Logging / Error Reporting.
+    # None (default) enables JSON logs when APP_ENV=production and keeps dev logs readable.
+    structured_json_logs: bool | None = None
+    readyz_db_timeout_seconds: float = Field(default=2.0, gt=0)
+    worker_heartbeat_stale_seconds: int = Field(default=60, ge=1)
+    worker_pending_task_alert_threshold_seconds: int = Field(default=600, ge=1)
     app_secret: str = 'change-me'
     # Minimum required length for app_secret in non-dev environments (32 bytes → 64 hex chars).
     _APP_SECRET_MIN_LENGTH: int = 32
@@ -189,6 +195,21 @@ class Settings(BaseSettings):
     image_generation_enable_streaming: bool = False
     image_generation_free_monthly_credits: int = 3
     image_generation_pro_monthly_credits: int = 199
+
+    @property
+    def use_structured_json_logs(self) -> bool:
+        if self.structured_json_logs is not None:
+            return self.structured_json_logs
+        return self.app_env.strip().lower() == 'production'
+
+    @field_validator('structured_json_logs', mode='before')
+    @classmethod
+    def parse_optional_bool_setting(cls, value: Any) -> Any:
+        if value is None:
+            return None
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
 
     def _local_dev_only(self) -> bool:
         local_origins = {'localhost', '127.0.0.1', '::1'}

@@ -68,6 +68,7 @@ def main() -> None:
                 gallery_audit_samples=[],
                 start_date=start_date,
                 end_date=end_date,
+                worker_health={'status': 'not_in_process'},
             )
             snapshot['generation_note'] = (
                 '数据库不可用，当前文件为运营健康回退快照，不代表真实健康状态。'

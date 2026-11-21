@@ -4,10 +4,12 @@ import signal
 import time
 
 from app.core.config import settings
+from app.core.logging_config import configure_logging
 from app.services.worker import ReviewWorker
 
 
 def main() -> None:
+    configure_logging()
     worker = ReviewWorker(worker_name=settings.review_worker_name or 'standalone-worker')
     worker.start()
 

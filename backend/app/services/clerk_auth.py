@@ -122,7 +122,8 @@ def _clerk_request(method: str, path: str, payload: dict[str, Any] | None = None
             raise api_error(status.HTTP_401_UNAUTHORIZED, 'CLERK_API_UNAUTHORIZED', message) from exc
         raise api_error(status.HTTP_502_BAD_GATEWAY, 'CLERK_API_FAILED', message) from exc
     except PooledHTTPRequestError as exc:
-        raise api_error(status.HTTP_502_BAD_GATEWAY, 'CLERK_API_UNREACHABLE', f'Clerk API request failed: {exc}') from exc
+        logger.warning('Clerk API %s %s unreachable', method, path, exc_info=True)
+        raise api_error(status.HTTP_502_BAD_GATEWAY, 'CLERK_API_UNREACHABLE', 'Clerk API request failed') from exc
 
     try:
         parsed = json.loads(raw)

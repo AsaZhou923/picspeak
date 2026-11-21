@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import logging
 import threading
 import time
 from concurrent.futures import Future, ThreadPoolExecutor, wait
+from typing import Any
 
 from app.core.config import settings
 from app.services.audit import cleanup_expired_request_logs
@@ -12,6 +14,7 @@ from app.services.guest_cleanup import cleanup_stale_guest_users
 from app.services.image_generation_task_processor import claim_next_pending_image_generation_task, expire_image_generation_tasks, process_image_generation_task
 from app.services.notification_processor import cleanup_expired_notifications, process_pending_notifications
 from app.services.review_task_processor import claim_next_pending_review_task, expire_review_tasks, process_review_task
+from app.services.worker_health import maybe_warn_stale_pending_tasks, oldest_pending_task_ages_seconds
 
 
 logger = logging.getLogger(__name__)
@@ -24,6 +27,8 @@ class ReviewWorker:
         self._maintenance_lock = threading.Lock()
         self._notification_lock = threading.Lock()
         self._task_sweep_lock = threading.Lock()
+        self._backlog_check_lock = threading.Lock()
+        self._heartbeat_lock = threading.Lock()
         self._notification_stop_event = threading.Event()
         self._notification_thread: threading.Thread | None = None
         self._next_guest_cleanup_at = 0.0
@@ -31,6 +36,12 @@ class ReviewWorker:
         self._next_limit_record_cleanup_at = 0.0
         self._next_notification_sweep_at = 0.0
         self._next_task_sweep_at = 0.0
+        self._next_backlog_check_at = 0.0
+        self._started_monotonic: float | None = None
+        self._last_loop_at: datetime | None = None
+        self._last_loop_monotonic: float | None = None
+        self._last_error: str | None = None
+        self._last_error_at: datetime | None = None
         self.worker_name = worker_name or settings.review_worker_name
         # Dedicated thread pool for image generation tasks (blocking I/O, up to 180s).
         # Keeps the worker main loop unblocked so review tasks can still be claimed.
@@ -41,10 +52,84 @@ class ReviewWorker:
         )
         self._gen_futures: list[Future] = []
 
+    def record_heartbeat(
+        self,
+        *,
+        now: datetime | None = None,
+        now_monotonic: float | None = None,
+    ) -> None:
+        wall_now = now or datetime.now(timezone.utc)
+        if wall_now.tzinfo is None:
+            wall_now = wall_now.replace(tzinfo=timezone.utc)
+        mono_now = time.monotonic() if now_monotonic is None else float(now_monotonic)
+        with self._heartbeat_lock:
+            self._last_loop_at = wall_now
+            self._last_loop_monotonic = mono_now
+
+    def record_error(self, error: BaseException | str, *, now: datetime | None = None) -> None:
+        wall_now = now or datetime.now(timezone.utc)
+        if wall_now.tzinfo is None:
+            wall_now = wall_now.replace(tzinfo=timezone.utc)
+        summary = f'{type(error).__name__}: {error}' if isinstance(error, BaseException) else str(error)
+        with self._heartbeat_lock:
+            self._last_error = summary[:500]
+            self._last_error_at = wall_now
+
+    def heartbeat_snapshot(
+        self,
+        *,
+        stale_after_seconds: int | None = None,
+        include_error_text: bool = False,
+        now_monotonic: float | None = None,
+    ) -> dict[str, Any]:
+        threshold = max(
+            int(settings.worker_heartbeat_stale_seconds if stale_after_seconds is None else stale_after_seconds),
+            1,
+        )
+        mono_now = time.monotonic() if now_monotonic is None else float(now_monotonic)
+        with self._heartbeat_lock:
+            last_loop_at = self._last_loop_at
+            last_loop_monotonic = self._last_loop_monotonic
+            started_monotonic = self._started_monotonic
+            last_error = self._last_error
+            last_error_at = self._last_error_at
+            running = self._running
+            alive_threads = sum(1 for thread in self._threads if thread.is_alive())
+
+        last_loop_age_seconds = (
+            round(max(0.0, mono_now - last_loop_monotonic), 1)
+            if last_loop_monotonic is not None
+            else None
+        )
+        if last_loop_monotonic is not None:
+            heartbeat_stale = (mono_now - last_loop_monotonic) > threshold or (running and alive_threads == 0)
+        elif running:
+            heartbeat_stale = alive_threads == 0 or (
+                started_monotonic is not None and (mono_now - started_monotonic) > threshold
+            )
+        else:
+            heartbeat_stale = False
+
+        snapshot: dict[str, Any] = {
+            'enabled': bool(settings.run_embedded_worker),
+            'running': running,
+            'alive_threads': alive_threads,
+            'heartbeat_stale': heartbeat_stale,
+            'last_loop_at': last_loop_at.isoformat() if last_loop_at is not None else None,
+            'last_loop_age_seconds': last_loop_age_seconds,
+            'has_error': last_error is not None,
+            'last_error_at': last_error_at.isoformat() if last_error_at is not None else None,
+        }
+        if include_error_text:
+            snapshot['last_error'] = last_error
+        return snapshot
+
     def start(self) -> None:
         if self._running:
             return
         self._running = True
+        with self._heartbeat_lock:
+            self._started_monotonic = time.monotonic()
         self._notification_stop_event.clear()
         self._notification_thread = threading.Thread(
             target=self._notification_maintenance_loop,
@@ -62,6 +147,8 @@ class ReviewWorker:
 
     def stop(self) -> None:
         self._running = False
+        with self._heartbeat_lock:
+            self._started_monotonic = None
         self._notification_stop_event.set()
         if self._notification_thread and self._notification_thread.is_alive():
             self._notification_thread.join(timeout=2)
@@ -79,6 +166,7 @@ class ReviewWorker:
         while self._running:
             task = None
             task_kind = ''
+            self.record_heartbeat()
             try:
                 self._run_guest_cleanup_if_due()
                 self._run_request_log_cleanup_if_due()
@@ -98,6 +186,7 @@ class ReviewWorker:
                     db.close()
 
                 if task is None:
+                    self.record_heartbeat()
                     time.sleep(idle_delay)
                     idle_delay = min(idle_delay * 2, max(idle_sleep_seconds, 2.0))
                     continue
@@ -114,14 +203,23 @@ class ReviewWorker:
                         claim_token=task.claimed_by,
                     )
                     self._gen_futures.append(future)
+                    self.record_heartbeat()
                     continue
 
                 logger.info('Review worker claimed task %s', task.public_id)
                 process_review_task(task.public_id, worker_name=self.worker_name, claim_token=task.claimed_by)
-            except Exception:
+                self.record_heartbeat()
+            except Exception as exc:
+                self.record_error(exc)
                 logger.exception(
                     'Review worker loop crashed while processing task %s',
                     getattr(task, 'public_id', None),
+                    extra={
+                        'event': 'worker_loop_unhandled_exception',
+                        'worker_name': self.worker_name,
+                        'task_id': getattr(task, 'public_id', None),
+                        'task_kind': task_kind or None,
+                    },
                 )
                 time.sleep(idle_sleep_seconds)
             finally:
@@ -132,7 +230,17 @@ class ReviewWorker:
         while self._running and not self._notification_stop_event.is_set():
             try:
                 self._run_task_sweep_if_due()
+                self._run_pending_backlog_check_if_due()
                 self._run_notification_sweep_if_due()
+            except Exception as exc:
+                self.record_error(exc)
+                logger.exception(
+                    'Worker notification maintenance loop crashed',
+                    extra={
+                        'event': 'worker_maintenance_unhandled_exception',
+                        'worker_name': self.worker_name,
+                    },
+                )
             finally:
                 now = time.monotonic()
                 wait_seconds = 1.0
@@ -157,14 +265,50 @@ class ReviewWorker:
                 db = SessionLocal()
                 try:
                     sweep(db)
-                except Exception:
-                    logger.exception('Failed to run task maintenance')
+                except Exception as exc:
+                    self.record_error(exc)
+                    logger.exception(
+                        'Failed to run task maintenance',
+                        extra={'event': 'worker_task_maintenance_error', 'worker_name': self.worker_name},
+                    )
                 finally:
                     db.close()
-        except Exception:
-            logger.exception('Failed to open or close task maintenance session')
+        except Exception as exc:
+            self.record_error(exc)
+            logger.exception(
+                'Failed to open or close task maintenance session',
+                extra={'event': 'worker_task_maintenance_error', 'worker_name': self.worker_name},
+            )
         finally:
             self._task_sweep_lock.release()
+
+    def _run_pending_backlog_check_if_due(self) -> None:
+        if time.monotonic() < self._next_backlog_check_at:
+            return
+        if not self._backlog_check_lock.acquire(blocking=False):
+            return
+        try:
+            now = time.monotonic()
+            if now < self._next_backlog_check_at:
+                return
+            self._next_backlog_check_at = now + 60
+
+            from app.db.session import SessionLocal
+
+            db = SessionLocal()
+            try:
+                ages = oldest_pending_task_ages_seconds(db)
+                maybe_warn_stale_pending_tasks(
+                    oldest_pending_review_seconds=ages['oldest_pending_review_seconds'],
+                    oldest_pending_generation_seconds=ages['oldest_pending_generation_seconds'],
+                    worker_heartbeat_stale=self.heartbeat_snapshot()['heartbeat_stale'],
+                )
+            finally:
+                db.close()
+        except Exception:
+            logger.warning('Failed to inspect pending task backlog age', exc_info=True)
+        finally:
+            self._backlog_check_lock.release()
 
     def _prune_done_gen_futures(self) -> None:
         """Remove completed generation futures and log any exceptions."""
@@ -172,9 +316,14 @@ class ReviewWorker:
         for future in done:
             exc = future.exception()
             if exc is not None:
+                self.record_error(exc)
                 logger.error(
                     'Image generation thread raised an unhandled exception: %s',
                     exc,
+                    extra={
+                        'event': 'worker_generation_unhandled_exception',
+                        'worker_name': self.worker_name,
+                    },
                     exc_info=(type(exc), exc, exc.__traceback__),
                 )
         self._gen_futures = [f for f in self._gen_futures if not f.done()]
@@ -189,9 +338,14 @@ class ReviewWorker:
         for future in done:
             exc = future.exception()
             if exc is not None:
+                self.record_error(exc)
                 logger.error(
                     'Image generation thread raised during shutdown: %s',
                     exc,
+                    extra={
+                        'event': 'worker_generation_unhandled_exception',
+                        'worker_name': self.worker_name,
+                    },
                     exc_info=(type(exc), exc, exc.__traceback__),
                 )
         if pending:
@@ -230,7 +384,8 @@ class ReviewWorker:
 
             if deleted_count:
                 logger.info('Deleted %s stale guest users without review history', deleted_count)
-        except Exception:
+        except Exception as exc:
+            self.record_error(exc)
             logger.exception('Failed to run stale guest cleanup')
         finally:
             self._maintenance_lock.release()
@@ -261,7 +416,8 @@ class ReviewWorker:
 
             if deleted_count:
                 logger.info('Deleted %s expired API request log(s)', deleted_count)
-        except Exception:
+        except Exception as exc:
+            self.record_error(exc)
             logger.exception('Failed to clean up expired API request logs')
         finally:
             self._maintenance_lock.release()
@@ -294,7 +450,8 @@ class ReviewWorker:
                     counters_deleted,
                     idempotency_deleted,
                 )
-        except Exception:
+        except Exception as exc:
+            self.record_error(exc)
             logger.exception('Failed to clean up expired rate-limit counters and idempotency records')
         finally:
             self._maintenance_lock.release()
@@ -333,7 +490,8 @@ class ReviewWorker:
 
             if result.get('processed') or expired:
                 logger.info('Notification sweep processed %s event(s), deleted %s expired notification(s)', result.get('processed'), expired)
-        except Exception:
+        except Exception as exc:
+            self.record_error(exc)
             logger.exception('Failed to run notification sweep')
         finally:
             self._notification_lock.release()

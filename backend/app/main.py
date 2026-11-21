@@ -8,6 +8,7 @@ from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
+from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import bind_guest_token
@@ -15,12 +16,19 @@ from app.api.request_state import get_current_user_public_id
 from app.api.router import router, webhook_router
 from app.core.config import settings
 from app.core.errors import normalize_http_error
+from app.core.logging_config import (
+    bind_request_log_context,
+    configure_logging,
+    reset_request_log_context,
+)
 from app.core.network import client_ip_from_request
 from app.core.request_limits import RequestBodyLimitMiddleware
-from app.db.session import SessionLocal
+from app.db.session import SessionLocal, engine
 from app.services.audit import log_api_request
 from app.services.worker import worker
+from app.services.worker_health import maybe_warn_stale_pending_tasks, oldest_pending_task_ages_seconds
 
+configure_logging()
 logger = logging.getLogger(__name__)
 _AUDIT_TASKS: set[asyncio.Task[object]] = set()
 _AUDIT_TASK_DRAIN_TIMEOUT_SECONDS = 5.0
@@ -113,6 +121,7 @@ def _log_error_response(
         log_payload['extra'] = extra
 
     if exc is not None:
+        log_payload['event'] = 'unhandled_api_exception'
         logger.error(
             'Unhandled API exception',
             extra=log_payload,
@@ -194,6 +203,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 # Paths excluded from audit logging (high-frequency / non-business endpoints).
 _AUDIT_SKIP_PATHS = {
     '/healthz',
+    '/readyz',
     '/docs',
     '/openapi.json',
     '/redoc',
@@ -321,6 +331,10 @@ async def request_audit_middleware(request: Request, call_next):
     started_at = time.perf_counter()
     request_id = f'req_{uuid4().hex}'
     request.state.request_id = request_id
+    log_context_tokens = bind_request_log_context(
+        request_id=request_id,
+        request_path=request.url.path,
+    )
     request_body = b''
     skip_audit = _should_skip_audit(request.url.path)
 
@@ -343,6 +357,7 @@ async def request_audit_middleware(request: Request, call_next):
             response.headers['Cache-Control'] = 'private, no-store'
         return response
     finally:
+        reset_request_log_context(log_context_tokens)
         # Skip audit for non-business endpoints.
         if not skip_audit:
             duration_ms = int((time.perf_counter() - started_at) * 1000)
@@ -366,6 +381,75 @@ async def request_audit_middleware(request: Request, call_next):
             )
 
 
+def _check_database_readiness(timeout_seconds: float) -> None:
+    timeout_ms = max(int(timeout_seconds * 1000), 100)
+    with engine.begin() as conn:
+        if conn.dialect.name == 'postgresql':
+            conn.execute(text("SELECT set_config('statement_timeout', :timeout_ms, true)"), {'timeout_ms': str(timeout_ms)})
+        conn.execute(text('SELECT 1')).scalar()
+
+
+def _collect_readiness_diagnostics() -> dict[str, object]:
+    worker_info = worker.heartbeat_snapshot(include_error_text=False)
+    oldest_review_seconds: float | None = None
+    oldest_generation_seconds: float | None = None
+    db = SessionLocal()
+    try:
+        ages = oldest_pending_task_ages_seconds(db)
+        oldest_review_seconds = ages['oldest_pending_review_seconds']
+        oldest_generation_seconds = ages['oldest_pending_generation_seconds']
+    except Exception:
+        logger.warning('Failed to read pending task backlog ages for readiness probe', exc_info=True)
+    finally:
+        db.close()
+
+    try:
+        maybe_warn_stale_pending_tasks(
+            oldest_pending_review_seconds=oldest_review_seconds,
+            oldest_pending_generation_seconds=oldest_generation_seconds,
+            worker_heartbeat_stale=bool(worker_info.get('heartbeat_stale')),
+        )
+    except Exception:
+        logger.warning('Failed to evaluate pending task backlog alert', exc_info=True)
+
+    return {
+        'oldest_pending_review_seconds': oldest_review_seconds,
+        'oldest_pending_generation_seconds': oldest_generation_seconds,
+        'worker': worker_info,
+    }
+
+
 @app.get('/healthz')
 def healthz():
     return {'status': 'ok'}
+
+
+@app.get('/readyz')
+async def readyz():
+    timeout_seconds = max(float(settings.readyz_db_timeout_seconds), 0.1)
+    try:
+        await asyncio.wait_for(
+            asyncio.to_thread(_check_database_readiness, timeout_seconds),
+            timeout=timeout_seconds,
+        )
+    except Exception:
+        logger.warning('Database readiness check failed', exc_info=True)
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={'status': 'unavailable'},
+        )
+
+    try:
+        diagnostics = await asyncio.wait_for(
+            asyncio.to_thread(_collect_readiness_diagnostics),
+            timeout=timeout_seconds,
+        )
+    except Exception:
+        logger.warning('Readiness diagnostics collection failed', exc_info=True)
+        diagnostics = {
+            'oldest_pending_review_seconds': None,
+            'oldest_pending_generation_seconds': None,
+            'worker': worker.heartbeat_snapshot(include_error_text=False),
+        }
+
+    return {'status': 'ok', **diagnostics}

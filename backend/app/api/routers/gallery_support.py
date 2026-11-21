@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import logging
 from typing import Any
 
 from fastapi import HTTPException, Request, status
@@ -25,6 +26,8 @@ from app.schemas import PublicGalleryItem
 from app.services.gallery_summary import extract_review_gallery_summary
 from app.services.object_storage import get_object_storage_client
 from app.services.public_identity import public_display_name
+
+logger = logging.getLogger(__name__)
 
 GALLERY_AUDIT_NONE = 'none'
 GALLERY_AUDIT_APPROVED = 'approved'
@@ -125,10 +128,11 @@ def _ensure_gallery_thumbnail(photo: Photo, *, size: int = PHOTO_THUMBNAIL_MAX_S
       CacheControl=GALLERY_THUMBNAIL_CACHE_CONTROL,
     )
   except Exception as exc:
+    logger.exception('Failed to upload gallery thumbnail %s to bucket %s', object_key, photo.bucket)
     raise api_error(
       status.HTTP_502_BAD_GATEWAY,
       'GALLERY_THUMBNAIL_UPLOAD_FAILED',
-      f'Failed to upload gallery thumbnail: {exc}',
+      'Failed to upload gallery thumbnail',
     ) from exc
 
   client_meta = _photo_client_meta(photo)

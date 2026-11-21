@@ -198,7 +198,8 @@ def create_generation(
                 negative_prompt=payload.negative_prompt,
             )
     except PromptSafetyError as exc:
-        raise api_error(status.HTTP_400_BAD_REQUEST, 'GENERATION_PROMPT_REJECTED', str(exc)) from exc
+        logger.warning('Generation prompt rejected', exc_info=True)
+        raise api_error(status.HTTP_400_BAD_REQUEST, 'GENERATION_PROMPT_REJECTED', 'Generation prompt was rejected') from exc
 
     reference_image_count = 1 if source_photo_internal_id is not None else 0
     credits_reserved = estimate_image_generation_credits(

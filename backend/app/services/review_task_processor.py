@@ -397,7 +397,15 @@ def process_review_task(task_public_id: str, *, worker_name: str, claim_token: s
             db.rollback()
             return {'result': 'noop', 'reason': 'lease_mismatch'}
         except Exception as exc:
-            logger.exception('Unhandled review task error for task %s', task_public_id)
+            logger.exception(
+                'Unhandled review task error for task %s',
+                task_public_id,
+                extra={
+                    'event': 'review_task_unhandled_exception',
+                    'task_id': task_public_id,
+                    'worker_name': worker_name,
+                },
+            )
             db.rollback()
             fresh_task = db.query(ReviewTask).filter(ReviewTask.id == task.id).first()
             if fresh_task is None:

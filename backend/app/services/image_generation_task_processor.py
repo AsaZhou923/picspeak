@@ -422,7 +422,15 @@ def process_image_generation_task(
         except GenerationTaskLeaseLost:
             raise
         except Exception as exc:
-            logger.exception('Unhandled image generation task error for task %s', task_public_id)
+            logger.exception(
+                'Unhandled image generation task error for task %s',
+                task_public_id,
+                extra={
+                    'event': 'generation_task_unhandled_exception',
+                    'task_id': task_public_id,
+                    'worker_name': worker_name,
+                },
+            )
             db.rollback()
             fresh_task = db.query(ImageGenerationTask).filter(ImageGenerationTask.public_id == task_public_id).first()
             if fresh_task is not None:
