@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-from collections import deque
 from contextvars import ContextVar, Token
 import json
 import logging
 import re
 import sys
-import threading
 from typing import Any
 
 from app.core.config import settings
@@ -26,9 +24,6 @@ _AMZ_QUERY_PARAM_RE = re.compile(
     r'(?=$|[&\s"\'<>]|%26|\\u0026|&amp;)',
     re.IGNORECASE,
 )
-
-_reported_exc_lock = threading.Lock()
-_reported_exc_ids: deque[int] = deque(maxlen=256)
 
 _saved_uvicorn_handlers: dict[str, tuple[list[logging.Handler], bool]] = {}
 
@@ -99,12 +94,12 @@ def _mask_log_value(value: Any) -> Any:
 
 def mark_exception_reported(exc: BaseException) -> None:
     """Mark an exception as already reported by the app's exception handler."""
+    # Mark the object itself: id()-based bookkeeping could match a later,
+    # unrelated exception that reuses a freed id and hide a real error.
     try:
         setattr(exc, '_picspeak_error_reported', True)
     except Exception:
         pass
-    with _reported_exc_lock:
-        _reported_exc_ids.append(id(exc))
 
 
 def is_exception_reported(exc: BaseException | None) -> bool:
@@ -113,15 +108,13 @@ def is_exception_reported(exc: BaseException | None) -> bool:
         return False
     seen: set[int] = set()
     stack: list[BaseException] = [exc]
-    with _reported_exc_lock:
-        reported_ids = set(_reported_exc_ids)
     while stack:
         current = stack.pop()
         obj_id = id(current)
         if obj_id in seen:
             continue
         seen.add(obj_id)
-        if getattr(current, '_picspeak_error_reported', False) or obj_id in reported_ids:
+        if getattr(current, '_picspeak_error_reported', False):
             return True
         if current.__cause__ is not None:
             stack.append(current.__cause__)

@@ -1050,6 +1050,87 @@ class StructuredErrorReportingTests(unittest.TestCase):
         finally:
             logging.getLogger().removeHandler(handler)
 
+    def test_real_uvicorn_server_reports_unhandled_exception_once_in_json(self) -> None:
+        import socket
+        import threading
+        import urllib.error
+        import urllib.request
+
+        import uvicorn
+
+        probe_router = APIRouter()
+
+        @probe_router.get('/_test/uvicorn-boom')
+        def _boom():
+            raise RuntimeError('uvicorn-e2e-boom')
+
+        root_logger = logging.getLogger()
+        original_root_handlers = list(root_logger.handlers)
+        uvicorn_names = ('uvicorn', 'uvicorn.error', 'uvicorn.access')
+        original_uvicorn = {
+            name: (
+                list(logging.getLogger(name).handlers),
+                list(logging.getLogger(name).filters),
+                logging.getLogger(name).propagate,
+                logging.getLogger(name).level,
+            )
+            for name in uvicorn_names
+        }
+        with socket.socket() as sock:
+            sock.bind(('127.0.0.1', 0))
+            port = sock.getsockname()[1]
+
+        app.include_router(probe_router)
+        stream = StringIO()
+        server = None
+        thread = None
+        try:
+            # Same order as the uvicorn CLI: stock LOGGING_CONFIG first, then app import configures logging.
+            config = uvicorn.Config(app, host='127.0.0.1', port=port, lifespan='off', log_level='info')
+            configure_logging(json_logs=True, stream=stream)
+            for name in uvicorn_names:
+                formatters = [type(getattr(h, 'formatter', None)).__module__ for h in logging.getLogger(name).handlers]
+                self.assertFalse(any(module.startswith('uvicorn.') for module in formatters), name)
+
+            server = uvicorn.Server(config)
+            with patch('app.main._schedule_audit_task', side_effect=lambda coro: coro.close()):
+                thread = threading.Thread(target=server.run, daemon=True)
+                thread.start()
+                deadline = time.monotonic() + 10
+                while not server.started and time.monotonic() < deadline:
+                    time.sleep(0.02)
+                self.assertTrue(server.started)
+                with self.assertRaises(urllib.error.HTTPError) as ctx:
+                    urllib.request.urlopen(f'http://127.0.0.1:{port}/_test/uvicorn-boom', timeout=5)
+                self.assertEqual(ctx.exception.code, 500)
+                self.assertNotIn('uvicorn-e2e-boom', ctx.exception.read().decode('utf-8'))
+                server.should_exit = True
+                thread.join(timeout=10)
+        finally:
+            if server is not None:
+                server.should_exit = True
+            if thread is not None:
+                thread.join(timeout=10)
+            app.router.routes = [r for r in app.router.routes if getattr(r, 'path', None) != '/_test/uvicorn-boom']
+            configure_logging(json_logs=False, stream=StringIO())
+            root_logger.handlers = original_root_handlers
+            for name, (handlers, filters, propagate, level) in original_uvicorn.items():
+                uv_logger = logging.getLogger(name)
+                uv_logger.handlers, uv_logger.filters, uv_logger.propagate, uv_logger.level = handlers, filters, propagate, level
+
+        lines = [line for line in stream.getvalue().splitlines() if line.strip()]
+        # One format: every physical line written by the process is a JSON object.
+        entries = [json.loads(line) for line in lines]
+        reported = [e for e in entries if e.get('@type') == ERROR_REPORTING_TYPE]
+        self.assertEqual(len(reported), 1)
+        self.assertEqual(reported[0]['event'], 'unhandled_api_exception')
+        self.assertIn('uvicorn-e2e-boom', reported[0]['message'])
+        self.assertFalse(any('Exception in ASGI application' in e['message'] for e in entries))
+        self.assertEqual(len([e for e in entries if 'uvicorn-e2e-boom' in e['message']]), 1)
+        access = [e for e in entries if e['logger'] == 'uvicorn.access']
+        self.assertEqual(len(access), 1)
+        self.assertIn('/_test/uvicorn-boom', access[0]['message'])
+
 
 class WorkerVisibilityTests(unittest.TestCase):
     def setUp(self) -> None:
