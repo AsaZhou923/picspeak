@@ -417,6 +417,13 @@ class PracticeWorkerPostgresTests(unittest.TestCase):
         task = self.db.query(ReviewTask).filter(ReviewTask.owner_user_id == self.user_id, ReviewTask.idempotency_key == key).one()
         self.assertEqual(replay['task_id'], task.public_id)
         self.assertEqual(task.error_code, 'TASK_DISPATCH_FAILED')
+        # The stored text is fixed; the raw dispatch exception never reaches task fields or events.
+        self.assertEqual(task.error_message, 'Failed to enqueue async review task')
+        event = self.db.query(ReviewTaskEvent).filter(
+            ReviewTaskEvent.task_id == task.id, ReviewTaskEvent.event_type == 'TASK_DISPATCH_FAILED',
+        ).one()
+        self.assertEqual(event.error_code, 'TASK_DISPATCH_FAILED')
+        self.assertNotIn('fixture dispatch failure', event.message or '')
         self.assertEqual(self.db.query(PracticeAttempt).filter(PracticeAttempt.task_id == task.id).count(), 1)
         self.assertEqual(self.db.query(UsageLedger).filter(UsageLedger.task_id == task.id).count(), 0)
 
