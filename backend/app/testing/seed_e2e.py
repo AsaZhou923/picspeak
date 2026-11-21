@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+import boto3
 from botocore.exceptions import ClientError
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
@@ -91,8 +92,27 @@ def _issue_e2e_registered_jwt(user: User) -> str:
     )
 
 
+def _storage_setup_client():
+    # The app signs with OBJECT_REGION (``auto`` in production, which yields
+    # SigV4 presigned URLs). S3-compatible test stores reject bucket creation
+    # signed for a non-us-east-1 region without a location constraint, so
+    # bucket setup alone uses a us-east-1 client against the same endpoint.
+    return boto3.client(
+        's3',
+        endpoint_url=settings.object_s3_endpoint.strip(),
+        aws_access_key_id=settings.object_access_key_id.strip(),
+        aws_secret_access_key=settings.object_secret_access_key.strip(),
+        region_name='us-east-1',
+    )
+
+
+def _browser_cors_origins() -> list[str]:
+    origins = [settings.frontend_origin, *settings.backend_cors_origins]
+    return sorted({origin.strip().rstrip('/') for origin in origins if origin and origin.strip()})
+
+
 def ensure_storage_bucket() -> None:
-    storage = get_object_storage_client()
+    storage = _storage_setup_client()
     bucket = settings.object_bucket
     try:
         storage.head_bucket(Bucket=bucket)
@@ -101,6 +121,22 @@ def ensure_storage_bucket() -> None:
         if code not in {'404', 'NoSuchBucket', 'NotFound'}:
             raise
         storage.create_bucket(Bucket=bucket)
+    # Browsers upload straight to presigned PUT URLs, so the bucket must
+    # answer the CORS preflight for the E2E frontend origins only.
+    storage.put_bucket_cors(
+        Bucket=bucket,
+        CORSConfiguration={
+            'CORSRules': [
+                {
+                    'AllowedOrigins': _browser_cors_origins(),
+                    'AllowedMethods': ['GET', 'HEAD', 'PUT'],
+                    'AllowedHeaders': ['*'],
+                    'ExposeHeaders': ['ETag'],
+                    'MaxAgeSeconds': 600,
+                }
+            ]
+        },
+    )
 
 
 def _upload_seeded_gallery_assets() -> tuple[str, str, bytes]:
@@ -339,7 +375,7 @@ def seed_e2e_fixtures(*, reset_guest_limits: bool = False) -> dict[str, Any]:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description='Seed test-only E2E fixtures into Postgres and MinIO.')
+    parser = argparse.ArgumentParser(description='Seed test-only E2E fixtures into Postgres and S3-compatible object storage.')
     parser.add_argument('--output', required=True, help='Path to write JSON fixture metadata.')
     parser.add_argument(
         '--reset-guest-limits',
