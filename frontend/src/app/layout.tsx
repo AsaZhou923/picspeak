@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import { headers } from 'next/headers';
-import { DM_Sans, JetBrains_Mono, Noto_Serif_JP, Noto_Serif_SC } from 'next/font/google';
+import localFont from 'next/font/local';
+import '../fonts/latin-extended.css';
+import '../fonts/noto-serif-cjk.css';
 import './globals.css';
 import SiteChrome from '@/components/layout/SiteChrome';
 import AppProviders from '@/components/providers/AppProviders';
@@ -10,36 +12,44 @@ import { isSupportedLocale } from '@/lib/locale';
 import { HOME_LANGUAGE_ALTERNATES, OPEN_GRAPH_LOCALES } from '@/lib/seo';
 import { siteConfig } from '@/lib/site';
 
-// Display serif. The CJK families are sliced by unicode-range, so a page only
-// downloads the glyph groups it actually renders; Japanese pages switch to the
-// JP cut in globals.css to get the correct glyph forms.
-const serifSc = Noto_Serif_SC({
-  weight: ['600', '900'],
-  variable: '--font-serif-sc',
-  display: 'swap',
-  preload: false,
-});
-
-const serifJp = Noto_Serif_JP({
-  weight: ['600', '900'],
-  variable: '--font-serif-jp',
-  display: 'swap',
-  preload: false,
-});
-
-const dmSans = DM_Sans({
-  subsets: ['latin'],
-  weight: ['400', '500', '600'],
+// Self-hosted Latin body and monospace variable fonts (OFL licenses in src/fonts/).
+// Non-Latin subsets for DM Sans / JetBrains Mono live in ../fonts/latin-extended.css,
+// and Noto Serif SC/JP unicode-range slices live in ../fonts/noto-serif-cjk.css, so
+// browsers only download non-primary subsets when needed while DM Sans latin preloads.
+const dmSans = localFont({
+  src: '../fonts/dm-sans-latin.woff2',
+  weight: '400 600',
+  style: 'normal',
   variable: '--font-sans-latin',
   display: 'swap',
+  preload: true,
+  adjustFontFallback: 'Arial',
+  declarations: [
+    { prop: 'font-family', value: "'DM Sans'" },
+    {
+      prop: 'unicode-range',
+      value:
+        'U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD',
+    },
+  ],
 });
 
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ['latin'],
-  weight: ['400', '500'],
+const jetbrainsMono = localFont({
+  src: '../fonts/jetbrains-mono-latin.woff2',
+  weight: '400 500',
+  style: 'normal',
   variable: '--font-mono-latin',
   display: 'swap',
   preload: false,
+  adjustFontFallback: 'Arial',
+  declarations: [
+    { prop: 'font-family', value: "'JetBrains Mono'" },
+    {
+      prop: 'unicode-range',
+      value:
+        'U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD',
+    },
+  ],
 });
 
 export const metadata: Metadata = {
@@ -121,7 +131,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html
       lang={lang}
-      className={`${serifSc.variable} ${serifJp.variable} ${dmSans.variable} ${jetbrainsMono.variable}`}
+      className={`${dmSans.variable} ${jetbrainsMono.variable}`}
       suppressHydrationWarning
     >
       <head>

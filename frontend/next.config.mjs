@@ -261,6 +261,10 @@ const canonicalRedirects = [
   },
 ];
 
+const immutableFontHeaders = [
+  { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
+];
+
 const ogFontFiles = ['./public/fonts/CormorantGaramond-SemiBold.woff', './public/fonts/DMSans-Medium.woff'];
 
 /** @type {import('next').NextConfig} */
@@ -277,6 +281,10 @@ const nextConfig = {
       {
         source: '/:path*',
         headers: [...securityHeaders, ...seoResponseHeaders],
+      },
+      {
+        source: '/fonts/:family(dm-sans|jetbrains-mono|noto-serif-sc|noto-serif-jp)/:version(v\\d+)/:path*',
+        headers: immutableFontHeaders,
       },
       ...cacheablePublicPageSources.map((source) => ({
         source,

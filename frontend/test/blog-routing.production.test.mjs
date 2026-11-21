@@ -1,7 +1,7 @@
 import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -470,5 +470,119 @@ test('AI discovery text remains crawlable while canonical HTML owns search index
     const response = await fetch(`${baseUrl}${pathName}`);
     assert.equal(response.status, 200, pathName);
     assert.match(response.headers.get('x-robots-tag') ?? '', /noindex, follow/i, pathName);
+  }
+});
+
+test('production HTML preserves font CSS variables, marks DM Sans for preload, and serves self-hosted fonts', async () => {
+  const response = await fetch(`${baseUrl}/en`);
+  assert.equal(response.status, 200);
+  const html = await response.text();
+
+  // No external Google Fonts URLs appear in HTML or bundled CSS, and <html> carries
+  // next/font/local variable classes.
+  assert.doesNotMatch(html, /fonts\.googleapis\.com|fonts\.gstatic\.com/i);
+  assert.match(html, /<html[^>]+class="[^"]*__variable_[^"]+"/i);
+
+  const stylesheetPaths = [
+    ...html.matchAll(/<link[^>]+rel="stylesheet"[^>]+href="(\/_next\/static\/css\/[^"]+\.css)"/gi),
+  ].map((match) => match[1]);
+  assert.ok(stylesheetPaths.length > 0, 'Expected production stylesheet link in /en HTML');
+
+  let combinedCss = '';
+  for (const cssPath of stylesheetPaths) {
+    const cssResponse = await fetch(`${baseUrl}${cssPath}`);
+    assert.equal(cssResponse.status, 200, cssPath);
+    combinedCss += await cssResponse.text();
+  }
+
+  for (const variableName of [
+    '--font-serif-sc',
+    '--font-serif-jp',
+    '--font-sans-latin',
+    '--font-mono-latin',
+    '--font-display',
+    '--font-body',
+    '--font-mono',
+  ]) {
+    assert.ok(combinedCss.includes(variableName), `Expected ${variableName} in production CSS`);
+  }
+  assert.doesNotMatch(combinedCss, /fonts\.googleapis\.com|fonts\.gstatic\.com/i);
+
+  // DM Sans must be emitted with Next.js's preload (`.p`) and size-adjust (`-s`) suffix.
+  const preloadedLatinMatch = combinedCss.match(/\/_next\/static\/media\/[^'")\s]+-s\.p\.woff2/);
+  assert.ok(preloadedLatinMatch, 'Expected preloaded DM Sans -s.p.woff2 in production CSS');
+
+  // The media hash differs between platforms, so take the expected preload from this build's
+  // font manifest. Next.js may deliver it as an HTTP Link header or a <link rel="preload"> tag.
+  const fontManifest = JSON.parse(
+    readFileSync(path.join(FRONTEND_DIR, '.next', 'server', 'next-font-manifest.json'), 'utf8'),
+  );
+  const layoutPreloads = Object.entries(fontManifest.app ?? {}).find(([entry]) =>
+    entry.replaceAll('\\', '/').endsWith('/src/app/layout'),
+  )?.[1];
+  // Local Windows builds can emit an empty app font manifest, so Next.js sends no preload there.
+  if (layoutPreloads !== undefined || process.platform !== 'win32') {
+    assert.ok(layoutPreloads, 'Expected root layout font preloads in next-font-manifest.json');
+    const preloadFiles = layoutPreloads.filter((file) => file.endsWith('.woff2'));
+    assert.equal(preloadFiles.length, 1, `Expected exactly DM Sans to preload, got ${preloadFiles}`);
+    const expectedPreload = `/_next/${preloadFiles[0]}`;
+    assert.equal(expectedPreload, preloadedLatinMatch[0], 'Preloaded font should be the DM Sans face');
+    const linkHeader = response.headers.get('link') ?? '';
+    const preloadTags = html.match(/<link[^>]+rel="preload"[^>]*>/gi) ?? [];
+    const isPreloaded = (value) =>
+      value.includes(`<${expectedPreload}>`) && /rel=preload/.test(value) && /as="font"/.test(value);
+    assert.ok(
+      linkHeader.split(/,\s*(?=<)/).some(isPreloaded) ||
+        preloadTags.some((tag) => tag.includes(`href="${expectedPreload}"`) && /as="font"/.test(tag)),
+      `Expected /en Link header or HTML to preload ${expectedPreload}`,
+    );
+  }
+
+  const latinResponse = await fetch(`${baseUrl}${preloadedLatinMatch[0]}`);
+  assert.equal(latinResponse.status, 200);
+  assert.match(latinResponse.headers.get('cache-control') ?? '', /immutable/i);
+  assert.equal(Buffer.from(await latinResponse.arrayBuffer()).toString('ascii', 0, 4), 'wOF2');
+
+  const cjkSliceMatch = combinedCss.match(/\/fonts\/noto-serif-sc\/v\d+\/[^'")\s]+\.woff2/);
+  assert.ok(cjkSliceMatch, 'Expected self-hosted Noto Serif SC slice URL in production CSS');
+  const sliceResponse = await fetch(`${baseUrl}${cjkSliceMatch[0]}`);
+  assert.equal(sliceResponse.status, 200);
+  assert.match(sliceResponse.headers.get('cache-control') ?? '', /immutable/i);
+  const bytes = Buffer.from(await sliceResponse.arrayBuffer());
+  assert.equal(bytes.toString('ascii', 0, 4), 'wOF2');
+
+  // Extended Latin & Cyrillic subsets for DM Sans and JetBrains Mono are served immutably.
+  for (const pattern of [
+    /\/fonts\/dm-sans\/v\d+\/latin-ext-[^'")\s]+\.woff2/,
+    /\/fonts\/jetbrains-mono\/v\d+\/latin-ext-[^'")\s]+\.woff2/,
+    /\/fonts\/jetbrains-mono\/v\d+\/cyrillic-[^'")\s]+\.woff2/,
+  ]) {
+    const extMatch = combinedCss.match(pattern);
+    assert.ok(extMatch, `Expected extended font URL matching ${pattern} in production CSS`);
+    const extResponse = await fetch(`${baseUrl}${extMatch[0]}`);
+    assert.equal(extResponse.status, 200, extMatch[0]);
+    assert.match(extResponse.headers.get('cache-control') ?? '', /immutable/i, extMatch[0]);
+    assert.equal(
+      Buffer.from(await extResponse.arrayBuffer()).toString('ascii', 0, 4),
+      'wOF2',
+      extMatch[0],
+    );
+  }
+
+  // Public font OFL license texts are accessible, while arbitrary .txt files under /fonts/ still 404.
+  for (const licensePath of [
+    '/fonts/dm-sans/OFL.txt',
+    '/fonts/jetbrains-mono/OFL.txt',
+    '/fonts/noto-serif-sc/OFL.txt',
+    '/fonts/noto-serif-jp/OFL.txt',
+  ]) {
+    const licenseResponse = await fetch(`${baseUrl}${licensePath}`);
+    assert.equal(licenseResponse.status, 200, licensePath);
+    assert.match(await licenseResponse.text(), /SIL OPEN FONT LICENSE/, licensePath);
+  }
+
+  for (const disallowedPath of ['/fonts/noto-serif-sc/not-a-license.txt', '/fonts/unknown/OFL.txt']) {
+    const disallowedResponse = await fetch(`${baseUrl}${disallowedPath}`);
+    assert.equal(disallowedResponse.status, 404, disallowedPath);
   }
 });
