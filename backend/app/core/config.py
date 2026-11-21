@@ -1,24 +1,122 @@
 import json
+import os
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Annotated, Any
 
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+from sqlalchemy.engine.url import make_url
+from sqlalchemy.exc import ArgumentError
+
+from app.core.env_files import settings_env_files
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 BACKEND_ROOT = REPO_ROOT / 'backend'
+_LOOPBACK_DB_HOSTS = frozenset({'localhost', '127.0.0.1', '::1'})
+_LOOPBACK_DB_ADDRS = frozenset({'127.0.0.1', '::1'})
+
+
+def _parse_libpq_host_values(raw_values: list[str]) -> list[str] | None:
+    hosts: list[str] = []
+    for raw in raw_values:
+        text = str(raw or '')
+        parts = text.split(',')
+        if any(not part.strip() for part in parts):
+            return None
+        for part in parts:
+            hosts.append(part.strip().strip('[]').lower())
+    return hosts or None
+
+
+def is_local_database_url(
+    database_url: str,
+    *,
+    environ: Mapping[str, str] | None = None,
+) -> bool:
+    """Return True only when the effective DB destination is SQLite or loopback.
+
+    In addition to the URL authority host, checks libpq query parameters
+    (``host``, ``hostaddr``, ``service``, ``servicefile``) and environment
+    overrides (``PGHOST``, ``PGHOSTADDR``, ``PGSERVICE``, ``PGSERVICEFILE``)
+    so a local-looking URL cannot be silently redirected to a remote server.
+    """
+    raw = str(database_url or '').strip()
+    if not raw:
+        return False
+    try:
+        parsed = make_url(raw)
+    except (ArgumentError, ValueError):
+        return False
+
+    backend = (parsed.drivername or '').split('+', 1)[0].strip().lower()
+    if backend == 'sqlite':
+        return True
+
+    env = os.environ if environ is None else environ
+    for service_env in ('PGSERVICE', 'PGSERVICEFILE'):
+        if str(env.get(service_env) or '').strip():
+            return False
+
+    raw_pghost = env.get('PGHOST')
+    if raw_pghost is not None and str(raw_pghost).strip():
+        env_hosts = _parse_libpq_host_values([str(raw_pghost)])
+        if not env_hosts or not all(host in _LOOPBACK_DB_HOSTS for host in env_hosts):
+            return False
+
+    raw_pghostaddr = env.get('PGHOSTADDR')
+    if raw_pghostaddr is not None and str(raw_pghostaddr).strip():
+        env_addrs = _parse_libpq_host_values([str(raw_pghostaddr)])
+        if not env_addrs or not all(addr in _LOOPBACK_DB_ADDRS for addr in env_addrs):
+            return False
+
+    lowered_query: dict[str, list[str]] = {}
+    for key, value in parsed.query.items():
+        lower_key = str(key).strip().lower()
+        entries = list(value) if isinstance(value, (list, tuple)) else [value]
+        lowered_query.setdefault(lower_key, []).extend(str(item) for item in entries)
+
+    if any(
+        str(val).strip()
+        for key in ('service', 'servicefile')
+        for val in lowered_query.get(key, [])
+    ):
+        return False
+
+    has_explicit_target = False
+
+    if parsed.host is not None and str(parsed.host).strip():
+        has_explicit_target = True
+        authority_host = str(parsed.host).strip().strip('[]').lower()
+        if authority_host not in _LOOPBACK_DB_HOSTS:
+            return False
+
+    if 'host' in lowered_query:
+        has_explicit_target = True
+        query_hosts = _parse_libpq_host_values(lowered_query['host'])
+        if not query_hosts or not all(host in _LOOPBACK_DB_HOSTS for host in query_hosts):
+            return False
+
+    if 'hostaddr' in lowered_query:
+        has_explicit_target = True
+        query_addrs = _parse_libpq_host_values(lowered_query['hostaddr'])
+        if not query_addrs or not all(addr in _LOOPBACK_DB_ADDRS for addr in query_addrs):
+            return False
+
+    return has_explicit_target
 
 
 class Settings(BaseSettings):
     # Support running from repo root, backend/, or script subdirectories while still finding env files.
+    # PICSPEAK_DISABLE_DOTENV=1 (set by the E2E smoke runner) ignores all of them.
     model_config = SettingsConfigDict(
-        env_file=(
+        env_file=settings_env_files((
             '.env',
             '../.env',
             'backend/.env',
             str(REPO_ROOT / '.env'),
             str(BACKEND_ROOT / '.env'),
-        ),
+        )),
         env_file_encoding='utf-8-sig',
         extra='ignore',
     )
@@ -195,6 +293,8 @@ class Settings(BaseSettings):
     image_generation_enable_streaming: bool = False
     image_generation_free_monthly_credits: int = 3
     image_generation_pro_monthly_credits: int = 199
+    # Test-only E2E fake AI / image generation switch. Forbidden when APP_ENV=production.
+    e2e_fake_ai_enabled: bool = False
 
     @property
     def use_structured_json_logs(self) -> bool:
@@ -340,7 +440,17 @@ class Settings(BaseSettings):
 
     @model_validator(mode='after')
     def validate_oauth_secret(self) -> 'Settings':
-        is_dev = self.app_env.strip().lower() == 'dev'
+        normalized_env = self.app_env.strip().lower()
+        is_dev = normalized_env == 'dev'
+
+        if self.e2e_fake_ai_enabled:
+            if normalized_env in {'production', 'prod'}:
+                raise ValueError('E2E_FAKE_AI_ENABLED cannot be enabled when APP_ENV=production')
+            if not is_local_database_url(self.database_url):
+                raise ValueError(
+                    'E2E_FAKE_AI_ENABLED requires DATABASE_URL to use SQLite or a loopback host '
+                    '(localhost, 127.0.0.1, ::1)'
+                )
 
         # Validate app_secret strength in non-dev environments.
         _insecure_app_secrets = {'', 'change-me', 'picspeakt123'}

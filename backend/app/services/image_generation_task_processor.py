@@ -506,7 +506,12 @@ def _process_generation_task(db: Session, task: ImageGenerationTask, *, claim_to
     db.add(task)
     db.commit()
 
-    client = OpenAIImageGenerationClient()
+    if settings.e2e_fake_ai_enabled:
+        from app.testing.fakes import FakeImageGenerationClient
+
+        client = FakeImageGenerationClient()
+    else:
+        client = OpenAIImageGenerationClient()
     try:
         reference_image = _load_reference_image(db, task) if reference_count > 0 else None
         if reference_image is None:
