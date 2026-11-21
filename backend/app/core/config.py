@@ -9,6 +9,8 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 from sqlalchemy.engine.url import make_url
 from sqlalchemy.exc import ArgumentError
 
+from app.core.env_files import settings_env_files
+
 REPO_ROOT = Path(__file__).resolve().parents[3]
 BACKEND_ROOT = REPO_ROOT / 'backend'
 _LOOPBACK_DB_HOSTS = frozenset({'localhost', '127.0.0.1', '::1'})
@@ -106,14 +108,15 @@ def is_local_database_url(
 
 class Settings(BaseSettings):
     # Support running from repo root, backend/, or script subdirectories while still finding env files.
+    # PICSPEAK_DISABLE_DOTENV=1 (set by the E2E smoke runner) ignores all of them.
     model_config = SettingsConfigDict(
-        env_file=(
+        env_file=settings_env_files((
             '.env',
             '../.env',
             'backend/.env',
             str(REPO_ROOT / '.env'),
             str(BACKEND_ROOT / '.env'),
-        ),
+        )),
         env_file_encoding='utf-8-sig',
         extra='ignore',
     )

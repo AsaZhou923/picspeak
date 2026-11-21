@@ -86,6 +86,10 @@ function buildBaseChildEnv() {
       baseEnv[key] = value;
     }
   }
+  // Filtering the inherited environment is not enough: backend settings also
+  // read backend/.env and repo-root .env. This makes every Python child ignore
+  // dotenv files, so only values set explicitly by this runner apply.
+  baseEnv.PICSPEAK_DISABLE_DOTENV = '1';
   return baseEnv;
 }
 
@@ -352,8 +356,37 @@ async function main() {
       OAUTH_JWT_SECRET: 'e2e-local-jwt-secret-0123456789abcdef0123456789abcdef',
       DATABASE_URL: databaseUrl,
       E2E_FAKE_AI_ENABLED: 'true',
+      // Dotenv files are ignored, so these restate (rather than rely on) the
+      // defaults that the smoke flows depend on.
       RUN_EMBEDDED_WORKER: 'true',
       REVIEW_WORKER_IDLE_SLEEP_MS: '100',
+      CLOUD_TASKS_ENABLED: 'false',
+      GUEST_USER_CLEANUP_ENABLED: 'false',
+      // The guest-quota test expects exactly one guest critique per UTC day.
+      GUEST_REVIEW_LIMIT_PER_DAY: '1',
+      GUEST_REVIEW_LIMIT_PER_MONTH: '30',
+      GUEST_REVIEW_RATE_LIMIT_PER_MINUTE: '4',
+      GUEST_REVIEW_NETWORK_LIMIT_PER_DAY: '12',
+      GUEST_REVIEW_NETWORK_LIMIT_PER_MONTH: '120',
+      GUEST_CREATION_RATE_LIMIT_PER_MINUTE: '10',
+      GUEST_CREATION_NETWORK_RATE_LIMIT_PER_MINUTE: '60',
+      FREE_REVIEW_LIMIT_PER_DAY: '5',
+      FREE_REVIEW_LIMIT_PER_MONTH: '60',
+      IMAGE_GENERATION_FREE_MONTHLY_CREDITS: '3',
+      IMAGE_GENERATION_DAILY_IPM_LIMIT: '5',
+      PRACTICE_ENABLED: 'false',
+      TRUST_X_FORWARDED_FOR: 'false',
+      NOTIFICATIONS_READ_ENABLED: 'false',
+      NOTIFICATIONS_EVENT_CAPTURE_ENABLED: 'false',
+      NOTIFICATIONS_WORKER_ENABLED: 'false',
+      ANNOUNCEMENT_PUBLISH_ENABLED: 'false',
+      // No real provider credentials: fake AI handles critique and generation.
+      AI_API_KEY: '',
+      OPENAI_API_KEY: '',
+      OPENAI_FALLBACK_API_KEY: '',
+      IMAGE_GENERATION_API_KEY: '',
+      LEMONSQUEEZY_API_KEY: '',
+      LEMONSQUEEZY_WEBHOOK_SIGNING_SECRET: '',
       OBJECT_BUCKET: S3_BUCKET,
       OBJECT_BASE_URL: s3Origin,
       OBJECT_S3_ENDPOINT: s3Origin,

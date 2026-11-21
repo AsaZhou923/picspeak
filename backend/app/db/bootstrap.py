@@ -9,6 +9,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy import create_engine, text
 from sqlalchemy.pool import NullPool
 
+from app.core.env_files import settings_env_files
+
 logger = logging.getLogger(__name__)
 
 _MIGRATION_LOCK_TIMEOUT_SECONDS = 300
@@ -18,13 +20,13 @@ _MIGRATION_LOCK_NAME = 'schema-migration'
 
 class _MigrationSettings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=(
+        env_file=settings_env_files((
             '.env',
             '../.env',
             'backend/.env',
             str(Path(__file__).resolve().parents[3] / '.env'),
             str(Path(__file__).resolve().parents[2] / '.env'),
-        ),
+        )),
         env_file_encoding='utf-8-sig',
         extra='ignore',
     )

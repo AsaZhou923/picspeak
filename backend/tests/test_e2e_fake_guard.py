@@ -1,5 +1,8 @@
+import json
 import os
+import subprocess
 import sys
+import tempfile
 import unittest
 from datetime import datetime, timezone
 from io import BytesIO
@@ -15,7 +18,8 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-from app.core.config import Settings, is_local_database_url, settings
+from app.core.config import REPO_ROOT, Settings, is_local_database_url, settings
+from app.core.env_files import settings_env_files
 from app.db.models import RateLimitCounter, UserPlan
 from app.services.ai import (
     _run_canonical_scoring,
@@ -286,6 +290,82 @@ class E2EFakeGuardTestCase(unittest.TestCase):
             with Image.open(BytesIO(result.image_bytes)) as img:
                 self.assertEqual(img.format, 'WEBP')
                 self.assertEqual(img.size, (256, 384))
+
+
+# A complete, valid configuration, so a leak shows up as values rather than a crash.
+_POISONED_DOTENV = (
+    'APP_SECRET=poisoned-app-secret-0123456789abcdef0123456789abcdef\n'
+    'OAUTH_JWT_SECRET=poisoned-jwt-secret-0123456789abcdef0123456789abcdef\n'
+    'CLOUD_TASKS_ENABLED=true\n'
+    'CLOUD_TASKS_PROJECT_ID=poisoned\n'
+    'CLOUD_TASKS_LOCATION=poisoned\n'
+    'CLOUD_TASKS_QUEUE=poisoned\n'
+    'CLOUD_TASKS_TARGET_URL=https://poisoned.example.invalid/tasks\n'
+    'CLOUD_TASKS_SECRET=poisoned-cloud-tasks-secret-0123456789abcdef\n'
+    'REVIEW_WORKER_NAME=poisoned-dotenv\n'
+    'GUEST_REVIEW_LIMIT_PER_DAY=99\n'
+    'DATABASE_URL=postgresql+psycopg2://u:p@db.example.com:5432/prod\n'
+)
+_PROBE = (
+    'import json\n'
+    'from app.core.config import settings\n'
+    'from app.db import bootstrap\n'
+    'print(json.dumps({"cloud_tasks_enabled": settings.cloud_tasks_enabled, '
+    '"review_worker_name": settings.review_worker_name, '
+    '"guest_review_limit_per_day": settings.guest_review_limit_per_day, '
+    '"migration_database_url": bootstrap._database_url()}))\n'
+)
+
+
+class DotenvIsolationTestCase(unittest.TestCase):
+    def test_settings_env_files_honours_disable_flag(self) -> None:
+        paths = ('.env', 'backend/.env')
+        self.assertEqual(settings_env_files(paths, {}), paths)
+        self.assertEqual(settings_env_files(paths, {'PICSPEAK_DISABLE_DOTENV': '0'}), paths)
+        for value in ('1', 'true', 'YES'):
+            self.assertIsNone(settings_env_files(paths, {'PICSPEAK_DISABLE_DOTENV': value}))
+
+    def _probe(self, cwd: str, *, disable_dotenv: bool) -> dict:
+        env = {key: value for key, value in os.environ.items() if key.upper() in {'PATH', 'SYSTEMROOT', 'TEMP', 'TMP'}}
+        env['PYTHONPATH'] = str(BACKEND_ROOT)
+        if disable_dotenv:
+            env['PICSPEAK_DISABLE_DOTENV'] = '1'
+        completed = subprocess.run(
+            [sys.executable, '-c', _PROBE],
+            cwd=cwd,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=True,
+        )
+        return json.loads(completed.stdout.strip().splitlines()[-1])
+
+    def test_disable_flag_ignores_poisoned_dotenv_for_app_and_migration_settings(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, '.env').write_text(_POISONED_DOTENV, encoding='utf-8')
+            values = self._probe(tmp, disable_dotenv=True)
+        self.assertEqual(
+            values,
+            {
+                'cloud_tasks_enabled': False,
+                'review_worker_name': 'embedded-worker',
+                'guest_review_limit_per_day': 1,
+                'migration_database_url': 'postgresql+psycopg2://postgres:postgres@localhost:5432/aipingtubackend',
+            },
+        )
+
+    def test_poisoned_dotenv_is_loaded_without_disable_flag(self) -> None:
+        # Control: proves the probe would detect a leak. Skipped when a real
+        # developer dotenv (loaded with higher priority) could mask the result.
+        if (REPO_ROOT / '.env').exists() or (BACKEND_ROOT / '.env').exists():
+            self.skipTest('a developer dotenv file overrides the temporary one')
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, '.env').write_text(_POISONED_DOTENV, encoding='utf-8')
+            values = self._probe(tmp, disable_dotenv=False)
+        self.assertTrue(values['cloud_tasks_enabled'])
+        self.assertEqual(values['review_worker_name'], 'poisoned-dotenv')
+        self.assertIn('db.example.com', values['migration_database_url'])
 
 
 if __name__ == '__main__':
