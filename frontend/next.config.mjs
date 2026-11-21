@@ -125,6 +125,27 @@ function buildApiSources() {
   return sources;
 }
 
+function buildLocalObjectStorageSources() {
+  const rawOrigin = process.env.LOCAL_OBJECT_STORAGE_ORIGIN?.trim();
+  if (!rawOrigin) {
+    return [];
+  }
+
+  try {
+    const parsed = new URL(rawOrigin);
+    if (
+      parsed.protocol === 'http:' &&
+      (parsed.hostname === '127.0.0.1' || parsed.hostname === 'localhost')
+    ) {
+      return [parsed.origin];
+    }
+  } catch {
+    // Ignore invalid env values.
+  }
+
+  return [];
+}
+
 function buildClientErrorReportUrl() {
   const rawApiUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
   const candidate = rawApiUrl || (IS_PRODUCTION ? '' : 'http://localhost:8000');
@@ -213,6 +234,7 @@ const connectSources = [
   ...turnstileSources,
   ...vercelConnectSources,
   ...buildObjectStorageAndSiteConnectSources(),
+  ...buildLocalObjectStorageSources(),
 ].join(' ');
 
 const devEvalSource = IS_PRODUCTION ? [] : ["'unsafe-eval'"];

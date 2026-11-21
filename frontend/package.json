@@ -14,6 +14,7 @@
     "build:clean": "npm run clean && next build",
     "start": "next start",
     "test": "node scripts/run-node-tests.mjs",
+    "test:e2e": "playwright test",
     "test:production-blog": "node --test --test-concurrency=1 test/blog-routing.production.test.mjs",
     "indexnow:submit": "node scripts/submit-indexnow.mjs",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
@@ -29,6 +30,7 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@playwright/test": "1.65.1",
     "@types/node": "^24.19.2",
     "@types/react": "^18.3.1",
     "@types/react-dom": "^18.3.0",
