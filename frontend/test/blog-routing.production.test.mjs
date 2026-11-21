@@ -1,7 +1,7 @@
 import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -511,10 +511,30 @@ test('production HTML preserves font CSS variables, marks DM Sans for preload, a
   // DM Sans must be emitted with Next.js's preload (`.p`) and size-adjust (`-s`) suffix.
   const preloadedLatinMatch = combinedCss.match(/\/_next\/static\/media\/[^'")\s]+-s\.p\.woff2/);
   assert.ok(preloadedLatinMatch, 'Expected preloaded DM Sans -s.p.woff2 in production CSS');
-  if (process.platform !== 'win32') {
+
+  // The media hash differs between platforms, so take the expected preload from this build's
+  // font manifest. Next.js may deliver it as an HTTP Link header or a <link rel="preload"> tag.
+  const fontManifest = JSON.parse(
+    readFileSync(path.join(FRONTEND_DIR, '.next', 'server', 'next-font-manifest.json'), 'utf8'),
+  );
+  const layoutPreloads = Object.entries(fontManifest.app ?? {}).find(([entry]) =>
+    entry.replaceAll('\\', '/').endsWith('/src/app/layout'),
+  )?.[1];
+  // Local Windows builds can emit an empty app font manifest, so Next.js sends no preload there.
+  if (layoutPreloads !== undefined || process.platform !== 'win32') {
+    assert.ok(layoutPreloads, 'Expected root layout font preloads in next-font-manifest.json');
+    const preloadFiles = layoutPreloads.filter((file) => file.endsWith('.woff2'));
+    assert.equal(preloadFiles.length, 1, `Expected exactly DM Sans to preload, got ${preloadFiles}`);
+    const expectedPreload = `/_next/${preloadFiles[0]}`;
+    assert.equal(expectedPreload, preloadedLatinMatch[0], 'Preloaded font should be the DM Sans face');
+    const linkHeader = response.headers.get('link') ?? '';
+    const preloadTags = html.match(/<link[^>]+rel="preload"[^>]*>/gi) ?? [];
+    const isPreloaded = (value) =>
+      value.includes(`<${expectedPreload}>`) && /rel=preload/.test(value) && /as="font"/.test(value);
     assert.ok(
-      html.includes(preloadedLatinMatch[0]),
-      `Expected /en HTML to preload ${preloadedLatinMatch[0]}`,
+      linkHeader.split(/,\s*(?=<)/).some(isPreloaded) ||
+        preloadTags.some((tag) => tag.includes(`href="${expectedPreload}"`) && /as="font"/.test(tag)),
+      `Expected /en Link header or HTML to preload ${expectedPreload}`,
     );
   }
 
