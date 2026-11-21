@@ -28,13 +28,13 @@ from app.testing.fakes import (
 
 class E2EFakeGuardTestCase(unittest.TestCase):
     def _settings(self, **overrides) -> Settings:
-        return Settings(
-            _env_file=None,
-            database_url='sqlite://localhost/picspeak-test',
-            app_secret='a' * 64,
-            oauth_jwt_secret='b' * 64,
+        kwargs = {
+            'database_url': 'sqlite:///:memory:',
+            'app_secret': 'a' * 64,
+            'oauth_jwt_secret': 'b' * 64,
             **overrides,
-        )
+        }
+        return Settings(_env_file=None, **kwargs)
 
     def test_e2e_fake_ai_disabled_by_default(self) -> None:
         cfg = self._settings()
@@ -46,13 +46,36 @@ class E2EFakeGuardTestCase(unittest.TestCase):
                 self._settings(app_env=env_name, e2e_fake_ai_enabled=True)
 
     def test_settings_allows_e2e_fake_ai_in_dev(self) -> None:
-        cfg = self._settings(app_env='dev', e2e_fake_ai_enabled=True)
-        self.assertTrue(cfg.e2e_fake_ai_enabled)
+        for db_url in (
+            'sqlite:///:memory:',
+            'sqlite:///picspeak-test.db',
+            'postgresql+psycopg2://postgres:postgres@localhost:5432/picspeak_e2e',
+            'postgresql+psycopg2://postgres:postgres@127.0.0.1:5432/picspeak_e2e',
+            'postgresql+psycopg2://postgres:postgres@[::1]:5432/picspeak_e2e',
+        ):
+            with self.subTest(database_url=db_url):
+                cfg = self._settings(app_env='dev', database_url=db_url, e2e_fake_ai_enabled=True)
+                self.assertTrue(cfg.e2e_fake_ai_enabled)
+
+    def test_settings_refuses_e2e_fake_ai_with_remote_database_even_in_dev(self) -> None:
+        for db_url in (
+            'postgresql+psycopg2://postgres:postgres@prod-db.internal:5432/picspeak',
+            'postgresql+psycopg2://postgres:postgres@10.0.0.12:5432/picspeak',
+            'postgresql+psycopg2://postgres:postgres@localhost.evil.example:5432/picspeak',
+            'postgresql+psycopg2://localhost:secret@prod-db.example.com:5432/picspeak',
+            'postgresql+psycopg2://postgres:postgres@/picspeak?host=/cloudsql/proj:region:inst',
+            'postgresql+psycopg2://postgres:postgres@127.0.0.1:5432/picspeak?host=prod-db.internal',
+            'postgresql+psycopg2://postgres:postgres@127.0.0.1:5432/picspeak?host=127.0.0.1,prod-db.internal',
+            '',
+        ):
+            with self.subTest(database_url=db_url), self.assertRaises(ValueError):
+                self._settings(app_env='dev', database_url=db_url, e2e_fake_ai_enabled=True)
 
     def test_runtime_guard_refuses_when_app_env_is_production(self) -> None:
         with (
             patch.object(settings, 'app_env', 'production'),
             patch.object(settings, 'e2e_fake_ai_enabled', True),
+            patch.object(settings, 'database_url', 'postgresql+psycopg2://postgres:postgres@127.0.0.1:5432/picspeak_e2e'),
         ):
             with self.assertRaises(RuntimeError):
                 assert_e2e_fake_ai_allowed()
@@ -60,6 +83,25 @@ class E2EFakeGuardTestCase(unittest.TestCase):
                 run_ai_review('flash', image_url='http://127.0.0.1:9000/test.jpg', review_model='gpt-6-sol')
             with self.assertRaises(RuntimeError):
                 FakeImageGenerationClient()
+
+    def test_runtime_guard_refuses_remote_database_even_when_app_env_is_dev(self) -> None:
+        for db_url in (
+            'postgresql+psycopg2://postgres:postgres@prod-db.internal:5432/picspeak',
+            'postgresql+psycopg2://postgres:postgres@/picspeak?host=/cloudsql/proj:region:inst',
+            'postgresql+psycopg2://postgres:postgres@127.0.0.1:5432/picspeak?host=prod-db.internal',
+        ):
+            with (
+                self.subTest(database_url=db_url),
+                patch.object(settings, 'app_env', 'dev'),
+                patch.object(settings, 'e2e_fake_ai_enabled', True),
+                patch.object(settings, 'database_url', db_url),
+            ):
+                with self.assertRaises(RuntimeError):
+                    assert_e2e_fake_ai_allowed()
+                with self.assertRaises(RuntimeError):
+                    run_ai_review('flash', image_url='http://127.0.0.1:9000/test.jpg', review_model='gpt-6-sol')
+                with self.assertRaises(RuntimeError):
+                    FakeImageGenerationClient()
 
     def test_runtime_guard_refuses_when_flag_is_false(self) -> None:
         with (
@@ -76,6 +118,7 @@ class E2EFakeGuardTestCase(unittest.TestCase):
         with (
             patch.object(settings, 'app_env', 'dev'),
             patch.object(settings, 'e2e_fake_ai_enabled', True),
+            patch.object(settings, 'database_url', 'postgresql+psycopg2://postgres:postgres@127.0.0.1:5432/picspeak_e2e'),
         ):
             profile = openai_review_profile_for_mode('flash')
             score = _run_canonical_scoring(
@@ -123,6 +166,7 @@ class E2EFakeGuardTestCase(unittest.TestCase):
         with (
             patch.object(settings, 'app_env', 'dev'),
             patch.object(settings, 'e2e_fake_ai_enabled', True),
+            patch.object(settings, 'database_url', 'sqlite:///:memory:'),
         ):
             client = FakeImageGenerationClient()
             result = client.generate(
