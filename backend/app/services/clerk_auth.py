@@ -111,16 +111,17 @@ def _clerk_request(method: str, path: str, payload: dict[str, Any] | None = None
         raw = response.data.decode('utf-8')
     except PooledHTTPStatusError as exc:
         response = exc.response
+        upstream_message = _parse_clerk_error(response.data, response.reason)
         logger.warning(
-            'Clerk API %s %s failed with HTTP %s',
+            'Clerk API %s %s failed with HTTP %s: %s',
             method,
             path,
             response.status,
+            upstream_message,
         )
-        message = _parse_clerk_error(response.data, response.reason)
         if response.status in {401, 403, 404}:
-            raise api_error(status.HTTP_401_UNAUTHORIZED, 'CLERK_API_UNAUTHORIZED', message) from exc
-        raise api_error(status.HTTP_502_BAD_GATEWAY, 'CLERK_API_FAILED', message) from exc
+            raise api_error(status.HTTP_401_UNAUTHORIZED, 'CLERK_API_UNAUTHORIZED', 'Clerk authentication failed') from exc
+        raise api_error(status.HTTP_502_BAD_GATEWAY, 'CLERK_API_FAILED', 'Clerk API request failed') from exc
     except PooledHTTPRequestError as exc:
         logger.warning('Clerk API %s %s unreachable', method, path, exc_info=True)
         raise api_error(status.HTTP_502_BAD_GATEWAY, 'CLERK_API_UNREACHABLE', 'Clerk API request failed') from exc

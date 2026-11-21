@@ -97,7 +97,75 @@ _PUBLIC_TASK_ERROR_MESSAGES: dict[str, tuple[str, str]] = {
         'Review task failed unexpectedly; retry scheduled',
         'Review task could not be completed',
     ),
+    'TASK_DISPATCH_FAILED': (
+        'Failed to enqueue async review task',
+        'Failed to enqueue async review task',
+    ),
+    'TASK_EXPIRED': (
+        'Task expired before completion',
+        'Task expired before completion',
+    ),
+    'TASK_STALLED': (
+        'Task heartbeat stalled; retry scheduled',
+        'Task heartbeat stalled and max retries were exhausted',
+    ),
+    'PHOTO_NOT_FOUND': (
+        'Photo record not found for task',
+        'Photo record not found for task',
+    ),
+    'PHOTO_ORIGINAL_EXPIRED': (
+        'The stored original was removed',
+        'The stored original was removed',
+    ),
+    'PHOTO_OWNER_MISMATCH': (
+        'Photo owner does not match task owner',
+        'Photo owner does not match task owner',
+    ),
+    'USER_NOT_FOUND': (
+        'Task owner not found',
+        'Task owner not found',
+    ),
+    'PRACTICE_GOAL_INVALID': (
+        'The saved practice goal is invalid',
+        'The saved practice goal is invalid',
+    ),
+    'QUOTA_EXCEEDED': (
+        'Plan quota exceeded',
+        'Plan quota exceeded',
+    ),
+    'RETAKE_SOURCE_NOT_FOUND': (
+        'Source review or original photo not found for retake comparison',
+        'Source review or original photo not found for retake comparison',
+    ),
+    'RETAKE_SOURCE_NOT_READY': (
+        'Source review or original photo is not ready for retake comparison',
+        'Source review or original photo is not ready for retake comparison',
+    ),
 }
+
+_GENERIC_TASK_ERROR_MESSAGES = (
+    'Review task failed; retry scheduled',
+    'Review task could not be completed',
+)
+
+_PUBLIC_TASK_LIFECYCLE_EVENT_MESSAGES: dict[str, str] = {
+    'TASK_CREATED': 'Task created',
+    'TASK_QUEUED': 'Task queued',
+    'TASK_CLAIMED': 'Task claimed',
+    'TASK_STARTED': 'Task started',
+    'TASK_PROGRESS': 'Task in progress',
+    'REVIEW_CREATED': 'Review succeeded',
+    'completed': 'Review succeeded',
+}
+
+_ERROR_TASK_EVENT_TYPES = frozenset({
+    'TASK_FAILED',
+    'TASK_RETRY_SCHEDULED',
+    'TASK_DEAD_LETTER',
+    'TASK_DISPATCH_FAILED',
+    'TASK_EXPIRED',
+    'TASK_STALLED',
+})
 
 
 def review_task_failure_stage(error_code: str | None) -> str:
@@ -154,13 +222,29 @@ def public_task_error_message(
     *,
     retryable: bool,
     fallback: str | None = None,
-) -> str | None:
-    if not error_code:
-        return fallback
-    mapped = _PUBLIC_TASK_ERROR_MESSAGES.get(error_code)
-    if not mapped:
-        return fallback
-    return mapped[0] if retryable else mapped[1]
+) -> str:
+    # Never forward stored diagnostic error_message text to clients.
+    _ = fallback
+    mapped = _PUBLIC_TASK_ERROR_MESSAGES.get(str(error_code or ''))
+    if mapped is not None:
+        return mapped[0] if retryable else mapped[1]
+    return _GENERIC_TASK_ERROR_MESSAGES[0] if retryable else _GENERIC_TASK_ERROR_MESSAGES[1]
+
+
+def public_task_event_message(
+    event_type: str | None,
+    error_code: str | None,
+    *,
+    retryable: bool,
+    task_error_code: str | None = None,
+) -> str:
+    if error_code:
+        return public_task_error_message(error_code, retryable=retryable)
+    if event_type in _PUBLIC_TASK_ERROR_MESSAGES:
+        return public_task_error_message(event_type, retryable=retryable)
+    if event_type in _ERROR_TASK_EVENT_TYPES:
+        return public_task_error_message(task_error_code or event_type, retryable=retryable)
+    return _PUBLIC_TASK_LIFECYCLE_EVENT_MESSAGES.get(str(event_type or ''), 'Task updated')
 
 
 def _review_task_stale_timeout_seconds() -> int:

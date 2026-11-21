@@ -56,7 +56,29 @@ _PUBLIC_GENERATION_ERROR_MESSAGES = {
     'IMAGE_GENERATION_CREDITS_EXHAUSTED': 'Image generation credits are exhausted',
     'IMAGE_GENERATION_STORAGE_FAILED': 'Generated image could not be saved',
     'IMAGE_GENERATION_PERSISTENCE_FAILED': 'Generated image could not be saved',
+    'TASK_DISPATCH_FAILED': 'Failed to enqueue async image generation task',
+    'GENERATION_TASK_DISPATCH_FAILED': 'Failed to enqueue async image generation task',
+    'TASK_EXPIRED': 'Image generation task expired before completion',
+    'TASK_STALLED': 'Image generation heartbeat stalled and max retries were exhausted',
+    'USER_NOT_FOUND': 'Task owner not found',
+    'GENERATION_PROMPT_REJECTED': 'Generation prompt was rejected',
+    'PROMPT_SAFETY': 'Generation prompt was rejected',
 }
+
+_GENERIC_GENERATION_ERROR_MESSAGE = 'Image generation could not be completed'
+_GENERIC_GENERATION_RETRY_MESSAGE = 'Image generation failed; retry scheduled'
+
+
+def public_generation_error_message(error_code: str | None, *, retryable: bool = False) -> str:
+    code = str(error_code or '')
+    if code == 'OPENAI_IMAGE_GENERATION_FAILED' and retryable:
+        return 'Image generation is temporarily unavailable; retry scheduled'
+    if code == 'TASK_STALLED' and retryable:
+        return 'Image generation heartbeat stalled; retry scheduled'
+    mapped = _PUBLIC_GENERATION_ERROR_MESSAGES.get(code)
+    if mapped is not None:
+        return mapped
+    return _GENERIC_GENERATION_RETRY_MESSAGE if retryable else _GENERIC_GENERATION_ERROR_MESSAGE
 
 
 def count_monthly_generation_credits(db: Session, user: User, *, now: datetime | None = None) -> int:
@@ -84,9 +106,7 @@ def _serialize_generation_task_status(task: ImageGenerationTask, image: Generate
     error = None
     if task.error_code or task.error_message:
         retryable = task.status == TaskStatus.PENDING and task.next_attempt_at is not None
-        public_message = _PUBLIC_GENERATION_ERROR_MESSAGES.get(str(task.error_code), task.error_message)
-        if task.error_code == 'OPENAI_IMAGE_GENERATION_FAILED' and retryable:
-            public_message = 'Image generation is temporarily unavailable; retry scheduled'
+        public_message = public_generation_error_message(task.error_code, retryable=retryable)
         error = {
             'code': task.error_code,
             'message': public_message,
@@ -1231,7 +1251,7 @@ def _handle_generation_failure(
             from app.services.task_dispatcher import TaskDispatchError, enqueue_image_generation_task
 
             enqueue_image_generation_task(task.public_id, delay_seconds=retry_delay)
-        except TaskDispatchError as exc:
+        except TaskDispatchError:
             logger.exception('Failed to enqueue Cloud Task retry for image generation task %s', task.public_id)
             failed_task = db.query(ImageGenerationTask).filter(
                 ImageGenerationTask.id == task.id,
@@ -1245,7 +1265,7 @@ def _handle_generation_failure(
                 failed_task.finished_at = now
                 failed_task.last_heartbeat_at = now
                 failed_task.error_code = 'TASK_DISPATCH_FAILED'
-                failed_task.error_message = str(exc)[:500]
+                failed_task.error_message = 'Failed to enqueue async image generation task'
                 db.add(failed_task)
                 release_generation_credit_reservation(db, task=failed_task, reason='TASK_DISPATCH_FAILED')
                 owner = db.query(User).filter(User.id == failed_task.owner_user_id).first()

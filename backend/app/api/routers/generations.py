@@ -634,7 +634,8 @@ def reuse_generation(
     return response
 
 
-def _mark_generation_dispatch_failed(db: Session, task_public_id: str, error_message: str) -> None:
+def _mark_generation_dispatch_failed(db: Session, task_public_id: str, error_message: str | None = None) -> None:
+    _ = error_message
     db.rollback()
     failed_task = db.query(ImageGenerationTask).filter(ImageGenerationTask.public_id == task_public_id).first()
     if failed_task is None:
@@ -645,7 +646,7 @@ def _mark_generation_dispatch_failed(db: Session, task_public_id: str, error_mes
     failed_task.finished_at = now
     failed_task.last_heartbeat_at = now
     failed_task.error_code = 'TASK_DISPATCH_FAILED'
-    failed_task.error_message = error_message[:500]
+    failed_task.error_message = 'Failed to enqueue async image generation task'
     db.add(failed_task)
     release_generation_credit_reservation(db, task=failed_task, reason='TASK_DISPATCH_FAILED')
     owner = db.query(User).filter(User.id == failed_task.owner_user_id).first()

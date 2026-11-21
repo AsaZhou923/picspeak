@@ -31,7 +31,7 @@ from app.api.routers import photos as photos_router
 from app.api.routers import review_actions
 from app.api.routers import uploads as uploads_router
 from app.core.config import Settings
-from app.core.http_client import PooledHTTPRequestError
+from app.core.http_client import PooledHTTPRequestError, PooledHTTPResponse, PooledHTTPStatusError
 from app.core.logging_config import (
     CloudLoggingJsonFormatter,
     DevTextFormatter,
@@ -80,15 +80,23 @@ def _dummy_request(path: str = '/api/v1/test') -> Request:
 
 
 class ErrorTextHardeningTests(unittest.TestCase):
-    def test_static_ast_forbids_exception_interpolation_in_api_errors(self) -> None:
-        """Ensure no api_error / HTTPException call interpolates an caught exception."""
+    def test_static_ast_forbids_exception_interpolation_and_unvetted_message_vars_in_api_errors(self) -> None:
+        """Ensure api_error / HTTPException never interpolates exceptions or passes unvetted message variables."""
         app_root = BACKEND_ROOT / 'app'
         offenders: list[str] = []
+        allowed_non_literal_messages = {
+            ('app/core/errors.py', 'message'),
+            ('app/api/routers/analytics.py', 'exc.message'),
+            ('app/api/routers/review_create.py', 'PHOTO_NOT_APPLICABLE_MESSAGE'),
+            ('app/services/guard.py', "f'Rate limit exceeded ({scope})'"),
+        }
 
         for path in sorted(app_root.rglob('*.py')):
+            rel = path.relative_to(BACKEND_ROOT).as_posix()
             source = path.read_text(encoding='utf-8-sig')
             tree = ast.parse(source, filename=str(path))
 
+            # 1) Reject any exception interpolation in args/kwargs of api_error / HTTPException
             for node in ast.walk(tree):
                 if not isinstance(node, ast.ExceptHandler) or not node.name:
                     continue
@@ -103,21 +111,39 @@ class ErrorTextHardeningTests(unittest.TestCase):
 
                     for arg in list(inner.args) + [kw.value for kw in inner.keywords]:
                         for sub in ast.walk(arg):
-                            # Direct str(exc) / repr(exc)
                             if (
                                 isinstance(sub, ast.Call)
                                 and isinstance(sub.func, ast.Name)
                                 and sub.func.id in {'str', 'repr'}
                                 and any(isinstance(a, ast.Name) and a.id == exc_name for a in sub.args)
                             ):
-                                offenders.append(f'{path.relative_to(BACKEND_ROOT)}:{inner.lineno}: {ast.get_source_segment(source, inner)}')
-                            # f-string interpolating {exc}
+                                offenders.append(f'{rel}:{inner.lineno}: {ast.get_source_segment(source, inner)}')
                             if isinstance(sub, ast.FormattedValue) and any(
                                 isinstance(v, ast.Name) and v.id == exc_name for v in ast.walk(sub.value)
                             ):
-                                offenders.append(f'{path.relative_to(BACKEND_ROOT)}:{inner.lineno}: {ast.get_source_segment(source, inner)}')
+                                offenders.append(f'{rel}:{inner.lineno}: {ast.get_source_segment(source, inner)}')
 
-        self.assertEqual(offenders, [], msg='Found exception interpolation in API error responses:\n' + '\n'.join(offenders))
+            # 2) Reject any non-literal message argument passed to api_error / ApiHTTPException
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Call):
+                    continue
+                fn = node.func
+                fn_name = fn.id if isinstance(fn, ast.Name) else (fn.attr if isinstance(fn, ast.Attribute) else '')
+                msg_node = None
+                if fn_name == 'api_error':
+                    if len(node.args) >= 3:
+                        msg_node = node.args[2]
+                    else:
+                        msg_node = next((kw.value for kw in node.keywords if kw.arg == 'message'), None)
+                elif fn_name == 'ApiHTTPException':
+                    msg_node = next((kw.value for kw in node.keywords if kw.arg == 'message'), None)
+                if msg_node is None or isinstance(msg_node, ast.Constant):
+                    continue
+                msg_src = ast.get_source_segment(source, msg_node) or ''
+                if (rel, msg_src) not in allowed_non_literal_messages:
+                    offenders.append(f'{rel}:{node.lineno}: non-literal message {msg_src!r}')
+
+        self.assertEqual(offenders, [], msg='Found unsafe API error messages:\n' + '\n'.join(offenders))
 
     def test_auth_token_invalid_returns_fixed_message_and_logs_with_request_id(self) -> None:
         secret = 'SENTINEL_JWT_SECRET_DETAIL'
@@ -217,8 +243,8 @@ class ErrorTextHardeningTests(unittest.TestCase):
         self.assertNotIn(secret, json.dumps(raised.exception.detail))
         self.assertEqual(len(logs.records), 1)
 
-    def test_clerk_unreachable_omits_network_exception_text(self) -> None:
-        secret = 'SENTINEL_CLERK_TLS_PROXY_ERROR'
+    def test_clerk_http_errors_and_unreachable_omit_upstream_details(self) -> None:
+        secret = 'SENTINEL_CLERK_UPSTREAM_BODY_DETAIL'
         with (
             patch('app.services.clerk_auth._require_clerk_secret_key', return_value='sk_test_123'),
             patch('app.services.clerk_auth.pooled_request', side_effect=PooledHTTPRequestError(secret)),
@@ -232,6 +258,153 @@ class ErrorTextHardeningTests(unittest.TestCase):
         self.assertEqual(raised.exception.detail['message'], 'Clerk API request failed')
         self.assertNotIn(secret, json.dumps(raised.exception.detail))
         self.assertEqual(len(logs.records), 1)
+
+        for status_code, expected_code, expected_message in (
+            (401, 'CLERK_API_UNAUTHORIZED', 'Clerk authentication failed'),
+            (500, 'CLERK_API_FAILED', 'Clerk API request failed'),
+        ):
+            with self.subTest(status_code=status_code):
+                response = PooledHTTPResponse(
+                    status=status_code,
+                    reason=f'Upstream {secret}',
+                    data=json.dumps({'errors': [{'long_message': secret}]}).encode('utf-8'),
+                    headers={},
+                )
+                with (
+                    patch('app.services.clerk_auth._require_clerk_secret_key', return_value='sk_test_123'),
+                    patch('app.services.clerk_auth.pooled_request', side_effect=PooledHTTPStatusError(response)),
+                    self.assertLogs('app.services.clerk_auth', level='WARNING') as status_logs,
+                    self.assertRaises(HTTPException) as status_raised,
+                ):
+                    clerk_auth._clerk_request('GET', '/v1/users/user_1')
+
+                self.assertEqual(status_raised.exception.detail['code'], expected_code)
+                self.assertEqual(status_raised.exception.detail['message'], expected_message)
+                self.assertNotIn(secret, json.dumps(status_raised.exception.detail))
+                self.assertTrue(any(secret in rec.getMessage() for rec in status_logs.records))
+
+    def test_task_status_realtime_generation_and_practice_omit_stored_diagnostics(self) -> None:
+        from app.api.routers import realtime, tasks as tasks_router
+        from app.db.models import TaskStatus
+        from app.services.image_generation_task_processor import _serialize_generation_task_status
+        from app.services.practice import _attempt_summary
+
+        secret = 'SENTINEL_STORED_DIAGNOSTIC_TRACE_999'
+        now = datetime(2026, 11, 21, 12, 0, tzinfo=timezone.utc)
+
+        # 1) Review task status with unmapped error_code
+        review_task = SimpleNamespace(
+            public_id='tsk_unmapped',
+            status=TaskStatus.FAILED,
+            progress=100,
+            attempt_count=1,
+            max_attempts=3,
+            next_attempt_at=None,
+            last_heartbeat_at=None,
+            started_at=now,
+            finished_at=now,
+            error_code='UNMAPPED_INTERNAL_CODE',
+            error_message=secret,
+        )
+        task_payload = tasks_router._serialize_task_status(review_task, None)
+        self.assertEqual(task_payload['error']['code'], 'UNMAPPED_INTERNAL_CODE')
+        self.assertEqual(task_payload['error']['message'], 'Review task could not be completed')
+        self.assertNotIn(secret, json.dumps(task_payload, default=str))
+
+        # 2) Realtime WebSocket payload including task event with sensitive stored message
+        event = SimpleNamespace(
+            event_type='TASK_DISPATCH_FAILED',
+            error_code=None,
+            message=secret,
+            created_at=now,
+        )
+        session_cm = MagicMock()
+        session_cm.__enter__.return_value = MagicMock()
+        session_cm.__exit__.return_value = False
+        with (
+            patch.object(realtime, 'SessionLocal', return_value=session_cm),
+            patch.object(realtime, '_load_task_snapshot', return_value=(review_task, None, event)),
+        ):
+            ws_payload, terminal = realtime._load_task_stream_update('tsk_unmapped', 1)
+        self.assertTrue(terminal)
+        self.assertNotIn(secret, json.dumps(ws_payload))
+        self.assertEqual(ws_payload['event']['message'], 'Failed to enqueue async review task')
+
+        # 3) Generation task status with unmapped error_code
+        gen_task = SimpleNamespace(
+            public_id='igt_unmapped',
+            status=TaskStatus.FAILED,
+            progress=100,
+            generation_mode='general',
+            intent='custom_creation',
+            request_payload={},
+            attempt_count=1,
+            max_attempts=2,
+            next_attempt_at=None,
+            last_heartbeat_at=None,
+            started_at=now,
+            finished_at=now,
+            error_code='UNMAPPED_GEN_CODE',
+            error_message=secret,
+        )
+        gen_payload = _serialize_generation_task_status(gen_task, None)
+        self.assertEqual(gen_payload['error']['code'], 'UNMAPPED_GEN_CODE')
+        self.assertEqual(gen_payload['error']['message'], 'Image generation could not be completed')
+        self.assertNotIn(secret, json.dumps(gen_payload, default=str))
+
+        # 4) Practice attempt summary with stored diagnostic on task
+        attempt = SimpleNamespace(
+            public_id='pat_1',
+            task_id=42,
+            review_id=None,
+            photo_id=9,
+            sequence=1,
+            attempt_kind='retake',
+            created_at=now,
+        )
+        session_obj = SimpleNamespace(id=1, owner_user_id=7)
+        actor = SimpleNamespace(user=SimpleNamespace(id=7, public_id='usr_7'), plan=UserPlan.free)
+        source_access = SimpleNamespace(access='available')
+        with patch(
+            'app.services.practice.attempt_access_summary',
+            return_value=SimpleNamespace(
+                task_public_id='tsk_unmapped',
+                review_public_id=None,
+                review_access='unavailable',
+                photo_public_id='pho_9',
+            ),
+        ):
+            summary = _attempt_summary(
+                attempt,
+                session=session_obj,
+                source_access=source_access,
+                tasks_by_id={42: review_task},
+                reviews_by_id={},
+                photos_by_id={},
+                actor=actor,
+            )
+        self.assertEqual(summary.error['code'], 'UNMAPPED_INTERNAL_CODE')
+        self.assertEqual(summary.error['message'], 'Review task could not be completed')
+        self.assertNotIn(secret, json.dumps(summary.model_dump(mode='json')))
+
+        # 5) Generation dispatch failure writer stores fixed text, not raw exception text
+        failed_gen_task = SimpleNamespace(
+            public_id='igt_dispatch',
+            owner_user_id=7,
+            status=TaskStatus.PENDING,
+            progress=0,
+            finished_at=None,
+            last_heartbeat_at=None,
+            error_code=None,
+            error_message=None,
+        )
+        db = MagicMock()
+        db.query.return_value.filter.return_value.first.side_effect = [failed_gen_task, None]
+        with patch('app.api.routers.generations.release_generation_credit_reservation'):
+            generations_router._mark_generation_dispatch_failed(db, 'igt_dispatch', secret)
+        self.assertEqual(failed_gen_task.error_code, 'TASK_DISPATCH_FAILED')
+        self.assertEqual(failed_gen_task.error_message, 'Failed to enqueue async image generation task')
+        self.assertNotIn(secret, failed_gen_task.error_message)
 
     def test_gallery_thumbnail_upload_omits_storage_exception_text(self) -> None:
         secret = 'SENTINEL_THUMB_PUT_ERROR'

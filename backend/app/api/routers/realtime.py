@@ -12,7 +12,7 @@ from app.api.routers.tasks import _is_retryable_task_error, _load_task_snapshot,
 from app.core.config import settings
 from app.db.models import TaskStatus
 from app.db.session import SessionLocal
-from app.services.review_task_processor import public_task_error_message
+from app.services.review_task_processor import public_task_event_message
 
 router = APIRouter(tags=['realtime'])
 
@@ -41,10 +41,11 @@ def _load_task_stream_update(task_id: str, owner_user_id: int) -> tuple[dict | N
             'task': _serialize_task_status(task, review),
             'event': {
                 'event_type': latest_event.event_type,
-                'message': public_task_error_message(
+                'message': public_task_event_message(
+                    latest_event.event_type,
                     latest_event.error_code,
                     retryable=_is_retryable_task_error(task),
-                    fallback=latest_event.message,
+                    task_error_code=task.error_code,
                 ),
                 'created_at': latest_event.created_at.isoformat(),
             } if latest_event else None,
