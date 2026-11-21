@@ -29,6 +29,62 @@ const MOCKED_FONTS_PATH = path.join(
 
 const POSTGRES_IMAGE = 'postgres:17-alpine';
 const MINIO_IMAGE = 'minio/minio:RELEASE.2025-09-07T16-13-09Z';
+const E2E_DB_MARKER_SQL =
+  "CREATE TABLE IF NOT EXISTS _picspeak_e2e_disposable_marker (marker text PRIMARY KEY, created_at timestamptz NOT NULL DEFAULT now()); INSERT INTO _picspeak_e2e_disposable_marker (marker) VALUES ('picspeak-e2e-smoke') ON CONFLICT DO NOTHING;";
+
+// Explicit allowlist of OS/toolchain environment variables forwarded to child
+// processes. Application, database, storage, AI, Clerk, and libpq PG* variables
+// are intentionally excluded so local developer shells cannot leak into E2E runs.
+const CHILD_ENV_ALLOWLIST = new Set([
+  'PATH',
+  'PATHEXT',
+  'COMSPEC',
+  'SYSTEMROOT',
+  'WINDIR',
+  'SYSTEMDRIVE',
+  'TEMP',
+  'TMP',
+  'TMPDIR',
+  'HOME',
+  'USERPROFILE',
+  'HOMEDRIVE',
+  'HOMEPATH',
+  'APPDATA',
+  'LOCALAPPDATA',
+  'PROGRAMDATA',
+  'PROGRAMFILES',
+  'PROGRAMFILES(X86)',
+  'COMMONPROGRAMFILES',
+  'COMMONPROGRAMFILES(X86)',
+  'OS',
+  'NUMBER_OF_PROCESSORS',
+  'PROCESSOR_ARCHITECTURE',
+  'LANG',
+  'LC_ALL',
+  'LC_CTYPE',
+  'TERM',
+  'CI',
+  'GITHUB_ACTIONS',
+  'PLAYWRIGHT_BROWSERS_PATH',
+  'XDG_CACHE_HOME',
+  'XDG_CONFIG_HOME',
+  'XDG_RUNTIME_DIR',
+  'SSL_CERT_FILE',
+  'SSL_CERT_DIR',
+  'NODE_OPTIONS',
+  'PYTHONUTF8',
+  'VIRTUAL_ENV',
+]);
+
+function buildBaseChildEnv() {
+  const baseEnv = {};
+  for (const [key, value] of Object.entries(process.env)) {
+    if (value !== undefined && CHILD_ENV_ALLOWLIST.has(key.toUpperCase())) {
+      baseEnv[key] = value;
+    }
+  }
+  return baseEnv;
+}
 
 const args = new Set(process.argv.slice(2));
 const useExistingServices =
@@ -150,7 +206,8 @@ async function stopProcess(child) {
 function removeDockerContainers(names) {
   for (const name of names) {
     try {
-      execFileSync('docker', ['rm', '-f', name], { stdio: 'ignore' });
+      // -v removes anonymous volumes created by postgres/minio images.
+      execFileSync('docker', ['rm', '-f', '-v', name], { stdio: 'ignore' });
     } catch {
       // Container already removed or never created.
     }
@@ -193,14 +250,25 @@ async function main() {
   process.on('SIGTERM', () => void handleSignal('SIGTERM'));
 
   try {
-    let pgPort = Number(process.env.E2E_PG_PORT || 5432);
-    let minioPort = Number(process.env.E2E_MINIO_PORT || 9000);
+    let pgPort;
+    let minioPort;
+    let databaseUrl;
+    let objectBucket;
+    let objectAccessKeyId;
+    let objectSecretAccessKey;
     const backendPort = Number(process.env.E2E_BACKEND_PORT || 8000);
     const frontendPort = Number(process.env.E2E_FRONTEND_PORT || 3000);
 
     if (!useExistingServices) {
-      pgPort = Number(process.env.E2E_PG_PORT || (await reservePort()));
+      // Default Docker mode ignores any inherited DATABASE_URL / OBJECT_* env
+      // and connects exclusively to its own disposable containers.
+      pgPort = await reservePort();
       minioPort = Number(process.env.E2E_MINIO_PORT || 19000);
+      databaseUrl = `postgresql+psycopg2://postgres:postgres@127.0.0.1:${pgPort}/picspeak_e2e`;
+      objectBucket = 'picspeak-e2e';
+      objectAccessKeyId = 'minioadmin';
+      objectSecretAccessKey = 'minioadmin';
+
       const pgContainer = `picspeak-e2e-pg-${runId}`;
       const minioContainer = `picspeak-e2e-minio-${runId}`;
       dockerContainers.push(pgContainer, minioContainer);
@@ -240,7 +308,7 @@ async function main() {
       ]);
 
       await waitForTcp('127.0.0.1', pgPort, 'PostgreSQL');
-      // Give PostgreSQL a moment to complete initial DB bootstrap after port opens.
+      let pgReady = false;
       for (let attempt = 0; attempt < 40; attempt += 1) {
         try {
           execFileSync(
@@ -248,26 +316,56 @@ async function main() {
             ['exec', pgContainer, 'pg_isready', '-U', 'postgres', '-d', 'picspeak_e2e'],
             { stdio: 'ignore' },
           );
+          pgReady = true;
           break;
         } catch {
           await new Promise((resolve) => setTimeout(resolve, 250));
         }
       }
+      if (!pgReady) {
+        throw new Error(
+          `Timed out waiting for PostgreSQL container ${pgContainer} to become ready after 40 pg_isready probes`,
+        );
+      }
+
+      // Mark this freshly created container database as disposable so seed_e2e
+      // can never run against an unmarked developer database.
+      runSync('docker', [
+        'exec',
+        pgContainer,
+        'psql',
+        '-U',
+        'postgres',
+        '-d',
+        'picspeak_e2e',
+        '-v',
+        'ON_ERROR_STOP=1',
+        '-c',
+        E2E_DB_MARKER_SQL,
+      ]);
+
       await waitForHttp(`http://127.0.0.1:${minioPort}/minio/health/live`, 'MinIO');
     } else {
+      pgPort = Number(process.env.E2E_PG_PORT || 5432);
+      minioPort = Number(process.env.E2E_MINIO_PORT || 9000);
+      databaseUrl =
+        process.env.DATABASE_URL ||
+        `postgresql+psycopg2://postgres:postgres@127.0.0.1:${pgPort}/picspeak_e2e`;
+      objectBucket = process.env.OBJECT_BUCKET || 'picspeak-e2e';
+      objectAccessKeyId = process.env.OBJECT_ACCESS_KEY_ID || 'minioadmin';
+      objectSecretAccessKey = process.env.OBJECT_SECRET_ACCESS_KEY || 'minioadmin';
+
       await waitForTcp('127.0.0.1', pgPort, 'PostgreSQL');
       await waitForHttp(`http://127.0.0.1:${minioPort}/minio/health/live`, 'MinIO');
     }
 
-    const databaseUrl =
-      process.env.DATABASE_URL ||
-      `postgresql+psycopg2://postgres:postgres@127.0.0.1:${pgPort}/picspeak_e2e`;
+    const baseChildEnv = buildBaseChildEnv();
     const minioOrigin = `http://127.0.0.1:${minioPort}`;
     const apiOrigin = `http://127.0.0.1:${backendPort}`;
     const frontendOrigin = `http://localhost:${frontendPort}`;
 
     const sharedBackendEnv = {
-      ...process.env,
+      ...baseChildEnv,
       APP_ENV: 'dev',
       APP_SECRET: 'e2e-local-app-secret-0123456789abcdef0123456789abcdef',
       OAUTH_JWT_SECRET: 'e2e-local-jwt-secret-0123456789abcdef0123456789abcdef',
@@ -275,11 +373,11 @@ async function main() {
       E2E_FAKE_AI_ENABLED: 'true',
       RUN_EMBEDDED_WORKER: 'true',
       REVIEW_WORKER_IDLE_SLEEP_MS: '100',
-      OBJECT_BUCKET: process.env.OBJECT_BUCKET || 'picspeak-e2e',
+      OBJECT_BUCKET: objectBucket,
       OBJECT_BASE_URL: minioOrigin,
       OBJECT_S3_ENDPOINT: minioOrigin,
-      OBJECT_ACCESS_KEY_ID: process.env.OBJECT_ACCESS_KEY_ID || 'minioadmin',
-      OBJECT_SECRET_ACCESS_KEY: process.env.OBJECT_SECRET_ACCESS_KEY || 'minioadmin',
+      OBJECT_ACCESS_KEY_ID: objectAccessKeyId,
+      OBJECT_SECRET_ACCESS_KEY: objectSecretAccessKey,
       OBJECT_REGION: 'us-east-1',
       CLERK_SECRET_KEY: '',
       CLERK_WEBHOOK_SIGNING_SECRET: '',
@@ -304,7 +402,7 @@ async function main() {
     );
 
     const sharedFrontendEnv = {
-      ...process.env,
+      ...baseChildEnv,
       NODE_ENV: 'production',
       NEXT_PUBLIC_API_URL: apiOrigin,
       NEXT_PUBLIC_SITE_URL: frontendOrigin,
@@ -377,7 +475,7 @@ async function main() {
     const testResult = await runCommandAsync(process.execPath, [PLAYWRIGHT_BIN, 'test'], {
       cwd: FRONTEND_DIR,
       env: {
-        ...process.env,
+        ...baseChildEnv,
         E2E_BASE_URL: frontendOrigin,
         E2E_FIXTURE_FILE: fixturePath,
       },

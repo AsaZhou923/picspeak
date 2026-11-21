@@ -14,6 +14,9 @@ concurrency:
 jobs:
   changes:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
     outputs:
       e2e: ${{ steps.filter.outputs.e2e }}
     steps:
@@ -21,6 +24,10 @@ jobs:
       - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
         id: filter
         with:
+          # Intentionally broader than API/app routes alone (covers all of
+          # backend/app/** and frontend/src/**): the e2e job runs in parallel
+          # with backend and frontend jobs, so catching service/component/copy
+          # regressions across the full main flow adds no critical-path delay.
           filters: |
             e2e:
               - 'backend/app/**'
@@ -186,6 +193,23 @@ jobs:
           else
             npx playwright install-deps chromium
           fi
+      - name: Mark disposable E2E database
+        run: |
+          python - <<'PY'
+          import os, psycopg2
+          conn = psycopg2.connect(os.environ['DATABASE_URL'].replace('postgresql+psycopg2://', 'postgresql://', 1))
+          conn.autocommit = True
+          with conn.cursor() as cur:
+              cur.execute(
+                  "CREATE TABLE IF NOT EXISTS _picspeak_e2e_disposable_marker "
+                  "(marker text PRIMARY KEY, created_at timestamptz NOT NULL DEFAULT now());"
+              )
+              cur.execute(
+                  "INSERT INTO _picspeak_e2e_disposable_marker (marker) "
+                  "VALUES ('picspeak-e2e-smoke') ON CONFLICT DO NOTHING;"
+              )
+          conn.close()
+          PY
       - name: Run E2E smoke suite
         run: node scripts/run_e2e_smoke.mjs --use-existing-services
       - name: Upload Playwright report and traces on failure
@@ -199,4 +223,4 @@ jobs:
           retention-days: 7
       - name: Stop MinIO container
         if: always()
-        run: docker rm -f picspeak-e2e-minio || true
+        run: docker rm -f -v picspeak-e2e-minio || true
