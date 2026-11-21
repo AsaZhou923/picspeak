@@ -45,6 +45,7 @@ from app.testing.fakes import (
     build_synthetic_image_bytes,
     fake_score_evidence,
 )
+from app.testing.wait_for_e2e_db import E2E_DB_MARKER_TABLE, E2E_DB_MARKER_VALUE
 
 
 E2E_USER_PUBLIC_ID = 'usr_e2e_smoke'
@@ -53,8 +54,6 @@ E2E_USER_USERNAME = 'e2e_photographer'
 E2E_GALLERY_PHOTO_PUBLIC_ID = 'pho_e2e_gallery01'
 E2E_GALLERY_REVIEW_PUBLIC_ID = 'rev_e2e_gallery01'
 E2E_GALLERY_SCORE = 8.4
-E2E_DB_MARKER_TABLE = '_picspeak_e2e_disposable_marker'
-E2E_DB_MARKER_VALUE = 'picspeak-e2e-smoke'
 E2E_GUEST_SCOPE_PREFIX = 'guest_'
 
 
