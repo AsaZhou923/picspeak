@@ -277,7 +277,7 @@ class ImageGenerationRoutesTests(unittest.TestCase):
             patch('app.api.routers.generations.deliver_generation_terminal_event') as deliver_event,
             patch('app.api.routers.generations.record_generation_terminal') as notification_event,
         ):
-            _mark_generation_dispatch_failed(db, 'igt_dispatch_failed', 'queue unavailable')
+            _mark_generation_dispatch_failed(db, 'igt_dispatch_failed')
         notification_event.assert_called_once_with(db, task)
 
         self.assertEqual(task.status, TaskStatus.FAILED)

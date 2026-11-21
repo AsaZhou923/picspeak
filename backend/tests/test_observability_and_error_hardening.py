@@ -388,7 +388,7 @@ class ErrorTextHardeningTests(unittest.TestCase):
         self.assertEqual(summary.error['message'], 'Review task could not be completed')
         self.assertNotIn(secret, json.dumps(summary.model_dump(mode='json')))
 
-        # 5) Generation dispatch failure writer stores fixed text, not raw exception text
+        # 5) Generation dispatch failure writer stores fixed text and cannot receive raw exception text
         failed_gen_task = SimpleNamespace(
             public_id='igt_dispatch',
             owner_user_id=7,
@@ -402,7 +402,7 @@ class ErrorTextHardeningTests(unittest.TestCase):
         db = MagicMock()
         db.query.return_value.filter.return_value.first.side_effect = [failed_gen_task, None]
         with patch('app.api.routers.generations.release_generation_credit_reservation'):
-            generations_router._mark_generation_dispatch_failed(db, 'igt_dispatch', secret)
+            generations_router._mark_generation_dispatch_failed(db, 'igt_dispatch')
         self.assertEqual(failed_gen_task.error_code, 'TASK_DISPATCH_FAILED')
         self.assertEqual(failed_gen_task.error_message, 'Failed to enqueue async image generation task')
         self.assertNotIn(secret, failed_gen_task.error_message)

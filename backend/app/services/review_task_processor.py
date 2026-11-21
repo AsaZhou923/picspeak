@@ -221,10 +221,8 @@ def public_task_error_message(
     error_code: str | None,
     *,
     retryable: bool,
-    fallback: str | None = None,
 ) -> str:
     # Never forward stored diagnostic error_message text to clients.
-    _ = fallback
     mapped = _PUBLIC_TASK_ERROR_MESSAGES.get(str(error_code or ''))
     if mapped is not None:
         return mapped[0] if retryable else mapped[1]
@@ -650,11 +648,7 @@ def _schedule_retry(db: Session, task: ReviewTask, *, error_code: str, error_mes
 
 def _handle_failure(db: Session, task: ReviewTask, *, error_code: str, error_message: str, retryable: bool) -> None:
     retry_scheduled = retryable and task.attempt_count < task.max_attempts
-    public_error = public_task_error_message(
-        error_code,
-        retryable=retry_scheduled,
-        fallback=error_message[:500],
-    )
+    public_error = public_task_error_message(error_code, retryable=retry_scheduled)
     if public_error != error_message[:500]:
         logger.warning(
             'Review task %s failed with internal detail hidden from clients: %s',
@@ -662,7 +656,7 @@ def _handle_failure(db: Session, task: ReviewTask, *, error_code: str, error_mes
             error_message,
         )
     if retry_scheduled:
-        _schedule_retry(db, task, error_code=error_code, error_message=public_error or 'Task retry scheduled')
+        _schedule_retry(db, task, error_code=error_code, error_message=public_error)
         return
     if retryable:
         _complete_task(
@@ -670,7 +664,7 @@ def _handle_failure(db: Session, task: ReviewTask, *, error_code: str, error_mes
             task,
             status=TaskStatus.DEAD_LETTER,
             error_code=error_code,
-            error_message=public_task_error_message(error_code, retryable=False, fallback=public_error or error_message[:500]),
+            error_message=public_task_error_message(error_code, retryable=False),
             dead_letter=True,
         )
         return
@@ -679,7 +673,7 @@ def _handle_failure(db: Session, task: ReviewTask, *, error_code: str, error_mes
         task,
         status=TaskStatus.FAILED,
         error_code=error_code,
-        error_message=public_task_error_message(error_code, retryable=False, fallback=public_error or error_message[:500]),
+        error_message=public_task_error_message(error_code, retryable=False),
     )
 
 

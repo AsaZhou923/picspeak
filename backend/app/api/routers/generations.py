@@ -297,7 +297,7 @@ def create_generation(
             enqueue_image_generation_task(task.public_id)
         except TaskDispatchError as exc:
             logger.exception('Failed to enqueue Cloud Task for image generation task %s', task.public_id)
-            _mark_generation_dispatch_failed(db, task.public_id, str(exc))
+            _mark_generation_dispatch_failed(db, task.public_id)
             raise api_error(
                 status.HTTP_503_SERVICE_UNAVAILABLE,
                 'GENERATION_TASK_DISPATCH_FAILED',
@@ -625,7 +625,7 @@ def reuse_generation(
             enqueue_image_generation_task(task.public_id)
         except TaskDispatchError as exc:
             logger.exception('Failed to enqueue Cloud Task for reused image generation task %s', task.public_id)
-            _mark_generation_dispatch_failed(db, task.public_id, str(exc))
+            _mark_generation_dispatch_failed(db, task.public_id)
             raise api_error(
                 status.HTTP_503_SERVICE_UNAVAILABLE,
                 'GENERATION_TASK_DISPATCH_FAILED',
@@ -634,8 +634,7 @@ def reuse_generation(
     return response
 
 
-def _mark_generation_dispatch_failed(db: Session, task_public_id: str, error_message: str | None = None) -> None:
-    _ = error_message
+def _mark_generation_dispatch_failed(db: Session, task_public_id: str) -> None:
     db.rollback()
     failed_task = db.query(ImageGenerationTask).filter(ImageGenerationTask.public_id == task_public_id).first()
     if failed_task is None:
