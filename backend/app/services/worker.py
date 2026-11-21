@@ -15,7 +15,7 @@ from app.services.guest_cleanup import cleanup_stale_guest_users
 from app.services.image_generation_task_processor import claim_next_pending_image_generation_task, expire_image_generation_tasks, process_image_generation_task
 from app.services.notification_processor import cleanup_expired_notifications, process_pending_notifications
 from app.services.review_task_processor import claim_next_pending_review_task, expire_review_tasks, process_review_task
-from app.services.worker_health import maybe_warn_stale_pending_tasks, oldest_pending_task_ages_seconds
+from app.services.worker_health import maybe_warn_stale_pending_tasks, oldest_pending_task_ages_seconds, task_owner_public_id
 
 
 logger = logging.getLogger(__name__)
@@ -52,6 +52,9 @@ class ReviewWorker:
             thread_name_prefix=f'{self.worker_name}-gen',
         )
         self._gen_futures: list[Future] = []
+        # Correlation fields for each submitted generation future, so an exception
+        # that escapes the processor is logged with the task it belongs to.
+        self._gen_future_log_context: dict[Future, dict[str, str | None]] = {}
 
     def record_heartbeat(
         self,
@@ -187,6 +190,9 @@ class ReviewWorker:
                     if task is None:
                         task = claim_next_pending_image_generation_task(db, worker_name=self.worker_name)
                         task_kind = 'generation' if task is not None else ''
+                    generation_owner_public_id = (
+                        task_owner_public_id(db, task.owner_user_id) if task_kind == 'generation' else None
+                    )
                 finally:
                     db.close()
 
@@ -208,6 +214,11 @@ class ReviewWorker:
                         claim_token=task.claimed_by,
                     )
                     self._gen_futures.append(future)
+                    self._gen_future_log_context[future] = {
+                        'task_public_id': _task_public_id,
+                        'task_kind': 'generation',
+                        'owner_public_id': generation_owner_public_id,
+                    }
                     self.record_heartbeat()
                     continue
 
@@ -323,19 +334,27 @@ class ReviewWorker:
         """Remove completed generation futures and log any exceptions."""
         done = [f for f in self._gen_futures if f.done()]
         for future in done:
-            exc = future.exception()
-            if exc is not None:
-                self.record_error(exc)
-                logger.error(
-                    'Image generation thread raised an unhandled exception: %s',
-                    exc,
-                    extra={
-                        'event': 'worker_generation_unhandled_exception',
-                        'worker_name': self.worker_name,
-                    },
-                    exc_info=(type(exc), exc, exc.__traceback__),
-                )
+            self._report_generation_future(future, 'Image generation thread raised an unhandled exception: %s')
         self._gen_futures = [f for f in self._gen_futures if not f.done()]
+
+    def _report_generation_future(self, future: Future, message: str) -> None:
+        log_context = self._gen_future_log_context.pop(future, {})
+        if future.cancelled():
+            return
+        exc = future.exception()
+        if exc is None:
+            return
+        self.record_error(exc)
+        with worker_log_context(worker_name=self.worker_name, **log_context):
+            logger.error(
+                message,
+                exc,
+                extra={
+                    'event': 'worker_generation_unhandled_exception',
+                    'worker_name': self.worker_name,
+                },
+                exc_info=(type(exc), exc, exc.__traceback__),
+            )
 
     def _drain_generation_futures(self) -> None:
         self._prune_done_gen_futures()
@@ -345,18 +364,7 @@ class ReviewWorker:
         timeout_seconds = max(int(settings.image_generation_shutdown_timeout_seconds or 0), 0)
         done, pending = wait(self._gen_futures, timeout=timeout_seconds)
         for future in done:
-            exc = future.exception()
-            if exc is not None:
-                self.record_error(exc)
-                logger.error(
-                    'Image generation thread raised during shutdown: %s',
-                    exc,
-                    extra={
-                        'event': 'worker_generation_unhandled_exception',
-                        'worker_name': self.worker_name,
-                    },
-                    exc_info=(type(exc), exc, exc.__traceback__),
-                )
+            self._report_generation_future(future, 'Image generation thread raised during shutdown: %s')
         if pending:
             logger.warning(
                 'Worker shutdown timed out with %s image generation task(s) still running after %ss',
@@ -366,6 +374,9 @@ class ReviewWorker:
             for future in pending:
                 future.cancel()
         self._gen_futures = [future for future in pending if not future.done()]
+        for future in list(self._gen_future_log_context):
+            if future not in self._gen_futures:
+                self._gen_future_log_context.pop(future, None)
 
     def _run_guest_cleanup_if_due(self) -> None:
         if not settings.guest_user_cleanup_enabled:

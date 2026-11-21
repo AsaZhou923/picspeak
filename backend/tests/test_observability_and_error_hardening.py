@@ -898,6 +898,63 @@ class StructuredErrorReportingTests(unittest.TestCase):
         # Worker records have no originating HTTP request.
         self.assertNotIn('request_id', entry)
 
+    def test_exception_escaping_generation_future_carries_task_correlation(self) -> None:
+        stream = StringIO()
+        handler = configure_logging(json_logs=True, stream=stream)
+        worker = ReviewWorker(worker_name='test-escape-worker')
+        self.addCleanup(worker._gen_executor.shutdown, False, cancel_futures=True)
+        claimed = SimpleNamespace(public_id='igt_escape_1', owner_user_id=42, claimed_by='lease-escape')
+        review_claim_calls = 0
+
+        def claim_review(*_args, **_kwargs):
+            # Iteration 1 claims the generation task; iteration 2 ends the loop.
+            nonlocal review_claim_calls
+            review_claim_calls += 1
+            if review_claim_calls >= 2:
+                worker._running = False
+            return None
+
+        worker._running = True
+        try:
+            with (
+                patch.object(worker, '_run_guest_cleanup_if_due'),
+                patch.object(worker, '_run_request_log_cleanup_if_due'),
+                patch.object(worker, '_run_limit_record_cleanup_if_due'),
+                patch('app.db.session.SessionLocal', return_value=MagicMock()),
+                patch('app.services.worker.claim_next_pending_review_task', side_effect=claim_review),
+                patch('app.services.worker.claim_next_pending_image_generation_task', side_effect=[claimed, None]),
+                patch('app.services.worker.task_owner_public_id', return_value='usr_escape_owner') as owner_lookup,
+                patch(
+                    'app.services.worker.process_image_generation_task',
+                    side_effect=RuntimeError('escaped-generation-boom'),
+                ),
+                patch('app.services.worker.time.sleep'),
+            ):
+                worker._loop()
+                futures = list(worker._gen_futures)
+                for future in futures:
+                    try:
+                        future.result(timeout=2)
+                    except RuntimeError:
+                        pass
+                worker._prune_done_gen_futures()
+        finally:
+            logging.getLogger().removeHandler(handler)
+
+        owner_lookup.assert_called_once()
+        self.assertEqual(owner_lookup.call_args.args[1], 42)
+        entries = [json.loads(line) for line in stream.getvalue().splitlines() if line.strip()]
+        escaped = [e for e in entries if e.get('event') == 'worker_generation_unhandled_exception']
+        self.assertEqual(len(escaped), 1)
+        entry = escaped[0]
+        self.assertEqual(entry['@type'], ERROR_REPORTING_TYPE)
+        self.assertEqual(entry['task_public_id'], 'igt_escape_1')
+        self.assertEqual(entry['task_kind'], 'generation')
+        self.assertEqual(entry['owner_public_id'], 'usr_escape_owner')
+        self.assertEqual(entry['worker_name'], 'test-escape-worker')
+        self.assertIn('escaped-generation-boom', entry['message'])
+        self.assertEqual(worker._gen_future_log_context, {})
+
     def test_worker_maintenance_failure_inside_loop_carries_worker_name(self) -> None:
         stream = StringIO()
         handler = configure_logging(json_logs=True, stream=stream)
