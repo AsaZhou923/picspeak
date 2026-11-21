@@ -979,6 +979,73 @@ class StructuredErrorReportingTests(unittest.TestCase):
         self.assertIn('escaped-generation-boom', entry['message'])
         self.assertEqual(worker._gen_future_log_context, {})
 
+    def test_generation_owner_lookup_failure_still_submits_and_drain_keeps_correlation(self) -> None:
+        import threading
+
+        stream = StringIO()
+        handler = configure_logging(json_logs=True, stream=stream)
+        worker = ReviewWorker(worker_name='test-drain-worker')
+        self.addCleanup(worker._gen_executor.shutdown, False, cancel_futures=True)
+        claimed = SimpleNamespace(public_id='igt_drain_1', owner_user_id=7, claimed_by='lease-drain')
+        release_generation = threading.Event()
+        review_claim_calls = 0
+
+        def blocked_generation(*_args, **_kwargs):
+            # Still running when shutdown starts, so the drain path reports it.
+            release_generation.wait(timeout=5)
+            raise RuntimeError('drained-generation-boom')
+
+        def claim_review(*_args, **_kwargs):
+            nonlocal review_claim_calls
+            review_claim_calls += 1
+            if review_claim_calls >= 2:
+                worker._running = False
+            return None
+
+        worker._running = True
+        try:
+            with (
+                patch.object(worker, '_run_guest_cleanup_if_due'),
+                patch.object(worker, '_run_request_log_cleanup_if_due'),
+                patch.object(worker, '_run_limit_record_cleanup_if_due'),
+                patch.object(worker, '_prune_done_gen_futures'),
+                patch('app.db.session.SessionLocal', return_value=MagicMock()),
+                patch('app.services.worker.claim_next_pending_review_task', side_effect=claim_review),
+                patch('app.services.worker.claim_next_pending_image_generation_task', side_effect=[claimed, None]),
+                patch('app.services.worker.task_owner_public_id', side_effect=RuntimeError('owner-lookup-down')),
+                patch(
+                    'app.services.worker.process_image_generation_task',
+                    side_effect=blocked_generation,
+                ) as process_generation,
+                patch('app.services.worker.time.sleep'),
+            ):
+                worker._loop()
+                # The committed claim is still handed to the executor.
+                self.assertEqual(len(worker._gen_futures), 1)
+                self.assertFalse(worker._gen_futures[0].done())
+            threading.Timer(0.2, release_generation.set).start()
+            with patch('app.services.worker.settings.image_generation_shutdown_timeout_seconds', 5):
+                worker._drain_generation_futures()
+        finally:
+            logging.getLogger().removeHandler(handler)
+
+        process_generation.assert_called_once()
+        self.assertEqual(process_generation.call_args.args[0], 'igt_drain_1')
+        entries = [json.loads(line) for line in stream.getvalue().splitlines() if line.strip()]
+        lookup_failures = [e for e in entries if e.get('event') == 'worker_owner_lookup_failed']
+        self.assertEqual(len(lookup_failures), 1)
+        self.assertNotIn('worker_loop_unhandled_exception', [e.get('event') for e in entries])
+        escaped = [e for e in entries if e.get('event') == 'worker_generation_unhandled_exception']
+        self.assertEqual(len(escaped), 1)
+        entry = escaped[0]
+        self.assertIn('during shutdown', entry['message'])
+        self.assertEqual(entry['task_public_id'], 'igt_drain_1')
+        self.assertEqual(entry['task_kind'], 'generation')
+        self.assertIsNone(entry.get('owner_public_id'))
+        self.assertEqual(entry['worker_name'], 'test-drain-worker')
+        self.assertEqual(worker._gen_futures, [])
+        self.assertEqual(worker._gen_future_log_context, {})
+
     def test_worker_maintenance_failure_inside_loop_carries_worker_name(self) -> None:
         stream = StringIO()
         handler = configure_logging(json_logs=True, stream=stream)

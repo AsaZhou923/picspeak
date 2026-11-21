@@ -191,7 +191,7 @@ class ReviewWorker:
                         task = claim_next_pending_image_generation_task(db, worker_name=self.worker_name)
                         task_kind = 'generation' if task is not None else ''
                     generation_owner_public_id = (
-                        task_owner_public_id(db, task.owner_user_id) if task_kind == 'generation' else None
+                        self._generation_owner_public_id(db, task) if task_kind == 'generation' else None
                     )
                 finally:
                     db.close()
@@ -336,6 +336,20 @@ class ReviewWorker:
         for future in done:
             self._report_generation_future(future, 'Image generation thread raised an unhandled exception: %s')
         self._gen_futures = [f for f in self._gen_futures if not f.done()]
+
+    def _generation_owner_public_id(self, db, task) -> str | None:
+        # The claim is already committed: a failed correlation lookup must not
+        # keep the task from being submitted.
+        try:
+            return task_owner_public_id(db, task.owner_user_id)
+        except Exception:
+            logger.warning(
+                'Could not resolve owner of image generation task %s for log correlation',
+                task.public_id,
+                exc_info=True,
+                extra={'event': 'worker_owner_lookup_failed', 'worker_name': self.worker_name},
+            )
+            return None
 
     def _report_generation_future(self, future: Future, message: str) -> None:
         log_context = self._gen_future_log_context.pop(future, {})
