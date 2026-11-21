@@ -124,11 +124,33 @@ function buildApiSources() {
   return sources;
 }
 
+function buildLocalObjectStorageSources() {
+  const rawOrigin = process.env.LOCAL_OBJECT_STORAGE_ORIGIN?.trim();
+  if (!rawOrigin) {
+    return [];
+  }
+
+  try {
+    const parsed = new URL(rawOrigin);
+    if (
+      parsed.protocol === 'http:' &&
+      (parsed.hostname === '127.0.0.1' || parsed.hostname === 'localhost')
+    ) {
+      return [parsed.origin];
+    }
+  } catch {
+    // Ignore invalid env values.
+  }
+
+  return [];
+}
+
 const connectSources = [
   "'self'",
   'https:',
   ...buildApiSources(),
   ...buildWebSocketConnectSources(),
+  ...buildLocalObjectStorageSources(),
 ].join(' ');
 
 const securityHeaders = [

@@ -12,6 +12,29 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      e2e: ${{ steps.filter.outputs.e2e }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+        id: filter
+        with:
+          filters: |
+            e2e:
+              - 'backend/app/**'
+              - 'backend/alembic/**'
+              - 'backend/scripts/ensure_runtime_schema.py'
+              - 'backend/requirements*.txt'
+              - 'frontend/src/**'
+              - 'frontend/next.config.mjs'
+              - 'frontend/package*.json'
+              - 'frontend/playwright.config.ts'
+              - 'frontend/e2e/**'
+              - 'scripts/run_e2e_smoke.mjs'
+              - '.github/workflows/ci.yml'
+
   backend:
     runs-on: ubuntu-latest
     env:
@@ -84,3 +107,96 @@ jobs:
         run: npm run build
       - name: Production Blog routing regression
         run: npm run test:production-blog
+
+  e2e:
+    needs: changes
+    if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.e2e == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      DATABASE_URL: postgresql+psycopg2://postgres:postgres@127.0.0.1:5432/picspeak_e2e
+      E2E_USE_EXISTING_SERVICES: '1'
+      E2E_PG_PORT: '5432'
+      E2E_MINIO_PORT: '9000'
+      OBJECT_BUCKET: picspeak-e2e
+      OBJECT_ACCESS_KEY_ID: minioadmin
+      OBJECT_SECRET_ACCESS_KEY: minioadmin
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: picspeak_e2e
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d picspeak_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements*.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Start MinIO object storage container
+        run: |
+          docker run -d --name picspeak-e2e-minio \
+            -p 127.0.0.1:9000:9000 \
+            -e MINIO_ROOT_USER=minioadmin \
+            -e MINIO_ROOT_PASSWORD=minioadmin \
+            -e MINIO_API_CORS_ALLOW_ORIGIN='*' \
+            minio/minio:RELEASE.2025-09-07T16-13-09Z \
+            server /data
+      - name: Install system packages
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libpq-dev
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Resolve Playwright version
+        id: playwright-version
+        working-directory: frontend
+        run: |
+          VERSION=$(node -p "require('./node_modules/@playwright/test/package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
+      - name: Install Playwright Chromium
+        working-directory: frontend
+        run: |
+          if [ "${{ steps.playwright-cache.outputs.cache-hit }}" != "true" ]; then
+            npx playwright install --with-deps chromium
+          else
+            npx playwright install-deps chromium
+          fi
+      - name: Run E2E smoke suite
+        run: node scripts/run_e2e_smoke.mjs --use-existing-services
+      - name: Upload Playwright report and traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-e2e-report
+          path: |
+            frontend/playwright-report
+            frontend/test-results
+          retention-days: 7
+      - name: Stop MinIO container
+        if: always()
+        run: docker rm -f picspeak-e2e-minio || true

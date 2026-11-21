@@ -38,3 +38,33 @@ test('unsupported API protocols do not enter the request or image CSP', async ()
     else process.env.NEXT_PUBLIC_API_URL = previous;
   }
 });
+
+test('LOCAL_OBJECT_STORAGE_ORIGIN only allows loopback HTTP origins in connect-src', async () => {
+  const previous = process.env.LOCAL_OBJECT_STORAGE_ORIGIN;
+  try {
+    process.env.LOCAL_OBJECT_STORAGE_ORIGIN = 'http://user:pass@127.0.0.1:9000/bucket?token=secret';
+    const loopbackModule = '../next.config.mjs?e2e-storage-loopback';
+    const { default: loopbackConfig } = await import(loopbackModule);
+    const loopbackHeaders = await loopbackConfig.headers();
+    const loopbackCsp = loopbackHeaders
+      .flatMap((route: { headers: { key: string; value: string }[] }) => route.headers)
+      .find((header: { key: string; value: string }) => header.key === 'Content-Security-Policy')?.value;
+    assert.ok(loopbackCsp);
+    const connectSrc = loopbackCsp.split('; ').find((part: string) => part.startsWith('connect-src '));
+    assert.ok(connectSrc?.split(' ').includes('http://127.0.0.1:9000'));
+    assert.doesNotMatch(loopbackCsp, /pass|secret|bucket/);
+
+    process.env.LOCAL_OBJECT_STORAGE_ORIGIN = 'http://evil.example.com:9000';
+    const remoteModule = '../next.config.mjs?e2e-storage-remote';
+    const { default: remoteConfig } = await import(remoteModule);
+    const remoteHeaders = await remoteConfig.headers();
+    const remoteCsp = remoteHeaders
+      .flatMap((route: { headers: { key: string; value: string }[] }) => route.headers)
+      .find((header: { key: string; value: string }) => header.key === 'Content-Security-Policy')?.value;
+    assert.ok(remoteCsp);
+    assert.doesNotMatch(remoteCsp, /evil\.example\.com/);
+  } finally {
+    if (previous === undefined) delete process.env.LOCAL_OBJECT_STORAGE_ORIGIN;
+    else process.env.LOCAL_OBJECT_STORAGE_ORIGIN = previous;
+  }
+});
