@@ -77,7 +77,7 @@ interface Harness {
   cursor: number; hooks: Hook[]; effects: Array<() => void>; dirty: boolean;
   params: URLSearchParams; pushes: string[]; calls: Array<Record<string, unknown>>; saved: string[]; tree: Tree;
   t: (key: string) => string; respond: (query: Record<string, unknown>) => Promise<any>;
-  authUnavailable?: boolean;
+  authUnavailable?: boolean; authLoading?: boolean;
 }
 // Dependency-aware hooks run the real page through edits, navigation and async
 // completions, without adding a DOM/test-renderer dependency to the application.
@@ -116,7 +116,8 @@ const pageUrl = moduleUrl(`${await readFile(new URL('../src/app/gallery/GalleryC
   '@/components/auth/ClerkSignInTrigger': stub('ClerkSignInTrigger'), '@/components/auth/AuthUnavailableNotice': stub('AuthUnavailableNotice'),
   '@/components/marketing/ProPromoCard': stub('ProPromoCard'),
   '@/lib/api': moduleUrl('export function getPublicGallery(query) { const h = globalThis.__galleryScoreHarness; h.calls.push(query); return h.respond(query); } export async function likeGalleryReview() {} export async function unlikeGalleryReview() {}'),
-  '@/lib/auth-context': moduleUrl('export function useAuth() { return { token: null, userInfo: null, ensureToken: async () => "", isLoading: false, authUnavailable: Boolean(globalThis.__galleryScoreHarness.authUnavailable) }; }'),
+  '@/lib/auth-context': moduleUrl('export function useAuth() { return { token: null, userInfo: null, ensureToken: async () => "", isLoading: Boolean(globalThis.__galleryScoreHarness.authLoading), authUnavailable: Boolean(globalThis.__galleryScoreHarness.authUnavailable) }; }'),
+  '@/lib/auth-gate': moduleUrl(await readFile(new URL('../src/lib/auth-gate.ts', import.meta.url), 'utf8')),
   '@/lib/error-utils': moduleUrl('export function formatUserFacingError(t, error, fallback) { return fallback; }'),
   '@/lib/gallery-navigation': moduleUrl('export function buildGalleryRestoreKey(query) { return query ? "/gallery?" + query : "/gallery"; } export function readGalleryRestoreState() { return null; } export function saveGalleryRestoreState(key) { globalThis.__galleryScoreHarness.saved.push(key); }'),
   '@/lib/content-conversion': moduleUrl('export function buildWorkspaceConversionHref() { return "/workspace"; }'), '@/lib/i18n': i18nUrl,
@@ -299,4 +300,14 @@ test('Like during a signed-in Clerk outage shows the auth-unavailable retry stat
   await guestCard.handleLikeToggle(guestCard.item); await flush(guest);
   assert.ok(!find(guest.tree, (node) => typeof node.type !== 'string' && node.type?.name === 'AuthUnavailableNotice'));
   assert.ok(JSON.stringify(guest.tree).includes(enTranslations.gallery_like_signin_title));
+});
+
+test('Like while auth is still undetermined shows neither the guest prompt nor the outage notice', async () => {
+  for (const authUnavailable of [false, true]) {
+    const pending = createHarness(); pending.authLoading = true; pending.authUnavailable = authUnavailable; await flush(pending);
+    const card = component(pending, 'GalleryCard');
+    await card.handleLikeToggle(card.item); await flush(pending);
+    assert.ok(!find(pending.tree, (node) => typeof node.type !== 'string' && node.type?.name === 'AuthUnavailableNotice'));
+    assert.ok(!JSON.stringify(pending.tree).includes(enTranslations.gallery_like_signin_title));
+  }
 });

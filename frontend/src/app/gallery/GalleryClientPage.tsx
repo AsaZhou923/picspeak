@@ -9,6 +9,7 @@ import ClerkSignInTrigger from '@/components/auth/ClerkSignInTrigger';
 import ProPromoCard from '@/components/marketing/ProPromoCard';
 import { getPublicGallery, likeGalleryReview, unlikeGalleryReview } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { resolveAuthGate } from '@/lib/auth-gate';
 import { formatUserFacingError } from '@/lib/error-utils';
 import {
   buildGalleryRestoreKey,
@@ -370,14 +371,15 @@ function GalleryPageContent() {
 
   const handleLikeToggle = useCallback(
     async (item: GalleryUxItem) => {
-      if (likeBusyId || authLoading) return;
+      const authGate = resolveAuthGate({ isLoading: authLoading, userInfo, authUnavailable });
+      // Undetermined auth must not flash the guest prompt at a signed-in browser.
+      if (likeBusyId || authGate === 'loading') return;
       setActionError('');
-      if (!userInfo || userInfo.plan === 'guest') {
-        // A signed-in browser that cannot reach Clerk must not be offered guest sign-in.
-        if (authUnavailable) {
-          setAuthOutageNoticeOpen(true);
-          return;
-        }
+      if (authGate === 'unavailable') {
+        setAuthOutageNoticeOpen(true);
+        return;
+      }
+      if (authGate === 'sign_in') {
         setGuestLikePromptOpen(true);
         return;
       }

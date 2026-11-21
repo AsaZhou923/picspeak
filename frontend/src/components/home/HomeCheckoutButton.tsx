@@ -6,6 +6,7 @@ import AuthUnavailableNotice from '@/components/auth/AuthUnavailableNotice';
 import ClerkSignInTrigger from '@/components/auth/ClerkSignInTrigger';
 import ActivationCodeModal from '@/components/billing/ActivationCodeModal';
 import { useAuth } from '@/lib/auth-context';
+import { resolveAuthGate } from '@/lib/auth-gate';
 import { useI18n } from '@/lib/i18n';
 import { CN_PRO_CHECKOUT_TIP, startProCheckout } from '@/lib/pro-checkout';
 
@@ -14,7 +15,7 @@ export default function HomeCheckoutButton() {
   const { ensureToken, isLoading, userInfo, authUnavailable } = useAuth();
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [activationOpen, setActivationOpen] = useState(false);
-  const requiresSignIn = !userInfo || userInfo.plan === 'guest';
+  const authGate = resolveAuthGate({ isLoading, userInfo, authUnavailable });
 
   async function handleCheckout() {
     if (checkoutLoading) return;
@@ -31,7 +32,7 @@ export default function HomeCheckoutButton() {
 
   return (
     <>
-      {isLoading ? (
+      {authGate === 'loading' ? (
         <button
           type="button"
           disabled
@@ -39,9 +40,9 @@ export default function HomeCheckoutButton() {
         >
           {t('generation_auth_loading_cta')}
         </button>
-      ) : requiresSignIn && authUnavailable ? (
+      ) : authGate === 'unavailable' ? (
         <AuthUnavailableNotice t={t} />
-      ) : requiresSignIn ? (
+      ) : authGate === 'sign_in' ? (
         <ClerkSignInTrigger
           fallbackRedirectUrl="/account/usage"
           signedInClassName="hidden"
