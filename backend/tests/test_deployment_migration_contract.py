@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 import re
 import shutil
 import subprocess
@@ -155,8 +156,18 @@ class DeploymentMigrationContractTests(unittest.TestCase):
         guard = config[config.index('id: BranchGuard') : config.index('  - id: Pull')]
         block = guard[guard.index('- |\n') + len('- |\n') :].rstrip()
         script = '\n'.join(line.removeprefix(' ' * 8) for line in block.splitlines()) + '\n'
-        self.assertIn('"$BRANCH_NAME"', script)
-        self.assertNotIn('$$BRANCH_NAME', script)
+
+        # Substituted values must reach bash only through env, never as script source.
+        env_section = guard[guard.index('    env:\n') : guard.index('    args:\n')]
+        env_entries = re.findall(r'      - (\S+)', env_section)
+        self.assertEqual(
+            env_entries,
+            ['GUARD_BRANCH=$BRANCH_NAME', 'GUARD_ALLOW=$_ALLOW_NON_MAIN_DEPLOY'],
+        )
+        self.assertIn('"$$GUARD_BRANCH"', script)
+        self.assertIn('"$$GUARD_ALLOW"', script)
+        self.assertNotRegex(script, r'(?<!\$)\$\{?(BRANCH_NAME|_ALLOW_NON_MAIN_DEPLOY)\b')
+        self.assertNotRegex(script, r'(?<!\$)\$\{?GUARD_')
 
         cases = (
             ('main', 'false', 0),
@@ -165,17 +176,31 @@ class DeploymentMigrationContractTests(unittest.TestCase):
             ('main-hotfix', 'false', 1),
             ('', 'false', 1),
             ('', 'true', 0),
+            ('x";exit 0;"', 'false', 1),
+            ('x";exit 0;"', 'true', 1),
+            ("x';exit 0;'", 'false', 1),
+            ('$(true)', 'false', 1),
+            ('`true`', 'false', 1),
+            ('main$(false)', 'false', 1),
+            ('main`false`', 'false', 1),
+            ('main;exit 0', 'false', 1),
+            ('${GUARD_ALLOW}', 'true', 1),
         )
         for branch, allow, expected in cases:
             with self.subTest(branch=branch, allow=allow):
-                rendered = _cloud_build_substitute(
-                    script, {'BRANCH_NAME': branch, '_ALLOW_NON_MAIN_DEPLOY': allow}
-                )
+                values = {'BRANCH_NAME': branch, '_ALLOW_NON_MAIN_DEPLOY': allow}
+                rendered = _cloud_build_substitute(script, values)
+                self.assertEqual(rendered, _cloud_build_substitute(script, {}))
+                env = dict(os.environ)
+                for entry in env_entries:
+                    key, _, value = _cloud_build_substitute(entry, values).partition('=')
+                    env[key] = value
                 completed = subprocess.run(
                     [bash, '-ceu', rendered],
                     capture_output=True,
                     text=True,
                     encoding='utf-8',
+                    env=env,
                     check=False,
                 )
                 self.assertEqual(completed.returncode, expected, completed.stderr)

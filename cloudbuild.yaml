@@ -17,19 +17,24 @@ steps:
   # Second line of defence behind the trigger's branch filter (issue #134): the
   # filter is an RE2 regex, so `main` also matched branches such as
   # `test/e2e-main-flow`. Every other step waits on this one, so a non-main
-  # build fails before Build, Push, Migrate or Deploy run.
+  # build fails before Build, Push, Migrate or Deploy run. Branch names may
+  # contain $, backticks, quotes or ;, so the substituted values reach bash only
+  # through env and the script reads them as quoted runtime variables.
   - id: BranchGuard
     name: gcr.io/cloud-builders/docker
     entrypoint: bash
+    env:
+      - GUARD_BRANCH=$BRANCH_NAME
+      - GUARD_ALLOW=$_ALLOW_NON_MAIN_DEPLOY
     args:
       - -ceu
       - |
-        if [ "$BRANCH_NAME" = "main" ]; then
+        if [ "$$GUARD_BRANCH" = "main" ]; then
           echo "BranchGuard: building main; deployment allowed."
-        elif [ -z "$BRANCH_NAME" ] && [ "$_ALLOW_NON_MAIN_DEPLOY" = "true" ]; then
+        elif [ -z "$$GUARD_BRANCH" ] && [ "$$GUARD_ALLOW" = "true" ]; then
           echo "BranchGuard: manual build with _ALLOW_NON_MAIN_DEPLOY=true; deployment allowed." >&2
         else
-          echo "BranchGuard: refusing to deploy branch '$BRANCH_NAME'; only main deploys to production." >&2
+          echo "BranchGuard: refusing to deploy branch '$$GUARD_BRANCH'; only main deploys to production." >&2
           echo "BranchGuard: manual builds without a branch need --substitutions=_ALLOW_NON_MAIN_DEPLOY=true." >&2
           exit 1
         fi
