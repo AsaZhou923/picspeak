@@ -34,13 +34,15 @@ export interface GlobalErrorHandlerOptions {
   target?: Pick<Window, 'addEventListener' | 'removeEventListener'>;
 }
 
-const DEFAULT_GLOBAL_SAMPLE_RATE = 0.5;
+const DEFAULT_GLOBAL_SAMPLE_RATE = 1;
 const DEDUP_WINDOW_MS = 60_000;
 const MAX_REPORTS_PER_SESSION = 20;
 const MAX_MESSAGE_CHARS = 500;
 const MAX_STACK_CHARS = 3_500;
 const MAX_URL_CHARS = 512;
 const MAX_UA_CHARS = 256;
+
+const CSP_ERROR_PATTERN = /\b(?:content[- ]security[- ]policy|securitypolicyviolation)\b/i;
 
 export const SENSITIVE_QUERY_PARAMS = new Set([
   'token',
@@ -74,6 +76,8 @@ const SECRET_QUERY_TEXT_PATTERN =
 
 const recentFingerprints = new Map<string, number>();
 let sessionReportCount = 0;
+let isDispatchingReport = false;
+let reportingTransportFailed = false;
 
 let globalHandlersInstalled = false;
 let globalHandlersRefCount = 0;
@@ -208,7 +212,14 @@ export function reportClientError(
   errorOrMessage: unknown,
   options: ClientErrorReportOptions = {}
 ): boolean {
-  if (isAbortLike(errorOrMessage)) {
+  if (isDispatchingReport || reportingTransportFailed || isAbortLike(errorOrMessage)) {
+    return false;
+  }
+
+  const kind: ClientErrorKind = options.kind ?? 'error';
+  // Browsers deliver CSP reports directly via report-uri / report-to; the JS
+  // reporter must never re-send CSP violations (prevents reporting loops).
+  if (kind === 'csp') {
     return false;
   }
 
@@ -218,7 +229,6 @@ export function reportClientError(
     return false;
   }
 
-  const kind: ClientErrorKind = options.kind ?? 'error';
   const source = options.source?.trim().slice(0, 64) || undefined;
   const { message: rawMessage, stack: rawStack } = extractMessageAndStack(errorOrMessage);
   const message = sanitizeReportText(rawMessage, MAX_MESSAGE_CHARS);
@@ -226,8 +236,8 @@ export function reportClientError(
     return false;
   }
 
-  // Never recursively report errors from the error-reporting endpoint itself.
-  if (message.includes('/client-errors')) {
+  // Never recursively report errors from the reporting endpoint itself or CSP violations.
+  if (message.includes('/client-errors') || CSP_ERROR_PATTERN.test(message)) {
     return false;
   }
 
@@ -275,8 +285,9 @@ export function reportClientError(
     release: (options.release ?? resolveRelease()).slice(0, 64),
   };
 
+  isDispatchingReport = true;
   try {
-    void fetchImpl(endpoint, {
+    const requestPromise = fetchImpl(endpoint, {
       method: 'POST',
       credentials: 'omit',
       keepalive: true,
@@ -284,12 +295,20 @@ export function reportClientError(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(payload),
-    }).catch(() => {
-      // Reporting is best-effort and must never cause unhandled rejections.
     });
+    if (requestPromise && typeof requestPromise.catch === 'function') {
+      void requestPromise.catch(() => {
+        // Once the reporting transport fails (e.g. blocked or offline), skip
+        // further reporting for this page session and never emit unhandled rejections.
+        reportingTransportFailed = true;
+      });
+    }
     return true;
   } catch {
+    reportingTransportFailed = true;
     return false;
+  } finally {
+    isDispatchingReport = false;
   }
 }
 
@@ -363,6 +382,8 @@ export function installGlobalClientErrorHandlers(options: GlobalErrorHandlerOpti
 export function resetClientErrorReporterForTests(): void {
   recentFingerprints.clear();
   sessionReportCount = 0;
+  isDispatchingReport = false;
+  reportingTransportFailed = false;
   if (activeGlobalCleanup) {
     activeGlobalCleanup();
   }

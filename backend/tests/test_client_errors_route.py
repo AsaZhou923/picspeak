@@ -14,10 +14,13 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
+from app.api.routers import client_errors
 from app.api.routers.client_errors import (
     MAX_CLIENT_ERROR_BODY_BYTES,
+    get_dropped_expected_csp_count,
     reset_client_error_rate_limiter,
 )
+from app.core.config import settings
 from app.main import _should_capture_audit_body, app
 from starlette.requests import Request
 
@@ -84,7 +87,7 @@ class ClientErrorsRouteTests(unittest.TestCase):
             self.assertNotIn(secret, str(getattr(record, 'stack', '')))
             self.assertNotIn(secret, str(getattr(record, 'url', '')))
 
-    def test_accepts_legacy_csp_report_content_type(self) -> None:
+    def test_accepts_legacy_csp_report_and_logs_at_info_not_warning(self) -> None:
         payload = {
             'csp-report': {
                 'document-uri': 'https://www.picspeak.art/workspace?photo_token=secret&mode=pro',
@@ -98,10 +101,11 @@ class ClientErrorsRouteTests(unittest.TestCase):
             }
         }
         with (
+            patch.object(settings, 'client_error_csp_sample_rate', 1.0),
             patch('app.main._schedule_audit_task') as schedule_audit_task,
             patch('app.main.worker.start'),
             patch('app.main.worker.stop'),
-            self.assertLogs('app.api.routers.client_errors', level='WARNING') as captured,
+            self.assertLogs('app.api.routers.client_errors', level='INFO') as captured,
         ):
             with TestClient(app) as client:
                 response = client.post(
@@ -114,6 +118,7 @@ class ClientErrorsRouteTests(unittest.TestCase):
         schedule_audit_task.assert_not_called()
         self.assertEqual(len(captured.records), 1)
         record = captured.records[0]
+        self.assertEqual(record.levelno, logging.INFO)
         self.assertEqual(getattr(record, 'kind', None), 'csp')
         self.assertEqual(getattr(record, 'source', None), 'csp_report')
         self.assertEqual(getattr(record, 'url', None), 'https://www.picspeak.art/workspace?mode=pro')
@@ -124,7 +129,86 @@ class ClientErrorsRouteTests(unittest.TestCase):
         self.assertNotIn('secret', str(csp_details))
         self.assertNotIn('leak', str(csp_details))
 
-    def test_accepts_reporting_api_v1_reports_json_batch_as_one_warning(self) -> None:
+    def test_drops_expected_inline_script_csp_reports_on_own_document_after_counting(self) -> None:
+        expected_cases = [
+            {
+                'csp-report': {
+                    'document-uri': 'https://www.picspeak.art/en',
+                    'effective-directive': 'script-src-elem',
+                    'violated-directive': 'script-src-elem',
+                    'blocked-uri': 'inline',
+                    'disposition': 'report',
+                }
+            },
+            {
+                'csp-report': {
+                    'document-uri': 'http://localhost:3000/workspace',
+                    'violated-directive': 'script-src',
+                    'blocked-uri': 'inline',
+                    'disposition': 'report',
+                }
+            },
+        ]
+        with (
+            patch.object(settings, 'client_error_csp_sample_rate', 1.0),
+            patch.dict(os.environ, {'CLIENT_ERROR_RATE_LIMIT_PER_MINUTE': '2'}),
+            patch('app.main._schedule_audit_task'),
+            patch('app.main.worker.start'),
+            patch('app.main.worker.stop'),
+            self.assertNoLogs('app.api.routers.client_errors', level='INFO'),
+        ):
+            with TestClient(app) as client:
+                first = client.post(
+                    '/api/v1/client-errors',
+                    headers={'Content-Type': 'application/csp-report'},
+                    content=json.dumps(expected_cases[0]),
+                )
+                second = client.post(
+                    '/api/v1/client-errors',
+                    headers={'Content-Type': 'application/csp-report'},
+                    content=json.dumps(expected_cases[1]),
+                )
+                # Dropped expected reports still count toward per-IP rate limiting.
+                third = client.post(
+                    '/api/v1/client-errors',
+                    headers={'Content-Type': 'application/csp-report'},
+                    content=json.dumps(expected_cases[0]),
+                )
+
+        self.assertEqual(first.status_code, 202)
+        self.assertEqual(second.status_code, 202)
+        self.assertEqual(third.status_code, 429)
+        self.assertEqual(get_dropped_expected_csp_count(), 2)
+
+    def test_inline_script_csp_on_third_party_document_is_not_dropped_as_expected(self) -> None:
+        payload = {
+            'csp-report': {
+                'document-uri': 'https://untrusted.example/page',
+                'effective-directive': 'script-src',
+                'blocked-uri': 'inline',
+                'disposition': 'report',
+            }
+        }
+        with (
+            patch.object(settings, 'client_error_csp_sample_rate', 1.0),
+            patch('app.main._schedule_audit_task'),
+            patch('app.main.worker.start'),
+            patch('app.main.worker.stop'),
+            self.assertLogs('app.api.routers.client_errors', level='INFO') as captured,
+        ):
+            with TestClient(app) as client:
+                response = client.post(
+                    '/api/v1/client-errors',
+                    headers={'Content-Type': 'application/csp-report'},
+                    content=json.dumps(payload),
+                )
+
+        self.assertEqual(response.status_code, 202)
+        self.assertEqual(get_dropped_expected_csp_count(), 0)
+        self.assertEqual(len(captured.records), 1)
+        self.assertEqual(captured.records[0].levelno, logging.INFO)
+
+    def test_reporting_api_batch_drops_expected_inline_and_logs_unexpected_at_info(self) -> None:
         batch = [
             {
                 'type': 'csp-violation',
@@ -139,9 +223,10 @@ class ClientErrorsRouteTests(unittest.TestCase):
             },
             {
                 'type': 'csp-violation',
-                'url': 'https://www.picspeak.art/gallery',
+                'url': 'https://www.picspeak.art/gallery?generation_token=secret_gen',
+                'user_agent': 'Chrome/130',
                 'body': {
-                    'documentURL': 'https://www.picspeak.art/gallery',
+                    'documentURL': 'https://www.picspeak.art/gallery?generation_token=secret_gen',
                     'effectiveDirective': 'connect-src',
                     'blockedURL': 'https://tracker.example/beacon',
                     'disposition': 'report',
@@ -149,10 +234,11 @@ class ClientErrorsRouteTests(unittest.TestCase):
             },
         ]
         with (
+            patch.object(settings, 'client_error_csp_sample_rate', 1.0),
             patch('app.main._schedule_audit_task'),
             patch('app.main.worker.start'),
             patch('app.main.worker.stop'),
-            self.assertLogs('app.api.routers.client_errors', level='WARNING') as captured,
+            self.assertLogs('app.api.routers.client_errors', level='INFO') as captured,
         ):
             with TestClient(app) as client:
                 response = client.post(
@@ -162,13 +248,78 @@ class ClientErrorsRouteTests(unittest.TestCase):
                 )
 
         self.assertEqual(response.status_code, 202)
+        self.assertEqual(get_dropped_expected_csp_count(), 1)
         self.assertEqual(len(captured.records), 1)
         record = captured.records[0]
+        self.assertEqual(record.levelno, logging.INFO)
         self.assertEqual(getattr(record, 'kind', None), 'csp')
         self.assertEqual(getattr(record, 'source', None), 'reporting_api')
-        self.assertEqual(getattr(record, 'report_count', None), 2)
+        self.assertEqual(getattr(record, 'csp', {}).get('effective_directive'), 'connect-src')
         self.assertEqual(getattr(record, 'url', None), 'https://www.picspeak.art/gallery')
         self.assertNotIn('secret_gen', str(getattr(record, 'url', '')))
+
+    def test_samples_remaining_csp_reports_at_default_5_percent_while_keeping_js_errors_unsampled(self) -> None:
+        self.assertEqual(settings.client_error_csp_sample_rate, 0.05)
+
+        unexpected_csp = {
+            'csp-report': {
+                'document-uri': 'https://www.picspeak.art/workspace',
+                'effective-directive': 'connect-src',
+                'blocked-uri': 'https://unexpected.example/collect',
+                'disposition': 'report',
+            }
+        }
+
+        # Sampled out (random >= 0.05): returns 202 without logging.
+        with (
+            patch.object(client_errors, '_sample_random', return_value=0.5),
+            patch('app.main._schedule_audit_task'),
+            patch('app.main.worker.start'),
+            patch('app.main.worker.stop'),
+            self.assertNoLogs('app.api.routers.client_errors', level='INFO'),
+        ):
+            with TestClient(app) as client:
+                sampled_out = client.post(
+                    '/api/v1/client-errors',
+                    headers={'Content-Type': 'application/csp-report'},
+                    content=json.dumps(unexpected_csp),
+                )
+        self.assertEqual(sampled_out.status_code, 202)
+
+        # Sampled in (random < 0.05): logs at INFO.
+        with (
+            patch.object(client_errors, '_sample_random', return_value=0.01),
+            patch('app.main._schedule_audit_task'),
+            patch('app.main.worker.start'),
+            patch('app.main.worker.stop'),
+            self.assertLogs('app.api.routers.client_errors', level='INFO') as captured_csp,
+        ):
+            with TestClient(app) as client:
+                sampled_in = client.post(
+                    '/api/v1/client-errors',
+                    headers={'Content-Type': 'application/csp-report'},
+                    content=json.dumps(unexpected_csp),
+                )
+        self.assertEqual(sampled_in.status_code, 202)
+        self.assertEqual(len(captured_csp.records), 1)
+        self.assertEqual(captured_csp.records[0].levelno, logging.INFO)
+
+        # JS errors stay unsampled and at WARNING even when CSP sample rate is 0.0.
+        with (
+            patch.object(settings, 'client_error_csp_sample_rate', 0.0),
+            patch.object(client_errors, '_sample_random', return_value=0.99),
+            patch('app.main._schedule_audit_task'),
+            patch('app.main.worker.start'),
+            patch('app.main.worker.stop'),
+            self.assertLogs('app.api.routers.client_errors', level='WARNING') as captured_js,
+        ):
+            with TestClient(app) as client:
+                js_err = client.post('/api/v1/client-errors', json={'kind': 'error', 'message': 'Upload broke'})
+                js_rej = client.post('/api/v1/client-errors', json={'kind': 'unhandledrejection', 'message': 'Poll rejected'})
+        self.assertEqual(js_err.status_code, 202)
+        self.assertEqual(js_rej.status_code, 202)
+        self.assertEqual(len(captured_js.records), 2)
+        self.assertTrue(all(rec.levelno == logging.WARNING for rec in captured_js.records))
 
     def test_rejects_oversized_payload_and_invalid_kind(self) -> None:
         oversized = json.dumps({'kind': 'error', 'message': 'x' * (MAX_CLIENT_ERROR_BODY_BYTES + 128)})

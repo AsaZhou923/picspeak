@@ -45,6 +45,8 @@ class Settings(BaseSettings):
     analytics_event_rate_limit_per_minute: int = 120
     auth_exchange_rate_limit_per_minute: int = 60
     blog_view_rate_limit_per_minute: int = 30
+    # Fraction of non-dropped CSP reports logged at INFO; JS errors remain unsampled.
+    client_error_csp_sample_rate: float = Field(default=0.05, ge=0.0, le=1.0)
 
     rate_limit_per_minute: int = 10
     ip_rate_limit_per_minute: int = 30

@@ -4,6 +4,7 @@ import json
 import logging
 import math
 import os
+import random
 import re
 import threading
 import time
@@ -13,6 +14,7 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from fastapi import APIRouter, Request, status
 
+from app.core.config import settings
 from app.core.errors import ApiHTTPException, api_error
 from app.core.network import client_ip_from_request, client_network_from_request
 from app.services.audit import mask_capability_url_text
@@ -34,6 +36,9 @@ ALLOWED_CONTENT_TYPES = frozenset({
     'application/reports+json',
     'text/plain',
 })
+# Known-expected Report-Only violations emitted by Next.js inline hydration scripts.
+EXPECTED_INLINE_SCRIPT_DIRECTIVES = frozenset({'script-src', 'script-src-elem'})
+CANONICAL_OWN_HOSTS = frozenset({'www.picspeak.art', 'picspeak.art'})
 
 SENSITIVE_QUERY_KEYS = frozenset({
     'token',
@@ -65,6 +70,11 @@ _BEARER_PATTERN = re.compile(r'(?i)\bBearer\s+[A-Za-z0-9\-._~+/]+=*')
 _QUERY_SECRET_PATTERN = re.compile(
     r'(?i)([?&](?:token|photo_token|generation_token|access_token|guest_token|session_token|refresh_token|id_token|x-amz-signature|x-amz-credential|x-amz-security-token|__clerk_handshake|__clerk_db_jwt)=)[^&\s"\'<>]+'
 )
+
+# Module-level RNG hook so tests can assert sampling deterministically.
+_sample_random = random.random
+_stats_lock = threading.Lock()
+_dropped_expected_csp_reports = 0
 
 
 class _InMemoryIpRateLimiter:
@@ -124,9 +134,25 @@ class _InMemoryIpRateLimiter:
 _rate_limiter = _InMemoryIpRateLimiter()
 
 
+def _record_dropped_expected_csp(count: int = 1) -> None:
+    global _dropped_expected_csp_reports
+    if count <= 0:
+        return
+    with _stats_lock:
+        _dropped_expected_csp_reports += count
+
+
+def get_dropped_expected_csp_count() -> int:
+    with _stats_lock:
+        return _dropped_expected_csp_reports
+
+
 def reset_client_error_rate_limiter() -> None:
-    """Clear in-memory rate-limit counters (intended for unit tests)."""
+    """Clear in-memory rate-limit and drop counters (intended for unit tests)."""
+    global _dropped_expected_csp_reports
     _rate_limiter.reset()
+    with _stats_lock:
+        _dropped_expected_csp_reports = 0
 
 
 def _rate_limit_per_minute() -> int:
@@ -139,6 +165,50 @@ def _rate_limit_per_minute() -> int:
         except ValueError:
             pass
     return DEFAULT_RATE_LIMIT_PER_MINUTE
+
+
+def _own_document_hosts() -> frozenset[str]:
+    hosts = set(CANONICAL_OWN_HOSTS)
+    for origin in [settings.frontend_origin, *settings.backend_cors_origins]:
+        if not origin:
+            continue
+        try:
+            hostname = urlsplit(origin).hostname
+        except ValueError:
+            hostname = None
+        if hostname:
+            hosts.add(hostname.lower())
+    return frozenset(hosts)
+
+
+def _is_known_expected_csp_violation(details: dict[str, Any], *, fallback_url: str | None = None) -> bool:
+    """Return True for Next.js inline hydration script violations on our own documents."""
+    directive_raw = str(details.get('effective_directive') or details.get('violated_directive') or '').strip()
+    directive = directive_raw.split()[0].lower() if directive_raw else ''
+    if directive not in EXPECTED_INLINE_SCRIPT_DIRECTIVES:
+        return False
+
+    blocked_uri = str(details.get('blocked_uri') or '').strip().strip("'\"").lower()
+    if blocked_uri != 'inline':
+        return False
+
+    doc_url = details.get('document_uri') or fallback_url
+    if not isinstance(doc_url, str) or not doc_url:
+        return False
+    try:
+        hostname = urlsplit(doc_url).hostname
+    except ValueError:
+        return False
+    return bool(hostname and hostname.lower() in _own_document_hosts())
+
+
+def _should_log_csp_report() -> bool:
+    rate = float(settings.client_error_csp_sample_rate)
+    if rate <= 0.0:
+        return False
+    if rate >= 1.0:
+        return True
+    return _sample_random() < rate
 
 
 def _truncate_text(value: Any, *, max_length: int) -> str | None:
@@ -267,25 +337,32 @@ def _parse_payload(raw_data: Any, *, content_type: str, fallback_ua: str | None)
     if content_type == 'application/reports+json' or isinstance(raw_data, list):
         if not isinstance(raw_data, list) or not raw_data:
             raise api_error(status.HTTP_400_BAD_REQUEST, 'INVALID_CLIENT_ERROR_REPORT', 'Report batch must be a non-empty JSON array')
-        violations: list[dict[str, Any]] = []
-        first_url: str | None = None
-        first_ua: str | None = None
+        kept_violations: list[tuple[dict[str, Any], str | None, str | None]] = []
+        dropped_expected = 0
+        valid_count = 0
         for item in raw_data[:MAX_CSP_REPORTS_PER_BATCH]:
             if not isinstance(item, dict):
                 continue
             body = item.get('body') if isinstance(item.get('body'), dict) else {}
             violation = _normalize_csp_violation(body)
+            if not violation:
+                continue
+            valid_count += 1
             item_url = _sanitize_url(item.get('url')) or violation.get('document_uri')
-            if first_url is None and item_url:
-                first_url = item_url
-            if first_ua is None:
-                first_ua = _sanitize_text(item.get('user_agent'), max_length=256)
-            if violation:
-                violations.append(violation)
-        if not violations:
+            item_ua = _sanitize_text(item.get('user_agent'), max_length=256)
+            if _is_known_expected_csp_violation(violation, fallback_url=item_url):
+                dropped_expected += 1
+                continue
+            kept_violations.append((violation, item_url, item_ua))
+        if valid_count == 0:
             raise api_error(status.HTTP_400_BAD_REQUEST, 'INVALID_CLIENT_ERROR_REPORT', 'No valid CSP reports in batch')
-        primary = violations[0]
+        if dropped_expected > 0:
+            _record_dropped_expected_csp(dropped_expected)
+        if not kept_violations:
+            return {'dropped': True, 'kind': 'csp'}
+        primary, first_url, first_ua = kept_violations[0]
         return {
+            'dropped': False,
             'kind': 'csp',
             'source': 'reporting_api',
             'error_message': _csp_summary_message(primary),
@@ -294,7 +371,7 @@ def _parse_payload(raw_data: Any, *, content_type: str, fallback_ua: str | None)
             'user_agent': first_ua or _sanitize_text(fallback_ua, max_length=256),
             'release': 'unknown',
             'csp': primary,
-            'report_count': len(raw_data),
+            'report_count': len(kept_violations),
         }
 
     if not isinstance(raw_data, dict):
@@ -306,7 +383,11 @@ def _parse_payload(raw_data: Any, *, content_type: str, fallback_ua: str | None)
         details = _normalize_csp_violation(csp_body)
         if not details:
             raise api_error(status.HTTP_400_BAD_REQUEST, 'INVALID_CLIENT_ERROR_REPORT', 'CSP report body is empty')
+        if _is_known_expected_csp_violation(details):
+            _record_dropped_expected_csp(1)
+            return {'dropped': True, 'kind': 'csp'}
         return {
+            'dropped': False,
             'kind': 'csp',
             'source': 'csp_report',
             'error_message': _csp_summary_message(details),
@@ -342,6 +423,7 @@ def _parse_payload(raw_data: Any, *, content_type: str, fallback_ua: str | None)
     source = _sanitize_text(raw_data.get('source'), max_length=64)
 
     return {
+        'dropped': False,
         'kind': raw_kind,
         'source': source or raw_kind,
         'error_message': message,
@@ -389,6 +471,12 @@ async def report_client_error(request: Request) -> dict[str, str]:
         fallback_ua=request.headers.get('user-agent'),
     )
 
+    if normalized.get('dropped'):
+        return {'status': 'accepted'}
+
+    if normalized['kind'] == 'csp' and not _should_log_csp_report():
+        return {'status': 'accepted'}
+
     log_payload: dict[str, Any] = {
         'event': 'client_error_reported',
         'request_id': getattr(request.state, 'request_id', None),
@@ -419,5 +507,8 @@ async def report_client_error(request: Request) -> dict[str, str]:
     if normalized['report_count'] > 1:
         log_payload['report_count'] = normalized['report_count']
 
-    logger.warning('Client error reported', extra=log_payload)
+    if normalized['kind'] == 'csp':
+        logger.info('Client CSP report received', extra=log_payload)
+    else:
+        logger.warning('Client error reported', extra=log_payload)
     return {'status': 'accepted'}

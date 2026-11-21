@@ -181,3 +181,79 @@ test('critical frontend paths explicitly report failures to the client error rep
     assert.match(source, pattern, `${relativePath} should wire reportClientError`);
   }
 });
+
+test('frontend reporter never re-reports CSP violations and skips reporting after fetch fails', async () => {
+  resetClientErrorReporterForTests();
+  const calls: string[] = [];
+  const okFetch = (async (input: RequestInfo | URL) => {
+    calls.push(String(input));
+    return new Response(null, { status: 202 });
+  }) as typeof fetch;
+
+  // Never subscribes to securitypolicyviolation and never sends kind: 'csp' or CSP violation messages.
+  const reporterSource = readFileSync(new URL('../src/lib/client-error-reporter.ts', import.meta.url), 'utf8');
+  assert.doesNotMatch(reporterSource, /addEventListener\(['"]securitypolicyviolation['"]/);
+  assert.equal(
+    reportClientError(new Error('CSP inline blocked'), {
+      kind: 'csp',
+      endpoint: 'https://api.picspeak.art/api/v1/client-errors',
+      fetchImpl: okFetch,
+    }),
+    false,
+  );
+  assert.equal(
+    reportClientError(new Error('Refused to execute inline script because it violates Content Security Policy'), {
+      kind: 'error',
+      endpoint: 'https://api.picspeak.art/api/v1/client-errors',
+      fetchImpl: okFetch,
+    }),
+    false,
+  );
+  assert.equal(calls.length, 0);
+
+  // Sync throw from fetch disables further reporting cleanly without throwing.
+  let syncAttempts = 0;
+  const throwingFetch = (() => {
+    syncAttempts += 1;
+    throw new Error('network blocked');
+  }) as unknown as typeof fetch;
+  assert.equal(
+    reportClientError(new Error('first boom'), {
+      endpoint: 'https://api.picspeak.art/api/v1/client-errors',
+      fetchImpl: throwingFetch,
+    }),
+    false,
+  );
+  assert.equal(
+    reportClientError(new Error('second boom'), {
+      endpoint: 'https://api.picspeak.art/api/v1/client-errors',
+      fetchImpl: throwingFetch,
+    }),
+    false,
+  );
+  assert.equal(syncAttempts, 1);
+
+  // Async rejection from fetch is swallowed and skips subsequent reports.
+  resetClientErrorReporterForTests();
+  let asyncAttempts = 0;
+  const rejectingFetch = (async () => {
+    asyncAttempts += 1;
+    throw new TypeError('Failed to fetch');
+  }) as unknown as typeof fetch;
+  assert.equal(
+    reportClientError(new Error('third boom'), {
+      endpoint: 'https://api.picspeak.art/api/v1/client-errors',
+      fetchImpl: rejectingFetch,
+    }),
+    true,
+  );
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.equal(
+    reportClientError(new Error('fourth boom'), {
+      endpoint: 'https://api.picspeak.art/api/v1/client-errors',
+      fetchImpl: rejectingFetch,
+    }),
+    false,
+  );
+  assert.equal(asyncAttempts, 1);
+});
