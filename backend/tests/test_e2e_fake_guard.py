@@ -1,6 +1,7 @@
 import os
 import sys
 import unittest
+from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
 from types import SimpleNamespace
@@ -15,7 +16,7 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 from app.core.config import Settings, is_local_database_url, settings
-from app.db.models import UserPlan
+from app.db.models import RateLimitCounter, UserPlan
 from app.services.ai import (
     _run_canonical_scoring,
     _run_openai_review,
@@ -29,7 +30,7 @@ from app.testing.fakes import (
     FakeImageGenerationClient,
     assert_e2e_fake_ai_allowed,
 )
-from app.testing.seed_e2e import _issue_e2e_registered_jwt, seed_e2e_fixtures
+from app.testing.seed_e2e import _issue_e2e_registered_jwt, _reset_guest_rate_limits, seed_e2e_fixtures
 
 
 class E2EFakeGuardTestCase(unittest.TestCase):
@@ -130,6 +131,45 @@ class E2EFakeGuardTestCase(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, '_picspeak_e2e_disposable_marker'):
                 seed_e2e_fixtures(reset_guest_limits=True)
             ensure_bucket.assert_not_called()
+
+    def test_reset_guest_rate_limits_only_removes_literal_guest_prefix(self) -> None:
+        memory_engine = create_engine('sqlite:///:memory:')
+        RateLimitCounter.__table__.create(memory_engine)
+        memory_session = sessionmaker(bind=memory_engine, autoflush=False, autocommit=False)
+        window_start = datetime(2026, 11, 21, tzinfo=timezone.utc)
+        scopes = [
+            'guest_review_daily',
+            'guest_api_minute',
+            'guestbook',
+            'guestbook_entry_minute',
+            'guestXreview_daily',
+            'registered_api_minute',
+        ]
+        db = memory_session()
+        try:
+            for index, scope in enumerate(scopes, start=1):
+                db.add(RateLimitCounter(
+                    id=index,
+                    scope=scope,
+                    scope_key='key',
+                    endpoint=None,
+                    window_start=window_start,
+                    window_seconds=60,
+                    hit_count=1,
+                ))
+            db.commit()
+
+            deleted = _reset_guest_rate_limits(db)
+            db.commit()
+
+            remaining = sorted(scope for (scope,) in db.query(RateLimitCounter.scope).all())
+        finally:
+            db.close()
+        self.assertEqual(deleted, 2)
+        self.assertEqual(
+            remaining,
+            ['guestXreview_daily', 'guestbook', 'guestbook_entry_minute', 'registered_api_minute'],
+        )
 
     def test_runtime_guard_refuses_when_app_env_is_production(self) -> None:
         with (

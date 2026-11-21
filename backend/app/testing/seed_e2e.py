@@ -55,6 +55,7 @@ E2E_GALLERY_REVIEW_PUBLIC_ID = 'rev_e2e_gallery01'
 E2E_GALLERY_SCORE = 8.4
 E2E_DB_MARKER_TABLE = '_picspeak_e2e_disposable_marker'
 E2E_DB_MARKER_VALUE = 'picspeak-e2e-smoke'
+E2E_GUEST_SCOPE_PREFIX = 'guest_'
 
 
 def _assert_disposable_e2e_database(db) -> None:
@@ -138,6 +139,17 @@ def _upload_seeded_gallery_assets() -> tuple[str, str, bytes]:
     return original_key, thumbnail_key, original_bytes
 
 
+def _reset_guest_rate_limits(db) -> int:
+    # Every guest counter scope in services/guard.py starts with the literal
+    # `guest_` prefix. autoescape keeps `_` from acting as a LIKE wildcard, so
+    # non-guest scopes such as `guestbook_*` survive.
+    return (
+        db.query(RateLimitCounter)
+        .filter(RateLimitCounter.scope.startswith(E2E_GUEST_SCOPE_PREFIX, autoescape=True))
+        .delete(synchronize_session=False)
+    )
+
+
 def seed_e2e_fixtures(*, reset_guest_limits: bool = False) -> dict[str, Any]:
     assert_e2e_fake_ai_allowed()
 
@@ -149,10 +161,7 @@ def seed_e2e_fixtures(*, reset_guest_limits: bool = False) -> dict[str, Any]:
         original_key, thumbnail_key, original_bytes = _upload_seeded_gallery_assets()
 
         if reset_guest_limits:
-            # Scoped strictly to guest rate-limit/quota counters inside the marked disposable DB.
-            db.query(RateLimitCounter).filter(
-                RateLimitCounter.scope.like('guest_%')
-            ).delete(synchronize_session=False)
+            _reset_guest_rate_limits(db)
 
         user = db.query(User).filter(User.public_id == E2E_USER_PUBLIC_ID).first()
         if user is None:
