@@ -138,7 +138,7 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U postgres -d picspeak_e2e"
+          --health-cmd "pg_isready -h 127.0.0.1 -U postgres -d picspeak_e2e"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
@@ -193,23 +193,11 @@ jobs:
           else
             npx playwright install-deps chromium
           fi
-      - name: Mark disposable E2E database
-        run: |
-          python - <<'PY'
-          import os, psycopg2
-          conn = psycopg2.connect(os.environ['DATABASE_URL'].replace('postgresql+psycopg2://', 'postgresql://', 1))
-          conn.autocommit = True
-          with conn.cursor() as cur:
-              cur.execute(
-                  "CREATE TABLE IF NOT EXISTS _picspeak_e2e_disposable_marker "
-                  "(marker text PRIMARY KEY, created_at timestamptz NOT NULL DEFAULT now());"
-              )
-              cur.execute(
-                  "INSERT INTO _picspeak_e2e_disposable_marker (marker) "
-                  "VALUES ('picspeak-e2e-smoke') ON CONFLICT DO NOTHING;"
-              )
-          conn.close()
-          PY
+      # The postgres image restarts after a socket-only init server; the TCP
+      # health check and this consecutive SELECT 1 probe only accept the final server.
+      - name: Wait for PostgreSQL and mark disposable E2E database
+        working-directory: backend
+        run: python -m app.testing.wait_for_e2e_db --mark-disposable
       - name: Run E2E smoke suite
         run: node scripts/run_e2e_smoke.mjs --use-existing-services
       - name: Upload Playwright report and traces on failure

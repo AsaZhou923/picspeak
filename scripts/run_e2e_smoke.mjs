@@ -29,8 +29,6 @@ const MOCKED_FONTS_PATH = path.join(
 
 const POSTGRES_IMAGE = 'postgres:17-alpine';
 const MINIO_IMAGE = 'minio/minio:RELEASE.2025-09-07T16-13-09Z';
-const E2E_DB_MARKER_SQL =
-  "CREATE TABLE IF NOT EXISTS _picspeak_e2e_disposable_marker (marker text PRIMARY KEY, created_at timestamptz NOT NULL DEFAULT now()); INSERT INTO _picspeak_e2e_disposable_marker (marker) VALUES ('picspeak-e2e-smoke') ON CONFLICT DO NOTHING;";
 
 // Explicit allowlist of OS/toolchain environment variables forwarded to child
 // processes. Application, database, storage, AI, Clerk, and libpq PG* variables
@@ -154,26 +152,6 @@ function runCommandAsync(command, commandArgs, options = {}) {
   });
 }
 
-async function waitForTcp(host, port, label, timeoutMs = 45_000) {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    const ok = await new Promise((resolve) => {
-      const socket = net.createConnection({ host, port });
-      socket.once('connect', () => {
-        socket.destroy();
-        resolve(true);
-      });
-      socket.once('error', () => {
-        socket.destroy();
-        resolve(false);
-      });
-    });
-    if (ok) return;
-    await new Promise((resolve) => setTimeout(resolve, 250));
-  }
-  throw new Error(`Timed out waiting for ${label} at ${host}:${port}`);
-}
-
 async function waitForHttp(url, label, { timeoutMs = 60_000, child = null, logs = () => '' } = {}) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -250,6 +228,7 @@ async function main() {
   process.on('SIGTERM', () => void handleSignal('SIGTERM'));
 
   try {
+    const baseChildEnv = buildBaseChildEnv();
     let pgPort;
     let minioPort;
     let databaseUrl;
@@ -307,42 +286,15 @@ async function main() {
         '/data',
       ]);
 
-      await waitForTcp('127.0.0.1', pgPort, 'PostgreSQL');
-      let pgReady = false;
-      for (let attempt = 0; attempt < 40; attempt += 1) {
-        try {
-          execFileSync(
-            'docker',
-            ['exec', pgContainer, 'pg_isready', '-U', 'postgres', '-d', 'picspeak_e2e'],
-            { stdio: 'ignore' },
-          );
-          pgReady = true;
-          break;
-        } catch {
-          await new Promise((resolve) => setTimeout(resolve, 250));
-        }
-      }
-      if (!pgReady) {
-        throw new Error(
-          `Timed out waiting for PostgreSQL container ${pgContainer} to become ready after 40 pg_isready probes`,
-        );
-      }
-
-      // Mark this freshly created container database as disposable so seed_e2e
-      // can never run against an unmarked developer database.
-      runSync('docker', [
-        'exec',
-        pgContainer,
-        'psql',
-        '-U',
-        'postgres',
-        '-d',
-        'picspeak_e2e',
-        '-v',
-        'ON_ERROR_STOP=1',
-        '-c',
-        E2E_DB_MARKER_SQL,
-      ]);
+      // The image's init step runs a temporary socket-only server and then
+      // restarts, so readiness is only accepted after consecutive SELECT 1
+      // probes over the app's own TCP host and port (explicit failure after
+      // 60s). The same probe then marks this fresh container database as
+      // disposable so seed_e2e can never run against an unmarked developer DB.
+      runSync(pythonExe, ['-m', 'app.testing.wait_for_e2e_db', '--mark-disposable'], {
+        cwd: BACKEND_DIR,
+        env: { ...baseChildEnv, DATABASE_URL: databaseUrl },
+      });
 
       await waitForHttp(`http://127.0.0.1:${minioPort}/minio/health/live`, 'MinIO');
     } else {
@@ -355,11 +307,14 @@ async function main() {
       objectAccessKeyId = process.env.OBJECT_ACCESS_KEY_ID || 'minioadmin';
       objectSecretAccessKey = process.env.OBJECT_SECRET_ACCESS_KEY || 'minioadmin';
 
-      await waitForTcp('127.0.0.1', pgPort, 'PostgreSQL');
+      // Existing services must already carry the disposable marker; only wait.
+      runSync(pythonExe, ['-m', 'app.testing.wait_for_e2e_db'], {
+        cwd: BACKEND_DIR,
+        env: { ...baseChildEnv, DATABASE_URL: databaseUrl },
+      });
       await waitForHttp(`http://127.0.0.1:${minioPort}/minio/health/live`, 'MinIO');
     }
 
-    const baseChildEnv = buildBaseChildEnv();
     const minioOrigin = `http://127.0.0.1:${minioPort}`;
     const apiOrigin = `http://127.0.0.1:${backendPort}`;
     const frontendOrigin = `http://localhost:${frontendPort}`;
