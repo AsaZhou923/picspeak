@@ -6,6 +6,8 @@ from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Iterable
 
+from app.core.config import settings
+
 
 TASK_KINDS = ('review', 'generation')
 TASK_STATUSES = ('PENDING', 'RUNNING', 'SUCCEEDED', 'FAILED', 'DEAD_LETTER', 'EXPIRED')
@@ -348,8 +350,13 @@ def build_operational_health_snapshot(
     if notifications.get('failed_events_present'):
         warnings.append('notification_events_failed')
 
+    # The worker heartbeat lives in the worker process's memory. A snapshot built
+    # elsewhere (e.g. the standalone exporter) cannot observe it, so it says so
+    # instead of reporting "unknown" as if it were a measurement.
+    pending_alert_threshold = int(settings.worker_pending_task_alert_threshold_seconds)
     worker_section: dict[str, Any] = {
-        'status': 'unavailable',
+        'status': 'not_observable',
+        'heartbeat_observable': False,
         'enabled': None,
         'running': None,
         'heartbeat_stale': None,
@@ -359,8 +366,10 @@ def build_operational_health_snapshot(
         'last_error_at': None,
         'oldest_pending_review_seconds': task_rows['review']['oldest_pending_seconds'],
         'oldest_pending_generation_seconds': task_rows['generation']['oldest_pending_seconds'],
+        'pending_alert_threshold_seconds': pending_alert_threshold,
     }
     if worker_health:
+        worker_section['heartbeat_observable'] = True
         worker_section.update(worker_health)
         worker_section['oldest_pending_review_seconds'] = task_rows['review']['oldest_pending_seconds']
         worker_section['oldest_pending_generation_seconds'] = task_rows['generation']['oldest_pending_seconds']
@@ -373,6 +382,15 @@ def build_operational_health_snapshot(
                 worker_section['status'] = 'disabled'
     if worker_section.get('heartbeat_stale') is True:
         warnings.append('worker_heartbeat_stale')
+    # Cross-process signal: a backlog older than the alert threshold is visible
+    # from any process that can read the database, whether or not a worker is alive.
+    pending_ages = [
+        age
+        for age in (worker_section['oldest_pending_review_seconds'], worker_section['oldest_pending_generation_seconds'])
+        if isinstance(age, (int, float))
+    ]
+    if pending_ages and max(pending_ages) > pending_alert_threshold:
+        warnings.append('pending_task_backlog_stale')
 
     status = 'healthy'
     if warnings:
@@ -489,18 +507,32 @@ def render_operational_health_markdown(snapshot: dict[str, Any]) -> str:
     oldest_generation = worker_info.get('oldest_pending_generation_seconds')
     heartbeat_stale = worker_info.get('heartbeat_stale')
     last_loop_age = worker_info.get('last_loop_age_seconds')
+    threshold = worker_info.get('pending_alert_threshold_seconds')
+    lines.extend(['', '## Worker 状态', '', f"- 状态：{worker_info.get('status', 'not_observable')}"])
+    if worker_info.get('heartbeat_observable') is False:
+        not_observable = '当前进程不可观测（worker 心跳只保存在 worker 进程内存中）'
+        lines.extend(
+            [
+                f'- 心跳是否过期：{not_observable}',
+                f'- 最近循环时间：{not_observable}',
+                f'- 最近错误：{not_observable}',
+            ]
+        )
+    else:
+        lines.extend(
+            [
+                f"- 心跳是否过期：{'未知' if heartbeat_stale is None else ('是' if heartbeat_stale else '否')}",
+                f"- 最近循环时间：{worker_info.get('last_loop_at') or '无'}",
+                f"- 距上次循环秒数：{'无' if last_loop_age is None else last_loop_age}",
+                f"- 最近错误：{worker_info.get('last_error') or '无'}",
+            ]
+        )
     lines.extend(
         [
-            '',
-            '## Worker 状态',
-            '',
-            f"- 状态：{worker_info.get('status', 'unavailable')}",
-            f"- 心跳是否过期：{'未知' if heartbeat_stale is None else ('是' if heartbeat_stale else '否')}",
-            f"- 最近循环时间：{worker_info.get('last_loop_at') or '无'}",
-            f"- 距上次循环秒数：{'无' if last_loop_age is None else last_loop_age}",
-            f"- 最近错误：{worker_info.get('last_error') or '无'}",
             f"- 最早 PENDING 评图任务等待秒数：{'无' if oldest_review is None else oldest_review}",
             f"- 最早 PENDING 生图任务等待秒数：{'无' if oldest_generation is None else oldest_generation}",
+            '- 跨进程告警信号：最早 PENDING 任务等待秒数，超过'
+            f"{'告警阈值' if threshold is None else f' {threshold} 秒'}时出现 `pending_task_backlog_stale` 警告",
         ]
     )
 

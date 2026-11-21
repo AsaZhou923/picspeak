@@ -44,6 +44,9 @@ class ExportOperationalHealthSnapshotScriptTests(unittest.TestCase):
             self.assertIn('数据库不可用，当前文件为运营健康回退快照', markdown)
             self.assertIn('原始错误：OperationalError', markdown)
             self.assertIn('connection refused', markdown)
+            # The exporter is not the worker process: heartbeat is labelled, not reported as unknown.
+            self.assertIn('心跳是否过期：当前进程不可观测', markdown)
+            self.assertNotIn('心跳是否过期：未知', markdown)
 
     def test_main_reraises_non_database_snapshot_errors(self) -> None:
         from scripts import export_operational_health_snapshot as script

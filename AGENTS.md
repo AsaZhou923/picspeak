@@ -261,6 +261,7 @@ Frontend values live in `frontend/.env.local`; `NEXT_PUBLIC_API_URL` and site/pu
 - Keep backend task state changes transactional and idempotent.
 - Do not bypass quota, credit, or guest/auth helpers when adding new creation endpoints.
 - When touching image generation, update pricing, task processor, API schemas, frontend contracts, and tests together.
+- Worker log records carry `worker_name`, and inside a claimed task also `task_public_id`, `task_kind` and `owner_public_id` (bound by `worker_log_context`). They have no `request_id`, because no HTTP request started them. The worker heartbeat exists only in the worker process's memory. Snapshots built elsewhere, including `export_operational_health_snapshot.py`, report it as `not_observable` rather than unknown. The cross-process alert signal is the oldest PENDING task age with the `pending_task_backlog_stale` warning. The threshold is `WORKER_PENDING_TASK_ALERT_THRESHOLD_SECONDS` (default 600), and both the worker log and the snapshot raise the warning. Do not add a heartbeat table for this.
 - Keep normal GPT review and `retake_compare` pinned to their trusted Flash (GPT-6 Sol/low) or Pro (GPT-6.1 Sol/high) profile unless model-specific contract tests and redacted live routing evidence are updated together.
 - Retake deltas must always be calculated from the two scores produced inside the same paired request; never subtract independently scored or mismatched-profile images.
 - When touching public pages, update localized copy and SEO tests together.

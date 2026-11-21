@@ -1442,6 +1442,47 @@ class WorkerVisibilityTests(unittest.TestCase):
         self.assertIn('最早 PENDING 评图任务等待秒数：660.0', markdown)
         self.assertIn('最早 PENDING 生图任务等待秒数：240.0', markdown)
         self.assertIn('RuntimeError: db lost', markdown)
+        self.assertNotIn('当前进程不可观测', markdown)
+        self.assertTrue(snapshot['worker']['heartbeat_observable'])
+        self.assertIn('pending_task_backlog_stale', snapshot['warnings'])
+
+    def test_out_of_process_snapshot_labels_heartbeat_not_observable_and_uses_backlog_signal(self) -> None:
+        now = datetime(2026, 11, 21, 12, 0, tzinfo=timezone.utc)
+
+        def snapshot_with_pending_age(age: timedelta) -> dict:
+            with patch('app.services.operational_health.settings.worker_pending_task_alert_threshold_seconds', 600):
+                return build_operational_health_snapshot(
+                    tasks=[OperationalTaskSample(kind='review', status='PENDING', created_at=now - age)],
+                    costs=[],
+                    ledger_entries=[],
+                    payment_events=[],
+                    gallery_audit_samples=[],
+                    start_date=now.date(),
+                    end_date=now.date(),
+                    now=now,
+                )
+
+        stale = snapshot_with_pending_age(timedelta(minutes=15))
+        worker_info = stale['worker']
+        self.assertEqual(worker_info['status'], 'not_observable')
+        self.assertFalse(worker_info['heartbeat_observable'])
+        self.assertIsNone(worker_info['heartbeat_stale'])
+        self.assertEqual(worker_info['pending_alert_threshold_seconds'], 600)
+        self.assertNotIn('worker_heartbeat_stale', stale['warnings'])
+        self.assertIn('pending_task_backlog_stale', stale['warnings'])
+        self.assertNotEqual(stale['status'], 'healthy')
+
+        markdown = render_operational_health_markdown(stale)
+        self.assertIn('- 状态：not_observable', markdown)
+        self.assertIn('心跳是否过期：当前进程不可观测', markdown)
+        self.assertIn('最近循环时间：当前进程不可观测', markdown)
+        self.assertNotIn('心跳是否过期：未知', markdown)
+        self.assertIn('最早 PENDING 评图任务等待秒数：900.0', markdown)
+        self.assertIn('超过 600 秒时出现 `pending_task_backlog_stale` 警告', markdown)
+
+        fresh = snapshot_with_pending_age(timedelta(minutes=2))
+        self.assertNotIn('pending_task_backlog_stale', fresh['warnings'])
+        self.assertEqual(fresh['worker']['status'], 'not_observable')
 
 
 if __name__ == '__main__':
