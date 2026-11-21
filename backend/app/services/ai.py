@@ -978,6 +978,10 @@ def _run_canonical_scoring(
     image_type: str,
     profile: OpenAIReviewProfile,
 ) -> CanonicalScore:
+    if settings.e2e_fake_ai_enabled:
+        from app.testing.fakes import fake_canonical_score
+
+        return fake_canonical_score(mode=profile.mode, image_type=image_type)
     if not settings.openai_api_key:
         raise AIReviewError('OPENAI_API_KEY is not configured for the canonical GPT scorer')
     if not profile.scorer_model_name:
@@ -1036,6 +1040,20 @@ def _run_openai_review(
     canonical_score: CanonicalScore | None,
     on_canonical_score: Callable[[CanonicalScore], None] | None,
 ) -> AIReviewResponse:
+    if settings.e2e_fake_ai_enabled:
+        from app.testing.fakes import fake_run_ai_review
+
+        return fake_run_ai_review(
+            mode=mode,
+            image_url=image_url,
+            locale=locale,
+            exif_data=exif_data,
+            image_type=image_type,
+            enforce_suggestion_structure=enforce_suggestion_structure,
+            review_model=openai_review_profile_for_mode(mode).writer_model_name,
+            canonical_score=canonical_score,
+            on_canonical_score=on_canonical_score,
+        )
     if not settings.openai_api_key:
         raise AIReviewError('OPENAI_API_KEY is not configured for OpenAI photo review')
     profile = openai_review_profile_for_mode(mode)
@@ -1148,6 +1166,20 @@ def run_ai_review(
     canonical_score: CanonicalScore | None = None,
     on_canonical_score: Callable[[CanonicalScore], None] | None = None,
 ) -> AIReviewResponse:
+    if settings.e2e_fake_ai_enabled:
+        from app.testing.fakes import fake_run_ai_review
+
+        return fake_run_ai_review(
+            mode=mode,
+            image_url=image_url,
+            locale=locale,
+            exif_data=exif_data,
+            image_type=image_type,
+            enforce_suggestion_structure=enforce_suggestion_structure,
+            review_model=review_model,
+            canonical_score=canonical_score,
+            on_canonical_score=on_canonical_score,
+        )
     if review_model in {'gpt-5.5', 'gpt-5.6-luna', 'gpt-6-luna', 'gpt-6-sol', 'gpt-6.1-sol'}:
         return _run_openai_review(
             mode=mode,
