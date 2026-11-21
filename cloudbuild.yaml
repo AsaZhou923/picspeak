@@ -7,11 +7,38 @@ substitutions:
   _MIGRATION_JOB: picspeak-db-migrate
   _DATABASE_SECRET: picspeak-supabase-database-url
   _RUNTIME_SERVICE_ACCOUNT: 781338217290-compute@developer.gserviceaccount.com
+  # Manual `gcloud builds submit` runs have no BRANCH_NAME and are refused by
+  # BranchGuard unless the operator passes
+  # `--substitutions=_ALLOW_NON_MAIN_DEPLOY=true`. The override never admits a
+  # triggered build from a branch other than main.
+  _ALLOW_NON_MAIN_DEPLOY: 'false'
 
 steps:
+  # Second line of defence behind the trigger's branch filter (issue #134): the
+  # filter is an RE2 regex, so `main` also matched branches such as
+  # `test/e2e-main-flow`. Every other step waits on this one, so a non-main
+  # build fails before Build, Push, Migrate or Deploy run.
+  - id: BranchGuard
+    name: gcr.io/cloud-builders/docker
+    entrypoint: bash
+    args:
+      - -ceu
+      - |
+        if [ "$BRANCH_NAME" = "main" ]; then
+          echo "BranchGuard: building main; deployment allowed."
+        elif [ -z "$BRANCH_NAME" ] && [ "$_ALLOW_NON_MAIN_DEPLOY" = "true" ]; then
+          echo "BranchGuard: manual build with _ALLOW_NON_MAIN_DEPLOY=true; deployment allowed." >&2
+        else
+          echo "BranchGuard: refusing to deploy branch '$BRANCH_NAME'; only main deploys to production." >&2
+          echo "BranchGuard: manual builds without a branch need --substitutions=_ALLOW_NON_MAIN_DEPLOY=true." >&2
+          exit 1
+        fi
+
   - id: Pull
     name: gcr.io/cloud-builders/docker
     entrypoint: bash
+    waitFor:
+      - BranchGuard
     args:
       - -ceu
       - |
@@ -72,7 +99,7 @@ steps:
     name: python:3.11-slim
     entrypoint: bash
     waitFor:
-      - '-'
+      - BranchGuard
     args:
       - -ceu
       - |

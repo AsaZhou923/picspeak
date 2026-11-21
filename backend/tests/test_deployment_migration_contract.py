@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -24,6 +25,39 @@ EXPECTED_PRODUCTION_UPDATE_ENV_VARS = (
     'LEMONSQUEEZY_PRO_ONE_TIME_VARIANT_ID=1445229,'
     'GUEST_REVIEW_LIMIT_PER_DAY=1,PRO_REVIEW_SOFT_LIMIT_PER_MONTH=150,PRO_REVIEW_SOFT_LIMIT_RATE_PER_MINUTE=2'
 )
+
+
+def _cloud_build_steps(config: str) -> dict[str, list[str] | None]:
+    """Return step ids in order with their waitFor lists (None when omitted)."""
+    steps: dict[str, list[str] | None] = {}
+    current: str | None = None
+    in_wait_for = False
+    for line in config[config.index('\nsteps:\n') : config.index('\nimages:\n')].splitlines():
+        step_match = re.fullmatch(r'  - id: (\S+)', line)
+        if step_match:
+            current = step_match.group(1)
+            steps[current] = None
+            in_wait_for = False
+        elif current is not None and line == '    waitFor:':
+            steps[current] = []
+            in_wait_for = True
+        elif in_wait_for and (item := re.fullmatch(r"      - '?([^']+)'?", line)):
+            steps[current].append(item.group(1))
+        else:
+            in_wait_for = False
+    return steps
+
+
+def _cloud_build_substitute(text: str, values: dict[str, str]) -> str:
+    """Apply one Cloud Build substitution pass: $$ escapes, $VAR and ${VAR} expand."""
+
+    def replace(match: re.Match[str]) -> str:
+        if match.group(0) == '$$':
+            return '$'
+        name = match.group(1) or match.group(2)
+        return values.get(name, match.group(0))
+
+    return re.sub(r'\$\$|\$\{([A-Z_][A-Z0-9_]*)\}|\$([A-Z_][A-Z0-9_]*)', replace, text)
 
 
 def _load_env_renderer_module():
@@ -61,6 +95,8 @@ class DeploymentMigrationContractTests(unittest.TestCase):
         config = (REPO_ROOT / 'cloudbuild.yaml').read_text(encoding='utf-8')
 
         ordered_steps = [
+            config.index('id: BranchGuard'),
+            config.index('id: Pull'),
             config.index('id: Build'),
             config.index('id: Push'),
             config.index('id: Migrate'),
@@ -78,6 +114,73 @@ class DeploymentMigrationContractTests(unittest.TestCase):
             config,
             re.compile(r'id: Deploy.*?waitFor:\s+- Migrate\s+- RenderEnv', re.DOTALL),
         )
+
+    def test_cloud_build_branch_guard_runs_first_and_gates_every_step(self) -> None:
+        config = (REPO_ROOT / 'cloudbuild.yaml').read_text(encoding='utf-8')
+        steps = _cloud_build_steps(config)
+
+        self.assertEqual(
+            list(steps),
+            ['BranchGuard', 'Pull', 'Build', 'Push', 'Migrate', 'RenderEnv', 'Deploy'],
+        )
+        self.assertIsNone(steps['BranchGuard'])
+        self.assertEqual(steps['Pull'], ['BranchGuard'])
+        self.assertEqual(steps['RenderEnv'], ['BranchGuard'])
+        self.assertNotIn("- '-'", config)
+        self.assertIn("_ALLOW_NON_MAIN_DEPLOY: 'false'", config)
+
+        # A step without waitFor waits on every earlier step; '-' would start immediately.
+        ids = list(steps)
+        for index, step_id in enumerate(ids[1:], start=1):
+            with self.subTest(step=step_id):
+                seen: set[str] = set()
+                pending = [step_id]
+                while pending:
+                    name = pending.pop()
+                    deps = steps[name]
+                    deps = ids[: ids.index(name)] if deps is None else deps
+                    self.assertNotIn('-', deps)
+                    for dep in deps:
+                        self.assertIn(dep, steps)
+                        if dep not in seen:
+                            seen.add(dep)
+                            pending.append(dep)
+                self.assertIn('BranchGuard', seen)
+
+    def test_cloud_build_branch_guard_refuses_non_main_builds(self) -> None:
+        bash = shutil.which('bash')
+        if bash is None:
+            self.skipTest('bash is not available')
+        config = (REPO_ROOT / 'cloudbuild.yaml').read_text(encoding='utf-8')
+        guard = config[config.index('id: BranchGuard') : config.index('  - id: Pull')]
+        block = guard[guard.index('- |\n') + len('- |\n') :].rstrip()
+        script = '\n'.join(line.removeprefix(' ' * 8) for line in block.splitlines()) + '\n'
+        self.assertIn('"$BRANCH_NAME"', script)
+        self.assertNotIn('$$BRANCH_NAME', script)
+
+        cases = (
+            ('main', 'false', 0),
+            ('test/e2e-main-flow', 'false', 1),
+            ('test/e2e-main-flow', 'true', 1),
+            ('main-hotfix', 'false', 1),
+            ('', 'false', 1),
+            ('', 'true', 0),
+        )
+        for branch, allow, expected in cases:
+            with self.subTest(branch=branch, allow=allow):
+                rendered = _cloud_build_substitute(
+                    script, {'BRANCH_NAME': branch, '_ALLOW_NON_MAIN_DEPLOY': allow}
+                )
+                completed = subprocess.run(
+                    [bash, '-ceu', rendered],
+                    capture_output=True,
+                    text=True,
+                    encoding='utf-8',
+                    check=False,
+                )
+                self.assertEqual(completed.returncode, expected, completed.stderr)
+                if expected:
+                    self.assertIn('BranchGuard: refusing to deploy', completed.stderr)
 
     def test_manual_backend_deploy_uses_the_same_migration_gate_and_relative_path(self) -> None:
         script = (REPO_ROOT / 'deploy' / 'deploy-backend.bat').read_text(encoding='utf-8')
