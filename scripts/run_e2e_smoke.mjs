@@ -6,10 +6,12 @@
  * (`pip install -r backend/requirements-e2e.txt`), so no storage image is pulled.
  *
  * Usage:
- *   node scripts/run_e2e_smoke.mjs [--use-existing-services] [--skip-build]
+ *   node scripts/run_e2e_smoke.mjs [--skip-build]
+ *   node scripts/run_e2e_smoke.mjs --use-existing-services --database-url <url> [--skip-build]
  *
- * --use-existing-services reuses an already running, disposable-marked
- * PostgreSQL (DATABASE_URL / E2E_PG_PORT) instead of starting a container.
+ * --use-existing-services reuses an already running, disposable-marked loopback
+ * PostgreSQL instead of starting a container. Its URL comes only from the
+ * explicit --database-url flag; an inherited DATABASE_URL is never used.
  */
 
 import { execFileSync, spawn } from 'node:child_process';
@@ -87,7 +89,24 @@ function buildBaseChildEnv() {
   return baseEnv;
 }
 
-const args = new Set(process.argv.slice(2));
+function parseArgs(argv) {
+  const flags = new Set();
+  let databaseUrl = null;
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (arg === '--database-url') {
+      databaseUrl = argv[index + 1] ?? '';
+      index += 1;
+    } else if (arg.startsWith('--database-url=')) {
+      databaseUrl = arg.slice('--database-url='.length);
+    } else {
+      flags.add(arg);
+    }
+  }
+  return { flags, databaseUrl };
+}
+
+const { flags: args, databaseUrl: explicitDatabaseUrl } = parseArgs(process.argv.slice(2));
 const useExistingServices =
   args.has('--use-existing-services') || process.env.E2E_USE_EXISTING_SERVICES === '1';
 const skipBuild = args.has('--skip-build') || process.env.E2E_SKIP_BUILD === '1';
@@ -235,7 +254,6 @@ async function main() {
 
   try {
     const baseChildEnv = buildBaseChildEnv();
-    let pgPort;
     let databaseUrl;
     // Fixed by default because the production build bakes the storage origin
     // into its CSP; --skip-build must reuse the same port.
@@ -247,7 +265,10 @@ async function main() {
     if (!useExistingServices) {
       // Default Docker mode ignores any inherited DATABASE_URL / OBJECT_* env
       // and connects exclusively to its own disposable container.
-      pgPort = await reservePort();
+      if (explicitDatabaseUrl !== null) {
+        throw new Error('--database-url is only valid with --use-existing-services.');
+      }
+      const pgPort = await reservePort();
       databaseUrl = `postgresql+psycopg2://postgres:postgres@127.0.0.1:${pgPort}/picspeak_e2e`;
 
       const pgContainer = `picspeak-e2e-pg-${runId}`;
@@ -274,21 +295,31 @@ async function main() {
       // probes over the app's own TCP host and port (explicit failure after
       // 60s). The same probe then marks this fresh container database as
       // disposable so seed_e2e can never run against an unmarked developer DB.
-      runSync(pythonExe, ['-m', 'app.testing.wait_for_e2e_db', '--mark-disposable'], {
+      runSync(pythonExe, ['-m', 'app.testing.wait_for_e2e_db', '--mark-disposable', '--require-local-database'], {
         cwd: BACKEND_DIR,
         env: { ...baseChildEnv, DATABASE_URL: databaseUrl },
       });
     } else {
-      pgPort = Number(process.env.E2E_PG_PORT || 5432);
-      databaseUrl =
-        process.env.DATABASE_URL ||
-        `postgresql+psycopg2://postgres:postgres@127.0.0.1:${pgPort}/picspeak_e2e`;
+      // Only an explicit flag selects the database, so an inherited
+      // DATABASE_URL (e.g. a developer's production shell) can never reach
+      // readiness, migrations, seeding or the app.
+      if (!explicitDatabaseUrl) {
+        throw new Error('--use-existing-services requires an explicit --database-url <loopback PostgreSQL URL>.');
+      }
+      databaseUrl = explicitDatabaseUrl;
 
-      // Existing services must already carry the disposable marker; only wait.
-      runSync(pythonExe, ['-m', 'app.testing.wait_for_e2e_db'], {
-        cwd: BACKEND_DIR,
-        env: { ...baseChildEnv, DATABASE_URL: databaseUrl },
-      });
+      // Before any connection, refuse unless the effective libpq destination
+      // (URL host, host/hostaddr/service query parameters, PG* environment) is
+      // loopback; inherited PG* variables are not forwarded to children at all.
+      // Existing services must already carry the disposable marker.
+      runSync(
+        pythonExe,
+        ['-m', 'app.testing.wait_for_e2e_db', '--require-local-database', '--require-disposable-marker'],
+        {
+          cwd: BACKEND_DIR,
+          env: { ...baseChildEnv, DATABASE_URL: databaseUrl },
+        },
+      );
     }
 
     // In-memory moto S3 server: state disappears with the process, so there is
@@ -335,8 +366,9 @@ async function main() {
       BACKEND_CORS_ORIGINS: JSON.stringify([`http://localhost:${frontendPort}`, `http://127.0.0.1:${frontendPort}`]),
     };
 
-    // 1. Run database migrations.
-    runSync(pythonExe, ['scripts/ensure_runtime_schema.py'], {
+    // 1. Run database migrations. The E2E entry point re-checks the loopback
+    // destination and disposable marker of the URL the migration itself resolves.
+    runSync(pythonExe, ['-m', 'app.testing.migrate_e2e'], {
       cwd: BACKEND_DIR,
       env: sharedBackendEnv,
     });

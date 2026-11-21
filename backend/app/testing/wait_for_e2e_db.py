@@ -7,6 +7,12 @@ temporary server, so this probe connects through the same host and port the app
 uses and requires several consecutive ``SELECT 1`` successes before returning.
 With ``--mark-disposable`` it then creates the disposable-database marker that
 ``seed_e2e`` requires, on the same verified TCP destination.
+
+``--require-local-database`` (implied by ``--mark-disposable`` and
+``--require-disposable-marker``) refuses, before any connection, a URL whose
+effective libpq destination (URL host, ``host``/``hostaddr``/``service`` query
+parameters and ``PG*`` environment) is not loopback. ``--require-disposable-marker``
+additionally fails unless the ready database already carries the marker.
 """
 
 from __future__ import annotations
@@ -37,6 +43,16 @@ def _mark_disposable(connection) -> None:
     )
 
 
+def _has_disposable_marker(connection) -> bool:
+    try:
+        return connection.execute(
+            text(f'SELECT 1 FROM {E2E_DB_MARKER_TABLE} WHERE marker = :marker LIMIT 1'),
+            {'marker': E2E_DB_MARKER_VALUE},
+        ).first() is not None
+    except SQLAlchemyError:
+        return False
+
+
 def wait_for_database(
     database_url: str,
     *,
@@ -44,15 +60,18 @@ def wait_for_database(
     interval_seconds: float = 0.3,
     timeout_seconds: float = 60.0,
     mark_disposable: bool = False,
+    require_local: bool = False,
+    require_marker: bool = False,
 ) -> int:
     url = make_url(database_url)
     if url.get_backend_name() != 'postgresql':
         raise RuntimeError('wait_for_e2e_db only supports PostgreSQL URLs.')
-    if mark_disposable:
+    if mark_disposable or require_local or require_marker:
         from app.core.config import is_local_database_url
 
         if not is_local_database_url(database_url):
-            raise RuntimeError('Refusing to mark a non-loopback database as disposable.')
+            action = 'mark' if mark_disposable else 'use'
+            raise RuntimeError(f'Refusing to {action} a non-loopback database for E2E.')
 
     engine = create_engine(url, poolclass=NullPool, connect_args={'connect_timeout': 2})
     deadline = time.monotonic() + timeout_seconds
@@ -70,6 +89,10 @@ def wait_for_database(
                         if mark_disposable:
                             _mark_disposable(connection)
                             connection.commit()
+                        elif require_marker and not _has_disposable_marker(connection):
+                            raise RuntimeError(
+                                f'Refusing to use database without disposable marker {E2E_DB_MARKER_VALUE!r}.'
+                            )
                         return attempts
             except SQLAlchemyError as exc:
                 consecutive = 0
@@ -91,6 +114,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument('--interval', type=float, default=0.3)
     parser.add_argument('--timeout', type=float, default=60.0)
     parser.add_argument('--mark-disposable', action='store_true')
+    parser.add_argument('--require-local-database', action='store_true')
+    parser.add_argument('--require-disposable-marker', action='store_true')
     args = parser.parse_args(argv)
     if not args.database_url:
         parser.error('--database-url or DATABASE_URL is required')
@@ -102,6 +127,8 @@ def main(argv: list[str] | None = None) -> int:
             interval_seconds=args.interval,
             timeout_seconds=args.timeout,
             mark_disposable=args.mark_disposable,
+            require_local=args.require_local_database,
+            require_marker=args.require_disposable_marker,
         )
     except (RuntimeError, TimeoutError) as exc:
         print(f'wait_for_e2e_db: {exc}', file=sys.stderr)

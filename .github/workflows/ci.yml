@@ -121,9 +121,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
-      DATABASE_URL: postgresql+psycopg2://postgres:postgres@127.0.0.1:5432/picspeak_e2e
-      E2E_USE_EXISTING_SERVICES: '1'
-      E2E_PG_PORT: '5432'
+      E2E_DATABASE_URL: postgresql+psycopg2://postgres:postgres@127.0.0.1:5432/picspeak_e2e
     services:
       postgres:
         image: postgres:17-alpine
@@ -185,9 +183,10 @@ jobs:
       # health check and this consecutive SELECT 1 probe only accept the final server.
       - name: Wait for PostgreSQL and mark disposable E2E database
         working-directory: backend
-        run: python -m app.testing.wait_for_e2e_db --mark-disposable
+        run: python -m app.testing.wait_for_e2e_db --mark-disposable --database-url "$E2E_DATABASE_URL"
+      # The runner never reads DATABASE_URL from its environment; the URL is passed explicitly.
       - name: Run E2E smoke suite
-        run: node scripts/run_e2e_smoke.mjs --use-existing-services
+        run: node scripts/run_e2e_smoke.mjs --use-existing-services --database-url "$E2E_DATABASE_URL"
       - name: Upload Playwright report and traces on failure
         if: failure()
         uses: actions/upload-artifact@v4
