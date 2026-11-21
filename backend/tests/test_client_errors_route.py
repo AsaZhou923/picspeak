@@ -49,10 +49,24 @@ class ClientErrorsRouteTests(unittest.TestCase):
                     },
                     json={
                         'kind': 'error',
-                        'source': 'upload',
-                        'message': 'Upload failed for https://r2.example/a.jpg?X-Amz-Signature=supersecret&token=tok123',
-                        'stack': 'Error: fail\n    at upload (https://www.picspeak.art/app.js?photo_token=secretphoto:1:2)',
-                        'url': 'https://user:pass@www.picspeak.art/workspace?mode=flash&token=secret1&photo_token=secret2&generation_token=secret3#frag',
+                        'source': 'upload:/share/shr_source_secret?code=src_code',
+                        'message': (
+                            'Upload failed for https://www.picspeak.art/share/shr_msg_secret'
+                            ' and https://api.picspeak.art/api/v1/public/reviews/pub_msg_secret'
+                            '?__clerk_ticket=tkt_msg_123&code=oauth_code_1&state=oauth_state_1'
+                            '&X-Amz-Signature=supersecret&X-Amz-Date=amzdate_msg&token=tok123'
+                        ),
+                        'stack': (
+                            'Error: fail\n'
+                            '    at load (https://www.picspeak.art/share/shr_stack_secret?photo_token=secretphoto&__clerk_ticket=tkt_stack_456:1:2)'
+                        ),
+                        'url': (
+                            'https://user:pass@www.picspeak.art/share/shr_url_secret'
+                            '?mode=flash&token=secret1&photo_token=secret2&generation_token=secret3'
+                            '&__clerk_ticket=tkt_url_789&code=url_code&state=url_state'
+                            '&X-Amz-Expires=amzexp_url&X-Goog-Date=googdate_url#frag'
+                        ),
+                        'referrer': 'https://www.picspeak.art/api/v1/public/reviews/pub_ref_secret?signature=sig_ref_999&keep=1',
                         'user_agent': 'CustomUA/1.0',
                         'release': 'sha-abc1234',
                     },
@@ -70,22 +84,57 @@ class ClientErrorsRouteTests(unittest.TestCase):
         self.assertEqual(record.levelno, logging.WARNING)
         self.assertEqual(getattr(record, 'event', None), 'client_error_reported')
         self.assertEqual(getattr(record, 'kind', None), 'error')
-        self.assertEqual(getattr(record, 'source', None), 'upload')
         self.assertEqual(getattr(record, 'release', None), 'sha-abc1234')
         self.assertEqual(getattr(record, 'user_agent', None), 'CustomUA/1.0')
-        self.assertEqual(getattr(record, 'url', None), 'https://www.picspeak.art/workspace?mode=flash')
+        self.assertEqual(getattr(record, 'url', None), 'https://www.picspeak.art/share/[redacted]?mode=flash')
+        self.assertEqual(getattr(record, 'referrer', None), 'https://www.picspeak.art/api/v1/public/reviews/[redacted]?keep=1')
         self.assertEqual(
             getattr(record, 'serviceContext', None),
             {'service': 'picspeak-frontend', 'version': 'sha-abc1234'},
         )
         self.assertEqual(
             getattr(record, 'context', None),
-            {'httpRequest': {'url': 'https://www.picspeak.art/workspace?mode=flash', 'userAgent': 'CustomUA/1.0'}},
+            {
+                'httpRequest': {
+                    'url': 'https://www.picspeak.art/share/[redacted]?mode=flash',
+                    'userAgent': 'CustomUA/1.0',
+                    'referrer': 'https://www.picspeak.art/api/v1/public/reviews/[redacted]?keep=1',
+                }
+            },
         )
-        for secret in ('supersecret', 'tok123', 'secretphoto', 'secret1', 'secret2', 'secret3', 'user:pass', '#frag'):
-            self.assertNotIn(secret, str(getattr(record, 'error_message', '')))
-            self.assertNotIn(secret, str(getattr(record, 'stack', '')))
-            self.assertNotIn(secret, str(getattr(record, 'url', '')))
+        all_logged = ' '.join(
+            str(getattr(record, attr, ''))
+            for attr in ('error_message', 'stack', 'url', 'source', 'referrer')
+        )
+        for secret in (
+            'shr_source_secret',
+            'src_code',
+            'shr_msg_secret',
+            'pub_msg_secret',
+            'tkt_msg_123',
+            'oauth_code_1',
+            'oauth_state_1',
+            'supersecret',
+            'amzdate_msg',
+            'amzexp_url',
+            'googdate_url',
+            'tok123',
+            'shr_stack_secret',
+            'secretphoto',
+            'tkt_stack_456',
+            'shr_url_secret',
+            'secret1',
+            'secret2',
+            'secret3',
+            'tkt_url_789',
+            'url_code',
+            'url_state',
+            'pub_ref_secret',
+            'sig_ref_999',
+            'user:pass',
+            '#frag',
+        ):
+            self.assertNotIn(secret, all_logged)
 
     def test_accepts_legacy_csp_report_and_logs_at_info_not_warning(self) -> None:
         payload = {
@@ -179,6 +228,62 @@ class ClientErrorsRouteTests(unittest.TestCase):
         self.assertEqual(second.status_code, 202)
         self.assertEqual(third.status_code, 429)
         self.assertEqual(get_dropped_expected_csp_count(), 2)
+
+    def test_enforced_inline_script_csp_report_is_not_dropped_and_logs_at_info(self) -> None:
+        enforced_batch = [
+            {
+                'type': 'csp-violation',
+                'url': 'https://www.picspeak.art/en',
+                'body': {
+                    'documentURL': 'https://www.picspeak.art/en',
+                    'effectiveDirective': 'script-src-elem',
+                    'blockedURL': 'inline',
+                    'disposition': 'enforce',
+                },
+            }
+        ]
+        with (
+            patch.object(settings, 'client_error_csp_sample_rate', 1.0),
+            patch('app.main._schedule_audit_task'),
+            patch('app.main.worker.start'),
+            patch('app.main.worker.stop'),
+            self.assertLogs('app.api.routers.client_errors', level='INFO') as captured,
+        ):
+            with TestClient(app) as client:
+                response = client.post(
+                    '/api/v1/client-errors',
+                    headers={'Content-Type': 'application/reports+json'},
+                    content=json.dumps(enforced_batch),
+                )
+
+        self.assertEqual(response.status_code, 202)
+        self.assertEqual(get_dropped_expected_csp_count(), 0)
+        self.assertEqual(len(captured.records), 1)
+        self.assertEqual(captured.records[0].levelno, logging.INFO)
+        self.assertEqual(getattr(captured.records[0], 'csp', {}).get('disposition'), 'enforce')
+
+    def test_parser_value_error_and_recursion_error_map_to_400_never_500(self) -> None:
+        cases = [
+            ('app.api.routers.client_errors.json.loads', exc_cls)
+            for exc_cls in (ValueError, RecursionError, TypeError, OverflowError)
+        ] + [('app.api.routers.client_errors._parse_payload', RecursionError)]
+        for target, exc_cls in cases:
+            with self.subTest(target=target, exc=exc_cls.__name__):
+                reset_client_error_rate_limiter()
+                with (
+                    patch(target, side_effect=exc_cls('parse limit')),
+                    patch('app.main._schedule_audit_task'),
+                    patch('app.main.worker.start'),
+                    patch('app.main.worker.stop'),
+                ):
+                    with TestClient(app) as client:
+                        response = client.post(
+                            '/api/v1/client-errors',
+                            headers={'Content-Type': 'application/json'},
+                            content='{"kind":"error","message":"x"}',
+                        )
+                self.assertEqual(response.status_code, 400)
+                self.assertEqual(response.json()['error']['code'], 'INVALID_CLIENT_ERROR_REPORT')
 
     def test_inline_script_csp_on_third_party_document_is_not_dropped_as_expected(self) -> None:
         payload = {

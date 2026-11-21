@@ -10,20 +10,42 @@ import {
   sanitizeReportUrl,
 } from '../src/lib/client-error-reporter.ts';
 
-test('sanitizeReportUrl strips sensitive tokens, credentials, and fragments while keeping safe params', () => {
+test('sanitizeReportUrl strips capability paths, sensitive tokens, credentials, and fragments while keeping safe params', () => {
   const sanitized = sanitizeReportUrl(
-    'https://user:pass@www.picspeak.art/workspace?mode=pro&token=t1&photo_token=p2&generation_token=g3&X-Amz-Signature=s4&image_type=portrait#secret-hash',
+    'https://user:pass@www.picspeak.art/share/shr_secret_123?mode=pro&token=t1&photo_token=p2&generation_token=g3&__clerk_ticket=tkt_999&code=c1&state=s1&X-Amz-Signature=s4&X-Amz-Date=d5&X-Goog-Expires=g6&image_type=portrait#secret-hash',
   );
-  assert.equal(sanitized, 'https://www.picspeak.art/workspace?mode=pro&image_type=portrait');
+  assert.equal(sanitized, 'https://www.picspeak.art/share/[redacted]?mode=pro&image_type=portrait');
+  assert.equal(
+    sanitizeReportUrl('https://api.picspeak.art/api/v1/public/reviews/pub_secret_456?signature=sig1&ok=1'),
+    'https://api.picspeak.art/api/v1/public/reviews/[redacted]?ok=1',
+  );
   assert.equal(sanitizeReportUrl('javascript:alert(1)'), undefined);
 });
 
-test('sanitizeReportText scrubs bearer tokens and signed query parameters', () => {
+test('sanitizeReportText scrubs capability paths, bearer tokens, and all shared sensitive query params', () => {
   const cleaned = sanitizeReportText(
-    'Failed Bearer eyJhbGciOiJIUzI1NiJ9.abc.def on https://api.picspeak.art/p?photo_token=secret123&generation_token=gen456&ok=1',
+    'Failed Bearer eyJhbGciOiJIUzI1NiJ9.abc.def on https://www.picspeak.art/share/shr_text_secret' +
+      ' and https://api.picspeak.art/api/v1/public/reviews/pub_text_secret' +
+      '?photo_token=secret123&generation_token=gen456&__clerk_ticket=tkt_text_777&code=code_888&state=state_999' +
+      '&X-Amz-Credential=amzcred_111&X-Amz-Date=amzdate_222&ok=1',
   );
   assert.ok(cleaned);
-  assert.doesNotMatch(cleaned, /eyJhbGci|secret123|gen456/);
+  for (const secret of [
+    'eyJhbGci',
+    'shr_text_secret',
+    'pub_text_secret',
+    'secret123',
+    'gen456',
+    'tkt_text_777',
+    'code_888',
+    'state_999',
+    'amzcred_111',
+    'amzdate_222',
+  ]) {
+    assert.ok(!cleaned.includes(secret), `expected ${secret} to be redacted in: ${cleaned}`);
+  }
+  assert.match(cleaned, /\/share\/\[redacted\]/);
+  assert.match(cleaned, /\/public\/reviews\/\[redacted\]/);
   assert.match(cleaned, /Bearer \*\*\*/);
 });
 
@@ -256,4 +278,157 @@ test('frontend reporter never re-reports CSP violations and skips reporting afte
     false,
   );
   assert.equal(asyncAttempts, 1);
+
+  // Non-2xx HTTP responses (429 / 500) trip the circuit breaker for the rest of the page session.
+  for (const statusCode of [429, 500]) {
+    resetClientErrorReporterForTests();
+    let httpAttempts = 0;
+    const failingStatusFetch = (async () => {
+      httpAttempts += 1;
+      return new Response(null, { status: statusCode });
+    }) as unknown as typeof fetch;
+    assert.equal(
+      reportClientError(new Error(`first-${statusCode}`), {
+        endpoint: 'https://api.picspeak.art/api/v1/client-errors',
+        fetchImpl: failingStatusFetch,
+      }),
+      true,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    for (let i = 0; i < 5; i += 1) {
+      assert.equal(
+        reportClientError(new Error(`after-${statusCode}-${i}`), {
+          endpoint: 'https://api.picspeak.art/api/v1/client-errors',
+          fetchImpl: failingStatusFetch,
+        }),
+        false,
+      );
+    }
+    assert.equal(httpAttempts, 1, `HTTP ${statusCode} must trip circuit breaker after first failed send`);
+  }
+});
+
+test('per-session cap persists across reloads via sessionStorage and degrades cleanly when storage throws', () => {
+  const store = new Map<string, string>();
+  const mockStorage = {
+    getItem: (key: string) => store.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      store.set(key, value);
+    },
+    removeItem: (key: string) => {
+      store.delete(key);
+    },
+  };
+  const prevWindow = (globalThis as { window?: unknown }).window;
+  Object.defineProperty(globalThis, 'window', {
+    value: { sessionStorage: mockStorage, location: { href: 'https://www.picspeak.art/workspace', origin: 'https://www.picspeak.art' } },
+    configurable: true,
+  });
+
+  try {
+    resetClientErrorReporterForTests();
+    let sentCount = 0;
+    const okFetch = (async () => {
+      sentCount += 1;
+      return new Response(null, { status: 202 });
+    }) as typeof fetch;
+
+    for (let i = 0; i < 24; i += 1) {
+      reportClientError(new Error(`err-doc1-${i}`), {
+        endpoint: 'https://api.picspeak.art/api/v1/client-errors',
+        fetchImpl: okFetch,
+      });
+    }
+    assert.equal(sentCount, 20);
+
+    // Simulate reload in the same tab: reset in-memory counters while retaining sessionStorage.
+    resetClientErrorReporterForTests({ clearStorage: false });
+    for (let i = 0; i < 5; i += 1) {
+      assert.equal(
+        reportClientError(new Error(`err-doc2-${i}`), {
+          endpoint: 'https://api.picspeak.art/api/v1/client-errors',
+          fetchImpl: okFetch,
+        }),
+        false,
+      );
+    }
+    assert.equal(sentCount, 20, 'session cap must span reloads in the same browser tab');
+
+    // Restricted/throwing sessionStorage still works via in-memory fallback.
+    Object.defineProperty(globalThis, 'window', {
+      value: {
+        get sessionStorage() {
+          throw new Error('SecurityError');
+        },
+        location: { href: 'https://www.picspeak.art/workspace', origin: 'https://www.picspeak.art' },
+      },
+      configurable: true,
+    });
+    resetClientErrorReporterForTests();
+    let fallbackSent = 0;
+    const fallbackFetch = (async () => {
+      fallbackSent += 1;
+      return new Response(null, { status: 202 });
+    }) as typeof fetch;
+    assert.equal(
+      reportClientError(new Error('storage-blocked-err'), {
+        endpoint: 'https://api.picspeak.art/api/v1/client-errors',
+        fetchImpl: fallbackFetch,
+      }),
+      true,
+    );
+    assert.equal(fallbackSent, 1);
+  } finally {
+    if (prevWindow === undefined) delete (globalThis as { window?: unknown }).window;
+    else Object.defineProperty(globalThis, 'window', { value: prevWindow, configurable: true });
+    resetClientErrorReporterForTests();
+  }
+});
+
+test('reportClientError redacts capability paths and sensitive query values across all outgoing fields', () => {
+  resetClientErrorReporterForTests();
+  const bodies: Array<Record<string, unknown>> = [];
+  const captureFetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+    bodies.push(JSON.parse(String(init?.body)));
+    return new Response(null, { status: 202 });
+  }) as typeof fetch;
+
+  const err = new Error(
+    'Failed loading https://www.picspeak.art/share/shr_m1?__clerk_ticket=tkt_m1&code=code_m1&state=st_m1',
+  );
+  err.stack = 'Error\n at fn (https://api.picspeak.art/api/v1/public/reviews/pub_s1?token=tok_s1:1:1)';
+
+  assert.equal(
+    reportClientError(err, {
+      source: 'upload:/share/shr_src1?photo_token=pt_src1',
+      url: 'https://www.picspeak.art/share/shr_u1?__clerk_ticket=tkt_u1&mode=flash',
+      referrer: 'https://www.picspeak.art/api/v1/public/reviews/pub_r1?signature=sig_r1&ok=1',
+      userAgent: 'UA/1.0 https://www.picspeak.art/share/shr_ua1?token=tok_ua1',
+      endpoint: 'https://api.picspeak.art/api/v1/client-errors',
+      fetchImpl: captureFetch,
+    }),
+    true,
+  );
+  assert.equal(bodies.length, 1);
+  const serialized = JSON.stringify(bodies[0]);
+  for (const secret of [
+    'shr_m1',
+    'tkt_m1',
+    'code_m1',
+    'st_m1',
+    'pub_s1',
+    'tok_s1',
+    'shr_src1',
+    'pt_src1',
+    'shr_u1',
+    'tkt_u1',
+    'pub_r1',
+    'sig_r1',
+    'shr_ua1',
+    'tok_ua1',
+  ]) {
+    assert.ok(!serialized.includes(secret), `outgoing payload leaked ${secret}: ${serialized}`);
+  }
+  assert.equal(bodies[0].url, 'https://www.picspeak.art/share/[redacted]?mode=flash');
+  assert.equal(bodies[0].referrer, 'https://www.picspeak.art/api/v1/public/reviews/[redacted]?ok=1');
 });

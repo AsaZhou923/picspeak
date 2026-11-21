@@ -40,10 +40,19 @@ ALLOWED_CONTENT_TYPES = frozenset({
 EXPECTED_INLINE_SCRIPT_DIRECTIVES = frozenset({'script-src', 'script-src-elem'})
 CANONICAL_OWN_HOSTS = frozenset({'www.picspeak.art', 'picspeak.art'})
 
-SENSITIVE_QUERY_KEYS = frozenset({
+# Single shared lists used for redacting BOTH standalone URLs and free-text fields
+# (message, stack, source, referrer, user_agent, release, CSP fields).
+CAPABILITY_PATH_PREFIXES: tuple[str, ...] = (
+    '/share/',
+    '/public/reviews/',
+)
+
+SENSITIVE_QUERY_KEYS: frozenset[str] = frozenset({
     'token',
     'photo_token',
     'generation_token',
+    'share_token',
+    'grant_token',
     'access_token',
     'guest_token',
     'session_token',
@@ -55,21 +64,45 @@ SENSITIVE_QUERY_KEYS = frozenset({
     'secret',
     'signature',
     'code',
+    'state',
     'auth',
     'authorization',
     'x-amz-signature',
     'x-amz-credential',
     'x-amz-security-token',
+    'x-goog-signature',
+    'x-goog-credential',
     '__clerk_handshake',
     '__clerk_db_jwt',
     '__clerk_ticket',
     '__clerk_status',
+    '__clerk_created_session',
 })
+# Every signed-URL parameter in these families (X-Amz-Date, X-Amz-Expires, ...) is redacted.
+SENSITIVE_QUERY_KEY_PREFIXES: tuple[str, ...] = ('x-amz-', 'x-goog-')
 
-_BEARER_PATTERN = re.compile(r'(?i)\bBearer\s+[A-Za-z0-9\-._~+/]+=*')
-_QUERY_SECRET_PATTERN = re.compile(
-    r'(?i)([?&](?:token|photo_token|generation_token|access_token|guest_token|session_token|refresh_token|id_token|x-amz-signature|x-amz-credential|x-amz-security-token|__clerk_handshake|__clerk_db_jwt)=)[^&\s"\'<>]+'
+_CAPABILITY_PATH_ALT = '|'.join(re.escape(prefix) for prefix in CAPABILITY_PATH_PREFIXES)
+# Tokens never contain `[`, so an already-redacted `[redacted]` segment is left alone.
+_CAPABILITY_PATH_PATTERN = re.compile(
+    rf'(?i)({_CAPABILITY_PATH_ALT})([^/?#\s"\'<>)\[\]]+)'
 )
+_ENCODED_CAPABILITY_PATH_ALT = '|'.join(
+    re.escape(prefix.replace('/', '%2f')) for prefix in CAPABILITY_PATH_PREFIXES
+)
+_ENCODED_CAPABILITY_PATH_PATTERN = re.compile(
+    rf'(?i)({_ENCODED_CAPABILITY_PATH_ALT})((?:(?!%2[fF]|%3[fF]|%23|[/?#&\s"\'<>)\[\]]).)+)'
+)
+
+_SENSITIVE_QUERY_ALT = '|'.join([
+    *(rf'{re.escape(prefix)}[a-z0-9-]+' for prefix in SENSITIVE_QUERY_KEY_PREFIXES),
+    *(re.escape(key) for key in sorted(SENSITIVE_QUERY_KEYS, key=len, reverse=True)),
+])
+_QUERY_SECRET_PATTERN = re.compile(
+    rf'(?i)((?:^|[?&]|%3[fF]|%26|\\u0026|\\u003[fF]|&amp;)(?:{_SENSITIVE_QUERY_ALT})(?:=|%3[dD]|\\u003[dD]))'
+    r'(?:(?!%26|\\u0026|&amp;|[&\s"\'<>)\]]).)*'
+)
+_BEARER_PATTERN = re.compile(r'(?i)\bBearer\s+[A-Za-z0-9\-._~+/]+=*')
+_URL_USERINFO_PATTERN = re.compile(r'(?i)\b(https?://)([^/\s@"\'<>]+)@')
 
 # Module-level RNG hook so tests can assert sampling deterministically.
 _sample_random = random.random
@@ -182,7 +215,11 @@ def _own_document_hosts() -> frozenset[str]:
 
 
 def _is_known_expected_csp_violation(details: dict[str, Any], *, fallback_url: str | None = None) -> bool:
-    """Return True for Next.js inline hydration script violations on our own documents."""
+    """Return True only for report-only Next.js inline hydration violations on our own documents."""
+    disposition = str(details.get('disposition') or '').strip().lower()
+    if disposition != 'report':
+        return False
+
     directive_raw = str(details.get('effective_directive') or details.get('violated_directive') or '').strip()
     directive = directive_raw.split()[0].lower() if directive_raw else ''
     if directive not in EXPECTED_INLINE_SCRIPT_DIRECTIVES:
@@ -222,13 +259,29 @@ def _truncate_text(value: Any, *, max_length: int) -> str | None:
     return f'{cleaned[:max_length]}...<truncated>'
 
 
-def _sanitize_text(value: Any, *, max_length: int) -> str | None:
-    text = _truncate_text(value, max_length=max_length)
-    if text is None:
-        return None
-    masked = mask_capability_url_text(text)
+def _is_sensitive_query_key(key: str) -> bool:
+    normalized = key.strip().lower()
+    return normalized in SENSITIVE_QUERY_KEYS or normalized.startswith(SENSITIVE_QUERY_KEY_PREFIXES)
+
+
+def _redact_capability_paths(text: str) -> str:
+    redacted = _CAPABILITY_PATH_PATTERN.sub(r'\1[redacted]', text)
+    return _ENCODED_CAPABILITY_PATH_PATTERN.sub(r'\1[redacted]', redacted)
+
+
+def _redact_sensitive_text(text: str) -> str:
+    masked = _redact_capability_paths(text)
+    masked = _URL_USERINFO_PATTERN.sub(r'\1***@', masked)
     masked = _BEARER_PATTERN.sub('Bearer ***', masked)
     masked = _QUERY_SECRET_PATTERN.sub(r'\1***', masked)
+    return mask_capability_url_text(masked)
+
+
+def _sanitize_text(value: Any, *, max_length: int) -> str | None:
+    text = _truncate_text(value, max_length=max_length * 2)
+    if text is None:
+        return None
+    masked = _redact_sensitive_text(text)
     return _truncate_text(masked, max_length=max_length)
 
 
@@ -251,17 +304,19 @@ def _sanitize_url(value: Any, *, max_length: int = 512) -> str | None:
     if '@' in netloc:
         netloc = netloc.rsplit('@', 1)[-1]
 
+    safe_path = _redact_capability_paths(parsed.path)
+
     safe_query = ''
     if parsed.query:
         kept_params = [
             (key, val)
             for key, val in parse_qsl(parsed.query, keep_blank_values=False)
-            if key.strip().lower() not in SENSITIVE_QUERY_KEYS
+            if not _is_sensitive_query_key(key)
         ]
         safe_query = urlencode(kept_params, doseq=True)
 
-    rebuilt = urlunsplit((parsed.scheme, netloc, parsed.path, safe_query, ''))
-    return _truncate_text(rebuilt, max_length=max_length)
+    rebuilt = urlunsplit((parsed.scheme, netloc, safe_path, safe_query, ''))
+    return _truncate_text(_redact_sensitive_text(rebuilt), max_length=max_length)
 
 
 async def _read_bounded_body(request: Request, *, max_bytes: int = MAX_CLIENT_ERROR_BODY_BYTES) -> bytes:
@@ -288,6 +343,7 @@ async def _read_bounded_body(request: Request, *, max_bytes: int = MAX_CLIENT_ER
 def _normalize_csp_violation(body: dict[str, Any]) -> dict[str, Any]:
     document_uri = _sanitize_url(body.get('document-uri') or body.get('documentURL'))
     blocked_uri = _sanitize_url(body.get('blocked-uri') or body.get('blockedURL'))
+    referrer = _sanitize_url(body.get('referrer'))
     effective_directive = _sanitize_text(
         body.get('effective-directive') or body.get('effectiveDirective') or body.get('violated-directive'),
         max_length=128,
@@ -311,6 +367,8 @@ def _normalize_csp_violation(body: dict[str, Any]) -> dict[str, Any]:
         details['violated_directive'] = violated_directive
     if blocked_uri:
         details['blocked_uri'] = blocked_uri
+    if referrer:
+        details['referrer'] = referrer
     if disposition:
         details['disposition'] = disposition
     if source_file:
@@ -329,7 +387,7 @@ def _csp_summary_message(details: dict[str, Any]) -> str:
     blocked = details.get('blocked_uri') or 'unknown-source'
     disposition = details.get('disposition')
     prefix = f'CSP violation ({disposition})' if disposition else 'CSP violation'
-    return f'{prefix}: {directive} blocked {blocked}'[:500]
+    return _sanitize_text(f'{prefix}: {directive} blocked {blocked}', max_length=500) or 'CSP violation'
 
 
 def _parse_payload(raw_data: Any, *, content_type: str, fallback_ua: str | None) -> dict[str, Any]:
@@ -368,6 +426,7 @@ def _parse_payload(raw_data: Any, *, content_type: str, fallback_ua: str | None)
             'error_message': _csp_summary_message(primary),
             'stack': None,
             'url': first_url or primary.get('document_uri'),
+            'referrer': primary.get('referrer'),
             'user_agent': first_ua or _sanitize_text(fallback_ua, max_length=256),
             'release': 'unknown',
             'csp': primary,
@@ -393,6 +452,7 @@ def _parse_payload(raw_data: Any, *, content_type: str, fallback_ua: str | None)
             'error_message': _csp_summary_message(details),
             'stack': None,
             'url': details.get('document_uri'),
+            'referrer': details.get('referrer'),
             'user_agent': _sanitize_text(fallback_ua, max_length=256),
             'release': 'unknown',
             'csp': details,
@@ -418,6 +478,7 @@ def _parse_payload(raw_data: Any, *, content_type: str, fallback_ua: str | None)
 
     stack = _sanitize_text(raw_data.get('stack'), max_length=4000)
     url = _sanitize_url(raw_data.get('url'))
+    referrer = _sanitize_url(raw_data.get('referrer'))
     user_agent = _sanitize_text(raw_data.get('user_agent') or fallback_ua, max_length=256)
     release = _sanitize_text(raw_data.get('release'), max_length=64) or 'unknown'
     source = _sanitize_text(raw_data.get('source'), max_length=64)
@@ -429,6 +490,7 @@ def _parse_payload(raw_data: Any, *, content_type: str, fallback_ua: str | None)
         'error_message': message,
         'stack': stack,
         'url': url,
+        'referrer': referrer,
         'user_agent': user_agent,
         'release': release,
         'csp': None,
@@ -460,22 +522,36 @@ async def report_client_error(request: Request) -> dict[str, str]:
     if not raw_body:
         raise api_error(status.HTTP_400_BAD_REQUEST, 'INVALID_CLIENT_ERROR_REPORT', 'Empty report body')
 
+    # Top-level parse guard: decoder and normalizer limits on untrusted input are client errors, never 500.
+    # UnicodeDecodeError and JSONDecodeError are ValueError subclasses.
     try:
         parsed_json = json.loads(raw_body.decode('utf-8'))
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise api_error(status.HTTP_400_BAD_REQUEST, 'INVALID_CLIENT_ERROR_REPORT', 'Invalid JSON body') from exc
-
-    normalized = _parse_payload(
-        parsed_json,
-        content_type=raw_content_type or 'application/json',
-        fallback_ua=request.headers.get('user-agent'),
-    )
+        normalized = _parse_payload(
+            parsed_json,
+            content_type=raw_content_type or 'application/json',
+            fallback_ua=request.headers.get('user-agent'),
+        )
+    except ApiHTTPException:
+        raise
+    except (ValueError, TypeError, RecursionError, OverflowError) as exc:
+        raise api_error(
+            status.HTTP_400_BAD_REQUEST,
+            'INVALID_CLIENT_ERROR_REPORT',
+            'Invalid report payload',
+        ) from exc
 
     if normalized.get('dropped'):
         return {'status': 'accepted'}
 
     if normalized['kind'] == 'csp' and not _should_log_csp_report():
         return {'status': 'accepted'}
+
+    http_context: dict[str, Any] = {
+        'url': normalized['url'],
+        'userAgent': normalized['user_agent'],
+    }
+    if normalized.get('referrer'):
+        http_context['referrer'] = normalized['referrer']
 
     log_payload: dict[str, Any] = {
         'event': 'client_error_reported',
@@ -494,12 +570,11 @@ async def report_client_error(request: Request) -> dict[str, str]:
             'version': normalized['release'],
         },
         'context': {
-            'httpRequest': {
-                'url': normalized['url'],
-                'userAgent': normalized['user_agent'],
-            },
+            'httpRequest': http_context,
         },
     }
+    if normalized.get('referrer'):
+        log_payload['referrer'] = normalized['referrer']
     if normalized['stack']:
         log_payload['stack'] = normalized['stack']
     if normalized['csp']:

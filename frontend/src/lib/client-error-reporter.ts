@@ -8,6 +8,7 @@ export interface ClientErrorReportPayload {
   message: string;
   stack?: string;
   url?: string;
+  referrer?: string;
   user_agent?: string;
   release?: string;
 }
@@ -17,6 +18,7 @@ export interface ClientErrorReportOptions {
   source?: string;
   sampleRate?: number;
   url?: string;
+  referrer?: string;
   userAgent?: string;
   release?: string;
   endpoint?: string | null;
@@ -37,6 +39,7 @@ export interface GlobalErrorHandlerOptions {
 const DEFAULT_GLOBAL_SAMPLE_RATE = 1;
 const DEDUP_WINDOW_MS = 60_000;
 const MAX_REPORTS_PER_SESSION = 20;
+const SESSION_COUNT_STORAGE_KEY = 'ps_client_error_count_v1';
 const MAX_MESSAGE_CHARS = 500;
 const MAX_STACK_CHARS = 3_500;
 const MAX_URL_CHARS = 512;
@@ -44,10 +47,19 @@ const MAX_UA_CHARS = 256;
 
 const CSP_ERROR_PATTERN = /\b(?:content[- ]security[- ]policy|securitypolicyviolation)\b/i;
 
+// Single shared lists used for redacting BOTH standalone URLs (url, referrer)
+// and free-text fields (message, stack, source, user_agent, release).
+export const CAPABILITY_PATH_PREFIXES = [
+  '/share/',
+  '/public/reviews/',
+] as const;
+
 export const SENSITIVE_QUERY_PARAMS = new Set([
   'token',
   'photo_token',
   'generation_token',
+  'share_token',
+  'grant_token',
   'access_token',
   'guest_token',
   'session_token',
@@ -59,29 +71,90 @@ export const SENSITIVE_QUERY_PARAMS = new Set([
   'secret',
   'signature',
   'code',
+  'state',
   'auth',
   'authorization',
   'x-amz-signature',
   'x-amz-credential',
   'x-amz-security-token',
+  'x-goog-signature',
+  'x-goog-credential',
   '__clerk_handshake',
   '__clerk_db_jwt',
   '__clerk_ticket',
   '__clerk_status',
+  '__clerk_created_session',
 ]);
 
+// Every signed-URL parameter in these families (X-Amz-Date, X-Amz-Expires, ...) is redacted.
+export const SENSITIVE_QUERY_PARAM_PREFIXES = ['x-amz-', 'x-goog-'] as const;
+
+function isSensitiveQueryParam(key: string): boolean {
+  const normalized = key.trim().toLowerCase();
+  return SENSITIVE_QUERY_PARAMS.has(normalized) || SENSITIVE_QUERY_PARAM_PREFIXES.some((prefix) => normalized.startsWith(prefix));
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Tokens never contain `[`, so an already-redacted `[redacted]` segment is left alone.
+const CAPABILITY_PATH_PATTERN = new RegExp(
+  `(${CAPABILITY_PATH_PREFIXES.map(escapeRegExp).join('|')})([^/?#\\s"'<>\\)\\[\\]]+)`,
+  'gi',
+);
+const ENCODED_CAPABILITY_PATH_PATTERN = new RegExp(
+  `(${CAPABILITY_PATH_PREFIXES.map((p) => escapeRegExp(p.replaceAll('/', '%2f'))).join('|')})((?:(?!%2[fF]|%3[fF]|%23|[/?#&\\s"'<>\\)\\[\\]]).)+)`,
+  'gi',
+);
+const SENSITIVE_QUERY_ALT = [
+  ...SENSITIVE_QUERY_PARAM_PREFIXES.map((prefix) => `${escapeRegExp(prefix)}[a-z0-9-]+`),
+  ...[...SENSITIVE_QUERY_PARAMS].sort((a, b) => b.length - a.length).map(escapeRegExp),
+].join('|');
+const SECRET_QUERY_TEXT_PATTERN = new RegExp(
+  `((?:^|[?&]|%3[fF]|%26|\\\\u0026|\\\\u003[fF]|&amp;)(?:${SENSITIVE_QUERY_ALT})(?:=|%3[dD]|\\\\u003[dD]))(?:(?!%26|\\\\u0026|&amp;|[&\\s"'<>\\)\\]]).)*`,
+  'gi',
+);
 const BEARER_PATTERN = /\bBearer\s+[A-Za-z0-9\-._~+/]+=*/gi;
-const SECRET_QUERY_TEXT_PATTERN =
-  /([?&](?:token|photo_token|generation_token|access_token|guest_token|session_token|refresh_token|id_token|x-amz-signature|x-amz-credential|x-amz-security-token|__clerk_handshake|__clerk_db_jwt)=)[^&\s"'<>]+/gi;
+const URL_USERINFO_PATTERN = /\b(https?:\/\/)([^/\s@"'<>]+)@/gi;
 
 const recentFingerprints = new Map<string, number>();
-let sessionReportCount = 0;
+let inMemorySessionReportCount = 0;
 let isDispatchingReport = false;
 let reportingTransportFailed = false;
 
 let globalHandlersInstalled = false;
 let globalHandlersRefCount = 0;
 let activeGlobalCleanup: (() => void) | null = null;
+
+function readSessionReportCount(): number {
+  let storedCount = 0;
+  try {
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      const raw = window.sessionStorage.getItem(SESSION_COUNT_STORAGE_KEY);
+      if (raw !== null) {
+        const parsed = Number.parseInt(raw, 10);
+        if (Number.isFinite(parsed) && parsed > 0) {
+          storedCount = parsed;
+        }
+      }
+    }
+  } catch {
+    // Restricted storage access falls back to in-memory tracking.
+  }
+  return Math.max(inMemorySessionReportCount, storedCount);
+}
+
+function writeSessionReportCount(nextCount: number): void {
+  inMemorySessionReportCount = nextCount;
+  try {
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      window.sessionStorage.setItem(SESSION_COUNT_STORAGE_KEY, String(nextCount));
+    }
+  } catch {
+    // Best-effort persistence only.
+  }
+}
 
 function resolveDefaultGlobalSampleRate(): number {
   const raw = process.env.NEXT_PUBLIC_CLIENT_ERROR_SAMPLE_RATE?.trim();
@@ -98,7 +171,7 @@ function resolveRelease(): string {
   const configured =
     process.env.NEXT_PUBLIC_RELEASE?.trim() ||
     process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA?.trim();
-  return (configured || 'dev').slice(0, 64);
+  return sanitizeReportText(configured || 'dev', 64) ?? 'dev';
 }
 
 export function resolveClientErrorEndpoint(apiBase?: string): string | null {
@@ -124,6 +197,19 @@ export function resolveClientErrorEndpoint(apiBase?: string): string | null {
   }
 }
 
+function redactCapabilityPaths(value: string): string {
+  return value
+    .replace(CAPABILITY_PATH_PATTERN, '$1[redacted]')
+    .replace(ENCODED_CAPABILITY_PATH_PATTERN, '$1[redacted]');
+}
+
+function redactSensitiveText(value: string): string {
+  return redactCapabilityPaths(value)
+    .replace(URL_USERINFO_PATTERN, '$1***@')
+    .replace(BEARER_PATTERN, 'Bearer ***')
+    .replace(SECRET_QUERY_TEXT_PATTERN, '$1***');
+}
+
 export function sanitizeReportUrl(rawUrl?: string | null): string | undefined {
   if (!rawUrl || typeof rawUrl !== 'string') {
     return undefined;
@@ -141,14 +227,15 @@ export function sanitizeReportUrl(rawUrl?: string | null): string | undefined {
     parsed.username = '';
     parsed.password = '';
     parsed.hash = '';
+    const safePath = redactCapabilityPaths(parsed.pathname);
     const kept = new URLSearchParams();
     for (const [key, value] of parsed.searchParams.entries()) {
-      if (!SENSITIVE_QUERY_PARAMS.has(key.trim().toLowerCase())) {
+      if (!isSensitiveQueryParam(key)) {
         kept.append(key, value);
       }
     }
     const query = kept.toString();
-    return `${parsed.origin}${parsed.pathname}${query ? `?${query}` : ''}`.slice(0, MAX_URL_CHARS);
+    return redactSensitiveText(`${parsed.origin}${safePath}${query ? `?${query}` : ''}`).slice(0, MAX_URL_CHARS);
   } catch {
     return undefined;
   }
@@ -158,10 +245,7 @@ export function sanitizeReportText(raw?: string | null, maxLength = MAX_MESSAGE_
   if (!raw || typeof raw !== 'string') {
     return undefined;
   }
-  const scrubbed = raw
-    .trim()
-    .replace(BEARER_PATTERN, 'Bearer ***')
-    .replace(SECRET_QUERY_TEXT_PATTERN, '$1***');
+  const scrubbed = redactSensitiveText(raw.trim());
   if (!scrubbed) {
     return undefined;
   }
@@ -229,7 +313,7 @@ export function reportClientError(
     return false;
   }
 
-  const source = options.source?.trim().slice(0, 64) || undefined;
+  const source = sanitizeReportText(options.source, 64);
   const { message: rawMessage, stack: rawStack } = extractMessageAndStack(errorOrMessage);
   const message = sanitizeReportText(rawMessage, MAX_MESSAGE_CHARS);
   if (!message) {
@@ -244,7 +328,8 @@ export function reportClientError(
   const stack = sanitizeReportText(rawStack, MAX_STACK_CHARS);
   const now = (options.now ?? Date.now)();
 
-  if (sessionReportCount >= MAX_REPORTS_PER_SESSION) {
+  const currentCount = readSessionReportCount();
+  if (currentCount >= MAX_REPORTS_PER_SESSION) {
     return false;
   }
 
@@ -270,19 +355,25 @@ export function reportClientError(
   }
 
   recentFingerprints.set(fingerprint, now);
-  sessionReportCount += 1;
+  writeSessionReportCount(currentCount + 1);
 
   const currentUrl = options.url ?? (typeof window !== 'undefined' ? window.location?.href : undefined);
+  const currentReferrer = options.referrer ?? (typeof document !== 'undefined' ? document.referrer || undefined : undefined);
   const currentUa = options.userAgent ?? (typeof navigator !== 'undefined' ? navigator.userAgent : undefined);
+  const sanitizedUrl = sanitizeReportUrl(currentUrl);
+  const sanitizedReferrer = sanitizeReportUrl(currentReferrer);
+  const sanitizedUa = sanitizeReportText(currentUa, MAX_UA_CHARS);
+  const sanitizedRelease = sanitizeReportText(options.release, 64) ?? resolveRelease();
 
   const payload: ClientErrorReportPayload = {
     kind,
     ...(source ? { source } : {}),
     message,
     ...(stack ? { stack } : {}),
-    ...(sanitizeReportUrl(currentUrl) ? { url: sanitizeReportUrl(currentUrl) } : {}),
-    ...(sanitizeReportText(currentUa, MAX_UA_CHARS) ? { user_agent: sanitizeReportText(currentUa, MAX_UA_CHARS) } : {}),
-    release: (options.release ?? resolveRelease()).slice(0, 64),
+    ...(sanitizedUrl ? { url: sanitizedUrl } : {}),
+    ...(sanitizedReferrer ? { referrer: sanitizedReferrer } : {}),
+    ...(sanitizedUa ? { user_agent: sanitizedUa } : {}),
+    release: sanitizedRelease,
   };
 
   isDispatchingReport = true;
@@ -296,12 +387,18 @@ export function reportClientError(
       },
       body: JSON.stringify(payload),
     });
-    if (requestPromise && typeof requestPromise.catch === 'function') {
-      void requestPromise.catch(() => {
-        // Once the reporting transport fails (e.g. blocked or offline), skip
-        // further reporting for this page session and never emit unhandled rejections.
-        reportingTransportFailed = true;
-      });
+    if (requestPromise && typeof requestPromise.then === 'function') {
+      void requestPromise
+        .then((response) => {
+          if (!response || !response.ok) {
+            reportingTransportFailed = true;
+          }
+        })
+        .catch(() => {
+          // Once the reporting endpoint returns non-2xx or fails at the network
+          // layer, stop sending for the rest of this page session.
+          reportingTransportFailed = true;
+        });
     }
     return true;
   } catch {
@@ -379,11 +476,20 @@ export function installGlobalClientErrorHandlers(options: GlobalErrorHandlerOpti
   };
 }
 
-export function resetClientErrorReporterForTests(): void {
+export function resetClientErrorReporterForTests(options: { clearStorage?: boolean } = {}): void {
   recentFingerprints.clear();
-  sessionReportCount = 0;
+  inMemorySessionReportCount = 0;
   isDispatchingReport = false;
   reportingTransportFailed = false;
+  if (options.clearStorage !== false) {
+    try {
+      if (typeof window !== 'undefined' && window.sessionStorage) {
+        window.sessionStorage.removeItem(SESSION_COUNT_STORAGE_KEY);
+      }
+    } catch {
+      // ignore
+    }
+  }
   if (activeGlobalCleanup) {
     activeGlobalCleanup();
   }
