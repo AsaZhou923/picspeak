@@ -44,7 +44,8 @@ from app.core.logging_config import (
 )
 from app.core.security import JWTValidationError
 from app.db.models import UserPlan
-from app.main import _check_database_readiness, app
+from app.db.session import create_readiness_engine, engine as shared_engine, readiness_engine
+from app.main import _check_database_readiness, _reset_readiness_state, app
 from app.schemas import BillingCheckoutRequest, CreditPackCheckoutRequest, GenerationCreateRequest, PresignRequest, ReviewMetaUpdateRequest
 from app.services import clerk_auth, lemonsqueezy_webhooks
 from app.services.content_audit import ContentAuditError
@@ -494,9 +495,11 @@ class ErrorTextHardeningTests(unittest.TestCase):
 class ReadinessProbeTests(unittest.TestCase):
     def setUp(self) -> None:
         reset_pending_task_alert_cooldown()
+        _reset_readiness_state()
 
     def tearDown(self) -> None:
         reset_pending_task_alert_cooldown()
+        _reset_readiness_state()
 
     def test_readyz_returns_minimal_ok_without_backlog_queries_and_skips_audit(self) -> None:
         with (
@@ -536,23 +539,97 @@ class ReadinessProbeTests(unittest.TestCase):
         schedule_audit.assert_not_called()
 
     def test_readyz_times_out_and_returns_503_unavailable(self) -> None:
-        def slow_db(_timeout_seconds: float) -> None:
-            time.sleep(0.5)
+        import threading
 
-        with (
-            patch('app.main.worker.start'),
-            patch('app.main.worker.stop'),
-            patch('app.main.settings.readyz_db_timeout_seconds', 0.1),
-            patch('app.main._check_database_readiness', side_effect=slow_db),
-        ):
-            with TestClient(app) as client:
-                started = time.monotonic()
-                response = client.get('/readyz')
-                elapsed = time.monotonic() - started
+        release = threading.Event()
+
+        def slow_db(_timeout_seconds: float) -> None:
+            release.wait(timeout=2.0)
+
+        try:
+            with (
+                patch('app.main.worker.start'),
+                patch('app.main.worker.stop'),
+                patch('app.main.settings.readyz_db_timeout_seconds', 0.1),
+                patch('app.main._check_database_readiness', side_effect=slow_db),
+            ):
+                with TestClient(app) as client:
+                    started = time.monotonic()
+                    response = client.get('/readyz')
+                    elapsed = time.monotonic() - started
+        finally:
+            release.set()
 
         self.assertEqual(response.status_code, 503)
         self.assertEqual(response.json(), {'status': 'unavailable'})
         self.assertLess(elapsed, 0.45)
+
+    def test_readyz_uses_dedicated_nullpool_engine_and_caps_concurrent_probes(self) -> None:
+        import threading
+        from sqlalchemy.pool import NullPool
+
+        self.assertIsNot(readiness_engine, shared_engine)
+        self.assertIsInstance(readiness_engine.pool, NullPool)
+
+        pg_probe_engine = create_readiness_engine(
+            'postgresql+psycopg2://postgres:postgres@127.0.0.1:5432/picspeak_test',
+            timeout_seconds=2.0,
+        )
+        try:
+            self.assertIsInstance(pg_probe_engine.pool, NullPool)
+        finally:
+            pg_probe_engine.dispose()
+
+        # Verify single in-flight probe concurrency cap and 1s cache behavior.
+        import app.main as app_main
+
+        probe_started = threading.Event()
+        release_probe = threading.Event()
+        probe_calls = 0
+
+        def blocking_probe(_timeout_seconds: float) -> None:
+            nonlocal probe_calls
+            probe_calls += 1
+            probe_started.set()
+            release_probe.wait(timeout=3.0)
+
+        with (
+            patch('app.main.worker.start'),
+            patch('app.main.worker.stop'),
+            patch('app.main._check_database_readiness', side_effect=blocking_probe),
+        ):
+            with TestClient(app) as client:
+                # 1) Seed a fresh cached OK result (<1s old), then hold one probe in-flight.
+                with app_main._readyz_state_lock:
+                    app_main._readyz_last_ok = True
+                    app_main._readyz_last_checked_monotonic = time.monotonic()
+
+                first_result: list[int] = []
+
+                def call_first() -> None:
+                    first_result.append(client.get('/readyz').status_code)
+
+                t = threading.Thread(target=call_first)
+                t.start()
+                self.assertTrue(probe_started.wait(timeout=2.0))
+
+                # Concurrent caller while probe is in-flight gets cached 200 without starting a 2nd probe.
+                cached_ok = client.get('/readyz')
+                self.assertEqual(cached_ok.status_code, 200)
+                self.assertEqual(cached_ok.json(), {'status': 'ok'})
+                self.assertEqual(probe_calls, 1)
+
+                # Once cache is stale (>1s old), concurrent caller gets 503 without starting a 2nd probe.
+                with app_main._readyz_state_lock:
+                    app_main._readyz_last_checked_monotonic = time.monotonic() - 2.0
+                stale_concurrent = client.get('/readyz')
+                self.assertEqual(stale_concurrent.status_code, 503)
+                self.assertEqual(stale_concurrent.json(), {'status': 'unavailable'})
+                self.assertEqual(probe_calls, 1)
+
+                release_probe.set()
+                t.join(timeout=2.0)
+                self.assertEqual(first_result, [200])
 
     def test_healthz_stays_lightweight_without_touching_db(self) -> None:
         with (
@@ -585,7 +662,7 @@ class ReadinessProbeTests(unittest.TestCase):
         cm.__enter__.return_value = conn
         cm.__exit__.return_value = False
 
-        with patch('app.main.engine.begin', return_value=cm):
+        with patch('app.main.readiness_engine.begin', return_value=cm):
             _check_database_readiness(2.0)
 
         self.assertEqual(len(executed), 2)

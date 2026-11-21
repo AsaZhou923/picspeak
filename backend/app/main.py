@@ -1,6 +1,7 @@
 import asyncio
 from contextlib import asynccontextmanager
 import logging
+import threading
 import time
 from uuid import uuid4
 
@@ -25,7 +26,7 @@ from app.core.logging_config import (
 )
 from app.core.network import client_ip_from_request
 from app.core.request_limits import RequestBodyLimitMiddleware
-from app.db.session import SessionLocal, engine
+from app.db.session import SessionLocal, readiness_engine
 from app.services.audit import log_api_request
 from app.services.worker import worker
 
@@ -383,9 +384,24 @@ async def request_audit_middleware(request: Request, call_next):
             )
 
 
+_READYZ_CACHE_TTL_SECONDS = 1.0
+_readyz_state_lock = threading.Lock()
+_readyz_in_flight = False
+_readyz_last_ok: bool | None = None
+_readyz_last_checked_monotonic: float | None = None
+
+
+def _reset_readiness_state() -> None:
+    global _readyz_in_flight, _readyz_last_ok, _readyz_last_checked_monotonic
+    with _readyz_state_lock:
+        _readyz_in_flight = False
+        _readyz_last_ok = None
+        _readyz_last_checked_monotonic = None
+
+
 def _check_database_readiness(timeout_seconds: float) -> None:
     timeout_ms = max(int(timeout_seconds * 1000), 100)
-    with engine.begin() as conn:
+    with readiness_engine.begin() as conn:
         if conn.dialect.name == 'postgresql':
             conn.execute(text("SELECT set_config('statement_timeout', :timeout_ms, true)"), {'timeout_ms': str(timeout_ms)})
         conn.execute(text('SELECT 1')).scalar()
@@ -398,17 +414,55 @@ def healthz():
 
 @app.get('/readyz')
 async def readyz():
-    timeout_seconds = max(float(settings.readyz_db_timeout_seconds), 0.1)
-    try:
-        await asyncio.wait_for(
-            asyncio.to_thread(_check_database_readiness, timeout_seconds),
-            timeout=timeout_seconds,
+    global _readyz_in_flight, _readyz_last_ok, _readyz_last_checked_monotonic
+
+    now = time.monotonic()
+    with _readyz_state_lock:
+        cache_fresh = (
+            _readyz_last_ok is not None
+            and _readyz_last_checked_monotonic is not None
+            and (now - _readyz_last_checked_monotonic) <= _READYZ_CACHE_TTL_SECONDS
         )
-    except Exception:
-        logger.warning('Database readiness check failed', exc_info=True)
+        if _readyz_in_flight:
+            if cache_fresh and _readyz_last_ok:
+                return {'status': 'ok'}
+            return JSONResponse(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                content={'status': 'unavailable'},
+            )
+        _readyz_in_flight = True
+
+    timeout_seconds = max(float(settings.readyz_db_timeout_seconds), 0.1)
+
+    def _run_probe() -> bool:
+        global _readyz_in_flight, _readyz_last_ok, _readyz_last_checked_monotonic
+        ok = False
+        try:
+            _check_database_readiness(timeout_seconds)
+            ok = True
+        except Exception:
+            logger.warning('Database readiness check failed', exc_info=True)
+            ok = False
+        finally:
+            finished_at = time.monotonic()
+            with _readyz_state_lock:
+                _readyz_last_ok = ok
+                _readyz_last_checked_monotonic = finished_at
+                _readyz_in_flight = False
+        return ok
+
+    try:
+        ok = await asyncio.wait_for(asyncio.to_thread(_run_probe), timeout=timeout_seconds)
+    except asyncio.TimeoutError:
+        logger.warning('Database readiness check timed out after %.2fs', timeout_seconds)
+        with _readyz_state_lock:
+            _readyz_last_ok = False
+            _readyz_last_checked_monotonic = time.monotonic()
+        ok = False
+
+    if not ok:
         return JSONResponse(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             content={'status': 'unavailable'},
         )
-
     return {'status': 'ok'}
