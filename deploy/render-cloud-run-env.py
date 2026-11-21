@@ -92,6 +92,11 @@ def parse_env_yaml(text: str) -> list[tuple[str, str]]:
         value = _parse_scalar(raw_value, line_no)
         if '\n' in value or '\r' in value:
             raise ValueError(f'Line {line_no}: multiline values are not supported for {key!r}')
+        if '"' in value:
+            raise ValueError(
+                f'Line {line_no}: double quotes (") are not allowed in value for {key!r} '
+                '(Windows cmd.exe cannot pass literal double quotes reliably through gcloud)'
+            )
         seen.add(key)
         entries.append((key, value))
 
@@ -103,6 +108,15 @@ def parse_env_yaml(text: str) -> list[tuple[str, str]]:
 def render_update_env_vars(entries: list[tuple[str, str]]) -> str:
     if not entries:
         raise ValueError('At least one environment variable is required')
+
+    for key, value in entries:
+        if '\n' in value or '\r' in value:
+            raise ValueError(f'Multiline values are not supported for {key!r}')
+        if '"' in value:
+            raise ValueError(
+                f'Double quotes (") are not allowed in value for {key!r} '
+                '(Windows cmd.exe cannot pass literal double quotes reliably through gcloud)'
+            )
 
     pairs = [f'{key}={value}' for key, value in entries]
     needs_custom_delimiter = any(',' in value for _, value in entries) or pairs[0].startswith('^')

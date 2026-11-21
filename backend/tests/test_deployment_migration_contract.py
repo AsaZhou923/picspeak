@@ -4,6 +4,7 @@ import importlib.util
 import re
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -90,6 +91,8 @@ class DeploymentMigrationContractTests(unittest.TestCase):
         self.assertIn('Refusing to deploy from a dirty working tree', script)
         self.assertIn('cd /d "%~dp0..\\backend"', script)
         self.assertNotIn('E:\\Project Code', script)
+        self.assertNotIn('ENV_RENDER_TMP', script)
+        self.assertNotIn('%RANDOM%', script)
 
     def test_deploy_paths_activate_review_profiles_live_payments_and_usage_policy(self) -> None:
         config = (REPO_ROOT / 'cloudbuild.yaml').read_text(encoding='utf-8')
@@ -167,10 +170,28 @@ class DeploymentMigrationContractTests(unittest.TestCase):
             'nested:\n  CHILD: "1"\n',
             'lower_key: "1"\n',
             'MISSING_VALUE:\n',
+            'QUOTED_SINGLE: \'say "hi there"\'\n',
+            'QUOTED_DOUBLE: "say \\"hi there\\""\n',
         ):
             with self.subTest(invalid=invalid):
                 with self.assertRaises(ValueError):
                     renderer.parse_env_yaml(invalid)
+
+        with self.assertRaises(ValueError):
+            renderer.render_update_env_vars([('A', 'say "hi"')])
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            bad_yaml = Path(tmpdir) / 'bad.yaml'
+            bad_yaml.write_text('A: \'say "hi there"\'\n', encoding='utf-8')
+            completed = subprocess.run(
+                [sys.executable, str(ENV_RENDERER), str(bad_yaml)],
+                capture_output=True,
+                text=True,
+                encoding='utf-8',
+                check=False,
+            )
+            self.assertEqual(completed.returncode, 1)
+            self.assertIn('double quotes', completed.stderr.lower())
 
     def test_cloud_run_jobs_doc_covers_operator_scripts_with_safety_gates(self) -> None:
         doc = (REPO_ROOT / 'deploy' / 'cloud-run-jobs.md').read_text(encoding='utf-8')
@@ -178,7 +199,18 @@ class DeploymentMigrationContractTests(unittest.TestCase):
         self.assertIn('picspeak-supabase-database-url', doc)
         self.assertIn('gcloud run jobs deploy', doc)
         self.assertIn('gcloud run jobs execute', doc)
+        self.assertIn('gcloud run jobs update', doc)
+        self.assertIn('--update-secrets="/secrets/announcement/spec.json=', doc)
+        self.assertNotIn('--set-secrets="/secrets/announcement/spec.json=', doc)
         for token in (
+            'APP_ENV=production',
+            'APP_SECRET=',
+            'OAUTH_JWT_SECRET=',
+            'NOTIFICATIONS_READ_ENABLED=true',
+            'NOTIFICATIONS_EVENT_CAPTURE_ENABLED=true',
+            'NOTIFICATIONS_WORKER_ENABLED=true',
+            'ANNOUNCEMENT_PUBLISH_ENABLED=true',
+            'import-update',
             'purge_expired_objects.py',
             'PICSPEAK_RETENTION_EXECUTE=1',
             'purge_expired_review_history.py',

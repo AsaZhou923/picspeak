@@ -12,9 +12,6 @@ set SERVICE_NAME=picspeak-api
 set MIGRATION_JOB=picspeak-db-migrate
 set DATABASE_SECRET=picspeak-supabase-database-url
 set RUNTIME_SERVICE_ACCOUNT=781338217290-compute@developer.gserviceaccount.com
-set "REPO_ROOT=%~dp0.."
-set "ENV_RENDERER=%~dp0render-cloud-run-env.py"
-set "ENV_FILE=%~dp0cloud-run-env.yaml"
 
 cd /d "%~dp0..\backend"
 
@@ -29,9 +26,8 @@ for /f %%i in ('git status --porcelain') do (
 )
 
 set "PYTHON_CMD="
-set "PYTHON_EXTRA_ARG="
-if exist "%REPO_ROOT%\.venv\Scripts\python.exe" (
-  set "PYTHON_CMD=%REPO_ROOT%\.venv\Scripts\python.exe"
+if exist "..\.venv\Scripts\python.exe" (
+  set "PYTHON_CMD=..\.venv\Scripts\python.exe"
 ) else (
   where python >nul 2>&1
   if not errorlevel 1 (
@@ -39,8 +35,7 @@ if exist "%REPO_ROOT%\.venv\Scripts\python.exe" (
   ) else (
     where py >nul 2>&1
     if not errorlevel 1 (
-      set "PYTHON_CMD=py"
-      set "PYTHON_EXTRA_ARG=-3"
+      set "PYTHON_CMD=py -3"
     )
   )
 )
@@ -50,21 +45,17 @@ if not defined PYTHON_CMD (
   exit /b 1
 )
 
-set "ENV_RENDER_TMP=%TEMP%\picspeak-cloud-run-env-%RANDOM%.txt"
-if defined PYTHON_EXTRA_ARG (
-  "%PYTHON_CMD%" %PYTHON_EXTRA_ARG% "%ENV_RENDERER%" "%ENV_FILE%" > "%ENV_RENDER_TMP%"
-) else (
-  "%PYTHON_CMD%" "%ENV_RENDERER%" "%ENV_FILE%" > "%ENV_RENDER_TMP%"
-)
+rem Validate exit code first (for /f discards command exit codes), then capture
+rem stdout directly with relative paths so spaces in parent folders or temp-file
+rem collisions across concurrent runs cannot occur.
+%PYTHON_CMD% ..\deploy\render-cloud-run-env.py ..\deploy\cloud-run-env.yaml >nul
 if errorlevel 1 (
-  if exist "%ENV_RENDER_TMP%" del /q "%ENV_RENDER_TMP%" >nul 2>&1
   echo [ERROR] Failed to render Cloud Run environment overrides from deploy\cloud-run-env.yaml.
   exit /b 1
 )
 
 set "UPDATE_ENV_VARS="
-for /f "usebackq delims=" %%i in ("%ENV_RENDER_TMP%") do set "UPDATE_ENV_VARS=%%i"
-del /q "%ENV_RENDER_TMP%" >nul 2>&1
+for /f "usebackq delims=" %%i in (`%PYTHON_CMD% ..\deploy\render-cloud-run-env.py ..\deploy\cloud-run-env.yaml`) do set "UPDATE_ENV_VARS=%%i"
 if not defined UPDATE_ENV_VARS (
   echo [ERROR] Rendered Cloud Run environment overrides are empty.
   exit /b 1

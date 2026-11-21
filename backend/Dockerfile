@@ -33,6 +33,8 @@ COPY alembic ./alembic
 COPY alembic.ini ./alembic.ini
 COPY scripts ./scripts
 
+# Run unprivileged; /app stays read-only to UID 10001 while standard Debian
+# sticky directories (/tmp, /var/tmp, /run/lock) remain writable for tempfiles.
 USER 10001:10001
 
 EXPOSE 8080
