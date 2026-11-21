@@ -465,12 +465,17 @@ async def readyz():
             # shield: a caller's timeout must not cancel the probe other callers share.
             ok = await asyncio.wait_for(asyncio.shield(asyncio.wrap_future(probe)), timeout=timeout_seconds)
         except asyncio.TimeoutError:
-            logger.warning('Database readiness check timed out after %.2fs', timeout_seconds)
             with _readyz_state_lock:
-                if not probe.done():
+                timed_out = not probe.done()
+                if timed_out:
                     _readyz_last_ok = False
                     _readyz_last_checked_monotonic = time.monotonic()
-            ok = False
+                    ok = False
+                else:
+                    # The probe resolved right at the deadline; report its result.
+                    ok = probe.result()
+            if timed_out:
+                logger.warning('Database readiness check timed out after %.2fs', timeout_seconds)
 
     if not ok:
         return JSONResponse(

@@ -709,6 +709,30 @@ class ReadinessProbeTests(unittest.TestCase):
 
         self.assertEqual(results, [(200, {'status': 'ok'})] * 10)
 
+    def test_readyz_reports_probe_result_that_lands_at_the_deadline(self) -> None:
+        import asyncio
+
+        async def deadline_race_wait_for(awaitable, timeout):
+            # The shared probe resolves, but the caller's own deadline fires first.
+            await awaitable
+            raise asyncio.TimeoutError
+
+        with (
+            patch('app.main.worker.start'),
+            patch('app.main.worker.stop'),
+            patch('app.main._check_database_readiness'),
+            patch('app.main.asyncio.wait_for', side_effect=deadline_race_wait_for),
+            patch('app.main.logger') as main_logger,
+        ):
+            with TestClient(app) as client:
+                response = client.get('/readyz')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {'status': 'ok'})
+        self.assertFalse(
+            any('timed out' in str(call.args[0]) for call in main_logger.warning.call_args_list),
+        )
+
     def test_healthz_stays_lightweight_without_touching_db(self) -> None:
         with (
             patch('app.main._schedule_audit_task') as schedule_audit,
