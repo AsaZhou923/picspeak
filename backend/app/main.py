@@ -1,4 +1,5 @@
 import asyncio
+from concurrent.futures import Future
 from contextlib import asynccontextmanager
 import logging
 import threading
@@ -386,15 +387,16 @@ async def request_audit_middleware(request: Request, call_next):
 
 _READYZ_CACHE_TTL_SECONDS = 1.0
 _readyz_state_lock = threading.Lock()
-_readyz_in_flight = False
+# At most one probe runs per process; concurrent callers await its result.
+_readyz_probe: Future[bool] | None = None
 _readyz_last_ok: bool | None = None
 _readyz_last_checked_monotonic: float | None = None
 
 
 def _reset_readiness_state() -> None:
-    global _readyz_in_flight, _readyz_last_ok, _readyz_last_checked_monotonic
+    global _readyz_probe, _readyz_last_ok, _readyz_last_checked_monotonic
     with _readyz_state_lock:
-        _readyz_in_flight = False
+        _readyz_probe = None
         _readyz_last_ok = None
         _readyz_last_checked_monotonic = None
 
@@ -407,6 +409,24 @@ def _check_database_readiness(timeout_seconds: float) -> None:
         conn.execute(text('SELECT 1')).scalar()
 
 
+def _run_readiness_probe(probe: Future[bool], timeout_seconds: float) -> None:
+    global _readyz_last_ok, _readyz_last_checked_monotonic
+    probe.set_running_or_notify_cancel()
+    ok = False
+    try:
+        _check_database_readiness(timeout_seconds)
+        ok = True
+    except Exception:
+        logger.warning('Database readiness check failed', exc_info=True)
+    finally:
+        # Publish the cached result and resolve waiters atomically, so a waiter
+        # that times out concurrently cannot overwrite a fresher result.
+        with _readyz_state_lock:
+            _readyz_last_ok = ok
+            _readyz_last_checked_monotonic = time.monotonic()
+            probe.set_result(ok)
+
+
 @app.get('/healthz')
 def healthz():
     return {'status': 'ok'}
@@ -414,8 +434,9 @@ def healthz():
 
 @app.get('/readyz')
 async def readyz():
-    global _readyz_in_flight, _readyz_last_ok, _readyz_last_checked_monotonic
+    global _readyz_probe, _readyz_last_ok, _readyz_last_checked_monotonic
 
+    timeout_seconds = max(float(settings.readyz_db_timeout_seconds), 0.1)
     now = time.monotonic()
     with _readyz_state_lock:
         cache_fresh = (
@@ -423,42 +444,33 @@ async def readyz():
             and _readyz_last_checked_monotonic is not None
             and (now - _readyz_last_checked_monotonic) <= _READYZ_CACHE_TTL_SECONDS
         )
-        if _readyz_in_flight:
-            if cache_fresh and _readyz_last_ok:
-                return {'status': 'ok'}
-            return JSONResponse(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                content={'status': 'unavailable'},
-            )
-        _readyz_in_flight = True
+        if cache_fresh:
+            ok: bool | None = _readyz_last_ok
+            probe = None
+        else:
+            ok = None
+            probe = _readyz_probe
+            if probe is None or probe.done():
+                probe = Future()
+                _readyz_probe = probe
+                threading.Thread(
+                    target=_run_readiness_probe,
+                    args=(probe, timeout_seconds),
+                    name='readyz-probe',
+                    daemon=True,
+                ).start()
 
-    timeout_seconds = max(float(settings.readyz_db_timeout_seconds), 0.1)
-
-    def _run_probe() -> bool:
-        global _readyz_in_flight, _readyz_last_ok, _readyz_last_checked_monotonic
-        ok = False
+    if probe is not None:
         try:
-            _check_database_readiness(timeout_seconds)
-            ok = True
-        except Exception:
-            logger.warning('Database readiness check failed', exc_info=True)
-            ok = False
-        finally:
-            finished_at = time.monotonic()
+            # shield: a caller's timeout must not cancel the probe other callers share.
+            ok = await asyncio.wait_for(asyncio.shield(asyncio.wrap_future(probe)), timeout=timeout_seconds)
+        except asyncio.TimeoutError:
+            logger.warning('Database readiness check timed out after %.2fs', timeout_seconds)
             with _readyz_state_lock:
-                _readyz_last_ok = ok
-                _readyz_last_checked_monotonic = finished_at
-                _readyz_in_flight = False
-        return ok
-
-    try:
-        ok = await asyncio.wait_for(asyncio.to_thread(_run_probe), timeout=timeout_seconds)
-    except asyncio.TimeoutError:
-        logger.warning('Database readiness check timed out after %.2fs', timeout_seconds)
-        with _readyz_state_lock:
-            _readyz_last_ok = False
-            _readyz_last_checked_monotonic = time.monotonic()
-        ok = False
+                if not probe.done():
+                    _readyz_last_ok = False
+                    _readyz_last_checked_monotonic = time.monotonic()
+            ok = False
 
     if not ok:
         return JSONResponse(

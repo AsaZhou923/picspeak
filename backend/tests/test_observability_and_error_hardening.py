@@ -599,11 +599,8 @@ class ReadinessProbeTests(unittest.TestCase):
             patch('app.main._check_database_readiness', side_effect=blocking_probe),
         ):
             with TestClient(app) as client:
-                # 1) Seed a fresh cached OK result (<1s old), then hold one probe in-flight.
-                with app_main._readyz_state_lock:
-                    app_main._readyz_last_ok = True
-                    app_main._readyz_last_checked_monotonic = time.monotonic()
-
+                # 1) A cold caller starts one probe and holds it in flight; then seed a fresh
+                #    cached OK result (<1s old) as if an earlier probe had just succeeded.
                 first_result: list[int] = []
 
                 def call_first() -> None:
@@ -612,24 +609,105 @@ class ReadinessProbeTests(unittest.TestCase):
                 t = threading.Thread(target=call_first)
                 t.start()
                 self.assertTrue(probe_started.wait(timeout=2.0))
+                with app_main._readyz_state_lock:
+                    app_main._readyz_last_ok = True
+                    app_main._readyz_last_checked_monotonic = time.monotonic()
 
-                # Concurrent caller while probe is in-flight gets cached 200 without starting a 2nd probe.
+                # A caller within the 1s cache window gets the cached 200 without starting a 2nd probe.
                 cached_ok = client.get('/readyz')
                 self.assertEqual(cached_ok.status_code, 200)
                 self.assertEqual(cached_ok.json(), {'status': 'ok'})
                 self.assertEqual(probe_calls, 1)
 
-                # Once cache is stale (>1s old), concurrent caller gets 503 without starting a 2nd probe.
+                # Once the cache is stale, a concurrent caller awaits the in-flight probe instead of
+                # failing fast, and still does not start a 2nd probe.
                 with app_main._readyz_state_lock:
                     app_main._readyz_last_checked_monotonic = time.monotonic() - 2.0
-                stale_concurrent = client.get('/readyz')
-                self.assertEqual(stale_concurrent.status_code, 503)
-                self.assertEqual(stale_concurrent.json(), {'status': 'unavailable'})
-                self.assertEqual(probe_calls, 1)
+                joined_result: list[int] = []
+                joiner = threading.Thread(target=lambda: joined_result.append(client.get('/readyz').status_code))
+                joiner.start()
+                time.sleep(0.2)
+                self.assertEqual(joined_result, [])
 
                 release_probe.set()
                 t.join(timeout=2.0)
+                joiner.join(timeout=2.0)
                 self.assertEqual(first_result, [200])
+                self.assertEqual(joined_result, [200])
+                self.assertEqual(probe_calls, 1)
+
+    def _concurrent_cold_readyz(self, calls: int = 10) -> list[tuple[int, dict]]:
+        import threading
+
+        barrier = threading.Barrier(calls)
+        results: list[tuple[int, dict]] = []
+        results_lock = threading.Lock()
+        with (
+            patch('app.main.worker.start'),
+            patch('app.main.worker.stop'),
+        ):
+            with TestClient(app) as client:
+
+                def call() -> None:
+                    barrier.wait(timeout=5)
+                    response = client.get('/readyz')
+                    with results_lock:
+                        results.append((response.status_code, response.json()))
+
+                threads = [threading.Thread(target=call) for _ in range(calls)]
+                for thread in threads:
+                    thread.start()
+                for thread in threads:
+                    thread.join(timeout=10)
+        return results
+
+    def test_cold_concurrent_readyz_calls_share_one_healthy_probe(self) -> None:
+        import threading
+
+        probe_calls = 0
+        calls_lock = threading.Lock()
+
+        def slow_healthy_probe(_timeout_seconds: float) -> None:
+            nonlocal probe_calls
+            with calls_lock:
+                probe_calls += 1
+            time.sleep(0.3)
+
+        with patch('app.main._check_database_readiness', side_effect=slow_healthy_probe):
+            results = self._concurrent_cold_readyz(10)
+
+        self.assertEqual(results, [(200, {'status': 'ok'})] * 10)
+        self.assertEqual(probe_calls, 1)
+
+    def test_cold_concurrent_readyz_calls_share_one_failed_probe(self) -> None:
+        def failing_probe(_timeout_seconds: float) -> None:
+            time.sleep(0.2)
+            raise RuntimeError('db down')
+
+        with (
+            patch('app.main._check_database_readiness', side_effect=failing_probe) as probe,
+            self.assertLogs('app.main', level='WARNING'),
+        ):
+            results = self._concurrent_cold_readyz(10)
+
+        self.assertEqual(results, [(503, {'status': 'unavailable'})] * 10)
+        self.assertEqual(probe.call_count, 1)
+
+    @unittest.skipUnless(
+        __import__('os').getenv('PICSPEAK_TEST_DATABASE_URL', '').strip(),
+        'requires disposable PostgreSQL via PICSPEAK_TEST_DATABASE_URL',
+    )
+    def test_cold_concurrent_readyz_calls_against_healthy_postgres_all_return_200(self) -> None:
+        import os
+
+        pg_engine = create_readiness_engine(os.environ['PICSPEAK_TEST_DATABASE_URL'], timeout_seconds=2.0)
+        try:
+            with patch('app.main.readiness_engine', pg_engine):
+                results = self._concurrent_cold_readyz(10)
+        finally:
+            pg_engine.dispose()
+
+        self.assertEqual(results, [(200, {'status': 'ok'})] * 10)
 
     def test_healthz_stays_lightweight_without_touching_db(self) -> None:
         with (
