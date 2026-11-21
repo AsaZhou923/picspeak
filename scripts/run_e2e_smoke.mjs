@@ -1,10 +1,15 @@
 #!/usr/bin/env node
 /**
- * Single end-to-end smoke runner usable both locally (with disposable Docker
- * Postgres + MinIO containers) and in CI (against service containers).
+ * Single end-to-end smoke runner usable both locally (with a disposable Docker
+ * Postgres container) and in CI (against a Postgres service container). Object
+ * storage is always a moto S3 server process started from the backend venv
+ * (`pip install -r backend/requirements-e2e.txt`), so no storage image is pulled.
  *
  * Usage:
  *   node scripts/run_e2e_smoke.mjs [--use-existing-services] [--skip-build]
+ *
+ * --use-existing-services reuses an already running, disposable-marked
+ * PostgreSQL (DATABASE_URL / E2E_PG_PORT) instead of starting a container.
  */
 
 import { execFileSync, spawn } from 'node:child_process';
@@ -20,15 +25,13 @@ const BACKEND_DIR = path.join(REPO_ROOT, 'backend');
 const FRONTEND_DIR = path.join(REPO_ROOT, 'frontend');
 const NEXT_BIN = path.join(FRONTEND_DIR, 'node_modules', 'next', 'dist', 'bin', 'next');
 const PLAYWRIGHT_BIN = path.join(FRONTEND_DIR, 'node_modules', '@playwright', 'test', 'cli.js');
-const MOCKED_FONTS_PATH = path.join(
-  FRONTEND_DIR,
-  'test',
-  'fixtures',
-  'google-fonts-mocked-responses.cjs',
-);
 
 const POSTGRES_IMAGE = 'postgres:17-alpine';
-const MINIO_IMAGE = 'minio/minio:RELEASE.2025-09-07T16-13-09Z';
+// moto's version is pinned in backend/requirements-e2e.txt. The app signs with
+// OBJECT_REGION=auto like production, so presigned uploads use SigV4.
+const S3_BUCKET = 'picspeak-e2e';
+const S3_ACCESS_KEY_ID = 'e2e-testing';
+const S3_SECRET_ACCESS_KEY = 'e2e-testing-secret';
 
 // Explicit allowlist of OS/toolchain environment variables forwarded to child
 // processes. Application, database, storage, AI, Clerk, and libpq PG* variables
@@ -184,7 +187,7 @@ async function stopProcess(child) {
 function removeDockerContainers(names) {
   for (const name of names) {
     try {
-      // -v removes anonymous volumes created by postgres/minio images.
+      // -v removes the anonymous data volume created by the postgres image.
       execFileSync('docker', ['rm', '-f', '-v', name], { stdio: 'ignore' });
     } catch {
       // Container already removed or never created.
@@ -201,14 +204,17 @@ async function main() {
   const fixturePath = path.join(tmpDir, 'e2e-fixture.json');
 
   const dockerContainers = [];
+  let s3Proc = null;
   let backendProc = null;
   let frontendProc = null;
+  let s3Logs = '';
   let backendLogs = '';
   let frontendLogs = '';
 
   const cleanup = async () => {
     await stopProcess(frontendProc);
     await stopProcess(backendProc);
+    await stopProcess(s3Proc);
     removeDockerContainers(dockerContainers);
     try {
       rmSync(tmpDir, { recursive: true, force: true });
@@ -230,27 +236,22 @@ async function main() {
   try {
     const baseChildEnv = buildBaseChildEnv();
     let pgPort;
-    let minioPort;
     let databaseUrl;
-    let objectBucket;
-    let objectAccessKeyId;
-    let objectSecretAccessKey;
+    // Fixed by default because the production build bakes the storage origin
+    // into its CSP; --skip-build must reuse the same port.
+    const s3Port = Number(process.env.E2E_S3_PORT || 19000);
+    const s3Origin = `http://127.0.0.1:${s3Port}`;
     const backendPort = Number(process.env.E2E_BACKEND_PORT || 8000);
     const frontendPort = Number(process.env.E2E_FRONTEND_PORT || 3000);
 
     if (!useExistingServices) {
       // Default Docker mode ignores any inherited DATABASE_URL / OBJECT_* env
-      // and connects exclusively to its own disposable containers.
+      // and connects exclusively to its own disposable container.
       pgPort = await reservePort();
-      minioPort = Number(process.env.E2E_MINIO_PORT || 19000);
       databaseUrl = `postgresql+psycopg2://postgres:postgres@127.0.0.1:${pgPort}/picspeak_e2e`;
-      objectBucket = 'picspeak-e2e';
-      objectAccessKeyId = 'minioadmin';
-      objectSecretAccessKey = 'minioadmin';
 
       const pgContainer = `picspeak-e2e-pg-${runId}`;
-      const minioContainer = `picspeak-e2e-minio-${runId}`;
-      dockerContainers.push(pgContainer, minioContainer);
+      dockerContainers.push(pgContainer);
 
       runSync('docker', [
         'run',
@@ -268,24 +269,6 @@ async function main() {
         POSTGRES_IMAGE,
       ]);
 
-      runSync('docker', [
-        'run',
-        '-d',
-        '--name',
-        minioContainer,
-        '-e',
-        'MINIO_ROOT_USER=minioadmin',
-        '-e',
-        'MINIO_ROOT_PASSWORD=minioadmin',
-        '-e',
-        'MINIO_API_CORS_ALLOW_ORIGIN=*',
-        '-p',
-        `127.0.0.1:${minioPort}:9000`,
-        MINIO_IMAGE,
-        'server',
-        '/data',
-      ]);
-
       // The image's init step runs a temporary socket-only server and then
       // restarts, so readiness is only accepted after consecutive SELECT 1
       // probes over the app's own TCP host and port (explicit failure after
@@ -295,27 +278,39 @@ async function main() {
         cwd: BACKEND_DIR,
         env: { ...baseChildEnv, DATABASE_URL: databaseUrl },
       });
-
-      await waitForHttp(`http://127.0.0.1:${minioPort}/minio/health/live`, 'MinIO');
     } else {
       pgPort = Number(process.env.E2E_PG_PORT || 5432);
-      minioPort = Number(process.env.E2E_MINIO_PORT || 9000);
       databaseUrl =
         process.env.DATABASE_URL ||
         `postgresql+psycopg2://postgres:postgres@127.0.0.1:${pgPort}/picspeak_e2e`;
-      objectBucket = process.env.OBJECT_BUCKET || 'picspeak-e2e';
-      objectAccessKeyId = process.env.OBJECT_ACCESS_KEY_ID || 'minioadmin';
-      objectSecretAccessKey = process.env.OBJECT_SECRET_ACCESS_KEY || 'minioadmin';
 
       // Existing services must already carry the disposable marker; only wait.
       runSync(pythonExe, ['-m', 'app.testing.wait_for_e2e_db'], {
         cwd: BACKEND_DIR,
         env: { ...baseChildEnv, DATABASE_URL: databaseUrl },
       });
-      await waitForHttp(`http://127.0.0.1:${minioPort}/minio/health/live`, 'MinIO');
     }
 
-    const minioOrigin = `http://127.0.0.1:${minioPort}`;
+    // In-memory moto S3 server: state disappears with the process, so there is
+    // no container or volume to clean up.
+    console.log(`Starting moto S3 server on ${s3Origin} ...`);
+    s3Proc = spawn(pythonExe, ['-m', 'moto.server', '-H', '127.0.0.1', '-p', String(s3Port)], {
+      cwd: BACKEND_DIR,
+      env: baseChildEnv,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    s3Proc.stdout.on('data', (chunk) => {
+      s3Logs += chunk.toString();
+    });
+    s3Proc.stderr.on('data', (chunk) => {
+      s3Logs += chunk.toString();
+    });
+    await waitForHttp(`${s3Origin}/moto-api/`, 'moto S3 server (pip install -r backend/requirements-e2e.txt)', {
+      timeoutMs: 30_000,
+      child: s3Proc,
+      logs: () => s3Logs,
+    });
+
     const apiOrigin = `http://127.0.0.1:${backendPort}`;
     const frontendOrigin = `http://localhost:${frontendPort}`;
 
@@ -328,12 +323,12 @@ async function main() {
       E2E_FAKE_AI_ENABLED: 'true',
       RUN_EMBEDDED_WORKER: 'true',
       REVIEW_WORKER_IDLE_SLEEP_MS: '100',
-      OBJECT_BUCKET: objectBucket,
-      OBJECT_BASE_URL: minioOrigin,
-      OBJECT_S3_ENDPOINT: minioOrigin,
-      OBJECT_ACCESS_KEY_ID: objectAccessKeyId,
-      OBJECT_SECRET_ACCESS_KEY: objectSecretAccessKey,
-      OBJECT_REGION: 'us-east-1',
+      OBJECT_BUCKET: S3_BUCKET,
+      OBJECT_BASE_URL: s3Origin,
+      OBJECT_S3_ENDPOINT: s3Origin,
+      OBJECT_ACCESS_KEY_ID: S3_ACCESS_KEY_ID,
+      OBJECT_SECRET_ACCESS_KEY: S3_SECRET_ACCESS_KEY,
+      OBJECT_REGION: 'auto',
       CLERK_SECRET_KEY: '',
       CLERK_WEBHOOK_SIGNING_SECRET: '',
       FRONTEND_ORIGIN: frontendOrigin,
@@ -346,7 +341,7 @@ async function main() {
       env: sharedBackendEnv,
     });
 
-    // 2. Seed deterministic E2E fixtures (MinIO bucket, registered user + JWT, public gallery critique).
+    // 2. Seed deterministic E2E fixtures (S3 bucket + CORS, registered user + JWT, public gallery critique).
     runSync(
       pythonExe,
       ['-m', 'app.testing.seed_e2e', '--reset-guest-limits', '--output', fixturePath],
@@ -361,13 +356,12 @@ async function main() {
       NODE_ENV: 'production',
       NEXT_PUBLIC_API_URL: apiOrigin,
       NEXT_PUBLIC_SITE_URL: frontendOrigin,
-      LOCAL_OBJECT_STORAGE_ORIGIN: minioOrigin,
+      LOCAL_OBJECT_STORAGE_ORIGIN: s3Origin,
       // Dummy pk_live_ key pointing to RFC 2606 `.invalid` keeps @clerk/nextjs
       // middleware/provider bootable without triggering Clerk's pk_test_ dev-browser
       // handshake redirect; Clerk JS immediately fails closed to the guest path.
       NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: 'pk_live_Y2xlcmsuaW52YWxpZCQ',
       CLERK_SECRET_KEY: 'sk_live_placeholder',
-      NEXT_FONT_GOOGLE_MOCKED_RESPONSES: MOCKED_FONTS_PATH,
     };
 
     // 3. Build frontend production bundle unless skipped.
