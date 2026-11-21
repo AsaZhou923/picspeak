@@ -14,6 +14,7 @@ from sqlalchemy.orm import Query, Session
 
 from app.api.deps import new_public_id
 from app.core.config import settings
+from app.core.logging_config import worker_log_context
 from app.db.models import (
     GeneratedImage,
     ImageGenerationTask,
@@ -46,6 +47,7 @@ from app.services.image_generation_pricing import (
 from app.services.notification_events import record_generation_terminal
 from app.services.object_storage import get_object_read_url, get_object_storage_client
 from app.services.product_analytics import record_product_event
+from app.services.worker_health import task_owner_public_id
 
 
 logger = logging.getLogger(__name__)
@@ -437,32 +439,34 @@ def process_image_generation_task(
         if task.claimed_by != claim_token:
             return {'result': 'noop', 'status': task.status.value, 'reason': 'lease_mismatch'}
 
-        try:
-            _process_generation_task(db, task, claim_token=claim_token)
-        except GenerationTaskLeaseLost:
-            raise
-        except Exception as exc:
-            logger.exception(
-                'Unhandled image generation task error for task %s',
-                task_public_id,
-                extra={
-                    'event': 'generation_task_unhandled_exception',
-                    'task_id': task_public_id,
-                    'worker_name': worker_name,
-                },
-            )
-            db.rollback()
-            fresh_task = db.query(ImageGenerationTask).filter(ImageGenerationTask.public_id == task_public_id).first()
-            if fresh_task is not None:
-                _handle_generation_failure(
-                    db,
-                    fresh_task,
-                    claim_token=claim_token,
-                    error_code='IMAGE_GENERATION_PROCESSING_FAILED',
-                    error_message=str(exc),
-                    retryable=True,
+        with worker_log_context(
+            worker_name=worker_name,
+            task_public_id=task_public_id,
+            task_kind='generation',
+            owner_public_id=task_owner_public_id(db, task.owner_user_id),
+        ):
+            try:
+                _process_generation_task(db, task, claim_token=claim_token)
+            except GenerationTaskLeaseLost:
+                raise
+            except Exception as exc:
+                logger.exception(
+                    'Unhandled image generation task error for task %s',
+                    task_public_id,
+                    extra={'event': 'generation_task_unhandled_exception'},
                 )
-            return {'result': 'failed'}
+                db.rollback()
+                fresh_task = db.query(ImageGenerationTask).filter(ImageGenerationTask.public_id == task_public_id).first()
+                if fresh_task is not None:
+                    _handle_generation_failure(
+                        db,
+                        fresh_task,
+                        claim_token=claim_token,
+                        error_code='IMAGE_GENERATION_PROCESSING_FAILED',
+                        error_message=str(exc),
+                        retryable=True,
+                    )
+                return {'result': 'failed'}
         return {'result': 'processed', 'status': task.status.value}
     except GenerationTaskLeaseLost:
         db.rollback()

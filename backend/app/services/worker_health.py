@@ -10,7 +10,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.db.models import ImageGenerationTask, ReviewTask, TaskStatus
+from app.db.models import ImageGenerationTask, ReviewTask, TaskStatus, User
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +49,14 @@ def oldest_pending_task_ages_seconds(db: Session, *, now: datetime | None = None
         'oldest_pending_review_seconds': _age_seconds(oldest_review, now_utc),
         'oldest_pending_generation_seconds': _age_seconds(oldest_generation, now_utc),
     }
+
+
+def task_owner_public_id(db: Session, owner_user_id: int | None) -> str | None:
+    """Public ID of a task owner for worker log correlation; never the internal user id."""
+    if owner_user_id is None:
+        return None
+    public_id = db.query(User.public_id).filter(User.id == owner_user_id).scalar()
+    return public_id if isinstance(public_id, str) else None
 
 
 def reset_pending_task_alert_cooldown() -> None:

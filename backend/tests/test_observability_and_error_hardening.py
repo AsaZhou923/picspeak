@@ -817,6 +817,125 @@ class StructuredErrorReportingTests(unittest.TestCase):
         snap = worker.heartbeat_snapshot(include_error_text=True)
         self.assertIsNotNone(snap['last_loop_at'])
         self.assertIn('worker-loop-boom', snap['last_error'])
+        # Worker records have no originating HTTP request.
+        self.assertNotIn('request_id', entry)
+
+    def test_worker_maintenance_failure_inside_loop_carries_worker_name(self) -> None:
+        stream = StringIO()
+        handler = configure_logging(json_logs=True, stream=stream)
+        worker = ReviewWorker(worker_name='test-maint-worker')
+        self.addCleanup(worker._gen_executor.shutdown, False, cancel_futures=True)
+
+        def stop_loop(*_args, **_kwargs):
+            worker._running = False
+            return None
+
+        worker._running = True
+        try:
+            with (
+                patch('app.services.worker.settings.guest_user_cleanup_enabled', True),
+                patch('app.services.worker.cleanup_stale_guest_users', side_effect=RuntimeError('guest-cleanup-boom')),
+                patch.object(worker, '_run_request_log_cleanup_if_due'),
+                patch.object(worker, '_run_limit_record_cleanup_if_due'),
+                patch('app.db.session.SessionLocal', return_value=MagicMock()),
+                patch('app.services.worker.claim_next_pending_review_task', side_effect=stop_loop),
+                patch('app.services.worker.claim_next_pending_image_generation_task', return_value=None),
+                patch('app.services.worker.time.sleep'),
+            ):
+                worker._loop()
+        finally:
+            logging.getLogger().removeHandler(handler)
+
+        entries = [json.loads(line) for line in stream.getvalue().splitlines() if line.strip()]
+        failures = [e for e in entries if 'guest-cleanup-boom' in e['message']]
+        self.assertEqual(len(failures), 1)
+        self.assertEqual(failures[0]['worker_name'], 'test-maint-worker')
+        self.assertEqual(failures[0]['@type'], ERROR_REPORTING_TYPE)
+
+    def test_worker_task_exceptions_carry_task_owner_kind_and_worker_correlation(self) -> None:
+        from app.db.models import TaskStatus as ModelTaskStatus
+        from app.services import image_generation_task_processor, review_task_processor
+
+        def running_task(public_id: str) -> SimpleNamespace:
+            return SimpleNamespace(
+                id=11,
+                public_id=public_id,
+                owner_user_id=7,
+                status=ModelTaskStatus.RUNNING,
+                claimed_by='lease-1',
+                next_attempt_at=None,
+            )
+
+        cases = (
+            (
+                'review',
+                'rt_corr_1',
+                review_task_processor,
+                lambda: review_task_processor.process_review_task('rt_corr_1', worker_name='corr-worker', claim_token='lease-1'),
+                ('expire_review_tasks', '_process_task', '_ensure_review_claim', '_handle_failure'),
+                'review_task_unhandled_exception',
+            ),
+            (
+                'generation',
+                'igt_corr_1',
+                image_generation_task_processor,
+                lambda: image_generation_task_processor.process_image_generation_task(
+                    'igt_corr_1', worker_name='corr-worker', claim_token='lease-1'
+                ),
+                ('expire_image_generation_tasks', '_process_generation_task', '_handle_generation_failure'),
+                'generation_task_unhandled_exception',
+            ),
+        )
+        for kind, public_id, module, run, patched, event in cases:
+            with self.subTest(kind=kind):
+                db = MagicMock()
+                db.query.return_value.filter.return_value.first.return_value = running_task(public_id)
+                stream = StringIO()
+                handler = configure_logging(json_logs=True, stream=stream)
+                try:
+                    with (
+                        patch.object(module, 'SessionLocal', return_value=db),
+                        patch.object(module, 'task_owner_public_id', return_value='usr_owner_corr') as owner_lookup,
+                        patch.multiple(module, **{name: MagicMock() for name in patched}),
+                    ):
+                        process_name = patched[1]
+                        getattr(module, process_name).side_effect = RuntimeError(f'{kind}-task-boom')
+                        run()
+                finally:
+                    logging.getLogger().removeHandler(handler)
+                owner_lookup.assert_called_once_with(db, 7)
+
+                entries = [json.loads(line) for line in stream.getvalue().splitlines() if line.strip()]
+                task_errors = [e for e in entries if e.get('event') == event]
+                self.assertEqual(len(task_errors), 1)
+                entry = task_errors[0]
+                self.assertEqual(entry['@type'], ERROR_REPORTING_TYPE)
+                self.assertEqual(entry['task_public_id'], public_id)
+                self.assertEqual(entry['task_kind'], kind)
+                self.assertEqual(entry['owner_public_id'], 'usr_owner_corr')
+                self.assertEqual(entry['worker_name'], 'corr-worker')
+                self.assertNotIn('request_id', entry)
+
+        # The context is released once the task finishes.
+        stream = StringIO()
+        handler = configure_logging(json_logs=True, stream=stream)
+        try:
+            logging.getLogger('app.after_task').warning('after-task')
+        finally:
+            logging.getLogger().removeHandler(handler)
+        entry = json.loads(stream.getvalue().strip())
+        for field in ('task_public_id', 'task_kind', 'owner_public_id', 'worker_name'):
+            self.assertNotIn(field, entry)
+
+    def test_task_owner_public_id_returns_public_id_only(self) -> None:
+        from app.services.worker_health import task_owner_public_id
+
+        db = MagicMock()
+        db.query.return_value.filter.return_value.scalar.return_value = 'usr_public_5'
+        self.assertEqual(task_owner_public_id(db, 5), 'usr_public_5')
+        db.query.return_value.filter.return_value.scalar.return_value = None
+        self.assertIsNone(task_owner_public_id(db, 5))
+        self.assertIsNone(task_owner_public_id(db, None))
 
     def test_dev_text_formatter_is_human_readable(self) -> None:
         formatter = DevTextFormatter()

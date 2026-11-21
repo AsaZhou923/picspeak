@@ -8,6 +8,7 @@ from concurrent.futures import Future, ThreadPoolExecutor, wait
 from typing import Any
 
 from app.core.config import settings
+from app.core.logging_config import worker_log_context
 from app.services.audit import cleanup_expired_request_logs
 from app.services.guard import cleanup_expired_idempotency_keys, cleanup_expired_rate_limit_counters
 from app.services.guest_cleanup import cleanup_stale_guest_users
@@ -161,6 +162,10 @@ class ReviewWorker:
         self._gen_executor.shutdown(wait=False, cancel_futures=True)
 
     def _loop(self) -> None:
+        with worker_log_context(worker_name=self.worker_name):
+            self._run_loop()
+
+    def _run_loop(self) -> None:
         idle_sleep_seconds = max(int(settings.review_worker_idle_sleep_ms), 50) / 1000
         idle_delay = idle_sleep_seconds
         while self._running:
@@ -217,7 +222,7 @@ class ReviewWorker:
                     extra={
                         'event': 'worker_loop_unhandled_exception',
                         'worker_name': self.worker_name,
-                        'task_id': getattr(task, 'public_id', None),
+                        'task_public_id': getattr(task, 'public_id', None),
                         'task_kind': task_kind or None,
                     },
                 )
@@ -227,6 +232,10 @@ class ReviewWorker:
 
 
     def _notification_maintenance_loop(self) -> None:
+        with worker_log_context(worker_name=self.worker_name):
+            self._run_notification_maintenance_loop()
+
+    def _run_notification_maintenance_loop(self) -> None:
         while self._running and not self._notification_stop_event.is_set():
             try:
                 self._run_task_sweep_if_due()

@@ -14,6 +14,7 @@ from pydantic import ValidationError
 from app.api.deps import new_public_id
 from app.core.config import settings
 from app.core.errors import ApiHTTPException
+from app.core.logging_config import worker_log_context
 from app.db.models import Photo, PhotoStatus, Review, ReviewMode, ReviewStatus, ReviewTask, TaskStatus, UsageLedger, User, UserPlan
 from app.db.session import SessionLocal
 from app.services.ai import (
@@ -41,6 +42,7 @@ from app.services.review_score_cache import (
     load_task_canonical_score_checkpoint,
 )
 from app.services.task_events import record_task_event
+from app.services.worker_health import task_owner_public_id
 from app.services.review_quota_reservations import (
     reserve_review_quota, consume_review_quota, release_task_review_quota,
 )
@@ -473,40 +475,42 @@ def process_review_task(task_public_id: str, *, worker_name: str, claim_token: s
                 return {'result': 'noop', 'status': task.status.value, 'reason': 'lease_mismatch'}
         else:
             return {'result': 'noop', 'status': task.status.value}
-        try:
-            _process_task(db, task, claim_token=claim_token)
-        except ReviewTaskLeaseLost:
-            db.rollback()
-            return {'result': 'noop', 'reason': 'lease_mismatch'}
-        except Exception as exc:
-            logger.exception(
-                'Unhandled review task error for task %s',
-                task_public_id,
-                extra={
-                    'event': 'review_task_unhandled_exception',
-                    'task_id': task_public_id,
-                    'worker_name': worker_name,
-                },
-            )
-            db.rollback()
-            fresh_task = db.query(ReviewTask).filter(ReviewTask.id == task.id).first()
-            if fresh_task is None:
-                return {'result': 'missing'}
-            if fresh_task.status == TaskStatus.RUNNING and fresh_task.claimed_by == claim_token:
-                try:
-                    _ensure_review_claim(db, fresh_task, claim_token)
-                except ReviewTaskLeaseLost:
-                    db.rollback()
-                    return {'result': 'noop', 'reason': 'lease_mismatch'}
-                _handle_failure(
-                    db,
-                    fresh_task,
-                    error_code='TASK_PROCESSING_FAILED',
-                    error_message=f'Unexpected worker error: {exc}',
-                    retryable=True,
+        with worker_log_context(
+            worker_name=worker_name,
+            task_public_id=task_public_id,
+            task_kind='review',
+            owner_public_id=task_owner_public_id(db, task.owner_user_id),
+        ):
+            try:
+                _process_task(db, task, claim_token=claim_token)
+            except ReviewTaskLeaseLost:
+                db.rollback()
+                return {'result': 'noop', 'reason': 'lease_mismatch'}
+            except Exception as exc:
+                logger.exception(
+                    'Unhandled review task error for task %s',
+                    task_public_id,
+                    extra={'event': 'review_task_unhandled_exception'},
                 )
-                return {'result': 'failed', 'status': fresh_task.status.value}
-            return {'result': 'noop', 'status': fresh_task.status.value}
+                db.rollback()
+                fresh_task = db.query(ReviewTask).filter(ReviewTask.id == task.id).first()
+                if fresh_task is None:
+                    return {'result': 'missing'}
+                if fresh_task.status == TaskStatus.RUNNING and fresh_task.claimed_by == claim_token:
+                    try:
+                        _ensure_review_claim(db, fresh_task, claim_token)
+                    except ReviewTaskLeaseLost:
+                        db.rollback()
+                        return {'result': 'noop', 'reason': 'lease_mismatch'}
+                    _handle_failure(
+                        db,
+                        fresh_task,
+                        error_code='TASK_PROCESSING_FAILED',
+                        error_message=f'Unexpected worker error: {exc}',
+                        retryable=True,
+                    )
+                    return {'result': 'failed', 'status': fresh_task.status.value}
+                return {'result': 'noop', 'status': fresh_task.status.value}
         return {'result': 'processed', 'status': task.status.value}
     finally:
         db.close()

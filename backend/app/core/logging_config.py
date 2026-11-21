@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 from contextvars import ContextVar, Token
 import json
 import logging
 import re
 import sys
-from typing import Any
+from typing import Any, Iterator
 
 from app.core.config import settings
 from app.services.audit import mask_capability_url_text
@@ -16,6 +17,15 @@ ERROR_REPORTING_TYPE = 'type.googleapis.com/google.devtools.clouderrorreporting.
 _request_id_var: ContextVar[str | None] = ContextVar('picspeak_request_id', default=None)
 _user_public_id_var: ContextVar[str | None] = ContextVar('picspeak_user_public_id', default=None)
 _request_path_var: ContextVar[str | None] = ContextVar('picspeak_request_path', default=None)
+
+# Worker correlation. Worker logs have no originating HTTP request, so they
+# carry these task identifiers instead of request_id.
+_WORKER_LOG_CONTEXT_VARS: dict[str, ContextVar[str | None]] = {
+    'worker_name': ContextVar('picspeak_worker_name', default=None),
+    'task_public_id': ContextVar('picspeak_task_public_id', default=None),
+    'task_kind': ContextVar('picspeak_task_kind', default=None),
+    'owner_public_id': ContextVar('picspeak_owner_public_id', default=None),
+}
 
 _CAPABILITY_PATH_RE = re.compile(r'(/(?:public/reviews|share)/)([^/?#\s"\'<>]+)', re.IGNORECASE)
 _AMZ_QUERY_PARAM_RE = re.compile(
@@ -154,6 +164,37 @@ def reset_request_log_context(tokens: tuple[Token[str | None], Token[str | None]
     _user_public_id_var.reset(user_token)
 
 
+@contextmanager
+def worker_log_context(
+    *,
+    worker_name: str | None = None,
+    task_public_id: str | None = None,
+    task_kind: str | None = None,
+    owner_public_id: str | None = None,
+) -> Iterator[None]:
+    """Attach worker/task correlation fields to logs emitted inside the block.
+
+    Only non-None fields are bound, so a task block nested in a worker loop keeps
+    the loop's worker_name unless it overrides it.
+    """
+    fields = {
+        'worker_name': worker_name,
+        'task_public_id': task_public_id,
+        'task_kind': task_kind,
+        'owner_public_id': owner_public_id,
+    }
+    tokens = [
+        (_WORKER_LOG_CONTEXT_VARS[name], _WORKER_LOG_CONTEXT_VARS[name].set(value))
+        for name, value in fields.items()
+        if value is not None
+    ]
+    try:
+        yield
+    finally:
+        for var, token in reversed(tokens):
+            var.reset(token)
+
+
 def get_request_log_context() -> dict[str, str | None]:
     return {
         'request_id': _request_id_var.get(),
@@ -186,6 +227,10 @@ class RequestContextFilter(logging.Filter):
             record.user_public_id = _user_public_id_var.get()
         if not getattr(record, 'request_path', None):
             record.request_path = _request_path_var.get()
+        for name, var in _WORKER_LOG_CONTEXT_VARS.items():
+            value = var.get()
+            if value is not None and not getattr(record, name, None):
+                setattr(record, name, value)
         return True
 
 
@@ -268,6 +313,10 @@ class CloudLoggingJsonFormatter(logging.Formatter):
             payload['user_public_id'] = user_public_id
         if request_path:
             payload['request_path'] = request_path
+        for name, var in _WORKER_LOG_CONTEXT_VARS.items():
+            value = getattr(record, name, None) or var.get()
+            if value is not None:
+                payload[name] = value
 
         for key, value in record.__dict__.items():
             if key in _STANDARD_LOG_RECORD_ATTRS or key.startswith('_') or key in payload:
@@ -311,7 +360,10 @@ class DevTextFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         request_id = getattr(record, 'request_id', None) or _request_id_var.get()
+        task_public_id = getattr(record, 'task_public_id', None)
         prefix = f' [req={request_id}]' if request_id else ''
+        if task_public_id:
+            prefix = f'{prefix} [task={task_public_id}]'
         timestamp = self.formatTime(record, '%Y-%m-%d %H:%M:%S')
         base = f'{timestamp} {record.levelname} [{record.name}]{prefix} {record.getMessage()}'
         if record.exc_info:
