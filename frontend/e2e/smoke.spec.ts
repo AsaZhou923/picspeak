@@ -75,7 +75,7 @@ test.describe('PicSpeak main flows smoke suite', () => {
     const expectedScore = fixture.expected_fake_review_score.toFixed(1);
     await expect(page.getByText(expectedScore, { exact: true }).first()).toBeVisible();
     await expect(page.getByText(/Clean subject placement/i)).toBeVisible();
-    await waitForLoadedImage(page, 'img[alt]');
+    await waitForLoadedImage(page, 'img[alt="Photo being reviewed"]');
   });
 
   test('guest quota exhaustion displays the sign-in and registration prompt', async ({
