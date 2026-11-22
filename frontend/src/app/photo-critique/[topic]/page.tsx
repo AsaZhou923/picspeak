@@ -13,8 +13,7 @@ import { serializeJsonLd } from '@/lib/json-ld';
 import { buildPublicBreadcrumbJsonLd, buildPublicWebPageJsonLd, INDEXABLE_ROBOTS, singlePageAlternates } from '@/lib/seo';
 import { siteConfig } from '@/lib/site';
 
-// Must be a literal for Next.js segment config; keep in sync with GALLERY_REVIEW_REVALIDATE_SECONDS.
-export const revalidate = 3600;
+export const dynamic = 'force-dynamic';
 export const dynamicParams = false;
 
 type PageProps = { params: Promise<{ topic: string }> };
@@ -28,7 +27,7 @@ export function generateStaticParams() {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { topic: slug } = await params;
   const topic = getPhotoCritiqueTopic(slug);
-  if (!topic) return {};
+  if (!topic) notFound();
   const copy = topic.copy.en;
   const path = getPhotoCritiqueTopicPath(topic.slug);
 

@@ -139,7 +139,7 @@ PicSpeak 在 Build Week 之前已经存在。活动期间，单张点评扩展�
 
 ## 📝 更新记录
 
-最新条目：[登录服务受阻时照常浏览，安全与发布更可靠](docs/changelog/CHANGELOG.md#2026-11-21-pages-work-when-sign-in-is-blocked)。更早的条目见[完整 Changelog](docs/changelog/CHANGELOG.md)。
+最新条目：[移出长廊后，作品的公开点评页随即下线](docs/changelog/CHANGELOG.md#2026-11-22-gallery-withdrawal)。更早的条目见[完整 Changelog](docs/changelog/CHANGELOG.md)。
 
 ## 🤝 参与贡献
 

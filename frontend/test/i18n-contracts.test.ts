@@ -10,6 +10,12 @@ import { localizedErrorMessage } from '../src/lib/error-utils.ts';
 
 const t = (key: keyof typeof enTranslations) => zhTranslations[key] ?? enTranslations[key] ?? key;
 
+test('home FAQ explains Gallery indexing and withdrawal in all three languages', () => {
+  assert.match(enTranslations.faq_a5, /After Gallery approval.*search engines may index.*takes that page offline/);
+  assert.match(zhTranslations.faq_a5, /长廊审核通过后.*搜索引擎可能收录.*移出长廊后.*下线/);
+  assert.match(jaTranslations.faq_a5, /ギャラリーの審査に通ると.*検索エンジンに登録.*ギャラリーから外すと.*非公開/);
+});
+
 test('current plan copy agrees on one Guest critique daily and continued Pro use with a slower minute rate', () => {
   for (const dictionary of [enTranslations, zhTranslations, jaTranslations]) {
     assert.doesNotMatch(dictionary.hero_label, /GPT-/);

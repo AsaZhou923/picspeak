@@ -123,7 +123,7 @@ class PublicGalleryDetailPayloadTests(unittest.TestCase):
                 'review_id', 'photo_id', 'photo_url', 'photo_thumbnail_url', 'mode', 'image_type',
                 'final_score', 'score_version', 'scores', 'advantage', 'critique', 'suggestions',
                 'summary', 'review_locale', 'owner_username', 'owner_avatar_url', 'owner_profile_url',
-                'like_count', 'viewer_is_owner', 'gallery_added_at', 'created_at', 'updated_at',
+                'like_count', 'viewer_is_owner', 'is_indexable', 'gallery_added_at', 'created_at', 'updated_at',
             },
         )
         serialized = repr(payload)
@@ -173,10 +173,11 @@ class PublicGalleryDetailRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 404)
         self.assertIn('REVIEW_NOT_FOUND', response.text)
         self.assertNotIn('set-cookie', {key.lower() for key in response.headers})
+        self.assertEqual(response.headers['cache-control'], 'private, no-store')
         create_guest_user.assert_not_called()
 
-    def test_approved_review_is_public_and_cacheable(self) -> None:
-        db = self._db_returning((_review(), _photo(), _owner()))
+    def test_approved_review_is_public_and_fresh(self) -> None:
+        db = self._db_returning((_review(), _photo(), _owner(), True))
         with patch(
             'app.api.routers.gallery_support._build_photo_proxy_url',
             return_value='https://api.example.test/photo',
@@ -192,12 +193,13 @@ class PublicGalleryDetailRouteTests(unittest.TestCase):
         self.assertEqual(body['owner_profile_url'], '/u/lens-owner')
         self.assertEqual(body['owner_username'], 'lens_owner')
         self.assertEqual(body['like_count'], 3)
-        self.assertEqual(response.headers['cache-control'], 'public, max-age=60')
+        self.assertEqual(response.headers['cache-control'], 'private, no-store')
+        self.assertTrue(body['is_indexable'])
         self.assertFalse(body['viewer_is_owner'])
         self.assertNotIn('set-cookie', {key.lower() for key in response.headers})
 
     def _get_with_viewer(self, viewer):
-        db = self._db_returning((_review(), _photo(), _owner()))
+        db = self._db_returning((_review(), _photo(), _owner(), True))
         with patch(
             'app.api.routers.gallery_support._build_photo_proxy_url',
             return_value='https://api.example.test/photo',
@@ -246,6 +248,7 @@ class PublicGalleryDetailRouteTests(unittest.TestCase):
         self.assertEqual([item['review_id'] for item in body['items']], ['rev_c', 'rev_b'])
         self.assertEqual(body['items'][1]['image_type'], 'default')
         self.assertEqual(body['next_cursor'], '20')
+        self.assertEqual(response.headers['cache-control'], 'private, no-store')
         query.limit.assert_called_once_with(3)
 
     def test_sitemap_entries_reject_invalid_cursor(self) -> None:
@@ -311,7 +314,7 @@ class PublicGalleryDetailPostgresTests(unittest.TestCase):
             review = Review(
                 public_id=f'rev_gd_{suffix}', photo_id=photo.id, owner_user_id=user.id, mode=ReviewMode.flash,
                 image_type='street', schema_version='1.0', final_score=Decimal('7.40'), is_public=True, tags_json=[],
-                result_json={'critique': 'Visible critique', 'review_locale': 'en'},
+                result_json=values.pop('result_json', {'critique': 'Visible critique. ' * 8, 'review_locale': 'en'}),
                 **values,
             )
             db.add(review)
@@ -343,6 +346,72 @@ class PublicGalleryDetailPostgresTests(unittest.TestCase):
 
         self.assertIn(approved, listed)
         self.assertTrue(listed.isdisjoint(hidden))
+
+    def test_quality_uses_strings_unicode_code_points_and_normalized_whitespace(self) -> None:
+        cases = [
+            ({'critique': 'a' * 79}, False),
+            ({'critique': 'a' * 80}, True),
+            ({'critique': '😀' * 79}, False),
+            ({'critique': '😀' * 80}, True),
+            ({'advantage': 'a' * 39, 'critique': '\u3000' * 60, 'suggestions': 'b' * 39}, False),
+            ({'advantage': '\u3000' + 'a' * 39, 'critique': '\t\n', 'suggestions': 'b' * 40 + '\u3000'}, True),
+            ({'advantage': ['a' * 200], 'critique': {'text': 'b' * 200}, 'suggestions': 12345}, False),
+            ({'advantage': None, 'critique': 'c' * 80}, True),
+        ]
+        reviews = [(self._insert(f'quality_{i}', result_json=payload), expected) for i, (payload, expected) in enumerate(cases)]
+        with patch('app.main.worker.start'), patch('app.main.worker.stop'):
+            with self._client() as client:
+                listed = {item['review_id'] for item in client.get('/api/v1/gallery/sitemap-entries').json()['items']}
+                for review_id, expected in reviews:
+                    with self.subTest(review_id=review_id):
+                        detail = client.get(f'/api/v1/gallery/{review_id}')
+                        self.assertEqual(detail.status_code, 200)
+                        self.assertEqual(detail.json()['is_indexable'], expected)
+                        self.assertEqual(review_id in listed, expected)
+
+    def test_sitemap_pagination_skips_thin_rows_before_limit_and_samples_are_current(self) -> None:
+        older = self._insert('older')
+        self._insert('thin', result_json={'critique': 'Too short'})
+        newer = self._insert('newer')
+        self._insert('pending_sample', gallery_audit_status='none')
+        self._insert('purged_sample', photo_status=PhotoStatus.PURGED)
+        with patch('app.main.worker.start'), patch('app.main.worker.stop'):
+            with self._client() as client:
+                seen = []
+                cursor = None
+                while True:
+                    params = {'limit': 1}
+                    if cursor:
+                        params['cursor'] = cursor
+                    response = client.get('/api/v1/gallery/sitemap-entries', params=params)
+                    self.assertEqual(response.status_code, 200)
+                    payload = response.json()
+                    seen.extend(item['review_id'] for item in payload['items'])
+                    cursor = payload['next_cursor']
+                    if cursor is None:
+                        break
+                self.assertEqual([review_id for review_id in seen if review_id in {older, newer}], [newer, older])
+                response = client.get('/api/v1/gallery/topic-samples', params={'image_type': 'street', 'limit': 2})
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.headers['cache-control'], 'private, no-store')
+                samples = response.json()['items']
+                self.assertEqual([item['review_id'] for item in samples], [newer, older])
+                self.assertEqual(set(samples[0]), {'review_id', 'photo_thumbnail_url', 'final_score', 'summary'})
+                db = self.Session()
+                try:
+                    db.query(Review).filter(Review.public_id == newer).update({'gallery_visible': False})
+                    db.commit()
+                finally:
+                    db.close()
+                self.assertEqual(client.get(f'/api/v1/gallery/{newer}').status_code, 404)
+                updated = client.get('/api/v1/gallery/topic-samples', params={'image_type': 'street'}).json()['items']
+                self.assertNotIn(newer, [item['review_id'] for item in updated])
+
+    def test_topic_samples_require_supported_genre(self) -> None:
+        with patch('app.main.worker.start'), patch('app.main.worker.stop'):
+            with self._client() as client:
+                self.assertEqual(client.get('/api/v1/gallery/topic-samples').status_code, 422)
+                self.assertEqual(client.get('/api/v1/gallery/topic-samples', params={'image_type': 'unknown'}).status_code, 422)
 
 
 if __name__ == '__main__':

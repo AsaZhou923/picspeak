@@ -1,5 +1,22 @@
 [
   {
+    "id": "2026-11-22-gallery-withdrawal",
+    "date": "2026-11-22",
+    "showPopup": false,
+    "title": "Withdrawing a critique takes its Gallery page offline",
+    "summary": "After you remove a critique from the Gallery, its public page closes and it drops out of the genre guides.",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-11-22-gallery-withdrawal",
+    "sections": [
+      {
+        "title": "Gallery visibility",
+        "items": [
+          "Search engines can take longer to remove an existing search result.",
+          "If you also created a share link, you can turn it off separately."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-11-21-pages-work-when-sign-in-is-blocked",
     "date": "2026-11-21",
     "showPopup": false,

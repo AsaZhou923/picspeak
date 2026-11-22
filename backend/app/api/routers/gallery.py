@@ -18,6 +18,8 @@ from app.gallery_scoreboard_schemas import (
   GalleryScoreboardResponse,
   GallerySitemapEntry,
   GallerySitemapResponse,
+  GalleryTopicSample,
+  GalleryTopicSamplesResponse,
   PublicGalleryReviewDetail,
 )
 from app.schemas import GalleryLikeResponse
@@ -35,12 +37,15 @@ from .gallery_support import (
   GALLERY_AUDIT_REJECTED,
   GALLERY_AUDIT_VALUES,
   _apply_review_history_filters_gallery,
+  _available_gallery_filters,
+  _build_public_gallery_thumbnail_url,
   _decode_public_gallery_cursor,
   _encode_public_gallery_cursor,
   _ensure_gallery_thumbnail,
   _find_public_gallery_review,
   _gallery_like_count,
   _gallery_like_counts,
+  _gallery_is_indexable_expr,
   _gallery_rank_score_expr,
   _gallery_rank_score_value,
   _gallery_recommendation_map,
@@ -57,7 +62,7 @@ router = APIRouter(prefix='/gallery', tags=['gallery'])
 
 
 PUBLIC_GALLERY_LIST_CACHE_CONTROL = 'public, max-age=30, s-maxage=60'
-PUBLIC_GALLERY_DETAIL_CACHE_CONTROL = 'public, max-age=60'
+PUBLIC_GALLERY_DETAIL_CACHE_CONTROL = 'private, no-store'
 
 
 @router.get('', response_model=GalleryListResponse)
@@ -347,6 +352,35 @@ def list_gallery_sitemap_entries(
   )
 
 
+@router.get('/topic-samples', response_model=GalleryTopicSamplesResponse)
+def list_gallery_topic_samples(
+  request: Request,
+  response: Response,
+  image_type: str = Query(pattern='^(portrait|street|landscape)$'),
+  limit: int = Query(default=3, ge=1, le=3),
+  db: Session = Depends(get_db),
+):
+  rows = (
+    db.query(Review)
+    .join(Photo, Photo.id == Review.photo_id)
+    .join(User, User.id == Review.owner_user_id)
+    .filter(Review.image_type == image_type, *_indexable_gallery_filters())
+    .order_by(Review.final_score.desc(), Review.id.desc())
+    .limit(limit)
+    .all()
+  )
+  response.headers['Cache-Control'] = PUBLIC_GALLERY_DETAIL_CACHE_CONTROL
+  return GalleryTopicSamplesResponse(items=[
+    GalleryTopicSample(
+      review_id=review.public_id,
+      photo_thumbnail_url=_build_public_gallery_thumbnail_url(request, review.public_id),
+      final_score=float(review.final_score),
+      summary=_review_gallery_summary(review),
+    )
+    for review in rows
+  ])
+
+
 @router.get('/{review_id}', response_model=PublicGalleryReviewDetail)
 def get_public_gallery_review(
   request: Request,
@@ -355,7 +389,7 @@ def get_public_gallery_review(
   authorization: str | None = Header(default=None),
   db: Session = Depends(get_db),
 ):
-  """Anonymous, cacheable read of one approved Gallery critique.
+  """Fresh anonymous read of one approved Gallery critique.
 
   Deliberately takes no actor dependency, so crawler and server-render requests
   never mint guest identities. Share-link-only critiques return 404. An optional
@@ -363,20 +397,19 @@ def get_public_gallery_review(
   entry points); such responses are private and never shared-cached.
   """
   row = (
-    db.query(Review, Photo, User)
+    db.query(Review, Photo, User, _gallery_is_indexable_expr().label('is_indexable'))
     .join(Photo, Photo.id == Review.photo_id)
     .join(User, User.id == Review.owner_user_id)
-    .filter(Review.public_id == review_id, *_indexable_gallery_filters())
+    .filter(Review.public_id == review_id, *_available_gallery_filters())
     .first()
   )
   if row is None:
-    raise api_error(status.HTTP_404_NOT_FOUND, 'REVIEW_NOT_FOUND', 'Review not found')
-  review, photo, owner = row
+    error = api_error(status.HTTP_404_NOT_FOUND, 'REVIEW_NOT_FOUND', 'Review not found')
+    error.headers = {'Cache-Control': PUBLIC_GALLERY_DETAIL_CACHE_CONTROL}
+    raise error
+  review, photo, owner, is_indexable = row
   viewer = _optional_gallery_viewer(authorization, db)
-  if authorization:
-    response.headers['Cache-Control'] = 'private, no-store'
-  else:
-    response.headers['Cache-Control'] = PUBLIC_GALLERY_DETAIL_CACHE_CONTROL
+  response.headers['Cache-Control'] = PUBLIC_GALLERY_DETAIL_CACHE_CONTROL
   response.headers['Vary'] = 'Authorization'
   return _public_gallery_detail(
     request,
@@ -386,4 +419,5 @@ def get_public_gallery_review(
     like_count=_gallery_like_count(db, review.id),
     owner_profile_url=_owner_profile_url(owner),
     viewer_is_owner=viewer is not None and viewer.id == review.owner_user_id,
+    is_indexable=bool(is_indexable),
   )

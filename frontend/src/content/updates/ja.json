@@ -1,5 +1,22 @@
 [
   {
+    "id": "2026-11-22-gallery-withdrawal",
+    "date": "2026-11-22",
+    "showPopup": false,
+    "title": "ギャラリーから外すと講評ページが非公開に",
+    "summary": "講評をギャラリーから外すと、その公開ページは閲覧できなくなり、ジャンル別ガイドの作例からも外れます。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-11-22-gallery-withdrawal",
+    "sections": [
+      {
+        "title": "作品の公開範囲",
+        "items": [
+          "すでに検索結果に載っている場合は、検索エンジン側の更新に時間がかかることがあります。",
+          "別途作成した共有リンクは、個別に無効にできます。"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-11-21-pages-work-when-sign-in-is-blocked",
     "date": "2026-11-21",
     "showPopup": false,
