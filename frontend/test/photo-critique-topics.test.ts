@@ -86,7 +86,7 @@ test('topic helpers resolve paths and locale fallbacks', () => {
   assert.equal(getPhotoCritiqueTopicCopy(PHOTO_CRITIQUE_TOPICS[0], 'fr').title, PHOTO_CRITIQUE_TOPICS[0].copy.en.title);
 });
 
-test('topic pages are indexable, cached by locale, listed, mirrored and linked', () => {
+test('topic pages are indexable, rendered fresh, listed, mirrored and linked', () => {
   const page = source('src', 'app', 'photo-critique', '[topic]', 'page.tsx');
   const view = source('src', 'components', 'topics', 'PhotoCritiqueTopicView.tsx');
   const sitemap = source('src', 'app', 'sitemap.ts');
@@ -103,7 +103,9 @@ test('topic pages are indexable, cached by locale, listed, mirrored and linked',
   assert.match(view, /source: 'topic_landing'/);
   assert.match(view, /entrypoint: 'topic_landing'/);
   assert.match(sitemap, /PHOTO_CRITIQUE_TOPICS\.map/);
-  assert.match(localizedSources, /'\/photo-critique\/:topic\(portrait\|street\|landscape\)'/);
+  assert.doesNotMatch(localizedSources, /photo-critique/);
+  assert.match(nextConfig, /const revocablePublicPageSources = .*'\/photo-critique\/:topic\*'/);
+  assert.match(page, /export const dynamic = 'force-dynamic'/);
   assert.match(footer, /getPhotoCritiqueTopicPath/);
   assert.match(analytics, /\\\/photo-critique\\\/\[\^\/\]\+\$\/\.test\(pathname\)\) \{\n\s+return 'topic_page_viewed'/);
   assert.match(analytics, /return 'topic_landing';/);

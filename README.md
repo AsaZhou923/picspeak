@@ -139,7 +139,7 @@ The event version used GPT-5.6 Terra. The current runtime uses GPT-6 Sol (Flash)
 
 ## 📝 Changelog
 
-The latest entry is [pages keep working when sign-in is blocked](docs/changelog/CHANGELOG.md#2026-11-21-pages-work-when-sign-in-is-blocked). See the [full changelog](docs/changelog/CHANGELOG.md) for older entries.
+The latest entry is [Withdrawing a critique takes its Gallery page offline](docs/changelog/CHANGELOG.md#2026-11-22-gallery-withdrawal). See the [full changelog](docs/changelog/CHANGELOG.md) for older entries.
 
 ## 🤝 Contributing
 

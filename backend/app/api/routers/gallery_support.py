@@ -5,7 +5,7 @@ import logging
 from typing import Any
 
 from fastapi import HTTPException, Request, status
-from sqlalchemy import func, literal
+from sqlalchemy import case, func, literal
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_user_from_token
@@ -187,10 +187,24 @@ def _public_gallery_filters() -> tuple[Any, ...]:
 
 
 PUBLIC_REVIEW_LOCALES = frozenset({'zh', 'en', 'ja'})
+GALLERY_MIN_INDEXABLE_TEXT = 80
+# Explicit Unicode whitespace keeps the threshold independent of database locale.
+GALLERY_TEXT_WHITESPACE = '\t\n\v\f\r\x1c\x1d\x1e\x1f \x85\xa0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000'
 
 
-def _indexable_gallery_filters() -> tuple[Any, ...]:
-  """Approved Gallery critiques that may appear on public, indexable pages.
+def _gallery_is_indexable_expr():
+  fields = []
+  for key in ('advantage', 'critique', 'suggestions'):
+    value = Review.result_json[key]
+    fields.append(case((func.jsonb_typeof(value) == 'string', value.astext), else_=''))
+  text = func.concat_ws(' ', *fields)
+  normalized = func.btrim(func.regexp_replace(text, f'[{GALLERY_TEXT_WHITESPACE}]+', ' ', 'g'))
+  # PostgreSQL char_length counts Unicode code points, including astral characters.
+  return func.char_length(normalized) >= GALLERY_MIN_INDEXABLE_TEXT
+
+
+def _available_gallery_filters() -> tuple[Any, ...]:
+  """Approved Gallery critiques whose public page is currently available.
 
   Share links are deliberately excluded: a link shared with someone is not
   consent to search-engine indexing. Callers must join Photo and the review
@@ -200,6 +214,10 @@ def _indexable_gallery_filters() -> tuple[Any, ...]:
     *_public_gallery_filters(),
     Photo.status == PhotoStatus.READY,
   )
+
+
+def _indexable_gallery_filters() -> tuple[Any, ...]:
+  return (*_available_gallery_filters(), _gallery_is_indexable_expr())
 
 
 def _find_public_gallery_review(db: Session, review_public_id: str) -> Review:
@@ -347,6 +365,7 @@ def _public_gallery_detail(
   like_count: int = 0,
   owner_profile_url: str | None = None,
   viewer_is_owner: bool = False,
+  is_indexable: bool = False,
 ) -> PublicGalleryReviewDetail:
   # Imported lazily: review_support imports this router package at module load.
   from app.api.routers.review_support import _coerce_review_scores
@@ -379,6 +398,7 @@ def _public_gallery_detail(
     owner_profile_url=owner_profile_url,
     like_count=max(0, int(like_count)),
     viewer_is_owner=bool(viewer_is_owner),
+    is_indexable=is_indexable,
     gallery_added_at=review.gallery_added_at or review.created_at,
     created_at=review.created_at,
     updated_at=review.updated_at or review.gallery_added_at or review.created_at,

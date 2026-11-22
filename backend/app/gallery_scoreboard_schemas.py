@@ -53,6 +53,7 @@ class PublicGalleryReviewDetail(BaseModel):
   like_count: int = 0
   # Only true for an authorized owner request; anonymous/cached reads are always false.
   viewer_is_owner: bool = False
+  is_indexable: bool = False
   gallery_added_at: datetime
   created_at: datetime
   updated_at: datetime
@@ -67,6 +68,17 @@ class GallerySitemapEntry(BaseModel):
 class GallerySitemapResponse(BaseModel):
   items: list[GallerySitemapEntry]
   next_cursor: str | None = None
+
+
+class GalleryTopicSample(BaseModel):
+  review_id: str
+  photo_thumbnail_url: str | None = None
+  final_score: float
+  summary: str
+
+
+class GalleryTopicSamplesResponse(BaseModel):
+  items: list[GalleryTopicSample]
 
 
 class GalleryScoreboardResponse(BaseModel):

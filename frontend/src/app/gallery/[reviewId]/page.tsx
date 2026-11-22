@@ -17,8 +17,7 @@ import { serializeJsonLd } from '@/lib/json-ld';
 import { buildPublicBreadcrumbJsonLd, INDEXABLE_ROBOTS, NO_INDEX_ROBOTS, singlePageAlternates } from '@/lib/seo';
 import { siteConfig } from '@/lib/site';
 
-// Must be a literal for Next.js segment config; keep in sync with GALLERY_REVIEW_DETAIL_REVALIDATE_SECONDS.
-export const revalidate = 60;
+export const dynamic = 'force-dynamic';
 
 type PageProps = { params: Promise<{ reviewId: string }> };
 

@@ -40,6 +40,8 @@ export type PublicGalleryReview = {
   like_count: number;
   /** Only set on the owner's own authorized client read; always false in cached server HTML. */
   viewer_is_owner?: boolean;
+  /** Server-owned quality decision; optional while an older API is still running. */
+  is_indexable?: boolean;
   gallery_added_at: string;
   created_at: string;
   updated_at: string;
@@ -318,9 +320,15 @@ export function buildGalleryReviewDescription(review: PublicGalleryReview): stri
   return truncate(source || review.summary, 160);
 }
 
-export function isIndexableGalleryReview(review: Pick<PublicGalleryReview, 'advantage' | 'critique' | 'suggestions'>): boolean {
-  const text = collapseWhitespace(`${review.advantage} ${review.critique} ${review.suggestions}`);
-  return text.length >= GALLERY_REVIEW_MIN_INDEXABLE_TEXT;
+export function isIndexableGalleryReview(review: Pick<PublicGalleryReview, 'advantage' | 'critique' | 'suggestions' | 'is_indexable'>): boolean {
+  if (typeof review.is_indexable === 'boolean') return review.is_indexable;
+  // Match the backend's explicit whitespace set and Unicode code-point count.
+  const text = [review.advantage, review.critique, review.suggestions]
+    .map((value) => typeof value === 'string' ? value : '')
+    .join(' ')
+    .replace(/[\u0009-\u000d\u001c-\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+/g, ' ')
+    .replace(/^ +| +$/g, '');
+  return Array.from(text).length >= GALLERY_REVIEW_MIN_INDEXABLE_TEXT;
 }
 
 export function buildGalleryReviewWorkspaceHref(review: Pick<PublicGalleryReview, 'review_id' | 'image_type'>): string {

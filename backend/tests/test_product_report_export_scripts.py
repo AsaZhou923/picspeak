@@ -26,11 +26,6 @@ REPORT_SCRIPTS = (
         'render_stage_a_snapshot_markdown',
         '数据库不可用，当前文件为零基线回退快照',
     ),
-    (
-        'scripts.export_content_conversion_weekly_report',
-        'render_content_conversion_weekly_markdown',
-        '数据库不可用，当前文件为零基线回退周报',
-    ),
 )
 
 
@@ -130,6 +125,90 @@ class ProductReportExportScriptTests(unittest.TestCase):
                     self.assertEqual(kwargs['end_date'].isoformat(), '2026-05-11')
                     self.assertTrue(str(kwargs['filename_stem']).endswith(('weekly-report', 'baseline-snapshot')))
                     self.assertEqual(output_path.read_text(encoding='utf-8'), '# report\n')
+
+
+class ContentConversionExportTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.script = importlib.import_module('scripts.export_content_conversion_weekly_report')
+        self.db = MagicMock()
+        self.db.get_bind.return_value.dialect.name = 'postgresql'
+
+    def test_database_failure_never_creates_or_overwrites_report(self) -> None:
+        for existing in (False, True):
+            with self.subTest(existing=existing), tempfile.TemporaryDirectory() as tmp_dir:
+                output_path = Path(tmp_dir) / 'report.md'
+                if existing:
+                    output_path.write_text('verified prior report', encoding='utf-8')
+                args = SimpleNamespace(start_date='2026-05-05', end_date='2026-05-11', output=str(output_path))
+                self.db.reset_mock()
+                error = OperationalError('SELECT 1', {}, RuntimeError('connection refused'))
+                with patch.object(self.script, 'parse_args', return_value=args), patch.object(
+                    self.script, 'SessionLocal', return_value=self.db,
+                ), patch.object(self.script, 'load_stage_a_snapshot_from_db', side_effect=error), patch.object(
+                    self.script, 'render_content_conversion_weekly_markdown',
+                ) as renderer:
+                    with self.assertRaisesRegex(SystemExit, 'export unavailable'):
+                        self.script.main()
+                renderer.assert_not_called()
+                self.db.rollback.assert_called_once()
+                self.db.close.assert_called_once()
+                if existing:
+                    self.assertEqual(output_path.read_text(encoding='utf-8'), 'verified prior report')
+                else:
+                    self.assertFalse(output_path.exists())
+
+    def test_success_is_read_only_and_default_path_uses_main_checkout(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            output_path = Path(tmp_dir) / 'report.md'
+            args = SimpleNamespace(start_date='2026-05-05', end_date='2026-05-11', output=None)
+            main_repo = Path(tmp_dir) / 'PicSpeak'
+            with patch.object(self.script, 'parse_args', return_value=args), patch.object(
+                self.script, 'SessionLocal', return_value=self.db,
+            ), patch.object(self.script, 'main_checkout_root', return_value=main_repo), patch.object(
+                self.script, 'resolve_report_output_path', return_value=output_path,
+            ) as resolve_path, patch.object(
+                self.script, 'load_stage_a_snapshot_from_db', return_value={},
+            ) as loader, patch.object(
+                self.script, 'render_content_conversion_weekly_markdown', return_value='# measured\n',
+            ):
+                self.script.main()
+            statements = [str(call.args[0]) for call in self.db.execute.call_args_list]
+            self.assertEqual(statements[0], 'SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
+            self.assertIn("SET LOCAL statement_timeout = '30s'", statements)
+            loader.assert_called_once()
+            self.db.commit.assert_not_called()
+            self.db.rollback.assert_called_once()
+            self.db.close.assert_called_once()
+            self.assertEqual(resolve_path.call_args.kwargs['repo_root'], main_repo)
+            self.assertEqual(output_path.read_text(encoding='utf-8'), '# measured\n')
+
+    def test_explicit_output_works_without_git_path_resolution(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            output_path = Path(tmp_dir) / 'custom.md'
+            args = SimpleNamespace(start_date='2026-05-05', end_date='2026-05-11', output=str(output_path))
+            with patch.object(self.script, 'parse_args', return_value=args), patch.object(
+                self.script, 'SessionLocal', return_value=self.db,
+            ), patch.object(self.script, 'main_checkout_root') as checkout, patch.object(
+                self.script, 'load_stage_a_snapshot_from_db', return_value={},
+            ), patch.object(self.script, 'render_content_conversion_weekly_markdown', return_value='# measured\n'):
+                self.script.main()
+            checkout.assert_not_called()
+            self.assertEqual(output_path.read_text(encoding='utf-8'), '# measured\n')
+
+    def test_non_postgres_database_is_rejected_without_loading_or_writing(self) -> None:
+        self.db.get_bind.return_value.dialect.name = 'sqlite'
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            output_path = Path(tmp_dir) / 'report.md'
+            args = SimpleNamespace(start_date='2026-05-05', end_date='2026-05-11', output=str(output_path))
+            with patch.object(self.script, 'parse_args', return_value=args), patch.object(
+                self.script, 'SessionLocal', return_value=self.db,
+            ), patch.object(self.script, 'load_stage_a_snapshot_from_db') as loader:
+                with self.assertRaisesRegex(SystemExit, 'PostgreSQL database is required'):
+                    self.script.main()
+            loader.assert_not_called()
+            self.db.rollback.assert_called_once()
+            self.db.close.assert_called_once()
+            self.assertFalse(output_path.exists())
 
 
 if __name__ == '__main__':

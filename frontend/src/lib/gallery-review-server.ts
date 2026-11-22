@@ -1,19 +1,13 @@
 import { buildGalleryApiUrl } from '@/lib/gallery-scoreboard-api';
 import {
+  isIndexableGalleryReview,
   isValidGalleryReviewId,
   type GallerySitemapEntry,
   type PublicGalleryReview,
 } from '@/lib/gallery-review-page';
 
-export const GALLERY_REVIEW_REVALIDATE_SECONDS = 3600;
-/**
- * Critique detail cache window. Kept short (matching the API's public max-age)
- * so withdrawing or deleting a critique takes its public page offline within
- * about a minute; the client also re-checks availability after hydration.
- */
-export const GALLERY_REVIEW_DETAIL_REVALIDATE_SECONDS = 60;
 const SITEMAP_PAGE_SIZE = 1000;
-const SITEMAP_MAX_PAGES = 20;
+const SITEMAP_MAX_URLS = 50_000;
 
 /**
  * Server-side read of one approved Gallery critique.
@@ -24,7 +18,7 @@ export async function fetchPublicGalleryReview(reviewId: string): Promise<Public
   if (!isValidGalleryReviewId(reviewId)) return null;
   const response = await fetch(buildGalleryApiUrl(`/gallery/${encodeURIComponent(reviewId)}`), {
     headers: { Accept: 'application/json' },
-    next: { revalidate: GALLERY_REVIEW_DETAIL_REVALIDATE_SECONDS, tags: [`gallery-review:${reviewId}`] },
+    cache: 'no-store',
   });
   if (response.status === 404) return null;
   if (!response.ok) {
@@ -36,28 +30,43 @@ export async function fetchPublicGalleryReview(reviewId: string): Promise<Public
   return { ...review, photo_url: null };
 }
 
-/** All indexable Gallery critiques for the sitemap; an API failure yields an empty list, never a broken sitemap. */
+/** Only a complete, current inventory can be published as a successful sitemap. */
 export async function fetchGallerySitemapEntries(): Promise<GallerySitemapEntry[]> {
   const entries: GallerySitemapEntry[] = [];
+  const reviewIds = new Set<string>();
   let cursor: string | null = null;
-  try {
-    for (let page = 0; page < SITEMAP_MAX_PAGES; page += 1) {
-      const query = new URLSearchParams({ limit: String(SITEMAP_PAGE_SIZE) });
-      if (cursor) query.set('cursor', cursor);
-      const response = await fetch(buildGalleryApiUrl(`/gallery/sitemap-entries?${query.toString()}`), {
-        headers: { Accept: 'application/json' },
-        next: { revalidate: GALLERY_REVIEW_REVALIDATE_SECONDS },
-      });
-      if (!response.ok) break;
-      const payload = (await response.json()) as { items?: GallerySitemapEntry[]; next_cursor?: string | null };
-      entries.push(...(payload.items ?? []));
-      cursor = payload.next_cursor ?? null;
-      if (!cursor) break;
+  while (true) {
+    const query = new URLSearchParams({ limit: String(SITEMAP_PAGE_SIZE) });
+    if (cursor) query.set('cursor', cursor);
+    const response = await fetch(buildGalleryApiUrl(`/gallery/sitemap-entries?${query.toString()}`), {
+      headers: { Accept: 'application/json' },
+      cache: 'no-store',
+    });
+    if (!response.ok) throw new Error(`Gallery sitemap request failed with ${response.status}`);
+    const payload = await response.json();
+    if (!payload || !Array.isArray(payload.items) || payload.items.length > SITEMAP_PAGE_SIZE
+      || !(payload.next_cursor === null || (typeof payload.next_cursor === 'string' && /^[1-9]\d*$/.test(payload.next_cursor)))) {
+      throw new Error('Invalid Gallery sitemap response');
     }
-  } catch {
-    return entries;
+    for (const item of payload.items) {
+      if (!item || typeof item.review_id !== 'string' || !isValidGalleryReviewId(item.review_id)
+        || reviewIds.has(item.review_id) || typeof item.image_type !== 'string'
+        || typeof item.last_modified !== 'string' || Number.isNaN(Date.parse(item.last_modified))) {
+        throw new Error('Invalid or duplicate Gallery sitemap entry');
+      }
+      reviewIds.add(item.review_id);
+      entries.push(item);
+    }
+    if (entries.length > SITEMAP_MAX_URLS || (entries.length === SITEMAP_MAX_URLS && payload.next_cursor !== null)) {
+      throw new Error('Gallery inventory exceeds the single-sitemap URL limit');
+    }
+    const nextCursor: string | null = payload.next_cursor;
+    if (nextCursor === null) return entries;
+    if (payload.items.length === 0 || (cursor !== null && BigInt(nextCursor) >= BigInt(cursor))) {
+      throw new Error('Gallery sitemap pagination did not advance');
+    }
+    cursor = nextCursor;
   }
-  return entries;
 }
 
 export type GalleryTopicSample = {
@@ -67,14 +76,16 @@ export type GalleryTopicSample = {
   summary: string;
 };
 
-/** Highest-scoring public critiques of one image type; an API failure yields no samples, never a broken page. */
+/** Fresh, quality-eligible examples; failures leave the guide readable without old samples. */
 export async function fetchGalleryTopicSamples(imageType: string, limit = 3): Promise<GalleryTopicSample[]> {
   try {
-    const query = new URLSearchParams({ image_type: imageType, sort: 'score', limit: String(limit) });
-    const response = await fetch(buildGalleryApiUrl(`/gallery?${query.toString()}`), {
+    const query = new URLSearchParams({ image_type: imageType, limit: String(limit) });
+    const response = await fetch(buildGalleryApiUrl(`/gallery/topic-samples?${query.toString()}`), {
       headers: { Accept: 'application/json' },
-      next: { revalidate: GALLERY_REVIEW_REVALIDATE_SECONDS },
+      cache: 'no-store',
     });
+    // During a backend-first rollout, older API instances still have the list route.
+    if (response.status === 404) return await fetchLegacyGalleryTopicSamples(imageType, limit);
     if (!response.ok) return [];
     const payload = (await response.json()) as { items?: GalleryTopicSample[] };
     return (payload.items ?? [])
@@ -89,4 +100,30 @@ export async function fetchGalleryTopicSamples(imageType: string, limit = 3): Pr
   } catch {
     return [];
   }
+}
+
+async function fetchLegacyGalleryTopicSamples(imageType: string, limit: number): Promise<GalleryTopicSample[]> {
+  const samples: GalleryTopicSample[] = [];
+  const candidateLimit = Math.min(6, limit * 2);
+  const query = new URLSearchParams({ image_type: imageType, sort: 'score', limit: String(candidateLimit) });
+  const response = await fetch(buildGalleryApiUrl(`/gallery?${query.toString()}`), {
+    headers: { Accept: 'application/json' },
+    cache: 'no-store',
+  });
+  if (!response.ok) return [];
+  const payload = await response.json();
+  if (!Array.isArray(payload?.items)) return [];
+  for (const item of payload.items.slice(0, candidateLimit)) {
+    if (!isValidGalleryReviewId(item?.review_id)) continue;
+    const review = await fetchPublicGalleryReview(item.review_id);
+    if (!review || review.image_type !== imageType || !isIndexableGalleryReview(review)) continue;
+    samples.push({
+      review_id: review.review_id,
+      photo_thumbnail_url: review.photo_thumbnail_url,
+      final_score: review.final_score,
+      summary: review.summary,
+    });
+    if (samples.length === limit) return samples;
+  }
+  return samples;
 }

@@ -1,5 +1,22 @@
 [
   {
+    "id": "2026-11-22-gallery-withdrawal",
+    "date": "2026-11-22",
+    "showPopup": false,
+    "title": "移出长廊后，作品的公开点评页随即下线",
+    "summary": "把点评移出长廊后，访客再打开原来的长廊链接时将看不到点评，题材指南也会移除该样例。",
+    "docPath": "docs/changelog/CHANGELOG.md#2026-11-22-gallery-withdrawal",
+    "sections": [
+      {
+        "title": "作品的公开范围",
+        "items": [
+          "如果作品已经被收录，搜索引擎更新搜索结果还需要一些时间。",
+          "如果你另外创建过分享链接，可以单独关闭它。"
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-11-21-pages-work-when-sign-in-is-blocked",
     "date": "2026-11-21",
     "showPopup": false,

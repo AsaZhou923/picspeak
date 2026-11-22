@@ -270,16 +270,17 @@ test('localized public pages partition shared cache by cookie and accepted langu
   }
 });
 
-test('public Gallery critique pages use a short cache window so withdrawals go offline quickly', async () => {
+test('revocable Gallery critiques and genre samples cannot be served from a shared cache', async () => {
   const nextConfig = await loadNextConfig('gallery-review-cache');
 
   const routes = await nextConfig.headers();
-  const galleryReviewRoutes = routes.filter((route) => route.source === '/gallery/:reviewId(rev_[A-Za-z0-9_-]+)');
-  assert.equal(galleryReviewRoutes.length, 1);
-  const headers = new Map(galleryReviewRoutes[0].headers.map((header) => [header.key, header.value]));
-  assert.equal(headers.get('Cache-Control'), 'public, s-maxage=60');
-  assert.doesNotMatch(headers.get('Cache-Control') ?? '', /stale-while-revalidate/);
-  assert.equal(headers.get('Vary'), 'Cookie, Accept-Language');
+  for (const source of ['/gallery/:reviewId+', '/photo-critique/:topic*']) {
+    const matches = routes.filter((route) => route.source === source);
+    assert.equal(matches.length, 1, source);
+    const headers = new Map(matches[0].headers.map((header) => [header.key, header.value]));
+    assert.equal(headers.get('Cache-Control'), 'private, no-store, max-age=0');
+    assert.equal(headers.get('Vary'), 'Cookie, Accept-Language');
+  }
 });
 
 test('the home AI mirror points directly to the canonical English homepage', async () => {

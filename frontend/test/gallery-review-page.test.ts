@@ -93,6 +93,15 @@ test('thin critiques render but are not offered for indexing', () => {
   assert.equal(isIndexableGalleryReview(review({ advantage: 'Nice.', critique: '', suggestions: '' })), false);
 });
 
+test('indexing uses the server decision and counts legacy text by Unicode code points', () => {
+  assert.equal(isIndexableGalleryReview(review({ is_indexable: false })), false);
+  assert.equal(isIndexableGalleryReview(review({ is_indexable: true, advantage: '', critique: '', suggestions: '' })), true);
+  assert.equal(isIndexableGalleryReview(review({ advantage: '😀'.repeat(79), critique: '', suggestions: '' })), false);
+  assert.equal(isIndexableGalleryReview(review({ advantage: '😀'.repeat(80), critique: '', suggestions: '' })), true);
+  assert.equal(isIndexableGalleryReview(review({ advantage: `\u3000${'a'.repeat(39)}\u3000\u3000${'b'.repeat(40)}\u3000`, critique: '', suggestions: '' })), true);
+  assert.equal(isIndexableGalleryReview(review({ advantage: `\u0085${'a'.repeat(79)}\u0085`, critique: '', suggestions: '' })), false);
+});
+
 test('gallery detail CTAs carry gallery attribution and the critique image type', () => {
   const href = new URL(buildGalleryReviewWorkspaceHref(review()), 'https://example.test');
   assert.equal(href.pathname, '/workspace');
@@ -153,10 +162,12 @@ test('gallery detail pages are discoverable through cards, robots and cache rule
   assert.match(card, /const reviewHref = `\/gallery\/\$\{item\.review_id\}/);
   assert.match(clientPage, /`\/gallery\/\$\{reviewId\}\?back=/);
   assert.match(robots, /GALLERY_SITEMAP_PATH/);
-  // Short, non-stale cache window of its own rather than the hour-long public page rule.
-  assert.match(nextConfig, /const galleryReviewPageSource = '\/gallery\/:reviewId\(rev_\[A-Za-z0-9_-\]\+\)'/);
+  assert.match(nextConfig, /const revocablePublicPageSources = \['\/gallery\/:reviewId\+', '\/photo-critique\/:topic\*'\]/);
+  assert.match(nextConfig, /const revocablePublicPageHeaders = \[\s*\{ key: 'Cache-Control', value: 'private, no-store, max-age=0' \}/);
   assert.doesNotMatch(localizedSources, /reviewId/);
-  assert.match(source('src', 'app', 'gallery', '[reviewId]', 'page.tsx'), /export const revalidate = 60;/);
+  assert.doesNotMatch(localizedSources, /photo-critique/);
+  assert.match(source('src', 'app', 'gallery', '[reviewId]', 'page.tsx'), /export const dynamic = 'force-dynamic';/);
+  assert.match(source('src', 'app', 'photo-critique', '[topic]', 'page.tsx'), /export const dynamic = 'force-dynamic';/);
 });
 
 test('public critique view hides withdrawn critiques and keeps owner actions visible', () => {

@@ -3,11 +3,27 @@ from __future__ import annotations
 import unittest
 from datetime import date
 from pathlib import Path
+from subprocess import CompletedProcess
+from unittest.mock import patch
 
-from scripts.report_export_paths import dated_analytics_report_path, resolve_report_output_path
+from scripts.report_export_paths import dated_analytics_report_path, main_checkout_root, resolve_report_output_path
 
 
 class ReportExportPathTests(unittest.TestCase):
+    def test_linked_worktree_uses_main_checkout_sibling_vault(self) -> None:
+        checkout = Path('projects') / 'PicSpeak'
+        worktree = Path('projects') / 'orca' / 'workspaces' / 'PicSpeak' / 'albacore'
+        with patch('scripts.report_export_paths.subprocess.run', return_value=CompletedProcess(
+            args=[], returncode=0, stdout=str(checkout / '.git') + '\n', stderr='',
+        )) as git:
+            resolved = main_checkout_root(worktree)
+        self.assertEqual(resolved, checkout)
+        self.assertEqual(git.call_args.args[0][2], str(worktree))
+        self.assertEqual(
+            dated_analytics_report_path(resolved, date(2026, 11, 22), 'content-conversion-weekly-report'),
+            Path('projects/docs/01 - Projects/PicSpeak/07 - Analytics/2026-11-22-content-conversion-weekly-report.md'),
+        )
+
     def test_dated_analytics_report_path_uses_end_date_prefix(self) -> None:
         repo_root = Path('repo')
 

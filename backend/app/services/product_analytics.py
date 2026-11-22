@@ -445,6 +445,7 @@ def _build_content_entrypoint_weekly(
             'review_results': review_results['users'],
             'distinct_content_items': len(content_slugs),
             'click_to_request_rate': _safe_rate(review_requests, workspace_clicks),
+            'review_requests_per_clicker': _safe_rate(review_requests, workspace_clicks) if workspace_clicks else None,
             'request_result_rate': _safe_rate(review_results['users'], review_requests),
         }
     return report
@@ -1757,9 +1758,9 @@ def render_content_conversion_weekly_markdown(snapshot: dict[str, Any]) -> str:
                 uploads=row.get('uploads', 0),
                 review_requests=row.get('review_requests', 0),
                 review_results=row.get('review_results', 0),
-                workspace_click_rate=_format_percent(row.get('workspace_click_rate', 0.0)),
-                upload_conversion_rate=_format_percent(row.get('upload_conversion_rate', 0.0)),
-                first_review_completion_rate=_format_percent(row.get('first_review_completion_rate', 0.0)),
+                workspace_click_rate=_format_percent(row.get('workspace_click_rate', 0.0)) if row.get('visitors') else 'n/a',
+                upload_conversion_rate=_format_percent(row.get('upload_conversion_rate', 0.0)) if row.get('visitors') else 'n/a',
+                first_review_completion_rate=_format_percent(row.get('first_review_completion_rate', 0.0)) if row.get('review_requests') else 'n/a',
             )
         )
 
@@ -1769,7 +1770,7 @@ def render_content_conversion_weekly_markdown(snapshot: dict[str, Any]) -> str:
             '',
             '## 内容入口位',
             '',
-            '| 入口位 | 工作台点击 | 发起点评 | cohort 查看结果 | 涉及内容数 | 点击→点评 | 点评→结果 |',
+            '| 入口位 | 工作台点击人数 | 发起点评任务数 | cohort 查看结果任务数 | 涉及内容数 | 每位点击者的点评任务数 | 点评→结果 |',
             '| --- | ---: | ---: | ---: | ---: | ---: | ---: |',
         ]
     )
@@ -1781,8 +1782,8 @@ def render_content_conversion_weekly_markdown(snapshot: dict[str, Any]) -> str:
                 review_requests=row.get('review_requests', 0),
                 review_results=row.get('review_results', 0),
                 items=row.get('distinct_content_items', 0),
-                click_rate=_format_percent(row.get('click_to_request_rate', 0.0)),
-                result_rate=_format_percent(row.get('request_result_rate', 0.0)),
+                click_rate=f"{row.get('review_requests', 0) / row['workspace_clicks']:.2f}" if row.get('workspace_clicks') else 'n/a',
+                result_rate=_format_percent(row.get('request_result_rate', 0.0)) if row.get('review_requests') else 'n/a',
             )
         )
 
@@ -1797,6 +1798,8 @@ def render_content_conversion_weekly_markdown(snapshot: dict[str, Any]) -> str:
             '- Prompt Library 点击率：`content_workspace_clicked(source=prompt_library) / prompt_library_viewed`。',
             '- 题材页点击率：`content_workspace_clicked(source=topic_landing) / topic_page_viewed`；Gallery 详情页并入 gallery 来源，入口位为 `gallery_detail`。',
             '- 入口位：点击取 `metadata.entrypoint`，点评请求取 `metadata.content_entrypoint`；涉及内容数按 `content_slug` 或 `gallery_review_id` 去重。',
+            '- 工作台点击人数按 device_id、session_id、user_public_id 顺序去重；点评任务按 task_id 或 review_id 去重。每位点击者的点评任务数可超过 1，同一人可发起多次点评，且两类事件可能缺失；它是两项计数之比。',
+            '- 点评→结果按相同 task_id/review_id 配对请求与 D0/D+1 结果查看，分母为有因果键的请求任务数。分母为零时比率显示 n/a；零次事件只表示窗口内无对应采集记录。时间窗口按 UTC 日期。',
             '- 工作台进入和上传成功都继承前端会话级来源，点击事件用来确认具体入口位。',
         ]
     )

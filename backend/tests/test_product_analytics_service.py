@@ -79,6 +79,37 @@ class ProductAnalyticsServiceTests(unittest.TestCase):
         snapshot = build_stage_a_snapshot(events=[], reviews=[], start_date=when.date(), end_date=when.date())
         self.assertEqual(snapshot['content_entrypoint_weekly']['gallery_detail']['workspace_clicks'], 0)
         self.assertEqual(snapshot['content_entrypoint_weekly']['topic_landing']['review_requests'], 0)
+        self.assertIsNone(snapshot['content_entrypoint_weekly']['topic_landing']['review_requests_per_clicker'])
+        markdown = render_content_conversion_weekly_markdown(snapshot)
+        self.assertIn('| topic_landing | 0 | 0 | 0 | 0 | n/a | n/a |', markdown)
+
+    def test_entrypoint_reports_tasks_per_clicker_and_causally_matched_results(self) -> None:
+        when = datetime(2026, 11, 14, 10, tzinfo=timezone.utc)
+        events = [
+            AnalyticsEventSample(
+                event_name=name, occurred_at=when.replace(minute=minute), device_id='one-visitor',
+                source='topic_landing', metadata=metadata,
+            )
+            for name, minute, metadata in [
+                ('content_workspace_clicked', 0, {'entrypoint': 'topic_landing'}),
+                ('content_workspace_clicked', 1, {'entrypoint': 'topic_landing'}),
+                ('review_requested', 2, {'content_entrypoint': 'topic_landing', 'task_id': 'task-a'}),
+                ('review_requested', 3, {'content_entrypoint': 'topic_landing', 'task_id': 'task-a'}),
+                ('review_requested', 4, {'content_entrypoint': 'topic_landing', 'task_id': 'task-b'}),
+                ('review_requested', 5, {'content_entrypoint': 'topic_landing'}),
+                ('review_result_viewed', 6, {'task_id': 'task-a'}),
+                ('review_result_viewed', 7, {'task_id': 'unrelated-task'}),
+            ]
+        ]
+        snapshot = build_stage_a_snapshot(events=events, reviews=[], start_date=when.date(), end_date=when.date())
+        row = snapshot['content_entrypoint_weekly']['topic_landing']
+        self.assertEqual(row['workspace_clicks'], 1)
+        self.assertEqual(row['review_requests'], 2)
+        self.assertEqual(row['review_requests_per_clicker'], 2.0)
+        self.assertEqual(row['request_result_rate'], 0.5)
+        markdown = render_content_conversion_weekly_markdown(snapshot)
+        self.assertIn('| topic_landing | 1 | 2 | 1 | 0 | 2.00 | 50.0% |', markdown)
+        self.assertIn('每位点击者的点评任务数', markdown)
 
     def test_stage_a_event_catalog_covers_required_funnel_events(self) -> None:
         required_events = {
@@ -647,8 +678,8 @@ class ProductAnalyticsServiceTests(unittest.TestCase):
 
         self.assertIn('# PicSpeak 内容来源转化周报', markdown)
         self.assertIn('| 来源 | 浏览访客 | 工作台点击 | 工作台进入 | 上传成功 | 发起点评 | cohort 查看结果 | 点击率 | 上传转化率 | cohort 结果查看率 |', markdown)
-        self.assertIn('| blog | 1 | 1 | 0 | 0 | 0 | 0 | 100.0% | 0.0% | 0.0% |', markdown)
-        self.assertIn('| prompt_library | 0 | 0 | 0 | 0 | 0 | 0 | 0.0% | 0.0% | 0.0% |', markdown)
+        self.assertIn('| blog | 1 | 1 | 0 | 0 | 0 | 0 | 100.0% | 0.0% | n/a |', markdown)
+        self.assertIn('| prompt_library | 0 | 0 | 0 | 0 | 0 | 0 | n/a | n/a | n/a |', markdown)
 
     def test_review_completion_uses_causal_d_plus_one_request_cohort(self) -> None:
         events = [
